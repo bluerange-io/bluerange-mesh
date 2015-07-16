@@ -1,0 +1,652 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?fileVersion 4.0.0?><cproject storage_type_id="org.eclipse.cdt.core.XmlProjectDescriptionStorage">
+	<storageModule moduleId="org.eclipse.cdt.core.settings">
+		<cconfiguration id="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1405888449">
+			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1405888449" moduleId="org.eclipse.cdt.core.settings" name="Debug">
+				<externalSettings/>
+				<extensions>
+					<extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
+					<extension id="org.eclipse.cdt.core.GASErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GmakeErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GLDErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.CWDLocator" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GCCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+				</extensions>
+			</storageModule>
+			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
+				<configuration artifactName="${ProjName}" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe,org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.debug" cleanCommand="${cross_rm} -rf" description="" errorParsers="org.eclipse.cdt.core.GASErrorParser;org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.GLDErrorParser;org.eclipse.cdt.core.CWDLocator;org.eclipse.cdt.core.GCCErrorParser" id="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1405888449" name="Debug" parent="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug" postannouncebuildStep="Generate Bin" postbuildStep="arm-none-eabi-objcopy -O binary ${BuildArtifactFileName} ${BuildArtifactFileBaseName}.bin;  md5 -p &lt; ${BuildArtifactFileBaseName}.bin &gt; ${BuildArtifactFileBaseName}md5.bin; cp ${BuildArtifactFileBaseName}md5.bin firmware.bin" preannouncebuildStep="" prebuildStep="">
+					<folderInfo id="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1405888449." name="/" resourcePath="">
+						<toolChain errorParsers="" id="ilg.gnuarmeclipse.managedbuild.cross.toolchain.elf.debug.1007524339" name="Cross ARM GCC" superClass="ilg.gnuarmeclipse.managedbuild.cross.toolchain.elf.debug">
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.level.1339601901" name="Optimization Level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.level" value="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.level.debug" valueType="enumerated"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.messagelength.1439958632" name="Message length (-fmessage-length=0)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.messagelength" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.signedchar.296608688" name="'char' is signed (-fsigned-char)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.signedchar" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.functionsections.1388210505" name="Function sections (-ffunction-sections)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.functionsections" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.datasections.2078425551" name="Data sections (-fdata-sections)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.datasections" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.1454977395" name="Debug level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level" value="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.max" valueType="enumerated"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format.1253799442" name="Debug format" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.family.1462395632" name="ARM family" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.family" value="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.mcpu.cortex-m0" valueType="enumerated"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.allwarn.572111615" name="Enable all common warnings (-Wall)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.allwarn" value="false" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.extrawarn.184208263" name="Enable extra warnings (-Wextra)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.extrawarn" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.nomoveloopinvariants.501913736" name="Disable loop invariant move (-fno-move-loop-invariants)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.nomoveloopinvariants" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.toolchain.name.863704733" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.toolchain.name" value="GNU Tools for ARM Embedded Processors" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.architecture.1633026225" name="Architecture" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.architecture" value="ilg.gnuarmeclipse.managedbuild.cross.option.architecture.arm" valueType="enumerated"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.instructionset.469035391" name="Instruction set" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.instructionset" value="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.instructionset.thumb" valueType="enumerated"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.prefix.1495194618" name="Prefix" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.prefix" value="arm-none-eabi-" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.c.75157693" name="C compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.c" value="gcc" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.cpp.596624531" name="C++ compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.cpp" value="g++" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.ar.505629541" name="Archiver" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.ar" value="ar" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.objcopy.111348642" name="Hex/Bin converter" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.objcopy" value="objcopy" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.objdump.1410566698" name="Listing generator" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.objdump" value="objdump" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.size.309404208" name="Size command" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.size" value="size" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.make.31712950" name="Build command" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.make" value="make" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.rm.373438365" name="Remove command" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.rm" value="rm" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.addtools.createflash.1793758283" name="Create flash image" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.addtools.createflash" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.addtools.printsize.107904904" name="Print size" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.addtools.printsize" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.212748048" name="Other warning flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other" value="" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.lto.2076570577" name="Link-time optimizer (-flto)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.lto" value="true" valueType="boolean"/>
+							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="ilg.gnuarmeclipse.managedbuild.cross.targetPlatform.1068510082" isAbstract="false" osList="all" superClass="ilg.gnuarmeclipse.managedbuild.cross.targetPlatform"/>
+							<builder buildPath="${workspace_loc:/FruityMesh}/Debug" errorParsers="org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.CWDLocator" id="ilg.gnuarmeclipse.managedbuild.cross.builder.1083403022" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="Gnu Make Builder" superClass="ilg.gnuarmeclipse.managedbuild.cross.builder">
+								<outputEntries>
+									<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="outputPath" name="Debug"/>
+									<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="outputPath" name="Release"/>
+								</outputEntries>
+							</builder>
+							<tool command="${cross_prefix}${cross_c}${cross_suffix}" commandLinePattern="${COMMAND} ${cross_toolchain_flags} ${FLAGS} -c ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" errorParsers="org.eclipse.cdt.core.GASErrorParser;org.eclipse.cdt.core.GCCErrorParser" id="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.1571357279" name="Cross ARM GNU Assembler" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler">
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.usepreprocessor.1287705037" name="Use preprocessor" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.usepreprocessor" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.include.paths.40593023" name="Include paths (-I)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.include.paths"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.defs.1093706376" name="Defined symbols (-D)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.defs" valueType="definedSymbols">
+									<listOptionValue builtIn="false" value="BLE_STACK_SUPPORT_REQD"/>
+									<listOptionValue builtIn="false" value="BOARD_PCA10031"/>
+									<listOptionValue builtIn="false" value="NRF51"/>
+									<listOptionValue builtIn="false" value="__need___va_list"/>
+								</option>
+								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.input.1211022563" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.input"/>
+							</tool>
+							<tool command="${cross_prefix}${cross_c}${cross_suffix}" commandLinePattern="${COMMAND} ${cross_toolchain_flags} ${FLAGS} -c ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" errorParsers="org.eclipse.cdt.core.GLDErrorParser;org.eclipse.cdt.core.GCCErrorParser" id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.1088117751" name="Cross ARM C Compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler">
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.include.paths.1337877588" name="Include paths (-I)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.include.paths" useByScannerDiscovery="false" valueType="includePath">
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc_ustl&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc_c&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/src&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/config&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/include&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/CMSIS/CMSIS/Include&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/src&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/CMSIS/include&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/examples/bsp&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_hids&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_radio_notification&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/device&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/gpiote&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_debug_assert_handler&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/ble_flash&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_error_log&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/pstorage&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/trace&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/softdevice/common/softdevice_handler&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/timer&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/softdevice/s130/headers&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/nrf_soc_nosd&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/bootloader_dfu&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/util&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/hal&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/scheduler&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/common&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/device_manager&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/bootloader_dfu/ble_transport&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_bas&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_dfu&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_dis&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_dis&quot;"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.defs.1956391883" name="Defined symbols (-D)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.defs" useByScannerDiscovery="false" valueType="definedSymbols">
+									<listOptionValue builtIn="false" value="BLE_STACK_SUPPORT_REQD"/>
+									<listOptionValue builtIn="false" value="BOARD_PCA10031"/>
+									<listOptionValue builtIn="false" value="NRF51"/>
+									<listOptionValue builtIn="false" value="__need___va_list"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.std.469708134" name="Language standard" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.std" useByScannerDiscovery="true" value="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.std.gnu99" valueType="enumerated"/>
+								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input.1459987658" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input"/>
+							</tool>
+							<tool command="${cross_prefix}${cross_cpp}${cross_suffix}" commandLinePattern="${COMMAND} ${cross_toolchain_flags} ${FLAGS} -c ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" errorParsers="org.eclipse.cdt.core.GLDErrorParser;org.eclipse.cdt.core.GCCErrorParser" id="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.2010088070" name="Cross ARM C++ Compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler">
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.include.paths.55074844" name="Include paths (-I)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.include.paths" useByScannerDiscovery="false" valueType="includePath">
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc_ustl&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/inc_c&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/src&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/config&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/include&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/CMSIS/CMSIS/Include&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/src&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/CMSIS/include&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/examples/bsp&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_hids&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_radio_notification&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/device&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/gpiote&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_debug_assert_handler&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/ble_flash&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_error_log&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/pstorage&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/trace&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/softdevice/common/softdevice_handler&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/timer&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/softdevice/s130/headers&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/nrf_soc_nosd&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/bootloader_dfu&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/util&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/hal&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/scheduler&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/common&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/device_manager&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/bootloader_dfu/ble_transport&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_bas&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_dfu&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_dis&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_dis&quot;"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.noexceptions.1091862352" name="Do not use exceptions (-fno-exceptions)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.noexceptions" useByScannerDiscovery="true" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.nortti.752915750" name="Do not use RTTI (-fno-rtti)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.nortti" useByScannerDiscovery="true" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.nousecxaatexit.462524583" name="Do not use _cxa_atexit() (-fno-use-cxa-atexit)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.nousecxaatexit" useByScannerDiscovery="true" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.nothreadsafestatics.2096825785" name="Do not use thread-safe statics (-fno-threadsafe-statics)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.nothreadsafestatics" useByScannerDiscovery="true" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.defs.320036857" name="Defined symbols (-D)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.defs" useByScannerDiscovery="false" valueType="definedSymbols">
+									<listOptionValue builtIn="false" value="BLE_STACK_SUPPORT_REQD"/>
+									<listOptionValue builtIn="false" value="DEBUG"/>
+									<listOptionValue builtIn="false" value="BOARD_PCA10031"/>
+									<listOptionValue builtIn="false" value="NRF51"/>
+									<listOptionValue builtIn="false" value="__need___va_list"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.std.2115403348" name="Language standard" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.std" useByScannerDiscovery="true" value="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.std.cpp11" valueType="enumerated"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.abiversion.1086142193" name="ABI version" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.abiversion" useByScannerDiscovery="true" value="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.abiversion.0" valueType="enumerated"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.preprocessonly.189824885" name="Preprocess only (-E)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.preprocessonly" useByScannerDiscovery="false" value="false" valueType="boolean"/>
+								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.input.2084451450" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.input"/>
+							</tool>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.linker.1045379374" name="Cross ARM C Linker" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.linker">
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.gcsections.129496561" name="Remove unused sections (-Xlinker --gc-sections)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.gcsections" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.paths.1435439680" name="Library search path (-L)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.paths" valueType="libPaths">
+									<listOptionValue builtIn="false" value="&quot;../ldscripts&quot;"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.scriptfile.1954348757" name="Script files (-T)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.scriptfile" valueType="stringList">
+									<listOptionValue builtIn="false" value="mem.ld"/>
+									<listOptionValue builtIn="false" value="libs.ld"/>
+									<listOptionValue builtIn="false" value="sections.ld"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.nostart.1901778324" name="Do not use standard start files (-nostartfiles)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.nostart" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.usenewlibnano.41797247" name="Use newlib-nano (--specs=nano.specs)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.usenewlibnano" value="true" valueType="boolean"/>
+							</tool>
+							<tool command="${cross_prefix}${cross_cpp}${cross_suffix}" commandLinePattern="${COMMAND} ${cross_toolchain_flags} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" errorParsers="" id="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.linker.231334876" name="Cross ARM C++ Linker" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.linker">
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.gcsections.1241713301" name="Remove unused sections (-Xlinker --gc-sections)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.gcsections" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.paths.2028667909" name="Library search path (-L)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.paths" valueType="libPaths">
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/CMSIS/Debug&quot;"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.scriptfile.1127564781" name="Script files (-T)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.scriptfile" valueType="stringList">
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/linker/gcc_nrf51_s130_32kb.ld&quot;"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.nostart.25000529" name="Do not use standard start files (-nostartfiles)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.nostart" value="false" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.usenewlibnano.256656889" name="Use newlib-nano (--specs=nano.specs)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.usenewlibnano" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.libs.2038843881" name="Libraries (-l)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.libs" valueType="libs">
+									<listOptionValue builtIn="false" value="CMSIS"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.other.663851082" name="Other linker flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.other" value="-L ${WorkspaceDirPath}/../sdk/ehal_latest/ARM/src" valueType="string"/>
+								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.linker.input.601518070" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.linker.input">
+									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
+									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
+								</inputType>
+							</tool>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.archiver.1328607460" name="Cross ARM GNU Archiver" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.archiver"/>
+							<tool command="${cross_prefix}${cross_objcopy}${cross_suffix}" commandLinePattern="${COMMAND} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT}" errorParsers="" id="ilg.gnuarmeclipse.managedbuild.cross.tool.createflash.1175247980" name="Cross ARM GNU Create Flash Image" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.createflash"/>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.createlisting.71840716" name="Cross ARM GNU Create Listing" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.createlisting">
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.source.303147601" name="Display source (--source|-S)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.source" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.allheaders.2110664408" name="Display all headers (--all-headers|-x)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.allheaders" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.demangle.1684199576" name="Demangle names (--demangle|-C)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.demangle" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.linenumbers.1483694331" name="Display line numbers (--line-numbers|-l)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.linenumbers" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.wide.365941050" name="Wide lines (--wide|-w)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.wide" value="true" valueType="boolean"/>
+							</tool>
+							<tool command="${cross_prefix}${cross_size}${cross_suffix}" commandLinePattern="${COMMAND} ${FLAGS}" errorParsers="" id="ilg.gnuarmeclipse.managedbuild.cross.tool.printsize.817753913" name="Cross ARM GNU Print Size" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.printsize">
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.printsize.format.1051018648" name="Size format" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.printsize.format" value="ilg.gnuarmeclipse.managedbuild.cross.option.printsize.format.berkeley" valueType="enumerated"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.printsize.totals.1868362031" name="Show totals" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.printsize.totals" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.printsize.other.883364628" name="Other flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.printsize.other" value="--radix=10" valueType="string"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.printsize.hex.1572659488" name="Hex" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.printsize.hex" value="false" valueType="boolean"/>
+							</tool>
+						</toolChain>
+					</folderInfo>
+					<folderInfo id="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1405888449.340927816" name="/" resourcePath="nRF_inc">
+						<toolChain id="ilg.gnuarmeclipse.managedbuild.cross.toolchain.elf.debug.885945860" name="Cross ARM GCC" superClass="ilg.gnuarmeclipse.managedbuild.cross.toolchain.elf.debug" unusedChildren="">
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.level.1339601901.1011470182" name="Optimization Level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.level.1339601901"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.messagelength.1439958632.1910752955" name="Message length (-fmessage-length=0)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.messagelength.1439958632"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.signedchar.296608688.266717860" name="'char' is signed (-fsigned-char)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.signedchar.296608688"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.functionsections.1388210505.755087283" name="Function sections (-ffunction-sections)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.functionsections.1388210505"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.datasections.2078425551.1030177688" name="Data sections (-fdata-sections)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.datasections.2078425551"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.1454977395.1013609319" name="Debug level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.1454977395"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format.1253799442.423184261" name="Debug format" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format.1253799442"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.family.1462395632.76974310" name="ARM family" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.family.1462395632"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.allwarn.572111615.1880198779" name="Enable all common warnings (-Wall)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.allwarn.572111615"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.extrawarn.184208263.1064394513" name="Enable extra warnings (-Wextra)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.extrawarn.184208263"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.nomoveloopinvariants.501913736.532500560" name="Disable loop invariant move (-fno-move-loop-invariants)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.nomoveloopinvariants.501913736"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.toolchain.name.863704733.254218144" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.toolchain.name.863704733"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.architecture.1633026225.1681845136" name="Architecture" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.architecture.1633026225"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.instructionset.469035391.1819528790" name="Instruction set" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.instructionset.469035391"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.prefix.1495194618.527552245" name="Prefix" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.prefix.1495194618"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.c.75157693.160968003" name="C compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.c.75157693"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.cpp.596624531.52656698" name="C++ compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.cpp.596624531"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.ar.505629541.141646868" name="Archiver" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.ar.505629541"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.objcopy.111348642.317082736" name="Hex/Bin converter" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.objcopy.111348642"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.objdump.1410566698.928473935" name="Listing generator" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.objdump.1410566698"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.size.309404208.1358516613" name="Size command" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.size.309404208"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.make.31712950.372909446" name="Build command" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.make.31712950"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.rm.373438365.1968984237" name="Remove command" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.rm.373438365"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.addtools.createflash.1793758283.2113331786" name="Create flash image" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.addtools.createflash.1793758283"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.addtools.printsize.107904904.1100228588" name="Print size" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.addtools.printsize.107904904"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.212748048.1389413301" name="Other warning flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.212748048"/>
+							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="ilg.gnuarmeclipse.managedbuild.cross.targetPlatform" isAbstract="false" osList="all" superClass="ilg.gnuarmeclipse.managedbuild.cross.targetPlatform"/>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.1875617387" name="Cross ARM GNU Assembler" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.1571357279">
+								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.input.2041218295" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.input"/>
+							</tool>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.1556693614" name="Cross ARM C Compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.1088117751">
+								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input.797395404" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input"/>
+							</tool>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.1953361665" name="Cross ARM C++ Compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.2010088070">
+								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.input.72430268" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.input"/>
+							</tool>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.linker.1865394309" name="Cross ARM C Linker" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.linker.1045379374">
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.other.884400383" name="Other linker flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.other" value="-L ${WorkspaceDirPath}/../sdk/ehal_latest/ARM/src" valueType="string"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.gcsections.1309313208" name="Remove unused sections (-Xlinker --gc-sections)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.gcsections" value="true" valueType="boolean"/>
+							</tool>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.linker.1153235291" name="Cross ARM C++ Linker" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.linker.231334876"/>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.archiver.840536337" name="Cross ARM GNU Archiver" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.archiver.1328607460"/>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.createflash.982418853" name="Cross ARM GNU Create Flash Image" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.createflash.1175247980"/>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.createlisting.990339638" name="Cross ARM GNU Create Listing" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.createlisting.71840716"/>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.printsize.278016347" name="Cross ARM GNU Print Size" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.printsize.817753913"/>
+						</toolChain>
+					</folderInfo>
+					<sourceEntries>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="config"/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="inc"/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="inc_c"/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="nRF_inc"/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
+					</sourceEntries>
+				</configuration>
+			</storageModule>
+			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
+			<storageModule moduleId="ilg.gnuarmeclipse.managedbuild.packs">
+				<option id="cmsis.device.name" value="nRF51422_xxAC"/>
+				<option id="cmsis.family.name" value="nRF51 Series"/>
+				<option id="cmsis.device.vendor.name" value="Nordic Semiconductor"/>
+				<option id="cmsis.device.vendor.id" value="54"/>
+				<option id="cmsis.device.pack.vendor" value="NordicSemiconductor"/>
+				<option id="cmsis.device.pack.name" value="nRF_DeviceFamilyPack"/>
+				<option id="cmsis.device.pack.version" value="1.1.4"/>
+				<option id="cmsis.board.name" value="nRF51 PCA10031"/>
+				<option id="cmsis.board.revision" value="V1.0.0"/>
+				<option id="cmsis.board.vendor.name" value="NordicSemiconductor"/>
+				<option id="cmsis.board.clock" value="32768"/>
+				<option id="cmsis.board.pack.vendor" value="NordicSemiconductor"/>
+				<option id="cmsis.board.pack.name" value="nRF_SoftDevice_S110"/>
+				<option id="cmsis.board.pack.version" value="7.1.0-3"/>
+				<option id="cmsis.core.name" value="Cortex-M0"/>
+				<option id="cmsis.compiler.define" value="NRF51"/>
+				<memory section="IRAM1" size="0x8000" start="0x20000000" startup="0"/>
+				<memory section="IROM1" size="0x40000" start="0x00000000" startup="true"/>
+			</storageModule>
+		</cconfiguration>
+		<cconfiguration id="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1405888449.2050588804">
+			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1405888449.2050588804" moduleId="org.eclipse.cdt.core.settings" name="Release">
+				<externalSettings/>
+				<extensions>
+					<extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
+					<extension id="org.eclipse.cdt.core.GASErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GmakeErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GLDErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.CWDLocator" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GCCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+				</extensions>
+			</storageModule>
+			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
+				<configuration artifactName="${ProjName}" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe,org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.debug" cleanCommand="${cross_rm} -rf" description="" errorParsers="org.eclipse.cdt.core.GASErrorParser;org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.GLDErrorParser;org.eclipse.cdt.core.CWDLocator;org.eclipse.cdt.core.GCCErrorParser" id="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1405888449.2050588804" name="Release" parent="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug" postannouncebuildStep="Generate Bin" postbuildStep="arm-none-eabi-objcopy -O binary ${BuildArtifactFileName} ${BuildArtifactFileBaseName}.bin;  md5 -p &lt; ${BuildArtifactFileBaseName}.bin &gt; ${BuildArtifactFileBaseName}md5.bin; cp ${BuildArtifactFileBaseName}md5.bin firmware.bin" preannouncebuildStep="" prebuildStep="">
+					<folderInfo id="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1405888449.2050588804." name="/" resourcePath="">
+						<toolChain errorParsers="" id="ilg.gnuarmeclipse.managedbuild.cross.toolchain.elf.debug.1863093983" name="Cross ARM GCC" superClass="ilg.gnuarmeclipse.managedbuild.cross.toolchain.elf.debug">
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.level.76438052" name="Optimization Level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.level" value="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.level.size" valueType="enumerated"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.messagelength.1175440379" name="Message length (-fmessage-length=0)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.messagelength" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.signedchar.147452837" name="'char' is signed (-fsigned-char)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.signedchar" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.functionsections.943368912" name="Function sections (-ffunction-sections)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.functionsections" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.datasections.72902637" name="Data sections (-fdata-sections)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.datasections" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.1066775686" name="Debug level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level" value="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.none" valueType="enumerated"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format.1080211789" name="Debug format" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.family.665525245" name="ARM family" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.family" value="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.mcpu.cortex-m0" valueType="enumerated"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.allwarn.1750023224" name="Enable all common warnings (-Wall)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.allwarn" value="false" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.extrawarn.864882914" name="Enable extra warnings (-Wextra)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.extrawarn" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.nomoveloopinvariants.1682236543" name="Disable loop invariant move (-fno-move-loop-invariants)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.nomoveloopinvariants" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.toolchain.name.1812659720" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.toolchain.name" value="GNU Tools for ARM Embedded Processors" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.architecture.1499571818" name="Architecture" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.architecture" value="ilg.gnuarmeclipse.managedbuild.cross.option.architecture.arm" valueType="enumerated"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.instructionset.1520047437" name="Instruction set" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.instructionset" value="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.instructionset.thumb" valueType="enumerated"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.prefix.1986199754" name="Prefix" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.prefix" value="arm-none-eabi-" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.c.755936435" name="C compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.c" value="gcc" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.cpp.897446116" name="C++ compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.cpp" value="g++" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.ar.959902629" name="Archiver" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.ar" value="ar" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.objcopy.1322549196" name="Hex/Bin converter" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.objcopy" value="objcopy" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.objdump.1660751140" name="Listing generator" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.objdump" value="objdump" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.size.104781042" name="Size command" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.size" value="size" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.make.631354009" name="Build command" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.make" value="make" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.rm.1303063712" name="Remove command" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.rm" value="rm" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.addtools.createflash.36386423" name="Create flash image" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.addtools.createflash" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.addtools.printsize.1991587051" name="Print size" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.addtools.printsize" value="true" valueType="boolean"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.509360041" name="Other warning flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other" value="" valueType="string"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.lto.252089273" name="Link-time optimizer (-flto)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.lto" value="true" valueType="boolean"/>
+							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="ilg.gnuarmeclipse.managedbuild.cross.targetPlatform.1654268635" isAbstract="false" osList="all" superClass="ilg.gnuarmeclipse.managedbuild.cross.targetPlatform"/>
+							<builder buildPath="${workspace_loc:/FruityMesh}/Debug" errorParsers="org.eclipse.cdt.core.GmakeErrorParser;org.eclipse.cdt.core.CWDLocator" id="ilg.gnuarmeclipse.managedbuild.cross.builder.659626991" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="Gnu Make Builder" superClass="ilg.gnuarmeclipse.managedbuild.cross.builder">
+								<outputEntries>
+									<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="outputPath" name="Debug"/>
+									<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="outputPath" name="Release"/>
+								</outputEntries>
+							</builder>
+							<tool command="${cross_prefix}${cross_c}${cross_suffix}" commandLinePattern="${COMMAND} ${cross_toolchain_flags} ${FLAGS} -c ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" errorParsers="org.eclipse.cdt.core.GASErrorParser;org.eclipse.cdt.core.GCCErrorParser" id="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.1380584355" name="Cross ARM GNU Assembler" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler">
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.usepreprocessor.493140008" name="Use preprocessor" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.usepreprocessor" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.include.paths.646946878" name="Include paths (-I)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.include.paths" valueType="includePath">
+									<listOptionValue builtIn="false" value="C:/nrf/projects/fruitymesh/FruityMesh/inc"/>
+									<listOptionValue builtIn="false" value="C:/nrf/projects/fruitymesh/FruityMesh/inc_ustl"/>
+									<listOptionValue builtIn="false" value="C:/nrf/projects/fruitymesh/FruityMesh/inc_c"/>
+									<listOptionValue builtIn="false" value="C:/nrf/projects/fruitymesh/FruityMesh/src"/>
+									<listOptionValue builtIn="false" value="C:/nrf/projects/fruitymesh/FruityMesh/config"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/include"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/CMSIS/CMSIS/Include"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/src"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/CMSIS/include"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/examples/bsp"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_hids"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_radio_notification"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/device"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/gpiote"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_debug_assert_handler"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/ble_flash"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_error_log"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/pstorage"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/trace"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/softdevice/common/softdevice_handler"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/timer"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/softdevice/s130/headers"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/nrf_soc_nosd"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/bootloader_dfu"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/util"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/hal"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/scheduler"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/common"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/device_manager"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/bootloader_dfu/ble_transport"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_bas"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_dfu"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_dis"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.defs.1055903613" name="Defined symbols (-D)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.assembler.defs" valueType="definedSymbols">
+									<listOptionValue builtIn="false" value="BLE_STACK_SUPPORT_REQD"/>
+									<listOptionValue builtIn="false" value="BOARD_PCA10031"/>
+									<listOptionValue builtIn="false" value="NRF51"/>
+									<listOptionValue builtIn="false" value="__need___va_list"/>
+								</option>
+								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.input.1946321961" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.input"/>
+							</tool>
+							<tool command="${cross_prefix}${cross_c}${cross_suffix}" commandLinePattern="${COMMAND} ${cross_toolchain_flags} ${FLAGS} -c ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" errorParsers="org.eclipse.cdt.core.GLDErrorParser;org.eclipse.cdt.core.GCCErrorParser" id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.262060867" name="Cross ARM C Compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler">
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.include.paths.831729765" name="Include paths (-I)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.include.paths" useByScannerDiscovery="false" valueType="includePath">
+									<listOptionValue builtIn="false" value="C:/nrf/projects/fruitymesh/FruityMesh/inc"/>
+									<listOptionValue builtIn="false" value="C:/nrf/projects/fruitymesh/FruityMesh/inc_ustl"/>
+									<listOptionValue builtIn="false" value="C:/nrf/projects/fruitymesh/FruityMesh/inc_c"/>
+									<listOptionValue builtIn="false" value="C:/nrf/projects/fruitymesh/FruityMesh/src"/>
+									<listOptionValue builtIn="false" value="C:/nrf/projects/fruitymesh/FruityMesh/config"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/include"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/CMSIS/CMSIS/Include"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/src"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/CMSIS/include"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/examples/bsp"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_hids"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_radio_notification"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/device"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/gpiote"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_debug_assert_handler"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/ble_flash"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_error_log"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/pstorage"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/trace"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/softdevice/common/softdevice_handler"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/timer"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/softdevice/s130/headers"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/nrf_soc_nosd"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/bootloader_dfu"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/util"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/hal"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/scheduler"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/common"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/device_manager"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/bootloader_dfu/ble_transport"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_bas"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_dfu"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_dis"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.defs.1259763324" name="Defined symbols (-D)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.defs" useByScannerDiscovery="false" valueType="definedSymbols">
+									<listOptionValue builtIn="false" value="BLE_STACK_SUPPORT_REQD"/>
+									<listOptionValue builtIn="false" value="BOARD_PCA10031"/>
+									<listOptionValue builtIn="false" value="NRF51"/>
+									<listOptionValue builtIn="false" value="__need___va_list"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.std.1452645004" name="Language standard" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.std" useByScannerDiscovery="true" value="ilg.gnuarmeclipse.managedbuild.cross.option.c.compiler.std.gnu99" valueType="enumerated"/>
+								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input.2144893777" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input"/>
+							</tool>
+							<tool command="${cross_prefix}${cross_cpp}${cross_suffix}" commandLinePattern="${COMMAND} ${cross_toolchain_flags} ${FLAGS} -c ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" errorParsers="org.eclipse.cdt.core.GLDErrorParser;org.eclipse.cdt.core.GCCErrorParser" id="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.813681668" name="Cross ARM C++ Compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler">
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.include.paths.166710974" name="Include paths (-I)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.include.paths" useByScannerDiscovery="false" valueType="includePath">
+									<listOptionValue builtIn="false" value="C:/nrf/projects/fruitymesh/FruityMesh/inc"/>
+									<listOptionValue builtIn="false" value="C:/nrf/projects/fruitymesh/FruityMesh/inc_ustl"/>
+									<listOptionValue builtIn="false" value="C:/nrf/projects/fruitymesh/FruityMesh/inc_c"/>
+									<listOptionValue builtIn="false" value="C:/nrf/projects/fruitymesh/FruityMesh/src"/>
+									<listOptionValue builtIn="false" value="C:/nrf/projects/fruitymesh/FruityMesh/config"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/include"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/CMSIS/CMSIS/Include"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/src"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/CMSIS/include"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/examples/bsp"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_hids"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_radio_notification"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/device"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/gpiote"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_debug_assert_handler"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/ble_flash"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_error_log"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/pstorage"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/trace"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/softdevice/common/softdevice_handler"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/timer"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/softdevice/s130/headers"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/nrf_soc_nosd"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/bootloader_dfu"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/util"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/drivers_nrf/hal"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/scheduler"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/common"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/device_manager"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/libraries/bootloader_dfu/ble_transport"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_bas"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_dfu"/>
+									<listOptionValue builtIn="false" value="C:/nrf/sdk/ehal_latest/ARM/Nordic/nRF51/nrf51_sdk/components/ble/ble_services/ble_dis"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.noexceptions.1886627612" name="Do not use exceptions (-fno-exceptions)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.noexceptions" useByScannerDiscovery="true" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.nortti.789571402" name="Do not use RTTI (-fno-rtti)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.nortti" useByScannerDiscovery="true" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.nousecxaatexit.752956858" name="Do not use _cxa_atexit() (-fno-use-cxa-atexit)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.nousecxaatexit" useByScannerDiscovery="true" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.nothreadsafestatics.128586698" name="Do not use thread-safe statics (-fno-threadsafe-statics)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.nothreadsafestatics" useByScannerDiscovery="true" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.defs.247982959" name="Defined symbols (-D)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.defs" useByScannerDiscovery="false" valueType="definedSymbols">
+									<listOptionValue builtIn="false" value="BLE_STACK_SUPPORT_REQD"/>
+									<listOptionValue builtIn="false" value="DEBUG"/>
+									<listOptionValue builtIn="false" value="BOARD_PCA10031"/>
+									<listOptionValue builtIn="false" value="NRF51"/>
+									<listOptionValue builtIn="false" value="__need___va_list"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.std.1528969076" name="Language standard" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.std" useByScannerDiscovery="true" value="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.std.cpp11" valueType="enumerated"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.abiversion.1587524286" name="ABI version" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.abiversion" useByScannerDiscovery="true" value="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.abiversion.0" valueType="enumerated"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.other.1954620773" name="Other compiler flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.compiler.other" useByScannerDiscovery="true" value="" valueType="string"/>
+								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.input.2011519333" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.input"/>
+							</tool>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.linker.1674011881" name="Cross ARM C Linker" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.linker">
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.gcsections.121145893" name="Remove unused sections (-Xlinker --gc-sections)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.gcsections" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.paths.1844547766" name="Library search path (-L)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.paths" valueType="libPaths">
+									<listOptionValue builtIn="false" value="&quot;../ldscripts&quot;"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.scriptfile.1072031562" name="Script files (-T)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.scriptfile" valueType="stringList">
+									<listOptionValue builtIn="false" value="mem.ld"/>
+									<listOptionValue builtIn="false" value="libs.ld"/>
+									<listOptionValue builtIn="false" value="sections.ld"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.nostart.992034769" name="Do not use standard start files (-nostartfiles)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.nostart" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.usenewlibnano.2055036307" name="Use newlib-nano (--specs=nano.specs)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.usenewlibnano" value="true" valueType="boolean"/>
+							</tool>
+							<tool command="${cross_prefix}${cross_cpp}${cross_suffix}" commandLinePattern="${COMMAND} ${cross_toolchain_flags} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" errorParsers="" id="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.linker.540444910" name="Cross ARM C++ Linker" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.linker">
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.gcsections.1935019139" name="Remove unused sections (-Xlinker --gc-sections)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.gcsections" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.paths.1808511411" name="Library search path (-L)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.paths" valueType="libPaths">
+									<listOptionValue builtIn="false" value="&quot;${WorkspaceDirPath}/../sdk/ehal_latest/ARM/Nordic/nRF51/CMSIS/Release&quot;"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.scriptfile.1156065549" name="Script files (-T)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.scriptfile" valueType="stringList">
+									<listOptionValue builtIn="false" value="&quot;${ProjDirPath}/linker/gcc_nrf51_s130_32kb.ld&quot;"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.nostart.1186415159" name="Do not use standard start files (-nostartfiles)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.nostart" value="false" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.usenewlibnano.148863573" name="Use newlib-nano (--specs=nano.specs)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.usenewlibnano" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.libs.419747570" name="Libraries (-l)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.libs" valueType="libs">
+									<listOptionValue builtIn="false" value="CMSIS"/>
+								</option>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.other.2035475843" name="Other linker flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.other" value="-L ${WorkspaceDirPath}/../sdk/ehal_latest/ARM/src" valueType="string"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.strip.1323922851" name="Omit all symbol information (-s)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.strip" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.printmap.274706881" name="Print link map (-Xlinker --print-map)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.printmap" value="false" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.verbose.1541654558" name="Verbose (-v)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.verbose" value="false" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.printgcsections.1354698846" name="Print removed sections (-Xlinker --print-gc-sections)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.cpp.linker.printgcsections" value="false" valueType="boolean"/>
+								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.linker.input.1752353881" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.linker.input">
+									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
+									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
+								</inputType>
+							</tool>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.archiver.796929074" name="Cross ARM GNU Archiver" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.archiver"/>
+							<tool command="${cross_prefix}${cross_objcopy}${cross_suffix}" commandLinePattern="${COMMAND} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT}" errorParsers="" id="ilg.gnuarmeclipse.managedbuild.cross.tool.createflash.1890748556" name="Cross ARM GNU Create Flash Image" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.createflash"/>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.createlisting.1850798771" name="Cross ARM GNU Create Listing" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.createlisting">
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.source.277582134" name="Display source (--source|-S)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.source" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.allheaders.1794803019" name="Display all headers (--all-headers|-x)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.allheaders" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.demangle.1845712480" name="Demangle names (--demangle|-C)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.demangle" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.linenumbers.1404156177" name="Display line numbers (--line-numbers|-l)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.linenumbers" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.wide.1624263634" name="Wide lines (--wide|-w)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.createlisting.wide" value="true" valueType="boolean"/>
+							</tool>
+							<tool command="${cross_prefix}${cross_size}${cross_suffix}" commandLinePattern="${COMMAND} ${FLAGS}" errorParsers="" id="ilg.gnuarmeclipse.managedbuild.cross.tool.printsize.932102206" name="Cross ARM GNU Print Size" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.printsize">
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.printsize.format.2146056744" name="Size format" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.printsize.format" value="ilg.gnuarmeclipse.managedbuild.cross.option.printsize.format.sysv" valueType="enumerated"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.printsize.totals.1757540436" name="Show totals" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.printsize.totals" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.printsize.other.1167950789" name="Other flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.printsize.other" value="--radix=10" valueType="string"/>
+							</tool>
+						</toolChain>
+					</folderInfo>
+					<folderInfo id="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1405888449.2050588804.nRF_inc" name="/" resourcePath="nRF_inc">
+						<toolChain id="ilg.gnuarmeclipse.managedbuild.cross.toolchain.elf.debug.1703184305" name="Cross ARM GCC" superClass="ilg.gnuarmeclipse.managedbuild.cross.toolchain.elf.debug" unusedChildren="">
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.level.1339601901.1011470182.854520009" name="Optimization Level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.level.1339601901"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.messagelength.1439958632.1910752955.383354985" name="Message length (-fmessage-length=0)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.messagelength.1439958632"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.signedchar.296608688.266717860.751493507" name="'char' is signed (-fsigned-char)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.signedchar.296608688"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.functionsections.1388210505.755087283.2019580030" name="Function sections (-ffunction-sections)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.functionsections.1388210505"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.datasections.2078425551.1030177688.1113576529" name="Data sections (-fdata-sections)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.datasections.2078425551"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.1454977395.1013609319.735400534" name="Debug level" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.level.1454977395"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format.1253799442.423184261.46087141" name="Debug format" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.debugging.format.1253799442"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.family.1462395632.76974310.1401746194" name="ARM family" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.family.1462395632"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.allwarn.572111615.1880198779.545952673" name="Enable all common warnings (-Wall)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.allwarn.572111615"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.extrawarn.184208263.1064394513.352297905" name="Enable extra warnings (-Wextra)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.extrawarn.184208263"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.nomoveloopinvariants.501913736.532500560.1948923855" name="Disable loop invariant move (-fno-move-loop-invariants)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.optimization.nomoveloopinvariants.501913736"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.toolchain.name.863704733.254218144.1678425422" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.toolchain.name.863704733"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.architecture.1633026225.1681845136.627524468" name="Architecture" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.architecture.1633026225"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.instructionset.469035391.1819528790.831403812" name="Instruction set" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.arm.target.instructionset.469035391"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.prefix.1495194618.527552245.1739096338" name="Prefix" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.prefix.1495194618"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.c.75157693.160968003.1168417842" name="C compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.c.75157693"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.cpp.596624531.52656698.336266337" name="C++ compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.cpp.596624531"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.ar.505629541.141646868.228944516" name="Archiver" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.ar.505629541"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.objcopy.111348642.317082736.2037663086" name="Hex/Bin converter" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.objcopy.111348642"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.objdump.1410566698.928473935.1267773399" name="Listing generator" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.objdump.1410566698"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.size.309404208.1358516613.2022931302" name="Size command" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.size.309404208"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.make.31712950.372909446.2006516636" name="Build command" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.make.31712950"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.command.rm.373438365.1968984237.991043929" name="Remove command" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.command.rm.373438365"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.addtools.createflash.1793758283.2113331786.1965056526" name="Create flash image" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.addtools.createflash.1793758283"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.addtools.printsize.107904904.1100228588.145873214" name="Print size" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.addtools.printsize.107904904"/>
+							<option id="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.212748048.1389413301.1010141412" name="Other warning flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.warnings.other.212748048"/>
+							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="ilg.gnuarmeclipse.managedbuild.cross.targetPlatform.2093138911" isAbstract="false" osList="all" superClass="ilg.gnuarmeclipse.managedbuild.cross.targetPlatform"/>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.1271440226" name="Cross ARM GNU Assembler" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.1380584355">
+								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.input.474644272" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.assembler.input"/>
+							</tool>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.21724478" name="Cross ARM C Compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.262060867">
+								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input.12323202" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input"/>
+							</tool>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.1260037813" name="Cross ARM C++ Compiler" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.813681668">
+								<inputType id="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.input.537068861" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.input"/>
+							</tool>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.c.linker.955874992" name="Cross ARM C Linker" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.c.linker.1674011881">
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.other.975862155" name="Other linker flags" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.other" value="-L ${WorkspaceDirPath}/../sdk/ehal_latest/ARM/src" valueType="string"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.strip.1109261999" name="Omit all symbol information (-s)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.strip" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.printmap.1060504449" name="Print link map (-Xlinker --print-map)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.printmap" value="false" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.usenewlibnano.228876407" name="Use newlib-nano (--specs=nano.specs)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.usenewlibnano" value="true" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.verbose.965826570" name="Verbose (-v)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.verbose" value="false" valueType="boolean"/>
+								<option id="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.printgcsections.1631502691" name="Print removed sections (-Xlinker --print-gc-sections)" superClass="ilg.gnuarmeclipse.managedbuild.cross.option.c.linker.printgcsections" value="false" valueType="boolean"/>
+							</tool>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.linker.184202831" name="Cross ARM C++ Linker" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.linker.540444910"/>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.archiver.1607076263" name="Cross ARM GNU Archiver" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.archiver.796929074"/>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.createflash.1092413384" name="Cross ARM GNU Create Flash Image" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.createflash.1890748556"/>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.createlisting.1786472540" name="Cross ARM GNU Create Listing" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.createlisting.1850798771"/>
+							<tool id="ilg.gnuarmeclipse.managedbuild.cross.tool.printsize.558296573" name="Cross ARM GNU Print Size" superClass="ilg.gnuarmeclipse.managedbuild.cross.tool.printsize.932102206"/>
+						</toolChain>
+					</folderInfo>
+					<sourceEntries>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="config"/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="inc"/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="inc_c"/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="nRF_inc"/>
+						<entry excluding="modules" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src/modules"/>
+					</sourceEntries>
+				</configuration>
+			</storageModule>
+			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
+			<storageModule moduleId="ilg.gnuarmeclipse.managedbuild.packs">
+				<option id="cmsis.device.name" value="nRF51422_xxAC"/>
+				<option id="cmsis.family.name" value="nRF51 Series"/>
+				<option id="cmsis.device.vendor.name" value="Nordic Semiconductor"/>
+				<option id="cmsis.device.vendor.id" value="54"/>
+				<option id="cmsis.device.pack.vendor" value="NordicSemiconductor"/>
+				<option id="cmsis.device.pack.name" value="nRF_DeviceFamilyPack"/>
+				<option id="cmsis.device.pack.version" value="1.1.4"/>
+				<option id="cmsis.board.name" value="nRF51 PCA10031"/>
+				<option id="cmsis.board.revision" value="V1.0.0"/>
+				<option id="cmsis.board.vendor.name" value="NordicSemiconductor"/>
+				<option id="cmsis.board.clock" value="32768"/>
+				<option id="cmsis.board.pack.vendor" value="NordicSemiconductor"/>
+				<option id="cmsis.board.pack.name" value="nRF_SoftDevice_S110"/>
+				<option id="cmsis.board.pack.version" value="7.1.0-3"/>
+				<option id="cmsis.core.name" value="Cortex-M0"/>
+				<option id="cmsis.compiler.define" value="NRF51"/>
+				<memory section="IRAM1" size="0x8000" start="0x20000000" startup="0"/>
+				<memory section="IROM1" size="0x40000" start="0x00000000" startup="true"/>
+			</storageModule>
+		</cconfiguration>
+	</storageModule>
+	<storageModule moduleId="cdtBuildSystem" version="4.0.0">
+		<project id="FruityMesh.ilg.gnuarmeclipse.managedbuild.cross.target.elf.736574138" name="Executable" projectType="ilg.gnuarmeclipse.managedbuild.cross.target.elf"/>
+	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
+	<storageModule moduleId="refreshScope" versionNumber="2">
+		<configuration configurationName="Debug">
+			<resource resourceType="PROJECT" workspacePath="/FruityMesh"/>
+		</configuration>
+		<configuration configurationName="Release">
+			<resource resourceType="PROJECT" workspacePath="/FruityMesh"/>
+		</configuration>
+	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
+	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
+	<storageModule moduleId="scannerConfiguration">
+		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		<scannerConfigBuildInfo instanceId="ilg.gnuarmeclipse.managedbuild.cross.config.elf.release.276065347;ilg.gnuarmeclipse.managedbuild.cross.config.elf.release.276065347.;ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.1146522074;ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.input.581712962">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1405888449;ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1405888449.;ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.1088117751;ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input.1459987658">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1405888449;ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1405888449.;ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.2010088070;ilg.gnuarmeclipse.managedbuild.cross.tool.cpp.compiler.input.2084451450">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="ilg.gnuarmeclipse.managedbuild.cross.config.elf.release.276065347;ilg.gnuarmeclipse.managedbuild.cross.config.elf.release.276065347.;ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.720247218;ilg.gnuarmeclipse.managedbuild.cross.tool.c.compiler.input.1121215195">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		</scannerConfigBuildInfo>
+	</storageModule>
+</cproject>
