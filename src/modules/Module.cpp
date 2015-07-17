@@ -128,12 +128,11 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 			else
 			{
 				connPacketModuleRequest packet;
-				packet.header.messageType = MESSAGE_TYPE_MODULE_REQUEST;
+				packet.header.messageType = MESSAGE_TYPE_MODULE_SET_CONFIGURATION;
 				packet.header.sender = node->persistentConfig.nodeId;
 				packet.header.receiver = atoi(commandArgs[0].c_str());
 
 				packet.moduleId = moduleId;
-				packet.moduleRequestType = moduleRequestTypes::MODULE_SET_CONFIGURATION;
 
 				//TODO:Send packet with variable length, and config
 
@@ -153,12 +152,11 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 			else
 			{
 				connPacketModuleRequest packet;
-				packet.header.messageType = MESSAGE_TYPE_MODULE_REQUEST;
+				packet.header.messageType = MESSAGE_TYPE_MODULE_GET_CONFIGURATION;
 				packet.header.sender = node->persistentConfig.nodeId;
 				packet.header.receiver = atoi(commandArgs[0].c_str());
 
 				packet.moduleId = moduleId;
-				packet.moduleRequestType = moduleRequestTypes::MODULE_GET_CONFIGURATION;
 
 				//TODO:Send packet with variable length, leave version field empty
 			}
@@ -179,12 +177,11 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 			else
 			{
 				connPacketModuleRequest packet;
-				packet.header.messageType = MESSAGE_TYPE_MODULE_REQUEST;
+				packet.header.messageType = MESSAGE_TYPE_MODULE_SET_ACTIVE;
 				packet.header.sender = node->persistentConfig.nodeId;
 				packet.header.receiver = atoi(commandArgs[0].c_str());
 
 				packet.moduleId = moduleId;
-				packet.moduleRequestType = moduleRequestTypes::MODULE_SET_ACTIVE;
 				packet.data[0] = (commandArgs.size() < 3 || commandArgs[2] == "1") ? 1 : 0;
 
 				cm->SendMessageToReceiver(NULL, (u8*) &packet, SIZEOF_CONN_PACKET_MODULE_REQUEST, true);
@@ -200,20 +197,24 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 void Module::ConnectionPacketReceivedEventHandler(ble_evt_t* bleEvent, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
 {
 	//We want to handle incoming packets that change the module configuration
-	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_REQUEST)
+	if(
+			packetHeader->messageType == MESSAGE_TYPE_MODULE_GET_CONFIGURATION
+			|| packetHeader->messageType == MESSAGE_TYPE_MODULE_SET_CONFIGURATION
+			|| packetHeader->messageType == MESSAGE_TYPE_MODULE_SET_ACTIVE
+	)
 	{
 		connPacketModuleRequest* packet = (connPacketModuleRequest*) packetHeader;
 		if(packet->moduleId != moduleId) return;
 
-		if(packet->moduleRequestType == moduleRequestTypes::MODULE_SET_CONFIGURATION){
+		if(packetHeader->messageType == MESSAGE_TYPE_MODULE_SET_CONFIGURATION){
 			//Save the received configuration to the module configuration
 
 
-		} else if(packet->moduleRequestType == moduleRequestTypes::MODULE_GET_CONFIGURATION){
+		} else if(packetHeader->messageType == MESSAGE_TYPE_MODULE_GET_CONFIGURATION){
 			//Send the module configuration
 
 
-		} else if(packet->moduleRequestType == moduleRequestTypes::MODULE_SET_ACTIVE){
+		} else if(packetHeader->messageType == MESSAGE_TYPE_MODULE_SET_ACTIVE){
 			//Look for the module and set it active or inactive
 			for(u32 i=0; i<MAX_MODULE_COUNT; i++){
 				if(node->activeModules[i] && node->activeModules[i]->moduleId == packet->moduleId){

@@ -84,8 +84,12 @@ class Connection
 		
 		//Buffers
 		u8 reliableBuffersFree; //reliable transmit buffers that are available currently to this connection
-		u8 packetBuffer[PACKET_BUFFER_SIZE];
-		PacketQueue* packetQueue;
+		u8 packetSendBuffer[PACKET_SEND_BUFFER_SIZE];
+		PacketQueue* packetSendQueue;
+		u8 packetSendPosition; //Is used to send messages that consist of multiple parts
+
+		u8 packetReassemblyBuffer[PACKET_REASSEMBLY_BUFFER_SIZE];
+		u8 packetReassemblyPosition; //Set to 0 if no reassembly is in progress
 
 		//Partner
 		nodeID partnerId;

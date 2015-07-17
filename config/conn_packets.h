@@ -41,34 +41,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //########## Connection packets ###############################################
 
-//Mesh clustering and handshake
-#define MESSAGE_TYPE_CLUSTER_WELCOME 50
-#define MESSAGE_TYPE_CLUSTER_ACK_1 51
-#define MESSAGE_TYPE_CLUSTER_ACK_2 52
-#define MESSAGE_TYPE_CLUSTER_INFO_UPDATE 53
+//Mesh clustering and handshake: Protocol defined
+#define MESSAGE_TYPE_CLUSTER_WELCOME 20
+#define MESSAGE_TYPE_CLUSTER_ACK_1 21
+#define MESSAGE_TYPE_CLUSTER_ACK_2 22
+#define MESSAGE_TYPE_CLUSTER_INFO_UPDATE 23
 
-//Module messages
+//Module messages: Protocol defined (yet unfinished)
+//MODULE_SET_CONFIG: Used to set/get a configuration for any module and to trigger an action
+//MODULE_GET_CONFIG: Receive the configuration for any module
+//MODULE_SET_ACTIVE: Activate or deactivate a module
+//MODULE_TRIGGER_ACTION: trigger some custom module action
+#define MESSAGE_TYPE_MODULE_SET_CONFIGURATION 50
+#define MESSAGE_TYPE_MODULE_GET_CONFIGURATION 51
+#define MESSAGE_TYPE_MODULE_SET_ACTIVE 52
+#define MESSAGE_TYPE_MODULE_TRIGGER_ACTION 53
 
-//We need two messages to set and get a complete config
-//We need a message to query data with commands that are different for each module
+#define MESSAGE_TYPE_ADVINFO 60
+#define MESSAGE_TYPE_QOS_CONNECTION_DATA 61
+#define MESSAGE_TYPE_QOS_REQUEST 62
 
-#define MESSAGE_TYPE_MODULE_REQUEST 85
-#define MESSAGE_TYPE_ADVINFO 84
-#define MESSAGE_TYPE_QOS_CONNECTION_DATA 82
-#define MESSAGE_TYPE_QOS_REQUEST 81
 
-//Other
+//Other packets: User space
 #define MESSAGE_TYPE_DATA_1 80
-#define MESSAGE_TYPE_DATA_2 83
+#define MESSAGE_TYPE_DATA_2 81
 
-//TODO: Should support message splitting
+//If hasMoreParts is set to true, the next message will only contain 1 byte hasMoreParts + messageType
+//and all remaining 19 bytes are used for transferring data, the last message of a split message does not have this flag
+//activated
 #define SIZEOF_CONN_PACKET_HEADER 5
 typedef struct
 {
-	u8 messageType;
+	u8 hasMoreParts : 1; //Set to true if message is split and has more data in the next packet
+	u8 messageType : 7;
 	nodeID sender;
 	nodeID receiver;
 }connPacketHeader;
+
+//Used for message splitting for all packets after the first one
+#define SIZEOF_CONN_PACKET_SPLIT_HEADER 1
+typedef struct
+{
+	u8 hasMoreParts : 1;
+	u8 messageType : 7;
+}connPacketSplitHeader;
 
 //CLUSTER_WELCOME
 #define SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_WELCOME 10
@@ -140,7 +156,7 @@ typedef struct
 
 
 //DATA_PACKET
-#define SIZEOF_CONN_PACKET_PAYLOAD_DATA_1 (MESH_SERVICE_CHARACTERISTIC_VALUE_LENGTH_MAX - SIZEOF_CONN_PACKET_HEADER)
+#define SIZEOF_CONN_PACKET_PAYLOAD_DATA_1 (MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER)
 typedef struct
 {
 	u8 length;
@@ -159,7 +175,7 @@ typedef struct
 
 
 //DATA_2_PACKET
-#define SIZEOF_CONN_PACKET_PAYLOAD_DATA_2 (MESH_SERVICE_CHARACTERISTIC_VALUE_LENGTH_MAX - SIZEOF_CONN_PACKET_HEADER)
+#define SIZEOF_CONN_PACKET_PAYLOAD_DATA_2 (MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER)
 typedef struct
 {
 	u8 length;
@@ -175,22 +191,13 @@ typedef struct
 }connPacketData2;
 
 
-//MODULE_SET: Used to set/get a configuration for any module and to trigger an action
-//TODO: This message needs a variable size and message splitting
-enum moduleRequestTypes{
-	MODULE_SET_CONFIGURATION=0,
-	MODULE_GET_CONFIGURATION=1,
-	MODULE_SET_ACTIVE=2,
-	MODULE_TRIGGER_ACTION=3
-};
-
-#define SIZEOF_CONN_PACKET_MODULE_REQUEST (SIZEOF_CONN_PACKET_HEADER + 15)
+//This message is used for different module request message types
+#define SIZEOF_CONN_PACKET_MODULE_REQUEST MAX_DATA_SIZE_PER_WRITE
 typedef struct
 {
 	connPacketHeader header;
 	u16 moduleId;
-	u8 moduleRequestType; //typeof moduleRequestTypes
-	u8 data[12]; //Data can be larger and will be transmitted in subsequent packets
+	u8 data[MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER - 3]; //Data can be larger and will be transmitted in subsequent packets
 
 }connPacketModuleRequest;
 

@@ -84,9 +84,9 @@ typedef u16 nodeID;
 typedef u32 clusterID;
 typedef i16 clusterSIZE;
 
-//Length of the mesh write characteristic
+//Maximum data that can be transmitted with one write
 //Max value according to: http://developer.nordicsemi.com/nRF51_SDK/doc/7.1.0/s120/html/a00557.html
-#define MESH_SERVICE_CHARACTERISTIC_VALUE_LENGTH_MAX 20
+#define MAX_DATA_SIZE_PER_WRITE 20
 
 
 /*############ OTHER STUFF ################*/	

@@ -117,12 +117,11 @@ bool TestModule::TerminalCommandHandler(string commandName, vector<string> comma
 
 		connPacketModuleRequest packet;
 
-		packet.header.messageType = MESSAGE_TYPE_MODULE_REQUEST;
+		packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
 		packet.header.sender = node->persistentConfig.nodeId;
 		packet.header.receiver = NODE_ID_BROADCAST;
 
 		packet.moduleId = moduleId;
-		packet.moduleRequestType = MODULE_TRIGGER_ACTION;
 		packet.data[0] = TestModuleMessages::LED_MESSAGE;
 		packet.data[1] = state;
 
@@ -145,11 +144,11 @@ void TestModule::ConnectionPacketReceivedEventHandler(ble_evt_t* bleEvent, Conne
 	Module::ConnectionPacketReceivedEventHandler(bleEvent, connection, packetHeader, dataLength);
 
 	//Check if this request is meant for modules in general
-	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_REQUEST){
+	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
 		connPacketModuleRequest* packet = (connPacketModuleRequest*)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
-		if(packet->moduleId == moduleId && packet->moduleRequestType == MODULE_TRIGGER_ACTION){
+		if(packet->moduleId == moduleId){
 
 			//It's a LED message
 			if(packet->data[0] == TestModuleMessages::LED_MESSAGE){

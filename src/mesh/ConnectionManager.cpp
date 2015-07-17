@@ -127,13 +127,13 @@ void ConnectionManager::SendMessageToReceiver(Connection* originConnection, u8* 
 
 void ConnectionManager::QueuePacket(Connection* connection, u8* data, u16 dataLength, bool reliable){
 	//Print packet as hex
-	char stringBuffer[100];
+	char stringBuffer[200];
 	Logger::getInstance().convertBufferToHexString(data, dataLength, stringBuffer);
 
 	logt("CONN_QUEUE", "PUT_PACKET(%d):len:%d,type:%d, hex: %s",connection->connectionId, dataLength, data[0], stringBuffer);
 
 	//Save packet
-	bool putResult = connection->packetQueue->Put(data, dataLength, reliable);
+	bool putResult = connection->packetSendQueue->Put(data, dataLength, reliable);
 
 	if(putResult) {
 		pendingPackets++;
@@ -287,7 +287,7 @@ void ConnectionManager::DisconnectionHandler(ble_evt_t* bleEvent)
 		else cm->freeOutConnections++;
 
 		//remove pending packets
-		cm->pendingPackets -= connection->packetQueue->_numElements;
+		cm->pendingPackets -= connection->packetSendQueue->_numElements;
 
 		connection->isConnected = false;
 
@@ -319,7 +319,8 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 		//Print packet as hex
 		char stringBuffer[100];
 		Logger::getInstance().convertBufferToHexString(bleEvent->evt.gatts_evt.params.write.data, bleEvent->evt.gatts_evt.params.write.len, stringBuffer);
-		logt("CONN", "RX: messageType %d (%d byte), reliable:%d hex: %s", ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->messageType, bleEvent->evt.gatts_evt.params.write.len, bleEvent->evt.gatts_evt.params.write.op, stringBuffer);
+		logt("CONN", "Received type %d, hasMore %d, length %d, reliable %d", ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->messageType, ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->hasMoreParts, bleEvent->evt.gatts_evt.params.write.len, bleEvent->evt.gatts_evt.params.write.op);
+		logt("CONN", "%s", stringBuffer);
 
 		connection->ReceivePacketHandler(bleEvent);
 	}
@@ -348,6 +349,7 @@ void ConnectionManager::fillTransmitBuffers()
 	//possible in a future SoftDevice version
 	//meanwhile, here is a trivial implementation
 
+
 	//Loop through all 4 connections infinitely
 	bool continueSending = false;
 	int i = -1;
@@ -357,11 +359,11 @@ void ConnectionManager::fillTransmitBuffers()
 
 
 		//Check if the connection is connected and has available packets
-		if(connections[i]->isConnected && connections[i]->packetQueue->_numElements > 0)
+		if(connections[i]->isConnected && connections[i]->packetSendQueue->_numElements > 0)
 		{
 
 			//Get one packet from the packet queue
-			sizedData packet = connections[i]->packetQueue->PeekNext();
+			sizedData packet = connections[i]->packetSendQueue->PeekNext();
 
 			char stringBuffer[120];
 			Logger::getInstance().convertBufferToHexString(packet.data+1, packet.length-1, stringBuffer);
@@ -370,21 +372,62 @@ void ConnectionManager::fillTransmitBuffers()
 			u8* data = packet.data + 1;
 			u16 dataSize = packet.length - 1;
 
+
+			//Multi-part messages are only supported reliable
+			if(dataSize > MAX_DATA_SIZE_PER_WRITE) reliable = true;
+			else ((connPacketHeader*) data)->hasMoreParts = 0;
+
 			//Reliable packets
 			if(reliable){
 				if(connections[i]->reliableBuffersFree > 0){
+
+					//Check if the packet can be transmitted in one MTU
+					//If not, it will be sent with message splitting and reliable
+					if(dataSize > MAX_DATA_SIZE_PER_WRITE){
+
+						//We might already have started to transmit the packet
+						if(connections[i]->packetSendPosition != 0){
+							//we need to modify the data a little and build our split
+							//message header. This does overwrite some of the old data
+							//but that's already been transmitted
+							connPacketSplitHeader* newHeader = (connPacketSplitHeader*)(data + connections[i]->packetSendPosition - SIZEOF_CONN_PACKET_SPLIT_HEADER);
+							newHeader->hasMoreParts = (dataSize - connections[i]->packetSendPosition > MAX_DATA_SIZE_PER_WRITE) ? 1: 0;
+							newHeader->messageType = ((connPacketHeader*) data)->messageType; //We take it from the start of our packet which should still be intact
+
+							//If the packet has more parts, we send a full packet, otherwise we send the remaining bits
+							if(newHeader->hasMoreParts) dataSize = MAX_DATA_SIZE_PER_WRITE;
+							else dataSize = dataSize - connections[i]->packetSendPosition;
+
+							//Now we set the data pointer to where we left the last time minus our new header
+							data = (u8*)newHeader;
+
+						}
+						//Or maybe this is the start of the transmission
+						else
+						{
+							((connPacketHeader*) data)->hasMoreParts = 1;
+							//Data is alright, but dataSize must be set to its new value
+							dataSize = MAX_DATA_SIZE_PER_WRITE;
+						}
+					}
+					char buffer[100];
+					Logger::getInstance().convertBufferToHexString(data, dataSize, buffer);
+
+
+					logt("ERROR", "Sending %s", buffer);
+
+
 					err = GATTController::bleWriteCharacteristic(connections[i]->connectionHandle, connections[i]->writeCharacteristicHandle, data, dataSize, true);
 
 					if(err == NRF_SUCCESS){
 						connections[i]->reliableBuffersFree--;
-						connections[i]->packetQueue->DiscardNext();
 					}
 
 
 					logt("CONN", "Reliable Write error %d", err);
 
 					//If we have another packet, we continue sending
-					if(connections[i]->packetQueue->_numElements > 0) continueSending = true;
+					if(connections[i]->packetSendQueue->_numElements > 0) continueSending = true;
 				}
 			//Unreliable packets
 			} else {
@@ -393,12 +436,12 @@ void ConnectionManager::fillTransmitBuffers()
 
 					if(err == NRF_SUCCESS){
 						txBufferFreeCount--;
-						connections[i]->packetQueue->DiscardNext();
+						connections[i]->packetSendQueue->DiscardNext();
 					}
 
 					logt("CONN", "Unreliable Write error %d", err);
 
-					if(connections[i]->packetQueue->_numElements > 0) continueSending = true;
+					if(connections[i]->packetSendQueue->_numElements > 0) continueSending = true;
 				}
 			}
 		}
@@ -441,11 +484,30 @@ void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
 		}
 		else
 		{
+			//TODO: After a split packet has been sent successfully, we must increment the sendposition
+			//and remove the packet only if it is finished
+
+
 			logt("CONN", "write_REQ complete");
 			Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gattc_evt.conn_handle);
+
+
+			connPacketSplitHeader* header = (connPacketSplitHeader*)(connection->packetSendQueue->PeekNext().data + 1 + connection->packetSendPosition); //+1 to remove reliable byte
+			logt("CONN", "header is type %d and moreData %d", header->messageType, header->hasMoreParts);
+
+			//Check if the packet has more parts
+			if(header->hasMoreParts == 0){
+				//Packet was either not split at all or is completely sent
+				connection->packetSendPosition = 0;
+				connection->packetSendQueue->DiscardNext();
+				cm->pendingPackets--;
+			} else {
+				//Update packet send position if we have more data
+				connection->packetSendPosition += MAX_DATA_SIZE_PER_WRITE;
+			}
+
 			connection->reliableBuffersFree += 1;
 
-			cm->pendingPackets--;
 
 			//Now we continue sending packets
 			if(cm->pendingPackets) cm->fillTransmitBuffers();

@@ -33,8 +33,10 @@ Connection::Connection(u8 id, ConnectionManager* cm, Node* node, ConnectionDirec
 	this->connectionId = id;
 	this->node = node;
 	this->direction = direction;
-	this->packetQueue = new PacketQueue(packetBuffer, PACKET_BUFFER_SIZE);
+	this->packetSendQueue = new PacketQueue(packetSendBuffer, PACKET_SEND_BUFFER_SIZE);
 	connectedClusterSize = 0;
+	packetReassemblyPosition = 0;
+	packetSendPosition = 0;
 
 	Init();
 }
@@ -49,10 +51,12 @@ void Connection::Init(){
 	handshakeDone = false;
 	handshakeStarted = 0;
 	writeCharacteristicHandle = 0;
+	packetReassemblyPosition = 0;
+	packetSendPosition = 0;
 
 	hopsToSink = -1;
 
-	this->packetQueue->Clean();
+	this->packetSendQueue->Clean();
 }
 
 bool Connection::Connect(ble_gap_addr_t* address, u16 writeCharacteristicHandle)
@@ -444,7 +448,7 @@ void Connection::PrintStatus(void)
 {
 	const char* directionString = (direction == CONNECTION_DIRECTION_IN) ? "< IN " : "> OUT";
 
-	trace("%s %d, handshake:%d, clusterId:%d, clusterSize:%d, toSink:%d, Queue:%d-%d(%d), relBuf:%d\n\r", directionString, this->partnerId, this->handshakeDone, this->connectedClusterId, this->connectedClusterSize, this->hopsToSink, (packetQueue->readPointer - packetQueue->bufferStart), (packetQueue->writePointer - packetQueue->bufferStart), packetQueue->_numElements, reliableBuffersFree);
+	trace("%s %d, handshake:%d, clusterId:%d, clusterSize:%d, toSink:%d, Queue:%d-%d(%d), relBuf:%d\n\r", directionString, this->partnerId, this->handshakeDone, this->connectedClusterId, this->connectedClusterSize, this->hopsToSink, (packetSendQueue->readPointer - packetSendQueue->bufferStart), (packetSendQueue->writePointer - packetSendQueue->bufferStart), packetSendQueue->_numElements, reliableBuffersFree);
 
 }
 

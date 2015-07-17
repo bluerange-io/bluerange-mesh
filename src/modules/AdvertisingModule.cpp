@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <Storage.h>
 
 extern "C"{
-
+#include <app_error.h>
 }
 
 //This module allows a number of advertising messages to be configured.
@@ -43,7 +43,6 @@ AdvertisingModule::AdvertisingModule(u16 moduleId, Node* node, ConnectionManager
 	: Module(moduleId, node, cm, name, storageSlot)
 {
 	//Register callbacks n' stuff
-	Logger::getInstance().enableTag("ADVMOD");
 
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
@@ -66,6 +65,7 @@ void AdvertisingModule::ConfigurationLoadedHandler()
 
 
 	//Start the Module...
+	logt("ADVMOD", "Config set %d", configuration.messageData[0].length);
 
 
 
@@ -114,6 +114,13 @@ void AdvertisingModule::NodeStateChangedHandler(discoveryState newState)
 		//Activate our advertising
 
 		u32 err = sd_ble_gap_adv_data_set(configuration.messageData[0].messageData, configuration.messageData[0].length, NULL, 0);
+		APP_ERROR_CHECK(err);
+
+		char buffer[100];
+		Logger::getInstance().convertBufferToHexString((u8*)configuration.messageData[0].messageData, 31, buffer);
+
+		logt("ADVMOD", "ADV set to %s", buffer);
+
 
 		//Now, start advertising
 		AdvertisingController::SetAdvertisingState(advState::ADV_STATE_HIGH);

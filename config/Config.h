@@ -134,7 +134,10 @@ class Conf
 #define VERSION_STRING "0.1"
 
 //Each of the Connections has a buffer for outgoing packets, this is its size in bytes
-#define PACKET_BUFFER_SIZE 400
+#define PACKET_SEND_BUFFER_SIZE 400
+
+//Each connection does also have a buffer to assemble packets that were split into 20 byte chunks
+#define PACKET_REASSEMBLY_BUFFER_SIZE 100
 
 //Number of supported Modules
 #define MAX_MODULE_COUNT 10
@@ -184,7 +187,7 @@ class Conf
 /*############ MODULES ################*/
 //The module ids are used to identify a module over the network, these must fit in two bytes
 //Numbers below 30000 are standard defined, numbers obove this range are free to use for
-//custom types
+//custom types, always leave a space of 10 to allow for multiple module instances
 enum moduleID{
 	//Standard modules
 	ADVERTISING_MODULE_ID=10,

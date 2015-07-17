@@ -78,7 +78,10 @@ typedef struct
 
 //####### Advertising packets #################################################
 
+//Message types: Protocol defined, up to 19
 #define MESSAGE_TYPE_JOIN_ME 1
+
+
 
 //Header that is common to all mesh advertising messages
 #define SIZEOF_ADV_PACKET_HEADER (SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_MANUFACTURER + 1 + 2 + 1) //11 byte

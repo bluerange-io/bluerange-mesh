@@ -1058,6 +1058,23 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 
 		cm->SendMessageToReceiver(NULL, (u8*) &data, SIZEOF_CONN_PACKET_DATA_1, reliable);
 	}
+	else if(commandName == "DATAL")
+	{
+		//Send some large data that is split over messages
+		u8 _packet[30];
+		connPacketHeader* packet = (connPacketHeader*)_packet;
+		packet->messageType = MESSAGE_TYPE_DATA_1;
+		packet->receiver = 0;
+		packet->sender = persistentConfig.nodeId;
+
+		for(u32 i=0; i< 25; i++){
+			_packet[i+5] = i+1;
+		}
+
+		cm->SendMessageToReceiver(NULL, _packet, 30, true);
+
+
+	}
 	else if (commandName == "LOSS")
 	{
 		//Simulate connection loss
