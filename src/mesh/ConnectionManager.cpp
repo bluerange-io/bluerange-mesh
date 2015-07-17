@@ -488,12 +488,18 @@ void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
 			//and remove the packet only if it is finished
 
 
+
 			logt("CONN", "write_REQ complete");
 			Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gattc_evt.conn_handle);
 
 
+			char buffer[100];
+			Logger::getInstance().convertBufferToHexString(connection->packetSendQueue->PeekNext().data + 1, connection->packetSendQueue->PeekNext().length, buffer);
+
+			logt("ERROR", "buf %s", buffer);
+
 			connPacketSplitHeader* header = (connPacketSplitHeader*)(connection->packetSendQueue->PeekNext().data + 1 + connection->packetSendPosition); //+1 to remove reliable byte
-			logt("CONN", "header is type %d and moreData %d", header->messageType, header->hasMoreParts);
+			logt("CONN", "header is type %d and moreData %d (%d-%d)", header->messageType, header->hasMoreParts, connection->packetSendQueue->PeekNext().data, header);
 
 			//Check if the packet has more parts
 			if(header->hasMoreParts == 0){
@@ -503,7 +509,7 @@ void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
 				cm->pendingPackets--;
 			} else {
 				//Update packet send position if we have more data
-				connection->packetSendPosition += MAX_DATA_SIZE_PER_WRITE;
+				connection->packetSendPosition += MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_SPLIT_HEADER;
 			}
 
 			connection->reliableBuffersFree += 1;
