@@ -43,7 +43,7 @@ class TestModule: public Module
 		enum TestModuleMessages{LED_MESSAGE=0};
 
 	public:
-		TestModule(u16 moduleId, Node* node, ConnectionManager* cm, char* name, u16 storageSlot);
+		TestModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 
 		void ConfigurationLoadedHandler();
 

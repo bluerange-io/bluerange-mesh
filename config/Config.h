@@ -58,10 +58,16 @@ class Conf
 		//Do not use any persistently saved module data
 		bool ignorePersistentConfigurationOnBoot = true;
 
+		//This variable can be toggled via the Terminal "BREAK" and can be used
+		//to toggle conditional breakpoints because the softdevice does not allow
+		//runtime breakpoints while in a connection or stepping
+		bool breakpointToggleActive = false;
+
+
 		// ########### TIMINGS ################################################
 
 		//Main timer tick interval
-		u32 mainTimerTickMs = 100;
+		u32 mainTimerTickMs = 200;
 
 		//Mesh connection parameters (used when a connection is set up)
 		u16 meshMinConnectionInterval = MSEC_TO_UNITS(100, UNIT_1_25_MS);   	//(7.5-4000) Minimum acceptable connection interval
@@ -116,7 +122,7 @@ class Conf
 
 		// ########### CONNECTION ################################################
 
-		u16 meshNetworkIdentifier = 7; //Allows a number of mesh networks to coexist in the same physical space without collision
+		u16 meshNetworkIdentifier = 1; //Allows a number of mesh networks to coexist in the same physical space without collision
 
 		const u8 meshMaxInConnections = 1; // Will probably never change and code will not allow this to change without modifications
 		const u8 meshMaxOutConnections = 3; //Will certainly change with future S130 versions

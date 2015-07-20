@@ -89,9 +89,9 @@ Node::Node(networkID networkId)
 	//same module receives the same storage slot
 	activeModules[0] = new TestModule(moduleID::TEST_MODULE_ID, this, cm, "TEST", 1);
 	//activeModules[1] = new DFUModule((moduleID::DFU_MODULE_ID, this, cm, "DFU", 2);
-	activeModules[2] = new StatusReporterModule(moduleID::STATUS_REPORTER_MODULE_ID, this, cm, "STATUS", 3);
-	activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "ADV", 4);
-	activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "SCAN", 5);
+	//activeModules[2] = new StatusReporterModule(moduleID::STATUS_REPORTER_MODULE_ID, this, cm, "STATUS", 3);
+	//activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "ADV", 4);
+	//activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "SCAN", 5);
 
 
 	//Register a pre/post transmit hook for radio events
@@ -1061,18 +1061,20 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	else if(commandName == "DATAL")
 	{
 		//Send some large data that is split over messages
-		u8 _packet[30];
+		const u8 dataLength = 49;
+		u8 _packet[dataLength];
 		connPacketHeader* packet = (connPacketHeader*)_packet;
 		packet->messageType = MESSAGE_TYPE_DATA_1;
 		packet->receiver = 0;
 		packet->sender = persistentConfig.nodeId;
 
-		for(u32 i=0; i< 25; i++){
-			_packet[i+5] = i+1;
+		for(u32 i=0; i< dataLength-5; i++){
+			_packet[i+5] = 1;
 		}
 
-		cm->SendMessageToReceiver(NULL, _packet, 30, true);
+		cm->SendMessageToReceiver(NULL, _packet, dataLength, true);
 
+		logt("ERROR", "end datal");
 
 	}
 	else if (commandName == "LOSS")
@@ -1124,6 +1126,10 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	else if (commandName == "START")
 	{
 		DisableStateMachine(false);
+	}
+	else if (commandName == "BREAK")
+	{
+		Config->breakpointToggleActive = !Config->breakpointToggleActive;
 	}
 	else if (commandName == "CONNECT")
 	{

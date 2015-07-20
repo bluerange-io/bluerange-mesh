@@ -102,7 +102,10 @@ void ConnectionManager::SendMessageOverConnections(Connection* ignoreConnection,
 		}
 	}
 
+	logt("ERROR", "start sendmess over conn");
 	fillTransmitBuffers();
+
+	logt("ERROR", "end send message over conn");
 }
 
 //Checks the receiver of the message first and routes it in the right direction
@@ -121,17 +124,20 @@ void ConnectionManager::SendMessageToReceiver(Connection* originConnection, u8* 
 	//All other packets will be broadcasted, but we could and should check if the receiver is connected to us
 	else
 	{
+		logt("ERROR", "start mes over conn");
 		SendMessageOverConnections(originConnection, data, dataLength, reliable);
 	}
+
+	logt("ERROR", "end send mess to rec");
 }
 
 void ConnectionManager::QueuePacket(Connection* connection, u8* data, u16 dataLength, bool reliable){
 	//Print packet as hex
-	char stringBuffer[200];
+	/*char stringBuffer[200];
 	Logger::getInstance().convertBufferToHexString(data, dataLength, stringBuffer);
 
 	logt("CONN_QUEUE", "PUT_PACKET(%d):len:%d,type:%d, hex: %s",connection->connectionId, dataLength, data[0], stringBuffer);
-
+*/
 	//Save packet
 	bool putResult = connection->packetSendQueue->Put(data, dataLength, reliable);
 
@@ -316,6 +322,25 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 	Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gap_evt.conn_handle);
 	if (connection != NULL)
 	{
+		//Check if we need to reassemble the packet
+		connPacketHeader* packet = (connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data;
+		if(connection->packetReassemblyPosition == 0 && packet->hasMoreParts == 0)
+		{
+			//Single packet, no more data
+
+		}
+		else if(connection->packetReassemblyPosition != 0 && packet->hasMoreParts)
+		{
+			//Multipart packet, still has more parts
+
+		}
+		else if(connection->packetReassemblyPosition != 0 && !packet->hasMoreParts)
+		{
+			//Multipart packet but this was the last transmission
+
+		}
+
+
 		//Print packet as hex
 		char stringBuffer[100];
 		Logger::getInstance().convertBufferToHexString(bleEvent->evt.gatts_evt.params.write.data, bleEvent->evt.gatts_evt.params.write.len, stringBuffer);
@@ -344,7 +369,7 @@ void ConnectionManager::handleDiscoveredCallback(u16 connectionHandle, u16 chara
 
 void ConnectionManager::fillTransmitBuffers()
 {
-	u32 err;
+	u32 err = 0;
 	//Filling the buffers nicely is not an easy task but is probably
 	//possible in a future SoftDevice version
 	//meanwhile, here is a trivial implementation
@@ -354,6 +379,8 @@ void ConnectionManager::fillTransmitBuffers()
 	bool continueSending = false;
 	int i = -1;
 	while(true){
+		logt("ERROR", "loop in fill");
+
 		i = (i+1) % Config->meshMaxConnections;
 		if(i == 0) continueSending = false;
 
@@ -361,6 +388,8 @@ void ConnectionManager::fillTransmitBuffers()
 		//Check if the connection is connected and has available packets
 		if(connections[i]->isConnected && connections[i]->packetSendQueue->_numElements > 0)
 		{
+
+			logt("ERROR", "continue...");
 
 			//Get one packet from the packet queue
 			sizedData packet = connections[i]->packetSendQueue->PeekNext();
@@ -373,9 +402,27 @@ void ConnectionManager::fillTransmitBuffers()
 			u16 dataSize = packet.length - 1;
 
 
+
+			logt("ERROR", "continue2...");
+
+
 			//Multi-part messages are only supported reliable
 			if(dataSize > MAX_DATA_SIZE_PER_WRITE) reliable = true;
 			else ((connPacketHeader*) data)->hasMoreParts = 0;
+
+
+			//logt("ERROR", "continue2b datasize %d, reliable %d, relbuf %d", dataSize, reliable, connections[i]->reliableBuffersFree);
+
+
+
+
+			if(Config->breakpointToggleActive && !connections[i]->reliableBuffersFree){
+				u32 i = 0;
+				while(1){
+					i++;
+					if(i > 10000) break;
+				};
+			}
 
 			//Reliable packets
 			if(reliable){
@@ -390,13 +437,17 @@ void ConnectionManager::fillTransmitBuffers()
 							//we need to modify the data a little and build our split
 							//message header. This does overwrite some of the old data
 							//but that's already been transmitted
-							connPacketSplitHeader* newHeader = (connPacketSplitHeader*)(data + connections[i]->packetSendPosition - SIZEOF_CONN_PACKET_SPLIT_HEADER);
+							connPacketSplitHeader* newHeader = (connPacketSplitHeader*)(data + connections[i]->packetSendPosition);
 							newHeader->hasMoreParts = (dataSize - connections[i]->packetSendPosition > MAX_DATA_SIZE_PER_WRITE) ? 1: 0;
 							newHeader->messageType = ((connPacketHeader*) data)->messageType; //We take it from the start of our packet which should still be intact
 
 							//If the packet has more parts, we send a full packet, otherwise we send the remaining bits
 							if(newHeader->hasMoreParts) dataSize = MAX_DATA_SIZE_PER_WRITE;
 							else dataSize = dataSize - connections[i]->packetSendPosition;
+
+
+
+							logt("ERROR", "continue4...");
 
 							//Now we set the data pointer to where we left the last time minus our new header
 							data = (u8*)newHeader;
@@ -410,21 +461,21 @@ void ConnectionManager::fillTransmitBuffers()
 							dataSize = MAX_DATA_SIZE_PER_WRITE;
 						}
 					}
-					char buffer[100];
+					/*char buffer[100];
 					Logger::getInstance().convertBufferToHexString(data, dataSize, buffer);
 
 
-					logt("ERROR", "Sending %s", buffer);
-
+					logt("ERROR", "Sending %s", buffer);*/
 
 					err = GATTController::bleWriteCharacteristic(connections[i]->connectionHandle, connections[i]->writeCharacteristicHandle, data, dataSize, true);
+					APP_ERROR_CHECK(err);
+
 
 					if(err == NRF_SUCCESS){
 						connections[i]->reliableBuffersFree--;
 					}
 
-
-					logt("CONN", "Reliable Write error %d", err);
+					//logt("CONN", "Reliable Write error %d", err);
 
 					//If we have another packet, we continue sending
 					if(connections[i]->packetSendQueue->_numElements > 0) continueSending = true;
@@ -439,21 +490,31 @@ void ConnectionManager::fillTransmitBuffers()
 						connections[i]->packetSendQueue->DiscardNext();
 					}
 
-					logt("CONN", "Unreliable Write error %d", err);
+					//logt("CONN", "Unreliable Write error %d", err);
 
 					if(connections[i]->packetSendQueue->_numElements > 0) continueSending = true;
 				}
 			}
 		}
 
+		logt("ERROR", "continue end!!!");
+
 
 		//Check if all buffers are filled
 		if(i == MAXIMUM_CONNECTIONS-1 && !continueSending) break;
+
+
+		logt("ERROR", "continue end2");
 	}
+
+
+	logt("ERROR", "end fill transmitbuf");
 }
 
 void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
 {
+	logt("ERROR", "event %d", bleEvent->header.evt_id);
+
 	ConnectionManager* cm = ConnectionManager::getInstance();
 	//There are two types of events that trigger a dataTransmittedCallback
 	//A TX complete event frees a number of transmit buffers
@@ -494,7 +555,7 @@ void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
 
 
 			char buffer[100];
-			Logger::getInstance().convertBufferToHexString(connection->packetSendQueue->PeekNext().data + 1, connection->packetSendQueue->PeekNext().length, buffer);
+			Logger::getInstance().convertBufferToHexString(connection->packetSendQueue->PeekNext().data + 1, connection->packetSendQueue->PeekNext().length-1, buffer);
 
 			logt("ERROR", "buf %s", buffer);
 

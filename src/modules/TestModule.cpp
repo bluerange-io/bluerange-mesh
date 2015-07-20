@@ -29,7 +29,7 @@ extern "C"{
 #include <limits.h>
 }
 
-TestModule::TestModule(u16 moduleId, Node* node, ConnectionManager* cm, char* name, u16 storageSlot)
+TestModule::TestModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
 	: Module(moduleId, node, cm, name, storageSlot)
 {
 	//Register callbacks n' stuff
