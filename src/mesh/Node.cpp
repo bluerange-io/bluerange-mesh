@@ -1074,7 +1074,6 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 
 		cm->SendMessageToReceiver(NULL, _packet, dataLength, true);
 
-		logt("ERROR", "end datal");
 
 	}
 	else if (commandName == "LOSS")

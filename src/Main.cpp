@@ -89,7 +89,6 @@ int main(void)
 	Logger::getInstance().enableTag("NODE");
 	Logger::getInstance().enableTag("STORAGE");
 	Logger::getInstance().enableTag("DATA");
-	Logger::getInstance().enableTag("CONN");
 
 	//Initialize the storage class
 	Storage::getInstance();

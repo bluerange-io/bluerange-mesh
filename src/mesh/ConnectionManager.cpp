@@ -351,7 +351,7 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 			connection->packetReassemblyPosition += bleEvent->evt.gatts_evt.params.write.len;
 
 			//Do not notify anyone until packet is finished
-			logt("ERROR", "first part");
+			logt("CM", "Received first part of message");
 		}
 		//Multipart packet, intermediate or last frame
 		else if(connection->packetReassemblyPosition != 0)
@@ -366,11 +366,11 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 			if(packet->hasMoreParts){
 				connection->packetReassemblyPosition += bleEvent->evt.gatts_evt.params.write.len - SIZEOF_CONN_PACKET_SPLIT_HEADER;
 
-				logt("ERROR", "middle part");
+				logt("CM", "Received middle part of message");
 
 			//Final packet
 			} else {
-				logt("ERROR", "Last aprt received");
+				logt("CM", "Received last part of message");
 
 				//Notify connection
 				connectionPacket p;

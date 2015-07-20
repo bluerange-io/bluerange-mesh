@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <Storage.h>
 #include <Node.h>
 #include <Config.h>
+#include <stdlib.h>
 
 extern "C"{
 
@@ -97,7 +98,8 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 	Module::TerminalCommandHandler(commandName, commandArgs);
 
 	//React on commands, return true if handled, false otherwise
-	if(commandName == "UART_GET_CONNECTIONS"){
+	if(commandName == "UART_GET_CONNECTIONS")
+	{
 
 		//Print own connections
 		if(Terminal::terminalIsInitialized){
@@ -116,7 +118,36 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 		packet.payload.type = 0;
 
 		cm->SendMessageOverConnections(NULL, (u8*) &packet, SIZEOF_CONN_PACKET_QOS_REQUEST, false);
-	} else {
+	}
+	else if(commandName == "UART_MODULE_TRIGGER_ACTION")
+	{
+		//Check which action
+
+
+		//E.g. UART_MODULE_TRIGGER_ACTION 635 STATUS led on
+		if(commandArgs.size() == 4 && commandArgs[2] == "led")
+		{
+			connPacketModuleRequest packet;
+			packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
+			packet.header.sender = node->persistentConfig.nodeId;
+			packet.header.receiver = atoi(commandArgs[0].c_str());
+
+			packet.moduleId = moduleId;
+			packet.data[0] = StatusModuleMessages::LED_MESSAGE;
+			packet.data[1] = commandArgs[3] == "on" ? 1: 0;
+
+
+			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_REQUEST+2, true);
+
+
+			return true;
+		}
+
+
+		return false;
+	}
+	else
+	{
 		return false;
 	}
 	return true;
@@ -126,6 +157,31 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 {
 	//Must call superclass for handling
 	Module::ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
+
+	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
+		connPacketModuleRequest* packet = (connPacketModuleRequest*)packetHeader;
+
+		//Check if our module is meant and we should trigger an action
+		if(packet->moduleId == moduleId){
+			//It's a LED message
+			if(packet->data[0] == StatusModuleMessages::LED_MESSAGE){
+				if(packet->data[1])
+				{
+					//Switch LED on
+					node->currentLedMode = Node::ledMode::LED_MODE_OFF;
+
+					node->LedRed->On();
+					node->LedGreen->On();
+					node->LedBlue->On();
+				}
+				else
+				{
+					//Switch LEDs back to connection signaling
+					node->currentLedMode = Node::ledMode::LED_MODE_CONNECTIONS;
+				}
+			}
+		}
+	}
 
 	switch(packetHeader->messageType){
 		case MESSAGE_TYPE_QOS_REQUEST:

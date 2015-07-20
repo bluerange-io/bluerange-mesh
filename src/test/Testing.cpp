@@ -73,7 +73,6 @@ Testing::Testing()
 //	Logger::getInstance().enableTag("JOIN");
 //	Logger::getInstance().enableTag("CONN");
 	Logger::getInstance().enableTag("MODULE");
-	Logger::getInstance().enableTag("CONN");
 
 	//Logger::getInstance().enableTag("SCAN");
 

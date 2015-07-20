@@ -43,6 +43,8 @@ class StatusReporterModule: public Module
 
 		StatusReporterModuleConfiguration configuration;
 
+		enum StatusModuleMessages{LED_MESSAGE=0};
+
 		u32 lastReportingTimer;
 
 		void SendConnectionInformation(Connection* toConnection);

@@ -137,5 +137,5 @@ bool AdvertisingModule::TerminalCommandHandler(string commandName, vector<string
 	Module::TerminalCommandHandler(commandName, commandArgs);
 
 	//React on commands, return true if handled, false otherwise
-
+	return false;
 }
