@@ -1061,7 +1061,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	else if(commandName == "DATAL")
 	{
 		//Send some large data that is split over messages
-		const u8 dataLength = 49;
+		const u8 dataLength = 140;
 		u8 _packet[dataLength];
 		connPacketHeader* packet = (connPacketHeader*)_packet;
 		packet->messageType = MESSAGE_TYPE_DATA_1;
@@ -1069,7 +1069,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		packet->sender = persistentConfig.nodeId;
 
 		for(u32 i=0; i< dataLength-5; i++){
-			_packet[i+5] = 1;
+			_packet[i+5] = i+1;
 		}
 
 		cm->SendMessageToReceiver(NULL, _packet, dataLength, true);

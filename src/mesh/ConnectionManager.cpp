@@ -102,10 +102,7 @@ void ConnectionManager::SendMessageOverConnections(Connection* ignoreConnection,
 		}
 	}
 
-	logt("ERROR", "start sendmess over conn");
 	fillTransmitBuffers();
-
-	logt("ERROR", "end send message over conn");
 }
 
 //Checks the receiver of the message first and routes it in the right direction
@@ -124,11 +121,8 @@ void ConnectionManager::SendMessageToReceiver(Connection* originConnection, u8* 
 	//All other packets will be broadcasted, but we could and should check if the receiver is connected to us
 	else
 	{
-		logt("ERROR", "start mes over conn");
 		SendMessageOverConnections(originConnection, data, dataLength, reliable);
 	}
-
-	logt("ERROR", "end send mess to rec");
 }
 
 void ConnectionManager::QueuePacket(Connection* connection, u8* data, u16 dataLength, bool reliable){
@@ -379,7 +373,6 @@ void ConnectionManager::fillTransmitBuffers()
 	bool continueSending = false;
 	int i = -1;
 	while(true){
-		logt("ERROR", "loop in fill");
 
 		i = (i+1) % Config->meshMaxConnections;
 		if(i == 0) continueSending = false;
@@ -388,41 +381,21 @@ void ConnectionManager::fillTransmitBuffers()
 		//Check if the connection is connected and has available packets
 		if(connections[i]->isConnected && connections[i]->packetSendQueue->_numElements > 0)
 		{
-
-			logt("ERROR", "continue...");
-
 			//Get one packet from the packet queue
 			sizedData packet = connections[i]->packetSendQueue->PeekNext();
 
-			char stringBuffer[120];
-			Logger::getInstance().convertBufferToHexString(packet.data+1, packet.length-1, stringBuffer);
+
+
 
 			bool reliable = packet.data[0];
 			u8* data = packet.data + 1;
 			u16 dataSize = packet.length - 1;
 
 
-
-			logt("ERROR", "continue2...");
-
-
 			//Multi-part messages are only supported reliable
 			if(dataSize > MAX_DATA_SIZE_PER_WRITE) reliable = true;
 			else ((connPacketHeader*) data)->hasMoreParts = 0;
 
-
-			//logt("ERROR", "continue2b datasize %d, reliable %d, relbuf %d", dataSize, reliable, connections[i]->reliableBuffersFree);
-
-
-
-
-			if(Config->breakpointToggleActive && !connections[i]->reliableBuffersFree){
-				u32 i = 0;
-				while(1){
-					i++;
-					if(i > 10000) break;
-				};
-			}
 
 			//Reliable packets
 			if(reliable){
@@ -446,9 +419,6 @@ void ConnectionManager::fillTransmitBuffers()
 							else dataSize = dataSize - connections[i]->packetSendPosition;
 
 
-
-							logt("ERROR", "continue4...");
-
 							//Now we set the data pointer to where we left the last time minus our new header
 							data = (u8*)newHeader;
 
@@ -461,11 +431,6 @@ void ConnectionManager::fillTransmitBuffers()
 							dataSize = MAX_DATA_SIZE_PER_WRITE;
 						}
 					}
-					/*char buffer[100];
-					Logger::getInstance().convertBufferToHexString(data, dataSize, buffer);
-
-
-					logt("ERROR", "Sending %s", buffer);*/
 
 					err = GATTController::bleWriteCharacteristic(connections[i]->connectionHandle, connections[i]->writeCharacteristicHandle, data, dataSize, true);
 					APP_ERROR_CHECK(err);
@@ -497,18 +462,10 @@ void ConnectionManager::fillTransmitBuffers()
 			}
 		}
 
-		logt("ERROR", "continue end!!!");
-
 
 		//Check if all buffers are filled
 		if(i == MAXIMUM_CONNECTIONS-1 && !continueSending) break;
-
-
-		logt("ERROR", "continue end2");
 	}
-
-
-	logt("ERROR", "end fill transmitbuf");
 }
 
 void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
@@ -552,12 +509,6 @@ void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
 
 			logt("CONN", "write_REQ complete");
 			Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gattc_evt.conn_handle);
-
-
-			char buffer[100];
-			Logger::getInstance().convertBufferToHexString(connection->packetSendQueue->PeekNext().data + 1, connection->packetSendQueue->PeekNext().length-1, buffer);
-
-			logt("ERROR", "buf %s", buffer);
 
 			connPacketSplitHeader* header = (connPacketSplitHeader*)(connection->packetSendQueue->PeekNext().data + 1 + connection->packetSendPosition); //+1 to remove reliable byte
 			logt("CONN", "header is type %d and moreData %d (%d-%d)", header->messageType, header->hasMoreParts, connection->packetSendQueue->PeekNext().data, header);
