@@ -70,7 +70,7 @@ class Connection
 		//Handler
 		void ConnectionSuccessfulHandler(ble_evt_t* bleEvent);
 		void DisconnectionHandler(ble_evt_t* bleEvent);
-		void ReceivePacketHandler(ble_evt_t* bleEvent);
+		void ReceivePacketHandler(connectionPacket* inPacket);
 		//void SendNextMessageHandler(ble_evt_t* bleEvent);
 		
 		//Helpers

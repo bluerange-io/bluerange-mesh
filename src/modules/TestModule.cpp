@@ -125,7 +125,7 @@ bool TestModule::TerminalCommandHandler(string commandName, vector<string> comma
 		packet.data[0] = TestModuleMessages::LED_MESSAGE;
 		packet.data[1] = state;
 
-		cm->SendMessageOverConnections(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_REQUEST, true);
+		cm->SendMessageOverConnections(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_REQUEST+2, true);
 
 
 		return true;
@@ -138,10 +138,10 @@ bool TestModule::TerminalCommandHandler(string commandName, vector<string> comma
 
 }
 
-void TestModule::ConnectionPacketReceivedEventHandler(ble_evt_t* bleEvent, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
+void TestModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
 {
 	//Must call superclass for handling
-	Module::ConnectionPacketReceivedEventHandler(bleEvent, connection, packetHeader, dataLength);
+	Module::ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
 
 	//Check if this request is meant for modules in general
 	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){

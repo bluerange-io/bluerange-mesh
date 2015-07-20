@@ -89,8 +89,8 @@ Node::Node(networkID networkId)
 	//same module receives the same storage slot
 	activeModules[0] = new TestModule(moduleID::TEST_MODULE_ID, this, cm, "TEST", 1);
 	//activeModules[1] = new DFUModule((moduleID::DFU_MODULE_ID, this, cm, "DFU", 2);
-	//activeModules[2] = new StatusReporterModule(moduleID::STATUS_REPORTER_MODULE_ID, this, cm, "STATUS", 3);
-	//activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "ADV", 4);
+	activeModules[2] = new StatusReporterModule(moduleID::STATUS_REPORTER_MODULE_ID, this, cm, "STATUS", 3);
+	activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "ADV", 4);
 	//activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "SCAN", 5);
 
 
@@ -320,11 +320,11 @@ void Node::UpdateClusterInfo(Connection* connection, connPacketClusterInfoUpdate
 	}
 }
 
-void Node::messageReceivedCallback(ble_evt_t* bleEvent)
+void Node::messageReceivedCallback(connectionPacket* inPacket)
 {
-	Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gatts_evt.conn_handle);
-	u8* data = bleEvent->evt.gatts_evt.params.write.data;
-	u16 dataLength = bleEvent->evt.gatts_evt.params.write.len;
+	Connection* connection = cm->GetConnectionFromHandle(inPacket->connectionHandle);
+	u8* data = inPacket->data;
+	u16 dataLength = inPacket->dataLength;
 
 	connPacketHeader* packetHeader = (connPacketHeader*) data;
 
@@ -343,11 +343,11 @@ void Node::messageReceivedCallback(ble_evt_t* bleEvent)
 			break;
 
 		case MESSAGE_TYPE_DATA_1:
-			if (dataLength == SIZEOF_CONN_PACKET_DATA_1)
+			if (dataLength >= SIZEOF_CONN_PACKET_DATA_1)
 			{
 				connPacketData1* packet = (connPacketData1*) data;
 
-				logt("DATA", "IN <= %d ################## Got Data packet %d:%d:%d ##################", connection->partnerId, packet->payload.data[0], packet->payload.data[1], packet->payload.data[2]);
+				logt("DATA", "IN <= %d ################## Got Data packet %d:%d:%d (len:%d) ##################", connection->partnerId, packet->payload.data[0], packet->payload.data[1], packet->payload.data[2], inPacket->dataLength);
 
 				//tracef("data is %u/%u/%u\n\r", packet->payload.data[0], packet->payload.data[1], packet->payload.data[2]);
 			}
@@ -378,7 +378,7 @@ void Node::messageReceivedCallback(ble_evt_t* bleEvent)
 	//Now we must pass the message to all of our modules for further processing
 	for(int i=0; i<MAX_MODULE_COUNT; i++){
 		if(activeModules[i] != 0){
-			activeModules[i]->ConnectionPacketReceivedEventHandler(bleEvent, connection, packetHeader, dataLength);
+			activeModules[i]->ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
 		}
 	}
 
@@ -1061,7 +1061,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	else if(commandName == "DATAL")
 	{
 		//Send some large data that is split over messages
-		const u8 dataLength = 140;
+		const u8 dataLength = 45;
 		u8 _packet[dataLength];
 		connPacketHeader* packet = (connPacketHeader*)_packet;
 		packet->messageType = MESSAGE_TYPE_DATA_1;

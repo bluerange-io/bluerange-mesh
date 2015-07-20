@@ -122,10 +122,10 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 	return true;
 }
 
-void StatusReporterModule::ConnectionPacketReceivedEventHandler(ble_evt_t* bleEvent, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
+void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
 {
 	//Must call superclass for handling
-	Module::ConnectionPacketReceivedEventHandler(bleEvent, connection, packetHeader, dataLength);
+	Module::ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
 
 	switch(packetHeader->messageType){
 		case MESSAGE_TYPE_QOS_REQUEST:

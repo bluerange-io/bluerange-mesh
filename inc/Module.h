@@ -115,7 +115,7 @@ protected:
 		virtual void BleEventHandler(ble_evt_t* bleEvent){};
 
 		//This handler receives all connection packets
-		virtual void ConnectionPacketReceivedEventHandler(ble_evt_t* bleEvent, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
+		virtual void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
 
 		//Changing the node state will affect some module's behaviour
 		virtual void NodeStateChangedHandler(discoveryState newState){};

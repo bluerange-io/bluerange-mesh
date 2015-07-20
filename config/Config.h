@@ -143,7 +143,7 @@ class Conf
 #define PACKET_SEND_BUFFER_SIZE 400
 
 //Each connection does also have a buffer to assemble packets that were split into 20 byte chunks
-#define PACKET_REASSEMBLY_BUFFER_SIZE 100
+#define PACKET_REASSEMBLY_BUFFER_SIZE 200
 
 //Number of supported Modules
 #define MAX_MODULE_COUNT 10

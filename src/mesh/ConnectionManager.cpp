@@ -313,6 +313,8 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 {
 	ConnectionManager* cm = ConnectionManager::getInstance();
 
+	//FIXME: must check for reassembly buffer size, if it is bigger, a stack overflow will occur
+
 	Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gap_evt.conn_handle);
 	if (connection != NULL)
 	{
@@ -320,28 +322,69 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 		connPacketHeader* packet = (connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data;
 		if(connection->packetReassemblyPosition == 0 && packet->hasMoreParts == 0)
 		{
+			//Print packet as hex
+			char stringBuffer[100];
+			Logger::getInstance().convertBufferToHexString(bleEvent->evt.gatts_evt.params.write.data, bleEvent->evt.gatts_evt.params.write.len, stringBuffer);
+			logt("CONN", "Received type %d, hasMore %d, length %d, reliable %d", ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->messageType, ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->hasMoreParts, bleEvent->evt.gatts_evt.params.write.len, bleEvent->evt.gatts_evt.params.write.op);
+			logt("CONN", "%s", stringBuffer);
+
 			//Single packet, no more data
+			connectionPacket p;
+			p.connectionHandle = bleEvent->evt.gatts_evt.conn_handle;
+			p.data = bleEvent->evt.gatts_evt.params.write.data;
+			p.dataLength = bleEvent->evt.gatts_evt.params.write.len;
+			p.reliable = bleEvent->evt.gatts_evt.params.write.op == BLE_GATTS_OP_WRITE_CMD ? false : true;
+
+			connection->ReceivePacketHandler(&p);
 
 		}
-		else if(connection->packetReassemblyPosition != 0 && packet->hasMoreParts)
+		//First of a multipart packet, still has more parts
+		else if(connection->packetReassemblyPosition == 0 && packet->hasMoreParts)
 		{
-			//Multipart packet, still has more parts
+			//Save at correct position of
+			memcpy(
+					connection->packetReassemblyBuffer,
+					bleEvent->evt.gatts_evt.params.write.data,
+					bleEvent->evt.gatts_evt.params.write.len
+				);
 
+			connection->packetReassemblyPosition += bleEvent->evt.gatts_evt.params.write.len;
+
+			//Do not notify anyone until packet is finished
+			logt("ERROR", "first part");
 		}
-		else if(connection->packetReassemblyPosition != 0 && !packet->hasMoreParts)
+		//Multipart packet, intermediate or last frame
+		else if(connection->packetReassemblyPosition != 0)
 		{
-			//Multipart packet but this was the last transmission
+			memcpy(
+				connection->packetReassemblyBuffer + connection->packetReassemblyPosition,
+				bleEvent->evt.gatts_evt.params.write.data + SIZEOF_CONN_PACKET_SPLIT_HEADER,
+				bleEvent->evt.gatts_evt.params.write.len - SIZEOF_CONN_PACKET_SPLIT_HEADER
+			);
 
+			//Intermediate packet
+			if(packet->hasMoreParts){
+				connection->packetReassemblyPosition += bleEvent->evt.gatts_evt.params.write.len - SIZEOF_CONN_PACKET_SPLIT_HEADER;
+
+				logt("ERROR", "middle part");
+
+			//Final packet
+			} else {
+				logt("ERROR", "Last aprt received");
+
+				//Notify connection
+				connectionPacket p;
+				p.connectionHandle = bleEvent->evt.gatts_evt.conn_handle;
+				p.data = connection->packetReassemblyBuffer;
+				p.dataLength = bleEvent->evt.gatts_evt.params.write.len + connection->packetReassemblyPosition - SIZEOF_CONN_PACKET_SPLIT_HEADER;
+				p.reliable = bleEvent->evt.gatts_evt.params.write.op == BLE_GATTS_OP_WRITE_CMD ? false : true;
+
+				//Reset the assembly buffer
+				connection->packetReassemblyPosition = 0;
+
+				connection->ReceivePacketHandler(&p);
+			}
 		}
-
-
-		//Print packet as hex
-		char stringBuffer[100];
-		Logger::getInstance().convertBufferToHexString(bleEvent->evt.gatts_evt.params.write.data, bleEvent->evt.gatts_evt.params.write.len, stringBuffer);
-		logt("CONN", "Received type %d, hasMore %d, length %d, reliable %d", ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->messageType, ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->hasMoreParts, bleEvent->evt.gatts_evt.params.write.len, bleEvent->evt.gatts_evt.params.write.op);
-		logt("CONN", "%s", stringBuffer);
-
-		connection->ReceivePacketHandler(bleEvent);
 	}
 }
 
@@ -470,7 +513,6 @@ void ConnectionManager::fillTransmitBuffers()
 
 void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
 {
-	logt("ERROR", "event %d", bleEvent->header.evt_id);
 
 	ConnectionManager* cm = ConnectionManager::getInstance();
 	//There are two types of events that trigger a dataTransmittedCallback

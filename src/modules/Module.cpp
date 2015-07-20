@@ -127,15 +127,22 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 			//Send command to other node
 			else
 			{
-				connPacketModuleRequest packet;
-				packet.header.messageType = MESSAGE_TYPE_MODULE_SET_CONFIGURATION;
-				packet.header.sender = node->persistentConfig.nodeId;
-				packet.header.receiver = atoi(commandArgs[0].c_str());
+				//calculate configuration size
+				const char* configString = commandArgs[2].c_str();
+				u16 configLength = (commandArgs[2].length()+1)/3;
 
-				packet.moduleId = moduleId;
+				u8 packetBuffer[configLength + SIZEOF_CONN_PACKET_MODULE_REQUEST];
+				connPacketModuleRequest* packet = (connPacketModuleRequest*)packetBuffer;
+				packet->header.messageType = MESSAGE_TYPE_MODULE_SET_CONFIGURATION;
+				packet->header.sender = node->persistentConfig.nodeId;
+				packet->header.receiver = atoi(commandArgs[0].c_str());
 
-				//TODO:Send packet with variable length, and config
+				packet->moduleId = moduleId;
+				//Fill data region with module config
+				Logger::getInstance().parseHexStringToBuffer(configString, packet->data, configLength);
 
+
+				cm->SendMessageToReceiver(NULL, packetBuffer, configLength + SIZEOF_CONN_PACKET_MODULE_REQUEST, true);
 			}
 
 		}
@@ -184,7 +191,7 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 				packet.moduleId = moduleId;
 				packet.data[0] = (commandArgs.size() < 3 || commandArgs[2] == "1") ? 1 : 0;
 
-				cm->SendMessageToReceiver(NULL, (u8*) &packet, SIZEOF_CONN_PACKET_MODULE_REQUEST, true);
+				cm->SendMessageToReceiver(NULL, (u8*) &packet, SIZEOF_CONN_PACKET_MODULE_REQUEST+1, true);
 			}
 		}
 
@@ -194,7 +201,7 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 	return true;
 }
 
-void Module::ConnectionPacketReceivedEventHandler(ble_evt_t* bleEvent, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
+void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
 {
 	//We want to handle incoming packets that change the module configuration
 	if(
@@ -207,7 +214,33 @@ void Module::ConnectionPacketReceivedEventHandler(ble_evt_t* bleEvent, Connectio
 		if(packet->moduleId != moduleId) return;
 
 		if(packetHeader->messageType == MESSAGE_TYPE_MODULE_SET_CONFIGURATION){
+			u16 configLength = inPacket->dataLength - SIZEOF_CONN_PACKET_MODULE_REQUEST;
+
 			//Save the received configuration to the module configuration
+			char* buffer[200];
+			Logger::getInstance().convertBufferToHexString((u8*)packet->data, configLength, (char*)buffer);
+
+			logt("ERROR", "rx (%d): %s", configLength,  buffer);
+
+			//Check if this config seems right
+			ModuleConfiguration* newConfig = (ModuleConfiguration*)packet->data;
+			if(
+					newConfig->version == configurationPointer->version
+					&& configLength == configurationLength
+			){
+				newConfig->moduleId = configurationPointer->moduleId; //ModuleID must not be transmitted
+				logt("ERROR", "Config set");
+				memcpy(configurationPointer, packet->data, configurationLength);
+
+				ConfigurationLoadedHandler();
+			}
+			else
+			{
+				logt("ERROR", "Wrong configuration length:%u vs. %u or version:%d vs %d", configLength, configurationLength, newConfig->version, configurationPointer->version);
+			}
+
+
+
 
 
 		} else if(packetHeader->messageType == MESSAGE_TYPE_MODULE_GET_CONFIGURATION){

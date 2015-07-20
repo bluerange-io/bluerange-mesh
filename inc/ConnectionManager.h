@@ -42,7 +42,7 @@ class ConnectionManagerCallback{
 		virtual void DisconnectionHandler(ble_evt_t* bleEvent) = 0;
 		virtual void ConnectionSuccessfulHandler(ble_evt_t* bleEvent) = 0;
 		virtual void ConnectionTimeoutHandler(ble_evt_t* bleEvent) = 0;
-		virtual void messageReceivedCallback(ble_evt_t* bleEvent) = 0;
+		virtual void messageReceivedCallback(connectionPacket* inPacket) = 0;
 };
 
 class ConnectionManager

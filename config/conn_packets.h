@@ -192,7 +192,7 @@ typedef struct
 
 
 //This message is used for different module request message types
-#define SIZEOF_CONN_PACKET_MODULE_REQUEST MAX_DATA_SIZE_PER_WRITE
+#define SIZEOF_CONN_PACKET_MODULE_REQUEST (SIZEOF_CONN_PACKET_HEADER + 2) //This size does not include the data reagion which is variable, add the used data region size to this size
 typedef struct
 {
 	connPacketHeader header;

@@ -529,6 +529,16 @@ void Logger::convertBufferToHexString(u8* srcBuffer, u32 srcLength, char* dstBuf
 	};
 }
 
+void Logger::parseHexStringToBuffer(const char* hexString, u8* dstBuffer, u16 dstBufferSize)
+{
+	u32 length = (strlen(hexString)+1)/3;
+	if(length > dstBufferSize) logt("ERROR", "too long for dstBuffer");
+
+	for(u32 i = 0; i<length; i++){
+		dstBuffer[i] = (u8)strtoul(hexString + (i*3), NULL, 16);
+	}
+}
+
 void Logger::disableAll()
 {
 	logFilter.clear();

@@ -168,18 +168,19 @@ void Connection::DisconnectionHandler(ble_evt_t* bleEvent)
 
 }
 
-void Connection::ReceivePacketHandler(ble_evt_t* bleEvent)
-{
 
-	u8* data = bleEvent->evt.gatts_evt.params.write.data;
-	u16 dataLength = bleEvent->evt.gatts_evt.params.write.len;
+void Connection::ReceivePacketHandler(connectionPacket* inPacket)
+{
+	u8* data = inPacket->data;
+	u16 dataLength = inPacket->dataLength;
+	bool reliable = inPacket->reliable;
 
 	//If it is a packet from the handshake, we keep it, otherwise, we forwared it to the node
 	connPacketHeader* packetHeader = (connPacketHeader*) data;
 
+	logt("CONN", "Received packet type %d, len %d", packetHeader->messageType, dataLength);
 
 	/*#################### ROUTING ############################*/
-	bool reliable = bleEvent->evt.gatts_evt.params.write.op == BLE_GATTS_OP_WRITE_CMD ? false : true;
 
 	//We are the last receiver for this packet
 	if(
@@ -435,7 +436,7 @@ void Connection::ReceivePacketHandler(ble_evt_t* bleEvent)
 				|| (packetHeader->receiver == NODE_ID_SHORTEST_SINK && node->persistentConfig.deviceType == deviceTypes::DEVICE_TYPE_SINK)
 		){
 			//Forward that Packet to the Node
-			connectionManager->connectionManagerCallback->messageReceivedCallback(bleEvent);
+			connectionManager->connectionManagerCallback->messageReceivedCallback(inPacket);
 		}
 	}
 

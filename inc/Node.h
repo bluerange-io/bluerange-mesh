@@ -193,7 +193,7 @@ class Node:
 		void DisconnectionHandler(ble_evt_t* bleEvent);
 		void ConnectionSuccessfulHandler(ble_evt_t* bleEvent);
 		void ConnectionTimeoutHandler(ble_evt_t* bleEvent);
-		void messageReceivedCallback(ble_evt_t* bleEvent);
+		void messageReceivedCallback(connectionPacket* inPacket);
 
 		//Set to true, to reset the system every 25 seconds and lock it when we find invalid states
 		static bool lookingForInvalidStateErrors;

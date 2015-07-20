@@ -55,7 +55,7 @@ public:
 	void DisconnectionHandler(ble_evt_t* bleEvent);
 	void ConnectionSuccessfulHandler(ble_evt_t* bleEvent);
 	void ConnectionTimeoutHandler(ble_evt_t* bleEvent);
-	void messageReceivedCallback(ble_evt_t* bleEvent);
+	void messageReceivedCallback(connectionPacket* inPacket);
 
 private:
 	static u32 nodeId;

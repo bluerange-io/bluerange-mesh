@@ -78,6 +78,16 @@ typedef struct
     u16		length; //Length of Data
 }sizedData;
 
+//A struct that is used for passing messages
+typedef struct
+{
+	u16 connectionHandle;
+	bool reliable;
+	u8* data;
+	u16 dataLength;
+}connectionPacket;
+
+
 //Data types for the mesh
 typedef u16 networkID;
 typedef u16 nodeID;

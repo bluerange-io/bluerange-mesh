@@ -58,5 +58,5 @@ class StatusReporterModule: public Module
 
 		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
 
-		void ConnectionPacketReceivedEventHandler(ble_evt_t* bleEvent, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
+		void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
 };

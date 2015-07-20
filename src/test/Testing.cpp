@@ -143,14 +143,14 @@ void Testing::ConnectionTimeoutHandler(ble_evt_t* bleEvent)
 	log("TIMEOUT");
 }
 
-void Testing::messageReceivedCallback(ble_evt_t* bleEvent)
+void Testing::messageReceivedCallback(connectionPacket* inPacket)
 {
-	log("message incoming, reliable:%d", bleEvent->evt.gatts_evt.params.write.op);
+	/*log("message incoming, reliable:%d", bleEvent->evt.gatts_evt.params.write.op);
 
 	u8* data = bleEvent->evt.gatts_evt.params.write.data;
 	u16 len = bleEvent->evt.gatts_evt.params.write.len;
 
-	log("Message IN: %d %d %d", data[0], data[1], data[2]);
+	log("Message IN: %d %d %d", data[0], data[1], data[2]);*/
 
 }
 
