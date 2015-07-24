@@ -81,7 +81,7 @@ void Module::ConfigurationLoadedHandler()
 	}
 	//Config-> loaded and ok
 	else {
-		logt("MODULE", "Module config loaded version:%d", configurationPointer->version);
+		logt("MODULE", "Module config loaded version:%d", configurationPointer->moduleVersion);
 	}
 }
 
@@ -110,7 +110,7 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 				//Check if this config seems right
 				ModuleConfiguration* newConfig = (ModuleConfiguration*)buffer;
 				if(
-						newConfig->version == configurationPointer->version
+						newConfig->moduleVersion == configurationPointer->moduleVersion
 						&& length == configurationLength
 				){
 					newConfig->moduleId = configurationPointer->moduleId; //ModuleID must not be transmitted
@@ -118,10 +118,12 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 					memcpy(configurationPointer, buffer, configurationLength);
 
 					ConfigurationLoadedHandler();
+
+					return true;
 				}
 				else
 				{
-					logt("ERROR", "Wrong configuration length:%u vs. %u or version:%d vs %d", length, configurationLength, newConfig->version, configurationPointer->version);
+					logt("ERROR", "Wrong configuration length:%u vs. %u or version:%d vs %d", length, configurationLength, newConfig->moduleVersion, configurationPointer->moduleVersion);
 				}
 			}
 			//Send command to other node
@@ -143,6 +145,8 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 
 
 				cm->SendMessageToReceiver(NULL, packetBuffer, configLength + SIZEOF_CONN_PACKET_MODULE_REQUEST, true);
+
+				return true;
 			}
 
 		}
@@ -193,6 +197,8 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 
 				cm->SendMessageToReceiver(NULL, (u8*) &packet, SIZEOF_CONN_PACKET_MODULE_REQUEST+1, true);
 			}
+
+			return true;
 		}
 
 	} else {
@@ -225,7 +231,7 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 			//Check if this config seems right
 			ModuleConfiguration* newConfig = (ModuleConfiguration*)packet->data;
 			if(
-					newConfig->version == configurationPointer->version
+					newConfig->moduleVersion == configurationPointer->moduleVersion
 					&& configLength == configurationLength
 			){
 				newConfig->moduleId = configurationPointer->moduleId; //ModuleID must not be transmitted
@@ -236,7 +242,7 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 			}
 			else
 			{
-				logt("ERROR", "Wrong configuration length:%u vs. %u or version:%d vs %d", configLength, configurationLength, newConfig->version, configurationPointer->version);
+				logt("ERROR", "Wrong configuration length:%u vs. %u or version:%d vs %d", configLength, configurationLength, newConfig->moduleVersion, configurationPointer->moduleVersion);
 			}
 
 

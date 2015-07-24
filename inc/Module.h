@@ -61,10 +61,12 @@ protected:
 		u16 moduleId;
 		u16 storageSlot;
 
+		//Pay attention that the module configuration is not packed and will
+		//therefore be padded by the compiler!!!
 		struct ModuleConfiguration{
 			u16 moduleId; //Id of the module, compared upon load and must match
+			u8 moduleVersion; //version of the configuration
 			u8 moduleActive; //Activate or deactivate the module
-			u8 version; //version of the configuration
 		};
 
 

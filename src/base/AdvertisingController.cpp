@@ -71,9 +71,9 @@ void AdvertisingController::Initialize(u16 networkIdentifier)
 	currentAdvertisingParams.p_whitelist = NULL;
 	currentAdvertisingParams.interval = 0x0200; // Advertising interval between 0x0020 and 0x4000 in 0.625 ms units (20ms to 10.24s), see @ref BLE_GAP_ADV_INTERVALS
 	currentAdvertisingParams.timeout = 0;
-	currentAdvertisingParams.channel_mask.ch_37_off = Config->advertiseOnChannel37;
-	currentAdvertisingParams.channel_mask.ch_38_off = Config->advertiseOnChannel38;
-	currentAdvertisingParams.channel_mask.ch_39_off = Config->advertiseOnChannel39;
+	currentAdvertisingParams.channel_mask.ch_37_off = Config->advertiseOnChannel37 ? 0 : 1;
+	currentAdvertisingParams.channel_mask.ch_38_off = Config->advertiseOnChannel38 ? 0 : 1;
+	currentAdvertisingParams.channel_mask.ch_39_off = Config->advertiseOnChannel39 ? 0 : 1;
 
 	//Set state
 	advertisingState = ADV_STATE_OFF;
@@ -108,6 +108,11 @@ void AdvertisingController::Initialize(u16 networkIdentifier)
 	scanHeader->manufacturer.type = BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA;
 	scanHeader->manufacturer.companyIdentifier = COMPANY_IDENTIFIER;
 
+}
+
+void AdvertisingController::SetNonConnectable()
+{
+	currentAdvertisingParams.type = BLE_GAP_ADV_TYPE_ADV_NONCONN_IND;
 }
 
 void AdvertisingController::UpdateAdvertisingData(u8 messageType, sizedData* payload, bool connectable)

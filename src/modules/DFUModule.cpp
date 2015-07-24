@@ -65,7 +65,7 @@ void DFUModule::ConfigurationLoadedHandler()
 	Module::ConfigurationLoadedHandler();
 
 	//Version migration can be added here
-	if(configuration.version == 1){/* ... */};
+	if(configuration.moduleVersion == 1){/* ... */};
 
 	//Do additional initialization upon loading the config
 
@@ -95,7 +95,7 @@ void DFUModule::ResetToDefaultConfiguration()
 	//Set default configuration values
 	configuration.moduleId = moduleId;
 	configuration.moduleActive = false;
-	configuration.version = 1;
+	configuration.moduleVersion = 1;
 }
 
 void DFUModule::BleEventHandler(ble_evt_t* bleEvent)

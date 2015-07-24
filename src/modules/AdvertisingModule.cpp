@@ -59,13 +59,13 @@ void AdvertisingModule::ConfigurationLoadedHandler()
 	Module::ConfigurationLoadedHandler();
 
 	//Version migration can be added here
-	if(configuration.version == 1){/* ... */};
+	if(configuration.moduleVersion == 1){/* ... */};
 
 	//Do additional initialization upon loading the config
 
 
 	//Start the Module...
-	logt("ADVMOD", "Config set %d", configuration.messageData[0].length);
+	logt("ADVMOD", "Config set");
 
 
 
@@ -82,7 +82,7 @@ void AdvertisingModule::ResetToDefaultConfiguration()
 	//Set default configuration values
 	configuration.moduleId = moduleId;
 	configuration.moduleActive = true;
-	configuration.version = 1;
+	configuration.moduleVersion = 1;
 
 	memset(configuration.messageData[0].messageData, 0, 31);
 
@@ -98,11 +98,10 @@ void AdvertisingModule::ResetToDefaultConfiguration()
 	name.name[0] = 'A';
 	name.name[1] = 'B';
 
-	configuration.baseIntervalMs = 500;
+	configuration.advertisingIntervalMs = 100;
 	configuration.messageCount = 1;
-	configuration.messageData[0].ratio = 1;
-	configuration.messageData[0].length = SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_NAME;
 
+	configuration.messageData[0].messageLength = 31;
 	memcpy(configuration.messageData[0].messageData, &flags, SIZEOF_ADV_STRUCTURE_FLAGS);
 	memcpy(configuration.messageData[0].messageData+SIZEOF_ADV_STRUCTURE_FLAGS, &name, SIZEOF_ADV_STRUCTURE_NAME);
 
@@ -110,10 +109,10 @@ void AdvertisingModule::ResetToDefaultConfiguration()
 
 void AdvertisingModule::NodeStateChangedHandler(discoveryState newState)
 {
-	if(newState == discoveryState::BACK_OFF){
+	if(newState == discoveryState::BACK_OFF || newState == discoveryState::DISCOVERY_OFF){
 		//Activate our advertising
 
-		u32 err = sd_ble_gap_adv_data_set(configuration.messageData[0].messageData, configuration.messageData[0].length, NULL, 0);
+		u32 err = sd_ble_gap_adv_data_set(configuration.messageData[0].messageData, configuration.messageData[0].messageLength, NULL, 0);
 		APP_ERROR_CHECK(err);
 
 		char buffer[100];
@@ -122,7 +121,13 @@ void AdvertisingModule::NodeStateChangedHandler(discoveryState newState)
 		logt("ADVMOD", "ADV set to %s", buffer);
 
 
+		if(configuration.messageData[0].forceNonConnectable)
+		{
+			AdvertisingController::SetNonConnectable();
+		}
+
 		//Now, start advertising
+		//TODO: Use values from config to advertise
 		AdvertisingController::SetAdvertisingState(advState::ADV_STATE_HIGH);
 
 	} else if (newState == discoveryState::DISCOVERY) {
@@ -134,8 +139,5 @@ void AdvertisingModule::NodeStateChangedHandler(discoveryState newState)
 bool AdvertisingModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
 	//Must be called to allow the module to get and set the config
-	Module::TerminalCommandHandler(commandName, commandArgs);
-
-	//React on commands, return true if handled, false otherwise
-	return false;
+	return Module::TerminalCommandHandler(commandName, commandArgs);
 }

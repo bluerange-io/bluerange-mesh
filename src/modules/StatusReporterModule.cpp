@@ -55,7 +55,7 @@ void StatusReporterModule::ConfigurationLoadedHandler()
 	Module::ConfigurationLoadedHandler();
 
 	//Version migration can be added here
-	if(configuration.version == 1){/* ... */};
+	if(configuration.moduleVersion == 1){/* ... */};
 
 	//Do additional initialization upon loading the config
 
@@ -82,7 +82,7 @@ void StatusReporterModule::ResetToDefaultConfiguration()
 	//Set default configuration values
 	configuration.moduleId = moduleId;
 	configuration.moduleActive = true;
-	configuration.version = 1;
+	configuration.moduleVersion = 1;
 
 	lastReportingTimer = 0;
 	configuration.reportingIntervalMs = 0;

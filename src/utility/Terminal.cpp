@@ -132,7 +132,7 @@ void Terminal::PollUART()
 
 			if (handled == 0){
 				if(promptAndEchoMode){
-					simple_uart_putstring((const u8*)"Command not found");
+					simple_uart_putstring((const u8*)"Command not found\n\r");
 				} else {
 					uart_error(Logger::COMMAND_NOT_FOUND);
 				}

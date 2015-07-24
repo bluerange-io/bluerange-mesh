@@ -31,21 +31,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <Module.h>
 
 #define ADVERTISING_MODULE_MAX_MESSAGES 1
+#define ADVERTISING_MODULE_MAX_MESSAGE_LENGTH 31
 
 class AdvertisingModule: public Module
 {
 	private:
 		struct AdvertisingMessage{
-			u8 ratio;
-			u8 messageData[31];
-			u8 length;
+			u8 forceNonConnectable : 1; //Always send this message non-connectable
+			u8 forceConnectable : 1; //Message is only sent, when it is possible to send it in connectable mode (if we have a free slave connection)
+			u8 reserved : 1;
+			u8 messageLength : 5;
+			u8 messageData[ADVERTISING_MODULE_MAX_MESSAGE_LENGTH];
 		};
 
 		//Module configuration that is saved persistently (size must be multiple of 4)
 		struct AdvertisingModuleConfiguration : ModuleConfiguration{
 			//Insert more persistent config values here
-			u16 baseIntervalMs;
+			//The interval at which the device advertises
+			//If multiple messages are configured, they will be distributed round robin
+			u16 advertisingIntervalMs;
+			//Number of messages
 			u8 messageCount;
+			u8 reserved;
 			AdvertisingMessage messageData[ADVERTISING_MODULE_MAX_MESSAGES];
 		};
 

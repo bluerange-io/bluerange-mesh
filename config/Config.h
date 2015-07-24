@@ -98,10 +98,10 @@ class Conf
 
 
 		//STATE timeouts
-		u16 meshStateTimeoutHigh = 3 * 1000; //Timeout of the High discovery state before deciding to which partner to connect
+		u16 meshStateTimeoutHigh = 1 * 1000; //Timeout of the High discovery state before deciding to which partner to connect
 		u16 meshStateTimeoutLow = 10 * 1000; //Timeout of the Low discovery state before deciding to which partner to connect
-		u16 meshStateTimeoutBackOff = 1 * 1000; //Timeout until the back_off state will return to discovery
-		u16 meshStateTimeoutBackOffVariance = 1 * 1000;  //Up to ... ms will be added randomly to the back off state timeout
+		u16 meshStateTimeoutBackOff = 2 * 1000; //Timeout until the back_off state will return to discovery
+		u16 meshStateTimeoutBackOffVariance = 2 * 1000;  //Up to ... ms will be added randomly to the back off state timeout
 
 		u16 discoveryHighToLowTransitionDuration = 10; // When discovery returns # times without results, the node will switch to low discovery
 
@@ -115,8 +115,8 @@ class Conf
 
 		// ########### ADVERTISING ################################################
 		u8 advertiseOnChannel37 = 1;
-		u8 advertiseOnChannel38 = 0;
-		u8 advertiseOnChannel39 = 0;
+		u8 advertiseOnChannel38 = 1;
+		u8 advertiseOnChannel39 = 1;
 
 
 
