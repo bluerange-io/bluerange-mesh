@@ -91,7 +91,7 @@ Node::Node(networkID networkId)
 	//activeModules[1] = new DFUModule((moduleID::DFU_MODULE_ID, this, cm, "DFU", 2);
 	activeModules[2] = new StatusReporterModule(moduleID::STATUS_REPORTER_MODULE_ID, this, cm, "STATUS", 3);
 	activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "ADV", 4);
-	//activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "SCAN", 5);
+	activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "SCAN", 5);
 
 
 	//Register a pre/post transmit hook for radio events

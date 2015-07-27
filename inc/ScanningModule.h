@@ -75,7 +75,10 @@ class ScanningModule: public Module
 		//Module configuration that is saved persistently (size must be multiple of 4)
 		struct ScanningModuleConfiguration : ModuleConfiguration{
 			//Insert more persistent config values here
+				u16 reportingIntervalMs;
 		};
+
+		u32 lastReportingTimerMs = 0;
 
 		ScanningModuleConfiguration configuration;
 
@@ -84,8 +87,17 @@ class ScanningModule: public Module
 
 		scannedPacket groupedPackets[SCAN_BUFFERS_SIZE];
 
+		//For total message counting
+		u32 totalMessages;
+		i32 totalRSSI;
+
+
+		enum ScanModuleMessages{TOTAL_SCANNED_PACKETS=0};
+
 		//Byte muss gesetzt sein, byte darf nicht gesetzt sein, byte ist egal
 		bool setScanFilter(scanFilterEntry* filter);
+
+		void SendReport();
 
 	public:
 		ScanningModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
@@ -99,6 +111,8 @@ class ScanningModule: public Module
 		void BleEventHandler(ble_evt_t* bleEvent);
 
 		void NodeStateChangedHandler(discoveryState newState);
+
+		void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
 
 		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
 };

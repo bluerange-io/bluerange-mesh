@@ -50,9 +50,33 @@ void ScanningModule::ConfigurationLoadedHandler()
 	};
 
 	//Do additional initialization upon loading the config
-
+	totalMessages = 0;
+	totalRSSI = 0;
 
 	//Start the Module...
+}
+
+void ScanningModule::ResetToDefaultConfiguration()
+{
+	//Set default configuration values
+	configuration.moduleId = moduleId;
+	configuration.moduleActive = true;
+	configuration.moduleVersion = 1;
+
+	//Set additional config values...
+	configuration.reportingIntervalMs = 2000;
+
+	//TODO: This is for testing only
+	scanFilterEntry filter;
+
+	filter.grouping = groupingType::GROUP_BY_ADDRESS;
+	filter.address.addr_type = 0xFF;
+	filter.advertisingType = 0xFF;
+	filter.minRSSI = -100;
+	filter.maxRSSI = 100;
+
+	setScanFilter(&filter);
+
 }
 
 //This function is used to set a number of filters that all non-mesh advertising packets
@@ -75,30 +99,60 @@ bool ScanningModule::setScanFilter(scanFilterEntry* filter)
 void ScanningModule::TimerEventHandler(u16 passedTime, u32 appTimer)
 {
 	//Do stuff on timer...
+	if(configuration.reportingIntervalMs != 0 && node->appTimerMs - lastReportingTimerMs > configuration.reportingIntervalMs){
+
+			SendReport();
+			totalMessages = 0;
+			totalRSSI = 0;
+			lastReportingTimerMs = node->appTimerMs;
+		}
 
 }
 
-void ScanningModule::ResetToDefaultConfiguration()
+void ScanningModule::SendReport()
 {
-	//Set default configuration values
-	configuration.moduleId = moduleId;
-	configuration.moduleActive = false;
-	configuration.moduleVersion = 1;
+	logt("SCANMOD", "Total:%d, avgRSSI:%d", totalMessages, totalRSSI);
+	if(totalMessages > 0){
+		connPacketModuleRequest data;
+		data.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
+		data.header.sender = node->persistentConfig.nodeId;
+		data.header.receiver = NODE_ID_BROADCAST; //Only send if sink available
 
-	//Set additional config values...
+		data.moduleId = moduleId;
+		data.data[0] = ScanModuleMessages::TOTAL_SCANNED_PACKETS;
 
-	//TODO: This is for testing only
-	scanFilterEntry filter;
+		memcpy(data.data + 1, &totalMessages, 4);
+		memcpy(data.data + 5, &totalRSSI, 4);
 
-	filter.grouping = groupingType::NO_GROUPING;
-	filter.address.addr_type = 0xFF;
-	filter.advertisingType = 0xFF;
-	filter.minRSSI = -100;
-	filter.maxRSSI = 100;
-
-	setScanFilter(&filter);
-
+		cm->SendMessageToReceiver(NULL, (u8*) &data, SIZEOF_CONN_PACKET_MODULE_REQUEST + 9, false);
+	}
 }
+
+
+void ScanningModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
+{
+	//Must call superclass for handling
+	Module::ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
+
+	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
+		connPacketModuleRequest* packet = (connPacketModuleRequest*)packetHeader;
+
+		//Check if our module is meant and we should trigger an action
+		if(packet->moduleId == moduleId){
+			//It's a LED message
+			if(packet->data[0] == ScanModuleMessages::TOTAL_SCANNED_PACKETS){
+
+				u32 totalMessages;
+				i32 totalRSSI;
+				memcpy(&totalMessages, packet->data+1, 4);
+				memcpy(&totalRSSI, packet->data+5, 4);
+
+				uart("SCANMOD", "from:%d, %u, %d", packet->header.sender, totalMessages, totalRSSI);
+			}
+		}
+	}
+}
+
 
 void ScanningModule::BleEventHandler(ble_evt_t* bleEvent)
 {
@@ -131,6 +185,14 @@ void ScanningModule::BleEventHandler(ble_evt_t* bleEvent)
 				ble_gap_addr_t* address = &bleEvent->evt.gap_evt.params.adv_report.peer_addr;
 				i8 rssi = bleEvent->evt.gap_evt.params.adv_report.rssi;
 
+				//Custom filter for iOS dudel name
+				if(data[3] == 0x06 && data[4] == 0x09 && data[5] == 0x44 && data[6] == 0x55){
+					//Collect the total amount of received packets
+					totalMessages++;
+					totalRSSI += rssi;
+				}
+
+
 				//logt("SCAN", "Other packet, rssi:%d, dataLength:%d", rssi, dataLength);
 
 				for (int i = 0; i < SCAN_FILTER_NUMBER; i++)
@@ -144,6 +206,9 @@ void ScanningModule::BleEventHandler(ble_evt_t* bleEvent)
 							{
 								if (scanFilters[i].minRSSI <= rssi && scanFilters[i].maxRSSI >= rssi)
 								{
+
+
+
 									if (scanFilters[i].grouping == GROUP_BY_ADDRESS)
 									{
 										for (int i = 0; i < SCAN_BUFFERS_SIZE; i++)
@@ -222,3 +287,4 @@ u32 bleParseAdvData(u8 type, sizedData* advData, sizedData* p_typedata)
 	}
 	return NRF_ERROR_NOT_FOUND;
 }
+
