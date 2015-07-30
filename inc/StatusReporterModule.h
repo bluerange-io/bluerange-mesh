@@ -43,7 +43,32 @@ class StatusReporterModule: public Module
 
 		StatusReporterModuleConfiguration configuration;
 
-		enum StatusModuleMessages{LED_MESSAGE=0};
+		enum StatusModuleTriggerActionMessages{
+			SET_LED_MESSAGE=0,
+			GET_STATUS_MESSAGE=1,
+			GET_CONNECTIONS_MESSAGE=2
+		};
+
+		enum StatusModuleActionResponseMessages{
+			STATUS_MESSAGE=0,
+			CONNECTIONS_MESSAGE=1
+		};
+
+
+		//Messages
+		#define SIZEOF_STATUS_REPORTER_MODULE_CONNECTIONS_MESSAGE 12
+		typedef struct
+		{
+				nodeID partner1;
+				nodeID partner2;
+				nodeID partner3;
+				nodeID partner4;
+				u8 rssi1;
+				u8 rssi2;
+				u8 rssi3;
+				u8 rssi4;
+
+		}StatusReporterModuleConnectionsMessage;
 
 		u32 lastReportingTimer;
 

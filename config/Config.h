@@ -122,7 +122,7 @@ class Conf
 
 		// ########### CONNECTION ################################################
 
-		u16 meshNetworkIdentifier = 1; //Allows a number of mesh networks to coexist in the same physical space without collision
+		u16 meshNetworkIdentifier = 2; //Allows a number of mesh networks to coexist in the same physical space without collision
 
 		const u8 meshMaxInConnections = 1; // Will probably never change and code will not allow this to change without modifications
 		const u8 meshMaxOutConnections = 3; //Will certainly change with future S130 versions

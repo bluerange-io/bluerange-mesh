@@ -110,6 +110,24 @@ void ConnectionManager::SendMessageToReceiver(Connection* originConnection, u8* 
 {
 	connPacketHeader* packetHeader = (connPacketHeader*) data;
 
+	//This packet was only meant for us, sth. like a packet to localhost
+	//Or if we sent this as a broadcast, we want to handle it ourself as well
+	if(
+			packetHeader->receiver == Node::getInstance()->persistentConfig.nodeId
+			|| (originConnection == NULL && packetHeader->receiver == NODE_ID_BROADCAST)
+	)
+	{
+		connectionPacket packet;
+		packet.connectionHandle = 0; //Not needed
+		packet.data = data;
+		packet.dataLength = dataLength;
+		packet.reliable = reliable;
+
+		//Send directly to our message handler in the node for processing
+		Node::getInstance()->messageReceivedCallback(&packet);
+	}
+
+
 	//Packets to the shortest sink
 	if(packetHeader->receiver == NODE_ID_SHORTEST_SINK)
 	{
@@ -119,7 +137,7 @@ void ConnectionManager::SendMessageToReceiver(Connection* originConnection, u8* 
 		if(dest) SendMessage(dest, data, dataLength, reliable);
 	}
 	//All other packets will be broadcasted, but we could and should check if the receiver is connected to us
-	else
+	else if(packetHeader->receiver != Node::getInstance()->persistentConfig.nodeId)
 	{
 		SendMessageOverConnections(originConnection, data, dataLength, reliable);
 	}

@@ -22,7 +22,7 @@ ScanningModule::ScanningModule(u16 moduleId, Node* node, ConnectionManager* cm, 
 		Module(moduleId, node, cm, name, storageSlot)
 {
 	//Register callbacks n' stuff
-	Logger::getInstance().enableTag("SCANMOD");
+	//Logger::getInstance().enableTag("SCANMOD");
 
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
@@ -60,11 +60,11 @@ void ScanningModule::ResetToDefaultConfiguration()
 {
 	//Set default configuration values
 	configuration.moduleId = moduleId;
-	configuration.moduleActive = true;
+	configuration.moduleActive = false;
 	configuration.moduleVersion = 1;
 
 	//Set additional config values...
-	configuration.reportingIntervalMs = 2000;
+	configuration.reportingIntervalMs = 10 * 1000;
 
 	//TODO: This is for testing only
 	scanFilterEntry filter;
@@ -147,7 +147,7 @@ void ScanningModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPa
 				memcpy(&totalMessages, packet->data+1, 4);
 				memcpy(&totalRSSI, packet->data+5, 4);
 
-				uart("SCANMOD", "from:%d, %u, %d", packet->header.sender, totalMessages, totalRSSI);
+				uart("SCANMOD", "{\"module\":%d, \"type\":\"general\", \"msgType\":\"totalpackets\", \"sender\":%d, \"messageSum\":%u, \"rssiSum\":%d}", moduleId, packet->header.sender, totalMessages, totalRSSI);
 			}
 		}
 	}
@@ -258,7 +258,7 @@ void ScanningModule::NodeStateChangedHandler(discoveryState newState)
 bool ScanningModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
 	//Must be called to allow the module to get and set the config
-	Module::TerminalCommandHandler(commandName, commandArgs);
+	return Module::TerminalCommandHandler(commandName, commandArgs);
 
 	//React on commands, return true if handled, false otherwise
 

@@ -994,7 +994,7 @@ void Node::UartGetStatus()
 	char mac[18];
 	sprintf(mac, "%02X:%02X:%02X:%02X:%02X:%02X", p_addr.addr[5], p_addr.addr[4], p_addr.addr[3], p_addr.addr[2], p_addr.addr[1], p_addr.addr[0]);
 
-	uart("STATUS", "{\"nodeId\":%d, \"mac\":\"%s\", \"clusterId\":%d, \"clusterSize\":%d, \"freeIn\":%d, \"freeOut\":%d}", persistentConfig.nodeId, mac, clusterId, clusterSize, cm->freeInConnections, cm->freeOutConnections);
+	uart("STATUS", "{\"module\":30, \"type\":\"response\", \"msgType\":\"status\", \"nodeId\":%d, \"mac\":\"%s\", \"clusterId\":%d, \"clusterSize\":%d, \"freeIn\":%d, \"freeOut\":%d}", persistentConfig.nodeId, mac, clusterId, clusterSize, cm->freeInConnections, cm->freeOutConnections);
 }
 
 

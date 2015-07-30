@@ -113,7 +113,7 @@ public:
 
 //Used for UART communication between node and attached pc
 #ifdef ENABLE_UART
-#define uart(tag, message, ...) Logger::getInstance().log_f(false, __FILE_S__, __LINE__, "<%s|" message ">", tag, ##__VA_ARGS__)
+#define uart(tag, message, ...) Logger::getInstance().log_f(false, __FILE_S__, __LINE__, message, ##__VA_ARGS__)
 #define uart_error(type) Logger::getInstance().uart_error_f(type)
 #else
 #define uart(...) do{}while(0)

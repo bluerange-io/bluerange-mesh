@@ -103,16 +103,16 @@ void Logger::uart_error_f(UartErrorType type)
 	switch (type)
 	{
 		case UartErrorType::NO_ERROR:
-			uart("ERROR", "{\"code\":0, \"text\":\"OK\"}");
+			uart("ERROR", "{\"module\":0, \"type\":\"error\", \"code\":0, \"text\":\"OK\"}");
 			break;
 		case UartErrorType::COMMAND_NOT_FOUND:
-			uart("ERROR", "{\"code\":1, \"text\":\"Command not found\"}");
+			uart("ERROR", "{\"module\":0, \"type\":\"error\", \"code\":1, \"text\":\"Command not found\"}");
 			break;
 		case UartErrorType::ARGUMENTS_WRONG:
-			uart("ERROR", "{\"code\":2, \"text\":\"Wrong Arguments\"}");
+			uart("ERROR", "{\"module\":0, \"type\":\"error\", \"code\":2, \"text\":\"Wrong Arguments\"}");
 			break;
 		default:
-			uart("ERROR", "{\"code\":99, \"text\":\"Unknown Error\"}");
+			uart("ERROR", "{\"module\":0, \"type\":\"error\", \"code\":99, \"text\":\"Unknown Error\"}");
 			break;
 	}
 }
