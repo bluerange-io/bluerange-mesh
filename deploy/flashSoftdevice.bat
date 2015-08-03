@@ -12,6 +12,7 @@ SET SEGGER4=680837880
 SET SEGGER5=680966072
 SET SEGGER6=680084304
 SET SEGGER7=680116493
+SET SEGGER8=680554309
 
 start /min %NRFJPROG_PATH% -s %SEGGER0% --erase --program %SOFTDEVICE_HEX%
 start /min %NRFJPROG_PATH% -s %SEGGER1% --erase --program %SOFTDEVICE_HEX%
@@ -21,5 +22,6 @@ start /min %NRFJPROG_PATH% -s %SEGGER4% --erase --program %SOFTDEVICE_HEX%
 start /min %NRFJPROG_PATH% -s %SEGGER5% --erase --program %SOFTDEVICE_HEX%
 start /min %NRFJPROG_PATH% -s %SEGGER6% --erase --program %SOFTDEVICE_HEX%
 start /min %NRFJPROG_PATH% -s %SEGGER7% --erase --program %SOFTDEVICE_HEX%
+start /min %NRFJPROG_PATH% -s %SEGGER8% --erase --program %SOFTDEVICE_HEX%
 
 echo "Flashing finished"

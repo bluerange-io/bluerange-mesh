@@ -90,7 +90,7 @@ class Node:
 		} testDevice;
 
 
-		#define NUM_TEST_DEVICES 9
+		#define NUM_TEST_DEVICES 10
 		static testDevice testDevices[];
 
 

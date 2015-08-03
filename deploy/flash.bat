@@ -14,6 +14,7 @@ SET SEGGER4=680837880
 SET SEGGER5=680966072
 SET SEGGER6=680084304
 SET SEGGER7=680116493
+SET SEGGER8=680554309
 
 SET APPHEXFILE=..\%1\FruityMesh.hex
 
@@ -25,5 +26,6 @@ start /min %NRFJPROG_PATH% -s %SEGGER4% --program %APPHEXFILE% -r
 start /min %NRFJPROG_PATH% -s %SEGGER5% --program %APPHEXFILE% -r
 start /min %NRFJPROG_PATH% -s %SEGGER6% --program %APPHEXFILE% -r
 start /min %NRFJPROG_PATH% -s %SEGGER7% --program %APPHEXFILE% -r
+start /min %NRFJPROG_PATH% -s %SEGGER8% --program %APPHEXFILE% -r
 
 echo "Flashing finished"

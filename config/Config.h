@@ -122,7 +122,7 @@ class Conf
 
 		// ########### CONNECTION ################################################
 
-		u16 meshNetworkIdentifier = 2; //Allows a number of mesh networks to coexist in the same physical space without collision
+		u16 meshNetworkIdentifier = 1; //Allows a number of mesh networks to coexist in the same physical space without collision
 
 		const u8 meshMaxInConnections = 1; // Will probably never change and code will not allow this to change without modifications
 		const u8 meshMaxOutConnections = 3; //Will certainly change with future S130 versions
@@ -160,15 +160,6 @@ class Conf
 //Identifiers
 #define COMPANY_IDENTIFIER 0x024D // Company identifier for manufacturer specific data header
 #define MESH_IDENTIFIER 0xF1 //Identifier that defines this as the mesh protocol
-
-//Specifiy some chip-intern ids and use the to give the nodes human readable numbers
-#define ID045_DEVICE_ID 0x625B70B2
-#define ID458_DEVICE_ID 0x378023FE
-#define ID847_DEVICE_ID 0xD0F1F53A
-#define ID635_DEVICE_ID 0x745EF251
-#define ID880_DEVICE_ID 0x3e0a4045
-#define ID072_DEVICE_ID 0x872bbd44
-#define ID667_DEVICE_ID 0xfbb59d31
 
 //GAP device name
 #define DEVICE_NAME "FRUITY"

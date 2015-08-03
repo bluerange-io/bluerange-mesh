@@ -112,23 +112,26 @@ void AdvertisingModule::NodeStateChangedHandler(discoveryState newState)
 	if(newState == discoveryState::BACK_OFF || newState == discoveryState::DISCOVERY_OFF){
 		//Activate our advertising
 
-		u32 err = sd_ble_gap_adv_data_set(configuration.messageData[0].messageData, configuration.messageData[0].messageLength, NULL, 0);
-		APP_ERROR_CHECK(err);
+		if(configuration.messageCount > 0){
+			u32 err = sd_ble_gap_adv_data_set(configuration.messageData[0].messageData, configuration.messageData[0].messageLength, NULL, 0);
+			APP_ERROR_CHECK(err);
 
-		char buffer[100];
-		Logger::getInstance().convertBufferToHexString((u8*)configuration.messageData[0].messageData, 31, buffer);
+			char buffer[100];
+			Logger::getInstance().convertBufferToHexString((u8*)configuration.messageData[0].messageData, 31, buffer);
 
-		logt("ADVMOD", "ADV set to %s", buffer);
+			logt("ADVMOD", "ADV set to %s", buffer);
 
 
-		if(configuration.messageData[0].forceNonConnectable)
-		{
-			AdvertisingController::SetNonConnectable();
+
+			if(configuration.messageData[0].forceNonConnectable)
+			{
+				AdvertisingController::SetNonConnectable();
+			}
+
+			//Now, start advertising
+			//TODO: Use values from config to advertise
+			AdvertisingController::SetAdvertisingState(advState::ADV_STATE_HIGH);
 		}
-
-		//Now, start advertising
-		//TODO: Use values from config to advertise
-		AdvertisingController::SetAdvertisingState(advState::ADV_STATE_HIGH);
 
 	} else if (newState == discoveryState::DISCOVERY) {
 		//Do not trigger custom advertisings anymore, reset to node's advertising

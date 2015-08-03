@@ -234,9 +234,12 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 					newConfig->moduleVersion == configurationPointer->moduleVersion
 					&& configLength == configurationLength
 			){
-				newConfig->moduleId = configurationPointer->moduleId; //ModuleID must not be transmitted
+				//Backup the module id because it must not be sent in the packet
+				u16 moduleId = configurationPointer->moduleId;
 				logt("ERROR", "Config set");
 				memcpy(configurationPointer, packet->data, configurationLength);
+				configurationPointer->moduleId = moduleId;
+
 
 				ConfigurationLoadedHandler();
 			}

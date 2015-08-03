@@ -60,11 +60,11 @@ void ScanningModule::ResetToDefaultConfiguration()
 {
 	//Set default configuration values
 	configuration.moduleId = moduleId;
-	configuration.moduleActive = false;
+	configuration.moduleActive = true;
 	configuration.moduleVersion = 1;
 
 	//Set additional config values...
-	configuration.reportingIntervalMs = 10 * 1000;
+	configuration.reportingIntervalMs = 20 * 1000;
 
 	//TODO: This is for testing only
 	scanFilterEntry filter;

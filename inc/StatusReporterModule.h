@@ -72,7 +72,9 @@ class StatusReporterModule: public Module
 
 		u32 lastReportingTimer;
 
-		void SendConnectionInformation(Connection* toConnection);
+		void SendConnectionInformation(nodeID toNode);
+
+		void SendStatusInformation(nodeID toNode);
 
 	public:
 		StatusReporterModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);

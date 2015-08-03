@@ -71,7 +71,7 @@ void StatusReporterModule::TimerEventHandler(u16 passedTime, u32 appTimer)
 	//Every reporting interval, the node should send its status
 	if(configuration.reportingIntervalMs != 0 && node->appTimerMs - lastReportingTimer > configuration.reportingIntervalMs){
 
-		//TODO: Add again SendConnectionInformation(NULL);
+		SendConnectionInformation(NODE_ID_BROADCAST);
 		lastReportingTimer = node->appTimerMs;
 	}
 
@@ -85,7 +85,7 @@ void StatusReporterModule::ResetToDefaultConfiguration()
 	configuration.moduleVersion = 1;
 
 	lastReportingTimer = 0;
-	configuration.reportingIntervalMs = 0;
+	configuration.reportingIntervalMs = 30 * 1000;
 	configuration.samplingIntervalMs = 0;
 
 	//Set additional config values...
@@ -146,16 +146,7 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 		}
 		else if(commandArgs.size() == 3 && commandArgs[2] == "get_status")
 		{
-			connPacketModuleRequest packet;
-			packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
-			packet.header.sender = node->persistentConfig.nodeId;
-			packet.header.receiver = destinationNode;
-
-			packet.moduleId = moduleId;
-			packet.data[0] = StatusModuleTriggerActionMessages::GET_STATUS_MESSAGE;
-
-
-			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_REQUEST+1, true);
+			SendStatusInformation(destinationNode);
 
 			return true;
 		}
@@ -309,4 +300,49 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 				break;
 		}*/
 	}
+}
+
+void StatusReporterModule::SendStatusInformation(nodeID toNode)
+{
+	connPacketModuleRequest packet;
+	packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
+	packet.header.sender = node->persistentConfig.nodeId;
+	packet.header.receiver = toNode;
+
+	packet.moduleId = moduleId;
+	packet.data[0] = StatusModuleTriggerActionMessages::GET_STATUS_MESSAGE;
+
+
+	cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_REQUEST+1, true);
+}
+
+
+void StatusReporterModule::SendConnectionInformation(nodeID toNode)
+{
+	//Build response and send
+	u16 packetSize = SIZEOF_CONN_PACKET_MODULE_REQUEST + 1 + SIZEOF_STATUS_REPORTER_MODULE_CONNECTIONS_MESSAGE;
+	u8 buffer[packetSize];
+	connPacketModuleRequest* outPacket = (connPacketModuleRequest*)buffer;
+
+	outPacket->header.messageType = MESSAGE_TYPE_MODULE_ACTION_RESPONSE;
+	outPacket->header.receiver = NODE_ID_BROADCAST;
+	outPacket->header.sender = node->persistentConfig.nodeId;
+
+	outPacket->moduleId = moduleId;
+	outPacket->data[0] = StatusModuleActionResponseMessages::CONNECTIONS_MESSAGE;
+
+	StatusReporterModuleConnectionsMessage* outPacketData = (StatusReporterModuleConnectionsMessage*)(outPacket->data + 1);
+
+	outPacketData->partner1 = cm->connections[0]->partnerId;
+	outPacketData->partner2 = cm->connections[1]->partnerId;
+	outPacketData->partner3 = cm->connections[2]->partnerId;
+	outPacketData->partner4 = cm->connections[3]->partnerId;
+
+	outPacketData->rssi1 = cm->connections[0]->GetAverageRSSI();
+	outPacketData->rssi2 = cm->connections[1]->GetAverageRSSI();
+	outPacketData->rssi3 = cm->connections[2]->GetAverageRSSI();
+	outPacketData->rssi4 = cm->connections[3]->GetAverageRSSI();
+
+
+	cm->SendMessageToReceiver(NULL, buffer, packetSize, true);
 }
