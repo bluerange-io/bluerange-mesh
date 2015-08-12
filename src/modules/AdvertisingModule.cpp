@@ -104,7 +104,6 @@ void AdvertisingModule::ResetToDefaultConfiguration()
 	configuration.messageData[0].messageLength = 31;
 	memcpy(configuration.messageData[0].messageData, &flags, SIZEOF_ADV_STRUCTURE_FLAGS);
 	memcpy(configuration.messageData[0].messageData+SIZEOF_ADV_STRUCTURE_FLAGS, &name, SIZEOF_ADV_STRUCTURE_NAME);
-
 }
 
 void AdvertisingModule::NodeStateChangedHandler(discoveryState newState)
