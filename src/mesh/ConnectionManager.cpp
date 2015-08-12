@@ -429,6 +429,10 @@ void ConnectionManager::fillTransmitBuffers()
 	//possible in a future SoftDevice version
 	//meanwhile, here is a trivial implementation
 
+	//FIXME: I get the feeling that there are more buffers available
+	//Reference: https://devzone.nordicsemi.com/question/41090/what-does-sd_ble_tx_buffer_count_get-return/
+	//This should be fixed to optimize throughput
+
 
 	//Loop through all 4 connections infinitely
 	bool continueSending = false;

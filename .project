@@ -48,7 +48,7 @@
 		<link>
 			<name>src/nrf/pstorage.c</name>
 			<type>1</type>
-			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf_sdk_latest/components/drivers_nrf/pstorage/pstorage.c</locationURI>
+			<locationURI>PARENT-2-PROJECT_LOC/sdk/nrf_sdk_latest/components/drivers_nrf/pstorage/pstorage.c</locationURI>
 		</link>
 		<link>
 			<name>src/nrf/softdevice_handler.c</name>

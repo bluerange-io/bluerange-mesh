@@ -22,9 +22,11 @@
 
 extern "C"
 {
+#include <time.h>
 #include <stdlib.h>
 #include <nrf_soc.h>
 #include <app_error.h>
+#include <app_timer.h>
 }
 
 //Buffer that keeps a predefined number of join me packets
@@ -100,7 +102,7 @@ Node::Node(networkID networkId)
 	joinMePacketBuffer = new SimpleBuffer((u8*) raw_joinMePacketBuffer, sizeof(joinMeBufferPacket) * JOIN_ME_PACKET_BUFFER_MAX_ELEMENTS, sizeof(joinMeBufferPacket));
 
 	//Load Node configuration from slot 0
-	if(Config->ignorePersistentConfigurationOnBoot){
+	if(Config->ignorePersistentNodeConfigurationOnBoot){
 		persistentConfig.version = 0xFF;
 		ConfigurationLoadedHandler();
 	} else {
@@ -123,12 +125,17 @@ void Node::ConfigurationLoadedHandler()
 		persistentConfig.networkId = Config->meshNetworkIdentifier;
 		persistentConfig.reserved = 0;
 
+		//Get a random number for the connection loss counter (hard on system start,...stat)
+		while(persistentConfig.connectionLossCounter == 0){
+			sd_rand_application_vector_get((u8*) &persistentConfig.connectionLossCounter, 2);
+		}
+
 		//Get an id for our testdevices when not working with persistent storage
 		InitWithTestDeviceSettings();
 	}
 	else
 	{
-		logt("NODE", "Config loaded nodeId:%X, connLossCount:%X, netowrkId:%d, reserved:%d", persistentConfig.nodeId, persistentConfig.connectionLossCounter, persistentConfig.networkId, persistentConfig.reserved);
+		logt("NODE", "Config loaded nodeId:%X, connLossCount:%u, netowrkId:%d, reserved:%d", persistentConfig.nodeId, persistentConfig.connectionLossCounter, persistentConfig.networkId, persistentConfig.reserved);
 	}
 
 
@@ -147,7 +154,7 @@ void Node::ConfigurationLoadedHandler()
 	this->UpdateJoinMePacket(NULL);
 
 	//Print configuration and start node
-	logt("NODE", "Config loaded nodeId:%d, connLossCount:%02X, reserved:%d", persistentConfig.nodeId, persistentConfig.connectionLossCounter, persistentConfig.reserved);
+	logt("NODE", "Config loaded nodeId:%d, connLossCount:%u, reserved:%d", persistentConfig.nodeId, persistentConfig.connectionLossCounter, persistentConfig.reserved);
 
 	//Go to Discovery
 	ChangeState(discoveryState::DISCOVERY);
@@ -934,15 +941,15 @@ clusterID Node::GenerateClusterID(void)
 	//Combine connection loss and nodeId to generate a unique cluster id
 	clusterID newId = this->persistentConfig.nodeId + this->persistentConfig.connectionLossCounter << 16;
 
-	logt("NODE", "New cluster id generated %d", newId);
+	logt("NODE", "New cluster id generated %u", newId);
 	return newId;
 }
 
 void Node::PrintStatus(void)
 {
 	trace("**************\n\r");
-	trace("This is Node %d in clusterId:%d with clusterSize:%d, type:%d\n\r", this->persistentConfig.nodeId, this->clusterId, this->clusterSize, this->persistentConfig.deviceType);
-	trace("Ack Field:%d, ChipId:%u\n\r", ackFieldDebugCopy, NRF_FICR->DEVICEID[1]);
+	trace("This is Node %d in clusterId:%d with clusterSize:%d\n\r", this->persistentConfig.nodeId, this->clusterId, this->clusterSize);
+	trace("Ack Field:%d, ChipId:%u, ConnectionLossCounter:%u, nodeType:%d\n\r", ackFieldDebugCopy, NRF_FICR->DEVICEID[1], persistentConfig.connectionLossCounter, this->persistentConfig.deviceType);
 
 	ble_gap_addr_t p_addr;
 	sd_ble_gap_address_get(&p_addr);
@@ -1182,6 +1189,14 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		return true;
 
 	}
+	else if (commandName == "SET_NODEID")
+	{
+
+		this->persistentConfig.nodeId = atoi(commandArgs[0].c_str());
+
+		return true;
+
+	}
 
 	/************* UART COMMANDS ***************/
 	else if (commandName == "UART_GET_STATUS")
@@ -1203,7 +1218,18 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	return true;
 }
 
-//IDs of test nodes
+/*
+IDs for development devices:
+	Use this section to map the nRF chip id to some of your desired values
+	This makes it easy to deploy the same firmware to a number of nodes and have them use Fixed settings
+
+Parameters:
+	- chipID: Boot the device with this firmware, enter "status" in the terminal and copy the chipID that is read from the NRF_FICR->DEVICEID[1] register
+	- nodeID: Enter the desired nodeID here (the last 3 digits of the segger id for example)
+	- deviceType: whether the node is a data endpoint, moving around or static
+	- string representation of the node id for the terminal
+	- desired BLE access address: Must comply to the spec (only modify the first byte for starters)
+*/
 Node::testDevice Node::testDevices[NUM_TEST_DEVICES] = {
 
 		{ 1650159794, 45, DEVICE_TYPE_SINK, "045", {BLE_GAP_ADDR_TYPE_RANDOM_STATIC, { 0x45, 0x16, 0xE8, 0x52, 0x4E, 0xc0 } } },
@@ -1228,6 +1254,7 @@ Node::testDevice Node::testDevices[NUM_TEST_DEVICES] = {
 
 	};
 
+//Uses the testDevice array and copies the configured values to the node settings
 void Node::InitWithTestDeviceSettings()
 {
 	u8 found = 0;

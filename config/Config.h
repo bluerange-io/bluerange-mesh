@@ -55,8 +55,12 @@ class Conf
 
 		// ########### DEBUGGING ################################################
 
+		//Do not load the persistent node configuration
+		//Beware: Persistent config must be updated with every connection loss or random shoudl be used....?
+		bool ignorePersistentNodeConfigurationOnBoot = true;
+
 		//Do not use any persistently saved module data
-		bool ignorePersistentConfigurationOnBoot = true;
+		bool ignorePersistentModuleConfigurationOnBoot = true;
 
 		//This variable can be toggled via the Terminal "BREAK" and can be used
 		//to toggle conditional breakpoints because the softdevice does not allow
@@ -137,7 +141,7 @@ class Conf
 #include <board_pca10031.h>
 //#include <board_adafruit_ble_friend.h>
 
-#define VERSION_STRING "0.1"
+#define VERSION_STRING "0.1.7"
 
 //Each of the Connections has a buffer for outgoing packets, this is its size in bytes
 #define PACKET_SEND_BUFFER_SIZE 400
@@ -158,8 +162,8 @@ class Conf
 #define ATTR_TABLE_MAX_SIZE 0x200
 
 //Identifiers
-#define COMPANY_IDENTIFIER 0x024D // Company identifier for manufacturer specific data header
-#define MESH_IDENTIFIER 0xF1 //Identifier that defines this as the mesh protocol
+#define COMPANY_IDENTIFIER 0x024D // Company identifier for manufacturer specific data header (M-Way Solutions GmbH)
+#define MESH_IDENTIFIER 0xF0 //Identifier that defines this as the fruitymesh protocol
 
 //GAP device name
 #define DEVICE_NAME "FRUITY"
@@ -203,3 +207,6 @@ enum moduleID{
 #define NODE_ID_GROUP_BASE 20000
 #define NODE_ID_HOPS_BASE 30000
 #define NODE_ID_SHORTEST_SINK 31001
+
+
+

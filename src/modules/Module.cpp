@@ -54,7 +54,7 @@ void Module::SaveModuleConfiguration()
 
 void Module::LoadModuleConfiguration()
 {
-	if(Config->ignorePersistentConfigurationOnBoot){
+	if(Config->ignorePersistentModuleConfigurationOnBoot){
 		//Invalidate config and load default
 		configurationPointer->moduleId = 0xFF;
 		ResetToDefaultConfiguration();

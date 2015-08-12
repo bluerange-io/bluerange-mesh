@@ -37,8 +37,12 @@ u32 Utility::GetRandomInteger(void)
 	u32 err = sd_rand_application_vector_get((u8*) &randomNumber, 4);
 	if (err == NRF_SUCCESS)
 		return randomNumber;
-	else
-		return 5; // Chosen by fair dice roll
+	else{
+		i32 temp;
+		err = sd_temp_get(&temp);
+		logt("ERROR", "Random number generator not yet initialized, temperature used");
+		return temp;
+	}
 }
 
 void Utility::CheckFreeHeap(void)
