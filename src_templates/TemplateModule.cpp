@@ -34,8 +34,7 @@ TemplateModule::TemplateModule(u16 moduleId, Node* node, ConnectionManager* cm, 
 	: Module(moduleId, node, cm, name, storageSlot)
 {
 	//Register callbacks n' stuff
-	Logger::getInstance().enableTag("TEMPLATE");
-	Terminal::AddTerminalCommandListener(this);
+	Logger::getInstance().enableTag("TEMPLATEMOD");
 
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
@@ -52,7 +51,7 @@ void TemplateModule::ConfigurationLoadedHandler()
 	Module::ConfigurationLoadedHandler();
 
 	//Version migration can be added here
-	if(configuration.version == 1){/* ... */};
+	if(configuration.moduleVersion == 1){/* ... */};
 
 	//Do additional initialization upon loading the config
 
@@ -72,7 +71,7 @@ void TemplateModule::ResetToDefaultConfiguration()
 	//Set default configuration values
 	configuration.moduleId = moduleId;
 	configuration.moduleActive = false;
-	configuration.version = 1;
+	configuration.moduleVersion = 1;
 
 	//Set additional config values...
 
@@ -85,4 +84,7 @@ bool TemplateModule::TerminalCommandHandler(string commandName, vector<string> c
 
 	//React on commands, return true if handled, false otherwise
 
+
+
+	return false;
 }

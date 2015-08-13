@@ -24,19 +24,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <Module.h>
 
-class TemplateModule: public Module
+class PingModule: public Module
 {
 	private:
 
 		//Module configuration that is saved persistently (size must be multiple of 4)
-		struct TemplateModuleConfiguration : ModuleConfiguration{
+		struct PingModuleConfiguration : ModuleConfiguration{
 			//Insert more persistent config values here
 		};
 
-		TemplateModuleConfiguration configuration;
+		PingModuleConfiguration configuration;
+
+		enum PingModuleTriggerActionMessages{
+			TRIGGER_PING=0
+		};
+
+		enum PingModuleActionResponseMessages{
+			PING_RESPONSE=0
+		};
 
 	public:
-		TemplateModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		PingModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 
 		void ConfigurationLoadedHandler();
 
@@ -46,7 +54,7 @@ class TemplateModule: public Module
 
 		//void BleEventHandler(ble_evt_t* bleEvent);
 
-		//void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
+		void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
 
 		//void NodeStateChangedHandler(discoveryState newState);
 
