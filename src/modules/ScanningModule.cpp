@@ -221,6 +221,7 @@ void ScanningModule::BleEventHandler(ble_evt_t* bleEvent)
 									{
 										logt("SCAN", "sending");
 
+										//FIXME: Legacy packet structure, should use module message
 										connPacketAdvInfo data;
 										data.header.messageType = MESSAGE_TYPE_ADVINFO;
 										data.header.sender = node->persistentConfig.nodeId;

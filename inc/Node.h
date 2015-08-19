@@ -160,7 +160,10 @@ class Node:
 		//States
 		void ChangeState(discoveryState newState);
 		void DisableStateMachine(bool disable); //Disables the ChangeState function and does therefore kill all automatic mesh functionality
+		void Stop();
 
+		//Persistent configuration
+		void SaveConfiguration();
 
 		//Connection handlers
 		//Message handlers

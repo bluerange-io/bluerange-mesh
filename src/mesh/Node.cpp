@@ -19,6 +19,7 @@
 #include <StatusReporterModule.h>
 #include <AdvertisingModule.h>
 #include <ScanningModule.h>
+#include <EnrollmentModule.h>
 
 extern "C"
 {
@@ -94,6 +95,7 @@ Node::Node(networkID networkId)
 	activeModules[2] = new StatusReporterModule(moduleID::STATUS_REPORTER_MODULE_ID, this, cm, "status", 3);
 	activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "adv", 4);
 	activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "scan", 5);
+	activeModules[5] = new EnrollmentModule(moduleID::ENROLLMENT_MODULE_ID, this, cm, "enroll", 6);
 
 
 	//Register a pre/post transmit hook for radio events
@@ -103,6 +105,7 @@ Node::Node(networkID networkId)
 
 	//Load Node configuration from slot 0
 	if(Config->ignorePersistentNodeConfigurationOnBoot){
+		logt("NODE", "ignoring persistent config!");
 		persistentConfig.version = 0xFF;
 		ConfigurationLoadedHandler();
 	} else {
@@ -119,7 +122,7 @@ void Node::ConfigurationLoadedHandler()
 	//If config is unset, set to default
 	if (persistentConfig.version == 0xFF)
 	{
-		logt("NODE", "default config set");
+		logt("NODE", "config was empty, default config set");
 		persistentConfig.version = 0;
 		persistentConfig.connectionLossCounter = 0;
 		persistentConfig.networkId = Config->meshNetworkIdentifier;
@@ -133,12 +136,6 @@ void Node::ConfigurationLoadedHandler()
 		//Get an id for our testdevices when not working with persistent storage
 		InitWithTestDeviceSettings();
 	}
-	else
-	{
-		logt("NODE", "Config loaded nodeId:%X, connLossCount:%u, netowrkId:%d, reserved:%d", persistentConfig.nodeId, persistentConfig.connectionLossCounter, persistentConfig.networkId, persistentConfig.reserved);
-	}
-
-
 
 	clusterId = this->GenerateClusterID();
 
@@ -154,7 +151,7 @@ void Node::ConfigurationLoadedHandler()
 	this->UpdateJoinMePacket(NULL);
 
 	//Print configuration and start node
-	logt("NODE", "Config loaded nodeId:%d, connLossCount:%u, reserved:%d", persistentConfig.nodeId, persistentConfig.connectionLossCounter, persistentConfig.reserved);
+	logt("NODE", "Config loaded nodeId:%d, connLossCount:%u, netowrkId:%d", persistentConfig.nodeId, persistentConfig.connectionLossCounter, persistentConfig.networkId);
 
 	//Go to Discovery
 	ChangeState(discoveryState::DISCOVERY);
@@ -678,6 +675,24 @@ void Node::AdvertisementMessageHandler(ble_evt_t* bleEvent)
 
 #pragma endregion Advertising
 
+
+/*
+ #########################################################################################################
+ ### Persistent configuration
+ #########################################################################################################
+ */
+#define ________________CONFIGURATION___________________
+#pragma region configuration
+
+void Node::SaveConfiguration()
+{
+	Storage::getInstance().QueuedWrite((u8*) &persistentConfig, sizeof(NodeConfiguration), 0, this);
+}
+
+
+#pragma endregion configuration
+
+
 /*
  #########################################################################################################
  ### Advertising and Receiving advertisements
@@ -814,6 +829,12 @@ void Node::DisableStateMachine(bool disable)
 	stateMachineDisabled = disable;
 }
 
+//Convenience method for stopping all mesh activity
+void Node::Stop(){
+	ChangeState(discoveryState::DISCOVERY_OFF);
+	DisableStateMachine(true);
+}
+
 void Node::TimerTickHandler(u16 timerMs)
 {
 	passsedTimeSinceLastTimerHandler = timerMs;
@@ -948,7 +969,7 @@ clusterID Node::GenerateClusterID(void)
 void Node::PrintStatus(void)
 {
 	trace("**************\n\r");
-	trace("This is Node %d in clusterId:%d with clusterSize:%d\n\r", this->persistentConfig.nodeId, this->clusterId, this->clusterSize);
+	trace("This is Node %u in clusterId:%x with clusterSize:%u, networkId:%u\n\r", this->persistentConfig.nodeId, this->clusterId, this->clusterSize, persistentConfig.networkId);
 	trace("Ack Field:%d, ChipId:%u, ConnectionLossCounter:%u, nodeType:%d\n\r", ackFieldDebugCopy, NRF_FICR->DEVICEID[1], persistentConfig.connectionLossCounter, this->persistentConfig.deviceType);
 
 	ble_gap_addr_t p_addr;
@@ -959,7 +980,7 @@ void Node::PrintStatus(void)
 	trace("GAP Addr is %s\n\r\n\r", addrString);
 
 	//Print connection info
-	trace("CONNECTIONS (freeIn:%d, freeOut:%d, pendingPackets:%d, txBuf:%d\n\r", cm->freeInConnections, cm->freeOutConnections, cm->pendingPackets, cm->txBufferFreeCount);
+	trace("CONNECTIONS (freeIn:%u, freeOut:%u, pendingPackets:%u, txBuf:%u\n\r", cm->freeInConnections, cm->freeOutConnections, cm->pendingPackets, cm->txBufferFreeCount);
 	cm->inConnection->PrintStatus();
 	for (int i = 0; i < Config->meshMaxOutConnections; i++)
 	{
@@ -975,7 +996,7 @@ void Node::PrintBufferStatus(void)
 	for (int i = 0; i < joinMePacketBuffer->_numElements; i++)
 	{
 		packet = (joinMeBufferPacket*) joinMePacketBuffer->PeekItemAt(i);
-		trace("=> %d, clusterId:%d, clusterSize:%d, freeIn:%d, freeOut:%d, writeHandle:%d, ack:%d", packet->payload.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.freeInConnections, packet->payload.freeOutConnections, packet->payload.meshWriteHandle, packet->payload.ackField);
+		trace("=> %d, clusterId:%u, clusterSize:%u, freeIn:%u, freeOut:%u, writeHandle:%u, ack:%u", packet->payload.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.freeInConnections, packet->payload.freeOutConnections, packet->payload.meshWriteHandle, packet->payload.ackField);
 		if (packet->connectable == BLE_GAP_ADV_TYPE_ADV_IND)
 		trace(" ADV_IND\n\r");
 		else if (packet->connectable == BLE_GAP_ADV_TYPE_ADV_NONCONN_IND)

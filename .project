@@ -26,6 +26,11 @@
 	</natures>
 	<linkedResources>
 		<link>
+			<name>release_notes.txt</name>
+			<type>1</type>
+			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf_sdk_latest/documentation/release_notes.txt</locationURI>
+		</link>
+		<link>
 			<name>src/nrf/Vectors_nRF51.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/ehal_latest/ARM/Nordic/nRF51/src/Vectors_nRF51.c</locationURI>

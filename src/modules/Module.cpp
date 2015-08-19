@@ -242,6 +242,8 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 				memcpy(configurationPointer, packet->data, configurationLength);
 				configurationPointer->moduleId = moduleId;
 
+				//TODO: Save
+
 
 				ConfigurationLoadedHandler();
 			}

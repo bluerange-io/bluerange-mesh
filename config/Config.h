@@ -126,7 +126,9 @@ class Conf
 
 		// ########### CONNECTION ################################################
 
-		u16 meshNetworkIdentifier = 1; //Allows a number of mesh networks to coexist in the same physical space without collision
+		//Allows a number of mesh networks to coexist in the same physical space without collision
+		//Allowed range is 0x0000 - 0xFF00 (0 - 65280), others are reserved for special purpose
+		u16 meshNetworkIdentifier = 7;
 
 		const u8 meshMaxInConnections = 1; // Will probably never change and code will not allow this to change without modifications
 		const u8 meshMaxOutConnections = 3; //Will certainly change with future S130 versions
@@ -168,6 +170,10 @@ class Conf
 //GAP device name
 #define DEVICE_NAME "FRUITY"
 
+//Storage
+#define STORAGE_BLOCK_SIZE 128 //Determines the maximum size for a module configuration
+#define STORAGE_BLOCK_NUMBER 10 //Determines the number of blocks that are available
+
 /*############ LOGGER ################*/
 
 //If undefined, the final build will have no logging / Terminal functionality built in
@@ -195,6 +201,7 @@ enum moduleID{
 	SCANNING_MODULE_ID=20,
 	STATUS_REPORTER_MODULE_ID=30,
 	DFU_MODULE_ID=40,
+	ENROLLMENT_MODULE_ID=50,
 
 	//Custom modules
 	TEST_MODULE_ID=30000

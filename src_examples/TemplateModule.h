@@ -35,6 +35,31 @@ class TemplateModule: public Module
 
 		TemplateModuleConfiguration configuration;
 
+		enum TemplateModuleTriggerActionMessages{
+			MESSAGE_0 = 0
+		};
+
+		enum TemplateModuleActionResponseMessages{
+			MESSAGE_0 = 0
+		};
+
+		/*
+		//####### Module messages (these need to be packed)
+		#pragma pack(push)
+		#pragma pack(1)
+
+			#define SIZEOF_TEMPLATE_MODULE_***_MESSAGE 10
+			typedef struct
+			{
+				//Insert values here
+
+			}TemplateModule***Message;
+
+		#pragma pack(pop)
+		//####### Module messages end
+		*/
+
+
 	public:
 		TemplateModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 

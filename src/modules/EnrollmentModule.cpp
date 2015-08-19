@@ -20,32 +20,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
-#include <TemplateModule.h>
+#include <EnrollmentModule.h>
 #include <Logger.h>
 #include <Utility.h>
 #include <Storage.h>
 #include <Node.h>
 
 extern "C"{
-
+#include <stdlib.h>
 }
 
-TemplateModule::TemplateModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
+/*
+Module purpose:
+After a node has been flashed, it is in an unconfigured state
+This module should allow configuration of network id, network key, nodeID and other necessary parameters
+ */
+
+
+EnrollmentModule::EnrollmentModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
 	: Module(moduleId, node, cm, name, storageSlot)
 {
 	//Register callbacks n' stuff
-	Logger::getInstance().enableTag("TEMPLATEMOD");
+	Logger::getInstance().enableTag("ENROLLMOD");
 
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
 	configurationPointer = &configuration;
-	configurationLength = sizeof(TemplateModuleConfiguration);
+	configurationLength = sizeof(EnrollmentModuleConfiguration);
 
 	//Start module configuration loading
 	LoadModuleConfiguration();
 }
 
-void TemplateModule::ConfigurationLoadedHandler()
+void EnrollmentModule::ConfigurationLoadedHandler()
 {
 	//Does basic testing on the loaded configuration
 	Module::ConfigurationLoadedHandler();
@@ -60,13 +67,13 @@ void TemplateModule::ConfigurationLoadedHandler()
 
 }
 
-void TemplateModule::TimerEventHandler(u16 passedTime, u32 appTimer)
+void EnrollmentModule::TimerEventHandler(u16 passedTime, u32 appTimer)
 {
 	//Do stuff on timer...
 
 }
 
-void TemplateModule::ResetToDefaultConfiguration()
+void EnrollmentModule::ResetToDefaultConfiguration()
 {
 	//Set default configuration values
 	configuration.moduleId = moduleId;
@@ -77,7 +84,7 @@ void TemplateModule::ResetToDefaultConfiguration()
 
 }
 
-bool TemplateModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
+bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
 	//Must be called to allow the module to get and set the config
 	Module::TerminalCommandHandler(commandName, commandArgs);
@@ -87,8 +94,29 @@ bool TemplateModule::TerminalCommandHandler(string commandName, vector<string> c
 	{
 		if(commandArgs[1] != moduleName) return false;
 
-		if(commandArgs.size() == 3 && commandArgs[2] == "argument_a")
+		if(commandArgs.size() == 5 && commandArgs[2] == "enroll")
 		{
+			nodeID currentNodeId = atoi(commandArgs[0].c_str());
+
+			nodeID futureNodeId = atoi(commandArgs[3].c_str());
+			networkID networkId = atoi(commandArgs[4].c_str());
+
+			//Build enrollment packet
+			u8 buffer[SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_MESSAGE];
+			connPacketModuleAction* packet = (connPacketModuleAction*)buffer;
+			EnrollmentModuleSetEnrollmentMessage* enrollmentMessage = (EnrollmentModuleSetEnrollmentMessage*)packet->data;
+
+			packet->header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
+			packet->header.sender = node->persistentConfig.nodeId;
+			packet->header.receiver = currentNodeId;
+
+			packet->moduleId = moduleId;
+			packet->actionType = EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT;
+
+			enrollmentMessage->networkId = networkId;
+			enrollmentMessage->nodeId = futureNodeId;
+
+			cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_MESSAGE, true);
 
 
 			return true;
@@ -107,8 +135,7 @@ bool TemplateModule::TerminalCommandHandler(string commandName, vector<string> c
 	return false;
 }
 
-/*
-void TemplateModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
+void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
 {
 	//Must call superclass for handling
 	Module::ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
@@ -118,7 +145,19 @@ void TemplateModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPa
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId){
-			if(packet->actionType == TemplateModuleTriggerActionMessages::MESSAGE_0){
+			if(packet->actionType == EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT){
+				EnrollmentModuleSetEnrollmentMessage* data = (EnrollmentModuleSetEnrollmentMessage*)packet->data;
+
+				//Stop all meshing
+				node->Stop();
+
+				//Save values to persistent config
+				node->persistentConfig.nodeId = data->nodeId;
+				node->persistentConfig.networkId = data->networkId;
+
+				node->SaveConfiguration();
+
+				logt("ENROLLMOD", "Enrollment received nodeId:%u, networkid:%u", data->nodeId, data->networkId);
 
 			}
 		}
@@ -131,11 +170,10 @@ void TemplateModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPa
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId)
 		{
-			if(packet->actionType == TemplateModuleActionResponseMessages::MESSAGE_0)
+			/*if(packet->actionType == EnrollmentModuleTriggerActionMessages::MESSAGE)
 			{
 
-			}
+			}*/
 		}
 	}
 }
-*/

@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma pack(1)
 
 
-//########## Connection packets ###############################################
+//########## Message types ###############################################
 
 //Mesh clustering and handshake: Protocol defined
 #define MESSAGE_TYPE_CLUSTER_WELCOME 20
@@ -66,9 +66,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MESSAGE_TYPE_QOS_REQUEST 62
 
 
-//Other packets: User space
+//Other packets: User space (IDs 80 - 110)
 #define MESSAGE_TYPE_DATA_1 80
 #define MESSAGE_TYPE_DATA_2 81
+
+
+//########## Message structs and sizes ###############################################
 
 //If hasMoreParts is set to true, the next message will only contain 1 byte hasMoreParts + messageType
 //and all remaining 19 bytes are used for transferring data, the last message of a split message does not have this flag
@@ -83,6 +86,7 @@ typedef struct
 }connPacketHeader;
 
 //Used for message splitting for all packets after the first one
+//This way, we do not need to resend the sender and receiver
 #define SIZEOF_CONN_PACKET_SPLIT_HEADER 1
 typedef struct
 {
@@ -196,24 +200,26 @@ typedef struct
 
 
 //This message is used for different module request message types
-#define SIZEOF_CONN_PACKET_MODULE_REQUEST (SIZEOF_CONN_PACKET_HEADER + 2) //This size does not include the data reagion which is variable, add the used data region size to this size
+#define SIZEOF_CONN_PACKET_MODULE_REQUEST (SIZEOF_CONN_PACKET_HEADER + 3) //This size does not include the data reagion which is variable, add the used data region size to this size
 typedef struct
 {
 	connPacketHeader header;
 	u16 moduleId;
-	u8 data[MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER - 2]; //Data can be larger and will be transmitted in subsequent packets
+	u8 requestHandle; //Used to implement end-to-end acknowledged requests
+	u8 data[MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER - 3]; //Data can be larger and will be transmitted in subsequent packets
 
 }connPacketModuleRequest;
 
 
 //This message is used for different module request message types
-#define SIZEOF_CONN_PACKET_MODULE_ACTION (SIZEOF_CONN_PACKET_HEADER + 3) //This size does not include the data reagion which is variable, add the used data region size to this size
+#define SIZEOF_CONN_PACKET_MODULE_ACTION (SIZEOF_CONN_PACKET_HEADER + 4) //This size does not include the data reagion which is variable, add the used data region size to this size
 typedef struct
 {
 	connPacketHeader header;
 	u16 moduleId;
+	u8 requestHandle; //Set to 0 if this packet does not need to be identified for reliability (Used to implement end-to-end acknowledged requests)
 	u8 actionType;
-	u8 data[MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER - 3]; //Data can be larger and will be transmitted in subsequent packets
+	u8 data[MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER - 4]; //Data can be larger and will be transmitted in subsequent packets
 
 }connPacketModuleAction;
 
@@ -238,43 +244,7 @@ typedef struct
 	connPacketPayloadAdvInfo payload;
 }connPacketAdvInfo;
 
-//QOS_REQUEST
-#define SIZEOF_CONN_PACKET_PAYLOAD_QOS_REQUEST 3
-typedef struct
-{
-	nodeID nodeId;
-	u8 type;
 
-}connPacketPayloadQosRequest;
-
-#define SIZEOF_CONN_PACKET_QOS_REQUEST (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_QOS_REQUEST)
-typedef struct
-{
-	connPacketHeader header;
-	connPacketPayloadQosRequest payload;
-}connPacketQosRequest;
-
-//QOS_CONNECTION_DATA
-#define SIZEOF_CONN_PACKET_PAYLOAD_QOS_CONNECTION_DATA 12
-typedef struct
-{
-		nodeID partner1;
-		nodeID partner2;
-		nodeID partner3;
-		nodeID partner4;
-		u8 rssi1;
-		u8 rssi2;
-		u8 rssi3;
-		u8 rssi4;
-
-}connPacketPayloadQosConnectionData;
-
-#define SIZEOF_CONN_PACKET_QOS_CONNECTION_DATA (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_QOS_CONNECTION_DATA)
-typedef struct
-{
-	connPacketHeader header;
-	connPacketPayloadQosConnectionData payload;
-}connPacketQosConnectionData;
 
 
 //End Packing

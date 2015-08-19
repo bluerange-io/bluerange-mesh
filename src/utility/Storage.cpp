@@ -46,12 +46,12 @@ Storage::Storage()
 
 	//Initialize pstorage library
 	pstorage_module_param_t param;
-	u8 num_blocks = 10;
+	u8 num_blocks = STORAGE_BLOCK_NUMBER;
 
 	bufferedOperationInProgress = false;
 
-	param.block_size  = 128; //Multiple of 4 and divisor of page size (usually 1024) in case total size is bigger than page size
-	param.block_count = 8;
+	param.block_size  = STORAGE_BLOCK_SIZE; //Multiple of 4 and divisor of page size (pagesize is usually 1024) in case total size is bigger than page size
+	param.block_count = 1;
 	param.cb          = PstorageEventHandler;
 
 	err = pstorage_init();
@@ -117,8 +117,9 @@ bool Storage::BufferedWrite(u8* data, u32 block,u32 len)
 
 	logt("STORAGE", "Writing len:%u to block:%u", len, block);
 
-
-	u32 err = pstorage_clear(&block_handles[block], len);
+	//Call clear first before writing to the flash
+	//Clear will generate an event that is handeled in the PstorabeEventHandler
+	u32 err = pstorage_clear(&block_handles[block], 128);
 	APP_ERROR_CHECK(err);
 
 	return true;
@@ -180,7 +181,7 @@ bool Storage::TerminalCommandHandler(string commandName, vector<string> commandA
 
 		BufferedWrite((unsigned char*)data, slotNum, len);
 
-		logt("STORAGE", "len: %d has been saved in %d", len, slotNum);
+		logt("STORAGE", "len: %d is saved in %d", len, slotNum);
 
 	} else if (commandName == "load"){
 		int slotNum = atoi(commandArgs[0].c_str());

@@ -76,11 +76,13 @@ typedef struct
 	u16 companyIdentifier;
 }advStructureManufacturer;
 
-//####### Advertising packets #################################################
+//####### Advertising packets => Message Types #################################################
 
 //Message types: Protocol defined, up to 19
 #define MESSAGE_TYPE_JOIN_ME 1
 
+
+//####### Advertising packets => Structs #################################################
 
 
 //Header that is common to all mesh advertising messages
@@ -122,6 +124,9 @@ typedef struct
 	u16 meshWriteHandle; //The GATT handle for the mesh communication characteristic
 	nodeID ackField;//Contains the acknowledgement from another node for the slave connection procedure
 }advPacketPayloadJoinMeV0;
+
+
+//####### Further definitions #################################################
 
 /*
  Different kind of mesh devices:

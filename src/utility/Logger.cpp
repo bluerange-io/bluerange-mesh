@@ -552,9 +552,6 @@ const char* Logger::getPstorageStatusErrorString(u16 operationCode)
 		case PSTORAGE_CLEAR_OP_CODE:
 			return "Error when Clear Operation was requested";
 
-		case PSTORAGE_ERROR_OP_CODE:
-			return "General Error Code";
-
 		case PSTORAGE_LOAD_OP_CODE:
 			return "Error when Load Operation was requested";
 

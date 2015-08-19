@@ -20,72 +20,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
-/*
- * The status reporter module is responsible for measuring battery, connections,
- * etc... and report them back to a sink
- */
-
 #pragma once
 
 #include <Module.h>
-#include <Terminal.h>
 
-class StatusReporterModule: public Module
+class EnrollmentModule: public Module
 {
 	private:
 
 		//Module configuration that is saved persistently (size must be multiple of 4)
-		struct StatusReporterModuleConfiguration : ModuleConfiguration{
+		struct EnrollmentModuleConfiguration : ModuleConfiguration{
+			u8 enrollmentState;
+			u8 reserved;
+			u16 reserved2;
 			//Insert more persistent config values here
-			u16 samplingIntervalMs;
-			u16 reportingIntervalMs;
 		};
 
-		StatusReporterModuleConfiguration configuration;
+		EnrollmentModuleConfiguration configuration;
 
-		enum StatusModuleTriggerActionMessages{
-			SET_LED_MESSAGE=0,
-			GET_STATUS_MESSAGE=1,
-			GET_CONNECTIONS_MESSAGE=2
+		enum enrollmentStates {NOT_ENROLLED, ENROLLED};
+
+
+		enum EnrollmentModuleTriggerActionMessages{
+			SET_ENROLLMENT=0
 		};
 
-		enum StatusModuleActionResponseMessages{
-			STATUS_MESSAGE=0,
-			CONNECTIONS_MESSAGE=1
-		};
+		enum EnrollmentModuleActionResponseMessages{
 
+		};
 
 		//####### Module specific message structs (these need to be packed)
 		#pragma pack(push)
 		#pragma pack(1)
 
-			#define SIZEOF_STATUS_REPORTER_MODULE_CONNECTIONS_MESSAGE 12
+			#define SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_MESSAGE 20
 			typedef struct
 			{
-					nodeID partner1;
-					nodeID partner2;
-					nodeID partner3;
-					nodeID partner4;
-					u8 rssi1;
-					u8 rssi2;
-					u8 rssi3;
-					u8 rssi4;
+				nodeID nodeId;
+				networkID networkId;
+				u8 networkKey[16];
 
-			}StatusReporterModuleConnectionsMessage;
+			}EnrollmentModuleSetEnrollmentMessage;
 
 		#pragma pack(pop)
 		//####### Module messages end
 
-
-
-		u32 lastReportingTimer;
-
-		void SendConnectionInformation(nodeID toNode);
-
-		void SendStatusInformation(nodeID toNode);
-
 	public:
-		StatusReporterModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		EnrollmentModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 
 		void ConfigurationLoadedHandler();
 
@@ -93,7 +74,11 @@ class StatusReporterModule: public Module
 
 		void TimerEventHandler(u16 passedTime, u32 appTimer);
 
-		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+		//void BleEventHandler(ble_evt_t* bleEvent);
 
 		void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
+
+		//void NodeStateChangedHandler(discoveryState newState);
+
+		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
 };

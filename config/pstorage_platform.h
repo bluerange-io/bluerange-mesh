@@ -22,6 +22,8 @@
 #include <stdint.h>
 #include "nrf.h"
 
+//This file is the compatible with SDK version 9.0
+
 static __INLINE uint16_t pstorage_flash_page_size()
 {
   return (uint16_t)NRF_FICR->CODEPAGESIZE;
