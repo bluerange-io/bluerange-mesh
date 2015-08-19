@@ -156,7 +156,7 @@ void Testing::messageReceivedCallback(connectionPacket* inPacket)
 
 bool Testing::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
-	if (commandName == "SEND")
+	if (commandName == "send")
 	{
 		//parameter 1: R=reliable, U=unreliable, B=both
 		//parameter 2: count
@@ -197,23 +197,23 @@ bool Testing::TerminalCommandHandler(string commandName, vector<string> commandA
 		}
 
 	}
-	else if (commandName == "FILL")
+	else if (commandName == "fill")
 	{
 		cm->fillTransmitBuffers();
 	}
-	else if (commandName == "ADVERTISE")
+	else if (commandName == "advertise")
 	{
 
 		AdvertisingController::SetAdvertisingState(advState::ADV_STATE_HIGH);
 
 	}
-	else if (commandName == "SCAN")
+	else if (commandName == "scan")
 	{
 
 		ScanController::SetScanState(scanState::SCAN_STATE_HIGH);
 
 	}
-	else if (commandName == "RESET")
+	else if (commandName == "reset")
 	{
 		sd_nvic_SystemReset();
 

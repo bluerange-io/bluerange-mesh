@@ -89,11 +89,11 @@ Node::Node(networkID networkId)
 	//module configurations with the Storage class
 	//Module ids must persist when nodes are updated to guearantee that the
 	//same module receives the same storage slot
-	activeModules[0] = new TestModule(moduleID::TEST_MODULE_ID, this, cm, "TEST", 1);
-	//activeModules[1] = new DFUModule((moduleID::DFU_MODULE_ID, this, cm, "DFU", 2);
-	activeModules[2] = new StatusReporterModule(moduleID::STATUS_REPORTER_MODULE_ID, this, cm, "STATUS", 3);
-	activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "ADV", 4);
-	activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "SCAN", 5);
+	activeModules[0] = new TestModule(moduleID::TEST_MODULE_ID, this, cm, "test", 1);
+	//activeModules[1] = new DFUModule((moduleID::DFU_MODULE_ID, this, cm, "dfu", 2);
+	activeModules[2] = new StatusReporterModule(moduleID::STATUS_REPORTER_MODULE_ID, this, cm, "status", 3);
+	activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "adv", 4);
+	activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "scan", 5);
 
 
 	//Register a pre/post transmit hook for radio events
@@ -1014,34 +1014,34 @@ void Node::UartGetStatus()
 bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
 	/************* SYSTEM ***************/
-	if (commandName == "RESET")
+	if (commandName == "reset")
 	{
 		sd_nvic_SystemReset();
 	}
-	else if (commandName == "STARTTERM")
+	else if (commandName == "startterm")
 	{
 		Terminal::promptAndEchoMode = true;
 	}
-	else if (commandName == "STOPTERM")
+	else if (commandName == "stopterm")
 	{
 		Terminal::promptAndEchoMode = false;
 		Logger::getInstance().disableAll();
 	}
 	/************* NODE ***************/
-	else if (commandName == "STATUS")
+	else if (commandName == "status")
 	{
 		PrintStatus();
 	}
-	else if (commandName == "BUFFERSTAT")
+	else if (commandName == "bufferstat")
 	{
 		PrintBufferStatus();
 	}
-	else if (commandName == "STAT")
+	else if (commandName == "stat")
 	{
 		PrintSingleLineStatus();
 	}
 
-	else if (commandName == "DATA")
+	else if (commandName == "data")
 	{
 		nodeID receiverId = 0;
 		if(commandArgs.size() > 0){
@@ -1065,7 +1065,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 
 		cm->SendMessageToReceiver(NULL, (u8*) &data, SIZEOF_CONN_PACKET_DATA_1, reliable);
 	}
-	else if(commandName == "DATAL")
+	else if(commandName == "datal")
 	{
 		//Send some large data that is split over messages
 		const u8 dataLength = 45;
@@ -1083,7 +1083,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 
 
 	}
-	else if (commandName == "LOSS")
+	else if (commandName == "loss")
 	{
 		//Simulate connection loss
 		this->persistentConfig.connectionLossCounter++;
@@ -1091,7 +1091,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		this->UpdateJoinMePacket(NULL);
 
 	}
-	else if (commandName == "DISCOVERY")
+	else if (commandName == "discovery")
 	{
 		if (commandArgs.size() < 1 || commandArgs[0] == "high")
 		{
@@ -1109,35 +1109,35 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 			ChangeState(discoveryState::DISCOVERY_OFF);
 		}
 	}
-	else if (commandName == "DISCOVER")
+	else if (commandName == "discover")
 	{
 		ChangeState(discoveryState::DISCOVERY_HIGH);
 	}
-	else if (commandName == "DISCOVERYLOW")
+	else if (commandName == "discoverylow")
 	{
 		noNodesFoundCounter = 50;
 
 	}
 	//Trigger this to save the current node configuration
-	else if (commandName == "SAVENODE")
+	else if (commandName == "savenode")
 	{
 		persistentConfig.reserved++;
 		Storage::getInstance().QueuedWrite((u8*) &persistentConfig, sizeof(NodeConfiguration), 0, this);
 
 	}
-	else if (commandName == "STOP")
+	else if (commandName == "stop")
 	{
 		DisableStateMachine(true);
 	}
-	else if (commandName == "START")
+	else if (commandName == "start")
 	{
 		DisableStateMachine(false);
 	}
-	else if (commandName == "BREAK")
+	else if (commandName == "break")
 	{
 		Config->breakpointToggleActive = !Config->breakpointToggleActive;
 	}
-	else if (commandName == "CONNECT")
+	else if (commandName == "connect")
 	{
 
 		for (int i = 0; i <NUM_TEST_DEVICES ; i++)
@@ -1152,7 +1152,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		}
 
 	}
-	else if (commandName == "DISCONNECT")
+	else if (commandName == "disconnect")
 	{
 		if (commandArgs.size() > 0)
 		{
@@ -1162,7 +1162,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		}
 	}
 
-	else if (commandName == "HEAP")
+	else if (commandName == "heap")
 	{
 
 		Utility::CheckFreeHeap();
@@ -1170,7 +1170,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		return true;
 
 	}
-	else if (commandName == "MODULES")
+	else if (commandName == "modules")
 	{
 
 		for(u32 i=0; i<MAX_MODULE_COUNT; i++)
@@ -1181,7 +1181,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		return true;
 
 	}
-	else if (commandName == "YOUSINK")
+	else if (commandName == "yousink")
 	{
 
 		this->persistentConfig.deviceType = deviceTypes::DEVICE_TYPE_SINK;
@@ -1189,7 +1189,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		return true;
 
 	}
-	else if (commandName == "SET_NODEID")
+	else if (commandName == "set_nodeid")
 	{
 
 		this->persistentConfig.nodeId = atoi(commandArgs[0].c_str());
@@ -1199,11 +1199,11 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	}
 
 	/************* UART COMMANDS ***************/
-	else if (commandName == "UART_GET_STATUS")
+	else if (commandName == "uart_get_status")
 	{
 		UartGetStatus();
 	}
-	else if (commandName == "UART_SET_CAMPAIGN")
+	else if (commandName == "uart_set_campaign")
 	{
 		if (commandArgs.size() > 0){
 			AdvertisingController::SetScanResponseData(this, commandArgs[0]);

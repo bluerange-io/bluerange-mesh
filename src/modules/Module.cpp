@@ -40,6 +40,8 @@ Module::Module(u16 moduleId, Node* node, ConnectionManager* cm, const char* name
 	memcpy(moduleName, name, MODULE_NAME_MAX_SIZE);
 
 	Terminal::AddTerminalCommandListener(this);
+
+	Logger::getInstance().enableTag("MODULE");
 }
 
 Module::~Module()
@@ -94,11 +96,11 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 	if(commandArgs.size() > 1 && strcmp(moduleName, commandArgs[1].c_str()) == 0)
 	{
 		//E.g. UART_MODULE_SET_CONFIG 0 STATUS 00:FF:A0 => command, nodeId (this for current node), moduleId, hex-string
-		if(commandName == "UART_MODULE_SET_CONFIG" && commandArgs.size() == 3)
+		if(commandName == "uart_module_set_config" && commandArgs.size() == 3)
 		{
 			if(commandArgs[0] == "this")
 			{
-				logt("ERROR", "This is module %s setting config", moduleName);
+				logt("MODULE", "This is module %s setting config", moduleName);
 
 				//HexString must be like "FF:34:67:22:24"
 				const char* hexString = commandArgs[2].c_str();
@@ -114,7 +116,7 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 						&& length == configurationLength
 				){
 					newConfig->moduleId = configurationPointer->moduleId; //ModuleID must not be transmitted
-					logt("ERROR", "Config set");
+					logt("MODULE", "Config set");
 					memcpy(configurationPointer, buffer, configurationLength);
 
 					ConfigurationLoadedHandler();
@@ -150,7 +152,7 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 			}
 
 		}
-		else if(commandName == "UART_MODULE_GET_CONFIG")
+		else if(commandName == "uart_module_get_config")
 		{
 			if(commandArgs[0] == "this")
 			{
@@ -172,7 +174,7 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 				//TODO:Send packet with variable length, leave version field empty
 			}
 		}
-		else if(commandName == "UART_MODULE_SET_ACTIVE")
+		else if(commandName == "uart_module_set_active")
 		{
 			if(commandArgs[0] == "this")
 			{
@@ -226,7 +228,7 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 			char* buffer[200];
 			Logger::getInstance().convertBufferToHexString((u8*)packet->data, configLength, (char*)buffer);
 
-			logt("ERROR", "rx (%d): %s", configLength,  buffer);
+			logt("MODULE", "rx (%d): %s", configLength,  buffer);
 
 			//Check if this config seems right
 			ModuleConfiguration* newConfig = (ModuleConfiguration*)packet->data;
@@ -236,7 +238,7 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 			){
 				//Backup the module id because it must not be sent in the packet
 				u16 moduleId = configurationPointer->moduleId;
-				logt("ERROR", "Config set");
+				logt("MODULE", "Config set");
 				memcpy(configurationPointer, packet->data, configurationLength);
 				configurationPointer->moduleId = moduleId;
 

@@ -113,7 +113,7 @@ bool DFUModule::TerminalCommandHandler(string commandName, vector<string> comman
 	//Must be called to allow the module to get and set the config
 	Module::TerminalCommandHandler(commandName, commandArgs);
 
-	if (commandName == "DFU")
+	if (commandName == "dfu")
 	{
 		return true;
 

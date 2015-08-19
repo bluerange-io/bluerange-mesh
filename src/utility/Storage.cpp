@@ -170,7 +170,7 @@ void Storage::ProcessQueue()
 
 bool Storage::TerminalCommandHandler(string commandName, vector<string> commandArgs){
 
-	if(commandName == "SAVE"){
+	if(commandName == "save"){
 		int slotNum = atoi(commandArgs[0].c_str());
 		int len = strlen(commandArgs[1].c_str());
 		if(len % 4 != 0) len = len +4 - (len%4);
@@ -182,7 +182,7 @@ bool Storage::TerminalCommandHandler(string commandName, vector<string> commandA
 
 		logt("STORAGE", "len: %d has been saved in %d", len, slotNum);
 
-	} else if (commandName == "LOAD"){
+	} else if (commandName == "load"){
 		int slotNum = atoi(commandArgs[0].c_str());
 		int len = atoi(commandArgs[1].c_str());
 		if(len % 4 != 0) len = len +4 - (len%4);

@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <Logger.h>
 #include <Terminal.h>
-#include <algorithm>
 
 extern "C"
 {
@@ -102,8 +101,6 @@ void Terminal::PollUART()
 		char* token = strtok(readBuffer, " ");
 		if (token != NULL)
 			commandName.assign(token);
-
-		transform(commandName.begin(), commandName.end(), commandName.begin(), ::toupper);
 
 		while (token != NULL)
 		{

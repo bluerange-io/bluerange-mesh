@@ -169,7 +169,7 @@ void Logger::toggleTag(string tag)
 bool Logger::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
 #ifdef ENABLE_LOGGING
-	if (commandName == "DEBUG" && commandArgs.size() == 1)
+	if (commandName == "debug" && commandArgs.size() == 1)
 	{
 		if (commandArgs[0] == "all")
 		{
@@ -186,13 +186,13 @@ bool Logger::TerminalCommandHandler(string commandName, vector<string> commandAr
 
 		return true;
 	}
-	else if (commandName == "DEBUGTAGS")
+	else if (commandName == "debugtags")
 	{
 		printEnabledTags();
 
 		return true;
 	}
-	else if (commandName == "DEBUGNONE")
+	else if (commandName == "debugnone")
 	{
 
 		return true;

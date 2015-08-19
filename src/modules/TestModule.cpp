@@ -87,7 +87,7 @@ bool TestModule::TerminalCommandHandler(string commandName, vector<string> comma
 	//Must be called to allow the module to get and set the config
 	Module::TerminalCommandHandler(commandName, commandArgs);
 
-	if (commandName == "TESTSAVE")
+	if (commandName == "testsave")
 	{
 		char buffer[70];
 		Logger::getInstance().convertBufferToHexString((u8*) &configuration, sizeof(TestModuleConfiguration), buffer);
@@ -101,7 +101,7 @@ bool TestModule::TerminalCommandHandler(string commandName, vector<string> comma
 		return true;
 
 	}
-	else if (commandName == "TESTLOAD")
+	else if (commandName == "testload")
 	{
 
 		LoadModuleConfiguration();
@@ -109,7 +109,7 @@ bool TestModule::TerminalCommandHandler(string commandName, vector<string> comma
 		return true;
 
 	}
-	else if (commandName == "LEDS")
+	else if (commandName == "leds")
 	{
 		//Check if user wants to set all LEDs on or off and send that as a broadcast packet to all
 		//mesh nodes
@@ -125,7 +125,7 @@ bool TestModule::TerminalCommandHandler(string commandName, vector<string> comma
 		packet.actionType = TestModuleMessages::LED_MESSAGE;
 		packet.data[0] = state;
 
-		cm->SendMessageOverConnections(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_REQUEST + 1, true);
+		cm->SendMessageOverConnections(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
 
 
 		return true;

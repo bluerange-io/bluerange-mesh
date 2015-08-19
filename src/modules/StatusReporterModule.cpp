@@ -98,12 +98,12 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 	Module::TerminalCommandHandler(commandName, commandArgs);
 
 	//React on commands, return true if handled, false otherwise
-	if(commandName == "UART_MODULE_TRIGGER_ACTION")
+	if(commandName == "uart_module_trigger_action")
 	{
 		//Rewrite "this" to our own node id, this will actually build the packet
 		//But reroute it to our own node
 		nodeID destinationNode = (commandArgs[0] == "this") ? node->persistentConfig.nodeId : atoi(commandArgs[0].c_str());
-		if(commandArgs[1] != "STATUS") return false;
+		if(commandArgs[1] != "status") return false;
 
 
 		//E.g. UART_MODULE_TRIGGER_ACTION 635 STATUS led on
