@@ -141,7 +141,7 @@ class Conf
 #include <board_pca10031.h>
 //#include <board_adafruit_ble_friend.h>
 
-#define VERSION_STRING "0.1.7"
+#define VERSION_STRING "0.1.8-beta"
 
 //Each of the Connections has a buffer for outgoing packets, this is its size in bytes
 #define PACKET_SEND_BUFFER_SIZE 400

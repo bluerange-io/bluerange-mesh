@@ -115,17 +115,17 @@ bool TestModule::TerminalCommandHandler(string commandName, vector<string> comma
 		//mesh nodes
 		bool state = (commandArgs.size() > 0 && commandArgs[0] == "on") ? true : false;
 
-		connPacketModuleRequest packet;
+		connPacketModuleAction packet;
 
 		packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
 		packet.header.sender = node->persistentConfig.nodeId;
 		packet.header.receiver = NODE_ID_BROADCAST;
 
 		packet.moduleId = moduleId;
-		packet.data[0] = TestModuleMessages::LED_MESSAGE;
-		packet.data[1] = state;
+		packet.actionType = TestModuleMessages::LED_MESSAGE;
+		packet.data[0] = state;
 
-		cm->SendMessageOverConnections(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_REQUEST+2, true);
+		cm->SendMessageOverConnections(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_REQUEST + 1, true);
 
 
 		return true;
@@ -145,14 +145,14 @@ void TestModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
 
 	//Check if this request is meant for modules in general
 	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
-		connPacketModuleRequest* packet = (connPacketModuleRequest*)packetHeader;
+		connPacketModuleAction* packet = (connPacketModuleAction*)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId){
 
 			//It's a LED message
-			if(packet->data[0] == TestModuleMessages::LED_MESSAGE){
-				if(packet->data[1])
+			if(packet->actionType == TestModuleMessages::LED_MESSAGE){
+				if(packet->data[0])
 				{
 					//Switch LED on
 					node->currentLedMode = Node::ledMode::LED_MODE_OFF;

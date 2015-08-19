@@ -113,18 +113,19 @@ void ScanningModule::SendReport()
 {
 	logt("SCANMOD", "Total:%d, avgRSSI:%d", totalMessages, totalRSSI);
 	if(totalMessages > 0){
-		connPacketModuleRequest data;
+		connPacketModuleAction data;
 		data.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
 		data.header.sender = node->persistentConfig.nodeId;
 		data.header.receiver = NODE_ID_BROADCAST; //Only send if sink available
 
 		data.moduleId = moduleId;
-		data.data[0] = ScanModuleMessages::TOTAL_SCANNED_PACKETS;
+		data.actionType = ScanModuleMessages::TOTAL_SCANNED_PACKETS;
 
-		memcpy(data.data + 1, &totalMessages, 4);
-		memcpy(data.data + 5, &totalRSSI, 4);
+		//Insert total messages and totalRSSI
+		memcpy(data.data + 0, &totalMessages, 4);
+		memcpy(data.data + 4, &totalRSSI, 4);
 
-		cm->SendMessageToReceiver(NULL, (u8*) &data, SIZEOF_CONN_PACKET_MODULE_REQUEST + 9, false);
+		cm->SendMessageToReceiver(NULL, (u8*) &data, SIZEOF_CONN_PACKET_MODULE_ACTION + 8, false);
 	}
 }
 
@@ -135,17 +136,17 @@ void ScanningModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPa
 	Module::ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
 
 	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
-		connPacketModuleRequest* packet = (connPacketModuleRequest*)packetHeader;
+		connPacketModuleAction* packet = (connPacketModuleAction*)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId){
 			//It's a LED message
-			if(packet->data[0] == ScanModuleMessages::TOTAL_SCANNED_PACKETS){
+			if(packet->actionType == ScanModuleMessages::TOTAL_SCANNED_PACKETS){
 
 				u32 totalMessages;
 				i32 totalRSSI;
-				memcpy(&totalMessages, packet->data+1, 4);
-				memcpy(&totalRSSI, packet->data+5, 4);
+				memcpy(&totalMessages, packet->data + 0, 4);
+				memcpy(&totalRSSI, packet->data + 4, 4);
 
 				uart("SCANMOD", "{\"module\":%d, \"type\":\"general\", \"msgType\":\"totalpackets\", \"sender\":%d, \"messageSum\":%u, \"rssiSum\":%d}", moduleId, packet->header.sender, totalMessages, totalRSSI);
 			}

@@ -201,9 +201,21 @@ typedef struct
 {
 	connPacketHeader header;
 	u16 moduleId;
-	u8 data[MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER - 3]; //Data can be larger and will be transmitted in subsequent packets
+	u8 data[MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER - 2]; //Data can be larger and will be transmitted in subsequent packets
 
 }connPacketModuleRequest;
+
+
+//This message is used for different module request message types
+#define SIZEOF_CONN_PACKET_MODULE_ACTION (SIZEOF_CONN_PACKET_HEADER + 3) //This size does not include the data reagion which is variable, add the used data region size to this size
+typedef struct
+{
+	connPacketHeader header;
+	u16 moduleId;
+	u8 actionType;
+	u8 data[MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER - 3]; //Data can be larger and will be transmitted in subsequent packets
+
+}connPacketModuleAction;
 
 
 //ADVINFO_PACKET

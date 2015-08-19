@@ -98,28 +98,7 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 	Module::TerminalCommandHandler(commandName, commandArgs);
 
 	//React on commands, return true if handled, false otherwise
-	if(commandName == "UART_GET_CONNECTIONS")
-	{
-
-		//Print own connections
-		if(Terminal::terminalIsInitialized){
-				//Print our own data
-
-				uart("QOS_CONN", "{\"nodeId\":%d, \"partners\":[%d,%d,%d,%d], \"rssiValues\":[%d,%d,%d,%d]}", node->persistentConfig.nodeId, cm->connections[0]->partnerId, cm->connections[1]->partnerId, cm->connections[2]->partnerId, cm->connections[3]->partnerId, cm->connections[0]->GetAverageRSSI(), cm->connections[1]->GetAverageRSSI(), cm->connections[2]->GetAverageRSSI(), cm->connections[3]->GetAverageRSSI());
-		}
-
-		//Query connection information from all other nodes
-		connPacketQosRequest packet;
-		packet.header.messageType = MESSAGE_TYPE_QOS_REQUEST;
-		packet.header.sender = node->persistentConfig.nodeId;
-		packet.header.receiver = 0;
-
-		packet.payload.nodeId = 0;
-		packet.payload.type = 0;
-
-		cm->SendMessageOverConnections(NULL, (u8*) &packet, SIZEOF_CONN_PACKET_QOS_REQUEST, false);
-	}
-	else if(commandName == "UART_MODULE_TRIGGER_ACTION")
+	if(commandName == "UART_MODULE_TRIGGER_ACTION")
 	{
 		//Rewrite "this" to our own node id, this will actually build the packet
 		//But reroute it to our own node
@@ -130,17 +109,17 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 		//E.g. UART_MODULE_TRIGGER_ACTION 635 STATUS led on
 		if(commandArgs.size() == 4 && commandArgs[2] == "led")
 		{
-			connPacketModuleRequest packet;
+			connPacketModuleAction packet;
 			packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
 			packet.header.sender = node->persistentConfig.nodeId;
 			packet.header.receiver = destinationNode;
 
 			packet.moduleId = moduleId;
-			packet.data[0] = StatusModuleTriggerActionMessages::SET_LED_MESSAGE;
-			packet.data[1] = commandArgs[3] == "on" ? 1: 0;
+			packet.actionType = StatusModuleTriggerActionMessages::SET_LED_MESSAGE;
+			packet.data[0] = commandArgs[3] == "on" ? 1: 0;
 
 
-			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_REQUEST+2, true);
+			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
 
 			return true;
 		}
@@ -152,16 +131,16 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 		}
 		else if(commandArgs.size() == 3 && commandArgs[2] == "get_connections")
 		{
-			connPacketModuleRequest packet;
+			connPacketModuleAction packet;
 			packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
 			packet.header.sender = node->persistentConfig.nodeId;
 			packet.header.receiver = destinationNode;
 
 			packet.moduleId = moduleId;
-			packet.data[0] = StatusModuleTriggerActionMessages::GET_CONNECTIONS_MESSAGE;
+			packet.actionType = StatusModuleTriggerActionMessages::GET_CONNECTIONS_MESSAGE;
 
 
-			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_REQUEST+1, true);
+			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
 
 			return true;
 		}
@@ -182,13 +161,13 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 	Module::ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
 
 	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
-		connPacketModuleRequest* packet = (connPacketModuleRequest*)packetHeader;
+		connPacketModuleAction* packet = (connPacketModuleAction*)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId){
 			//It's a LED message
-			if(packet->data[0] == StatusModuleTriggerActionMessages::SET_LED_MESSAGE){
-				if(packet->data[1])
+			if(packet->actionType == StatusModuleTriggerActionMessages::SET_LED_MESSAGE){
+				if(packet->data[0])
 				{
 					//Switch LED on
 					node->currentLedMode = Node::ledMode::LED_MODE_OFF;
@@ -204,28 +183,28 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 				}
 			}
 			//We were queried for our status
-			else if(packet->data[0] == StatusModuleTriggerActionMessages::GET_STATUS_MESSAGE)
+			else if(packet->actionType == StatusModuleTriggerActionMessages::GET_STATUS_MESSAGE)
 			{
 				//TODO: Build the status response packet and do not just print st. to the console
 				node->UartGetStatus();
 
 			}
 			//We were queried for our connections
-			else if(packet->data[0] == StatusModuleTriggerActionMessages::GET_CONNECTIONS_MESSAGE)
+			else if(packet->actionType == StatusModuleTriggerActionMessages::GET_CONNECTIONS_MESSAGE)
 			{
 				//Build response and send
-				u16 packetSize = SIZEOF_CONN_PACKET_MODULE_REQUEST + 1 + SIZEOF_STATUS_REPORTER_MODULE_CONNECTIONS_MESSAGE;
+				u16 packetSize = SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_STATUS_REPORTER_MODULE_CONNECTIONS_MESSAGE;
 				u8 buffer[packetSize];
-				connPacketModuleRequest* outPacket = (connPacketModuleRequest*)buffer;
+				connPacketModuleAction* outPacket = (connPacketModuleAction*)buffer;
 
 				outPacket->header.messageType = MESSAGE_TYPE_MODULE_ACTION_RESPONSE;
 				outPacket->header.receiver = packetHeader->sender;
 				outPacket->header.sender = node->persistentConfig.nodeId;
 
 				outPacket->moduleId = moduleId;
-				outPacket->data[0] = StatusModuleActionResponseMessages::CONNECTIONS_MESSAGE;
+				outPacket->actionType = StatusModuleActionResponseMessages::CONNECTIONS_MESSAGE;
 
-				StatusReporterModuleConnectionsMessage* outPacketData = (StatusReporterModuleConnectionsMessage*)(outPacket->data + 1);
+				StatusReporterModuleConnectionsMessage* outPacketData = (StatusReporterModuleConnectionsMessage*)(outPacket->data);
 
 				outPacketData->partner1 = cm->connections[0]->partnerId;
 				outPacketData->partner2 = cm->connections[1]->partnerId;
@@ -247,91 +226,60 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 	//Parse Module responses
 	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_ACTION_RESPONSE){
 
-		connPacketModuleRequest* packet = (connPacketModuleRequest*)packetHeader;
+		connPacketModuleAction* packet = (connPacketModuleAction*)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId)
 		{
 			//Somebody reported its connections back
-			if(packet->data[0] == StatusModuleActionResponseMessages::CONNECTIONS_MESSAGE)
+			if(packet->actionType == StatusModuleActionResponseMessages::CONNECTIONS_MESSAGE)
 			{
-				StatusReporterModuleConnectionsMessage* packetData = (StatusReporterModuleConnectionsMessage*) (packet->data+1);
+				StatusReporterModuleConnectionsMessage* packetData = (StatusReporterModuleConnectionsMessage*) (packet->data);
 				uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"connections\", \"nodeId\":%d, \"partners\":[%d,%d,%d,%d], \"rssiValues\":[%d,%d,%d,%d]}", moduleId, packet->header.sender, packetData->partner1, packetData->partner2, packetData->partner3, packetData->partner4, packetData->rssi1, packetData->rssi2, packetData->rssi3, packetData->rssi4);
 			}
-			else if(packet->data[0] == StatusModuleActionResponseMessages::STATUS_MESSAGE)
+			else if(packet->actionType == StatusModuleActionResponseMessages::STATUS_MESSAGE)
 			{
+				//TODO: print status information to console
 				logt("STATUSMOD", "STATUSREQUEST");
 			}
 		}
-
-		/*switch(packetHeader->messageType){
-			case MESSAGE_TYPE_QOS_REQUEST:
-				if (dataLength == SIZEOF_CONN_PACKET_QOS_REQUEST)
-				{
-					logt("DATA", "IN <= %d QOS_REQUEST", connection->partnerId);
-
-					connPacketQosRequest* packet = (connPacketQosRequest*) packetHeader;
-
-					//Check if we are requested to send a quality of service packet
-					if (packet->payload.nodeId == 0 || packet->payload.nodeId == node->persistentConfig.nodeId)
-					{
-						if (packet->payload.type == 0)
-						{
-							SendConnectionInformation(connection);
-						}
-						else if (packet->payload.type == 1)
-						{
-							//more
-						}
-					}
-				}
-				break;
-				//In case we receive a packet with connection information, we print it
-			case MESSAGE_TYPE_QOS_CONNECTION_DATA:
-				if (dataLength == SIZEOF_CONN_PACKET_QOS_CONNECTION_DATA)
-				{
-					connPacketQosConnectionData* packet = (connPacketQosConnectionData*) packetHeader;
-
-					if (Terminal::terminalIsInitialized)
-					{
-						uart("QOS_CONN", "{\"nodeId\":%d, \"partners\":[%d,%d,%d,%d], \"rssiValues\":[%d,%d,%d,%d]}", packet->header.sender, packet->payload.partner1, packet->payload.partner2, packet->payload.partner3, packet->payload.partner4, packet->payload.rssi1, packet->payload.rssi2, packet->payload.rssi3, packet->payload.rssi4);
-					}
-				}
-				break;
-		}*/
 	}
 }
 
+//This method sends the node's status over the network
 void StatusReporterModule::SendStatusInformation(nodeID toNode)
 {
-	connPacketModuleRequest packet;
+	connPacketModuleAction packet;
 	packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
 	packet.header.sender = node->persistentConfig.nodeId;
 	packet.header.receiver = toNode;
 
 	packet.moduleId = moduleId;
-	packet.data[0] = StatusModuleTriggerActionMessages::GET_STATUS_MESSAGE;
+	packet.actionType = StatusModuleTriggerActionMessages::GET_STATUS_MESSAGE;
 
 
-	cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_REQUEST+1, true);
+	//TODO: this information needs to be completed: Fill witgh data
+
+
+	cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION, true);
 }
 
-
+//This method sends information about the current connections over the network
 void StatusReporterModule::SendConnectionInformation(nodeID toNode)
 {
 	//Build response and send
-	u16 packetSize = SIZEOF_CONN_PACKET_MODULE_REQUEST + 1 + SIZEOF_STATUS_REPORTER_MODULE_CONNECTIONS_MESSAGE;
+	u16 packetSize = SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_STATUS_REPORTER_MODULE_CONNECTIONS_MESSAGE;
 	u8 buffer[packetSize];
-	connPacketModuleRequest* outPacket = (connPacketModuleRequest*)buffer;
+	connPacketModuleAction* outPacket = (connPacketModuleAction*)buffer;
 
 	outPacket->header.messageType = MESSAGE_TYPE_MODULE_ACTION_RESPONSE;
 	outPacket->header.receiver = NODE_ID_BROADCAST;
 	outPacket->header.sender = node->persistentConfig.nodeId;
 
 	outPacket->moduleId = moduleId;
-	outPacket->data[0] = StatusModuleActionResponseMessages::CONNECTIONS_MESSAGE;
+	outPacket->actionType = StatusModuleActionResponseMessages::CONNECTIONS_MESSAGE;
 
-	StatusReporterModuleConnectionsMessage* outPacketData = (StatusReporterModuleConnectionsMessage*)(outPacket->data + 1);
+	StatusReporterModuleConnectionsMessage* outPacketData = (StatusReporterModuleConnectionsMessage*)(outPacket->data);
 
 	outPacketData->partner1 = cm->connections[0]->partnerId;
 	outPacketData->partner2 = cm->connections[1]->partnerId;
