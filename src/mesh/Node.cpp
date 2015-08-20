@@ -969,7 +969,7 @@ clusterID Node::GenerateClusterID(void)
 void Node::PrintStatus(void)
 {
 	trace("**************\n\r");
-	trace("This is Node %u in clusterId:%x with clusterSize:%u, networkId:%u\n\r", this->persistentConfig.nodeId, this->clusterId, this->clusterSize, persistentConfig.networkId);
+	trace("This is Node %u in clusterId:%x with clusterSize:%d, networkId:%u\n\r", this->persistentConfig.nodeId, this->clusterId, this->clusterSize, persistentConfig.networkId);
 	trace("Ack Field:%d, ChipId:%u, ConnectionLossCounter:%u, nodeType:%d\n\r", ackFieldDebugCopy, NRF_FICR->DEVICEID[1], persistentConfig.connectionLossCounter, this->persistentConfig.deviceType);
 
 	ble_gap_addr_t p_addr;
@@ -996,7 +996,7 @@ void Node::PrintBufferStatus(void)
 	for (int i = 0; i < joinMePacketBuffer->_numElements; i++)
 	{
 		packet = (joinMeBufferPacket*) joinMePacketBuffer->PeekItemAt(i);
-		trace("=> %d, clusterId:%u, clusterSize:%u, freeIn:%u, freeOut:%u, writeHandle:%u, ack:%u", packet->payload.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.freeInConnections, packet->payload.freeOutConnections, packet->payload.meshWriteHandle, packet->payload.ackField);
+		trace("=> %d, clusterId:%x, clusterSize:%d, freeIn:%u, freeOut:%u, writeHandle:%u, ack:%u", packet->payload.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.freeInConnections, packet->payload.freeOutConnections, packet->payload.meshWriteHandle, packet->payload.ackField);
 		if (packet->connectable == BLE_GAP_ADV_TYPE_ADV_IND)
 		trace(" ADV_IND\n\r");
 		else if (packet->connectable == BLE_GAP_ADV_TYPE_ADV_NONCONN_IND)
@@ -1010,7 +1010,7 @@ void Node::PrintBufferStatus(void)
 
 void Node::PrintSingleLineStatus(void)
 {
-	trace("NodeId: %d, clusterId:%d, clusterSize:%d (%d:%d, %d:%d, %d:%d, %d:%d)\n\r", persistentConfig.nodeId, clusterId, clusterSize, cm->inConnection->partnerId, cm->inConnection->connectedClusterSize, cm->outConnections[0]->partnerId, cm->outConnections[0]->connectedClusterSize, cm->outConnections[1]->partnerId, cm->outConnections[1]->connectedClusterSize, cm->outConnections[2]->partnerId,
+	trace("NodeId: %u, clusterId:%x, clusterSize:%d (%d:%d, %d:%d, %d:%d, %d:%d)\n\r", persistentConfig.nodeId, clusterId, clusterSize, cm->inConnection->partnerId, cm->inConnection->connectedClusterSize, cm->outConnections[0]->partnerId, cm->outConnections[0]->connectedClusterSize, cm->outConnections[1]->partnerId, cm->outConnections[1]->connectedClusterSize, cm->outConnections[2]->partnerId,
 			cm->outConnections[2]->connectedClusterSize);
 }
 
@@ -1022,7 +1022,7 @@ void Node::UartGetStatus()
 	char mac[18];
 	sprintf(mac, "%02X:%02X:%02X:%02X:%02X:%02X", p_addr.addr[5], p_addr.addr[4], p_addr.addr[3], p_addr.addr[2], p_addr.addr[1], p_addr.addr[0]);
 
-	uart("STATUS", "{\"module\":30, \"type\":\"response\", \"msgType\":\"status\", \"nodeId\":%d, \"mac\":\"%s\", \"clusterId\":%d, \"clusterSize\":%d, \"freeIn\":%d, \"freeOut\":%d}", persistentConfig.nodeId, mac, clusterId, clusterSize, cm->freeInConnections, cm->freeOutConnections);
+	uart("STATUS", "{\"module\":30, \"type\":\"response\", \"msgType\":\"status\", \"nodeId\":%u, \"mac\":\"%s\", \"clusterId\":%u, \"clusterSize\":%d, \"freeIn\":%u, \"freeOut\":%u}", persistentConfig.nodeId, mac, clusterId, clusterSize, cm->freeInConnections, cm->freeOutConnections);
 }
 
 

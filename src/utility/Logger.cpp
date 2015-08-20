@@ -121,7 +121,11 @@ void Logger::enableTag(string tag)
 {
 #ifdef ENABLE_LOGGING
 	transform(tag.begin(), tag.end(), tag.begin(), ::toupper);
-	logFilter.push_back(tag);
+	logFilterIterator = find(logFilter.begin(), logFilter.end(), tag);
+	//Only push tag if not found
+	if (logFilterIterator == logFilter.end()){
+		logFilter.push_back(tag);
+	}
 #endif
 }
 

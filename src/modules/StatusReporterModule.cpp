@@ -125,7 +125,7 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 		}
 		else if(commandArgs.size() == 3 && commandArgs[2] == "get_status")
 		{
-			SendStatusInformation(destinationNode);
+			RequestStatusInformation(destinationNode);
 
 			return true;
 		}
@@ -185,8 +185,7 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 			//We were queried for our status
 			else if(packet->actionType == StatusModuleTriggerActionMessages::GET_STATUS_MESSAGE)
 			{
-				//TODO: Build the status response packet and do not just print st. to the console
-				node->UartGetStatus();
+				SendStatusInformation(packet->header.sender);
 
 			}
 			//We were queried for our connections
@@ -239,29 +238,56 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 			}
 			else if(packet->actionType == StatusModuleActionResponseMessages::STATUS_MESSAGE)
 			{
-				//TODO: print status information to console
-				logt("STATUSMOD", "STATUSREQUEST");
+				//Print packet to console
+				StatusReporterModuleStatusMessage* data = (StatusReporterModuleStatusMessage*) (packet->data);
+				uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"status\", \"nodeId\":%u, \"chipIdA\":%u, \"chipIdB\":%u, \"clusterId\":%u, \"clusterSize\":%d, \"freeIn\":%u, \"freeOut\":%u, \"addr\":\"%02x:%02x:%02x:%02x:%02x:%02x\"}", moduleId, packet->header.sender, data->chipIdA, data->chipIdB, data->clusterId, data->clusterSize, data->freeIn, data->freeOut, data->accessAddress.addr[0], data->accessAddress.addr[1], data->accessAddress.addr[2], data->accessAddress.addr[3], data->accessAddress.addr[4], data->accessAddress.addr[5]);
 			}
 		}
 	}
 }
 
-//This method sends the node's status over the network
-void StatusReporterModule::SendStatusInformation(nodeID toNode)
+void StatusReporterModule::RequestStatusInformation(nodeID targetNode)
 {
 	connPacketModuleAction packet;
 	packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
 	packet.header.sender = node->persistentConfig.nodeId;
-	packet.header.receiver = toNode;
+	packet.header.receiver = targetNode;
 
 	packet.moduleId = moduleId;
 	packet.actionType = StatusModuleTriggerActionMessages::GET_STATUS_MESSAGE;
 
-
-	//TODO: this information needs to be completed: Fill witgh data
+	logt("STATUS", "Requesting status");
 
 
 	cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION, true);
+}
+
+//This method sends the node's status over the network
+void StatusReporterModule::SendStatusInformation(nodeID toNode)
+{
+	logt("STATUS", "Sending back info");
+
+	u8 buffer[SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE];
+	connPacketModuleAction* packet = (connPacketModuleAction*) buffer;
+	StatusReporterModuleStatusMessage* data = (StatusReporterModuleStatusMessage*) packet->data;
+
+	packet->header.messageType = MESSAGE_TYPE_MODULE_ACTION_RESPONSE;
+	packet->header.sender = node->persistentConfig.nodeId;
+	packet->header.receiver = toNode;
+
+	packet->moduleId = moduleId;
+	packet->actionType = StatusModuleActionResponseMessages::STATUS_MESSAGE;
+
+	data->chipIdA = NRF_FICR->DEVICEID[0];
+	data->chipIdB = NRF_FICR->DEVICEID[1];
+	data->clusterId = node->clusterId;
+	data->clusterSize = node->clusterSize;
+	sd_ble_gap_address_get(&data->accessAddress);
+	data->freeIn = cm->freeInConnections;
+	data->freeOut = cm->freeOutConnections;
+
+
+	cm->SendMessageToReceiver(NULL, (u8*)packet, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE, true);
 }
 
 //This method sends information about the current connections over the network
