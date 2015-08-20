@@ -104,6 +104,7 @@ public:
 	void blePrettyPrintAdvData(sizedData advData);
 	void convertBufferToHexString(u8* srcBuffer, u32 srcLength, char* dstBuffer);
 	void parseHexStringToBuffer(const char* hexString, u8* dstBuffer, u16 dstBufferSize);
+	void convertTimestampToString(u64 timestamp, char* buffer);
 
 };
 

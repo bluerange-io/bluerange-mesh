@@ -118,6 +118,12 @@ class Node:
 		discoveryState currentDiscoveryState;
 		discoveryState nextDiscoveryState;
 
+		//The global time is saved as 32768 ticks per second (APP_TIMER_CLOCK_FREQ)
+		//Any node that uses a prescaler must therefore adapt to this
+
+		u64 globalTime; //Hooray to the compiler for abstracting 64bit operations :-)
+		u32 globalTimeSetAt; //The value of the RTC timer when the globalTime was set
+
 		u16 passsedTimeSinceLastTimerHandler;
 		i32 currentStateTimeoutMs;
 		u32 appTimerMs;

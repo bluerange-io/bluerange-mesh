@@ -35,6 +35,7 @@ extern "C"
 #include <simple_uart.h>
 #include <pstorage.h>
 #include <stdarg.h>
+#include <app_timer.h>
 }
 
 using namespace std;
@@ -523,6 +524,37 @@ void Logger::blePrettyPrintAdvData(sizedData advData)
 
 		i += fieldSize + 1;
 	}
+}
+
+//Trivial implementation for converting the timestamp in human readable format
+//This does not pay respect to any leap seconds, gap years, whatever
+void Logger::convertTimestampToString(u64 timestamp, char* buffer)
+{
+	u64 yearDivider = (u64)APP_TIMER_CLOCK_FREQ * 60 * 60 * 24 * 365;
+	u16 years = timestamp / yearDivider + 1970;
+	timestamp = timestamp % yearDivider;
+
+	u64 dayDivider = (u64)APP_TIMER_CLOCK_FREQ * 60 * 60 * 24;
+	u16 days = timestamp / dayDivider + 1;
+	timestamp = timestamp % dayDivider;
+
+	u32 hourDivider = APP_TIMER_CLOCK_FREQ * 60 * 60;
+	u16 hours = timestamp / hourDivider;
+	timestamp = timestamp % hourDivider;
+
+	u32 minuteDivider = APP_TIMER_CLOCK_FREQ * 60;
+	u16 minutes = timestamp / minuteDivider;
+	timestamp = timestamp % minuteDivider;
+
+	u32 secondDivider = APP_TIMER_CLOCK_FREQ;
+	u16 seconds = timestamp / secondDivider;
+	timestamp = timestamp % secondDivider;
+
+	u32 millisecondDivider = APP_TIMER_CLOCK_FREQ / 1000;
+	u16 milliseconds = timestamp / millisecondDivider;
+	timestamp = timestamp % millisecondDivider;
+
+	sprintf(buffer, "approx. %u years, %u days, %02uh:%02um:%02us,%03ums", years, days, hours, minutes, seconds, milliseconds);
 }
 
 void Logger::convertBufferToHexString(u8* srcBuffer, u32 srcLength, char* dstBuffer)

@@ -59,6 +59,9 @@ Node::Node(networkID networkId)
 	this->lastRadioActiveCountResetTimerMs = 0;
 	this->radioActiveCount = 0;
 
+	globalTimeSetAt = 0;
+	globalTime = 0;
+
 	//Set the current state and its timeout
 	currentStateTimeoutMs = 0;
 	currentDiscoveryState = discoveryState::BOOTUP;
@@ -842,6 +845,15 @@ void Node::TimerTickHandler(u16 timerMs)
 	appTimerMs += timerMs;
 	currentStateTimeoutMs -= timerMs;
 
+	//Update our global time
+	//TODO: should take care of PRESCALER register value as well
+	u32 rtc1, passedTime;
+	app_timer_cnt_get(&rtc1);
+	app_timer_cnt_diff_compute(rtc1, globalTimeSetAt, &passedTime);
+
+	globalTime += passedTime;
+	app_timer_cnt_get(&globalTimeSetAt); //Update the time that the timestamp was last updated
+
 	//FIXME: Used for debugging invalid state errors, reboot the nodes until an error occurs
 	if (lookingForInvalidStateErrors)
 	{
@@ -1110,6 +1122,42 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		this->persistentConfig.connectionLossCounter++;
 		clusterId = this->GenerateClusterID();
 		this->UpdateJoinMePacket(NULL);
+
+	}
+	else if (commandName == "settime")
+	{
+		u64 timeStamp = (atoi(commandArgs[0].c_str()) * (u64)APP_TIMER_CLOCK_FREQ);
+
+		//Set the time for our node
+		globalTime = timeStamp;
+		app_timer_cnt_get(&globalTimeSetAt);
+	}
+	else if(commandName == "gettime")
+	{
+		u32 rtc1;
+		app_timer_cnt_get(&rtc1);
+
+		char timestring[50];
+		Logger::getInstance().convertTimestampToString(globalTime, timestring);
+
+		trace("Time is currently %s, setAt:%d, rtc1:%u\r\n", timestring, globalTimeSetAt, rtc1);
+	}
+	else if (commandName == "sendtime")
+	{
+		//Generate a timestamp packet and send it to all other nodes
+		connPacketUpdateTimestamp packet;
+
+		packet.header.messageType = MESSAGE_TYPE_UPDATE_TIMESTAMP;
+		packet.header.sender = persistentConfig.nodeId;
+		packet.header.receiver = 0;
+
+		//Data must not be filled because it is set in the fillTransmitBuffers method
+		//Because it might still take some time from filling the buffer to sending the packet
+		//We should use the radio event or estimate the sending based on the connetion parameters
+
+		//It is then received and processed in the Connectionmanager::messageReceivedCallback
+
+		cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_UPDATE_TIMESTAMP, true);
 
 	}
 	else if (commandName == "discovery")

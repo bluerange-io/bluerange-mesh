@@ -33,6 +33,7 @@ extern "C"
 #include <ble.h>
 #include <ble_gap.h>
 #include <stdlib.h>
+#include <inttypes.h>
 }
 
 
@@ -73,6 +74,9 @@ Testing::Testing()
 //	Logger::getInstance().enableTag("JOIN");
 //	Logger::getInstance().enableTag("CONN");
 	Logger::getInstance().enableTag("MODULE");
+
+
+
 
 	//Logger::getInstance().enableTag("SCAN");
 

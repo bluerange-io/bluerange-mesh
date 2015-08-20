@@ -42,10 +42,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //########## Message types ###############################################
 
 //Mesh clustering and handshake: Protocol defined
-#define MESSAGE_TYPE_CLUSTER_WELCOME 20
-#define MESSAGE_TYPE_CLUSTER_ACK_1 21
-#define MESSAGE_TYPE_CLUSTER_ACK_2 22
-#define MESSAGE_TYPE_CLUSTER_INFO_UPDATE 23
+#define MESSAGE_TYPE_CLUSTER_WELCOME 20 //The initial message after a connection setup
+#define MESSAGE_TYPE_CLUSTER_ACK_1 21 //Both sides must acknowledge the handshake
+#define MESSAGE_TYPE_CLUSTER_ACK_2 22 //Second ack
+#define MESSAGE_TYPE_CLUSTER_INFO_UPDATE 23 //When the cluster size changes, this message is used
+
+//Others
+#define MESSAGE_TYPE_UPDATE_TIMESTAMP 30 //Used to enable timestamp distribution over the mesh
 
 //Module messages: Protocol defined (yet unfinished)
 //MODULE_SET_CONFIG: Used to set/get a configuration for any module and to trigger an action
@@ -61,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MESSAGE_TYPE_MODULE_ACTION_RESPONSE 54
 #define MESSAGE_TYPE_MODULE_GENERAL 55
 
+//Legacy messages: should be removed
 #define MESSAGE_TYPE_ADVINFO 60
 #define MESSAGE_TYPE_QOS_CONNECTION_DATA 61
 #define MESSAGE_TYPE_QOS_REQUEST 62
@@ -197,6 +201,15 @@ typedef struct
 	connPacketHeader header;
 	connPacketPayloadData1 payload;
 }connPacketData2;
+
+
+//Timestamp synchronization packet
+#define SIZEOF_CONN_PACKET_UPDATE_TIMESTAMP (SIZEOF_CONN_PACKET_HEADER + 8)
+typedef struct
+{
+	connPacketHeader header;
+	u64 timestamp;
+}connPacketUpdateTimestamp;
 
 
 //This message is used for different module request message types

@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 extern "C"{
 #include <app_error.h>
+#include <app_timer.h>
 }
 
 
@@ -336,8 +337,20 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 	Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gap_evt.conn_handle);
 	if (connection != NULL)
 	{
-		//Check if we need to reassemble the packet
+
 		connPacketHeader* packet = (connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data;
+
+		//At first, some special treatment for out timestamp packet
+		if(packet->messageType == MESSAGE_TYPE_UPDATE_TIMESTAMP)
+		{
+			//Set our time to the received timestamp and update the time when we've received this packet
+			app_timer_cnt_get(&Node::getInstance()->globalTimeSetAt);
+			Node::getInstance()->globalTime = ((connPacketUpdateTimestamp*)packet)->timestamp;
+
+			logt("ERROR", "time updated at:%u with timestamp:%u", Node::getInstance()->globalTimeSetAt, (u32)Node::getInstance()->globalTime);
+		}
+
+		//Check if we need to reassemble the packet
 		if(connection->packetReassemblyPosition == 0 && packet->hasMoreParts == 0)
 		{
 			//Print packet as hex
@@ -496,6 +509,24 @@ void ConnectionManager::fillTransmitBuffers()
 							dataSize = MAX_DATA_SIZE_PER_WRITE;
 						}
 					}
+
+					//Update packet timestamp as close as possible before sending it
+					if(((connPacketHeader*) data)->messageType == MESSAGE_TYPE_UPDATE_TIMESTAMP){
+						//Add the time that it took from setting the time until it gets send
+						u32 additionalTime;
+						u32 rtc1;
+						app_timer_cnt_get(&rtc1);
+						app_timer_cnt_diff_compute(rtc1, Node::getInstance()->globalTimeSetAt, &additionalTime);
+
+						logt("ERROR", "sending time:%u with prevRtc1:%u, rtc1:%u, diff:%u", (u32)Node::getInstance()->globalTime, Node::getInstance()->globalTimeSetAt, rtc1, additionalTime);
+
+						((connPacketUpdateTimestamp*) data)->timestamp = Node::getInstance()->globalTime + additionalTime;
+
+
+						/*((connPacketUpdateTimestamp*) data)->timestamp = 0;
+						((connPacketUpdateTimestamp*) data)->milliseconds = 0;*/
+					}
+
 
 					err = GATTController::bleWriteCharacteristic(connections[i]->connectionHandle, connections[i]->writeCharacteristicHandle, data, dataSize, true);
 					APP_ERROR_CHECK(err);
