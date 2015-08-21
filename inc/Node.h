@@ -189,7 +189,6 @@ class Node:
 
 
 		//Uart communication
-		void UartGetStatus();
 		void UartSetCampaign();
 
 		//Methods of TerminalCommandListener

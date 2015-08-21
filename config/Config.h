@@ -176,6 +176,8 @@ class Conf
 
 /*############ LOGGER ################*/
 
+#define EOL "\r\n"
+
 //If undefined, the final build will have no logging / Terminal functionality built in
 #define ENABLE_LOGGING
 #define ENABLE_TERMINAL

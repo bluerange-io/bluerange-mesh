@@ -50,7 +50,7 @@ void Terminal::Init()
 		simple_uart_putstring((const u8*) "[H"); //Cursor to Home
 
 		//Send App start header
-		simple_uart_putstring((const u8*) "--------------------------------------------------\r\n");
+		simple_uart_putstring((const u8*) "--------------------------------------------------" EOL);
 		simple_uart_putstring((const u8*) "Terminal started, compile date: ");
 		simple_uart_putstring((const u8*) __DATE__);
 		simple_uart_putstring((const u8*) "  ");
@@ -58,7 +58,7 @@ void Terminal::Init()
 		simple_uart_putstring((const u8*) ", version: ");
 		simple_uart_putstring((const u8*) VERSION_STRING);
 
-		simple_uart_putstring((const u8*) "\n\r--------------------------------------------------\r\n");
+		simple_uart_putstring((const u8*) EOL "--------------------------------------------------" EOL);
 	}
 
 	terminalIsInitialized = true;
@@ -86,7 +86,7 @@ void Terminal::PollUART()
 		//Output query string and typed symbol to terminal
 		if (promptAndEchoMode)
 		{
-			simple_uart_putstring((const u8*)"\n\rmhTerm: "); //Display prompt
+			simple_uart_putstring((const u8*) EOL "mhTerm: "); //Display prompt
 			simple_uart_put(readBuffer[0]); //echo back symbol
 		}
 
@@ -110,7 +110,7 @@ void Terminal::PollUART()
 		}
 
 		//Check for clear screen
-		if (commandName == "CLS")
+		if (commandName == "cls")
 		{
 			//Send Escape sequence
 			simple_uart_put(27); //ESC
@@ -129,7 +129,7 @@ void Terminal::PollUART()
 
 			if (handled == 0){
 				if(promptAndEchoMode){
-					simple_uart_putstring((const u8*)"Command not found\n\r");
+					simple_uart_putstring((const u8*)"Command not found" EOL);
 				} else {
 					uart_error(Logger::COMMAND_NOT_FOUND);
 				}
@@ -178,7 +178,7 @@ void Terminal::ReadlineUART(char* readBuffer, u8 readBufferLength, u8 offset)
 			if (byteBuffer == '\r' || counter >= readBufferLength || counter >= 250)
 			{
 				readBuffer[counter] = '\0';
-				if(promptAndEchoMode) simple_uart_putstring((const u8*) "\n");
+				if(promptAndEchoMode) simple_uart_putstring((const u8*) EOL);
 				break;
 			}
 			else

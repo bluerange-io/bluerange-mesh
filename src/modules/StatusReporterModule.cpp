@@ -240,7 +240,7 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 			{
 				//Print packet to console
 				StatusReporterModuleStatusMessage* data = (StatusReporterModuleStatusMessage*) (packet->data);
-				uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"status\", \"nodeId\":%u, \"chipIdA\":%u, \"chipIdB\":%u, \"clusterId\":%u, \"clusterSize\":%d, \"freeIn\":%u, \"freeOut\":%u, \"addr\":\"%02x:%02x:%02x:%02x:%02x:%02x\"}", moduleId, packet->header.sender, data->chipIdA, data->chipIdB, data->clusterId, data->clusterSize, data->freeIn, data->freeOut, data->accessAddress.addr[0], data->accessAddress.addr[1], data->accessAddress.addr[2], data->accessAddress.addr[3], data->accessAddress.addr[4], data->accessAddress.addr[5]);
+				uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"status\", \"nodeId\":%u, \"chipIdA\":%u, \"chipIdB\":%u, \"clusterId\":%u, \"clusterSize\":%d, \"freeIn\":%u, \"freeOut\":%u, \"addr\":\"%02X:%02X:%02X:%02X:%02X:%02X\"}", moduleId, packet->header.sender, data->chipIdA, data->chipIdB, data->clusterId, data->clusterSize, data->freeIn, data->freeOut, data->accessAddress.addr[5], data->accessAddress.addr[4], data->accessAddress.addr[3], data->accessAddress.addr[2], data->accessAddress.addr[1], data->accessAddress.addr[0]);
 			}
 		}
 	}

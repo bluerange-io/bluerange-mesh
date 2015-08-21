@@ -57,7 +57,7 @@ void Logger::log_f(bool printLine, const char* file, i32 line, const char* messa
 
 	if (printLine)
 	{
-		sprintf(mhTraceBuffer2, "[%s@%d]: %s \r\n", file, line, mhTraceBuffer);
+		sprintf(mhTraceBuffer2, "[%s@%d]: %s" EOL, file, line, mhTraceBuffer);
 		simple_uart_putstring((const uint8_t *) mhTraceBuffer2);
 	}
 	else
@@ -83,7 +83,7 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
 
 		if (logType == LOG_LINE)
 		{
-			sprintf(mhTraceBuffer2, "[%s@%d %s]: %s \r\n", file, line, tag, mhTraceBuffer);
+			sprintf(mhTraceBuffer2, "[%s@%d %s]: %s" EOL, file, line, tag, mhTraceBuffer);
 			simple_uart_putstring((const uint8_t *) mhTraceBuffer2);
 		}
 		else if (logType == LOG_MESSAGE_ONLY)
@@ -146,10 +146,10 @@ void Logger::disableTag(string tag)
 void Logger::printEnabledTags()
 {
 #ifdef ENABLE_LOGGING
-	if(logEverything) trace("LOG ALL IS ACTIVE\n\r");
+	if(logEverything) trace("LOG ALL IS ACTIVE" EOL);
 	for (string tag : logFilter)
 	{
-		trace("%s\n\r", tag.c_str());
+		trace("%s" EOL, tag.c_str());
 	}
 #endif
 }
@@ -520,7 +520,7 @@ void Logger::blePrettyPrintAdvData(sizedData advData)
 
 		//Print it
 		convertBufferToHexString(fieldData.data, fieldData.length, hexString);
-		trace("Type %d, Data %s \n\r", fieldType, hexString);
+		trace("Type %d, Data %s" EOL, fieldType, hexString);
 
 		i += fieldSize + 1;
 	}
