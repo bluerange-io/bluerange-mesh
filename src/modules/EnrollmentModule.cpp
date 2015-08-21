@@ -86,53 +86,74 @@ void EnrollmentModule::ResetToDefaultConfiguration()
 
 bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
-	//Must be called to allow the module to get and set the config
-	Module::TerminalCommandHandler(commandName, commandArgs);
-
 	//React on commands, return true if handled, false otherwise
-	if(commandName == "uart_module_trigger_action")
+	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)
 	{
-		if(commandArgs[1] != moduleName) return false;
-
-		if(commandArgs.size() == 5 && commandArgs[2] == "enroll")
+		if(commandName == "uart_module_trigger_action" || commandName == "action")
 		{
-			nodeID currentNodeId = atoi(commandArgs[0].c_str());
+			//If we know the previous id of the node, we can address it with this
+			if(commandArgs.size() == 5 && commandArgs[2] == "nodeid")
+			{
+				nodeID currentNodeId = atoi(commandArgs[0].c_str());
 
-			nodeID futureNodeId = atoi(commandArgs[3].c_str());
-			networkID networkId = atoi(commandArgs[4].c_str());
+				nodeID futureNodeId = atoi(commandArgs[3].c_str());
+				networkID networkId = atoi(commandArgs[4].c_str());
 
-			//Build enrollment packet
-			u8 buffer[SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_MESSAGE];
-			connPacketModuleAction* packet = (connPacketModuleAction*)buffer;
-			EnrollmentModuleSetEnrollmentMessage* enrollmentMessage = (EnrollmentModuleSetEnrollmentMessage*)packet->data;
+				//Build enrollment packet
+				u8 buffer[SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_NODE_ID_MESSAGE];
+				connPacketModuleAction* packet = (connPacketModuleAction*)buffer;
+				EnrollmentModuleSetEnrollmentByNodeIdMessage* enrollmentMessage = (EnrollmentModuleSetEnrollmentByNodeIdMessage*)packet->data;
 
-			packet->header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
-			packet->header.sender = node->persistentConfig.nodeId;
-			packet->header.receiver = currentNodeId;
+				packet->header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
+				packet->header.sender = node->persistentConfig.nodeId;
+				packet->header.receiver = currentNodeId;
 
-			packet->moduleId = moduleId;
-			packet->actionType = EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT;
+				packet->moduleId = moduleId;
+				packet->actionType = EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_NODE_ID;
 
-			enrollmentMessage->networkId = networkId;
-			enrollmentMessage->nodeId = futureNodeId;
+				enrollmentMessage->networkId = networkId;
+				enrollmentMessage->nodeId = futureNodeId;
 
-			cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_MESSAGE, true);
+				cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_NODE_ID_MESSAGE, true);
 
+				return true;
+			}
+			//If it has a random id, we can broadcast an enrollment packet and use the chipid to address the node
+			else if(commandArgs.size() == 7 && commandArgs[2] == "chipid")
+			{
+				u32 chipIdA = strtoul(commandArgs[3].c_str(), NULL, 10);
+				u32 chipIdB = strtoul(commandArgs[4].c_str(), NULL, 10);
 
-			return true;
+				nodeID futureNodeId = atoi(commandArgs[5].c_str());
+				networkID networkId = atoi(commandArgs[6].c_str());
+
+				//Build enrollment packet
+				u8 buffer[SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_CHIP_ID_MESSAGE];
+				connPacketModuleAction* packet = (connPacketModuleAction*)buffer;
+				EnrollmentModuleSetEnrollmentByChipIdMessage* enrollmentMessage = (EnrollmentModuleSetEnrollmentByChipIdMessage*)packet->data;
+
+				packet->header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
+				packet->header.sender = node->persistentConfig.nodeId;
+				packet->header.receiver = NODE_ID_BROADCAST;
+
+				packet->moduleId = moduleId;
+				packet->actionType = EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_CHIP_ID;
+
+				enrollmentMessage->chipIdA = chipIdA;
+				enrollmentMessage->chipIdB = chipIdB;
+
+				enrollmentMessage->nodeId = futureNodeId;
+				enrollmentMessage->networkId = networkId;
+
+				cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_CHIP_ID_MESSAGE, true);
+
+				return true;
+			}
 		}
-		else if(commandArgs.size() == 3 && commandArgs[2] == "argument_b")
-		{
-
-
-			return true;
-		}
-
-		return true;
-
 	}
 
-	return false;
+	//Must be called to allow the module to get and set the config
+	return Module::TerminalCommandHandler(commandName, commandArgs);
 }
 
 void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
@@ -145,8 +166,11 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId){
-			if(packet->actionType == EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT){
-				EnrollmentModuleSetEnrollmentMessage* data = (EnrollmentModuleSetEnrollmentMessage*)packet->data;
+			if(packet->actionType == EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_NODE_ID)
+			{
+				EnrollmentModuleSetEnrollmentByNodeIdMessage* data = (EnrollmentModuleSetEnrollmentByNodeIdMessage*)packet->data;
+
+				logt("ENROLLMOD", "Enrollment (by nodeId) received nodeId:%u, networkid:%u", data->nodeId, data->networkId);
 
 				//Stop all meshing
 				node->Stop();
@@ -157,8 +181,36 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 
 				node->SaveConfiguration();
 
-				logt("ENROLLMOD", "Enrollment received nodeId:%u, networkid:%u", data->nodeId, data->networkId);
+				//Switch to green LED, user must now reboot the node
+				node->currentLedMode = Node::ledMode::LED_MODE_OFF;
+				node->LedRed->Off();
+				node->LedGreen->On();
+				node->LedBlue->Off();
 
+			}
+			else if(packet->actionType == EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_CHIP_ID)
+			{
+				EnrollmentModuleSetEnrollmentByChipIdMessage* data = (EnrollmentModuleSetEnrollmentByChipIdMessage*)packet->data;
+
+				if(data->chipIdA == NRF_FICR->DEVICEID[0] && data->chipIdB == NRF_FICR->DEVICEID[1])
+				{
+					logt("ENROLLMOD", "Enrollment (by chipId) received nodeId:%u, networkid:%u", data->nodeId, data->networkId);
+
+					//Stop all meshing
+					node->Stop();
+
+					//Save values to persistent config
+					node->persistentConfig.nodeId = data->nodeId;
+					node->persistentConfig.networkId = data->networkId;
+
+					node->SaveConfiguration();
+
+					//Switch to green LED, user must now reboot the node
+					node->currentLedMode = Node::ledMode::LED_MODE_OFF;
+					node->LedRed->Off();
+					node->LedGreen->On();
+					node->LedBlue->Off();
+				}
 			}
 		}
 	}

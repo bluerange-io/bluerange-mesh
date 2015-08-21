@@ -94,65 +94,58 @@ void StatusReporterModule::ResetToDefaultConfiguration()
 
 bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
-	//Must be called to allow the module to get and set the config
-	Module::TerminalCommandHandler(commandName, commandArgs);
-
 	//React on commands, return true if handled, false otherwise
-	if(commandName == "uart_module_trigger_action")
+	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)
 	{
-		//Rewrite "this" to our own node id, this will actually build the packet
-		//But reroute it to our own node
-		nodeID destinationNode = (commandArgs[0] == "this") ? node->persistentConfig.nodeId : atoi(commandArgs[0].c_str());
-		if(commandArgs[1] != "status") return false;
-
-
-		//E.g. UART_MODULE_TRIGGER_ACTION 635 STATUS led on
-		if(commandArgs.size() == 4 && commandArgs[2] == "led")
+		if(commandName == "uart_module_trigger_action" || commandName == "action")
 		{
-			connPacketModuleAction packet;
-			packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
-			packet.header.sender = node->persistentConfig.nodeId;
-			packet.header.receiver = destinationNode;
+			//Rewrite "this" to our own node id, this will actually build the packet
+			//But reroute it to our own node
+			nodeID destinationNode = (commandArgs[0] == "this") ? node->persistentConfig.nodeId : atoi(commandArgs[0].c_str());
 
-			packet.moduleId = moduleId;
-			packet.actionType = StatusModuleTriggerActionMessages::SET_LED_MESSAGE;
-			packet.data[0] = commandArgs[3] == "on" ? 1: 0;
+			//E.g. UART_MODULE_TRIGGER_ACTION 635 STATUS led on
+			if(commandArgs.size() == 4 && commandArgs[2] == "led")
+			{
+				connPacketModuleAction packet;
+				packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
+				packet.header.sender = node->persistentConfig.nodeId;
+				packet.header.receiver = destinationNode;
+
+				packet.moduleId = moduleId;
+				packet.actionType = StatusModuleTriggerActionMessages::SET_LED_MESSAGE;
+				packet.data[0] = commandArgs[3] == "on" ? 1: 0;
 
 
-			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
+				cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
 
-			return true;
+				return true;
+			}
+			else if(commandArgs.size() == 3 && commandArgs[2] == "get_status")
+			{
+				RequestStatusInformation(destinationNode);
+
+				return true;
+			}
+			else if(commandArgs.size() == 3 && commandArgs[2] == "get_connections")
+			{
+				connPacketModuleAction packet;
+				packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
+				packet.header.sender = node->persistentConfig.nodeId;
+				packet.header.receiver = destinationNode;
+
+				packet.moduleId = moduleId;
+				packet.actionType = StatusModuleTriggerActionMessages::GET_CONNECTIONS_MESSAGE;
+
+
+				cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
+
+				return true;
+			}
 		}
-		else if(commandArgs.size() == 3 && commandArgs[2] == "get_status")
-		{
-			RequestStatusInformation(destinationNode);
-
-			return true;
-		}
-		else if(commandArgs.size() == 3 && commandArgs[2] == "get_connections")
-		{
-			connPacketModuleAction packet;
-			packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
-			packet.header.sender = node->persistentConfig.nodeId;
-			packet.header.receiver = destinationNode;
-
-			packet.moduleId = moduleId;
-			packet.actionType = StatusModuleTriggerActionMessages::GET_CONNECTIONS_MESSAGE;
-
-
-			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
-
-			return true;
-		}
-
-
-		return false;
 	}
-	else
-	{
-		return false;
-	}
-	return true;
+
+	//Must be called to allow the module to get and set the config
+	return Module::TerminalCommandHandler(commandName, commandArgs);
 }
 
 void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)

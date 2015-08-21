@@ -140,6 +140,8 @@ void AdvertisingModule::NodeStateChangedHandler(discoveryState newState)
 
 bool AdvertisingModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
+	//Check for commands
+
 	//Must be called to allow the module to get and set the config
 	return Module::TerminalCommandHandler(commandName, commandArgs);
 }

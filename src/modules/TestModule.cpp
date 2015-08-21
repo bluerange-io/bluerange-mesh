@@ -84,8 +84,6 @@ void TestModule::ResetToDefaultConfiguration()
 
 bool TestModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
-	//Must be called to allow the module to get and set the config
-	Module::TerminalCommandHandler(commandName, commandArgs);
 
 	if (commandName == "testsave")
 	{
@@ -99,7 +97,6 @@ bool TestModule::TerminalCommandHandler(string commandName, vector<string> comma
 		SaveModuleConfiguration();
 
 		return true;
-
 	}
 	else if (commandName == "testload")
 	{
@@ -107,7 +104,6 @@ bool TestModule::TerminalCommandHandler(string commandName, vector<string> comma
 		LoadModuleConfiguration();
 
 		return true;
-
 	}
 	else if (commandName == "leds")
 	{
@@ -127,40 +123,12 @@ bool TestModule::TerminalCommandHandler(string commandName, vector<string> comma
 
 		cm->SendMessageOverConnections(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
 
-
 		return true;
-
-	}
-	/*else if (commandName == "test_storage_save")
-	{
-		//test for storage routine
-
-		//Store two blocks of data
-		u8 buffer1[STORAGE_BLOCK_SIZE];
-		for(int i=0; i < STORAGE_BLOCK_SIZE; i++){
-			buffer1[i] = i % 77;
-		}
-
-		u8 buffer2[STORAGE_BLOCK_SIZE];
-		for(int i=0; i < STORAGE_BLOCK_SIZE; i++){
-			buffer2[i] = 7;
-		}
-
-		//Save both blocks
-		Storage::getInstance().QueuedWrite(buffer1, STORAGE_BLOCK_SIZE, 0, NULL);
-		Storage::getInstance().QueuedWrite(buffer2, STORAGE_BLOCK_SIZE, 1, NULL);
-	}
-	else if(commandName == "test_storage_load")
-	{
-		//Read both
-	}*/
-
-
-	else
-	{
-		return false;
 	}
 
+
+	//Must be called to allow the module to get and set the config
+	return Module::TerminalCommandHandler(commandName, commandArgs);
 }
 
 void TestModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)

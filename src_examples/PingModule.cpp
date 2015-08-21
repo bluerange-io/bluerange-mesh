@@ -80,32 +80,34 @@ void PingModule::ResetToDefaultConfiguration()
 
 bool PingModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
-	//Must be called to allow the module to get and set the config
-	Module::TerminalCommandHandler(commandName, commandArgs);
+	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)
+	{
+		//React on commands, return true if handled, false otherwise
+		if(commandName == "pingmod"){
+			//Get the id of the target node
+			nodeID targetNodeId = atoi(commandArgs[0].c_str());
+			logt("PINGMOD", "Trying to ping node %u", targetNodeId);
 
-	//React on commands, return true if handled, false otherwise
-	if(commandName == "pingmod"){
-		//Get the id of the target node
-		nodeID targetNodeId = atoi(commandArgs[0].c_str());
-		logt("PINGMOD", "Trying to ping node %u", targetNodeId);
+			//Send ping packet to that node
+			connPacketModuleAction packet;
+			packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
+			packet.header.sender = node->persistentConfig.nodeId;
+			packet.header.receiver = targetNodeId;
 
-		//Send ping packet to that node
-		connPacketModuleAction packet;
-		packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
-		packet.header.sender = node->persistentConfig.nodeId;
-		packet.header.receiver = targetNodeId;
-
-		packet.moduleId = moduleId;
-		packet.actionType = PingModuleTriggerActionMessages::TRIGGER_PING;
-		packet.data[0] = 123;
+			packet.moduleId = moduleId;
+			packet.actionType = PingModuleTriggerActionMessages::TRIGGER_PING;
+			packet.data[0] = 123;
 
 
-		cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
+			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
 
-		return true;
+			return true;
+		}
 	}
 
-	return false;
+
+	//Must be called to allow the module to get and set the config
+	return Module::TerminalCommandHandler(commandName, commandArgs);
 }
 
 void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)

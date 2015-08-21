@@ -93,12 +93,12 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 {
 	//If somebody wants to set the module config over uart, he's welcome
 	//First, check if our module is meant
-	if(commandArgs.size() > 1 && strcmp(moduleName, commandArgs[1].c_str()) == 0)
+	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)
 	{
 		//E.g. UART_MODULE_SET_CONFIG 0 STATUS 00:FF:A0 => command, nodeId (this for current node), moduleId, hex-string
-		if(commandName == "uart_module_set_config" && commandArgs.size() == 3)
+		if(commandName == "uart_module_set_config" || commandName == "setconf")
 		{
-			if(commandArgs[0] == "this")
+			if(commandArgs.size() == 3 && commandArgs[0] == "this")
 			{
 				logt("MODULE", "This is module %s setting config", moduleName);
 
@@ -120,13 +120,13 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 					memcpy(configurationPointer, buffer, configurationLength);
 
 					ConfigurationLoadedHandler();
-
-					return true;
 				}
 				else
 				{
 					logt("ERROR", "Wrong configuration length:%u vs. %u or version:%d vs %d", length, configurationLength, newConfig->moduleVersion, configurationPointer->moduleVersion);
 				}
+
+				return true;
 			}
 			//Send command to other node
 			else
@@ -152,17 +152,19 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 			}
 
 		}
-		else if(commandName == "uart_module_get_config")
+		else if(commandName == "uart_module_get_config" || commandName == "getconf")
 		{
-			if(commandArgs[0] == "this")
+			if(commandArgs.size() == 2 && commandArgs[0] == "this")
 			{
 				char* buffer[200];
 				Logger::getInstance().convertBufferToHexString((u8*)configurationPointer, configurationLength, (char*)buffer);
 
 				uart("MODULE", "{\"name\":\"%s\", \"config\":\"%s\"}", moduleName, buffer);
+
+				return true;
 			}
 			//It's a nodeID, we must send the get_config command to another module
-			else
+			else if(commandArgs.size() == 2)
 			{
 				connPacketModuleRequest packet;
 				packet.header.messageType = MESSAGE_TYPE_MODULE_GET_CONFIGURATION;
@@ -171,10 +173,12 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 
 				packet.moduleId = moduleId;
 
-				//TODO:Send packet with variable length, leave version field empty
+				//TODO:Send config packet with variable length, leave version field empty
+
+				return true;
 			}
 		}
-		else if(commandName == "uart_module_set_active")
+		else if(commandName == "uart_module_set_active" || commandName == "setactive")
 		{
 			if(commandArgs[0] == "this")
 			{
@@ -185,6 +189,8 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 				} else {
 					configurationPointer->moduleActive = !configurationPointer->moduleActive;
 				}
+
+				return true;
 			}
 			//Send command to another node
 			else
@@ -198,15 +204,15 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 				packet.data[0] = (commandArgs.size() < 3 || commandArgs[2] == "1") ? 1 : 0;
 
 				cm->SendMessageToReceiver(NULL, (u8*) &packet, SIZEOF_CONN_PACKET_MODULE_REQUEST+1, true);
-			}
 
-			return true;
+				return true;
+			}
 		}
 
-	} else {
-		return false;
 	}
-	return true;
+
+
+	return false;
 }
 
 void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)

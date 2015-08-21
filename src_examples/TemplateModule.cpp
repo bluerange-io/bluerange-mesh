@@ -79,32 +79,33 @@ void TemplateModule::ResetToDefaultConfiguration()
 
 bool TemplateModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
-	//Must be called to allow the module to get and set the config
-	Module::TerminalCommandHandler(commandName, commandArgs);
-
 	//React on commands, return true if handled, false otherwise
-	if(commandName == "uart_module_trigger_action")
+	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)
 	{
-		if(commandArgs[1] != moduleName) return false;
-
-		if(commandArgs.size() == 3 && commandArgs[2] == "argument_a")
+		if(commandName == "uart_module_trigger_action")
 		{
+			if(commandArgs[1] != moduleName) return false;
 
+			if(commandArgs.size() == 3 && commandArgs[2] == "argument_a")
+			{
+
+
+				return true;
+			}
+			else if(commandArgs.size() == 3 && commandArgs[2] == "argument_b")
+			{
+
+
+				return true;
+			}
 
 			return true;
+
 		}
-		else if(commandArgs.size() == 3 && commandArgs[2] == "argument_b")
-		{
-
-
-			return true;
-		}
-
-		return true;
-
 	}
 
-	return false;
+	//Must be called to allow the module to get and set the config
+	return Module::TerminalCommandHandler(commandName, commandArgs);
 }
 
 /*

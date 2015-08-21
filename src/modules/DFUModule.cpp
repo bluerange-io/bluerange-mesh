@@ -110,17 +110,8 @@ void DFUModule::AppDFUHandler(ble_dfu_t* p_dfu, ble_dfu_evt_t* DFUEvent)
 
 bool DFUModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
+	//other commands
+
 	//Must be called to allow the module to get and set the config
-	Module::TerminalCommandHandler(commandName, commandArgs);
-
-	if (commandName == "dfu")
-	{
-		return true;
-
-	}
-	else
-	{
-		return false;
-	}
-
+	return Module::TerminalCommandHandler(commandName, commandArgs);
 }

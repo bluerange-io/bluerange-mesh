@@ -429,7 +429,7 @@ void Node::UpdateJoinMePacket(joinMeBufferPacket* ackCluster)
 	data.data = (u8*) &packet;
 	data.length = SIZEOF_ADV_PACKET_PAYLOAD_JOIN_ME_V0;
 
-	logt("JOIN", "JOIN_ME updated clusterId:%d, clusterSize:%d, freeIn:%d, freeOut:%d, handle:%d, ack:%d", packet.clusterId, packet.clusterSize, packet.freeInConnections, packet.freeOutConnections, packet.meshWriteHandle, packet.ackField);
+	logt("JOIN", "JOIN_ME updated clusterId:%u, clusterSize:%d, freeIn:%u, freeOut:%u, handle:%u, ack:%u", packet.clusterId, packet.clusterSize, packet.freeInConnections, packet.freeOutConnections, packet.meshWriteHandle, packet.ackField);
 
 	//Broadcast connectable advertisement if we have a free inConnection, otherwise, we can only act as master
 	if (!cm->inConnection->isConnected) AdvertisingController::UpdateAdvertisingData(MESSAGE_TYPE_JOIN_ME, &data, true);

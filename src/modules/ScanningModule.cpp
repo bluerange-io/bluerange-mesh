@@ -259,11 +259,12 @@ void ScanningModule::NodeStateChangedHandler(discoveryState newState)
 
 bool ScanningModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
-	//Must be called to allow the module to get and set the config
-	return Module::TerminalCommandHandler(commandName, commandArgs);
-
 	//React on commands, return true if handled, false otherwise
 
+
+
+	//Must be called to allow the module to get and set the config
+	return Module::TerminalCommandHandler(commandName, commandArgs);
 }
 
 //currently not used

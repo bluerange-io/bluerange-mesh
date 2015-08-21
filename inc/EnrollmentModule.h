@@ -42,7 +42,8 @@ class EnrollmentModule: public Module
 
 
 		enum EnrollmentModuleTriggerActionMessages{
-			SET_ENROLLMENT=0
+			SET_ENROLLMENT_BY_NODE_ID=0,
+			SET_ENROLLMENT_BY_CHIP_ID=1
 		};
 
 		enum EnrollmentModuleActionResponseMessages{
@@ -53,14 +54,25 @@ class EnrollmentModule: public Module
 		#pragma pack(push)
 		#pragma pack(1)
 
-			#define SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_MESSAGE 20
+			#define SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_NODE_ID_MESSAGE 20
 			typedef struct
 			{
 				nodeID nodeId;
 				networkID networkId;
 				u8 networkKey[16];
 
-			}EnrollmentModuleSetEnrollmentMessage;
+			}EnrollmentModuleSetEnrollmentByNodeIdMessage;
+
+			#define SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_CHIP_ID_MESSAGE 26
+			typedef struct
+			{
+				u32 chipIdA;
+				u32 chipIdB;
+				nodeID nodeId;
+				networkID networkId;
+				u8 networkKey[16];
+
+			}EnrollmentModuleSetEnrollmentByChipIdMessage;
 
 		#pragma pack(pop)
 		//####### Module messages end
