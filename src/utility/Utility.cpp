@@ -32,17 +32,21 @@ extern "C"{
 
 u32 Utility::GetRandomInteger(void)
 {
+	u32 err = NRF_ERROR_BUSY;
+	u32 counter = 0;
 	u32 randomNumber;
 
-	u32 err = sd_rand_application_vector_get((u8*) &randomNumber, 4);
-	if (err == NRF_SUCCESS)
-		return randomNumber;
-	else{
-		i32 temp;
-		err = sd_temp_get(&temp);
-		logt("ERROR", "Random number generator not yet initialized, temperature used");
-		return temp;
+	while(err != NRF_SUCCESS){
+		err = sd_rand_application_vector_get((u8*) &randomNumber, 4);
+		counter++;
+
+		if(counter > 100000){
+			logt("ERROR", "Random number generator is pigheaded and does not deliver random numbers...");
+			return 5;
+		}
 	}
+
+	return randomNumber;
 }
 
 void Utility::CheckFreeHeap(void)

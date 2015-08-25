@@ -74,7 +74,7 @@ class Node:
 			ble_gap_addr_t nodeAddress; //7 bytes
 			networkID networkId;
 			nodeID nodeId;
-			u8 longTermKey[BLE_GAP_SEC_KEY_LEN]; //16 bytes
+			u8 networkKey[BLE_GAP_SEC_KEY_LEN]; //16 bytes
 			u16 connectionLossCounter;
 			deviceTypes deviceType;
 			u16 reserved;

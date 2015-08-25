@@ -36,6 +36,11 @@ extern "C"{
 }
 
 
+//The flow for any connection is:
+// Connected => Encrypted => Mesh handle discovered => Handshake done
+//encryption can be disabled and handle discovery can be skipped (handle from JOIN_ME packet will be used)
+
+
 
 
 ConnectionManager* ConnectionManager::instance = NULL;
@@ -72,6 +77,7 @@ ConnectionManager::ConnectionManager(){
 	//Register GAPController callbacks
 	GAPController::setDisconnectionHandler(DisconnectionHandler);
 	GAPController::setConnectionSuccessfulHandler(ConnectionSuccessfulHandler);
+	GAPController::setConnectionEncryptedHandler(ConnectionEncryptedHandler);
 	GAPController::setConnectionTimeoutHandler(ConnectionTimeoutHandler);
 
 	//Set GATTController callbacks
@@ -248,6 +254,8 @@ void ConnectionManager::DisconnectOtherConnections(Connection* connection)
 //STATIC methods for handling events
 //
 //
+
+//Called as soon as a new connection is made, either as central or peripheral
 void ConnectionManager::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 {
 	logt("CM", "Connection success");
@@ -273,9 +281,15 @@ void ConnectionManager::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 		c->ConnectionSuccessfulHandler(bleEvent);
 		cm->connectionManagerCallback->ConnectionSuccessfulHandler(bleEvent);
 
-		if(!cm->doHandshake){
-				c->handshakeDone = true;
-			}
+		//If encryption is enabled, we wait for the central to start encrypting
+		if(Config->encryptionEnabled)
+		{
+
+		}
+		//If handshake is disabled,
+		else if(!cm->doHandshake){
+			c->handshakeDone = true;
+		}
 	}
 	//We are master (central)
 	else if (bleEvent->evt.gap_evt.params.connected.role == BLE_GAP_ROLE_CENTRAL)
@@ -285,15 +299,74 @@ void ConnectionManager::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 		c->ConnectionSuccessfulHandler(bleEvent);
 		cm->connectionManagerCallback->ConnectionSuccessfulHandler(bleEvent);
 
-		if(cm->doHandshake) c->StartHandshake();
-		else c->handshakeDone = true;
+		//If encryption is enabled, the central starts to encrypt the connection
+		if(Config->encryptionEnabled)
+		{
+			GAPController::startEncryptingConnection(bleEvent->evt.gap_evt.conn_handle);
+		}
+		//If no encryption is enabled, we start the handshake
+		else if(cm->doHandshake)
+		{
+			c->StartHandshake();
+		}
+		//If the handshake is disabled, we just set the variable
+		else
+		{
+			c->handshakeDone = true;
+		}
 	}
 
 	cm->pendingConnection = NULL;
-
-
-
 }
+
+//When a connection changes to encrypted
+void ConnectionManager::ConnectionEncryptedHandler(ble_evt_t* bleEvent)
+{
+	ConnectionManager* cm = ConnectionManager::getInstance();
+	Connection* c = cm->GetConnectionFromHandle(bleEvent->evt.gap_evt.conn_handle);
+
+	logt("CM", "Connection id %u is now encrypted", c->connectionId);
+
+	//We are peripheral
+	if(c->direction == Connection::CONNECTION_DIRECTION_IN)
+	{
+		if(!cm->doHandshake){
+			c->handshakeDone = true;
+		}
+	}
+	//We are central
+	else if(c->direction == Connection::CONNECTION_DIRECTION_OUT)
+	{
+		if(cm->doHandshake)
+		{
+			c->StartHandshake();
+		}
+		//If the handshake is disabled, we just set the variable
+		else
+		{
+			c->handshakeDone = true;
+		}
+	}
+}
+
+//When the mesh handle has been discovered
+void ConnectionManager::handleDiscoveredCallback(u16 connectionHandle, u16 characteristicHandle)
+{
+	ConnectionManager* cm = ConnectionManager::getInstance();
+
+	Connection* connection = cm->GetConnectionFromHandle(connectionHandle);
+	if (connection != NULL)
+	{
+		connection->writeCharacteristicHandle = characteristicHandle;
+
+		if(cm->doHandshake) connection->StartHandshake();
+		else {
+			cm->connectionManagerCallback->ConnectionSuccessfulHandler(NULL);
+		}
+	}
+}
+
+
 
 void ConnectionManager::DisconnectionHandler(ble_evt_t* bleEvent)
 {
@@ -347,7 +420,7 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 			app_timer_cnt_get(&Node::getInstance()->globalTimeSetAt);
 			Node::getInstance()->globalTime = ((connPacketUpdateTimestamp*)packet)->timestamp;
 
-			logt("ERROR", "time updated at:%u with timestamp:%u", Node::getInstance()->globalTimeSetAt, (u32)Node::getInstance()->globalTime);
+			logt("NODE", "time updated at:%u with timestamp:%u", Node::getInstance()->globalTimeSetAt, (u32)Node::getInstance()->globalTime);
 		}
 
 		//Check if we need to reassemble the packet
@@ -419,21 +492,7 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 	}
 }
 
-void ConnectionManager::handleDiscoveredCallback(u16 connectionHandle, u16 characteristicHandle)
-{
-	ConnectionManager* cm = ConnectionManager::getInstance();
 
-	Connection* connection = cm->GetConnectionFromHandle(connectionHandle);
-	if (connection != NULL)
-	{
-		connection->writeCharacteristicHandle = characteristicHandle;
-
-		if(cm->doHandshake) connection->StartHandshake();
-		else {
-			cm->connectionManagerCallback->ConnectionSuccessfulHandler(NULL);
-		}
-	}
-}
 
 void ConnectionManager::fillTransmitBuffers()
 {
@@ -518,7 +577,7 @@ void ConnectionManager::fillTransmitBuffers()
 						app_timer_cnt_get(&rtc1);
 						app_timer_cnt_diff_compute(rtc1, Node::getInstance()->globalTimeSetAt, &additionalTime);
 
-						logt("ERROR", "sending time:%u with prevRtc1:%u, rtc1:%u, diff:%u", (u32)Node::getInstance()->globalTime, Node::getInstance()->globalTimeSetAt, rtc1, additionalTime);
+						logt("NODE", "sending time:%u with prevRtc1:%u, rtc1:%u, diff:%u", (u32)Node::getInstance()->globalTime, Node::getInstance()->globalTimeSetAt, rtc1, additionalTime);
 
 						((connPacketUpdateTimestamp*) data)->timestamp = Node::getInstance()->globalTime + additionalTime;
 
@@ -660,7 +719,7 @@ Connection* ConnectionManager::GetConnectionToShortestSink(Connection* excludeCo
 clusterSIZE ConnectionManager::GetHopsToShortestSink(Connection* excludeConnection)
 {
 	if(Node::getInstance()->persistentConfig.deviceType == deviceTypes::DEVICE_TYPE_SINK){
-		logt("ERROR", "HOPS 1");
+		logt("SINK", "HOPS 1");
 			return 0;
 		} else {
 
@@ -674,7 +733,7 @@ clusterSIZE ConnectionManager::GetHopsToShortestSink(Connection* excludeConnecti
 				}
 			}
 
-			logt("ERROR", "HOPS %d", (c == NULL) ? -1 : c->hopsToSink);
+			logt("SINK", "HOPS %d", (c == NULL) ? -1 : c->hopsToSink);
 			return (c == NULL) ? -1 : c->hopsToSink;
 		}
 }

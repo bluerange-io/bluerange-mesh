@@ -9,6 +9,7 @@
 #include <Connection.h>
 #include <SimpleBuffer.h>
 #include <AdvertisingController.h>
+#include <GAPController.h>
 #include <GATTController.h>
 #include <ConnectionManager.h>
 #include <ScanController.h>
@@ -129,6 +130,7 @@ void Node::ConfigurationLoadedHandler()
 		persistentConfig.version = 0;
 		persistentConfig.connectionLossCounter = 0;
 		persistentConfig.networkId = Config->meshNetworkIdentifier;
+		memcpy(&persistentConfig.networkKey, &Config->meshNetworkKey, 16);
 		persistentConfig.reserved = 0;
 
 		//Get a random number for the connection loss counter (hard on system start,...stat)
@@ -982,7 +984,7 @@ void Node::PrintStatus(void)
 {
 	trace("**************" EOL);
 	trace("This is Node %u in clusterId:%x with clusterSize:%d, networkId:%u" EOL, this->persistentConfig.nodeId, this->clusterId, this->clusterSize, persistentConfig.networkId);
-	trace("Ack Field:%d, ChipId:%u, ConnectionLossCounter:%u, nodeType:%d" EOL, ackFieldDebugCopy, NRF_FICR->DEVICEID[1], persistentConfig.connectionLossCounter, this->persistentConfig.deviceType);
+	trace("Ack Field:%d, ChipIdA:%u, ChipIdB:%u, ConnectionLossCounter:%u, nodeType:%d" EOL, ackFieldDebugCopy, NRF_FICR->DEVICEID[0], NRF_FICR->DEVICEID[1], persistentConfig.connectionLossCounter, this->persistentConfig.deviceType);
 
 	ble_gap_addr_t p_addr;
 	sd_ble_gap_address_get(&p_addr);
@@ -1221,6 +1223,17 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	{
 
 		Utility::CheckFreeHeap();
+
+		return true;
+
+	}
+
+	else if (commandName == "sec")
+	{
+		u16 connectionId = strtol(commandArgs[0].c_str(), NULL, 10);
+
+		//Enable connection security
+		GAPController::startEncryptingConnection(cm->connections[connectionId]->connectionHandle);
 
 		return true;
 

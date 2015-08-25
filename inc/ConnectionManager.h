@@ -54,7 +54,7 @@ class ConnectionManager
 		//Used within the send methods
 		void QueuePacket(Connection* connection, u8* data, u16 dataLength, bool reliable);
 
-
+		//An outConnection is initialized before being connected (saved here during initializing phase)
 		Connection* pendingConnection;
 
 
@@ -114,6 +114,7 @@ class ConnectionManager
 		//GAPController Handlers
 		static void DisconnectionHandler(ble_evt_t* bleEvent);
 		static void ConnectionSuccessfulHandler(ble_evt_t* bleEvent);
+		static void ConnectionEncryptedHandler(ble_evt_t* bleEvent);
 		static void ConnectionTimeoutHandler(ble_evt_t* bleEvent);
 
 		//GATTController Handlers

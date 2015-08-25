@@ -89,6 +89,7 @@ int main(void)
 	Logger::getInstance().enableTag("NODE");
 	Logger::getInstance().enableTag("STORAGE");
 	Logger::getInstance().enableTag("DATA");
+	Logger::getInstance().enableTag("SEC");
 
 	//Initialize the storage class
 	Storage::getInstance();
@@ -207,7 +208,7 @@ extern "C"
 		//Output Error message to UART
 		if(error_code != NRF_SUCCESS){
 			const char* errorString = Logger::getNrfErrorString(error_code);
-			//logt("ERROR", "ERROR CODE %d: %s in file %s@%d", error_code, errorString, p_file_name, line_num);
+			logt("ERROR", "ERROR CODE %d: %s in file %s@%d", error_code, errorString, p_file_name, line_num);
 		}
 
 		//Invalid states are bad and should be debugged, but should not necessarily

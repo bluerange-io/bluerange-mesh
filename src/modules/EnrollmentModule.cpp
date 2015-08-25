@@ -92,12 +92,13 @@ bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string>
 		if(commandName == "uart_module_trigger_action" || commandName == "action")
 		{
 			//If we know the previous id of the node, we can address it with this
-			if(commandArgs.size() == 5 && commandArgs[2] == "nodeid")
+			if(commandArgs.size() >= 5 && commandArgs[2] == "nodeid")
 			{
 				nodeID currentNodeId = atoi(commandArgs[0].c_str());
 
 				nodeID futureNodeId = atoi(commandArgs[3].c_str());
 				networkID networkId = atoi(commandArgs[4].c_str());
+
 
 				//Build enrollment packet
 				u8 buffer[SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_NODE_ID_MESSAGE];
@@ -114,12 +115,18 @@ bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string>
 				enrollmentMessage->networkId = networkId;
 				enrollmentMessage->nodeId = futureNodeId;
 
+				//If a network key is given, set it
+				if(commandArgs.size() > 5){
+					u8 networkKey[16];
+					Logger::getInstance().parseHexStringToBuffer(commandArgs[5].c_str(), enrollmentMessage->networkKey, 16);
+				}
+
 				cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_NODE_ID_MESSAGE, true);
 
 				return true;
 			}
 			//If it has a random id, we can broadcast an enrollment packet and use the chipid to address the node
-			else if(commandArgs.size() == 7 && commandArgs[2] == "chipid")
+			else if(commandArgs.size() >= 7 && commandArgs[2] == "chipid")
 			{
 				u32 chipIdA = strtoul(commandArgs[3].c_str(), NULL, 10);
 				u32 chipIdB = strtoul(commandArgs[4].c_str(), NULL, 10);
@@ -144,6 +151,12 @@ bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string>
 
 				enrollmentMessage->nodeId = futureNodeId;
 				enrollmentMessage->networkId = networkId;
+
+				//If a network key is given, set it
+				if(commandArgs.size() > 7){
+					u8 networkKey[16];
+					Logger::getInstance().parseHexStringToBuffer(commandArgs[7].c_str(), enrollmentMessage->networkKey, 16);
+				}
 
 				cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_CHIP_ID_MESSAGE, true);
 
@@ -194,7 +207,7 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 
 				if(data->chipIdA == NRF_FICR->DEVICEID[0] && data->chipIdB == NRF_FICR->DEVICEID[1])
 				{
-					logt("ENROLLMOD", "Enrollment (by chipId) received nodeId:%u, networkid:%u", data->nodeId, data->networkId);
+					logt("ENROLLMOD", "Enrollment (by chipId) received nodeId:%u, networkid:%u, key[0]=%u, key[10]=%u, key[15]=%u", data->nodeId, data->networkId, data->networkKey[0], data->networkKey[10], data->networkKey[15]);
 
 					//Stop all meshing
 					node->Stop();
@@ -202,6 +215,7 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 					//Save values to persistent config
 					node->persistentConfig.nodeId = data->nodeId;
 					node->persistentConfig.networkId = data->networkId;
+					memcpy(&node->persistentConfig.networkKey, data->networkKey, 16);
 
 					node->SaveConfiguration();
 

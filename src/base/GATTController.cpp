@@ -63,9 +63,20 @@ void GATTController::bleMeshServiceInit()
 	//Read and write permissions, variable length, etc...
 	ble_gatts_attr_md_t attributeMetadata;
 	memset(&attributeMetadata, 0, sizeof(ble_gatts_attr_md_t));
-	BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attributeMetadata.read_perm);
-	BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attributeMetadata.write_perm);
-	attributeMetadata.vloc = BLE_GATTS_VLOC_STACK;
+
+	//If encryption is enabled, we want our mesh handle only to be accessable over an
+	//encrypted connection with authentication
+	if(Config->encryptionEnabled){
+		BLE_GAP_CONN_SEC_MODE_SET_ENC_NO_MITM(&attributeMetadata.read_perm);
+		BLE_GAP_CONN_SEC_MODE_SET_ENC_NO_MITM(&attributeMetadata.write_perm);
+	}
+	else
+	{
+		BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attributeMetadata.read_perm);
+		BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attributeMetadata.write_perm);
+	}
+
+	attributeMetadata.vloc = BLE_GATTS_VLOC_STACK; //We currently have the value on the SoftDevice stack, we might port that to the application space
 	attributeMetadata.rd_auth = 0;
 	attributeMetadata.wr_auth = 0;
 	attributeMetadata.vlen = 1; //Make it a variable length attribute

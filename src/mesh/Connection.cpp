@@ -27,6 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <ConnectionManager.h>
 #include <Logger.h>
 
+
+//The Connection Class does have methods like Connect,... but connections, service
+//discovery or encryption are handeled by the Connectionmanager so that we can control
+//The parallel flow of multiple connections
+
+
 Connection::Connection(u8 id, ConnectionManager* cm, Node* node, ConnectionDirection direction)
 {
 	connectionManager = cm;
@@ -59,6 +65,8 @@ void Connection::Init(){
 	this->packetSendQueue->Clean();
 }
 
+//Once a connection has been connected in the connection manager, these parameters
+//Are passed to the connect function
 bool Connection::Connect(ble_gap_addr_t* address, u16 writeCharacteristicHandle)
 {
 	if(isConnected) return false;

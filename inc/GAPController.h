@@ -39,6 +39,7 @@ class GAPController
 private:
 	static void (*connectionTimeoutCallback)(ble_evt_t* bleEvent);
 	static void (*connectionSuccessCallback)(ble_evt_t* bleEvent);
+	static void (*connectionEncryptedCallback)(ble_evt_t* bleEvent);
 	static void (*disconnectionCallback)(ble_evt_t* bleEvent);
 
 	//Set to true if a connection procedure is ongoing
@@ -52,12 +53,16 @@ public:
 	//Configure the callbacks
 	static void setConnectionTimeoutHandler(void (*callback)(ble_evt_t* bleEvent));
 	static void setConnectionSuccessfulHandler(void (*callback)(ble_evt_t* bleEvent));
+	static void setConnectionEncryptedHandler(void (*callback)(ble_evt_t* bleEvent));
 	static void setDisconnectionHandler(void (*callback)(ble_evt_t* bleEvent));
 
 	//Connects to a peripheral with the specified address and calls the corresponding callbacks
 	static bool connectToPeripheral(ble_gap_addr_t* address);
 	//Disconnects from a peripheral when given a connection handle
 	static void disconnectFromPeripheral(u16 connectionHandle);
+
+	//Encryption
+	static void startEncryptingConnection(u16 connectionHandle);
 
 
 

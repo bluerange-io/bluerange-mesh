@@ -102,10 +102,10 @@ class Conf
 
 
 		//STATE timeouts
-		u16 meshStateTimeoutHigh = 1 * 1000; //Timeout of the High discovery state before deciding to which partner to connect
+		u16 meshStateTimeoutHigh = 3 * 1000; //Timeout of the High discovery state before deciding to which partner to connect
 		u16 meshStateTimeoutLow = 10 * 1000; //Timeout of the Low discovery state before deciding to which partner to connect
-		u16 meshStateTimeoutBackOff = 2 * 1000; //Timeout until the back_off state will return to discovery
-		u16 meshStateTimeoutBackOffVariance = 2 * 1000;  //Up to ... ms will be added randomly to the back off state timeout
+		u16 meshStateTimeoutBackOff = 1 * 1000; //Timeout until the back_off state will return to discovery
+		u16 meshStateTimeoutBackOffVariance = 1 * 1000;  //Up to ... ms will be added randomly to the back off state timeout
 
 		u16 discoveryHighToLowTransitionDuration = 10; // When discovery returns # times without results, the node will switch to low discovery
 
@@ -119,8 +119,8 @@ class Conf
 
 		// ########### ADVERTISING ################################################
 		u8 advertiseOnChannel37 = 1;
-		u8 advertiseOnChannel38 = 1;
-		u8 advertiseOnChannel39 = 1;
+		u8 advertiseOnChannel38 = 0;
+		u8 advertiseOnChannel39 = 0;
 
 
 
@@ -128,12 +128,20 @@ class Conf
 
 		//Allows a number of mesh networks to coexist in the same physical space without collision
 		//Allowed range is 0x0000 - 0xFF00 (0 - 65280), others are reserved for special purpose
-		u16 meshNetworkIdentifier = 5;
+		u16 meshNetworkIdentifier = 8;
 
 		const u8 meshMaxInConnections = 1; // Will probably never change and code will not allow this to change without modifications
 		const u8 meshMaxOutConnections = 3; //Will certainly change with future S130 versions
 		const u8 meshMaxConnections = meshMaxInConnections + meshMaxOutConnections; //for convenience
 
+
+		// ########### ENCRYPTION ################################################
+		//When enabling encryption, the mesh handle can only be read through an encrypted connection
+		//And connections will perform an encryption before the handshake
+		const bool encryptionEnabled = false;
+		const u8 meshNetworkKey[16] = {1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6}; //16 byte Long term key in little endian format
+		//06050403020100090807060504030201 => How to enter it in the MCP
+		//01:02:03:04:05:06:07:08:09:00:01:02:03:04:05:06 => Format for TI Sniffer
 };
 
 

@@ -63,7 +63,7 @@ class EnrollmentModule: public Module
 
 			}EnrollmentModuleSetEnrollmentByNodeIdMessage;
 
-			#define SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_CHIP_ID_MESSAGE 26
+			#define SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_CHIP_ID_MESSAGE 28
 			typedef struct
 			{
 				u32 chipIdA;
