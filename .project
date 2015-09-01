@@ -43,7 +43,7 @@
 		<link>
 			<name>src/nrf/ble_radio_notification.c</name>
 			<type>1</type>
-			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf_sdk_8_1/components/ble/ble_radio_notification/ble_radio_notification.c</locationURI>
+			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf_sdk_latest/components/ble/ble_radio_notification/ble_radio_notification.c</locationURI>
 		</link>
 		<link>
 			<name>src/nrf/nrf_delay.c</name>
