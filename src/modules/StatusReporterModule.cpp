@@ -71,7 +71,12 @@ void StatusReporterModule::TimerEventHandler(u16 passedTime, u32 appTimer)
 	//Every reporting interval, the node should send its status
 	if(configuration.reportingIntervalMs != 0 && node->appTimerMs - lastReportingTimer > configuration.reportingIntervalMs){
 
+		//Send connection info
 		SendConnectionInformation(NODE_ID_BROADCAST);
+
+		//And status as well
+		SendStatusInformation(NODE_ID_BROADCAST);
+
 		lastReportingTimer = node->appTimerMs;
 	}
 
@@ -97,7 +102,12 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 	//React on commands, return true if handled, false otherwise
 	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)
 	{
-		if(commandName == "uart_module_trigger_action" || commandName == "action")
+		//Get the status information of the plugged in node
+		if(commandName == "uart_get_plugged_in")
+		{
+			uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"plugged_in\", \"nodeId\":%u, \"chipIdA\":%u, \"chipIdB\":%u\"}", moduleId, node->persistentConfig.nodeId, NRF_FICR->DEVICEID[0], NRF_FICR->DEVICEID[1]);
+		}
+		else if(commandName == "uart_module_trigger_action" || commandName == "action")
 		{
 			//Rewrite "this" to our own node id, this will actually build the packet
 			//But reroute it to our own node
