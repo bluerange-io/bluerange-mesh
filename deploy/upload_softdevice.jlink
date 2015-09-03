@@ -1,0 +1,5 @@
+w4 4001e504 1
+loadbin "path/to/softdevice130.hex" 0
+r
+g
+exit
