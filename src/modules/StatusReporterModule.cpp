@@ -99,15 +99,18 @@ void StatusReporterModule::ResetToDefaultConfiguration()
 
 bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
+	//Get the status information of the plugged in node
+	if(commandName == "uart_get_plugged_in")
+	{
+		uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"plugged_in\", \"nodeId\":%u, \"chipIdA\":%u, \"chipIdB\":%u\"}", moduleId, node->persistentConfig.nodeId, NRF_FICR->DEVICEID[0], NRF_FICR->DEVICEID[1]);
+
+		return true;
+	}
+
 	//React on commands, return true if handled, false otherwise
 	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)
 	{
-		//Get the status information of the plugged in node
-		if(commandName == "uart_get_plugged_in")
-		{
-			uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"plugged_in\", \"nodeId\":%u, \"chipIdA\":%u, \"chipIdB\":%u\"}", moduleId, node->persistentConfig.nodeId, NRF_FICR->DEVICEID[0], NRF_FICR->DEVICEID[1]);
-		}
-		else if(commandName == "uart_module_trigger_action" || commandName == "action")
+		if(commandName == "uart_module_trigger_action" || commandName == "action")
 		{
 			//Rewrite "this" to our own node id, this will actually build the packet
 			//But reroute it to our own node
