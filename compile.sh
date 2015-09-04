@@ -1,5 +1,11 @@
 #!/bin/bash
 
+if [ "$(uname)" == "Darwin" ]; then
+	PLATFORM="mac"
+elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+	PLATFORM="linux"
+fi
+
 if [ ! -f src/nrf/Vectors_nRF51.c ]; then
 	cp ../../sdk/ehal_2015_06_01/ARM/Nordic/nRF51/src/Vectors_nRF51.c src/nrf/
 	cp ../../sdk/nrf_sdk_9_0/components/libraries/timer/app_timer.c src/nrf/
@@ -34,7 +40,7 @@ for FILE in `find . -name "*.cpp" -not -path "./src_examples/*" -or -name "*.c" 
 	
 	echo "Compiling ${FILE}..."
 
-	${HOME}/nrf/sdk/gcc_arm_embedded_4_9/bin/arm-none-eabi-${COMPILER} \
+	${HOME}/nrf/sdk/gcc_arm_embedded_4_9_${PLATFORM}/bin/arm-none-eabi-${COMPILER} \
 	-mcpu=cortex-m0 \
 	-mthumb \
 	-Og \
@@ -200,7 +206,7 @@ done
 
 echo "Linking..."
 
-${HOME}/nrf/sdk/gcc_arm_embedded_4_9/bin/arm-none-eabi-g++ \
+${HOME}/nrf/sdk/gcc_arm_embedded_4_9_${PLATFORM}/bin/arm-none-eabi-g++ \
 -mcpu=cortex-m0 \
 -mthumb \
 -Og \
@@ -230,7 +236,7 @@ fi
 
 echo "Generating HEX file..."
 
-${HOME}/nrf/sdk/gcc_arm_embedded_4_9/bin/arm-none-eabi-objcopy \
+${HOME}/nrf/sdk/gcc_arm_embedded_4_9_${PLATFORM}/bin/arm-none-eabi-objcopy \
 -O ihex \
 "FruityMesh.elf" \
 "Debug/FruityMesh.hex"
