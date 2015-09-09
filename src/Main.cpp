@@ -211,7 +211,7 @@ extern "C"
 		}
 
 		//Output Error message to UART
-		if(error_code != NRF_SUCCESS && error_code != NRF_ERROR_SOFTDEVICE_NOT_ENABLED){
+		if(error_code != NRF_SUCCESS){
 			const char* errorString = Logger::getNrfErrorString(error_code);
 			logt("ERROR", "ERROR CODE %d: %s in file %s@%d", error_code, errorString, p_file_name, line_num);
 		}

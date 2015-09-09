@@ -47,7 +47,8 @@ class EnrollmentModule: public Module
 		};
 
 		enum EnrollmentModuleActionResponseMessages{
-
+			ENROLLMENT_BY_NODE_ID_SUCCESSFUL=0,
+			ENROLLMENT_BY_CHIP_ID_SUCCESSFUL=1
 		};
 
 		//####### Module specific message structs (these need to be packed)
