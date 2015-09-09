@@ -38,27 +38,27 @@
 		<link>
 			<name>src/nrf51/app_timer.c</name>
 			<type>1</type>
-			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf_sdk_latest/components/libraries/timer/app_timer.c</locationURI>
+			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf51_sdk_latest/components/libraries/timer/app_timer.c</locationURI>
 		</link>
 		<link>
 			<name>src/nrf51/ble_radio_notification.c</name>
 			<type>1</type>
-			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf_sdk_latest/components/ble/ble_radio_notification/ble_radio_notification.c</locationURI>
+			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf51_sdk_latest/components/ble/ble_radio_notification/ble_radio_notification.c</locationURI>
 		</link>
 		<link>
 			<name>src/nrf51/nrf_delay.c</name>
 			<type>1</type>
-			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf_sdk_latest/components/drivers_nrf/hal/nrf_delay.c</locationURI>
+			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf51_sdk_latest/components/drivers_nrf/hal/nrf_delay.c</locationURI>
 		</link>
 		<link>
 			<name>src/nrf51/pstorage.c</name>
 			<type>1</type>
-			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf_sdk_latest/components/drivers_nrf/pstorage/pstorage.c</locationURI>
+			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf51_sdk_latest/components/drivers_nrf/pstorage/pstorage.c</locationURI>
 		</link>
 		<link>
 			<name>src/nrf51/softdevice_handler.c</name>
 			<type>1</type>
-			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf_sdk_latest/components/softdevice/common/softdevice_handler/softdevice_handler.c</locationURI>
+			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf51_sdk_latest/components/softdevice/common/softdevice_handler/softdevice_handler.c</locationURI>
 		</link>
 		<link>
 			<name>src/nrf52/Vectors_nRF52.c</name>
