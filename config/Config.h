@@ -128,11 +128,15 @@ class Conf
 
 		//Allows a number of mesh networks to coexist in the same physical space without collision
 		//Allowed range is 0x0000 - 0xFF00 (0 - 65280), others are reserved for special purpose
-		u16 meshNetworkIdentifier = 8;
+		u16 meshNetworkIdentifier = 1;
 
 		const u8 meshMaxInConnections = 1; // Will probably never change and code will not allow this to change without modifications
 		const u8 meshMaxOutConnections = 3; //Will certainly change with future S130 versions
 		const u8 meshMaxConnections = meshMaxInConnections + meshMaxOutConnections; //for convenience
+
+		const bool enableRadioNotificationHandler = false;
+
+		const bool enableConnectionRSSIMeasurement = true;
 
 
 		// ########### ENCRYPTION ################################################
@@ -148,7 +152,12 @@ class Conf
 // ########### COMPILE TIME SETTINGS ##########################################
 
 //Select the board for which to compile
-#include <board_pca10031.h>
+#ifdef NRF51
+	#include <board_pca10031.h>
+#endif
+#ifdef NRF52
+	#include <board_pca10036.h>
+#endif
 //#include <board_adafruit_ble_friend.h>
 
 #define VERSION_STRING "0.1.8-beta"

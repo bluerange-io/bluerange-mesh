@@ -40,7 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 extern "C"{
 #include <stdlib.h>
-#include <pstorage_platform.h>
 #include <nrf_soc.h>
 #include <app_error.h>
 #include <softdevice_handler.h>
@@ -75,8 +74,15 @@ bool lookingForInvalidStateErrors = false;
 
 Conf* Conf::instance;
 
+
+
 int main(void)
 {
+#ifdef NRF52
+	//Disable ram sleep mode for nrf52 preview DK
+	*(uint32_t *)0x4007C074 = 3131961357;
+#endif
+
 	u32 err;
 
 	//Initialize the UART Terminal
@@ -96,7 +102,6 @@ int main(void)
 
 	//Init the magic
 	node = new Node(Config->meshNetworkIdentifier);
-
 
 	new Testing();
 
@@ -206,7 +211,7 @@ extern "C"
 		}
 
 		//Output Error message to UART
-		if(error_code != NRF_SUCCESS){
+		if(error_code != NRF_SUCCESS && error_code != NRF_ERROR_SOFTDEVICE_NOT_ENABLED){
 			const char* errorString = Logger::getNrfErrorString(error_code);
 			logt("ERROR", "ERROR CODE %d: %s in file %s@%d", error_code, errorString, p_file_name, line_num);
 		}

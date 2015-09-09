@@ -12,7 +12,7 @@
 #ifndef PCA10031_H
 #define PCA10031_H
 
-// LEDs definitions for PCA10031
+// LEDs definitions for PCA10031 (nrf51 Dongle)
 #define LEDS_NUMBER    3
 
 #define LED_START      21

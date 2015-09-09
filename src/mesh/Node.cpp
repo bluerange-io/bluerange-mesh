@@ -29,6 +29,7 @@ extern "C"
 #include <nrf_soc.h>
 #include <app_error.h>
 #include <app_timer.h>
+#include <ble_radio_notification.h>
 }
 
 //Buffer that keeps a predefined number of join me packets
@@ -78,6 +79,8 @@ Node::Node(networkID networkId)
 	LedGreen->Off();
 	LedBlue->Off();
 
+
+
 	//Register terminal listener
 	Terminal::AddTerminalCommandListener(this);
 
@@ -103,8 +106,9 @@ Node::Node(networkID networkId)
 
 
 	//Register a pre/post transmit hook for radio events
-	//ble_radio_notification_init(NRF_APP_PRIORITY_HIGH, NRF_RADIO_NOTIFICATION_DISTANCE_1740US, radioNotificationHook);
-
+	if(Config->enableRadioNotificationHandler){
+		ble_radio_notification_init(NRF_APP_PRIORITY_HIGH, NRF_RADIO_NOTIFICATION_DISTANCE_800US, RadioEventHandler);
+	}
 	joinMePacketBuffer = new SimpleBuffer((u8*) raw_joinMePacketBuffer, sizeof(joinMeBufferPacket) * JOIN_ME_PACKET_BUFFER_MAX_ELEMENTS, sizeof(joinMeBufferPacket));
 
 	//Load Node configuration from slot 0
@@ -131,12 +135,11 @@ void Node::ConfigurationLoadedHandler()
 		persistentConfig.connectionLossCounter = 0;
 		persistentConfig.networkId = Config->meshNetworkIdentifier;
 		memcpy(&persistentConfig.networkKey, &Config->meshNetworkKey, 16);
+		persistentConfig.calibratedRSSI = -53;
 		persistentConfig.reserved = 0;
 
 		//Get a random number for the connection loss counter (hard on system start,...stat)
-		while(persistentConfig.connectionLossCounter == 0){
-			sd_rand_application_vector_get((u8*) &persistentConfig.connectionLossCounter, 2);
-		}
+		persistentConfig.connectionLossCounter = Utility::GetRandomInteger();
 
 		//Get an id for our testdevices when not working with persistent storage
 		InitWithTestDeviceSettings();
@@ -185,6 +188,15 @@ void Node::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 void Node::HandshakeDoneHandler(Connection* connection)
 {
 	logt("NODE", "Handshake done");
+
+	//Call our lovely modules
+	for(int i=0; i<MAX_MODULE_COUNT; i++){
+		if(activeModules[i] != 0){
+			activeModules[i]->MeshConnectionChangedHandler(connection);
+		}
+	}
+
+
 	//Go back to Discovery
 	ChangeState(discoveryState::DISCOVERY);
 
@@ -920,21 +932,18 @@ void Node::TimerTickHandler(u16 timerMs)
  */
 #define ________________RADIO___________________
 
-void radioNotificationHook(bool radio_active)
-{
-	//Node_RadioEventHandler(radio_active);
-}
-
+//This will get called before every packet that is sent and can be used to modify packets before sending
+//
 void Node::RadioEventHandler(bool radioActive)
 {
 	//Let's do some logging
-	if (radioActive) radioActiveCount++;
+	/*if (radioActive) radioActiveCount++;
 
 	if (currentLedMode == LED_MODE_RADIO)
 	{
 		if (radioActive) LedRed->On();
 		else LedRed->Off();
-	}
+	}*/
 
 	//if(radioActive) trace("1,");
 	//else trace("0,");
@@ -1185,6 +1194,11 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	else if (commandName == "stop")
 	{
 		DisableStateMachine(true);
+	}
+	else if (commandName == "clearstorage")
+	{
+		persistentConfig.version = 0xFF;
+		Storage::getInstance().QueuedWrite((u8*) &persistentConfig, sizeof(NodeConfiguration), 0, this);
 	}
 	else if (commandName == "start")
 	{

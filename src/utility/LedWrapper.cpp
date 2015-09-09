@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <LedWrapper.h>
 
 extern "C"{
-#include <nrf51.h>
+#include <nrf.h>
 }
 
 LedWrapper::LedWrapper(uint32_t io_num, bool active_high)

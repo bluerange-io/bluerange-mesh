@@ -34,12 +34,17 @@ class StatusReporterModule: public Module
 {
 	private:
 
+		enum RSSISampingModes{RSSI_SAMLING_NONE=0, RSSI_SAMLING_LOW=1, RSSI_SAMLING_MEDIUM=2, RSSI_SAMLING_HIGH=3};
+
 		//Module configuration that is saved persistently (size must be multiple of 4)
 		struct StatusReporterModuleConfiguration: ModuleConfiguration
 		{
 				//Insert more persistent config values here
-				u16 samplingIntervalMs;
-				u16 reportingIntervalMs;
+				u16 connectionReportingIntervalMs;
+				u16 statusReportingIntervalMs;
+				u8 connectionRSSISamplingMode; //typeof RSSISampingModes
+				u8 advertisingRSSISamplingMode; //typeof RSSISampingModes
+				u16 reserved;
 		};
 
 		StatusReporterModuleConfiguration configuration;
@@ -65,10 +70,10 @@ class StatusReporterModule: public Module
 				nodeID partner2;
 				nodeID partner3;
 				nodeID partner4;
-				u8 rssi1;
-				u8 rssi2;
-				u8 rssi3;
-				u8 rssi4;
+				i8 rssi1;
+				i8 rssi2;
+				i8 rssi3;
+				i8 rssi4;
 
 			} StatusReporterModuleConnectionsMessage;
 
@@ -83,18 +88,50 @@ class StatusReporterModule: public Module
 				u8 freeIn;
 				u8 freeOut;
 				u8 batteryInfo;
+				u8 calibratedRSSI;
 
 			} StatusReporterModuleStatusMessage;
+
+
+			//This message delivers non- (or not often)changing information
+			#define SIZEOF_STATUS_REPORTER_MODULE_INFO_MESSAGE 13
+			typedef struct
+			{
+				u32 chipIdA;
+				u32 chipIdB;
+				ble_gap_addr_t accessAddress;
+				networkID networkId;
+				u8 nodeVersion;
+				u8 calibratedRSSI;
+				u8 deviceType;
+
+			} StatusReporterModuleInfoMessage;
+
+			//This message delivers often changing information and info about the incoming connection
+			#define SIZEOF_STATUS_REPORTER_MODULE_FULL_STATUS_MESSAGE 10
+			typedef struct
+			{
+				clusterID clusterId;
+				clusterSIZE clusterSize;
+				nodeID inConnectionPartner;
+				i8 inConnectionRSSI;
+				u8 batteryInfo;
+
+			} StatusReporterModuleFullStatusMessage;
 
 		#pragma pack(pop)
 		//####### Module messages end
 
-		u32 lastReportingTimer;
+		u32 lastConnectionReportingTimer;
+		u32 lastStatusReportingTimer;
 
 		void SendConnectionInformation(nodeID toNode);
 
 		void RequestStatusInformation(nodeID targetNode);
 		void SendStatusInformation(nodeID toNode);
+
+		void StartConnectionRSSIMeasurement(Connection* connection);
+		void StopConnectionRSSIMeasurement(Connection* connection);
 
 	public:
 		StatusReporterModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
@@ -108,4 +145,9 @@ class StatusReporterModule: public Module
 		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
 
 		void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
+
+		void BleEventHandler(ble_evt_t* bleEvent);
+
+		void MeshConnectionChangedHandler(Connection* connection);
+
 };

@@ -116,6 +116,9 @@ protected:
 		//This handler receives all ble events and can act on them
 		virtual void BleEventHandler(ble_evt_t* bleEvent){};
 
+		//When a mesh connection is connected with handshake and everything or if it is disconnected, the ConnectionManager will call this handler
+		virtual void MeshConnectionChangedHandler(Connection* connection){};
+
 		//This handler receives all connection packets
 		virtual void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
 

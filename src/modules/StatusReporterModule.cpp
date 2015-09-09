@@ -29,21 +29,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 
 extern "C"{
-
+#include <app_error.h>
 }
 
 StatusReporterModule::StatusReporterModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
 	: Module(moduleId, node, cm, name, storageSlot)
 {
 	//Register callbacks n' stuff
-	Logger::getInstance().enableTag("REPORT");
+	Logger::getInstance().enableTag("STATUSMOD");
 
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
 	configurationPointer = &configuration;
 	configurationLength = sizeof(StatusReporterModuleConfiguration);
 
-	lastReportingTimer = 0;
+	lastConnectionReportingTimer = 0;
+	lastStatusReportingTimer = 0;
 
 	//Start module configuration loading
 	LoadModuleConfiguration();
@@ -68,17 +69,24 @@ void StatusReporterModule::ConfigurationLoadedHandler()
 
 void StatusReporterModule::TimerEventHandler(u16 passedTime, u32 appTimer)
 {
-	//Every reporting interval, the node should send its status
-	if(configuration.reportingIntervalMs != 0 && node->appTimerMs - lastReportingTimer > configuration.reportingIntervalMs){
-
+	//Every reporting interval, the node should send its connections
+	if(configuration.connectionReportingIntervalMs != 0 && node->appTimerMs - lastConnectionReportingTimer > configuration.connectionReportingIntervalMs)
+	{
 		//Send connection info
 		SendConnectionInformation(NODE_ID_BROADCAST);
 
-		//And status as well
+		lastConnectionReportingTimer = node->appTimerMs;
+	}
+
+	//Every reporting interval, the node should send its status
+	if(configuration.statusReportingIntervalMs != 0 && node->appTimerMs - lastStatusReportingTimer > configuration.statusReportingIntervalMs)
+	{
+		//Send status
 		SendStatusInformation(NODE_ID_BROADCAST);
 
-		lastReportingTimer = node->appTimerMs;
+		lastStatusReportingTimer = node->appTimerMs;
 	}
+
 
 }
 
@@ -86,12 +94,16 @@ void StatusReporterModule::ResetToDefaultConfiguration()
 {
 	//Set default configuration values
 	configuration.moduleId = moduleId;
-	configuration.moduleActive = false;
+	configuration.moduleActive = true;
 	configuration.moduleVersion = 1;
 
-	lastReportingTimer = 0;
-	configuration.reportingIntervalMs = 30 * 1000;
-	configuration.samplingIntervalMs = 0;
+	lastConnectionReportingTimer = 0;
+	lastStatusReportingTimer = 0;
+
+	configuration.statusReportingIntervalMs = 0;
+	configuration.connectionReportingIntervalMs = 30 * 1000;
+	configuration.connectionRSSISamplingMode = RSSISampingModes::RSSI_SAMLING_HIGH;
+	configuration.advertisingRSSISamplingMode = RSSISampingModes::RSSI_SAMLING_HIGH;
 
 	//Set additional config values...
 
@@ -102,7 +114,25 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 	//Get the status information of the plugged in node
 	if(commandName == "uart_get_plugged_in")
 	{
-		uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"plugged_in\", \"nodeId\":%u, \"chipIdA\":%u, \"chipIdB\":%u\"}", moduleId, node->persistentConfig.nodeId, NRF_FICR->DEVICEID[0], NRF_FICR->DEVICEID[1]);
+		uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"plugged_in\", \"nodeId\":%u, \"chipIdA\":%u, \"chipIdB\":%u}", moduleId, node->persistentConfig.nodeId, NRF_FICR->DEVICEID[0], NRF_FICR->DEVICEID[1]);
+
+		return true;
+	}
+	else if(commandName == "rssistart")
+	{
+		for (int i = 0; i < Config->meshMaxConnections; i++)
+		{
+			StartConnectionRSSIMeasurement(cm->connections[i]);
+		}
+
+		return true;
+	}
+	else if(commandName == "rssistop")
+	{
+		for (int i = 0; i < Config->meshMaxConnections; i++)
+		{
+			StopConnectionRSSIMeasurement(cm->connections[i]);
+		}
 
 		return true;
 	}
@@ -197,33 +227,7 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 			//We were queried for our connections
 			else if(packet->actionType == StatusModuleTriggerActionMessages::GET_CONNECTIONS_MESSAGE)
 			{
-				//Build response and send
-				u16 packetSize = SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_STATUS_REPORTER_MODULE_CONNECTIONS_MESSAGE;
-				u8 buffer[packetSize];
-				connPacketModuleAction* outPacket = (connPacketModuleAction*)buffer;
-
-				outPacket->header.messageType = MESSAGE_TYPE_MODULE_ACTION_RESPONSE;
-				outPacket->header.receiver = packetHeader->sender;
-				outPacket->header.sender = node->persistentConfig.nodeId;
-
-				outPacket->moduleId = moduleId;
-				outPacket->actionType = StatusModuleActionResponseMessages::CONNECTIONS_MESSAGE;
-
-				StatusReporterModuleConnectionsMessage* outPacketData = (StatusReporterModuleConnectionsMessage*)(outPacket->data);
-
-				outPacketData->partner1 = cm->connections[0]->partnerId;
-				outPacketData->partner2 = cm->connections[1]->partnerId;
-				outPacketData->partner3 = cm->connections[2]->partnerId;
-				outPacketData->partner4 = cm->connections[3]->partnerId;
-
-				outPacketData->rssi1 = cm->connections[0]->GetAverageRSSI();
-				outPacketData->rssi2 = cm->connections[1]->GetAverageRSSI();
-				outPacketData->rssi3 = cm->connections[2]->GetAverageRSSI();
-				outPacketData->rssi4 = cm->connections[3]->GetAverageRSSI();
-
-
-				cm->SendMessageToReceiver(NULL, buffer, packetSize, true);
-
+				StatusReporterModule::SendConnectionInformation(packetHeader->sender);
 			}
 		}
 	}
@@ -325,4 +329,71 @@ void StatusReporterModule::SendConnectionInformation(nodeID toNode)
 
 
 	cm->SendMessageToReceiver(NULL, buffer, packetSize, true);
+}
+
+void StatusReporterModule::StartConnectionRSSIMeasurement(Connection* connection){
+	u32 err = 0;
+
+	if (connection->isConnected)
+	{
+		//Reset old values
+		connection->rssiSamplesNum = 0;
+		connection->rssiSamplesSum = 0;
+
+		err = sd_ble_gap_rssi_start(connection->connectionHandle, 0, 0);
+		APP_ERROR_CHECK(err);
+
+		logt("STATUSMOD", "RSSI measurement started for connection %u with code %u", connection->connectionId, err);
+	}
+}
+
+void StatusReporterModule::StopConnectionRSSIMeasurement(Connection* connection){
+	u32 err = 0;
+
+	if (connection->isConnected)
+	{
+		err = sd_ble_gap_rssi_stop(connection->connectionHandle);
+		APP_ERROR_CHECK(err);
+
+		logt("STATUSMOD", "RSSI measurement stopped for connection %u with code %u", connection->connectionId, err);
+	}
+}
+
+
+//This handler receives all ble events and can act on them
+void StatusReporterModule::BleEventHandler(ble_evt_t* bleEvent){
+
+	//New RSSI measurement for connection received
+	if(bleEvent->header.evt_id == BLE_GAP_EVT_RSSI_CHANGED)
+	{
+		Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gap_evt.conn_handle);
+		i8 rssi = bleEvent->evt.gap_evt.params.rssi_changed.rssi;
+
+		connection->rssiSamplesNum++;
+		connection->rssiSamplesSum += rssi;
+
+		if(connection->rssiSamplesNum > 50){
+			connection->rssiAverage = connection->rssiSamplesSum / connection->rssiSamplesNum;
+
+			connection->rssiSamplesNum = 0;
+			connection->rssiSamplesSum = 0;
+
+			logt("STATUSMOD", "New RSSI average %d", connection->rssiAverage);
+		}
+
+
+	}
+}
+;
+
+void StatusReporterModule::MeshConnectionChangedHandler(Connection* connection)
+{
+	//New connection has just been made
+	if(connection->handshakeDone){
+		//TODO: Implement low and medium rssi sampling with timer handler
+		//TODO: disable and enable rssi sampling on existing connections
+		if(configuration.connectionRSSISamplingMode == RSSISampingModes::RSSI_SAMLING_HIGH){
+			StartConnectionRSSIMeasurement(connection);
+		}
+	}
 }

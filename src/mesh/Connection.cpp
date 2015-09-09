@@ -60,6 +60,10 @@ void Connection::Init(){
 	packetReassemblyPosition = 0;
 	packetSendPosition = 0;
 
+	rssiSamplesNum = 0;
+	rssiSamplesSum = 0;
+	rssiAverage = 0;
+
 	hopsToSink = -1;
 
 	this->packetSendQueue->Clean();
@@ -75,7 +79,6 @@ bool Connection::Connect(ble_gap_addr_t* address, u16 writeCharacteristicHandle)
 
 	memcpy(&partnerAddress, address, sizeof(ble_gap_addr_t));
 	this->writeCharacteristicHandle = writeCharacteristicHandle;
-
 
 	return true;
 }
@@ -461,10 +464,9 @@ void Connection::PrintStatus(void)
 
 }
 
-u8 Connection::GetAverageRSSI()
+i8 Connection::GetAverageRSSI()
 {
-	//TODO:implement
-	if(isConnected) return 22;
+	if(isConnected) return rssiAverage;
 	else return 0;
 }
 /* EOF */

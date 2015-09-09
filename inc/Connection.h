@@ -76,12 +76,17 @@ class Connection
 		//Helpers
 		void PrintStatus(void);
 
-		u8 GetAverageRSSI();
+		i8 GetAverageRSSI();
 
 		//Variables
 		u8 connectionId;
 		ConnectionDirection direction;
 		
+		//RSSI measurement
+		u16 rssiSamplesSum; //Absolut sum of sampled rssi packets
+		u16 rssiSamplesNum; //Number of samples
+		i8 rssiAverage; //The averaged rssi of the last measurement
+
 		//Buffers
 		u8 reliableBuffersFree; //reliable transmit buffers that are available currently to this connection
 		u8 packetSendBuffer[PACKET_SEND_BUFFER_SIZE];

@@ -77,7 +77,8 @@ class Node:
 			u8 networkKey[BLE_GAP_SEC_KEY_LEN]; //16 bytes
 			u16 connectionLossCounter;
 			deviceTypes deviceType;
-			u16 reserved;
+			u8 calibratedRSSI; //The average RSSI, received in a distance of 1m with a tx power of +0 dBm
+			u8 reserved;
 		};
 
 		//For our test devices
@@ -175,7 +176,7 @@ class Node:
 		//Message handlers
 		void AdvertisementMessageHandler(ble_evt_t* bleEvent);
 		//Timers and Stuff handler
-		void RadioEventHandler(bool radioActive);
+		static void RadioEventHandler(bool radioActive);
 		void TimerTickHandler(u16 timerMs);
 
 		//Helpers
