@@ -1,4 +1,4 @@
-
+@echo off
 
 echo Arguments:
 echo     1: softdevice or fruitymesh or erase or reset (what to flash)
