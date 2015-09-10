@@ -2,7 +2,7 @@
 
 echo Arguments:
 echo     1: softdevice or fruitymesh or erase or reset (what to flash)
-echo     2: name of textfile which contains newline seperated segger ids
+echo     2: name of textfile which contains newline seperated segger ids (or current.txt to flash all connected devices)
 echo     3: Debug or Release (The folder from which to take the application hex)
 echo     4: NRF51 or NRF52 (device family to flash)
 
@@ -34,6 +34,12 @@ echo.
 
 echo IDs:
 
+if %IDS% == current.txt (
+	REM Get currently connected IDs
+	%NRFJPROG_PATH% --ids > current.txt
+)
+
+
 cd %EXEC_FOLDER%
 for /f "tokens=* delims=" %%x in (%IDS%) do (
 
@@ -43,7 +49,7 @@ for /f "tokens=* delims=" %%x in (%IDS%) do (
 		start /min cmd /C "%NRFJPROG_PATH% -s %%x --program %FRUITYMESH_HEX% --sectorerase --family %FAMILY% && %NRFJPROG_PATH% -s %%x --reset"
 	)
 	if %TYPE% == softdevice (
-		start /min %NRFJPROG_PATH% -s %%x --erase --program %SOFTDEVICE_HEX% --chiperase -family %FAMILY%
+		start /min %NRFJPROG_PATH% -s %%x --program %SOFTDEVICE_HEX% --chiperase --family %FAMILY%
 	)
 	if %TYPE% == erase (
 		start /min nrfjprog -s %%x --eraseall --family %FAMILY%

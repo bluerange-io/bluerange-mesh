@@ -78,24 +78,20 @@ Conf* Conf::instance;
 
 int main(void)
 {
-#ifdef NRF52
-	//Disable ram sleep mode for nrf52 preview DK
-	//*(uint32_t *)0x4007C074 = 3131961357;
-#endif
 
 	u32 err;
 
 	//Initialize the UART Terminal
 	Terminal::Init();
 
-	//Initialialize the SoftDevice and the BLE stack
-	bleInit();
-
 	//Enable logging for some interesting log tags
 	Logger::getInstance().enableTag("NODE");
 	Logger::getInstance().enableTag("STORAGE");
 	Logger::getInstance().enableTag("DATA");
 	Logger::getInstance().enableTag("SEC");
+
+	//Initialialize the SoftDevice and the BLE stack
+	bleInit();
 
 	//Initialize the storage class
 	Storage::getInstance();
