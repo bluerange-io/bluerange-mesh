@@ -80,7 +80,7 @@ int main(void)
 {
 #ifdef NRF52
 	//Disable ram sleep mode for nrf52 preview DK
-	*(uint32_t *)0x4007C074 = 3131961357;
+	//*(uint32_t *)0x4007C074 = 3131961357;
 #endif
 
 	u32 err;
@@ -165,6 +165,8 @@ int main(void)
 //INIT function that starts up the Softdevice and registers the needed handlers
 void bleInit(void){
 	u32 err = 0;
+
+	logt("NODE", "Initializing Softdevice");
 
     // Initialize the SoftDevice handler with the low frequency clock source
 	//And a reference to the previously allocated buffer

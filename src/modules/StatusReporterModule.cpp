@@ -378,7 +378,7 @@ void StatusReporterModule::BleEventHandler(ble_evt_t* bleEvent){
 			connection->rssiSamplesNum = 0;
 			connection->rssiSamplesSum = 0;
 
-			logt("STATUSMOD", "New RSSI average %d", connection->rssiAverage);
+			//logt("STATUSMOD", "New RSSI average %d", connection->rssiAverage);
 		}
 
 

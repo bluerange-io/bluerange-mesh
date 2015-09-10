@@ -58,6 +58,12 @@ void Terminal::Init()
 		simple_uart_putstring((const u8*) ", version: ");
 		simple_uart_putstring((const u8*) VERSION_STRING);
 
+#ifdef NRF52
+		simple_uart_putstring((const u8*) ", nRF52");
+#else
+		simple_uart_putstring((const u8*) ", nRF51");
+#endif
+
 		simple_uart_putstring((const u8*) EOL "--------------------------------------------------" EOL);
 	}
 
