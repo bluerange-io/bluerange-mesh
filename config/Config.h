@@ -136,7 +136,7 @@ class Conf
 
 		const bool enableRadioNotificationHandler = false;
 
-		const bool enableConnectionRSSIMeasurement = true;
+		const bool enableConnectionRSSIMeasurement = false;
 
 
 		// ########### ENCRYPTION ################################################
@@ -168,7 +168,7 @@ class Conf
 //Each connection does also have a buffer to assemble packets that were split into 20 byte chunks
 #define PACKET_REASSEMBLY_BUFFER_SIZE 200
 
-//Size for tracing messages to UART
+//Size for tracing messages to UART, if it is too short, messages will get truncated
 #define TRACE_BUFFER_SIZE 300
 
 //Number of supported Modules
@@ -184,15 +184,15 @@ class Conf
 #define ATTR_TABLE_MAX_SIZE 0x200
 
 //Identifiers
-#define COMPANY_IDENTIFIER 0x024D // Company identifier for manufacturer specific data header (M-Way Solutions GmbH)
+#define COMPANY_IDENTIFIER 0x024D // Company identifier for manufacturer specific data header (M-Way Solutions GmbH) - Should not be changed to ensure compatibility with the mesh protocol
 #define MESH_IDENTIFIER 0xF0 //Identifier that defines this as the fruitymesh protocol
 
 //GAP device name
 #define DEVICE_NAME "FRUITY"
 
 //Serial should be short but unique for the given manufacturer id
-#define MANUFACTURER_ID 0xFFFF
-#define SERIAL_NUMBER_LENGTH 5
+#define MANUFACTURER_ID 0xFFFF //The manufacturer id should match your company identifier that should be registered with the bluetooth sig: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
+#define SERIAL_NUMBER_LENGTH 5 //A serial could use the alphabet "BCDFGHJKLMNPQRSTVWXYZ123456789". This is good for readability (short, no inter-digit resemblance, 25 million possible combinations, no funny words)
 
 //Storage
 #define STORAGE_BLOCK_SIZE 128 //Determines the maximum size for a module configuration

@@ -159,7 +159,7 @@ void Node::ConfigurationLoadedHandler()
 	this->UpdateJoinMePacket(NULL);
 
 	//Print configuration and start node
-	logt("NODE", "Config loaded nodeId:%d, connLossCount:%u, netowrkId:%d", persistentConfig.nodeId, persistentConfig.connectionLossCounter, persistentConfig.networkId);
+	logt("NODE", "Config loaded nodeId:%d, connLossCount:%u, networkId:%d", persistentConfig.nodeId, persistentConfig.connectionLossCounter, persistentConfig.networkId);
 
 	//Go to Discovery
 	ChangeState(discoveryState::DISCOVERY);

@@ -686,7 +686,6 @@ void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
 			//Now we continue sending packets
 			if(cm->pendingPackets) cm->fillTransmitBuffers();
 		}
-
 	}
 }
 

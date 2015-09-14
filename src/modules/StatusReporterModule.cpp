@@ -394,8 +394,10 @@ void StatusReporterModule::MeshConnectionChangedHandler(Connection* connection)
 	if(connection->handshakeDone){
 		//TODO: Implement low and medium rssi sampling with timer handler
 		//TODO: disable and enable rssi sampling on existing connections
-		if(configuration.connectionRSSISamplingMode == RSSISampingModes::RSSI_SAMLING_HIGH){
-			StartConnectionRSSIMeasurement(connection);
+		if(Config->enableConnectionRSSIMeasurement){
+			if(configuration.connectionRSSISamplingMode == RSSISampingModes::RSSI_SAMLING_HIGH){
+				StartConnectionRSSIMeasurement(connection);
+			}
 		}
 	}
 }
