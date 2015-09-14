@@ -49,7 +49,7 @@ void Logger::log_f(bool printLine, const char* file, i32 line, const char* messa
 {
 	memset(mhTraceBuffer, 0, TRACE_BUFFER_SIZE);
 
-	//Variable argument list must be passed to vsprintf
+	//Variable argument list must be passed to vnsprintf
 	va_list aptr;
 	va_start(aptr, message);
 	vsnprintf(mhTraceBuffer, TRACE_BUFFER_SIZE, message, aptr);
@@ -75,7 +75,7 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
 		memset(mhTraceBuffer, 0, TRACE_BUFFER_SIZE);
 		memset(mhTraceBuffer2, 0, TRACE_BUFFER_SIZE);
 
-		//Variable argument list must be passed to vsprintf
+		//Variable argument list must be passed to vsnprintf
 		va_list aptr;
 		va_start(aptr, message);
 		vsnprintf(mhTraceBuffer, TRACE_BUFFER_SIZE, message, aptr);
