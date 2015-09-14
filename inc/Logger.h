@@ -46,8 +46,6 @@ using namespace std;
 #define __FILE_S__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #endif
 
-#define TRACE_BUFFER_SIZE 200
-
 class Logger : public TerminalCommandListener
 {
 private:

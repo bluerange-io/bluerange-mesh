@@ -77,11 +77,13 @@ class StatusReporterModule: public Module
 
 			} StatusReporterModuleConnectionsMessage;
 
-			#define SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE 24
+			#define SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE 26 + SERIAL_NUMBER_LENGTH
 			typedef struct
 			{
 				u32 chipIdA;
 				u32 chipIdB;
+				u16 manufacturerId;
+				u8 serialNumber[SERIAL_NUMBER_LENGTH];
 				clusterID clusterId;
 				clusterSIZE clusterSize;
 				ble_gap_addr_t accessAddress;
@@ -94,11 +96,13 @@ class StatusReporterModule: public Module
 
 
 			//This message delivers non- (or not often)changing information
-			#define SIZEOF_STATUS_REPORTER_MODULE_INFO_MESSAGE 13
+			#define SIZEOF_STATUS_REPORTER_MODULE_INFO_MESSAGE (13 + SERIAL_NUMBER_LENGTH)
 			typedef struct
 			{
 				u32 chipIdA;
 				u32 chipIdB;
+				u16 manufacturerId;
+				u8 serialNumber[SERIAL_NUMBER_LENGTH];
 				ble_gap_addr_t accessAddress;
 				networkID networkId;
 				u8 nodeVersion;

@@ -97,7 +97,7 @@ Node::Node(networkID networkId)
 	//module configurations with the Storage class
 	//Module ids must persist when nodes are updated to guearantee that the
 	//same module receives the same storage slot
-	activeModules[0] = new TestModule(moduleID::TEST_MODULE_ID, this, cm, "test", 1);
+	//activeModules[0] = new TestModule(moduleID::TEST_MODULE_ID, this, cm, "test", 1);
 	//activeModules[1] = new DFUModule((moduleID::DFU_MODULE_ID, this, cm, "dfu", 2);
 	activeModules[2] = new StatusReporterModule(moduleID::STATUS_REPORTER_MODULE_ID, this, cm, "status", 3);
 	activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "adv", 4);
@@ -390,7 +390,7 @@ void Node::messageReceivedCallback(connectionPacket* inPacket)
 			{
 				connPacketAdvInfo* packet = (connPacketAdvInfo*) data;
 
-				uart("ADVINFO", "{\"sender\":\"%d\",\"addr\":\"%x:%x:%x:%x:%x:%x\",\"count\":%d,\"rssiSum\":%d}", packet->header.sender, packet->payload.peerAddress[0], packet->payload.peerAddress[1], packet->payload.peerAddress[2], packet->payload.peerAddress[3], packet->payload.peerAddress[4], packet->payload.peerAddress[5], packet->payload.packetCount, packet->payload.inverseRssiSum);
+				uart("ADVINFO", "{\"sender\":\"%d\",\"addr\":\"%x:%x:%x:%x:%x:%x\",\"count\":%d,\"rssiSum\":%d}" SEP, packet->header.sender, packet->payload.peerAddress[0], packet->payload.peerAddress[1], packet->payload.peerAddress[2], packet->payload.peerAddress[3], packet->payload.peerAddress[4], packet->payload.peerAddress[5], packet->payload.packetCount, packet->payload.inverseRssiSum);
 
 			}
 			break;
@@ -997,7 +997,7 @@ void Node::PrintStatus(void)
 
 	ble_gap_addr_t p_addr;
 	sd_ble_gap_address_get(&p_addr);
-	trace("GAP Addr is %02X:%02X:%02X:%02X:%02X:%02X" EOL EOL, p_addr.addr[5], p_addr.addr[4], p_addr.addr[3], p_addr.addr[2], p_addr.addr[1], p_addr.addr[0]);
+	trace("GAP Addr is %02X:%02X:%02X:%02X:%02X:%02X, serial:%s" EOL EOL, p_addr.addr[5], p_addr.addr[4], p_addr.addr[3], p_addr.addr[2], p_addr.addr[1], p_addr.addr[0], persistentConfig.serialNumber);
 
 	//Print connection info
 	trace("CONNECTIONS (freeIn:%u, freeOut:%u, pendingPackets:%u, txBuf:%u" EOL, cm->freeInConnections, cm->freeOutConnections, cm->pendingPackets, cm->txBufferFreeCount);
@@ -1241,7 +1241,6 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		return true;
 
 	}
-
 	else if (commandName == "sec")
 	{
 		u16 connectionId = strtol(commandArgs[0].c_str(), NULL, 10);
@@ -1359,5 +1358,17 @@ void Node::InitWithTestDeviceSettings()
 		sd_ble_gap_address_get(&persistentConfig.nodeAddress);
 
 	}
+
+	//Generate a random serial number
+	const char* alphabet = "BCDFGHJKLMNPQRSTVWXYZ123456789";
+
+	for(int i=0; i<SERIAL_NUMBER_LENGTH; i++){
+		persistentConfig.serialNumber[i] = alphabet[(NRF_FICR->DEVICEID[0] * i) % 30];
+	}
+	persistentConfig.serialNumber[SERIAL_NUMBER_LENGTH] = '\0';
+	persistentConfig.manufacturerId = 0xFFFF;
+
+	logt("ERROR", "Serial is %s", persistentConfig.serialNumber);
+
 }
 /* EOF */

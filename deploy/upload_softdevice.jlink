@@ -1,5 +1,5 @@
 w4 4001e504 1
-loadbin "../../softdevices/sd130_1.0.0-prod/s130_nrf51_1.0.0_softdevice.hex" 0
+loadbin "../../../softdevices/sd130_1.0.0-prod/s130_nrf51_1.0.0_softdevice.hex" 0
 r
 g
 exit

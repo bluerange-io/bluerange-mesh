@@ -126,6 +126,7 @@ bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string>
 				return true;
 			}
 			//If it has a random id, we can broadcast an enrollment packet and use the chipid to address the node
+			//Example: action 0 enroll chipid [chipIdA] [chipIdB] [futureNodeId] [furutreNetworkId]
 			else if(commandArgs.size() >= 7 && commandArgs[2] == "chipid")
 			{
 				u32 chipIdA = strtoul(commandArgs[3].c_str(), NULL, 10);
@@ -159,6 +160,39 @@ bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string>
 				}
 
 				cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_CHIP_ID_MESSAGE, true);
+
+				return true;
+			}
+			//Enroll by serial number
+			else if(commandArgs.size() >= 6 && commandArgs[2] == "serial")
+			{
+				nodeID newNodeId = atoi(commandArgs[4].c_str());
+				networkID newNetworkId = atoi(commandArgs[5].c_str());
+
+
+				//Build enrollment packet
+				u8 buffer[SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE];
+				connPacketModuleAction* packet = (connPacketModuleAction*)buffer;
+				EnrollmentModuleSetEnrollmentBySerialMessage* enrollmentMessage = (EnrollmentModuleSetEnrollmentBySerialMessage*)packet->data;
+
+				packet->header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
+				packet->header.sender = node->persistentConfig.nodeId;
+				packet->header.receiver = 0;
+
+				packet->moduleId = moduleId;
+				packet->actionType = EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_SERIAL;
+
+				memcpy(enrollmentMessage->serialNumber, commandArgs[3].c_str(), SERIAL_NUMBER_LENGTH);
+				enrollmentMessage->newNodeId = newNodeId;
+				enrollmentMessage->newNetworkId = newNetworkId;
+
+				//If a network key is given, set it
+				if(commandArgs.size() > 6){
+					u8 networkKey[16];
+					Logger::getInstance().parseHexStringToBuffer(commandArgs[6].c_str(), enrollmentMessage->newNetworkKey, 16);
+				}
+
+				cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE, true);
 
 				return true;
 			}
@@ -200,6 +234,8 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 				node->LedGreen->On();
 				node->LedBlue->Off();
 
+				SendEnrollmentResponse(NODE_ID_BROADCAST, enrollmentMethods::BY_NODE_ID, 0, NRF_FICR->DEVICEID[0], NRF_FICR->DEVICEID[1], (u8*)node->persistentConfig.serialNumber);
+
 			}
 			else if(packet->actionType == EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_CHIP_ID)
 			{
@@ -224,6 +260,38 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 					node->LedRed->Off();
 					node->LedGreen->On();
 					node->LedBlue->Off();
+
+
+					SendEnrollmentResponse(NODE_ID_BROADCAST, enrollmentMethods::BY_CHIP_ID, 0, NRF_FICR->DEVICEID[0], NRF_FICR->DEVICEID[1], (u8*)node->persistentConfig.serialNumber);
+				}
+			}
+			//If an enrollment by serial is received
+			else if(packet->actionType == EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_SERIAL)
+			{
+				EnrollmentModuleSetEnrollmentBySerialMessage* data = (EnrollmentModuleSetEnrollmentBySerialMessage*)packet->data;
+
+				if(memcmp(data->serialNumber, node->persistentConfig.serialNumber, SERIAL_NUMBER_LENGTH) == 0)
+				{
+					logt("ENROLLMOD", "Enrollment (by serial) received nodeId:%u, networkid:%u, key[0]=%u, key[10]=%u, key[15]=%u", data->newNodeId, data->newNetworkId, data->newNetworkKey[0], data->newNetworkKey[10], data->newNetworkKey[15]);
+
+					//Stop all meshing
+					node->Stop();
+
+					//Save values to persistent config
+					node->persistentConfig.nodeId = data->newNodeId;
+					node->persistentConfig.networkId = data->newNetworkId;
+					memcpy(&node->persistentConfig.networkKey, data->newNetworkKey, 16);
+
+					node->SaveConfiguration();
+
+					//Switch to green LED, user must now reboot the node
+					node->currentLedMode = Node::ledMode::LED_MODE_OFF;
+					node->LedRed->Off();
+					node->LedGreen->On();
+					node->LedBlue->Off();
+
+
+					SendEnrollmentResponse(NODE_ID_BROADCAST, enrollmentMethods::BY_SERIAL, 0, NRF_FICR->DEVICEID[0], NRF_FICR->DEVICEID[1], (u8*)node->persistentConfig.serialNumber);
 				}
 			}
 		}
@@ -236,10 +304,48 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId)
 		{
-			/*if(packet->actionType == EnrollmentModuleTriggerActionMessages::MESSAGE)
+			if(packet->actionType == EnrollmentModuleActionResponseMessages::ENROLLMENT_SUCCESSFUL)
 			{
+				EnrollmentModuleEnrollmentResponse* data = (EnrollmentModuleEnrollmentResponse*)packet->data;
 
-			}*/
+
+				const char* enrollmentMethodString = "";
+				if(data->enrollmentMethod == enrollmentMethods::BY_NODE_ID) enrollmentMethodString = "node_id";
+				else if(data->enrollmentMethod == enrollmentMethods::BY_CHIP_ID) enrollmentMethodString = "chip_id";
+				else if(data->enrollmentMethod == enrollmentMethods::BY_SERIAL) enrollmentMethodString = "serial";
+
+				//Add null terminator to string
+				u8 serialNumber[SERIAL_NUMBER_LENGTH+1];
+				memcpy(serialNumber, data->serialNumber, SERIAL_NUMBER_LENGTH);
+				serialNumber[SERIAL_NUMBER_LENGTH] = '\0';
+
+				uart("ENROLLMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"enroll\", \"method\":\"%s\", \"result\":\"success\", \"newNodeId\":%u, \"chipIdA\":%u, \"chipIdB\":%u, \"serial\":\"%s\"}" SEP, moduleId, enrollmentMethodString, packet->header.sender, data->chipIdA, data->chipIdB, serialNumber);
+			}
 		}
 	}
+}
+
+void EnrollmentModule::SendEnrollmentResponse(nodeID receiver, u8 enrollmentMethod, u8 result, u32 chipIdA, u32 chipIdB, u8* serialNumber)
+{
+	//Inform the sender, that the enrollment was successful
+	u8 buffer[SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_RESPONSE];
+	connPacketModuleAction* packet = (connPacketModuleAction*)buffer;
+	EnrollmentModuleEnrollmentResponse* data = (EnrollmentModuleEnrollmentResponse*)packet->data;
+
+	packet->header.messageType = MESSAGE_TYPE_MODULE_ACTION_RESPONSE;
+	packet->header.sender = node->persistentConfig.nodeId;
+	packet->header.receiver = receiver;
+
+	packet->moduleId = moduleId;
+	packet->actionType = EnrollmentModuleActionResponseMessages::ENROLLMENT_SUCCESSFUL;
+
+	data->result = result;
+	data->enrollmentMethod = enrollmentMethod;
+	data->chipIdA = NRF_FICR->DEVICEADDR[0];
+	data->chipIdB = NRF_FICR->DEVICEADDR[1];
+	memcpy(data->serialNumber, node->persistentConfig.serialNumber, SERIAL_NUMBER_LENGTH);
+
+
+	cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_RESPONSE, true);
+
 }

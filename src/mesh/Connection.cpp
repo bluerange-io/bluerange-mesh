@@ -460,7 +460,7 @@ void Connection::PrintStatus(void)
 {
 	const char* directionString = (direction == CONNECTION_DIRECTION_IN) ? "< IN " : "> OUT";
 
-	trace("%s %d, handshake:%d, clusterId:%d, clusterSize:%d, toSink:%d, Queue:%d-%d(%d), relBuf:%d" EOL, directionString, this->partnerId, this->handshakeDone, this->connectedClusterId, this->connectedClusterSize, this->hopsToSink, (packetSendQueue->readPointer - packetSendQueue->bufferStart), (packetSendQueue->writePointer - packetSendQueue->bufferStart), packetSendQueue->_numElements, reliableBuffersFree);
+	trace("%s %u, handshake:%u, clusterId:%x, clusterSize:%u, toSink:%d, Queue:%u-%u(%u), relBuf:%u" EOL, directionString, this->partnerId, this->handshakeDone, this->connectedClusterId, this->connectedClusterSize, this->hopsToSink, (packetSendQueue->readPointer - packetSendQueue->bufferStart), (packetSendQueue->writePointer - packetSendQueue->bufferStart), packetSendQueue->_numElements, reliableBuffersFree);
 
 }
 

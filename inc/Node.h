@@ -74,6 +74,8 @@ class Node:
 			ble_gap_addr_t nodeAddress; //7 bytes
 			networkID networkId;
 			nodeID nodeId;
+			u16 manufacturerId; //According to the BLE company identifiers: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
+			char serialNumber[SERIAL_NUMBER_LENGTH+1];//should be 0 terminated
 			u8 networkKey[BLE_GAP_SEC_KEY_LEN]; //16 bytes
 			u16 connectionLossCounter;
 			deviceTypes deviceType;

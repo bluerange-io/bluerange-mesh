@@ -57,7 +57,7 @@ class Conf
 
 		//Do not load the persistent node configuration
 		//Beware: Persistent config must be updated with every connection loss or random shoudl be used....?
-		bool ignorePersistentNodeConfigurationOnBoot = true;
+		bool ignorePersistentNodeConfigurationOnBoot = false;
 
 		//Do not use any persistently saved module data
 		bool ignorePersistentModuleConfigurationOnBoot = true;
@@ -168,6 +168,9 @@ class Conf
 //Each connection does also have a buffer to assemble packets that were split into 20 byte chunks
 #define PACKET_REASSEMBLY_BUFFER_SIZE 200
 
+//Size for tracing messages to UART
+#define TRACE_BUFFER_SIZE 300
+
 //Number of supported Modules
 #define MAX_MODULE_COUNT 10
 
@@ -187,6 +190,10 @@ class Conf
 //GAP device name
 #define DEVICE_NAME "FRUITY"
 
+//Serial should be short but unique for the given manufacturer id
+#define MANUFACTURER_ID 0xFFFF
+#define SERIAL_NUMBER_LENGTH 5
+
 //Storage
 #define STORAGE_BLOCK_SIZE 128 //Determines the maximum size for a module configuration
 #define STORAGE_BLOCK_NUMBER 10 //Determines the number of blocks that are available
@@ -194,6 +201,7 @@ class Conf
 /*############ LOGGER ################*/
 
 #define EOL "\r\n"
+#define SEP "\r\n"
 
 //If undefined, the final build will have no logging / Terminal functionality built in
 #define ENABLE_LOGGING

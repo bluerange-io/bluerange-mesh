@@ -423,14 +423,16 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 			logt("NODE", "time updated at:%u with timestamp:%u", Node::getInstance()->globalTimeSetAt, (u32)Node::getInstance()->globalTime);
 		}
 
+
+		//Print packet as hex
+		char stringBuffer[100];
+		Logger::getInstance().convertBufferToHexString(bleEvent->evt.gatts_evt.params.write.data, bleEvent->evt.gatts_evt.params.write.len, stringBuffer);
+		logt("CONN", "Received type %d, hasMore %d, length %d, reliable %d:", ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->messageType, ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->hasMoreParts, bleEvent->evt.gatts_evt.params.write.len, bleEvent->evt.gatts_evt.params.write.op);
+		logt("CONN", "%s", stringBuffer);
+
 		//Check if we need to reassemble the packet
 		if(connection->packetReassemblyPosition == 0 && packet->hasMoreParts == 0)
 		{
-			//Print packet as hex
-			char stringBuffer[100];
-			Logger::getInstance().convertBufferToHexString(bleEvent->evt.gatts_evt.params.write.data, bleEvent->evt.gatts_evt.params.write.len, stringBuffer);
-			logt("CONN", "Received type %d, hasMore %d, length %d, reliable %d", ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->messageType, ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->hasMoreParts, bleEvent->evt.gatts_evt.params.write.len, bleEvent->evt.gatts_evt.params.write.op);
-			logt("CONN", "%s", stringBuffer);
 
 			//Single packet, no more data
 			connectionPacket p;

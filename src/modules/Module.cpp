@@ -83,7 +83,7 @@ void Module::ConfigurationLoadedHandler()
 	}
 	//Config-> loaded and ok
 	else {
-		logt("MODULE", "Module config loaded version:%d", configurationPointer->moduleVersion);
+		logt("MODULE", "Module %u config loaded version:%d", moduleId, configurationPointer->moduleVersion);
 	}
 }
 
@@ -159,7 +159,7 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 				char* buffer[200];
 				Logger::getInstance().convertBufferToHexString((u8*)configurationPointer, configurationLength, (char*)buffer);
 
-				uart("MODULE", "{\"name\":\"%s\", \"config\":\"%s\"}", moduleName, buffer);
+				uart("MODULE", "{\"name\":\"%s\", \"config\":\"%s\"}" SEP, moduleName, buffer);
 
 				return true;
 			}

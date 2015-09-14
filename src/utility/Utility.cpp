@@ -54,5 +54,5 @@ void Utility::CheckFreeHeap(void)
 	struct mallinfo used = mallinfo();
 	u32 size = used.uordblks + used.hblkhd;
 
-	uart("NODE", "{\"heap\":%u}", size);
+	uart("NODE", "{\"heap\":%u}" SEP, size);
 }

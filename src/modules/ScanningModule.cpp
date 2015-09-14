@@ -148,7 +148,7 @@ void ScanningModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPa
 				memcpy(&totalMessages, packet->data + 0, 4);
 				memcpy(&totalRSSI, packet->data + 4, 4);
 
-				uart("SCANMOD", "{\"module\":%d, \"type\":\"general\", \"msgType\":\"totalpackets\", \"sender\":%d, \"messageSum\":%u, \"rssiSum\":%d}", moduleId, packet->header.sender, totalMessages, totalRSSI);
+				uart("SCANMOD", "{\"module\":%d, \"type\":\"general\", \"msgType\":\"totalpackets\", \"sender\":%d, \"messageSum\":%u, \"rssiSum\":%d}" SEP, moduleId, packet->header.sender, totalMessages, totalRSSI);
 			}
 		}
 	}

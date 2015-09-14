@@ -40,15 +40,17 @@ class EnrollmentModule: public Module
 
 		enum enrollmentStates {NOT_ENROLLED, ENROLLED};
 
+		enum enrollmentMethods {BY_NODE_ID=0, BY_CHIP_ID=1, BY_SERIAL=2};
+
 
 		enum EnrollmentModuleTriggerActionMessages{
 			SET_ENROLLMENT_BY_NODE_ID=0,
-			SET_ENROLLMENT_BY_CHIP_ID=1
+			SET_ENROLLMENT_BY_CHIP_ID=1,
+			SET_ENROLLMENT_BY_SERIAL=2
 		};
 
 		enum EnrollmentModuleActionResponseMessages{
-			ENROLLMENT_BY_NODE_ID_SUCCESSFUL=0,
-			ENROLLMENT_BY_CHIP_ID_SUCCESSFUL=1
+			ENROLLMENT_SUCCESSFUL=0
 		};
 
 		//####### Module specific message structs (these need to be packed)
@@ -75,8 +77,36 @@ class EnrollmentModule: public Module
 
 			}EnrollmentModuleSetEnrollmentByChipIdMessage;
 
+			#define SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE (20+SERIAL_NUMBER_LENGTH)
+			typedef struct
+			{
+				u8 serialNumber[SERIAL_NUMBER_LENGTH];
+				nodeID newNodeId;
+				networkID newNetworkId;
+				u8 newNetworkKey[16];
+
+			}EnrollmentModuleSetEnrollmentBySerialMessage;
+
+
+			//Answers
+			#define SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_RESPONSE (10+SERIAL_NUMBER_LENGTH)
+			typedef struct
+			{
+				u8 enrollmentMethod;
+				u8 result;
+				u32 chipIdA;
+				u32 chipIdB;
+				u8 serialNumber[SERIAL_NUMBER_LENGTH];
+
+			}EnrollmentModuleEnrollmentResponse;
+
+
 		#pragma pack(pop)
 		//####### Module messages end
+
+
+		void SendEnrollmentResponse(nodeID receiver, u8 enrollmentMethod, u8 result, u32 chipIdA, u32 chipIdB, u8* serialNumber);
+
 
 	public:
 		EnrollmentModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);

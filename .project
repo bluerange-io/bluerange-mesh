@@ -46,11 +46,6 @@
 			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf51_sdk_latest/components/ble/ble_radio_notification/ble_radio_notification.c</locationURI>
 		</link>
 		<link>
-			<name>src/nrf51/nrf_delay.c</name>
-			<type>1</type>
-			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf51_sdk_latest/components/drivers_nrf/hal/nrf_delay.c</locationURI>
-		</link>
-		<link>
 			<name>src/nrf51/pstorage.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf51_sdk_latest/components/drivers_nrf/pstorage/pstorage.c</locationURI>

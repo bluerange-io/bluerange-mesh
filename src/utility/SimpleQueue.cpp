@@ -29,7 +29,7 @@ bool SimpleQueue::Put(u8* data, u32 dataLength)
 	
 	//If the writePointer is ahead (or at the same point) of the read pointer && bufferSpace
 	//at the end is not enough && dataSize at the beginning is enough
-	if(writePointer >= readPointer && bufferEnd - writePointer <= elementSize && readPointer - bufferStart >= elementSize){
+	if(writePointer >= readPointer && (u32)(bufferEnd - writePointer) <= elementSize && (u32)(readPointer - bufferStart) >= elementSize){
 		writePointer = bufferStart;
 		((u32*)writePointer)[0] = 0;
 	}
