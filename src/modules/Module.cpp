@@ -98,39 +98,10 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 		//E.g. UART_MODULE_SET_CONFIG 0 STATUS 00:FF:A0 => command, nodeId (this for current node), moduleId, hex-string
 		if(commandName == "uart_module_set_config" || commandName == "setconf")
 		{
-			if(commandArgs.size() == 3 && commandArgs[0] == "this")
+			if(commandArgs.size() == 3)
 			{
-				logt("MODULE", "This is module %s setting config", moduleName);
+				nodeID receiver = commandArgs[0] == "this" ? node->persistentConfig.nodeId : atoi(commandArgs[0].c_str());
 
-				//HexString must be like "FF:34:67:22:24"
-				const char* hexString = commandArgs[2].c_str();
-				u32 length = (commandArgs[2].length()+1)/3;
-				u8 buffer[200];
-				for(u32 i = 0; i<length; i++){
-					buffer[i] = (u8)strtoul(hexString + (i*3), NULL, 16);
-				}
-				//Check if this config seems right
-				ModuleConfiguration* newConfig = (ModuleConfiguration*)buffer;
-				if(
-						newConfig->moduleVersion == configurationPointer->moduleVersion
-						&& length == configurationLength
-				){
-					newConfig->moduleId = configurationPointer->moduleId; //ModuleID must not be transmitted
-					logt("MODULE", "Config set");
-					memcpy(configurationPointer, buffer, configurationLength);
-
-					ConfigurationLoadedHandler();
-				}
-				else
-				{
-					logt("ERROR", "Wrong configuration length:%u vs. %u or version:%d vs %d", length, configurationLength, newConfig->moduleVersion, configurationPointer->moduleVersion);
-				}
-
-				return true;
-			}
-			//Send command to other node
-			else
-			{
 				//calculate configuration size
 				const char* configString = commandArgs[2].c_str();
 				u16 configLength = (commandArgs[2].length()+1)/3;
@@ -139,7 +110,7 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 				connPacketModuleRequest* packet = (connPacketModuleRequest*)packetBuffer;
 				packet->header.messageType = MESSAGE_TYPE_MODULE_SET_CONFIGURATION;
 				packet->header.sender = node->persistentConfig.nodeId;
-				packet->header.receiver = atoi(commandArgs[0].c_str());
+				packet->header.receiver = receiver;
 
 				packet->moduleId = moduleId;
 				//Fill data region with module config
@@ -255,7 +226,8 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 			}
 			else
 			{
-				logt("ERROR", "Wrong configuration length:%u vs. %u or version:%d vs %d", configLength, configurationLength, newConfig->moduleVersion, configurationPointer->moduleVersion);
+				if(newConfig->moduleVersion != configurationPointer->moduleVersion) uart("ERROR", "{\"module\":%u, \"type\":\"error\", \"code\":1, \"text\":\"wrong config version. \"}" SEP, moduleId);
+				else uart("ERROR", "{\"module\":%u, \"type\":\"error\", \"code\":2, \"text\":\"wrong configuration length. \"}" SEP, moduleId);
 			}
 
 
