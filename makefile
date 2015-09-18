@@ -174,7 +174,7 @@ LDFLAGS += -Wl,-Map,"_build/FruityMesh.map"
 LDFLAGS += --specs=nano.specs
 
 LIBS += -L$(EHAL_PATH)/ARM/src
-LIBS += -L$(EHAL_PATH)/ARM/Nordic/nRF51/CMSIS/DEBUG
+LIBS += -L$(EHAL_PATH)/ARM/Nordic/nRF51/CMSIS/Debug
 LIBS += -lCMSIS
 
 CPP_SOURCE_FILE_NAMES = $(notdir $(CPP_SOURCE_FILES))
