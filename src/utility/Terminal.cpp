@@ -22,6 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <Logger.h>
 #include <Terminal.h>
+#include <Config.h>
+#include <Utility.h>
 
 extern "C"
 {
@@ -41,6 +43,9 @@ void Terminal::Init()
 	//Start UART communication
 	simple_uart_config(RTS_PIN_NUMBER, TX_PIN_NUMBER, CTS_PIN_NUMBER, RX_PIN_NUMBER, HWFC);
 
+	char versionString[15];
+	Utility::GetVersionStringFromInt(Config->firmwareVersion, versionString);
+
 	if (promptAndEchoMode)
 	{
 		//Send Escape sequence
@@ -56,7 +61,7 @@ void Terminal::Init()
 		simple_uart_putstring((const u8*) "  ");
 		simple_uart_putstring((const u8*) __TIME__);
 		simple_uart_putstring((const u8*) ", version: ");
-		simple_uart_putstring((const u8*) VERSION_STRING);
+		simple_uart_putstring((const u8*) versionString);
 
 #ifdef NRF52
 		simple_uart_putstring((const u8*) ", nRF52");
@@ -84,6 +89,7 @@ void Terminal::PollUART()
 		return;
 
 	static char readBuffer[250] = { 0 };
+	static char testCopy[250] = {0};
 	readBuffer[0] = 0;
 
 	if (simple_uart_get_with_timeout(0, (u8*) readBuffer))
@@ -98,6 +104,9 @@ void Terminal::PollUART()
 
 		//Read line from uart
 		ReadlineUART(readBuffer, 250, 1);
+
+		//FIXME: remove after finding problem
+		memcpy(testCopy, readBuffer, 250);
 
 		//Clear previous command
 		commandName.clear();
@@ -139,6 +148,8 @@ void Terminal::PollUART()
 				} else {
 					uart_error(Logger::COMMAND_NOT_FOUND);
 				}
+				//FIXME: to find problems with uart input
+				uart("ERROR", "{\"user_input\":\"%s\"}" SEP, testCopy);
 			}
 		}
 	}

@@ -95,13 +95,13 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 	//First, check if our module is meant
 	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)
 	{
+		nodeID receiver = commandArgs[0] == "this" ? node->persistentConfig.nodeId : atoi(commandArgs[0].c_str());
+
 		//E.g. UART_MODULE_SET_CONFIG 0 STATUS 00:FF:A0 => command, nodeId (this for current node), moduleId, hex-string
 		if(commandName == "uart_module_set_config" || commandName == "setconf")
 		{
 			if(commandArgs.size() == 3)
 			{
-				nodeID receiver = commandArgs[0] == "this" ? node->persistentConfig.nodeId : atoi(commandArgs[0].c_str());
-
 				//calculate configuration size
 				const char* configString = commandArgs[2].c_str();
 				u16 configLength = (commandArgs[2].length()+1)/3;
@@ -135,12 +135,13 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 				return true;
 			}
 			//It's a nodeID, we must send the get_config command to another module
+			//FIXME: Not yet supported
 			else if(commandArgs.size() == 2)
 			{
 				connPacketModuleRequest packet;
 				packet.header.messageType = MESSAGE_TYPE_MODULE_GET_CONFIGURATION;
 				packet.header.sender = node->persistentConfig.nodeId;
-				packet.header.receiver = atoi(commandArgs[0].c_str());
+				packet.header.receiver = receiver;
 
 				packet.moduleId = moduleId;
 
@@ -151,33 +152,17 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 		}
 		else if(commandName == "uart_module_set_active" || commandName == "setactive")
 		{
-			if(commandArgs[0] == "this")
-			{
-				if(commandArgs.size() > 2 && commandArgs[2] == "0"){
-					configurationPointer->moduleActive = false;
-				} else if(commandArgs.size() > 2 && commandArgs[2] == "1"){
-					configurationPointer->moduleActive = true;
-				} else {
-					configurationPointer->moduleActive = !configurationPointer->moduleActive;
-				}
+			connPacketModuleRequest packet;
+			packet.header.messageType = MESSAGE_TYPE_MODULE_SET_ACTIVE;
+			packet.header.sender = node->persistentConfig.nodeId;
+			packet.header.receiver = receiver;
 
-				return true;
-			}
-			//Send command to another node
-			else
-			{
-				connPacketModuleRequest packet;
-				packet.header.messageType = MESSAGE_TYPE_MODULE_SET_ACTIVE;
-				packet.header.sender = node->persistentConfig.nodeId;
-				packet.header.receiver = atoi(commandArgs[0].c_str());
+			packet.moduleId = moduleId;
+			packet.data[0] = (commandArgs.size() < 3 || commandArgs[2] == "1") ? 1 : 0;
 
-				packet.moduleId = moduleId;
-				packet.data[0] = (commandArgs.size() < 3 || commandArgs[2] == "1") ? 1 : 0;
+			cm->SendMessageToReceiver(NULL, (u8*) &packet, SIZEOF_CONN_PACKET_MODULE_REQUEST+1, true);
 
-				cm->SendMessageToReceiver(NULL, (u8*) &packet, SIZEOF_CONN_PACKET_MODULE_REQUEST+1, true);
-
-				return true;
-			}
+			return true;
 		}
 
 	}
@@ -198,7 +183,8 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 		connPacketModuleRequest* packet = (connPacketModuleRequest*) packetHeader;
 		if(packet->moduleId != moduleId) return;
 
-		if(packetHeader->messageType == MESSAGE_TYPE_MODULE_SET_CONFIGURATION){
+		if(packetHeader->messageType == MESSAGE_TYPE_MODULE_SET_CONFIGURATION)
+		{
 			u16 configLength = inPacket->dataLength - SIZEOF_CONN_PACKET_MODULE_REQUEST;
 
 			//Save the received configuration to the module configuration
@@ -229,16 +215,15 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 				if(newConfig->moduleVersion != configurationPointer->moduleVersion) uart("ERROR", "{\"module\":%u, \"type\":\"error\", \"code\":1, \"text\":\"wrong config version. \"}" SEP, moduleId);
 				else uart("ERROR", "{\"module\":%u, \"type\":\"error\", \"code\":2, \"text\":\"wrong configuration length. \"}" SEP, moduleId);
 			}
+		}
+		else if(packetHeader->messageType == MESSAGE_TYPE_MODULE_GET_CONFIGURATION)
+		{
+			//TODO: Send the module configuration
 
 
-
-
-
-		} else if(packetHeader->messageType == MESSAGE_TYPE_MODULE_GET_CONFIGURATION){
-			//Send the module configuration
-
-
-		} else if(packetHeader->messageType == MESSAGE_TYPE_MODULE_SET_ACTIVE){
+		}
+		else if(packetHeader->messageType == MESSAGE_TYPE_MODULE_SET_ACTIVE)
+		{
 			//Look for the module and set it active or inactive
 			for(u32 i=0; i<MAX_MODULE_COUNT; i++){
 				if(node->activeModules[i] && node->activeModules[i]->moduleId == packet->moduleId){

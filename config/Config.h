@@ -146,6 +146,15 @@ class Conf
 		const u8 meshNetworkKey[16] = {1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6}; //16 byte Long term key in little endian format
 		//06050403020100090807060504030201 => How to enter it in the MCP
 		//01:02:03:04:05:06:07:08:09:00:01:02:03:04:05:06 => Format for TI Sniffer
+
+
+
+		// ########### OTHER ################################################
+		u16 firmwareVersionMajor = 0; //0-400
+		u16 firmwareVersionMinor = 1; //0-999
+		u16 firmwareVersionPatch = 9; //0-9999
+		u32 firmwareVersion = 10000000 * firmwareVersionMajor + 10000 * firmwareVersionMinor + firmwareVersionPatch;
+
 };
 
 
@@ -160,8 +169,6 @@ class Conf
 #endif
 //#include <board_adafruit_ble_friend.h>
 
-#define VERSION_STRING "0.1.8-beta"
-
 //Each of the Connections has a buffer for outgoing packets, this is its size in bytes
 #define PACKET_SEND_BUFFER_SIZE 400
 
@@ -169,7 +176,7 @@ class Conf
 #define PACKET_REASSEMBLY_BUFFER_SIZE 200
 
 //Size for tracing messages to UART, if it is too short, messages will get truncated
-#define TRACE_BUFFER_SIZE 300
+#define TRACE_BUFFER_SIZE 500
 
 //Number of supported Modules
 #define MAX_MODULE_COUNT 10

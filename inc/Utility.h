@@ -33,6 +33,7 @@ class Utility
 public:
 	static u32 GetRandomInteger(void);
 	static void CheckFreeHeap(void);
+	static void GetVersionStringFromInt(u32 version, char* outputBuffer);
 
 };
 

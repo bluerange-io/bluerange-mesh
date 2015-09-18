@@ -89,13 +89,13 @@ bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string>
 	//React on commands, return true if handled, false otherwise
 	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)
 	{
+		nodeID receiver = commandArgs[0] == "this" ? node->persistentConfig.nodeId : atoi(commandArgs[0].c_str());
+
 		if(commandName == "uart_module_trigger_action" || commandName == "action")
 		{
 			//If we know the previous id of the node, we can address it with this
 			if(commandArgs.size() >= 5 && commandArgs[2] == "nodeid")
 			{
-				nodeID currentNodeId = atoi(commandArgs[0].c_str());
-
 				nodeID futureNodeId = atoi(commandArgs[3].c_str());
 				networkID networkId = atoi(commandArgs[4].c_str());
 
@@ -107,7 +107,7 @@ bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string>
 
 				packet->header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
 				packet->header.sender = node->persistentConfig.nodeId;
-				packet->header.receiver = currentNodeId;
+				packet->header.receiver = receiver;
 
 				packet->moduleId = moduleId;
 				packet->actionType = EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_NODE_ID;
@@ -142,7 +142,7 @@ bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string>
 
 				packet->header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
 				packet->header.sender = node->persistentConfig.nodeId;
-				packet->header.receiver = NODE_ID_BROADCAST;
+				packet->header.receiver = receiver;
 
 				packet->moduleId = moduleId;
 				packet->actionType = EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_CHIP_ID;
@@ -177,7 +177,7 @@ bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string>
 
 				packet->header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
 				packet->header.sender = node->persistentConfig.nodeId;
-				packet->header.receiver = 0;
+				packet->header.receiver = receiver;
 
 				packet->moduleId = moduleId;
 				packet->actionType = EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_SERIAL;

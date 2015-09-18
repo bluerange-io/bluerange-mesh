@@ -77,7 +77,7 @@ class StatusReporterModule: public Module
 
 			} StatusReporterModuleConnectionsMessage;
 
-			#define SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE 26 + SERIAL_NUMBER_LENGTH
+			#define SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE 40 + SERIAL_NUMBER_LENGTH
 			typedef struct
 			{
 				u32 chipIdA;
@@ -91,6 +91,10 @@ class StatusReporterModule: public Module
 				u8 freeOut;
 				u8 batteryInfo;
 				u8 calibratedRSSI;
+				u32 firmwareVersion;
+				u32 uptimeSeconds;
+				networkID networkId;
+				u32 messagesPerHour;
 
 			} StatusReporterModuleStatusMessage;
 

@@ -138,12 +138,13 @@ void Node::ConfigurationLoadedHandler()
 		persistentConfig.calibratedRSSI = -53;
 		persistentConfig.reserved = 0;
 
-		//Get a random number for the connection loss counter (hard on system start,...stat)
-		persistentConfig.connectionLossCounter = Utility::GetRandomInteger();
-
 		//Get an id for our testdevices when not working with persistent storage
 		InitWithTestDeviceSettings();
 	}
+
+
+	//Get a random number for the connection loss counter (hard on system start,...stat)
+	persistentConfig.connectionLossCounter = Utility::GetRandomInteger();
 
 	clusterId = this->GenerateClusterID();
 
@@ -392,6 +393,53 @@ void Node::messageReceivedCallback(connectionPacket* inPacket)
 
 				uart("ADVINFO", "{\"sender\":\"%d\",\"addr\":\"%x:%x:%x:%x:%x:%x\",\"count\":%d,\"rssiSum\":%d}" SEP, packet->header.sender, packet->payload.peerAddress[0], packet->payload.peerAddress[1], packet->payload.peerAddress[2], packet->payload.peerAddress[3], packet->payload.peerAddress[4], packet->payload.peerAddress[5], packet->payload.packetCount, packet->payload.inverseRssiSum);
 
+			}
+			break;
+
+
+			//Somebody requested a list of modules on this node
+		case MESSAGE_TYPE_MODULES_GET_LIST:
+			{
+				u8 buffer[SIZEOF_CONN_PACKET_HEADER +  MAX_MODULE_COUNT * 4];
+				connPacketHeader* header = (connPacketHeader*)buffer;
+
+				header->messageType = MESSAGE_TYPE_MODULES_LIST;
+				header->receiver = packetHeader->sender;
+				header->sender = persistentConfig.nodeId;
+
+
+				//Go through all modules and build a list
+				for(u32 i=0; i<MAX_MODULE_COUNT; i++){
+					u32 position = SIZEOF_CONN_PACKET_HEADER + i *4;
+
+					if(activeModules[i] != 0){
+						buffer[position] = activeModules[i]->configurationPointer->moduleId;
+						buffer[position + 2] = activeModules[i]->configurationPointer->moduleVersion;
+						buffer[position + 3] = activeModules[i]->configurationPointer->moduleActive;
+					} else {
+						memset(buffer + position, 0, 4);
+					}
+				}
+
+				cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_HEADER +  MAX_MODULE_COUNT * 4, false);
+
+			}
+			break;
+
+			//List of modules coming in
+		case MESSAGE_TYPE_MODULES_LIST:
+			{
+				connPacketAdvInfo* packet = (connPacketAdvInfo*) data;
+				u8* data = (u8*)(packet) + SIZEOF_CONN_PACKET_HEADER;
+
+				logt("ERROR", "Module List");
+
+				//Go through all modules and build a list
+				u32 numModules = (dataLength - SIZEOF_CONN_PACKET_HEADER) / 4;
+
+				for(u32 i=0; i<numModules; i++){
+					if(data[i*4]) logt("ERROR", "id: %u, version: %u, active: %u", data[i*4], data[i*4+2], data[i*4+3]);
+				}
 			}
 			break;
 	}
@@ -1287,6 +1335,20 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		} else {
 			uart_error(Logger::ARGUMENTS_WRONG);
 		}
+	}
+	else if((commandName == "uart_get_modules" || commandName == "getmodules") && commandArgs.size() == 1)
+	{
+		//Request a list of modules
+		nodeID receiver = commandArgs[0] == "this" ? persistentConfig.nodeId : atoi(commandArgs[0].c_str());
+
+		connPacketHeader header;
+		header.messageType = MESSAGE_TYPE_MODULES_GET_LIST;
+		header.sender = persistentConfig.nodeId;
+		header.receiver = receiver;
+
+		cm->SendMessageToReceiver(NULL, (u8*) &header, SIZEOF_CONN_PACKET_HEADER, true);
+
+		return true;
 	}
 	else
 	{

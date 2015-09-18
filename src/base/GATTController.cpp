@@ -373,8 +373,8 @@ bool GATTController::bleMeshServiceEventHandler(ble_evt_t* bleEvent)
 			return true;
 
 		case BLE_GATTC_EVT_TIMEOUT:
-			//FIXME: must be handled: No write complete is triggered when this event is thrown
-			//What should we do?
+			//FIXME: must be handled.
+			//we must tear down the connection or no more writes will be supported
 
 
 			return true;

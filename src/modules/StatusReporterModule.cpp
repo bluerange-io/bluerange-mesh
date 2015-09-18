@@ -114,7 +114,7 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 	//Get the status information of the plugged in node
 	if(commandName == "uart_get_plugged_in")
 	{
-		uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"plugged_in\", \"nodeId\":%u, \"chipIdA\":%u, \"chipIdB\":%u}" SEP, moduleId, node->persistentConfig.nodeId, NRF_FICR->DEVICEID[0], NRF_FICR->DEVICEID[1]);
+		uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"plugged_in\", \"nodeId\":%u, \"chipIdA\":%u, \"chipIdB\":%u, \"serialNumber\":\"%s\"}" SEP, moduleId, node->persistentConfig.nodeId, NRF_FICR->DEVICEID[0], NRF_FICR->DEVICEID[1], node->persistentConfig.serialNumber);
 
 		return true;
 	}
@@ -250,7 +250,8 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 			{
 				//Print packet to console
 				StatusReporterModuleStatusMessage* data = (StatusReporterModuleStatusMessage*) (packet->data);
-				uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"status\", \"nodeId\":%u, \"chipIdA\":%u, \"chipIdB\":%u, \"manufacturerId\":%u, \"serialNumber\":\"%s\", \"clusterId\":%u, \"clusterSize\":%d, \"freeIn\":%u, \"freeOut\":%u, \"addr\":\"%02X:%02X:%02X:%02X:%02X:%02X\"}" SEP, moduleId, packet->header.sender, data->chipIdA, data->chipIdB, data->manufacturerId, data->serialNumber, data->clusterId, data->clusterSize, data->freeIn, data->freeOut, data->accessAddress.addr[5], data->accessAddress.addr[4], data->accessAddress.addr[3], data->accessAddress.addr[2], data->accessAddress.addr[1], data->accessAddress.addr[0]);
+
+				uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"status\", \"nodeId\":%u, \"chipIdA\":%u, \"chipIdB\":%u, \"manufacturerId\":%u, \"serialNumber\":\"%s\", \"clusterId\":%u, \"clusterSize\":%d, \"freeIn\":%u, \"freeOut\":%u, \"addr\":\"%02X:%02X:%02X:%02X:%02X:%02X\", \"version\":%u, \"uptimeSeconds\":%u, \"estimatedBatteryRuntimeHours\":%u, \"networkId\":%u}" SEP, moduleId, packet->header.sender, data->chipIdA, data->chipIdB, data->manufacturerId, data->serialNumber, data->clusterId, data->clusterSize, data->freeIn, data->freeOut, data->accessAddress.addr[5], data->accessAddress.addr[4], data->accessAddress.addr[3], data->accessAddress.addr[2], data->accessAddress.addr[1], data->accessAddress.addr[0], data->firmwareVersion, data->uptimeSeconds, 0xFFFFFFFF, data->networkId);
 			}
 		}
 	}
@@ -297,7 +298,9 @@ void StatusReporterModule::SendStatusInformation(nodeID toNode)
 	sd_ble_gap_address_get(&data->accessAddress);
 	data->freeIn = cm->freeInConnections;
 	data->freeOut = cm->freeOutConnections;
-
+	data->firmwareVersion = Config->firmwareVersion;
+	data->uptimeSeconds = node->appTimerMs / 1000; //FIXME: change this back if appTimer is changed to seconds
+	data->networkId = node->persistentConfig.networkId;
 
 	cm->SendMessageToReceiver(NULL, (u8*)packet, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE, true);
 }

@@ -56,3 +56,25 @@ void Utility::CheckFreeHeap(void)
 
 	uart("NODE", "{\"heap\":%u}" SEP, size);
 }
+
+//buffer should have a length of 15 bytes
+//major.minor.patch - 111.222.4444
+void Utility::GetVersionStringFromInt(u32 version, char* outputBuffer)
+{
+	u16 major = version / 10000000;
+	u16 minor = (version - 10000000 * major) / 10000;
+	u16 patch = (version - 10000000 * major - 10000 * minor);
+
+	sprintf(outputBuffer, "%u.%u.%u", major, minor, patch);
+
+}
+/*
+void Utility::GetVersionStringFromInts(u16 major, char* outputBuffer)
+{
+	u16 major = version / 10000000;
+	u16 minor = (version - 10000000 * major) / 10000;
+	u16 patch = (version - 10000000 * major - 10000 * minor);
+
+	sprintf(outputBuffer, "%u.%u.%u", major, minor, patch);
+
+}*/

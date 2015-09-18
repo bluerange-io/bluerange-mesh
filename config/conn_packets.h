@@ -64,6 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MESSAGE_TYPE_MODULE_ACTION_RESPONSE 54
 #define MESSAGE_TYPE_MODULE_GENERAL 55
 
+//Request a listing of all modules and receive this list
+#define MESSAGE_TYPE_MODULES_GET_LIST 56
+#define MESSAGE_TYPE_MODULES_LIST 57
+
 //Legacy messages: should be removed
 #define MESSAGE_TYPE_ADVINFO 60
 #define MESSAGE_TYPE_QOS_CONNECTION_DATA 61
