@@ -21,6 +21,7 @@
 #include <AdvertisingModule.h>
 #include <ScanningModule.h>
 #include <EnrollmentModule.h>
+#include <GatewayModule.h>
 
 extern "C"
 {
@@ -103,6 +104,7 @@ Node::Node(networkID networkId)
 	activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "adv", 4);
 	activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "scan", 5);
 	activeModules[5] = new EnrollmentModule(moduleID::ENROLLMENT_MODULE_ID, this, cm, "enroll", 6);
+	activeModules[6] = new GatewayModule(moduleID::GATEWAY_MODULE_ID, this, cm, "gateway", 7);
 
 
 	//Register a pre/post transmit hook for radio events
