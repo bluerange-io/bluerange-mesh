@@ -59,4 +59,6 @@ class GatewayModule: public Module
 		//void NodeStateChangedHandler(discoveryState newState);
 
 		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+
+		bool IsGatewayDevice();
 };

@@ -92,8 +92,6 @@ protected:
 		ModuleConfiguration* configurationPointer;
 		u16 configurationLength;
 
-
-
 		//##### Handlers that can be implemented by any module, but are implemented empty here
 
 		//This function is called as soon as the module settings have been loaded or updated

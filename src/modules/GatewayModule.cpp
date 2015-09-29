@@ -31,8 +31,6 @@ extern "C"{
 
 }
 
-const bool isGateway = true;
-
 GatewayModule::GatewayModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
 	: Module(moduleId, node, cm, name, storageSlot)
 {
@@ -84,7 +82,7 @@ bool GatewayModule::TerminalCommandHandler(string commandName, vector<string> co
 {
 	if(commandName == "uart_module_trigger_action" || commandName == "action")
 	{
-		if(isGateway && commandArgs.size() == 3 && commandArgs[1] == moduleName) {
+		if(IsGatewayDevice() && commandArgs.size() == 3 && commandArgs[1] == moduleName) {
 			//This is a gateway dongle connected via serial to a node http gateway.
 			//Incoming gateway message should therefore be forwarded to target node in the mesh.
 
@@ -134,6 +132,11 @@ bool GatewayModule::TerminalCommandHandler(string commandName, vector<string> co
 	return Module::TerminalCommandHandler(commandName, commandArgs);
 }
 
+bool GatewayModule::IsGatewayDevice()
+{
+	return true;
+}
+
 void GatewayModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
 {
 	Module::ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
@@ -142,7 +145,7 @@ void GatewayModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPac
 		connPacketModuleAction* packet = (connPacketModuleAction*)packetHeader;
 
 		if(packet->moduleId == moduleId && packet->actionType == GatewayModuleTriggerActionMessages::TRIGGER_GATEWAY){
-			if(isGateway) {
+			if(IsGatewayDevice()) {
 				logt("GATEWAYMOD", "{ \"gateway-message\": { \"sender\": \"%u\", \"receiver\": \"%u\", \"message\": \"%d\" }}", packet->header.sender, packet->header.remoteReceiver, packet->data[0]);
 			} else {
 				logt("GATEWAYMOD", "Gateway message received with data: %d", packet->data[0]);
