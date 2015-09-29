@@ -31,6 +31,8 @@ extern "C"{
 
 }
 
+const bool isGateway = true;
+
 GatewayModule::GatewayModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
 	: Module(moduleId, node, cm, name, storageSlot)
 {
@@ -80,10 +82,12 @@ void GatewayModule::ResetToDefaultConfiguration()
 
 bool GatewayModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
-	if(commandArgs.size() >= 3 && commandArgs[1] == moduleName)
+	if(commandName == "uart_module_trigger_action" || commandName == "action")
 	{
-		if(commandName == "uart_module_trigger_action" || commandName == "action")
-		{
+		if(isGateway && commandArgs.size() == 3 && commandArgs[1] == moduleName) {
+			//This is a gateway dongle connected via serial to a node http gateway.
+			//Incoming gateway message should therefore be forwarded to target node in the mesh.
+
 			nodeID targetNodeId = atoi(commandArgs[0].c_str());
 			int message = atoi(commandArgs[2].c_str());
 			logt("GATEWAYMOD", "Sending message %d to node %u", message, targetNodeId);
@@ -98,7 +102,30 @@ bool GatewayModule::TerminalCommandHandler(string commandName, vector<string> co
 			packet.data[0] = message;
 
 			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
+			return true;
+		}
 
+		if(commandArgs.size() == 4 && commandArgs[1] == moduleName) {
+			//This is a regular dongle connected via serial to a serial port.
+			//Someone is using a CLI command to push a gateway message out over a node http gateway.
+			//Incoming serial message should be sent to the gateway with remoteReceiver set.
+
+			nodeID gatewayNodeId = atoi(commandArgs[0].c_str());
+			nodeID remoteNodeId = atoi(commandArgs[2].c_str());
+			int message = atoi(commandArgs[3].c_str());
+			logt("GATEWAYMOD", "Sending message %d to gateway %u intended for remote node %u", message, gatewayNodeId, remoteNodeId);
+
+			connPacketModuleAction packet;
+			packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
+			packet.header.sender = node->persistentConfig.nodeId;
+			packet.header.receiver = gatewayNodeId;
+			packet.header.remoteReceiver = remoteNodeId;
+
+			packet.moduleId = moduleId;
+			packet.actionType = GatewayModuleTriggerActionMessages::TRIGGER_GATEWAY;
+			packet.data[0] = message;
+
+			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
 			return true;
 		}
 	}
@@ -114,8 +141,10 @@ void GatewayModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPac
 	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
 		connPacketModuleAction* packet = (connPacketModuleAction*)packetHeader;
 
-		if(packet->moduleId == moduleId){
-			if(packet->actionType == GatewayModuleTriggerActionMessages::TRIGGER_GATEWAY){
+		if(packet->moduleId == moduleId && packet->actionType == GatewayModuleTriggerActionMessages::TRIGGER_GATEWAY){
+			if(isGateway) {
+				logt("GATEWAYMOD", "{ \"gateway-message\": { \"sender\": \"%u\", \"receiver\": \"%u\", \"message\": \"%d\" }}", packet->header.sender, packet->header.remoteReceiver, packet->data[0]);
+			} else {
 				logt("GATEWAYMOD", "Gateway message received with data: %d", packet->data[0]);
 			}
 		}

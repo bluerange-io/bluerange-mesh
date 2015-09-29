@@ -87,6 +87,7 @@ typedef struct
 	u8 messageType : 7;
 	nodeID sender;
 	nodeID receiver;
+	nodeID remoteReceiver;
 }connPacketHeader;
 
 //Used for message splitting for all packets after the first one
