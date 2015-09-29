@@ -80,25 +80,27 @@ void GatewayModule::ResetToDefaultConfiguration()
 
 bool GatewayModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
-	if(commandName == "gatewaymod"){
-	    //Get the id of the target node
-	    nodeID targetNodeId = atoi(commandArgs[0].c_str());
-	    logt("GATEWAYMOD", "Trying to ping node %u", targetNodeId);
+	if(commandArgs.size() >= 3 && commandArgs[1] == moduleName)
+	{
+		if(commandName == "uart_module_trigger_action" || commandName == "action")
+		{
+			nodeID targetNodeId = atoi(commandArgs[0].c_str());
+			int message = atoi(commandArgs[2].c_str());
+			logt("GATEWAYMOD", "Sending message %d to node %u", message, targetNodeId);
 
-	    //Send ping packet to that node
-	    connPacketModuleAction packet;
-	    packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
-	    packet.header.sender = node->persistentConfig.nodeId;
-	    packet.header.receiver = targetNodeId;
+			connPacketModuleAction packet;
+			packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
+			packet.header.sender = node->persistentConfig.nodeId;
+			packet.header.receiver = targetNodeId;
 
-	    packet.moduleId = moduleId;
-	    packet.actionType = GatewayModuleTriggerActionMessages::TRIGGER_GATEWAY;
-	    packet.data[0] = 123;
+			packet.moduleId = moduleId;
+			packet.actionType = GatewayModuleTriggerActionMessages::TRIGGER_GATEWAY;
+			packet.data[0] = message;
 
+			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
 
-	    cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
-
-	    return true;
+			return true;
+		}
 	}
 	
 	//Must be called to allow the module to get and set the config
@@ -107,49 +109,14 @@ bool GatewayModule::TerminalCommandHandler(string commandName, vector<string> co
 
 void GatewayModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
 {
-	//Must call superclass for handling
 	Module::ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
 
-	//Filter trigger_action messages
 	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
 		connPacketModuleAction* packet = (connPacketModuleAction*)packetHeader;
 
-		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId){
-			//It's a ping message
 			if(packet->actionType == GatewayModuleTriggerActionMessages::TRIGGER_GATEWAY){
-
-				//Inform the user
-				logt("GATEWAYMOD", "Ping request received with data: %d", packet->data[0]);
-
-				//Send PING_RESPONSE
-				connPacketModuleAction outPacket;
-				outPacket.header.messageType = MESSAGE_TYPE_MODULE_ACTION_RESPONSE;
-				outPacket.header.sender = node->persistentConfig.nodeId;
-				outPacket.header.receiver = packetHeader->sender;
-
-				outPacket.moduleId = moduleId;
-				outPacket.actionType = GatewayModuleActionResponseMessages::GATEWAY_RESPONSE;
-				outPacket.data[0] = packet->data[0];
-				outPacket.data[1] = 111;
-
-				cm->SendMessageToReceiver(NULL, (u8*)&outPacket, SIZEOF_CONN_PACKET_MODULE_ACTION + 2, true);
-
-			}
-		}
-	}
-
-	//Parse Module action_response messages
-	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_ACTION_RESPONSE){
-
-		connPacketModuleAction* packet = (connPacketModuleAction*)packetHeader;
-
-		//Check if our module is meant and we should trigger an action
-		if(packet->moduleId == moduleId)
-		{
-			//Somebody reported its connections back
-			if(packet->actionType == GatewayModuleActionResponseMessages::GATEWAY_RESPONSE){
-				logt("GATEWAYMOD", "Ping came back from %u with data %d, %d", packet->header.sender, packet->data[0], packet->data[1]);
+				logt("GATEWAYMOD", "Gateway message received with data: %d", packet->data[0]);
 			}
 		}
 	}
