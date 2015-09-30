@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //If hasMoreParts is set to true, the next message will only contain 1 byte hasMoreParts + messageType
 //and all remaining 19 bytes are used for transferring data, the last message of a split message does not have this flag
 //activated
-#define SIZEOF_CONN_PACKET_HEADER 5
+#define SIZEOF_CONN_PACKET_HEADER 6
 typedef struct
 {
 	u8 hasMoreParts : 1; //Set to true if message is split and has more data in the next packet

@@ -82,13 +82,16 @@ bool GatewayModule::TerminalCommandHandler(string commandName, vector<string> co
 {
 	if(commandName == "uart_module_trigger_action" || commandName == "action")
 	{
+		//action TARGET_NODE_ID gateway MESSAGE
 		if(IsGatewayDevice() && commandArgs.size() == 3 && commandArgs[1] == moduleName) {
+			//Gateway Device
+			//--------------
 			//This is a gateway dongle connected via serial to a node http gateway.
+			//The command above was received from a CLI, by either a human or a nodejs gateway instance.
 			//Incoming gateway message should therefore be forwarded to target node in the mesh.
 
 			nodeID targetNodeId = atoi(commandArgs[0].c_str());
-			int message = atoi(commandArgs[2].c_str());
-			logt("GATEWAYMOD", "Sending message %d to node %u", message, targetNodeId);
+			logt("GATEWAYMOD", "Sending message '%s' to node %u", commandArgs[2].c_str(), targetNodeId);
 
 			connPacketModuleAction packet;
 			packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
@@ -97,21 +100,27 @@ bool GatewayModule::TerminalCommandHandler(string commandName, vector<string> co
 
 			packet.moduleId = moduleId;
 			packet.actionType = GatewayModuleTriggerActionMessages::TRIGGER_GATEWAY;
-			packet.data[0] = message;
 
-			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
+			vector<u8> convert(commandArgs[2].begin(), commandArgs[2].end());
+			for(int i = 0; i < convert.size(); i++) {
+			    packet.data[i] = convert[i];
+			}
+
+			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + commandArgs[2].length() + 1, true);
 			return true;
 		}
 
+		//action GATEWAY_NODE_ID gateway REMOTE_NODE_ID MESSAGE
 		if(commandArgs.size() == 4 && commandArgs[1] == moduleName) {
-			//This is a regular dongle connected via serial to a serial port.
-			//Someone is using a CLI command to push a gateway message out over a node http gateway.
-			//Incoming serial message should be sent to the gateway with remoteReceiver set.
+			//Remote-message Requesting Device
+			//--------------------------------
+			//This is any device on the network, probably a non-gateway device, but it is connected to
+			//a serial port. Someone has used a CLI to tell this node to send a message to a remote node
+			//via a gateway dongle. Incoming serial message should be sent to the gateway with remoteReceiver set.
 
 			nodeID gatewayNodeId = atoi(commandArgs[0].c_str());
 			nodeID remoteNodeId = atoi(commandArgs[2].c_str());
-			int message = atoi(commandArgs[3].c_str());
-			logt("GATEWAYMOD", "Sending message %d to gateway %u intended for remote node %u", message, gatewayNodeId, remoteNodeId);
+			logt("GATEWAYMOD", "Sending message '%s' to gateway %u intended for remote node %u", commandArgs[3].c_str(), gatewayNodeId, remoteNodeId);
 
 			connPacketModuleAction packet;
 			packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
@@ -121,9 +130,13 @@ bool GatewayModule::TerminalCommandHandler(string commandName, vector<string> co
 
 			packet.moduleId = moduleId;
 			packet.actionType = GatewayModuleTriggerActionMessages::TRIGGER_GATEWAY;
-			packet.data[0] = message;
 
-			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
+			vector<u8> convert(commandArgs[3].begin(), commandArgs[3].end());
+			for(int i = 0; i < convert.size(); i++) {
+			    packet.data[i] = convert[i];
+			}
+
+			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + commandArgs[3].length() + 1, true);
 			return true;
 		}
 	}
@@ -145,10 +158,19 @@ void GatewayModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPac
 		connPacketModuleAction* packet = (connPacketModuleAction*)packetHeader;
 
 		if(packet->moduleId == moduleId && packet->actionType == GatewayModuleTriggerActionMessages::TRIGGER_GATEWAY){
+
+			connPacketModuleAction* packet = (connPacketModuleAction*)packetHeader;
+
+			string message = "";	
+			for(int i = 0; i < sizeof(packet->data); i++) {
+			    message += packet->data[i];
+			}
+
 			if(IsGatewayDevice()) {
-				logt("GATEWAYMOD", "{ \"gateway-message\": { \"sender\": \"%u\", \"receiver\": \"%u\", \"message\": \"%d\" }}", packet->header.sender, packet->header.remoteReceiver, packet->data[0]);
+				logt("GATEWAYMOD", "Outbound message received for gateway: '%s'", message.c_str());
+				logt("GATEWAYMOD", "{ \"gateway-message\": { \"sender\": \"%u\", \"receiver\": \"%u\", \"message\": \"%s\" }}", packet->header.sender, packet->header.remoteReceiver, message.c_str());
 			} else {
-				logt("GATEWAYMOD", "Gateway message received with data: %d", packet->data[0]);
+				logt("GATEWAYMOD", "Inbound message received from gateway: '%s'", message.c_str());
 			}
 		}
 	}
