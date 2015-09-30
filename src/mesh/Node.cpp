@@ -22,6 +22,7 @@
 #include <ScanningModule.h>
 #include <EnrollmentModule.h>
 #include <GatewayModule.h>
+#include <CustomModule.h>
 
 extern "C"
 {
@@ -106,6 +107,7 @@ Node::Node(networkID networkId)
 	activeModules[5] = new EnrollmentModule(moduleID::ENROLLMENT_MODULE_ID, this, cm, "enroll", 6);
 	activeModules[6] = new GatewayModule(moduleID::GATEWAY_MODULE_ID, this, cm, "gateway", 7);
 	isGatewayDevice = ((GatewayModule*)activeModules[6])->IsGatewayDevice();
+	activeModules[7] = new CustomModule(moduleID::CUSTOM_MODULE_ID, this, cm, "custom", 8);
 
 	//Register a pre/post transmit hook for radio events
 	if(Config->enableRadioNotificationHandler){
