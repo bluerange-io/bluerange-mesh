@@ -1,12 +1,12 @@
 FruityGate (nRF)
 ==
-FruityGate allows you to connect multiple mesh networks together using http.
+FruityGate is a gateway instance which connects a local bluetooth mesh network to remote bluetooth mesh networks, via other gateway instances.
 
-There are two halves to FruityGate: a [nodejs app](https://github.com/microcosm/fruitygate-nodejs), and an nRF app (this repo). The nodejs app runs on any internet-enabled computer, and talks over USB to a [NRF51 device](https://www.nordicsemi.com/eng/Products/nRF51-Series-SoC) (like this dongle) which is running the nRF app.
+FruityGate (nRF) is one half of a FruityGate instance. The other half is a nodejs app called [FruityGate (node.js)](https://github.com/microcosm/fruitygate-nodejs). The nodejs app runs on any internet-enabled computer, and talks over USB to a [NRF51 device](https://www.nordicsemi.com/eng/Products/nRF51-Series-SoC) (like [this dongle](https://www.digikey.com/product-detail/en/NRF51-DONGLE/1490-1037-ND/5022448)) which is running FruityGate (nRF).
 
-![An nRF51 dongle](/img/nRF51_PCA10031.jpg)
+![End to end diagram](/img/FruityGate.png)
 
-When the nRF device is a member of a [fruity](https://github.com/mwaylabs/fruitymesh/wiki)-based mesh network, it will work with the nodejs app to act as a gateway which can talk to other similar gateways. In this way you can share messages between multiple bluetooth mesh networks over http.
+Nodes in a local bluetooth mesh, such as the battery-powered beacons in the image above, connect to and send messages through FruityGate (nRF). From there the messages are sent via FruityGate (node.js) out over http websockets to remote FruityGate gateways, for transmission to nodes on remote meshes.
 
 The meshes can be in the same building or on the other side of the world.
 
