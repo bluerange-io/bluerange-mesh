@@ -1,16 +1,12 @@
-Serial Gateway / FruityMesh
+FruityGate (nRF)
 ==
-One half of an http gateway for [fruitymesh](https://github.com/mwaylabs/fruitymesh/wiki)-based bluetooth mesh networks.
+FruityGate allows you to connect multiple mesh networks together using http.
 
-Say that again?
---
-The code in this repo works alongside [serial-gateway-node](https://github.com/microcosm/serial-gateway-node). That repo is a nodejs app which sits on any internet-enabled computer, and the code from this repo runs on an [NRF51 device](https://www.nordicsemi.com/eng/Products/nRF51-Series-SoC).
-
-To have them work together, plug the nRF51 device into the USB port of the computer. For simplicity, it's easiest to use an nRF51 PCA10031 dongle as your gateway device:
+There are two halves to FruityGate: a [nodejs app](https://github.com/microcosm/fruitygate-nodejs), and an nRF app (this repo). The nodejs app runs on any internet-enabled computer, and talks over USB to a [NRF51 device](https://www.nordicsemi.com/eng/Products/nRF51-Series-SoC) (like this dongle) which is running the nRF app.
 
 ![An nRF51 dongle](/img/nRF51_PCA10031.jpg)
 
-When launched, the nodejs app will find the nRF51 device. They work together to form a gateway so that nodes on the local mesh can find nodes on remote meshes which also have http gateways.
+When the nRF device is a member of a [fruity](https://github.com/mwaylabs/fruitymesh/wiki)-based mesh network, it will work with the nodejs app to act as a gateway which can talk to other similar gateways. In this way you can share messages between multiple bluetooth mesh networks over http.
 
 The meshes can be in the same building or on the other side of the world.
 
