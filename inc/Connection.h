@@ -88,6 +88,7 @@ class Connection
 		i8 rssiAverage; //The averaged rssi of the last measurement
 
 		//Buffers
+		u8 unreliableBuffersFree; //Number of
 		u8 reliableBuffersFree; //reliable transmit buffers that are available currently to this connection
 		u8 packetSendBuffer[PACKET_SEND_BUFFER_SIZE];
 		PacketQueue* packetSendQueue;

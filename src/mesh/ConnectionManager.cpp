@@ -494,9 +494,74 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 	}
 }
 
+void ConnectionManager::fillTransmitBuffers(){
+
+	u32 err;
+	int i = -1; //connection index
+	bool continueSending = false;
 
 
-void ConnectionManager::fillTransmitBuffers()
+
+	//Fill with unreliable packets
+	for(int i=0; i<Config->meshMaxConnections; i++)
+	{
+		if(connections[i]->isConnected && connections[i]->packetSendQueue->_numElements > 0)
+		{
+			while(connections[i]->packetSendQueue->_numElements > 0)
+			{
+				bool packetCouldNotBeSent = false;
+
+				//Get one packet from the packet queue
+				sizedData packet = connections[i]->packetSendQueue->PeekNext();
+				bool reliable = packet.data[0];
+				u8* data = packet.data + 1;
+				u16 dataSize = packet.length - 1;
+
+				//FIXME: remove
+				((connPacketHeader*) data)->hasMoreParts = 0;
+				reliable = false;
+
+				//The Next packet should be sent reliably
+				if(reliable){
+					if(connections[i]->reliableBuffersFree > 0){
+						//TODO: implement
+
+					} else {
+						packetCouldNotBeSent = true;
+					}
+
+
+				}
+
+				//The next packet is to be sent unreliably
+				if(!reliable){
+					if(connections[i]->unreliableBuffersFree > 0)
+					{
+						err = GATTController::bleWriteCharacteristic(connections[i]->connectionHandle, connections[i]->writeCharacteristicHandle, data, dataSize, false);
+
+						if(err == NRF_SUCCESS){
+							connections[i]->unreliableBuffersFree--;
+							connections[i]->packetSendQueue->DiscardNext();
+							logt("TEST", "packet to conn %u (txfree: %d)", i, connections[i]->unreliableBuffersFree);
+						}
+					} else {
+						packetCouldNotBeSent = true;
+					}
+				}
+
+				//Go to next connection if a packet (either reliable or unreliable)
+				//could not be sent because the corresponding buffers are full
+				if(packetCouldNotBeSent) break;
+			}
+		}
+
+	}
+
+
+}
+
+
+void ConnectionManager::fillTransmitBuffersOld()
 {
 	u32 err = 0;
 	//Filling the buffers nicely is not an easy task but is probably
@@ -639,6 +704,8 @@ void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
 		//A TX complete event frees a number of transmit buffers that can be used for all
 		//connections
 		cm->txBufferFreeCount += bleEvent->evt.common_evt.params.tx_complete.count;
+
+		cm->GetConnectionFromHandle(bleEvent->evt.common_evt.conn_handle)->unreliableBuffersFree += bleEvent->evt.common_evt.params.tx_complete.count;
 
 		cm->pendingPackets -= bleEvent->evt.common_evt.params.tx_complete.count;
 

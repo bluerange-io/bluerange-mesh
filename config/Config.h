@@ -57,7 +57,7 @@ class Conf
 
 		//Do not load the persistent node configuration
 		//Beware: Persistent config must be updated with every connection loss or random shoudl be used....?
-		bool ignorePersistentNodeConfigurationOnBoot = false;
+		bool ignorePersistentNodeConfigurationOnBoot = true;
 
 		//Do not use any persistently saved module data
 		bool ignorePersistentModuleConfigurationOnBoot = true;
@@ -74,8 +74,8 @@ class Conf
 		u32 mainTimerTickMs = 200;
 
 		//Mesh connection parameters (used when a connection is set up)
-		u16 meshMinConnectionInterval = MSEC_TO_UNITS(100, UNIT_1_25_MS);   	//(7.5-4000) Minimum acceptable connection interval
-		u16 meshMaxConnectionInterval = MSEC_TO_UNITS(100, UNIT_1_25_MS);   	//(7.5-4000) Maximum acceptable connection interval
+		u16 meshMinConnectionInterval = MSEC_TO_UNITS(200, UNIT_1_25_MS);   	//(7.5-4000) Minimum acceptable connection interval
+		u16 meshMaxConnectionInterval = MSEC_TO_UNITS(200, UNIT_1_25_MS);   	//(7.5-4000) Maximum acceptable connection interval
 		u16 meshPeripheralSlaveLatency = 0;                  					//(0-...) Slave latency in number of connection events
 		u16 meshConnectionSupervisionTimeout = MSEC_TO_UNITS(6000, UNIT_10_MS);   	//(100-32000) Connection supervisory timeout
 

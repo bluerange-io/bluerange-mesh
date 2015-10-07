@@ -49,6 +49,7 @@ Connection::Connection(u8 id, ConnectionManager* cm, Node* node, ConnectionDirec
 
 void Connection::Init(){
 	connectedClusterId = 0;
+	unreliableBuffersFree = 3; //FIXME: request from softdevice
 	reliableBuffersFree = 1;
 	partnerId = 0;
 	connectionHandle = BLE_CONN_HANDLE_INVALID;
@@ -143,7 +144,7 @@ void Connection::StartHandshake(void)
 	packet.payload.hopsToSink = connectionManager->GetHopsToShortestSink(this);
 
 
-	logt("HANDSHAKE", "OUT => conn(%d) CLUSTER_WELCOME, cID:%d, cSize:%d", connectionId, packet.payload.clusterId, packet.payload.clusterSize);
+	logt("HANDSHAKE", "OUT => conn(%d) CLUSTER_WELCOME, cID:%x, cSize:%d", connectionId, packet.payload.clusterId, packet.payload.clusterSize);
 
 	connectionManager->SendMessage(this, (u8*) &packet, SIZEOF_CONN_PACKET_CLUSTER_WELCOME, true);
 
@@ -258,7 +259,7 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 			logt("HANDSHAKE", "############ Handshake starting ###############");
 
 
-			logt("HANDSHAKE", "IN <= %d CLUSTER_WELCOME clustID:%d, clustSize:%d, toSink:%d", packet->header.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.hopsToSink);
+			logt("HANDSHAKE", "IN <= %d CLUSTER_WELCOME clustID:%x, clustSize:%d, toSink:%d", packet->header.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.hopsToSink);
 
 			//PART 1: We do have the same cluster ID. Ouuups, should not have happened, run Forest!
 			if (packet->payload.clusterId == node->clusterId)

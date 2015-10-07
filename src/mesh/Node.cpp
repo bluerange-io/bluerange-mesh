@@ -97,12 +97,12 @@ Node::Node(networkID networkId)
 	//module configurations with the Storage class
 	//Module ids must persist when nodes are updated to guearantee that the
 	//same module receives the same storage slot
-	//activeModules[0] = new TestModule(moduleID::TEST_MODULE_ID, this, cm, "test", 1);
+	activeModules[0] = new TestModule(moduleID::TEST_MODULE_ID, this, cm, "test", 1);
 	//activeModules[1] = new DFUModule((moduleID::DFU_MODULE_ID, this, cm, "dfu", 2);
-	activeModules[2] = new StatusReporterModule(moduleID::STATUS_REPORTER_MODULE_ID, this, cm, "status", 3);
-	activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "adv", 4);
-	activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "scan", 5);
-	activeModules[5] = new EnrollmentModule(moduleID::ENROLLMENT_MODULE_ID, this, cm, "enroll", 6);
+	//activeModules[2] = new StatusReporterModule(moduleID::STATUS_REPORTER_MODULE_ID, this, cm, "status", 3);
+	//activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "adv", 4);
+	//activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "scan", 5);
+	//activeModules[5] = new EnrollmentModule(moduleID::ENROLLMENT_MODULE_ID, this, cm, "enroll", 6);
 
 
 	//Register a pre/post transmit hook for radio events
@@ -135,8 +135,8 @@ void Node::ConfigurationLoadedHandler()
 		persistentConfig.connectionLossCounter = 0;
 		persistentConfig.networkId = Config->meshNetworkIdentifier;
 		memcpy(&persistentConfig.networkKey, &Config->meshNetworkKey, 16);
-		persistentConfig.calibratedRSSI = -53;
-		persistentConfig.reserved = 0;
+		persistentConfig.dBmRX = 10;
+		persistentConfig.dBmTX = 10;
 
 		//Get an id for our testdevices when not working with persistent storage
 		InitWithTestDeviceSettings();
@@ -1033,7 +1033,7 @@ clusterID Node::GenerateClusterID(void)
 	//Combine connection loss and nodeId to generate a unique cluster id
 	clusterID newId = this->persistentConfig.nodeId + this->persistentConfig.connectionLossCounter << 16;
 
-	logt("NODE", "New cluster id generated %u", newId);
+	logt("NODE", "New cluster id generated %x", newId);
 	return newId;
 }
 
@@ -1235,7 +1235,6 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	//Trigger this to save the current node configuration
 	else if (commandName == "savenode")
 	{
-		persistentConfig.reserved++;
 		Storage::getInstance().QueuedWrite((u8*) &persistentConfig, sizeof(NodeConfiguration), 0, this);
 
 	}

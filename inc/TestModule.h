@@ -38,9 +38,14 @@ class TestModule: public Module
 			char testString[12];
 		};
 
+		bool flood;
+
+		u32 packetsOut;
+		u32 packetsIn;
+
 		TestModuleConfiguration configuration;
 
-		enum TestModuleMessages{LED_MESSAGE=0};
+		enum TestModuleMessages{LED_MESSAGE=0, FLOOD_MESSAGE=1};
 
 	public:
 		TestModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);

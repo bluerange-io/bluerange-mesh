@@ -60,7 +60,7 @@ void ScanningModule::ResetToDefaultConfiguration()
 {
 	//Set default configuration values
 	configuration.moduleId = moduleId;
-	configuration.moduleActive = false;
+	configuration.moduleActive = true;
 	configuration.moduleVersion = 1;
 
 	//Set additional config values...

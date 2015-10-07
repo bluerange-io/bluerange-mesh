@@ -79,8 +79,8 @@ class Node:
 			u8 networkKey[BLE_GAP_SEC_KEY_LEN]; //16 bytes
 			u16 connectionLossCounter;
 			deviceTypes deviceType;
-			u8 calibratedRSSI; //The average RSSI, received in a distance of 1m with a tx power of +0 dBm
-			u8 reserved;
+			u8 dBmTX; //The average RSSI, received in a distance of 1m with a tx power of +0 dBm
+			u8 dBmRX; //Receiver sensitivity (or receied power from a packet sent at 1m distance with +0dBm?)
 		};
 
 		//For our test devices

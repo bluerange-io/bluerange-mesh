@@ -70,6 +70,7 @@ class ConnectionManager
 
 		//This method is called when empty buffers are available and there is data to send
 		void fillTransmitBuffers();
+		void fillTransmitBuffersOld();
 
 		void setConnectionManagerCallback(ConnectionManagerCallback* cb);
 

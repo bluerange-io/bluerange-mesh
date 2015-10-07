@@ -251,7 +251,7 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 				//Print packet to console
 				StatusReporterModuleStatusMessage* data = (StatusReporterModuleStatusMessage*) (packet->data);
 
-				uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"status\", \"nodeId\":%u, \"chipIdA\":%u, \"chipIdB\":%u, \"manufacturerId\":%u, \"serialNumber\":\"%s\", \"clusterId\":%u, \"clusterSize\":%d, \"freeIn\":%u, \"freeOut\":%u, \"addr\":\"%02X:%02X:%02X:%02X:%02X:%02X\", \"version\":%u, \"uptimeSeconds\":%u, \"estimatedBatteryRuntimeHours\":%u, \"networkId\":%u}" SEP, moduleId, packet->header.sender, data->chipIdA, data->chipIdB, data->manufacturerId, data->serialNumber, data->clusterId, data->clusterSize, data->freeIn, data->freeOut, data->accessAddress.addr[5], data->accessAddress.addr[4], data->accessAddress.addr[3], data->accessAddress.addr[2], data->accessAddress.addr[1], data->accessAddress.addr[0], data->firmwareVersion, data->uptimeSeconds, 0xFFFFFFFF, data->networkId);
+				uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"status\", \"nodeId\":%u, \"chipIdA\":%u, \"chipIdB\":%u, \"manufacturerId\":%u, \"serialNumber\":\"%s\", \"clusterId\":%u, \"clusterSize\":%d, \"freeIn\":%u, \"freeOut\":%u, \"addr\":\"%02X:%02X:%02X:%02X:%02X:%02X\", \"version\":%u, \"uptimeSeconds\":%u, \"estimatedBatteryRuntimeHours\":%u, \"networkId\":%u, \"dBmTX\":%u, \"dBmRX\":%u}" SEP, moduleId, packet->header.sender, data->chipIdA, data->chipIdB, data->manufacturerId, data->serialNumber, data->clusterId, data->clusterSize, data->freeIn, data->freeOut, data->accessAddress.addr[5], data->accessAddress.addr[4], data->accessAddress.addr[3], data->accessAddress.addr[2], data->accessAddress.addr[1], data->accessAddress.addr[0], data->firmwareVersion, data->uptimeSeconds, 0xFFFFFFFF, data->networkId, data->dBmTX, data->dBmRX);
 			}
 		}
 	}
@@ -301,6 +301,9 @@ void StatusReporterModule::SendStatusInformation(nodeID toNode)
 	data->firmwareVersion = Config->firmwareVersion;
 	data->uptimeSeconds = node->appTimerMs / 1000; //FIXME: change this back if appTimer is changed to seconds
 	data->networkId = node->persistentConfig.networkId;
+	data->dBmRX = node->persistentConfig.dBmRX;
+	data->dBmTX = node->persistentConfig.dBmTX;
+
 
 	cm->SendMessageToReceiver(NULL, (u8*)packet, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE, true);
 }

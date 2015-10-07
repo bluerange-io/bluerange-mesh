@@ -34,11 +34,16 @@ TestModule::TestModule(u16 moduleId, Node* node, ConnectionManager* cm, const ch
 {
 	//Register callbacks n' stuff
 	Logger::getInstance().enableTag("TEST");
+	Logger::getInstance().enableTag("CONN");
 
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
 	configurationPointer = &configuration;
 	configurationLength = sizeof(TestModuleConfiguration);
+
+	flood = false;
+	packetsOut = 0;
+	packetsIn = 0;
 
 	ResetToDefaultConfiguration();
 
@@ -63,20 +68,41 @@ void TestModule::TimerEventHandler(u16 passedTime, u32 appTimer){
 
 	if(!configuration.moduleActive) return;
 
-	//logt("TEST", "Passed time %d, appTimer:%d", passedTime, appTimer);
+	if(appTimer % 1000 == 0) logt("TEST", "Out: %u, In:%u", packetsOut, packetsIn);
+
+	if(flood){
+
+		//FIXME: The packet queue might have problems when it is filled with too many packets
+		//This seems to break the softdevice, fix that.
+
+		while(cm->pendingPackets < 6){
+			packetsOut++;
+
+			connPacketModuleAction data;
+			data.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
+			data.header.sender = node->persistentConfig.nodeId;
+			data.header.receiver = NODE_ID_HOPS_BASE + 2;
+
+			data.actionType = TestModuleMessages::FLOOD_MESSAGE;
+			data.moduleId = moduleId;
+			data.data[0] = 1;
+
+			cm->SendMessageToReceiver(NULL, (u8*) &data, SIZEOF_CONN_PACKET_MODULE_ACTION, false);
+		}
+	}
 
 	//Reset every few seconds
-	if(configuration.rebootTimeMs != 0 && configuration.rebootTimeMs < appTimer){
+	/*if(configuration.rebootTimeMs != 0 && configuration.rebootTimeMs < appTimer){
 		logt("TEST", "Resetting!");
 		NVIC_SystemReset();
-	}
+	}*/
 }
 
 void TestModule::ResetToDefaultConfiguration()
 {
 	//Set default configuration values
 	configuration.moduleId = moduleId;
-	configuration.moduleActive = false;
+	configuration.moduleActive = true;
 	configuration.moduleVersion = 1;
 	configuration.rebootTimeMs = 0;
 	memcpy(&configuration.testString, "jdhdur", 7);
@@ -85,8 +111,14 @@ void TestModule::ResetToDefaultConfiguration()
 bool TestModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
 
-	if (commandName == "testsave")
+	if (commandName == "flood")
 	{
+		flood = !flood;
+
+		return true;
+	}
+	if (commandName == "testsave")
+		{
 		char buffer[70];
 		Logger::getInstance().convertBufferToHexString((u8*) &configuration, sizeof(TestModuleConfiguration), buffer);
 
@@ -159,6 +191,11 @@ void TestModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
 					//Switch LEDs back to connection signaling
 					node->currentLedMode = Node::ledMode::LED_MODE_CONNECTIONS;
 				}
+			}
+
+			else if(packet->actionType == TestModuleMessages::FLOOD_MESSAGE){
+				packetsIn++;
+
 			}
 		}
 	}
