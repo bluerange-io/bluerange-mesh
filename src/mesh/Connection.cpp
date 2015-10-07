@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 Connection::Connection(u8 id, ConnectionManager* cm, Node* node, ConnectionDirection direction)
 {
-	connectionManager = cm;
+	this->cm = cm;
 	this->connectionId = id;
 	this->node = node;
 	this->direction = direction;
@@ -49,7 +49,7 @@ Connection::Connection(u8 id, ConnectionManager* cm, Node* node, ConnectionDirec
 
 void Connection::Init(){
 	connectedClusterId = 0;
-	unreliableBuffersFree = 3; //FIXME: request from softdevice
+	unreliableBuffersFree = cm->txBuffersPerLink; //FIXME: request from softdevice
 	reliableBuffersFree = 1;
 	partnerId = 0;
 	connectionHandle = BLE_CONN_HANDLE_INVALID;
@@ -141,12 +141,12 @@ void Connection::StartHandshake(void)
 	//If we are sink ourself, we set it to 1, otherwise we use our
 	//shortest path to reach a sink and increment it by one.
 	//If there is no known sink, we set it to 0.
-	packet.payload.hopsToSink = connectionManager->GetHopsToShortestSink(this);
+	packet.payload.hopsToSink = cm->GetHopsToShortestSink(this);
 
 
 	logt("HANDSHAKE", "OUT => conn(%d) CLUSTER_WELCOME, cID:%x, cSize:%d", connectionId, packet.payload.clusterId, packet.payload.clusterSize);
 
-	connectionManager->SendMessage(this, (u8*) &packet, SIZEOF_CONN_PACKET_CLUSTER_WELCOME, true);
+	cm->SendMessage(this, (u8*) &packet, SIZEOF_CONN_PACKET_CLUSTER_WELCOME, true);
 
 }
 
@@ -205,10 +205,10 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 	//The packet should continue to the shortest sink
 	else if(packetHeader->receiver == NODE_ID_SHORTEST_SINK)
 	{
-		Connection* connection = connectionManager->GetConnectionToShortestSink(NULL);
+		Connection* connection = cm->GetConnectionToShortestSink(NULL);
 
 		if(connection){
-			connectionManager->SendMessage(connection, data, dataLength, reliable);
+			cm->SendMessage(connection, data, dataLength, reliable);
 		}
 		//We could send it as a broadcast or we just drop it if we do not know any sink
 		else {
@@ -233,7 +233,7 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 		}
 
 		//Send to all other connections
-		connectionManager->SendMessageOverConnections(this, data, dataLength, reliable);
+		cm->SendMessageOverConnections(this, data, dataLength, reliable);
 	}
 
 
@@ -283,7 +283,7 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 				logt("HANDSHAKE", "I am smaller");
 
 				//Kill other Connections
-				connectionManager->DisconnectOtherConnections(this);
+				cm->DisconnectOtherConnections(this);
 
 				//Update my own information on the connection
 				//this->connectedClusterId = packet->payload.clusterId;
@@ -306,12 +306,12 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 				packet.header.sender = node->persistentConfig.nodeId;
 				packet.header.receiver = this->partnerId;
 
-				packet.payload.hopsToSink = connectionManager->GetHopsToShortestSink(this);
+				packet.payload.hopsToSink = cm->GetHopsToShortestSink(this);
 				packet.payload.reserved = 0;
 
 				logt("HANDSHAKE", "OUT => %d CLUSTER_ACK_1, hops:%d", packet.header.receiver, packet.payload.hopsToSink);
 
-				connectionManager->SendMessage(this, (u8*) &packet, SIZEOF_CONN_PACKET_CLUSTER_ACK_1, true);
+				cm->SendMessage(this, (u8*) &packet, SIZEOF_CONN_PACKET_CLUSTER_ACK_1, true);
 
 				//Update advertisement packets
 				//node->UpdateJoinMePacket(NULL);
@@ -363,9 +363,9 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 
 			//Send message to all other connections and update the hops to sink accordingly
 			for(int i=0; i<Config->meshMaxConnections; i++){
-				if(connectionManager->connections[i] == this || !connectionManager->connections[i]->handshakeDone) continue;
-				outPacket.payload.hopsToSink = connectionManager->GetHopsToShortestSink(connectionManager->connections[i]);
-				connectionManager->SendMessage(connectionManager->connections[i], (u8*) &outPacket, SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE, true);
+				if(cm->connections[i] == this || !cm->connections[i]->handshakeDone) continue;
+				outPacket.payload.hopsToSink = cm->GetHopsToShortestSink(cm->connections[i]);
+				cm->SendMessage(cm->connections[i], (u8*) &outPacket, SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE, true);
 			}
 
 			//Confirm to the new node that it just joined our cluster => send ACK2
@@ -380,7 +380,7 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 
 			logt("HANDSHAKE", "OUT => %d CLUSTER_ACK_2 clustId:%d, clustSize:%d", this->partnerId, node->clusterId, node->clusterSize);
 
-			connectionManager->SendMessage(this, (u8*) &outPacket2, SIZEOF_CONN_PACKET_CLUSTER_ACK_2, true);
+			cm->SendMessage(this, (u8*) &outPacket2, SIZEOF_CONN_PACKET_CLUSTER_ACK_2, true);
 
 			//Update our advertisement packet
 			node->UpdateJoinMePacket(NULL);
@@ -448,7 +448,7 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 				|| (packetHeader->receiver == NODE_ID_SHORTEST_SINK && node->persistentConfig.deviceType == deviceTypes::DEVICE_TYPE_SINK)
 		){
 			//Forward that Packet to the Node
-			connectionManager->connectionManagerCallback->messageReceivedCallback(inPacket);
+			cm->connectionManagerCallback->messageReceivedCallback(inPacket);
 		}
 	}
 
@@ -461,7 +461,7 @@ void Connection::PrintStatus(void)
 {
 	const char* directionString = (direction == CONNECTION_DIRECTION_IN) ? "< IN " : "> OUT";
 
-	trace("%s %u, handshake:%u, clusterId:%x, clusterSize:%u, toSink:%d, Queue:%u-%u(%u), relBuf:%u" EOL, directionString, this->partnerId, this->handshakeDone, this->connectedClusterId, this->connectedClusterSize, this->hopsToSink, (packetSendQueue->readPointer - packetSendQueue->bufferStart), (packetSendQueue->writePointer - packetSendQueue->bufferStart), packetSendQueue->_numElements, reliableBuffersFree);
+	trace("%s %u, handshake:%u, clusterId:%x, clusterSize:%u, toSink:%d, Queue:%u-%u(%u), relBuf:%u, unrelBuf:%u" EOL, directionString, this->partnerId, this->handshakeDone, this->connectedClusterId, this->connectedClusterSize, this->hopsToSink, (packetSendQueue->readPointer - packetSendQueue->bufferStart), (packetSendQueue->writePointer - packetSendQueue->bufferStart), packetSendQueue->_numElements, reliableBuffersFree, unreliableBuffersFree);
 
 }
 

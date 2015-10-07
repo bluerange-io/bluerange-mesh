@@ -41,7 +41,7 @@ TestModule::TestModule(u16 moduleId, Node* node, ConnectionManager* cm, const ch
 	configurationPointer = &configuration;
 	configurationLength = sizeof(TestModuleConfiguration);
 
-	flood = false;
+	flood = 0;
 	packetsOut = 0;
 	packetsIn = 0;
 
@@ -68,7 +68,7 @@ void TestModule::TimerEventHandler(u16 passedTime, u32 appTimer){
 
 	if(!configuration.moduleActive) return;
 
-	if(appTimer % 1000 == 0) logt("TEST", "Out: %u, In:%u", packetsOut, packetsIn);
+	//if(appTimer % 1000 == 0) logt("TEST", "Out: %u, In:%u", packetsOut, packetsIn);
 
 	if(flood){
 
@@ -87,7 +87,7 @@ void TestModule::TimerEventHandler(u16 passedTime, u32 appTimer){
 			data.moduleId = moduleId;
 			data.data[0] = 1;
 
-			cm->SendMessageToReceiver(NULL, (u8*) &data, SIZEOF_CONN_PACKET_MODULE_ACTION, false);
+			cm->SendMessageToReceiver(NULL, (u8*) &data, SIZEOF_CONN_PACKET_MODULE_ACTION, flood == 1 ? true : false);
 		}
 	}
 
@@ -113,7 +113,7 @@ bool TestModule::TerminalCommandHandler(string commandName, vector<string> comma
 
 	if (commandName == "flood")
 	{
-		flood = !flood;
+		flood = (flood+1) % 3;
 
 		return true;
 	}

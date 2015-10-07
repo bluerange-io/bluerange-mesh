@@ -97,12 +97,12 @@ Node::Node(networkID networkId)
 	//module configurations with the Storage class
 	//Module ids must persist when nodes are updated to guearantee that the
 	//same module receives the same storage slot
-	activeModules[0] = new TestModule(moduleID::TEST_MODULE_ID, this, cm, "test", 1);
+	//activeModules[0] = new TestModule(moduleID::TEST_MODULE_ID, this, cm, "test", 1);
 	//activeModules[1] = new DFUModule((moduleID::DFU_MODULE_ID, this, cm, "dfu", 2);
-	//activeModules[2] = new StatusReporterModule(moduleID::STATUS_REPORTER_MODULE_ID, this, cm, "status", 3);
-	//activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "adv", 4);
-	//activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "scan", 5);
-	//activeModules[5] = new EnrollmentModule(moduleID::ENROLLMENT_MODULE_ID, this, cm, "enroll", 6);
+	activeModules[2] = new StatusReporterModule(moduleID::STATUS_REPORTER_MODULE_ID, this, cm, "status", 3);
+	activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "adv", 4);
+	activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "scan", 5);
+	activeModules[5] = new EnrollmentModule(moduleID::ENROLLMENT_MODULE_ID, this, cm, "enroll", 6);
 
 
 	//Register a pre/post transmit hook for radio events
@@ -1048,7 +1048,7 @@ void Node::PrintStatus(void)
 	trace("GAP Addr is %02X:%02X:%02X:%02X:%02X:%02X, serial:%s" EOL EOL, p_addr.addr[5], p_addr.addr[4], p_addr.addr[3], p_addr.addr[2], p_addr.addr[1], p_addr.addr[0], persistentConfig.serialNumber);
 
 	//Print connection info
-	trace("CONNECTIONS (freeIn:%u, freeOut:%u, pendingPackets:%u, txBuf:%u" EOL, cm->freeInConnections, cm->freeOutConnections, cm->pendingPackets, cm->txBufferFreeCount);
+	trace("CONNECTIONS (freeIn:%u, freeOut:%u, pendingPackets:%u" EOL, cm->freeInConnections, cm->freeOutConnections, cm->pendingPackets);
 	cm->inConnection->PrintStatus();
 	for (int i = 0; i < Config->meshMaxOutConnections; i++)
 	{

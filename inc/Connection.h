@@ -44,7 +44,7 @@ class Connection
 {
 	private:
 		Node* node; //Reference to the own Node
-		ConnectionManager* connectionManager;
+		ConnectionManager* cm;
 
 		void Init();
 

@@ -81,7 +81,7 @@ class ConnectionManager
 		//Keep track of outgoing packets and the transmit buffers
 		u16 pendingPackets;
 
-		u8 txBufferFreeCount;
+		u8 txBuffersPerLink;
 
 		u8 freeInConnections;
 		u8 freeOutConnections;

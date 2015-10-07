@@ -62,6 +62,9 @@ ConnectionManager::ConnectionManager(){
 	freeOutConnections = Config->meshMaxOutConnections;
 	freeInConnections = Config->meshMaxInConnections;
 
+	//Find out how many tx buffers we have
+	u32 err =  sd_ble_tx_buffer_count_get(&txBuffersPerLink);
+	APP_ERROR_CHECK(err);
 
 	//Create all connections
 	inConnection = connections[0] = new Connection(0, this, Node::getInstance(), Connection::CONNECTION_DIRECTION_IN);
@@ -69,10 +72,6 @@ ConnectionManager::ConnectionManager(){
 	for(int i=1; i<=Config->meshMaxOutConnections; i++){
 		connections[i] = outConnections[i-1] = new Connection(i, this, Node::getInstance(), Connection::CONNECTION_DIRECTION_OUT);
 	}
-
-	//Find out how many tx buffers we have
-	u32 err =  sd_ble_tx_buffer_count_get(&txBufferFreeCount);
-	APP_ERROR_CHECK(err);
 
 	//Register GAPController callbacks
 	GAPController::setDisconnectionHandler(DisconnectionHandler);
@@ -497,9 +496,7 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 void ConnectionManager::fillTransmitBuffers(){
 
 	u32 err;
-	int i = -1; //connection index
-	bool continueSending = false;
-
+	//TODO: Some error handling would be nice to have
 
 
 	//Fill with unreliable packets
@@ -517,20 +514,78 @@ void ConnectionManager::fillTransmitBuffers(){
 				u8* data = packet.data + 1;
 				u16 dataSize = packet.length - 1;
 
-				//FIXME: remove
-				((connPacketHeader*) data)->hasMoreParts = 0;
-				reliable = false;
+				//Multi-part messages are only supported reliable
+				//Switch packet to reliable if it is a multipart packet
+				if(dataSize > MAX_DATA_SIZE_PER_WRITE) reliable = true;
+				else ((connPacketHeader*) data)->hasMoreParts = 0;
 
 				//The Next packet should be sent reliably
 				if(reliable){
 					if(connections[i]->reliableBuffersFree > 0){
-						//TODO: implement
+						//Check if the packet can be transmitted in one MTU
+						//If not, it will be sent with message splitting and reliable
+						if(dataSize > MAX_DATA_SIZE_PER_WRITE){
+
+							//We might already have started to transmit the packet
+							if(connections[i]->packetSendPosition != 0){
+								//we need to modify the data a little and build our split
+								//message header. This does overwrite some of the old data
+								//but that's already been transmitted
+								connPacketSplitHeader* newHeader = (connPacketSplitHeader*)(data + connections[i]->packetSendPosition);
+								newHeader->hasMoreParts = (dataSize - connections[i]->packetSendPosition > MAX_DATA_SIZE_PER_WRITE) ? 1: 0;
+								newHeader->messageType = ((connPacketHeader*) data)->messageType; //We take it from the start of our packet which should still be intact
+
+								//If the packet has more parts, we send a full packet, otherwise we send the remaining bits
+								if(newHeader->hasMoreParts) dataSize = MAX_DATA_SIZE_PER_WRITE;
+								else dataSize = dataSize - connections[i]->packetSendPosition;
+
+								//Now we set the data pointer to where we left the last time minus our new header
+								data = (u8*)newHeader;
+
+							}
+							//Or maybe this is the start of the transmission
+							else
+							{
+								((connPacketHeader*) data)->hasMoreParts = 1;
+								//Data is alright, but dataSize must be set to its new value
+								dataSize = MAX_DATA_SIZE_PER_WRITE;
+							}
+						}
+
+
+						//Update packet timestamp as close as possible before sending it
+						//TODO: This could be done more accurate because we receive an event when the
+						//Packet was sent, so we could calculate the time between sending and getting the event
+						//And send a second packet with the time difference.
+						if(((connPacketHeader*) data)->messageType == MESSAGE_TYPE_UPDATE_TIMESTAMP){
+							//Add the time that it took from setting the time until it gets send
+							u32 additionalTime;
+							u32 rtc1;
+							app_timer_cnt_get(&rtc1);
+							app_timer_cnt_diff_compute(rtc1, Node::getInstance()->globalTimeSetAt, &additionalTime);
+
+							logt("NODE", "sending time:%u with prevRtc1:%u, rtc1:%u, diff:%u", (u32)Node::getInstance()->globalTime, Node::getInstance()->globalTimeSetAt, rtc1, additionalTime);
+
+							((connPacketUpdateTimestamp*) data)->timestamp = Node::getInstance()->globalTime + additionalTime;
+
+
+							/*((connPacketUpdateTimestamp*) data)->timestamp = 0;
+							((connPacketUpdateTimestamp*) data)->milliseconds = 0;*/
+						}
+
+
+						//Finally, send the packet to the SoftDevice
+						err = GATTController::bleWriteCharacteristic(connections[i]->connectionHandle, connections[i]->writeCharacteristicHandle, data, dataSize, true);
+						APP_ERROR_CHECK(err);
+
+						if(err == NRF_SUCCESS)
+						{
+							connections[i]->reliableBuffersFree--;
+						}
 
 					} else {
 						packetCouldNotBeSent = true;
 					}
-
-
 				}
 
 				//The next packet is to be sent unreliably
@@ -544,6 +599,7 @@ void ConnectionManager::fillTransmitBuffers(){
 							connections[i]->packetSendQueue->DiscardNext();
 							logt("TEST", "packet to conn %u (txfree: %d)", i, connections[i]->unreliableBuffersFree);
 						}
+
 					} else {
 						packetCouldNotBeSent = true;
 					}
@@ -554,141 +610,9 @@ void ConnectionManager::fillTransmitBuffers(){
 				if(packetCouldNotBeSent) break;
 			}
 		}
-
-	}
-
-
-}
-
-
-void ConnectionManager::fillTransmitBuffersOld()
-{
-	u32 err = 0;
-	//Filling the buffers nicely is not an easy task but is probably
-	//possible in a future SoftDevice version
-	//meanwhile, here is a trivial implementation
-
-	//FIXME: I get the feeling that there are more buffers available
-	//Reference: https://devzone.nordicsemi.com/question/41090/what-does-sd_ble_tx_buffer_count_get-return/
-	//This should be fixed to optimize throughput
-
-
-	//Loop through all 4 connections infinitely
-	bool continueSending = false;
-	int i = -1;
-	while(true){
-
-		i = (i+1) % Config->meshMaxConnections;
-		if(i == 0) continueSending = false;
-
-
-		//Check if the connection is connected and has available packets
-		if(connections[i]->isConnected && connections[i]->packetSendQueue->_numElements > 0)
-		{
-			//Get one packet from the packet queue
-			sizedData packet = connections[i]->packetSendQueue->PeekNext();
-
-
-
-
-			bool reliable = packet.data[0];
-			u8* data = packet.data + 1;
-			u16 dataSize = packet.length - 1;
-
-
-			//Multi-part messages are only supported reliable
-			if(dataSize > MAX_DATA_SIZE_PER_WRITE) reliable = true;
-			else ((connPacketHeader*) data)->hasMoreParts = 0;
-
-
-			//Reliable packets
-			if(reliable){
-				if(connections[i]->reliableBuffersFree > 0){
-
-					//Check if the packet can be transmitted in one MTU
-					//If not, it will be sent with message splitting and reliable
-					if(dataSize > MAX_DATA_SIZE_PER_WRITE){
-
-						//We might already have started to transmit the packet
-						if(connections[i]->packetSendPosition != 0){
-							//we need to modify the data a little and build our split
-							//message header. This does overwrite some of the old data
-							//but that's already been transmitted
-							connPacketSplitHeader* newHeader = (connPacketSplitHeader*)(data + connections[i]->packetSendPosition);
-							newHeader->hasMoreParts = (dataSize - connections[i]->packetSendPosition > MAX_DATA_SIZE_PER_WRITE) ? 1: 0;
-							newHeader->messageType = ((connPacketHeader*) data)->messageType; //We take it from the start of our packet which should still be intact
-
-							//If the packet has more parts, we send a full packet, otherwise we send the remaining bits
-							if(newHeader->hasMoreParts) dataSize = MAX_DATA_SIZE_PER_WRITE;
-							else dataSize = dataSize - connections[i]->packetSendPosition;
-
-
-							//Now we set the data pointer to where we left the last time minus our new header
-							data = (u8*)newHeader;
-
-						}
-						//Or maybe this is the start of the transmission
-						else
-						{
-							((connPacketHeader*) data)->hasMoreParts = 1;
-							//Data is alright, but dataSize must be set to its new value
-							dataSize = MAX_DATA_SIZE_PER_WRITE;
-						}
-					}
-
-					//Update packet timestamp as close as possible before sending it
-					if(((connPacketHeader*) data)->messageType == MESSAGE_TYPE_UPDATE_TIMESTAMP){
-						//Add the time that it took from setting the time until it gets send
-						u32 additionalTime;
-						u32 rtc1;
-						app_timer_cnt_get(&rtc1);
-						app_timer_cnt_diff_compute(rtc1, Node::getInstance()->globalTimeSetAt, &additionalTime);
-
-						logt("NODE", "sending time:%u with prevRtc1:%u, rtc1:%u, diff:%u", (u32)Node::getInstance()->globalTime, Node::getInstance()->globalTimeSetAt, rtc1, additionalTime);
-
-						((connPacketUpdateTimestamp*) data)->timestamp = Node::getInstance()->globalTime + additionalTime;
-
-
-						/*((connPacketUpdateTimestamp*) data)->timestamp = 0;
-						((connPacketUpdateTimestamp*) data)->milliseconds = 0;*/
-					}
-
-
-					err = GATTController::bleWriteCharacteristic(connections[i]->connectionHandle, connections[i]->writeCharacteristicHandle, data, dataSize, true);
-					APP_ERROR_CHECK(err);
-
-
-					if(err == NRF_SUCCESS){
-						connections[i]->reliableBuffersFree--;
-					}
-
-					//logt("CONN", "Reliable Write error %d", err);
-
-					//If we have another packet, we continue sending
-					if(connections[i]->packetSendQueue->_numElements > 0) continueSending = true;
-				}
-			//Unreliable packets
-			} else {
-				if(txBufferFreeCount > 0){
-					err = GATTController::bleWriteCharacteristic(connections[i]->connectionHandle, connections[i]->writeCharacteristicHandle, data, dataSize, false);
-
-					if(err == NRF_SUCCESS){
-						txBufferFreeCount--;
-						connections[i]->packetSendQueue->DiscardNext();
-					}
-
-					//logt("CONN", "Unreliable Write error %d", err);
-
-					if(connections[i]->packetSendQueue->_numElements > 0) continueSending = true;
-				}
-			}
-		}
-
-
-		//Check if all buffers are filled
-		if(i == MAXIMUM_CONNECTIONS-1 && !continueSending) break;
 	}
 }
+
 
 void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
 {
@@ -701,10 +625,8 @@ void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
 	{
 
 		logt("CONN", "write_CMD complete (n=%d)", bleEvent->evt.common_evt.params.tx_complete.count);
-		//A TX complete event frees a number of transmit buffers that can be used for all
-		//connections
-		cm->txBufferFreeCount += bleEvent->evt.common_evt.params.tx_complete.count;
 
+		//This connection has just been given back some transmit buffers
 		cm->GetConnectionFromHandle(bleEvent->evt.common_evt.conn_handle)->unreliableBuffersFree += bleEvent->evt.common_evt.params.tx_complete.count;
 
 		cm->pendingPackets -= bleEvent->evt.common_evt.params.tx_complete.count;
@@ -725,11 +647,6 @@ void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
 		}
 		else
 		{
-			//TODO: After a split packet has been sent successfully, we must increment the sendposition
-			//and remove the packet only if it is finished
-
-
-
 			logt("CONN", "write_REQ complete");
 			Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gattc_evt.conn_handle);
 

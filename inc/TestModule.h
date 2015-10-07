@@ -38,7 +38,7 @@ class TestModule: public Module
 			char testString[12];
 		};
 
-		bool flood;
+		u8 flood;
 
 		u32 packetsOut;
 		u32 packetsIn;
