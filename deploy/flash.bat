@@ -51,6 +51,9 @@ for /f "tokens=* delims=" %%x in (%IDS%) do (
 	if %TYPE% == softdevice (
 		start /min %NRFJPROG_PATH% -s %%x --program %SOFTDEVICE_HEX% --chiperase --family %FAMILY%
 	)
+	if %TYPE% == full (
+		start /min cmd /C "%NRFJPROG_PATH% -s %%x --program %SOFTDEVICE_HEX% --chiperase --family %FAMILY% && %NRFJPROG_PATH% -s %%x --program %FRUITYMESH_HEX% --family %FAMILY% && %NRFJPROG_PATH% -s %%x --reset"
+	)
 	if %TYPE% == erase (
 		start /min nrfjprog -s %%x --eraseall --family %FAMILY%
 	)
