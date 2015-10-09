@@ -308,6 +308,41 @@ void StatusReporterModule::SendStatusInformation(nodeID toNode)
 	cm->SendMessageToReceiver(NULL, (u8*)packet, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE, true);
 }
 
+
+//Message type can be either MESSAGE_TYPE_MODULE_ACTION_RESPONSE or MESSAGE_TYPE_MODULE_GENERAL
+void StatusReporterModule::SendDeviceInfo(nodeID toNode, u8 messageType)
+{
+	u16 packetSize = SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_STATUS_REPORTER_MODULE_DEVICE_INFO_MESSAGE;
+	u8 buffer[packetSize];
+	connPacketModuleAction* outPacket = (connPacketModuleAction*)buffer;
+	outPacket->header.messageType = MESSAGE_TYPE_MODULE_ACTION_RESPONSE;
+	outPacket->header.receiver = toNode;
+	outPacket->header.sender = node->persistentConfig.nodeId;
+	outPacket->moduleId = moduleId;
+	outPacket->actionType = StatusModuleActionResponseMessages::DEVICE_INFO;
+
+	StatusReporterModuleDeviceInfoMessage* outPacketData = (StatusReporterModuleDeviceInfoMessage*)(outPacket->data);
+
+	outPacketData->manufacturerId = node->persistentConfig.manufacturerId;
+	outPacketData->deviceType = node->persistentConfig.deviceType;
+	memcpy(outPacketData->serialNumber, node->persistentConfig.serialNumber, SERIAL_NUMBER_LENGTH);
+	sd_ble_gap_address_get(&outPacketData->accessAddress);
+	outPacketData->nodeVersion = Config->firmwareVersion;
+	outPacketData->networkId = node->persistentConfig.networkId;
+	outPacketData->dBmRX = node->persistentConfig.dBmRX;
+	outPacketData->dBmTX = node->persistentConfig.dBmTX;
+
+
+	cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_STATUS_REPORTER_MODULE_DEVICE_INFO_MESSAGE, false);
+
+}
+
+void StatusReporterModule::SendFullStatus(nodeID toNode)
+{
+
+}
+
+
 //This method sends information about the current connections over the network
 void StatusReporterModule::SendConnectionInformation(nodeID toNode)
 {

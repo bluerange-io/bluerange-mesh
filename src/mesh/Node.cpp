@@ -79,6 +79,8 @@ Node::Node(networkID networkId)
 	LedGreen->Off();
 	LedBlue->Off();
 
+	ledBlinkPosition = 0;
+
 
 
 	//Register terminal listener
@@ -943,6 +945,28 @@ void Node::TimerTickHandler(u16 timerMs)
 		u8 countHandshake = (cm->inConnection->handshakeDone ? 1 : 0) + (cm->outConnections[0]->handshakeDone ? 1 : 0) + (cm->outConnections[1]->handshakeDone ? 1 : 0) + (cm->outConnections[2]->handshakeDone ? 1 : 0);
 		u8 countConnected = (cm->inConnection->isConnected ? 1 : 0) + (cm->outConnections[0]->isConnected ? 1 : 0) + (cm->outConnections[1]->isConnected ? 1 : 0) + (cm->outConnections[2]->isConnected ? 1 : 0);
 
+		u8 i = ledBlinkPosition / 2;
+
+		if(i < Config->meshMaxConnections){
+			if(ledBlinkPosition % 2 == 0){
+				//Connected and handshake done
+				if(cm->connections[i]->handshakeDone) { LedBlue->On(); }
+				//Connected and handshake done
+				if(!cm->connections[i]->handshakeDone && cm->connections[i]->isConnected) { LedGreen->On(); }
+				//A free connection
+				if(!cm->connections[i]->handshakeDone && !cm->connections[i]->isConnected) {  }
+				//No connections
+				if(countHandshake == 0 && countConnected == 0) { LedRed->On(); }
+			} else {
+				LedRed->Off();
+				LedGreen->Off();
+				LedBlue->Off();
+			}
+		}
+
+		ledBlinkPosition = (ledBlinkPosition + 1) % ((Config->meshMaxConnections + 2) * 2);
+
+/*
 		//Check if we want to switch one off
 		if (appTimerMs - LedRed->lastStateChangeMs >= 300) LedRed->Off();
 		if (appTimerMs - LedGreen->lastStateChangeMs >= 300) LedGreen->Off();
@@ -967,7 +991,7 @@ void Node::TimerTickHandler(u16 timerMs)
 				LedBlue->On();
 				LedBlue->lastStateChangeMs = appTimerMs;
 			}
-		}
+		}*/
 	}
 }
 

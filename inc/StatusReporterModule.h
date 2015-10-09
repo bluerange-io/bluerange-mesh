@@ -56,7 +56,8 @@ class StatusReporterModule: public Module
 
 		enum StatusModuleActionResponseMessages
 		{
-			STATUS_MESSAGE = 0, CONNECTIONS_MESSAGE = 1
+			STATUS_MESSAGE = 0, CONNECTIONS_MESSAGE = 1,
+			DEVICE_INFO = 2, FULL_STATUS = 3
 		};
 
 		//####### Module specific message structs (these need to be packed)
@@ -101,30 +102,32 @@ class StatusReporterModule: public Module
 
 
 			//This message delivers non- (or not often)changing information
-			#define SIZEOF_STATUS_REPORTER_MODULE_INFO_MESSAGE (13 + SERIAL_NUMBER_LENGTH)
+			#define SIZEOF_STATUS_REPORTER_MODULE_DEVICE_INFO_MESSAGE (14 + SERIAL_NUMBER_LENGTH)
 			typedef struct
 			{
-				u32 chipIdA;
-				u32 chipIdB;
 				u16 manufacturerId;
 				u8 serialNumber[SERIAL_NUMBER_LENGTH];
 				ble_gap_addr_t accessAddress;
 				networkID networkId;
 				u8 nodeVersion;
-				u8 calibratedRSSI;
+				u8 dBmRX;
+				u8 dBmTX;
 				u8 deviceType;
 
-			} StatusReporterModuleInfoMessage;
+			} StatusReporterModuleDeviceInfoMessage;
 
 			//This message delivers often changing information and info about the incoming connection
-			#define SIZEOF_STATUS_REPORTER_MODULE_FULL_STATUS_MESSAGE 10
+			#define SIZEOF_STATUS_REPORTER_MODULE_FULL_STATUS_MESSAGE 14
 			typedef struct
 			{
 				clusterID clusterId;
 				clusterSIZE clusterSize;
 				nodeID inConnectionPartner;
 				i8 inConnectionRSSI;
+				u8 freeIn : 2;
+				u8 freeOut : 6;
 				u8 batteryInfo;
+				u16 connectionLossCounter; //Connection losses since reboot
 
 			} StatusReporterModuleFullStatusMessage;
 
@@ -138,6 +141,10 @@ class StatusReporterModule: public Module
 
 		void RequestStatusInformation(nodeID targetNode);
 		void SendStatusInformation(nodeID toNode);
+
+
+		void SendDeviceInfo(nodeID toNode, u8 messageType);
+		void SendFullStatus(nodeID toNode, u8 messageType);
 
 		void StartConnectionRSSIMeasurement(Connection* connection);
 		void StopConnectionRSSIMeasurement(Connection* connection);

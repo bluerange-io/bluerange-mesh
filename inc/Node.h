@@ -140,6 +140,8 @@ class Node:
 		u32 radioActiveCount;
 		u32 lastRadioActiveCountResetTimerMs;
 
+		u8 ledBlinkPosition;
+
 		enum ledMode
 		{
 			LED_MODE_OFF, LED_MODE_CONNECTIONS, LED_MODE_RADIO
