@@ -151,11 +151,11 @@ void ConnectionManager::SendMessageToReceiver(Connection* originConnection, u8* 
 
 void ConnectionManager::QueuePacket(Connection* connection, u8* data, u16 dataLength, bool reliable){
 	//Print packet as hex
-	/*char stringBuffer[200];
+	char stringBuffer[200];
 	Logger::getInstance().convertBufferToHexString(data, dataLength, stringBuffer);
 
-	logt("CONN_QUEUE", "PUT_PACKET(%d):len:%d,type:%d, hex: %s",connection->connectionId, dataLength, data[0], stringBuffer);
-*/
+	logt("CONN", "PUT_PACKET(%d):len:%d,type:%d, hex: %s",connection->connectionId, dataLength, data[0], stringBuffer);
+
 	//Save packet
 	bool putResult = connection->packetSendQueue->Put(data, dataLength, reliable);
 
@@ -404,11 +404,18 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 {
 	ConnectionManager* cm = ConnectionManager::getInstance();
 
+
 	//FIXME: must check for reassembly buffer size, if it is bigger, a stack overflow will occur
 
 	Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gap_evt.conn_handle);
 	if (connection != NULL)
 	{
+		//TODO: At this point we should check if the write was a valid operation for the mesh
+		/*if( bleEvent->evt.gatts_evt.params.write.handle != GATTController::getMeshWriteHandle() ){
+			connection->Disconnect();
+			logt("ERROR", "Non mesh device was disconnected");
+		}*/
+
 
 		connPacketHeader* packet = (connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data;
 

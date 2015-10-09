@@ -89,6 +89,7 @@ int main(void)
 	Logger::getInstance().enableTag("STORAGE");
 	Logger::getInstance().enableTag("DATA");
 	Logger::getInstance().enableTag("SEC");
+	Logger::getInstance().enableTag("CONN");
 
 	//Initialialize the SoftDevice and the BLE stack
 	bleInit();

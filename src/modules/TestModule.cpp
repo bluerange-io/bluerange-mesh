@@ -78,7 +78,7 @@ void TestModule::TimerEventHandler(u16 passedTime, u32 appTimer){
 		while(cm->pendingPackets < 6){
 			packetsOut++;
 
-			connPacketModuleAction data;
+			connPacketModule data;
 			data.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
 			data.header.sender = node->persistentConfig.nodeId;
 			data.header.receiver = NODE_ID_HOPS_BASE + 2;
@@ -87,7 +87,7 @@ void TestModule::TimerEventHandler(u16 passedTime, u32 appTimer){
 			data.moduleId = moduleId;
 			data.data[0] = 1;
 
-			cm->SendMessageToReceiver(NULL, (u8*) &data, SIZEOF_CONN_PACKET_MODULE_ACTION, flood == 1 ? true : false);
+			cm->SendMessageToReceiver(NULL, (u8*) &data, SIZEOF_CONN_PACKET_MODULE, flood == 1 ? true : false);
 		}
 	}
 
@@ -143,7 +143,7 @@ bool TestModule::TerminalCommandHandler(string commandName, vector<string> comma
 		//mesh nodes
 		bool state = (commandArgs.size() > 0 && commandArgs[0] == "on") ? true : false;
 
-		connPacketModuleAction packet;
+		connPacketModule packet;
 
 		packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
 		packet.header.sender = node->persistentConfig.nodeId;
@@ -153,7 +153,7 @@ bool TestModule::TerminalCommandHandler(string commandName, vector<string> comma
 		packet.actionType = TestModuleMessages::LED_MESSAGE;
 		packet.data[0] = state;
 
-		cm->SendMessageOverConnections(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
+		cm->SendMessageOverConnections(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE + 1, true);
 
 		return true;
 	}
@@ -170,7 +170,7 @@ void TestModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
 
 	//Check if this request is meant for modules in general
 	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
-		connPacketModuleAction* packet = (connPacketModuleAction*)packetHeader;
+		connPacketModule* packet = (connPacketModule*)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId){

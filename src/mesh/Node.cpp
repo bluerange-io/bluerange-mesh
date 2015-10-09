@@ -79,6 +79,8 @@ Node::Node(networkID networkId)
 	LedGreen->Off();
 	LedBlue->Off();
 
+	ledBlinkPosition = 0;
+
 
 
 	//Register terminal listener
@@ -396,52 +398,41 @@ void Node::messageReceivedCallback(connectionPacket* inPacket)
 			}
 			break;
 
+	}
 
-			//Somebody requested a list of modules on this node
-		case MESSAGE_TYPE_MODULES_GET_LIST:
-			{
-				u8 buffer[SIZEOF_CONN_PACKET_HEADER +  MAX_MODULE_COUNT * 4];
-				connPacketHeader* header = (connPacketHeader*)buffer;
-
-				header->messageType = MESSAGE_TYPE_MODULES_LIST;
-				header->receiver = packetHeader->sender;
-				header->sender = persistentConfig.nodeId;
+	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_CONFIG)
+	{
+		connPacketModule* packet = (connPacketModule*) packetHeader;
 
 
-				//Go through all modules and build a list
-				for(u32 i=0; i<MAX_MODULE_COUNT; i++){
-					u32 position = SIZEOF_CONN_PACKET_HEADER + i *4;
+		if(packet->actionType == Module::ModuleConfigMessages::GET_MODULE_LIST)
+		{
+			SendModuleList(packet->header.sender, 7);
 
-					if(activeModules[i] != 0){
-						buffer[position] = activeModules[i]->configurationPointer->moduleId;
-						buffer[position + 2] = activeModules[i]->configurationPointer->moduleVersion;
-						buffer[position + 3] = activeModules[i]->configurationPointer->moduleActive;
-					} else {
-						memset(buffer + position, 0, 4);
+		}
+		else if(packet->actionType == Module::ModuleConfigMessages::MODULE_LIST)
+		{
+
+			uart("MODULE", "{\"nodeId\":%u,\"type\":\"module_list\",\"modules\":[", packet->header.sender);
+
+			u16 moduleCount = (dataLength - SIZEOF_CONN_PACKET_MODULE) / 4;
+			bool first = false;
+			for(int i=0; i<moduleCount; i++){
+				u16 moduleId = packet->data[i*4+0];
+
+				if(moduleId)
+				{
+					//comma seperator issue,....
+					if(first){
+						uart("MODULE", ",");
+						first = false;
 					}
-				}
+					uart("MODULE", "{\"id\":%u,\"version\":%u\",\"active\":%u}", moduleId, packet->data[i*4+2], packet->data[i*4+3]);
 
-				cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_HEADER +  MAX_MODULE_COUNT * 4, false);
-
-			}
-			break;
-
-			//List of modules coming in
-		case MESSAGE_TYPE_MODULES_LIST:
-			{
-				connPacketAdvInfo* packet = (connPacketAdvInfo*) data;
-				u8* data = (u8*)(packet) + SIZEOF_CONN_PACKET_HEADER;
-
-				logt("ERROR", "Module List");
-
-				//Go through all modules and build a list
-				u32 numModules = (dataLength - SIZEOF_CONN_PACKET_HEADER) / 4;
-
-				for(u32 i=0; i<numModules; i++){
-					if(data[i*4]) logt("ERROR", "id: %u, version: %u, active: %u", data[i*4], data[i*4+2], data[i*4+3]);
 				}
 			}
-			break;
+			uart("MODULE", "]}");
+		}
 	}
 
 	//Now we must pass the message to all of our modules for further processing
@@ -689,6 +680,16 @@ void Node::AdvertisementMessageHandler(ble_evt_t* bleEvent)
 			{
 
 				advPacketJoinMeV0* packet = (advPacketJoinMeV0*) data;
+
+				//JOIN_ME packets are added to the buffer as following:
+				//First, we look if a packet from this node is already in the buffer => we update it
+				//Then, we check if we still have an empty slot
+				//Next, we overwrite packets that are very old
+				//If our packet is from a different cluster, we do now overwrite packets from our own cluster
+				//Finally, if no space has been found, we must drop the packet
+
+				//TODO: Write this part
+
 
 				//Ignore advertising packets from the same cluster
 				if (packet->payload.clusterId == clusterId) return;
@@ -943,6 +944,28 @@ void Node::TimerTickHandler(u16 timerMs)
 		u8 countHandshake = (cm->inConnection->handshakeDone ? 1 : 0) + (cm->outConnections[0]->handshakeDone ? 1 : 0) + (cm->outConnections[1]->handshakeDone ? 1 : 0) + (cm->outConnections[2]->handshakeDone ? 1 : 0);
 		u8 countConnected = (cm->inConnection->isConnected ? 1 : 0) + (cm->outConnections[0]->isConnected ? 1 : 0) + (cm->outConnections[1]->isConnected ? 1 : 0) + (cm->outConnections[2]->isConnected ? 1 : 0);
 
+		u8 i = ledBlinkPosition / 2;
+
+		if(i < Config->meshMaxConnections){
+			if(ledBlinkPosition % 2 == 0){
+				//Connected and handshake done
+				if(cm->connections[i]->handshakeDone) { LedBlue->On(); }
+				//Connected and handshake done
+				if(!cm->connections[i]->handshakeDone && cm->connections[i]->isConnected) { LedGreen->On(); }
+				//A free connection
+				if(!cm->connections[i]->handshakeDone && !cm->connections[i]->isConnected) {  }
+				//No connections
+				if(countHandshake == 0 && countConnected == 0) { LedRed->On(); }
+			} else {
+				LedRed->Off();
+				LedGreen->Off();
+				LedBlue->Off();
+			}
+		}
+
+		ledBlinkPosition = (ledBlinkPosition + 1) % ((Config->meshMaxConnections + 2) * 2);
+
+/*
 		//Check if we want to switch one off
 		if (appTimerMs - LedRed->lastStateChangeMs >= 300) LedRed->Off();
 		if (appTimerMs - LedGreen->lastStateChangeMs >= 300) LedGreen->Off();
@@ -967,7 +990,7 @@ void Node::TimerTickHandler(u16 timerMs)
 				LedBlue->On();
 				LedBlue->lastStateChangeMs = appTimerMs;
 			}
-		}
+		}*/
 	}
 }
 
@@ -1064,7 +1087,7 @@ void Node::PrintBufferStatus(void)
 	for (int i = 0; i < joinMePacketBuffer->_numElements; i++)
 	{
 		packet = (joinMeBufferPacket*) joinMePacketBuffer->PeekItemAt(i);
-		trace("=> %d, clusterId:%x, clusterSize:%d, freeIn:%u, freeOut:%u, writeHandle:%u, ack:%u", packet->payload.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.freeInConnections, packet->payload.freeOutConnections, packet->payload.meshWriteHandle, packet->payload.ackField);
+		trace("=> %d, clusterId:%x, clusterSize:%d, freeIn:%u, freeOut:%u, writeHandle:%u, ack:%u, rssi:%d", packet->payload.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.freeInConnections, packet->payload.freeOutConnections, packet->payload.meshWriteHandle, packet->payload.ackField, packet->rssi);
 		if (packet->connectable == BLE_GAP_ADV_TYPE_ADV_IND)
 		trace(" ADV_IND" EOL);
 		else if (packet->connectable == BLE_GAP_ADV_TYPE_ADV_NONCONN_IND)
@@ -1337,15 +1360,18 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	}
 	else if((commandName == "uart_get_modules" || commandName == "getmodules") && commandArgs.size() == 1)
 	{
-		//Request a list of modules
 		nodeID receiver = commandArgs[0] == "this" ? persistentConfig.nodeId : atoi(commandArgs[0].c_str());
 
-		connPacketHeader header;
-		header.messageType = MESSAGE_TYPE_MODULES_GET_LIST;
-		header.sender = persistentConfig.nodeId;
-		header.receiver = receiver;
+		connPacketModule packet;
+		packet.header.messageType = MESSAGE_TYPE_MODULE_CONFIG;
+		packet.header.sender = persistentConfig.nodeId;
+		packet.header.receiver = receiver;
 
-		cm->SendMessageToReceiver(NULL, (u8*) &header, SIZEOF_CONN_PACKET_HEADER, true);
+		packet.moduleId = 0;
+		packet.actionType = Module::ModuleConfigMessages::GET_MODULE_LIST;
+		packet.requestHandle = 7; //TODO
+
+		cm->SendMessageToReceiver(NULL, (u8*) &packet, SIZEOF_CONN_PACKET_MODULE, true);
 
 		return true;
 	}
@@ -1355,6 +1381,40 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	}
 	return true;
 }
+
+inline void Node::SendModuleList(nodeID toNode, u8 requestHandle)
+{
+u8 buffer[SIZEOF_CONN_PACKET_MODULE + MAX_MODULE_COUNT*4];
+		memset(buffer, 0, sizeof(buffer));
+
+		connPacketModule* outPacket = (connPacketModule*)buffer;
+		outPacket->header.messageType = MESSAGE_TYPE_MODULE_CONFIG;
+		outPacket->header.sender = persistentConfig.nodeId;
+		outPacket->header.receiver = toNode;
+
+		outPacket->moduleId = 0;
+		outPacket->requestHandle = requestHandle;
+		outPacket->actionType = Module::ModuleConfigMessages::MODULE_LIST;
+
+
+		for(int i = 0; i<MAX_MODULE_COUNT; i++){
+			if(activeModules[i] != NULL){
+				//TODO: can we do this better? the data region is unaligned in memory
+				memcpy(outPacket->data + i*4, &activeModules[i]->configurationPointer->moduleId, 2);
+				memcpy(outPacket->data + i*4 + 2, &activeModules[i]->configurationPointer->moduleVersion, 1);
+				memcpy(outPacket->data + i*4 + 3, &activeModules[i]->configurationPointer->moduleActive, 1);
+			}
+		}
+
+		/*
+		char* strbuffer[200];
+		Logger::getInstance().convertBufferToHexString(buffer, SIZEOF_CONN_PACKET_MODULE + MAX_MODULE_COUNT*4, (char*)strbuffer);
+		logt("MODULE", "Sending: %s", strbuffer);
+*/
+
+		cm->SendMessageToReceiver(NULL, (u8*)outPacket, SIZEOF_CONN_PACKET_MODULE + MAX_MODULE_COUNT*4, true);
+}
+
 
 /*
 IDs for development devices:

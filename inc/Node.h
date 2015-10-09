@@ -99,6 +99,8 @@ class Node:
 
 		void InitWithTestDeviceSettings();
 
+		void SendModuleList(nodeID toNode, u8 requestHandle);
+
 
 	public:
 		static Node* getInstance()
@@ -139,6 +141,8 @@ class Node:
 
 		u32 radioActiveCount;
 		u32 lastRadioActiveCountResetTimerMs;
+
+		u8 ledBlinkPosition;
 
 		enum ledMode
 		{

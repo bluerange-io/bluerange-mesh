@@ -101,8 +101,8 @@ bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string>
 
 
 				//Build enrollment packet
-				u8 buffer[SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_NODE_ID_MESSAGE];
-				connPacketModuleAction* packet = (connPacketModuleAction*)buffer;
+				u8 buffer[SIZEOF_CONN_PACKET_MODULE + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_NODE_ID_MESSAGE];
+				connPacketModule* packet = (connPacketModule*)buffer;
 				EnrollmentModuleSetEnrollmentByNodeIdMessage* enrollmentMessage = (EnrollmentModuleSetEnrollmentByNodeIdMessage*)packet->data;
 
 				packet->header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
@@ -121,7 +121,7 @@ bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string>
 					Logger::getInstance().parseHexStringToBuffer(commandArgs[5].c_str(), enrollmentMessage->networkKey, 16);
 				}
 
-				cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_NODE_ID_MESSAGE, true);
+				cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_NODE_ID_MESSAGE, true);
 
 				return true;
 			}
@@ -136,8 +136,8 @@ bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string>
 				networkID networkId = atoi(commandArgs[6].c_str());
 
 				//Build enrollment packet
-				u8 buffer[SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_CHIP_ID_MESSAGE];
-				connPacketModuleAction* packet = (connPacketModuleAction*)buffer;
+				u8 buffer[SIZEOF_CONN_PACKET_MODULE + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_CHIP_ID_MESSAGE];
+				connPacketModule* packet = (connPacketModule*)buffer;
 				EnrollmentModuleSetEnrollmentByChipIdMessage* enrollmentMessage = (EnrollmentModuleSetEnrollmentByChipIdMessage*)packet->data;
 
 				packet->header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
@@ -159,7 +159,7 @@ bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string>
 					Logger::getInstance().parseHexStringToBuffer(commandArgs[7].c_str(), enrollmentMessage->networkKey, 16);
 				}
 
-				cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_CHIP_ID_MESSAGE, true);
+				cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_CHIP_ID_MESSAGE, true);
 
 				return true;
 			}
@@ -171,8 +171,8 @@ bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string>
 
 
 				//Build enrollment packet
-				u8 buffer[SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE];
-				connPacketModuleAction* packet = (connPacketModuleAction*)buffer;
+				u8 buffer[SIZEOF_CONN_PACKET_MODULE + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE];
+				connPacketModule* packet = (connPacketModule*)buffer;
 				EnrollmentModuleSetEnrollmentBySerialMessage* enrollmentMessage = (EnrollmentModuleSetEnrollmentBySerialMessage*)packet->data;
 
 				packet->header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
@@ -192,7 +192,7 @@ bool EnrollmentModule::TerminalCommandHandler(string commandName, vector<string>
 					Logger::getInstance().parseHexStringToBuffer(commandArgs[6].c_str(), enrollmentMessage->newNetworkKey, 16);
 				}
 
-				cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE, true);
+				cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE, true);
 
 				return true;
 			}
@@ -209,7 +209,7 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 	Module::ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
 
 	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
-		connPacketModuleAction* packet = (connPacketModuleAction*)packetHeader;
+		connPacketModule* packet = (connPacketModule*)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId){
@@ -299,7 +299,7 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 
 	//Parse Module responses
 	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_ACTION_RESPONSE){
-		connPacketModuleAction* packet = (connPacketModuleAction*)packetHeader;
+		connPacketModule* packet = (connPacketModule*)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId)
@@ -328,8 +328,8 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 void EnrollmentModule::SendEnrollmentResponse(nodeID receiver, u8 enrollmentMethod, u8 result, u32 chipIdA, u32 chipIdB, u8* serialNumber)
 {
 	//Inform the sender, that the enrollment was successful
-	u8 buffer[SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_RESPONSE];
-	connPacketModuleAction* packet = (connPacketModuleAction*)buffer;
+	u8 buffer[SIZEOF_CONN_PACKET_MODULE + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_RESPONSE];
+	connPacketModule* packet = (connPacketModule*)buffer;
 	EnrollmentModuleEnrollmentResponse* data = (EnrollmentModuleEnrollmentResponse*)packet->data;
 
 	packet->header.messageType = MESSAGE_TYPE_MODULE_ACTION_RESPONSE;
@@ -346,6 +346,6 @@ void EnrollmentModule::SendEnrollmentResponse(nodeID receiver, u8 enrollmentMeth
 	memcpy(data->serialNumber, node->persistentConfig.serialNumber, SERIAL_NUMBER_LENGTH);
 
 
-	cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE_ACTION + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_RESPONSE, true);
+	cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_RESPONSE, true);
 
 }
