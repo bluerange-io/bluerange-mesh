@@ -12,7 +12,7 @@ The meshes can be in the same building or on the other side of the world.
 
 How to use it
 --
-Clone this repo, compile and flash onto any nRF51 device that you want to be one half of a gateway. Plug the device into a computer, and follow the [serial-gateway-node](https://github.com/microcosm/serial-gateway-node) instructions on the computer to connect the nodejs app.
+Clone this repo, compile and flash onto any nRF51 device that you want to be one half of a gateway. Plug the device into a computer, and follow the [FruityGate (node.js)](https://github.com/microcosm/fruitygate-nodejs) instructions on the computer to connect the nodejs app.
 
 Yes. But how to *really* use it?
 --
@@ -89,7 +89,7 @@ cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION +
 
 This example shows you how to convert a string into a `u8` ([aka](https://github.com/mwaylabs/fruitymesh/blob/master/config/types.h) `uint8_t`) byte array, for sending. Of course you can use decimal numbers or whatever you like in that array instead, so long as the node that receives it knows what to do with it.
 
-Some of the variables in the example above are context-dependent on example implementations from the [sample ping module](https://github.com/mwaylabs/fruitymesh/wiki/Implementing-a-Custom-Module). If you need to dig deeper, check out this commit for a [full example implementation](https://github.com/microcosm/serial-gateway-fruitymesh/commit/878422af09593218dc347b660ca09d05bc720368).
+Some of the variables in the example above are context-dependent on example implementations from the [sample ping module](https://github.com/mwaylabs/fruitymesh/wiki/Implementing-a-Custom-Module). If you need to dig deeper, check out this commit for a [full example implementation](https://github.com/microcosm/fruitygate-nrf/commit/878422af09593218dc347b660ca09d05bc720368).
 
 Example: receive a string
 --
@@ -122,7 +122,7 @@ This code will read in the byte array as a string and print it. Of course if you
 
 Can you say that again but quicker?
 --
-Yes. For quick reference, you can see what's involved in implementing a gateway-compatible custom module in [this commit diff](https://github.com/microcosm/serial-gateway-fruitymesh/commit/878422af09593218dc347b660ca09d05bc720368). The only thing not covered in that diff is the packet header stuff above - don't forget to do that!
+Yes. For quick reference, you can see what's involved in implementing a gateway-compatible custom module in [this commit diff](https://github.com/microcosm/fruitygate-nrf/commit/878422af09593218dc347b660ca09d05bc720368). The only thing not covered in that diff is the packet header stuff above - don't forget to do that!
 
 This doesn't work. You suck.
 --
