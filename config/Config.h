@@ -223,7 +223,9 @@ enum moduleID{
 	ENROLLMENT_MODULE_ID=50,
 
 	//Custom modules
-	TEST_MODULE_ID=30000
+	TEST_MODULE_ID=30000,
+	CUSTOM_MODULE_ID=30010,
+	GATEWAY_MODULE_ID=30999
 };
 
 /*############ Regarding node ids ################*/
