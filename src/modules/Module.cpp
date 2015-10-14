@@ -236,8 +236,8 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 				}
 				else
 				{
-					if(newConfig->moduleVersion != configurationPointer->moduleVersion) uart("ERROR", "{\"module\":%u, \"type\":\"error\", \"code\":1, \"text\":\"wrong config version. \"}" SEP, moduleId);
-					else uart("ERROR", "{\"module\":%u, \"type\":\"error\", \"code\":2, \"text\":\"wrong configuration length. \"}" SEP, moduleId);
+					if(newConfig->moduleVersion != configurationPointer->moduleVersion) uart("ERROR", "{\"type\":\"error\",\"module\":%u,\"code\":1,\"text\":\"wrong config version.\"}" SEP, moduleId);
+					else uart("ERROR", "{\"type\":\"error\",\"module\":%u,\"code\":2,\"text\":\"wrong configuration length. \"}" SEP, moduleId);
 				}
 			}
 			else if(packet->actionType == ModuleConfigMessages::GET_CONFIG)
@@ -294,21 +294,20 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 			 * */
 			if(packet->actionType == ModuleConfigMessages::SET_CONFIG_RESULT)
 			{
-				uart("MODULE", "{\"nodeId\":%u,\"module\":%u,\"type\":\"set_config_result\",", packet->header.sender, packet->moduleId);
-				uart("MODULE",  "\"requestHandle\":%u,\"code\":%u\"}" SEP, packet->requestHandle, packet->data[0]);
+				uart("MODULE", "{\"nodeId\":%u,\"type\":\"set_config_result\",\"module\":%u,", packet->header.sender, packet->moduleId);
+				uart("MODULE",  "\"requestHandle\":%u,\"code\":%u\}" SEP, packet->requestHandle, packet->data[0]);
 			}
 			else if(packet->actionType == ModuleConfigMessages::SET_ACTIVE_RESULT)
 			{
-				uart("MODULE", "{\"nodeId\":%u,\"module\":%u,\"type\":\"set_active_result\",", packet->header.sender, packet->moduleId);
-				uart("MODULE",  "\"requestHandle\":%u,\"code\":%u\"}" SEP, packet->requestHandle, packet->data[0]);
+				uart("MODULE", "{\"nodeId\":%u,\"type\":\"set_active_result\",\"module\":%u,", packet->header.sender, packet->moduleId);
+				uart("MODULE",  "\"requestHandle\":%u,\"code\":%u\}" SEP, packet->requestHandle, packet->data[0]);
 			}
 			else if(packet->actionType == ModuleConfigMessages::CONFIG)
 			{
-				//TODO: Send the module configuration, currently we only print it to the console
 				char* buffer[200];
 				Logger::getInstance().convertBufferToHexString(packet->data, dataFieldLength, (char*)buffer);
 
-				uart("MODULE", "{\"nodeId\":%u,\"module\":\"%s\",\"config\":\"%s\"}" SEP, packet->header.sender, moduleName, buffer);
+				uart("MODULE", "{\"nodeId\":%u,\"type\":\"config\",\"module\":%u,\"config\":\"%s\"}" SEP, packet->header.sender, moduleId, buffer);
 
 
 			}

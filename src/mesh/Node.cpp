@@ -416,22 +416,22 @@ void Node::messageReceivedCallback(connectionPacket* inPacket)
 			uart("MODULE", "{\"nodeId\":%u,\"type\":\"module_list\",\"modules\":[", packet->header.sender);
 
 			u16 moduleCount = (dataLength - SIZEOF_CONN_PACKET_MODULE) / 4;
-			bool first = false;
+			bool first = true;
 			for(int i=0; i<moduleCount; i++){
 				u16 moduleId = packet->data[i*4+0];
 
 				if(moduleId)
 				{
 					//comma seperator issue,....
-					if(first){
+					if(!first){
 						uart("MODULE", ",");
-						first = false;
 					}
-					uart("MODULE", "{\"id\":%u,\"version\":%u\",\"active\":%u}", moduleId, packet->data[i*4+2], packet->data[i*4+3]);
+					uart("MODULE", "{\"id\":%u,\"version\":%u,\"active\":%u}", moduleId, packet->data[i*4+2], packet->data[i*4+3]);
 
+					first = false;
 				}
 			}
-			uart("MODULE", "]}");
+			uart("MODULE", "]}" SEP);
 		}
 	}
 

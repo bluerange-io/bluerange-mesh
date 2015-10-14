@@ -557,6 +557,8 @@ void Logger::convertTimestampToString(u64 timestamp, char* buffer)
 	sprintf(buffer, "approx. %u years, %u days, %02uh:%02um:%02us,%03ums", years, days, hours, minutes, seconds, milliseconds);
 }
 
+//FIXME: This method does not know the destination buffer length and could crash the system
+//It also lets developers run into trouble while debugging....
 void Logger::convertBufferToHexString(u8* srcBuffer, u32 srcLength, char* dstBuffer)
 {
 	for (u32 i = 0; i < srcLength; i++)

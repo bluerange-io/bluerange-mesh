@@ -51,16 +51,18 @@ class StatusReporterModule: public Module
 
 		enum StatusModuleTriggerActionMessages
 		{
-			SET_LED_MESSAGE = 0,
-			GET_STATUS_MESSAGE = 1, GET_CONNECTIONS_MESSAGE = 2,
-			GET_DEVICE_INFO = 2, GET_FULL_STATUS = 3,
+			SET_LED = 0,
+			GET_STATUS = 1,
+			GET_DEVICE_INFO = 2,
+			GET_ALL_CONNECTIONS = 3,
 			GET_NEARBY_NODES = 4
 		};
 
 		enum StatusModuleActionResponseMessages
 		{
-			STATUS_MESSAGE = 0, CONNECTIONS_MESSAGE = 1,
-			DEVICE_INFO = 2, FULL_STATUS = 3,
+			STATUS = 1,
+			DEVICE_INFO = 2,
+			ALL_CONNECTIONS = 3,
 			NEARBY_NODES = 4
 		};
 
@@ -82,35 +84,13 @@ class StatusReporterModule: public Module
 
 			} StatusReporterModuleConnectionsMessage;
 
-			#define SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE 41 + SERIAL_NUMBER_LENGTH
-			typedef struct
-			{
-				u32 chipIdA;
-				u32 chipIdB;
-				u16 manufacturerId;
-				u8 serialNumber[SERIAL_NUMBER_LENGTH];
-				clusterID clusterId;
-				clusterSIZE clusterSize;
-				ble_gap_addr_t accessAddress;
-				u8 freeIn;
-				u8 freeOut;
-				u8 batteryInfo;
-				u8 dBmRX;
-				u8 dBmTX;
-				u32 firmwareVersion;
-				u32 uptimeSeconds;
-				networkID networkId;
-				u32 messagesPerHour;
-
-			} StatusReporterModuleStatusMessage;
-
-
 			//This message delivers non- (or not often)changing information
-			#define SIZEOF_STATUS_REPORTER_MODULE_DEVICE_INFO_MESSAGE (14 + SERIAL_NUMBER_LENGTH)
+			#define SIZEOF_STATUS_REPORTER_MODULE_DEVICE_INFO_MESSAGE (22 + SERIAL_NUMBER_LENGTH)
 			typedef struct
 			{
 				u16 manufacturerId;
 				u8 serialNumber[SERIAL_NUMBER_LENGTH];
+				u8 chipId[8];
 				ble_gap_addr_t accessAddress;
 				networkID networkId;
 				u8 nodeVersion;
@@ -140,14 +120,11 @@ class StatusReporterModule: public Module
 		u32 lastConnectionReportingTimer;
 		u32 lastStatusReportingTimer;
 
-		void SendConnectionInformation(nodeID toNode);
 
-		void SendStatusInformation(nodeID toNode);
-
-
+		void SendStatus(nodeID toNode, u8 messageType);
 		void SendDeviceInfo(nodeID toNode, u8 messageType);
-		void SendFullStatus(nodeID toNode, u8 messageType);
 		void SendNearbyNodes(nodeID toNode, u8 messageType);
+		void SendAllConnections(nodeID toNode, u8 messageType);
 
 		void StartConnectionRSSIMeasurement(Connection* connection);
 		void StopConnectionRSSIMeasurement(Connection* connection);
