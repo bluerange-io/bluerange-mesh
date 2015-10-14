@@ -28,8 +28,7 @@ extern "C"{
 
 LedWrapper::LedWrapper(uint32_t io_num, bool active_high)
 {
-	if(io_num == 0) active = false;
-	else active = true;
+	active = true;
     m_active_high = active_high;
     m_io_msk = 1 << io_num;
     NRF_GPIO->DIRSET = m_io_msk;

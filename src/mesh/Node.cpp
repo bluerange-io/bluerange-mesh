@@ -71,9 +71,9 @@ Node::Node(networkID networkId)
 	this->appTimerMs = 0;
 	this->lastDecisionTimeMs = 0;
 
-	LedRed = new LedWrapper(BSP_LED_0, false);
-	LedGreen = new LedWrapper(BSP_LED_1, false);
-	LedBlue = new LedWrapper(BSP_LED_2, false);
+	LedRed = new LedWrapper(BSP_LED_0, INVERT_LEDS);
+	LedGreen = new LedWrapper(BSP_LED_1, INVERT_LEDS);
+	LedBlue = new LedWrapper(BSP_LED_2, INVERT_LEDS);
 
 	LedRed->Off();
 	LedGreen->Off();

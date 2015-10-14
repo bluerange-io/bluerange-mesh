@@ -242,7 +242,6 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 			}
 			else if(packet->actionType == ModuleConfigMessages::GET_CONFIG)
 			{
-				logt("ERROR", "send config");
 
 				u8 buffer[SIZEOF_CONN_PACKET_MODULE + configurationLength];
 

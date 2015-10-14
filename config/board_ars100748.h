@@ -9,34 +9,31 @@
  * the file.
  *
  */
-#ifndef PCA10036_H
-#define PCA10036_H
+#ifndef ARS10047_H
+#define ARS10047_H
 
-// LEDs definitions for PCA10028 (nrf52 preview development kit)
-#define LEDS_NUMBER    4
+// LEDs definitions for ARS10047 v1.0
+#define LEDS_NUMBER    3
 
-#define LED_START      17
-#define LED_1          17
-#define LED_2          18
-#define LED_3          19
-#define LED_4          20
-#define LED_STOP       20
+#define LED_START      0
+#define LED_1          0
+#define LED_2          2
+#define LED_3          1
+#define LED_STOP       2
 
-#define LEDS_LIST { LED_1, LED_2, LED_3, LED_4 }
+#define LEDS_LIST { LED_1, LED_2, LED_3}
 
 #define BSP_LED_0      LED_1
 #define BSP_LED_1      LED_2
 #define BSP_LED_2      LED_3
-#define BSP_LED_3      LED_4
 
 #define BSP_LED_0_MASK (1<<BSP_LED_0)
 #define BSP_LED_1_MASK (1<<BSP_LED_1)
 #define BSP_LED_2_MASK (1<<BSP_LED_2)
-#define BSP_LED_3_MASK (1<<BSP_LED_3)
 
-#define INVERT_LEDS false
+#define INVERT_LEDS true
 
-#define LEDS_MASK      (BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK | BSP_LED_3_MASK)
+#define LEDS_MASK      (BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK)
 /* all LEDs are lit when GPIO is low */
 #define LEDS_INV_MASK  LEDS_MASK
 
@@ -119,4 +116,4 @@
 
 #define SER_CONN_CHIP_RESET_PIN     27    // Pin used to reset connectivity chip
 
-#endif // PCA10036_H
+#endif // ARS10047_H

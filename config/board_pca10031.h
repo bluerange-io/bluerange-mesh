@@ -35,6 +35,8 @@
 #define BSP_LED_1_MASK    (1<<BSP_LED_1)
 #define BSP_LED_2_MASK    (1<<BSP_LED_2)
 
+#define INVERT_LEDS false
+
 #define LEDS_MASK      (BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK)
 //defines which LEDs are lit when signal is low
 #define LEDS_INV_MASK  LEDS_MASK
