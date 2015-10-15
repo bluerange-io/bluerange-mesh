@@ -22,6 +22,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <SimpleBuffer.h>
 
+extern "C"
+{
+#include <cstring>
+}
+
 SimpleBuffer::SimpleBuffer(u8* buffer, u16 bufferLength, u16 itemLength)
 {
 	this->_numElements = 0;

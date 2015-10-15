@@ -11,7 +11,6 @@
 
 extern "C"
 {
-
 }
 
 //This module scans for specific messages and reports them back

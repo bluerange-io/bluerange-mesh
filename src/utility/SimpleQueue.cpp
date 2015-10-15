@@ -3,6 +3,7 @@
 
 extern "C"{
 #include <nrf_error.h>
+#include <cstring>
 }
 
 SimpleQueue::SimpleQueue(u8* buffer, u32 bufferLength)

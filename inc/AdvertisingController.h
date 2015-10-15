@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <types.h>
 #include <adv_packets.h>
 #include <Node.h>
-#include <string>
 
 extern "C"{
 #include <ble.h>

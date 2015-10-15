@@ -33,6 +33,7 @@ extern "C"
 #include <ble_hci.h>
 #include <nrf_error.h>
 #include <simple_uart.h>
+#include <cstring>
 #include <pstorage.h>
 #include <stdarg.h>
 #include <app_timer.h>
@@ -47,6 +48,7 @@ Logger::Logger()
 
 void Logger::log_f(bool printLine, const char* file, i32 line, const char* message, ...)
 {
+#ifdef ENABLE_LOGGING
 	memset(mhTraceBuffer, 0, TRACE_BUFFER_SIZE);
 
 	//Variable argument list must be passed to vnsprintf
@@ -64,7 +66,7 @@ void Logger::log_f(bool printLine, const char* file, i32 line, const char* messa
 	{
 		simple_uart_putstring((const uint8_t *) mhTraceBuffer);
 	}
-
+#endif
 }
 
 void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...)

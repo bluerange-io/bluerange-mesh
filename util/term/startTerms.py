@@ -6,7 +6,7 @@ import os
 
 def main():
     # Config
-    terminalPath = '"putty.exe"'
+    terminalPath = 'putty.exe'
 
     while True:
         # Rest

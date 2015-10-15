@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <string>
 #include <vector>
+
 #include <Config.h>
 
 #include <types.h>
@@ -39,8 +40,6 @@ using namespace std;
 
 
 #define MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS 20
-
-
 
 
 class TerminalCommandListener
@@ -69,8 +68,12 @@ public:
 class Terminal
 {
 private:
+
+
 	static string commandName;
 	static vector<string> commandArgs;
+
+
 
 	static SimplePushStack* registeredCallbacks;
 

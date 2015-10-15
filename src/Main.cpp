@@ -75,7 +75,6 @@ bool lookingForInvalidStateErrors = false;
 Conf* Conf::instance;
 
 
-
 int main(void)
 {
 
@@ -89,7 +88,6 @@ int main(void)
 	Logger::getInstance().enableTag("STORAGE");
 	Logger::getInstance().enableTag("DATA");
 	Logger::getInstance().enableTag("SEC");
-	Logger::getInstance().enableTag("CONN");
 
 	//Initialialize the SoftDevice and the BLE stack
 	bleInit();
@@ -100,10 +98,7 @@ int main(void)
 	//Init the magic
 	node = new Node(Config->meshNetworkIdentifier);
 
-	new Testing();
-
-	struct mallinfo used = mallinfo();
-	volatile u32 size = used.uordblks + used.hblkhd;
+	//new Testing();
 
 	//Start Timers
 	initTimers();

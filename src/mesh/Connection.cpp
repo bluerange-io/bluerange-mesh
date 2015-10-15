@@ -27,6 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <ConnectionManager.h>
 #include <Logger.h>
 
+extern "C"{
+}
+
 
 //The Connection Class does have methods like Connect,... but connections, service
 //discovery or encryption are handeled by the Connectionmanager so that we can control

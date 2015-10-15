@@ -80,7 +80,7 @@ protected:
 		virtual void ResetToDefaultConfiguration(){};
 
 		//Constructs a simple TriggerAction message and sends it
-		void SendTriggerActionMessage(nodeID toNode, u8 actionType, u8 requestHandle, u8* additionalData, u16 additionalDataSize, bool reliable);
+		void SendModuleActionMessage(u8 messageType, nodeID toNode, u8 actionType, u8 requestHandle, u8* additionalData, u16 additionalDataSize, bool reliable);
 
 
 
@@ -135,6 +135,11 @@ protected:
 		//Changing the node state will affect some module's behaviour
 		virtual void NodeStateChangedHandler(discoveryState newState){};
 
+		//The Terminal Command handler is called for all modules with the user input
+#ifdef TERMINAL_ENABLED
 		virtual bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+#else
+		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+#endif
 
 };

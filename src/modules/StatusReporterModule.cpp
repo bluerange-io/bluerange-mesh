@@ -26,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <Storage.h>
 #include <Node.h>
 #include <Config.h>
-#include <stdlib.h>
 
 extern "C"{
 #include <app_error.h>
+#include <stdlib.h>
 }
 
 StatusReporterModule::StatusReporterModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
@@ -112,7 +112,7 @@ void StatusReporterModule::ResetToDefaultConfiguration()
 //This method sends the node's status over the network
 void StatusReporterModule::SendStatus(nodeID toNode, u8 messageType)
 {
-	u16 packetSize = SIZEOF_CONN_PACKET_MODULE + SIZEOF_STATUS_REPORTER_MODULE_FULL_STATUS_MESSAGE;
+	u16 packetSize = SIZEOF_CONN_PACKET_MODULE + SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE;
 		u8 buffer[packetSize];
 		connPacketModule* outPacket = (connPacketModule*)buffer;
 		outPacket->header.messageType = messageType;
@@ -121,7 +121,7 @@ void StatusReporterModule::SendStatus(nodeID toNode, u8 messageType)
 		outPacket->moduleId = moduleId;
 		outPacket->actionType = StatusModuleActionResponseMessages::STATUS;
 
-		StatusReporterModuleFullStatusMessage* outPacketData = (StatusReporterModuleFullStatusMessage*)(outPacket->data);
+		StatusReporterModuleStatusMessage* outPacketData = (StatusReporterModuleStatusMessage*)(outPacket->data);
 
 		outPacketData->batteryInfo = 0; //TODO
 		outPacketData->clusterSize = node->clusterSize;
@@ -131,7 +131,7 @@ void StatusReporterModule::SendStatus(nodeID toNode, u8 messageType)
 		outPacketData->inConnectionPartner = cm->inConnection->partnerId;
 		outPacketData->inConnectionRSSI = cm->inConnection->rssiAverage;
 
-		cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE + SIZEOF_STATUS_REPORTER_MODULE_FULL_STATUS_MESSAGE, false);
+		cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE + SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE, false);
 }
 
 //Message type can be either MESSAGE_TYPE_MODULE_ACTION_RESPONSE or MESSAGE_TYPE_MODULE_GENERAL
@@ -273,14 +273,8 @@ void StatusReporterModule::BleEventHandler(ble_evt_t* bleEvent){
 
 bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
-	//Get the status information of the plugged in node
-	if(commandName == "uart_get_plugged_in")
-	{
-		uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"plugged_in\", \"nodeId\":%u, \"chipIdA\":%u, \"chipIdB\":%u, \"serialNumber\":\"%s\"}" SEP, moduleId, node->persistentConfig.nodeId, NRF_FICR->DEVICEID[0], NRF_FICR->DEVICEID[1], node->persistentConfig.serialNumber);
 
-		return true;
-	}
-	else if(commandName == "rssistart")
+	if(commandName == "rssistart")
 	{
 		for (int i = 0; i < Config->meshMaxConnections; i++)
 		{
@@ -302,7 +296,7 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 	//React on commands, return true if handled, false otherwise
 	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)
 	{
-		if(commandName == "uart_module_trigger_action" || commandName == "action")
+		if(commandName == "action")
 		{
 			//Rewrite "this" to our own node id, this will actually build the packet
 			//But reroute it to our own node
@@ -315,7 +309,8 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 				u8 ledState = commandArgs[3] == "on" ? 1: 0;
 				u8 requestHandle = commandArgs.size() >= 5 ? atoi(commandArgs[4].c_str()) : 0;
 
-				SendTriggerActionMessage(
+				SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
 					destinationNode,
 					StatusModuleTriggerActionMessages::SET_LED,
 					requestHandle,
@@ -326,11 +321,10 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 
 				return true;
 			}
-			else if(commandArgs.size() == 3 && commandArgs[2] == "get_status")
+			if(commandArgs.size() == 3 && commandArgs[2] == "get_status")
 			{
-				logt("STATUS", "Requesting status");
-
-				SendTriggerActionMessage(
+				SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
 					destinationNode,
 					StatusModuleTriggerActionMessages::GET_STATUS,
 					0,
@@ -343,9 +337,8 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 			}
 			else if(commandArgs.size() == 3 && commandArgs[2] == "get_device_info")
 			{
-				logt("STATUS", "Requesting device info");
-
-				SendTriggerActionMessage(
+				SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
 					destinationNode,
 					StatusModuleTriggerActionMessages::GET_DEVICE_INFO,
 					0,
@@ -358,7 +351,8 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 			}
 			else if(commandArgs.size() == 3 && commandArgs[2] == "get_connections")
 			{
-				SendTriggerActionMessage(
+				SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
 					destinationNode,
 					StatusModuleTriggerActionMessages::GET_ALL_CONNECTIONS,
 					0,
@@ -371,7 +365,8 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 			}
 			else if(commandArgs.size() == 3 && commandArgs[2] == "get_nearby")
 			{
-				SendTriggerActionMessage(
+				SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
 					destinationNode,
 					StatusModuleTriggerActionMessages::GET_NEARBY_NODES,
 					0,
@@ -410,6 +405,17 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 					node->LedRed->On();
 					node->LedGreen->On();
 					node->LedBlue->On();
+
+					//send confirmation
+					SendModuleActionMessage(
+						MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+						packet->header.sender,
+						StatusModuleActionResponseMessages::SET_LED_RESULT,
+						packet->requestHandle,
+						NULL,
+						0,
+						false
+					);
 				}
 				else
 				{
@@ -453,7 +459,7 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 			if(packet->actionType == StatusModuleActionResponseMessages::ALL_CONNECTIONS)
 			{
 				StatusReporterModuleConnectionsMessage* packetData = (StatusReporterModuleConnectionsMessage*) (packet->data);
-				uart("STATUSMOD", "{\"module\":%d, \"type\":\"response\", \"msgType\":\"connections\", \"nodeId\":%d, \"partners\":[%d,%d,%d,%d], \"rssiValues\":[%d,%d,%d,%d]}" SEP, moduleId, packet->header.sender, packetData->partner1, packetData->partner2, packetData->partner3, packetData->partner4, packetData->rssi1, packetData->rssi2, packetData->rssi3, packetData->rssi4);
+				uart("STATUSMOD", "{\"type\":\"connections\",\"nodeId\":%d,\"module\":%d,\"partners\":[%d,%d,%d,%d],\"rssiValues\":[%d,%d,%d,%d]}" SEP, packet->header.sender, moduleId, packetData->partner1, packetData->partner2, packetData->partner3, packetData->partner4, packetData->rssi1, packetData->rssi2, packetData->rssi3, packetData->rssi4);
 			}
 			else if(packet->actionType == StatusModuleActionResponseMessages::DEVICE_INFO)
 			{
@@ -474,7 +480,7 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 			else if(packet->actionType == StatusModuleActionResponseMessages::STATUS)
 			{
 				//Print packet to console
-				StatusReporterModuleFullStatusMessage* data = (StatusReporterModuleFullStatusMessage*) (packet->data);
+				StatusReporterModuleStatusMessage* data = (StatusReporterModuleStatusMessage*) (packet->data);
 
 				uart("STATUSMOD", "{\"nodeId\":%u,\"type\":\"status\",\"module\":%d,", packet->header.sender, moduleId);
 				uart("STATUSMOD", "\"batteryInfo\":%u,\"clusterSize\":%u,", data->batteryInfo, data->clusterSize);
@@ -505,10 +511,14 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 
 				uart("STATUSMOD", "]}" SEP);
 			}
+			else if(packet->actionType == StatusModuleActionResponseMessages::SET_LED_RESULT)
+			{
+				uart("MODULE", "{\"nodeId\":%u,\"type\":\"set_led_result\",\"module\":%u,", packet->header.sender, packet->moduleId);
+				uart("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, 0);
+			}
 		}
 	}
 }
-
 
 void StatusReporterModule::MeshConnectionChangedHandler(Connection* connection)
 {

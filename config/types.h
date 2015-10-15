@@ -25,8 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * declared in this file.
  */
 
-//#define vector<string> int
-
 #pragma once
 
 
@@ -50,9 +48,9 @@ extern "C"{
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <string.h>
 #include <ble_gap.h>
 #include <ble_gatts.h>
+#include <cstring>
 }
 
 

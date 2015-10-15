@@ -20,32 +20,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
-#include <TemplateModule.h>
+#include <IoModule.h>
 #include <Logger.h>
 #include <Utility.h>
 #include <Storage.h>
 #include <Node.h>
 
 extern "C"{
-
+#include <stdlib.h>
 }
 
-TemplateModule::TemplateModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
+IoModule::IoModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
 	: Module(moduleId, node, cm, name, storageSlot)
 {
 	//Register callbacks n' stuff
-	Logger::getInstance().enableTag("TEMPLATEMOD");
+	Logger::getInstance().enableTag("IOMOD");
 
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
 	configurationPointer = &configuration;
-	configurationLength = sizeof(TemplateModuleConfiguration);
+	configurationLength = sizeof(IoModuleConfiguration);
 
 	//Start module configuration loading
 	LoadModuleConfiguration();
 }
 
-void TemplateModule::ConfigurationLoadedHandler()
+void IoModule::ConfigurationLoadedHandler()
 {
 	//Does basic testing on the loaded configuration
 	Module::ConfigurationLoadedHandler();
@@ -60,13 +60,13 @@ void TemplateModule::ConfigurationLoadedHandler()
 
 }
 
-void TemplateModule::TimerEventHandler(u16 passedTime, u32 appTimer)
+void IoModule::TimerEventHandler(u16 passedTime, u32 appTimer)
 {
 	//Do stuff on timer...
 
 }
 
-void TemplateModule::ResetToDefaultConfiguration()
+void IoModule::ResetToDefaultConfiguration()
 {
 	//Set default configuration values
 	configuration.moduleId = moduleId;
@@ -77,7 +77,7 @@ void TemplateModule::ResetToDefaultConfiguration()
 
 }
 
-bool TemplateModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
+bool IoModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
 	//React on commands, return true if handled, false otherwise
 	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)
@@ -86,20 +86,42 @@ bool TemplateModule::TerminalCommandHandler(string commandName, vector<string> c
 		{
 			if(commandArgs[1] != moduleName) return false;
 
-			if(commandArgs.size() == 3 && commandArgs[2] == "argument_a")
-			{
+			nodeID destinationNode = (commandArgs[0] == "this") ? node->persistentConfig.nodeId : atoi(commandArgs[0].c_str());
 
+			if(commandArgs.size() >= 5 && commandArgs[2] == "set")
+			{
+				u8 requestHandle = commandArgs.size() >= 6 ? atoi(commandArgs[5].c_str()) : 0;
+
+				SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					destinationNode,
+					IoModuleTriggerActionMessages::SET_IO,
+					requestHandle,
+					NULL,
+					0,
+					false
+				);
 
 				return true;
 			}
-			else if(commandArgs.size() == 3 && commandArgs[2] == "argument_b")
+			else if(commandArgs.size() == 3 && commandArgs[2] == "get")
 			{
+				u8 requestHandle = commandArgs.size() >= 6 ? atoi(commandArgs[5].c_str()) : 0;
 
+				SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					destinationNode,
+					IoModuleTriggerActionMessages::GET_IO,
+					requestHandle,
+					NULL,
+					0,
+					false
+				);
 
 				return true;
 			}
 
-			return true;
+			return false;
 
 		}
 	}
@@ -108,8 +130,8 @@ bool TemplateModule::TerminalCommandHandler(string commandName, vector<string> c
 	return Module::TerminalCommandHandler(commandName, commandArgs);
 }
 
-/*
-void TemplateModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
+
+void IoModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
 {
 	//Must call superclass for handling
 	Module::ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
@@ -119,8 +141,10 @@ void TemplateModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPa
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId){
-			if(packet->actionType == TemplateModuleTriggerActionMessages::MESSAGE_0){
-
+			if(packet->actionType == IoModuleTriggerActionMessages::SET_IO){
+				node->LedRed->On();
+				node->LedGreen->On();
+				node->LedBlue->On();
 			}
 		}
 	}
@@ -132,11 +156,11 @@ void TemplateModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPa
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId)
 		{
-			if(packet->actionType == TemplateModuleActionResponseMessages::MESSAGE_0)
+			if(packet->actionType == IoModuleActionResponseMessages::SET_IO_RESULT)
 			{
 
 			}
 		}
 	}
 }
-*/
+

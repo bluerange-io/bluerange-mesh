@@ -30,8 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 
-#include <string>
 #include <vector>
+#include <string>
 
 #include <Config.h>
 #include <Terminal.h>
@@ -55,8 +55,6 @@ private:
 
 	vector<string> logFilter;
 	vector<string>::iterator logFilterIterator;
-
-
 
 	char mhTraceBuffer[TRACE_BUFFER_SIZE] = { 0 };
 	char mhTraceBuffer2[TRACE_BUFFER_SIZE] = { 0 };

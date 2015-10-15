@@ -94,8 +94,6 @@ class EnrollmentModule: public Module
 			{
 				u8 enrollmentMethod;
 				u8 result;
-				u32 chipIdA;
-				u32 chipIdB;
 				u8 serialNumber[SERIAL_NUMBER_LENGTH];
 
 			}EnrollmentModuleEnrollmentResponse;
@@ -105,7 +103,7 @@ class EnrollmentModule: public Module
 		//####### Module messages end
 
 
-		void SendEnrollmentResponse(nodeID receiver, u8 enrollmentMethod, u8 result, u32 chipIdA, u32 chipIdB, u8* serialNumber);
+		void SendEnrollmentResponse(nodeID receiver, u8 enrollmentMethod, u8 requestHandle, u8 result, u8* serialNumber);
 
 
 	public:

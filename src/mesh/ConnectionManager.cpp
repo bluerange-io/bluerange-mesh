@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
-#include <string>
-
 #include <types.h>
 #include <Node.h>
 #include <ConnectionManager.h>

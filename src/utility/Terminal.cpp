@@ -30,9 +30,12 @@ extern "C"
 #include <simple_uart.h>
 }
 
+
+#ifdef ENABLE_TERMINAL
 bool Terminal::terminalIsInitialized = false;
 bool Terminal::promptAndEchoMode = true;
 SimplePushStack* Terminal::registeredCallbacks;
+#endif
 
 //Initialize the mhTerminal
 void Terminal::Init()

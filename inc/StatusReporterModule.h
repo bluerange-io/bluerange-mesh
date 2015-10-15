@@ -60,6 +60,7 @@ class StatusReporterModule: public Module
 
 		enum StatusModuleActionResponseMessages
 		{
+			SET_LED_RESULT = 0,
 			STATUS = 1,
 			DEVICE_INFO = 2,
 			ALL_CONNECTIONS = 3,
@@ -101,7 +102,7 @@ class StatusReporterModule: public Module
 			} StatusReporterModuleDeviceInfoMessage;
 
 			//This message delivers often changing information and info about the incoming connection
-			#define SIZEOF_STATUS_REPORTER_MODULE_FULL_STATUS_MESSAGE 9
+			#define SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE 9
 			typedef struct
 			{
 				clusterSIZE clusterSize;
@@ -112,7 +113,7 @@ class StatusReporterModule: public Module
 				u8 batteryInfo;
 				u8 connectionLossCounter; //Connection losses since reboot
 
-			} StatusReporterModuleFullStatusMessage;
+			} StatusReporterModuleStatusMessage;
 
 		#pragma pack(pop)
 		//####### Module messages end

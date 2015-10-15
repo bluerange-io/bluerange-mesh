@@ -21,6 +21,7 @@
 #include <AdvertisingModule.h>
 #include <ScanningModule.h>
 #include <EnrollmentModule.h>
+#include <IoModule.h>
 
 extern "C"
 {
@@ -105,6 +106,7 @@ Node::Node(networkID networkId)
 	activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "adv", 4);
 	activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "scan", 5);
 	activeModules[5] = new EnrollmentModule(moduleID::ENROLLMENT_MODULE_ID, this, cm, "enroll", 6);
+	activeModules[6] = new IoModule(moduleID::IO_MODULE_ID, this, cm, "io", 7);
 
 
 	//Register a pre/post transmit hook for radio events
@@ -1129,19 +1131,22 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		Logger::getInstance().disableAll();
 	}
 	/************* NODE ***************/
+	//Get a full status of the node
 	else if (commandName == "status")
 	{
 		PrintStatus();
 	}
+	//Print the JOIN_ME buffer
 	else if (commandName == "bufferstat")
 	{
 		PrintBufferStatus();
 	}
+	//Get a one-lined stat for the node
 	else if (commandName == "stat")
 	{
 		PrintSingleLineStatus();
 	}
-
+	//Broadcast some data over all connections
 	else if (commandName == "data")
 	{
 		nodeID receiverId = 0;
@@ -1151,7 +1156,6 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 			else receiverId = NODE_ID_BROADCAST;
 		}
 
-		//Send data over all connections
 		connPacketData1 data;
 		data.header.messageType = MESSAGE_TYPE_DATA_1;
 		data.header.sender = persistentConfig.nodeId;
@@ -1166,9 +1170,9 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 
 		cm->SendMessageToReceiver(NULL, (u8*) &data, SIZEOF_CONN_PACKET_DATA_1, reliable);
 	}
+	//Send some large data that is split over a few messages
 	else if(commandName == "datal")
 	{
-		//Send some large data that is split over messages
 		const u8 dataLength = 45;
 		u8 _packet[dataLength];
 		connPacketHeader* packet = (connPacketHeader*)_packet;
@@ -1181,17 +1185,15 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		}
 
 		cm->SendMessageToReceiver(NULL, _packet, dataLength, true);
-
-
 	}
+	//Simulate connection loss which generates a new cluster id
 	else if (commandName == "loss")
 	{
-		//Simulate connection loss
 		this->persistentConfig.connectionLossCounter++;
 		clusterId = this->GenerateClusterID();
 		this->UpdateJoinMePacket(NULL);
-
 	}
+	//Set a timestamp for this node
 	else if (commandName == "settime")
 	{
 		u64 timeStamp = (atoi(commandArgs[0].c_str()) * (u64)APP_TIMER_CLOCK_FREQ);
@@ -1200,6 +1202,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		globalTime = timeStamp;
 		app_timer_cnt_get(&globalTimeSetAt);
 	}
+	//Display the time of this node
 	else if(commandName == "gettime")
 	{
 		u32 rtc1;
@@ -1210,9 +1213,9 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 
 		trace("Time is currently %s, setAt:%d, rtc1:%u" EOL, timestring, globalTimeSetAt, rtc1);
 	}
+	//Generate a timestamp packet and send it to all other nodes
 	else if (commandName == "sendtime")
 	{
-		//Generate a timestamp packet and send it to all other nodes
 		connPacketUpdateTimestamp packet;
 
 		packet.header.messageType = MESSAGE_TYPE_UPDATE_TIMESTAMP;
@@ -1228,6 +1231,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_UPDATE_TIMESTAMP, true);
 
 	}
+	//Switch to another discovery mode
 	else if (commandName == "discovery")
 	{
 		if (commandArgs.size() < 1 || commandArgs[0] == "high")
@@ -1246,41 +1250,35 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 			ChangeState(discoveryState::DISCOVERY_OFF);
 		}
 	}
-	else if (commandName == "discover")
-	{
-		ChangeState(discoveryState::DISCOVERY_HIGH);
-	}
-	else if (commandName == "discoverylow")
-	{
-		noNodesFoundCounter = 50;
-
-	}
-	//Trigger this to save the current node configuration
+	//Save the current node configuration
 	else if (commandName == "savenode")
 	{
 		Storage::getInstance().QueuedWrite((u8*) &persistentConfig, sizeof(NodeConfiguration), 0, this);
-
 	}
+	//Stop the state machine
 	else if (commandName == "stop")
 	{
 		DisableStateMachine(true);
 	}
+	//Start the state machine
+	else if (commandName == "start")
+	{
+		DisableStateMachine(false);
+	}
+	//Clear the persistant storage of the node configuration
 	else if (commandName == "clearstorage")
 	{
 		persistentConfig.version = 0xFF;
 		Storage::getInstance().QueuedWrite((u8*) &persistentConfig, sizeof(NodeConfiguration), 0, this);
 	}
-	else if (commandName == "start")
-	{
-		DisableStateMachine(false);
-	}
+	//This variable can be used to toggle conditional breakpoints
 	else if (commandName == "break")
 	{
 		Config->breakpointToggleActive = !Config->breakpointToggleActive;
 	}
+	//Try to connect to one of the nodes in the test devices array
 	else if (commandName == "connect")
 	{
-
 		for (int i = 0; i <NUM_TEST_DEVICES ; i++)
 		{
 			if (strcmp(commandArgs[0].c_str(), testDevices[i].name) == 0)
@@ -1288,11 +1286,10 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 				trace("Trying to connecting to node %s", testDevices[i].name);
 
 				cm->ConnectAsMaster(testDevices[i].id, &testDevices[i].addr, 14);
-
 			}
 		}
-
 	}
+	//Disconnect a connection by id (0-4)
 	else if (commandName == "disconnect")
 	{
 		if (commandArgs.size() > 0)
@@ -1302,55 +1299,33 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 			cm->connections[connectionNumber]->Disconnect();
 		}
 	}
-
+	//Display the free heap
 	else if (commandName == "heap")
 	{
-
 		Utility::CheckFreeHeap();
-
-		return true;
-
 	}
-	else if (commandName == "sec")
+	//Encrypt a connection by id
+	else if (commandName == "security")
 	{
 		u16 connectionId = strtol(commandArgs[0].c_str(), NULL, 10);
 
 		//Enable connection security
 		GAPController::startEncryptingConnection(cm->connections[connectionId]->connectionHandle);
-
-		return true;
-
 	}
-	else if (commandName == "modules")
-	{
-
-		for(u32 i=0; i<MAX_MODULE_COUNT; i++)
-		{
-			if(activeModules[i] != NULL) log("Module: %s", activeModules[i]->moduleName);
-		}
-
-		return true;
-
-	}
+	//Configure the current node to be a data endpoint
 	else if (commandName == "yousink")
 	{
-
 		this->persistentConfig.deviceType = deviceTypes::DEVICE_TYPE_SINK;
-
-		return true;
-
 	}
+	//Change nodeid of current node
 	else if (commandName == "set_nodeid")
 	{
-
 		this->persistentConfig.nodeId = atoi(commandArgs[0].c_str());
-
-		return true;
-
 	}
 
 	/************* UART COMMANDS ***************/
-	else if (commandName == "uart_set_campaign")
+	//
+	else if (commandName == "uart_scan_response")
 	{
 		if (commandArgs.size() > 0){
 			AdvertisingController::SetScanResponseData(this, commandArgs[0]);
@@ -1358,7 +1333,13 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 			uart_error(Logger::ARGUMENTS_WRONG);
 		}
 	}
-	else if((commandName == "uart_get_modules" || commandName == "getmodules") && commandArgs.size() == 1)
+	//Get the status information of this node
+	else if(commandName == "get_plugged_in")
+	{
+		uart("NODE", "{\"type\":\"plugged_in\",\"nodeId\":%u,\"serialNumber\":\"%s\"}" SEP, persistentConfig.nodeId, persistentConfig.serialNumber);
+	}
+	//Query all modules from any node
+	else if((commandName == "get_modules") && commandArgs.size() == 1)
 	{
 		nodeID receiver = commandArgs[0] == "this" ? persistentConfig.nodeId : atoi(commandArgs[0].c_str());
 
@@ -1369,11 +1350,8 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 
 		packet.moduleId = 0;
 		packet.actionType = Module::ModuleConfigMessages::GET_MODULE_LIST;
-		packet.requestHandle = 7; //TODO
 
 		cm->SendMessageToReceiver(NULL, (u8*) &packet, SIZEOF_CONN_PACKET_MODULE, true);
-
-		return true;
 	}
 	else
 	{

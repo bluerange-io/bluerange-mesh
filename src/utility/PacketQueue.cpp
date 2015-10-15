@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 extern "C"
 {
 #include <nrf_error.h>
+#include <cstring>
 }
 
 PacketQueue::PacketQueue(u8* buffer, u16 bufferLength)
