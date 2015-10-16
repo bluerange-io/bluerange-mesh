@@ -51,6 +51,9 @@ AdvertisingModule::AdvertisingModule(u16 moduleId, Node* node, ConnectionManager
 
 	//Start module configuration loading
 	LoadModuleConfiguration();
+
+	//Periodically broadcast a debug packet with some stats for debugging
+	broadcastDebugPackets = false;
 }
 
 void AdvertisingModule::ConfigurationLoadedHandler()
@@ -111,11 +114,64 @@ void AdvertisingModule::NodeStateChangedHandler(discoveryState newState)
 	if(newState == discoveryState::BACK_OFF || newState == discoveryState::DISCOVERY_OFF){
 		//Activate our advertising
 
-		if(configuration.messageCount > 0){
+		//This is a small packet for debugging a node's state
+		if(broadcastDebugPackets){
+			u8 buffer[31];
+			memset(buffer, 0, 31);
+
+			advStructureFlags* flags = (advStructureFlags*)buffer;
+			flags->len = SIZEOF_ADV_STRUCTURE_FLAGS-1;
+			flags->type = BLE_GAP_AD_TYPE_FLAGS;
+			flags->flags = BLE_GAP_ADV_FLAG_LE_GENERAL_DISC_MODE | BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED;
+
+			advStructureManufacturer* manufacturer = (advStructureManufacturer*)(buffer+3);
+			manufacturer->len = 26;
+			manufacturer->type = BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA;
+			manufacturer->companyIdentifier = 0x24D;
+
+			AdvertisingModuleDebugMessage* msg = (AdvertisingModuleDebugMessage*)(buffer+7);
+
+			msg->debugPacketIdentifier = 0xDE;
+			msg->nodeId = node->persistentConfig.nodeId;
+			msg->clusterId = node->clusterId;
+			msg->clusterSize = node->clusterSize;
+			msg->freeIn = cm->freeInConnections;
+			msg->freeOut = cm->freeOutConnections;
+			msg->connectionLossCounter = node->persistentConfig.connectionLossCounter;
+
+			for(u8 i = 0; i<4; i++){
+				if(cm->connections[i]){
+					if(cm->connections[i]->reliableBuffersFree > 0){
+						msg->txBufferFreeBitmask |= 1 << (i*2);
+					}
+					if(cm->connections[i]->unreliableBuffersFree > 0){
+						msg->txBufferFreeBitmask |= 1 << (i*2+1);
+					}
+				}
+			}
+
+			if(cm->connections[0]->isConnected) msg->partner0 = cm->connections[0]->partnerId;
+			if(cm->connections[1]->isConnected) msg->partner1 = cm->connections[1]->partnerId;
+			if(cm->connections[2]->isConnected) msg->partner2 = cm->connections[2]->partnerId;
+			if(cm->connections[3]->isConnected) msg->partner3 = cm->connections[3]->partnerId;
+
+			msg->packetEnd = 0xDE;
+
+			char strbuffer[200];
+			Logger::getInstance().convertBufferToHexString(buffer, 31, strbuffer);
+
+			logt("ADVMOD", "ADV set to %s", strbuffer);
+
+			u32 err = sd_ble_gap_adv_data_set(buffer, 31, NULL, 0);
+			APP_ERROR_CHECK(err);
+
+			AdvertisingController::SetAdvertisingState(advState::ADV_STATE_HIGH);
+		}
+		else if(configuration.messageCount > 0){
 			u32 err = sd_ble_gap_adv_data_set(configuration.messageData[0].messageData, configuration.messageData[0].messageLength, NULL, 0);
 			APP_ERROR_CHECK(err);
 
-			char buffer[100];
+			char buffer[200];
 			Logger::getInstance().convertBufferToHexString((u8*)configuration.messageData[0].messageData, 31, buffer);
 
 			logt("ADVMOD", "ADV set to %s", buffer);
@@ -140,7 +196,19 @@ void AdvertisingModule::NodeStateChangedHandler(discoveryState newState)
 
 bool AdvertisingModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
-	//Check for commands
+	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)
+	{
+		if(commandName == "action")
+		{
+			if(commandArgs[1] != moduleName) return false;
+
+			if(commandArgs[2] == "command_name")
+			{
+
+			}
+		}
+
+	}
 
 	//Must be called to allow the module to get and set the config
 	return Module::TerminalCommandHandler(commandName, commandArgs);

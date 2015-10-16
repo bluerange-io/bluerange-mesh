@@ -302,25 +302,6 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 			//But reroute it to our own node
 			nodeID destinationNode = (commandArgs[0] == "this") ? node->persistentConfig.nodeId : atoi(commandArgs[0].c_str());
 
-
-			//E.g. UART_MODULE_TRIGGER_ACTION 635 STATUS led on
-			if(commandArgs.size() >= 4 && commandArgs[2] == "led")
-			{
-				u8 ledState = commandArgs[3] == "on" ? 1: 0;
-				u8 requestHandle = commandArgs.size() >= 5 ? atoi(commandArgs[4].c_str()) : 0;
-
-				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
-					destinationNode,
-					StatusModuleTriggerActionMessages::SET_LED,
-					requestHandle,
-					&ledState,
-					1,
-					false
-				);
-
-				return true;
-			}
 			if(commandArgs.size() == 3 && commandArgs[2] == "get_status")
 			{
 				SendModuleActionMessage(
@@ -395,36 +376,9 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId){
-			//It's a LED message
-			if(packet->actionType == StatusModuleTriggerActionMessages::SET_LED){
-				if(packet->data[0])
-				{
-					//Switch LED on
-					node->currentLedMode = Node::ledMode::LED_MODE_OFF;
 
-					node->LedRed->On();
-					node->LedGreen->On();
-					node->LedBlue->On();
-
-					//send confirmation
-					SendModuleActionMessage(
-						MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
-						packet->header.sender,
-						StatusModuleActionResponseMessages::SET_LED_RESULT,
-						packet->requestHandle,
-						NULL,
-						0,
-						false
-					);
-				}
-				else
-				{
-					//Switch LEDs back to connection signaling
-					node->currentLedMode = Node::ledMode::LED_MODE_CONNECTIONS;
-				}
-			}
 			//We were queried for our status
-			else if(packet->actionType == StatusModuleTriggerActionMessages::GET_STATUS)
+			if(packet->actionType == StatusModuleTriggerActionMessages::GET_STATUS)
 			{
 				SendStatus(packet->header.sender, MESSAGE_TYPE_MODULE_ACTION_RESPONSE);
 
@@ -510,11 +464,6 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 				}
 
 				uart("STATUSMOD", "]}" SEP);
-			}
-			else if(packet->actionType == StatusModuleActionResponseMessages::SET_LED_RESULT)
-			{
-				uart("MODULE", "{\"nodeId\":%u,\"type\":\"set_led_result\",\"module\":%u,", packet->header.sender, packet->moduleId);
-				uart("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, 0);
 			}
 		}
 	}

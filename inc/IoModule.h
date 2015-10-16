@@ -24,6 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <Module.h>
 
+extern "C"{
+#include <nrf_gpio.h>
+}
+
 class IoModule: public Module
 {
 	private:
@@ -36,13 +40,29 @@ class IoModule: public Module
 		IoModuleConfiguration configuration;
 
 		enum IoModuleTriggerActionMessages{
-			SET_IO = 0,
-			GET_IO = 1
+			SET_PIN_CONFIG = 0,
+			GET_PIN_CONFIG = 1,
+			GET_PIN_LEVEL = 2,
+			SET_LED = 3 //used to trigger a signaling led
 		};
 
 		enum IoModuleActionResponseMessages{
-			SET_IO_RESULT = 0,
-			IO = 1
+			SET_PIN_CONFIG_RESULT = 0,
+			PIN_CONFIG = 1,
+			PIN_LEVEL = 2,
+			SET_LED_RESPONSE = 3
+		};
+
+		//Combines a pin and its config
+		#define SIZEOF_GPIO_PIN_CONFIG 2
+		struct gpioPinConfig{
+			u8 pinNumber : 5;
+			u8 direction : 1; //configure pin as either input or output (nrf_gpio_pin_dir_t)
+			u8 inputBufferConnected : 1; //disconnect input buffer when port not used to save energy
+			u8 pull : 2; //pull down (1) or up (3) or disable pull (0) on pin (nrf_gpio_pin_pull_t)
+			u8 driveStrength : 3; // GPIO_PIN_CNF_DRIVE_*
+			u8 sense : 2; // if configured as input sense either high or low level
+			u8 set : 1; // set pin or unset it
 		};
 
 		/*
