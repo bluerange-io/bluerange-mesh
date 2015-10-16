@@ -3,8 +3,6 @@
 #
 # Selectable build options 
 #------------------------------------------------------------------------------
-
-
 TARGET_BOARD         ?= BOARD_PCA10031
 
 #------------------------------------------------------------------------------
@@ -17,6 +15,7 @@ TEMPLATE_PATH := $(COMPONENTS)/toolchain/gcc
 EHAL_PATH     := $(HOME)/nrf/sdk/ehal_latest
 LINKER_SCRIPT := ./linker/gcc_nrf51_s130_32kb.ld
 OUTPUT_NAME   := FruityMesh
+JLINK	      := jlinkexe
 
 #------------------------------------------------------------------------------
 # Proceed cautiously beyond this point.  Little should change.
@@ -55,7 +54,6 @@ SIZE     := "$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-size"
 MK       := mkdir
 RM       := rm -rf
 CP       := cp
-
 
 # function for removing duplicates in a list
 remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-out $(firstword $1),$1))))
@@ -146,8 +144,8 @@ CFLAGS += -fno-move-loop-invariants
 CFLAGS += -Wextra
 CFLAGS += -g3
 CFLAGS += -DBLE_STACK_SUPPORT_REQD
-CFLAGS += -DDEBUG
-CFLAGS += -DBOARD_PCA10031
+CFLAGS += $(DEBUG_FLAGS)
+CFLAGS += -D$(TARGET_BOARD)
 CFLAGS += -DNRF51
 CFLAGS += -D__need___va_list
 CFLAGS += -w
@@ -156,6 +154,9 @@ CFLAGS += -fno-exceptions
 CFLAGS += -fno-rtti
 CFLAGS += -fno-use-cxa-atexit
 CFLAGS += -fno-threadsafe-statics
+
+CFLAGS += -DENABLE_LOGGING
+CFLAGS += -DDEST_BOARD_ID=0
 
 LDFLAGS += -mcpu=cortex-m0
 LDFLAGS += -mthumb
@@ -210,8 +211,10 @@ all: $(BUILD_DIRECTORIES) $(OBJECTS)
 	@echo "*****************************************************"
 
 debug : all
-
 release : all
+
+flash: all
+	$(JLINK) deploy/upload_fruitymesh.jlink
 
 # Create build directories
 $(BUILD_DIRECTORIES):
@@ -221,14 +224,12 @@ $(BUILD_DIRECTORIES):
 # Create objects from CPP SRC files
 $(OBJECT_DIRECTORY)/%.o: %.cpp
 	@echo Compiling file: $(notdir $<)
-	$(NO_ECHO)$(CPP) -std=c++11 $(CFLAGS) $(INC_PATHS) \
-	-c $< -o $@ > $(OUTPUT_BINARY_DIRECTORY)/$*.lst
+	$(NO_ECHO)$(CPP) -std=c++11 $(CFLAGS) $(INC_PATHS) -c $< -o $@ > $(OUTPUT_BINARY_DIRECTORY)/$*.lst
 
 # Create objects from C SRC files
 $(OBJECT_DIRECTORY)/%.o: %.c
 	@echo Compiling file: $(notdir $<)
-	$(NO_ECHO)$(CC) -std=gnu99 $(CFLAGS) $(INC_PATHS) \
-	-c $< -o $@ > $(OUTPUT_BINARY_DIRECTORY)/$*.lst
+	$(NO_ECHO)$(CC) -std=gnu99 $(CFLAGS) $(INC_PATHS) -c $< -o $@ > $(OUTPUT_BINARY_DIRECTORY)/$*.lst
 
 # Link
 $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_NAME).elf: $(BUILD_DIRECTORIES) $(OBJECTS)
