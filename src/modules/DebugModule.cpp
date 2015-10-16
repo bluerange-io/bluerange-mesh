@@ -20,26 +20,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
-#include <TestModule.h>
+#include <DebugModule.h>
 #include <Utility.h>
 #include <Storage.h>
 #include <Node.h>
 
 extern "C"{
 #include <limits.h>
+#include <stdlib.h>
 }
 
-TestModule::TestModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
+DebugModule::DebugModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
 	: Module(moduleId, node, cm, name, storageSlot)
 {
 	//Register callbacks n' stuff
-	Logger::getInstance().enableTag("TEST");
-	Logger::getInstance().enableTag("CONN");
+	Logger::getInstance().enableTag("DEBUGMOD");
 
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
 	configurationPointer = &configuration;
-	configurationLength = sizeof(TestModuleConfiguration);
+	configurationLength = sizeof(DebugModuleConfiguration);
 
 	flood = 0;
 	packetsOut = 0;
@@ -51,7 +51,7 @@ TestModule::TestModule(u16 moduleId, Node* node, ConnectionManager* cm, const ch
 	LoadModuleConfiguration();
 }
 
-void TestModule::ConfigurationLoadedHandler()
+void DebugModule::ConfigurationLoadedHandler()
 {
 	//Does basic testing on the loaded configuration
 	Module::ConfigurationLoadedHandler();
@@ -64,14 +64,16 @@ void TestModule::ConfigurationLoadedHandler()
 
 }
 
-void TestModule::TimerEventHandler(u16 passedTime, u32 appTimer){
+void DebugModule::TimerEventHandler(u16 passedTime, u32 appTimer){
 
 	if(!configuration.moduleActive) return;
 
-	//if(appTimer % 1000 == 0) logt("TEST", "Out: %u, In:%u", packetsOut, packetsIn);
+	if(appTimer % 1000 == 0 && (packetsIn > 0 || packetsOut > 0))
+	{
+		logt("DEBUGMOD", "Flood Packets out: %u, in:%u", packetsOut, packetsIn);
+	}
 
 	if(flood){
-
 		//FIXME: The packet queue might have problems when it is filled with too many packets
 		//This seems to break the softdevice, fix that.
 
@@ -83,7 +85,7 @@ void TestModule::TimerEventHandler(u16 passedTime, u32 appTimer){
 			data.header.sender = node->persistentConfig.nodeId;
 			data.header.receiver = NODE_ID_HOPS_BASE + 2;
 
-			data.actionType = TestModuleMessages::FLOOD_MESSAGE;
+			data.actionType = DebugModuleTriggerActionMessages::FLOOD_MESSAGE;
 			data.moduleId = moduleId;
 			data.data[0] = 1;
 
@@ -92,13 +94,13 @@ void TestModule::TimerEventHandler(u16 passedTime, u32 appTimer){
 	}
 
 	//Reset every few seconds
-	/*if(configuration.rebootTimeMs != 0 && configuration.rebootTimeMs < appTimer){
-		logt("TEST", "Resetting!");
+	if(configuration.rebootTimeMs != 0 && configuration.rebootTimeMs < appTimer){
+		logt("DEBUGMOD", "Resetting!");
 		NVIC_SystemReset();
-	}*/
+	}
 }
 
-void TestModule::ResetToDefaultConfiguration()
+void DebugModule::ResetToDefaultConfiguration()
 {
 	//Set default configuration values
 	configuration.moduleId = moduleId;
@@ -108,23 +110,72 @@ void TestModule::ResetToDefaultConfiguration()
 	memcpy(&configuration.testString, "jdhdur", 7);
 }
 
-bool TestModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
+bool DebugModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
-
-	if (commandName == "flood")
+	//React on commands, return true if handled, false otherwise
+	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)
 	{
-		flood = (flood+1) % 3;
+		nodeID destinationNode = (commandArgs[0] == "this") ? node->persistentConfig.nodeId : atoi(commandArgs[0].c_str());
 
-		return true;
+
+		if(commandName == "action")
+		{
+			//Send a reset command to a node in the mesh, it will then reboot
+			if(commandArgs.size() >= 3 && commandArgs[2] == "reset")
+			{
+				SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					destinationNode,
+					DebugModuleTriggerActionMessages::RESET_NODE,
+					0,
+					NULL,
+					0,
+					false
+				);
+
+				return true;
+			}
+			//Reset the connection loss counter of any node
+			else if(commandArgs[2] == "reset_connection_loss_counter")
+			{
+				SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					destinationNode,
+					DebugModuleTriggerActionMessages::RESET_CONNECTION_LOSS_COUNTER,
+					0,
+					NULL,
+					0,
+					false
+				);
+
+				return true;
+			}
+			//Flood the network with messages and count them
+			else if(commandArgs[2] == "flood")
+			{
+				//Toggles the flood mode between reliable, unreliable and off
+				flood = (flood+1) % 3;
+				if(flood == 0) logt("DEBUGMOD", "Flooding is off");
+				if(flood == 1) logt("DEBUGMOD", "Flooding with reliable packets");
+				if(flood == 2) logt("DEBUGMOD", "Flooding with unreliable packets");
+
+				return true;
+			}
+
+		}
+
 	}
+
+
+	// Some old stuff to reboot the node every once in a while
 	if (commandName == "testsave")
 		{
 		char buffer[70];
-		Logger::getInstance().convertBufferToHexString((u8*) &configuration, sizeof(TestModuleConfiguration), buffer);
+		Logger::getInstance().convertBufferToHexString((u8*) &configuration, sizeof(DebugModuleConfiguration), buffer);
 
 		configuration.rebootTimeMs = 12 * 1000;
 
-		logt("TEST", "Saving config %s (%d)", buffer, sizeof(TestModuleConfiguration));
+		logt("DEBUGMOD", "Saving config %s (%d)", buffer, sizeof(DebugModuleConfiguration));
 
 		SaveModuleConfiguration();
 
@@ -137,33 +188,13 @@ bool TestModule::TerminalCommandHandler(string commandName, vector<string> comma
 
 		return true;
 	}
-	else if (commandName == "leds")
-	{
-		//Check if user wants to set all LEDs on or off and send that as a broadcast packet to all
-		//mesh nodes
-		bool state = (commandArgs.size() > 0 && commandArgs[0] == "on") ? true : false;
-
-		connPacketModule packet;
-
-		packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
-		packet.header.sender = node->persistentConfig.nodeId;
-		packet.header.receiver = NODE_ID_BROADCAST;
-
-		packet.moduleId = moduleId;
-		packet.actionType = TestModuleMessages::LED_MESSAGE;
-		packet.data[0] = state;
-
-		cm->SendMessageOverConnections(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE + 1, true);
-
-		return true;
-	}
 
 
 	//Must be called to allow the module to get and set the config
 	return Module::TerminalCommandHandler(commandName, commandArgs);
 }
 
-void TestModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
+void DebugModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
 {
 	//Must call superclass for handling
 	Module::ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
@@ -175,26 +206,22 @@ void TestModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId){
 
-			//It's a LED message
-			if(packet->actionType == TestModuleMessages::LED_MESSAGE){
-				if(packet->data[0])
-				{
-					//Switch LED on
-					node->currentLedMode = Node::ledMode::LED_MODE_OFF;
-
-					node->LedRed->On();
-					node->LedGreen->On();
-					node->LedBlue->On();
-				}
-				else
-				{
-					//Switch LEDs back to connection signaling
-					node->currentLedMode = Node::ledMode::LED_MODE_CONNECTIONS;
-				}
-			}
-
-			else if(packet->actionType == TestModuleMessages::FLOOD_MESSAGE){
+			if(packet->actionType == DebugModuleTriggerActionMessages::FLOOD_MESSAGE){
 				packetsIn++;
+			}
+			else if(packet->actionType == DebugModuleTriggerActionMessages::RESET_NODE){
+
+				logt("DEBUGMOD", "Scheduled reboot in 10 seconds");
+
+				//Schedule a reboot in a few seconds
+				configuration.rebootTimeMs = node->appTimerMs + 10 * 1000;
+
+			}
+			else if(packet->actionType == DebugModuleTriggerActionMessages::RESET_CONNECTION_LOSS_COUNTER){
+
+				logt("DEBUGMOD", "Resetting connection loss counter");
+
+				node->persistentConfig.connectionLossCounter = 0;
 
 			}
 		}

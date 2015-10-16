@@ -152,7 +152,7 @@ void ConnectionManager::QueuePacket(Connection* connection, u8* data, u16 dataLe
 	char stringBuffer[200];
 	Logger::getInstance().convertBufferToHexString(data, dataLength, stringBuffer);
 
-	logt("CONN", "PUT_PACKET(%d):len:%d,type:%d, hex: %s",connection->connectionId, dataLength, data[0], stringBuffer);
+	logt("CONN_DATA", "PUT_PACKET(%d):len:%d,type:%d, hex: %s",connection->connectionId, dataLength, data[0], stringBuffer);
 
 	//Save packet
 	bool putResult = connection->packetSendQueue->Put(data, dataLength, reliable);
@@ -431,8 +431,8 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 		//Print packet as hex
 		char stringBuffer[100];
 		Logger::getInstance().convertBufferToHexString(bleEvent->evt.gatts_evt.params.write.data, bleEvent->evt.gatts_evt.params.write.len, stringBuffer);
-		logt("CONN", "Received type %d, hasMore %d, length %d, reliable %d:", ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->messageType, ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->hasMoreParts, bleEvent->evt.gatts_evt.params.write.len, bleEvent->evt.gatts_evt.params.write.op);
-		logt("CONN", "%s", stringBuffer);
+		logt("CONN_DATA", "Received type %d, hasMore %d, length %d, reliable %d:", ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->messageType, ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->hasMoreParts, bleEvent->evt.gatts_evt.params.write.len, bleEvent->evt.gatts_evt.params.write.op);
+		logt("CONN_DATA", "%s", stringBuffer);
 
 		//Check if we need to reassemble the packet
 		if(connection->packetReassemblyPosition == 0 && packet->hasMoreParts == 0)
@@ -602,7 +602,7 @@ void ConnectionManager::fillTransmitBuffers(){
 						if(err == NRF_SUCCESS){
 							connections[i]->unreliableBuffersFree--;
 							connections[i]->packetSendQueue->DiscardNext();
-							logt("TEST", "packet to conn %u (txfree: %d)", i, connections[i]->unreliableBuffersFree);
+							logt("CONN", "packet to conn %u (txfree: %d)", i, connections[i]->unreliableBuffersFree);
 						}
 
 					} else {
@@ -629,7 +629,7 @@ void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
 	if(bleEvent->header.evt_id == BLE_EVT_TX_COMPLETE)
 	{
 
-		logt("CONN", "write_CMD complete (n=%d)", bleEvent->evt.common_evt.params.tx_complete.count);
+		logt("CONN_DATA", "write_CMD complete (n=%d)", bleEvent->evt.common_evt.params.tx_complete.count);
 
 		//This connection has just been given back some transmit buffers
 		cm->GetConnectionFromHandle(bleEvent->evt.common_evt.conn_handle)->unreliableBuffersFree += bleEvent->evt.common_evt.params.tx_complete.count;
@@ -652,11 +652,11 @@ void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
 		}
 		else
 		{
-			logt("CONN", "write_REQ complete");
+			logt("CONN_DATA", "write_REQ complete");
 			Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gattc_evt.conn_handle);
 
 			connPacketSplitHeader* header = (connPacketSplitHeader*)(connection->packetSendQueue->PeekNext().data + 1 + connection->packetSendPosition); //+1 to remove reliable byte
-			logt("CONN", "header is type %d and moreData %d (%d-%d)", header->messageType, header->hasMoreParts, connection->packetSendQueue->PeekNext().data, header);
+			logt("CONN_DATA", "header is type %d and moreData %d (%d-%d)", header->messageType, header->hasMoreParts, connection->packetSendQueue->PeekNext().data, header);
 
 			//Check if the packet has more parts
 			if(header->hasMoreParts == 0){

@@ -198,18 +198,18 @@ void IoModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, 
 
 					if(pinConfig->set) NRF_GPIO->OUTSET = (1UL << pinConfig->pinNumber);
 					else NRF_GPIO->OUTCLR = (1UL << pinConfig->pinNumber);
-
-					//Confirmation
-					SendModuleActionMessage(
-						MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
-						packet->header.sender,
-						IoModuleActionResponseMessages::SET_PIN_CONFIG_RESULT,
-						packet->requestHandle,
-						NULL,
-						0,
-						false
-					);
 				}
+
+				//Confirmation
+				SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+					packet->header.sender,
+					IoModuleActionResponseMessages::SET_PIN_CONFIG_RESULT,
+					packet->requestHandle,
+					NULL,
+					0,
+					false
+				);
 			}
 			//A message to switch on the LEDs
 			else if(packet->actionType == IoModuleTriggerActionMessages::SET_LED){

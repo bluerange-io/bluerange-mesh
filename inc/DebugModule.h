@@ -28,27 +28,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <Module.h>
 
-class TestModule: public Module
+class DebugModule: public Module
 {
 	private:
 
 		//Module configuration that is saved persistently (size must be multiple of 4)
-		struct TestModuleConfiguration : ModuleConfiguration{
+		struct DebugModuleConfiguration : ModuleConfiguration{
 			u32 rebootTimeMs; //Time until reboot
 			char testString[12];
 		};
 
+		//Counters for flood messages
 		u8 flood;
-
 		u32 packetsOut;
 		u32 packetsIn;
 
-		TestModuleConfiguration configuration;
+		DebugModuleConfiguration configuration;
 
-		enum TestModuleMessages{LED_MESSAGE=0, FLOOD_MESSAGE=1};
+
+		enum DebugModuleTriggerActionMessages{
+			RESET_NODE = 0,
+			RESET_CONNECTION_LOSS_COUNTER = 1,
+			FLOOD_MESSAGE = 2
+
+		};
+
+		enum DebugModuleActionResponseMessages{
+
+		};
 
 	public:
-		TestModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		DebugModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 
 		void ConfigurationLoadedHandler();
 

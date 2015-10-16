@@ -15,10 +15,10 @@
 #include <ScanController.h>
 #include <Utility.h>
 #include <Logger.h>
-#include <TestModule.h>
 #include <DFUModule.h>
 #include <StatusReporterModule.h>
 #include <AdvertisingModule.h>
+#include <DebugModule.h>
 #include <ScanningModule.h>
 #include <EnrollmentModule.h>
 #include <IoModule.h>
@@ -100,7 +100,7 @@ Node::Node(networkID networkId)
 	//module configurations with the Storage class
 	//Module ids must persist when nodes are updated to guearantee that the
 	//same module receives the same storage slot
-	//activeModules[0] = new TestModule(moduleID::TEST_MODULE_ID, this, cm, "test", 1);
+	activeModules[0] = new DebugModule(moduleID::DEBUG_MODULE_ID, this, cm, "debug", 1);
 	//activeModules[1] = new DFUModule((moduleID::DFU_MODULE_ID, this, cm, "dfu", 2);
 	activeModules[2] = new StatusReporterModule(moduleID::STATUS_REPORTER_MODULE_ID, this, cm, "status", 3);
 	activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "adv", 4);
@@ -420,7 +420,7 @@ void Node::messageReceivedCallback(connectionPacket* inPacket)
 			u16 moduleCount = (dataLength - SIZEOF_CONN_PACKET_MODULE) / 4;
 			bool first = true;
 			for(int i=0; i<moduleCount; i++){
-				u16 moduleId = packet->data[i*4+0];
+				u16 moduleId = *(u16*)(packet->data + i*4);
 
 				if(moduleId)
 				{

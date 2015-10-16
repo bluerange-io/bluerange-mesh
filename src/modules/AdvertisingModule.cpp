@@ -53,7 +53,7 @@ AdvertisingModule::AdvertisingModule(u16 moduleId, Node* node, ConnectionManager
 	LoadModuleConfiguration();
 
 	//Periodically broadcast a debug packet with some stats for debugging
-	broadcastDebugPackets = false;
+	broadcastDebugPackets = true;
 }
 
 void AdvertisingModule::ConfigurationLoadedHandler()
@@ -84,7 +84,7 @@ void AdvertisingModule::ResetToDefaultConfiguration()
 {
 	//Set default configuration values
 	configuration.moduleId = moduleId;
-	configuration.moduleActive = false;
+	configuration.moduleActive = true;
 	configuration.moduleVersion = 1;
 
 	memset(configuration.messageData[0].messageData, 0, 31);
