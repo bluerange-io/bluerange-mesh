@@ -420,7 +420,10 @@ void Node::messageReceivedCallback(connectionPacket* inPacket)
 			u16 moduleCount = (dataLength - SIZEOF_CONN_PACKET_MODULE) / 4;
 			bool first = true;
 			for(int i=0; i<moduleCount; i++){
-				u16 moduleId = *(u16*)(packet->data + i*4);
+				u16 moduleId = 0, version = 0, active = 0;
+				memcpy(&moduleId, packet->data + i*4+0, 2);
+				memcpy(&version, packet->data + i*4+2, 1);
+				memcpy(&active, packet->data + i*4+3, 1);
 
 				if(moduleId)
 				{
@@ -428,7 +431,7 @@ void Node::messageReceivedCallback(connectionPacket* inPacket)
 					if(!first){
 						uart("MODULE", ",");
 					}
-					uart("MODULE", "{\"id\":%u,\"version\":%u,\"active\":%u}", moduleId, packet->data[i*4+2], packet->data[i*4+3]);
+					uart("MODULE", "{\"id\":%u,\"version\":%u,\"active\":%u}", moduleId, version, active);
 
 					first = false;
 				}
