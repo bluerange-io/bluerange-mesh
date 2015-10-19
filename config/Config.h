@@ -168,7 +168,6 @@ class Conf
 #ifdef NRF52
 	#include <board_pca10036.h>
 #endif
-//#include <board_adafruit_ble_friend.h>
 
 //Each of the Connections has a buffer for outgoing packets, this is its size in bytes
 #define PACKET_SEND_BUFFER_SIZE 400

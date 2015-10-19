@@ -101,7 +101,7 @@ int main(void)
 	//Init the magic
 	node = new Node(Config->meshNetworkIdentifier);
 
-	//new Testing();
+	new Testing();
 
 	//Start Timers
 	initTimers();
