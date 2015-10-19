@@ -53,7 +53,7 @@ AdvertisingModule::AdvertisingModule(u16 moduleId, Node* node, ConnectionManager
 	LoadModuleConfiguration();
 
 	//Periodically broadcast a debug packet with some stats for debugging
-	broadcastDebugPackets = true;
+	broadcastDebugPackets = false;
 }
 
 void AdvertisingModule::ConfigurationLoadedHandler()
@@ -202,9 +202,12 @@ bool AdvertisingModule::TerminalCommandHandler(string commandName, vector<string
 		{
 			if(commandArgs[1] != moduleName) return false;
 
-			if(commandArgs[2] == "command_name")
+			if(commandArgs[2] == "broadcast_debug")
 			{
+				broadcastDebugPackets = !broadcastDebugPackets;
+				logt("ADVMOD", "Debug Packets are now set to %u", broadcastDebugPackets);
 
+				return true;
 			}
 		}
 
