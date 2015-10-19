@@ -70,7 +70,7 @@ class Node:
 
 		//Persistently saved configuration (should be multiple of 4 bytes long)
 		struct NodeConfiguration{
-			u8 version;
+			u32 version;
 			ble_gap_addr_t nodeAddress; //7 bytes
 			networkID networkId;
 			nodeID nodeId;
@@ -81,6 +81,7 @@ class Node:
 			deviceTypes deviceType;
 			u8 dBmTX; //The average RSSI, received in a distance of 1m with a tx power of +0 dBm
 			u8 dBmRX; //Receiver sensitivity (or receied power from a packet sent at 1m distance with +0dBm?)
+			u8 reserved;
 		};
 
 		//For our test devices

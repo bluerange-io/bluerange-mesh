@@ -118,7 +118,7 @@ Node::Node(networkID networkId)
 	//Load Node configuration from slot 0
 	if(Config->ignorePersistentNodeConfigurationOnBoot){
 		logt("NODE", "ignoring persistent config!");
-		persistentConfig.version = 0xFF;
+		persistentConfig.version = 0xFFFFFFFF;
 		ConfigurationLoadedHandler();
 	} else {
 		Storage::getInstance().QueuedRead((u8*) &persistentConfig, sizeof(NodeConfiguration), 0, this);
@@ -132,7 +132,7 @@ void Node::ConfigurationLoadedHandler()
 
 
 	//If config is unset, set to default
-	if (persistentConfig.version == 0xFF)
+	if (persistentConfig.version == 0xFFFFFFFF)
 	{
 		logt("NODE", "config was empty, default config set");
 		persistentConfig.version = 0;
@@ -1268,7 +1268,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	//Clear the persistant storage of the node configuration
 	else if (commandName == "clearstorage")
 	{
-		persistentConfig.version = 0xFF;
+		persistentConfig.version = 0xFFFFFFFF;
 		Storage::getInstance().QueuedWrite((u8*) &persistentConfig, sizeof(NodeConfiguration), 0, this);
 	}
 	//This variable can be used to toggle conditional breakpoints

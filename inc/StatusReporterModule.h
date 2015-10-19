@@ -86,7 +86,7 @@ class StatusReporterModule: public Module
 			} StatusReporterModuleConnectionsMessage;
 
 			//This message delivers non- (or not often)changing information
-			#define SIZEOF_STATUS_REPORTER_MODULE_DEVICE_INFO_MESSAGE (22 + SERIAL_NUMBER_LENGTH)
+			#define SIZEOF_STATUS_REPORTER_MODULE_DEVICE_INFO_MESSAGE (25 + SERIAL_NUMBER_LENGTH)
 			typedef struct
 			{
 				u16 manufacturerId;
@@ -94,7 +94,7 @@ class StatusReporterModule: public Module
 				u8 chipId[8];
 				ble_gap_addr_t accessAddress;
 				networkID networkId;
-				u8 nodeVersion;
+				u32 nodeVersion;
 				u8 dBmRX;
 				u8 dBmTX;
 				u8 deviceType;

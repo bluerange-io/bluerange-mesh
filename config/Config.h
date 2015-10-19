@@ -128,7 +128,7 @@ class Conf
 
 		//Allows a number of mesh networks to coexist in the same physical space without collision
 		//Allowed range is 0x0000 - 0xFF00 (0 - 65280), others are reserved for special purpose
-		u16 meshNetworkIdentifier = 1;
+		u16 meshNetworkIdentifier = 3;
 
 		const u8 meshMaxInConnections = 1; // Will probably never change and code will not allow this to change without modifications
 		const u8 meshMaxOutConnections = 3; //Will certainly change with future S130 versions
