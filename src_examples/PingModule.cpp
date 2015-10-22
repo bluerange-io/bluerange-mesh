@@ -99,7 +99,7 @@ bool PingModule::TerminalCommandHandler(string commandName, vector<string> comma
 			packet.data[0] = 123;
 
 
-			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_HEADER + 1, true);
+			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE + 1, true);
 
 			return true;
 		}
@@ -138,7 +138,7 @@ void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
 				outPacket.data[0] = packet->data[0];
 				outPacket.data[1] = 111;
 
-				cm->SendMessageToReceiver(NULL, (u8*)&outPacket, SIZEOF_CONN_PACKET_HEADER + 2, true);
+				cm->SendMessageToReceiver(NULL, (u8*)&outPacket, SIZEOF_CONN_PACKET_MODULE + 2, true);
 
 			}
 		}
