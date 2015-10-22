@@ -89,7 +89,7 @@ bool PingModule::TerminalCommandHandler(string commandName, vector<string> comma
 			logt("PINGMOD", "Trying to ping node %u", targetNodeId);
 
 			//Send ping packet to that node
-			connPacketModuleAction packet;
+			connPacketModule packet;
 			packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
 			packet.header.sender = node->persistentConfig.nodeId;
 			packet.header.receiver = targetNodeId;
@@ -99,8 +99,7 @@ bool PingModule::TerminalCommandHandler(string commandName, vector<string> comma
 			packet.data[0] = 123;
 
 
-			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE_ACTION + 1, true);
-
+			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE + 1, true);
 			return true;
 		}
 	}
@@ -117,7 +116,7 @@ void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
 
 	//Filter trigger_action messages
 	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
-		connPacketModuleAction* packet = (connPacketModuleAction*)packetHeader;
+		connPacketModule* packet = (connPacketModule*)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId){
@@ -128,7 +127,7 @@ void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
 				logt("PINGMOD", "Ping request received with data: %d", packet->data[0]);
 
 				//Send PING_RESPONSE
-				connPacketModuleAction outPacket;
+				connPacketModule outPacket;
 				outPacket.header.messageType = MESSAGE_TYPE_MODULE_ACTION_RESPONSE;
 				outPacket.header.sender = node->persistentConfig.nodeId;
 				outPacket.header.receiver = packetHeader->sender;
@@ -138,8 +137,7 @@ void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
 				outPacket.data[0] = packet->data[0];
 				outPacket.data[1] = 111;
 
-				cm->SendMessageToReceiver(NULL, (u8*)&outPacket, SIZEOF_CONN_PACKET_MODULE_ACTION + 2, true);
-
+				cm->SendMessageToReceiver(NULL, (u8*)&outPacket, SIZEOF_CONN_PACKET_MODULE + 2, true);
 			}
 		}
 	}
@@ -147,7 +145,7 @@ void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
 	//Parse Module action_response messages
 	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_ACTION_RESPONSE){
 
-		connPacketModuleAction* packet = (connPacketModuleAction*)packetHeader;
+		connPacketModule* packet = (connPacketModule*)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId)
