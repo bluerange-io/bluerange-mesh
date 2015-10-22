@@ -100,7 +100,6 @@ bool PingModule::TerminalCommandHandler(string commandName, vector<string> comma
 
 
 			cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE + 1, true);
-
 			return true;
 		}
 	}
@@ -139,7 +138,6 @@ void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
 				outPacket.data[1] = 111;
 
 				cm->SendMessageToReceiver(NULL, (u8*)&outPacket, SIZEOF_CONN_PACKET_MODULE + 2, true);
-
 			}
 		}
 	}
