@@ -24,13 +24,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <Module.h>
 
-class PingModule: public Module
+class RSSIModule: public Module
 {
 	private:
         enum RSSISamplingModes{RSSI_SAMPLING_NONE=0, RSSI_SAMPLING_LOW=1, RSSI_SAMPLING_MEDIUM=2, RSSI_SAMPLING_HIGH=3};
 
 		//Module configuration that is saved persistently (size must be multiple of 4)
-		struct PingModuleConfiguration : ModuleConfiguration{
+		struct RSSIModuleConfiguration : ModuleConfiguration{
             u8 connectionRSSISamplingMode; //typeof RSSISamplingModes
             u8 advertisingRSSISamplingMode; //typeof RSSISamplingModes
 			int pingInterval;
@@ -38,20 +38,20 @@ class PingModule: public Module
 			int pingCount;
 		};
 
-		PingModuleConfiguration configuration;
+		RSSIModuleConfiguration configuration;
 
-		enum PingModuleTriggerActionMessages{
+		enum RSSIModuleTriggerActionMessages{
 			TRIGGER_PING=0
 		};
 
-		enum PingModuleActionResponseMessages{
+		enum RSSIModuleActionResponseMessages{
 			PING_RESPONSE=0
 		};
 
 		bool SendPing(nodeID targetNodeId);
 
 	public:
-		PingModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		RSSIModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 
 		void ConfigurationLoadedHandler();
 
