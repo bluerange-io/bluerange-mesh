@@ -84,6 +84,7 @@ CPP_SOURCE_FILES += ./src/modules/ScanningModule.cpp
 CPP_SOURCE_FILES += ./src/modules/StatusReporterModule.cpp
 CPP_SOURCE_FILES += ./src/modules/DebugModule.cpp
 CPP_SOURCE_FILES += ./src/modules/IoModule.cpp
+CPP_SOURCE_FILES += ./src/modules/PingModule.cpp
 CPP_SOURCE_FILES += ./src/test/TestBattery.cpp
 CPP_SOURCE_FILES += ./src/test/Testing.cpp
 CPP_SOURCE_FILES += ./src/utility/LedWrapper.cpp
