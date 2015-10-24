@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 extern "C"{
 #include "nrf_gpio.h"
+#include <app_error.h>
 }
 
 PingModule::PingModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
@@ -50,6 +51,8 @@ PingModule::PingModule(u16 moduleId, Node* node, ConnectionManager* cm, const ch
 
 	//Start module configuration loading
 	LoadModuleConfiguration();
+
+    configuration.moduleActive = true;
 }
 
 void PingModule::ConfigurationLoadedHandler()
@@ -64,12 +67,14 @@ void PingModule::ConfigurationLoadedHandler()
 	configuration.pingInterval = kTimerInterval;
 	configuration.lastPingTimer = 0;
 	configuration.pingCount = 0;
-
-        configuration.moduleActive = true;
+    configuration.connectionRSSISamplingMode = RSSISamplingModes::RSSI_SAMPLING_HIGH;
+    configuration.advertisingRSSISamplingMode = RSSISamplingModes::RSSI_SAMPLING_HIGH;
 
 	nrf_gpio_cfg_output(kPinNumberRed);
 	nrf_gpio_cfg_output(kPinNumberGreen);
 	nrf_gpio_cfg_output(kPinNumberBlue);
+
+    Config->enableConnectionRSSIMeasurement = true;
 
 	//Start the Module...
 	logt("PINGMOD", "ConfigLoaded");
@@ -95,6 +100,8 @@ void PingModule::ResetToDefaultConfiguration()
 	configuration.pingInterval = kTimerInterval;
 	configuration.pingCount = 0;
 	configuration.lastPingTimer = 0;
+    configuration.connectionRSSISamplingMode = RSSISamplingModes::RSSI_SAMPLING_HIGH;
+    configuration.advertisingRSSISamplingMode = RSSISamplingModes::RSSI_SAMPLING_HIGH;
 
 	//Set additional config values...
 	logt("PINGMOD", "Reset");
@@ -150,7 +157,7 @@ void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
                 switch(packet->actionType)
                 {
                     case PingModuleTriggerActionMessages::TRIGGER_PING:
-                        logt("PINGMOD", "Ping request received from %u with data: %d", packetHeader->sender, packet->data[0]);
+//                        logt("PINGMOD", "Ping request received from %u with data: %d", packetHeader->sender, packet->data[0]);
 
                         //Send PING_RESPONSE
                         connPacketModule outPacket;
@@ -211,7 +218,7 @@ void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
                 switch(packet->actionType)
                 {
                     case PingModuleActionResponseMessages::PING_RESPONSE:
-                        logt("PINGMOD", "MESSAGE_TYPE_MODULE_ACTION_RESPONSE: Got response.");
+//                        logt("PINGMOD", "MESSAGE_TYPE_MODULE_ACTION_RESPONSE: Got response.");
                         break;
 
                      default:
@@ -221,5 +228,64 @@ void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
             }
             break;
     }
+
 }
 
+void PingModule::MeshConnectionChangedHandler(Connection* connection)
+{
+    logt("PINGMOD", "MeshConnectionChangedHandler");
+    //New connection has just been made
+    if(connection->handshakeDone){
+        logt("PINGMOD", "MeshConnectionChangedHandler::Handshake");
+        if(Config->enableConnectionRSSIMeasurement){
+            logt("PINGMOD", "RSSI");
+            if(configuration.connectionRSSISamplingMode == RSSISamplingModes::RSSI_SAMPLING_HIGH){
+                logt("PINGMOD", "MeshConnectionChangedHandler::sampling");
+                StartConnectionRSSIMeasurement(connection);
+            }
+        }
+    }
+}
+
+void PingModule::StartConnectionRSSIMeasurement(Connection* connection){
+    u32 err = 0;
+
+    if (connection->isConnected)
+    {
+        //Reset old values
+        connection->rssiSamplesNum = 0;
+        connection->rssiSamplesSum = 0;
+
+        err = sd_ble_gap_rssi_start(connection->connectionHandle, 0, 0);
+        APP_ERROR_CHECK(err);
+
+        logt("PINGMOD", "************* RSSI measurement started for connection %u with code %u", connection->connectionId, err);
+    } else
+    {
+        logt("PINGMOD", "************* RSSI measurement not connected");
+    }
+}
+
+//This handler receives all ble events and can act on them
+void PingModule::BleEventHandler(ble_evt_t* bleEvent) {
+    //New RSSI measurement for connection received
+    if(bleEvent->header.evt_id == BLE_GAP_EVT_RSSI_CHANGED)
+    {
+        Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gap_evt.conn_handle);
+        i8 rssi = bleEvent->evt.gap_evt.params.rssi_changed.rssi;
+
+        connection->rssiSamplesNum++;
+        connection->rssiSamplesSum += rssi;
+
+        if(connection->rssiSamplesNum > 50){
+            connection->rssiAverage = connection->rssiSamplesSum / connection->rssiSamplesNum;
+
+            connection->rssiSamplesNum = 0;
+            connection->rssiSamplesSum = 0;
+
+            logt("PINGMOD", "New RSSI average %d", connection->rssiAverage);
+        }
+
+
+    }
+}

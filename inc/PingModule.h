@@ -27,10 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 class PingModule: public Module
 {
 	private:
+        enum RSSISamplingModes{RSSI_SAMPLING_NONE=0, RSSI_SAMPLING_LOW=1, RSSI_SAMPLING_MEDIUM=2, RSSI_SAMPLING_HIGH=3};
 
 		//Module configuration that is saved persistently (size must be multiple of 4)
 		struct PingModuleConfiguration : ModuleConfiguration{
-			//Insert more persistent config values here
+            u8 connectionRSSISamplingMode; //typeof RSSISamplingModes
+            u8 advertisingRSSISamplingMode; //typeof RSSISamplingModes
 			int pingInterval;
 			int lastPingTimer;
 			int pingCount;
@@ -64,4 +66,8 @@ class PingModule: public Module
 		//void NodeStateChangedHandler(discoveryState newState);
 
 		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+        virtual void MeshConnectionChangedHandler(Connection* connection);
+        void StartConnectionRSSIMeasurement(Connection* connection);
+        void BleEventHandler(ble_evt_t* bleEvent);
+
 };
