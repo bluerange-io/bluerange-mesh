@@ -134,9 +134,8 @@ class Conf
 		const u8 meshMaxOutConnections = 3; //Will certainly change with future S130 versions
 		const u8 meshMaxConnections = meshMaxInConnections + meshMaxOutConnections; //for convenience
 
-		const bool enableRadioNotificationHandler = false;
-
-		const bool enableConnectionRSSIMeasurement = false;
+        bool enableRadioNotificationHandler = false;
+		bool enableConnectionRSSIMeasurement = false;
 
 
 		// ########### ENCRYPTION ################################################
