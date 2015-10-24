@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <Utility.h>
 #include <Storage.h>
 #include <Node.h>
-#include <PingModule.h>
+#include <RSSIModule.h>
 #include <stdlib.h>
 #include <LedWrapper.h>
 
@@ -38,7 +38,7 @@ extern "C"{
 #include <app_error.h>
 }
 
-PingModule::PingModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
+RSSIModule::RSSIModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
 	: Module(moduleId, node, cm, name, storageSlot)
 {
 	//Register callbacks n' stuff
@@ -47,7 +47,7 @@ PingModule::PingModule(u16 moduleId, Node* node, ConnectionManager* cm, const ch
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
 	configurationPointer = &configuration;
-	configurationLength = sizeof(PingModuleConfiguration);
+	configurationLength = sizeof(RSSIModuleConfiguration);
 
 	//Start module configuration loading
 	LoadModuleConfiguration();
@@ -55,7 +55,7 @@ PingModule::PingModule(u16 moduleId, Node* node, ConnectionManager* cm, const ch
     configuration.moduleActive = true;
 }
 
-void PingModule::ConfigurationLoadedHandler()
+void RSSIModule::ConfigurationLoadedHandler()
 {
 	//Does basic testing on the loaded configuration
 	Module::ConfigurationLoadedHandler();
@@ -80,7 +80,7 @@ void PingModule::ConfigurationLoadedHandler()
 	logt("PINGMOD", "ConfigLoaded");
 }
 
-void PingModule::TimerEventHandler(u16 passedTime, u32 appTimer)
+void RSSIModule::TimerEventHandler(u16 passedTime, u32 appTimer)
 {
 	if(configuration.pingInterval != 0 && node->appTimerMs - configuration.lastPingTimer > configuration.pingInterval)
 	{
@@ -91,7 +91,7 @@ void PingModule::TimerEventHandler(u16 passedTime, u32 appTimer)
 	}
 }
 
-void PingModule::ResetToDefaultConfiguration()
+void RSSIModule::ResetToDefaultConfiguration()
 {
 	//Set default configuration values
 	configuration.moduleId = moduleId;
@@ -107,7 +107,7 @@ void PingModule::ResetToDefaultConfiguration()
 	logt("PINGMOD", "Reset");
 }
 
-bool PingModule::SendPing(nodeID targetNodeId)
+bool RSSIModule::SendPing(nodeID targetNodeId)
 {
 	// logt("PINGMOD", "Trying to ping node %u from %u", targetNodeId, node->persistentConfig.nodeId);
 
@@ -118,14 +118,14 @@ bool PingModule::SendPing(nodeID targetNodeId)
         packet.header.receiver = targetNodeId;
 
         packet.moduleId = moduleId;
-        packet.actionType = PingModuleTriggerActionMessages::TRIGGER_PING;
+        packet.actionType = RSSIModuleTriggerActionMessages::TRIGGER_PING;
        	packet.data[0] = configuration.pingCount++;
 
         cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE + 1, true);
 	return(true);
 }
 
-bool PingModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
+bool RSSIModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
 	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)
 	{
@@ -141,7 +141,7 @@ bool PingModule::TerminalCommandHandler(string commandName, vector<string> comma
 	return Module::TerminalCommandHandler(commandName, commandArgs);
 }
 
-void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
+void RSSIModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
 {
 	//Must call superclass for handling
 	Module::ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
@@ -156,7 +156,7 @@ void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
             {
                 switch(packet->actionType)
                 {
-                    case PingModuleTriggerActionMessages::TRIGGER_PING:
+                    case RSSIModuleTriggerActionMessages::TRIGGER_PING:
 //                        logt("PINGMOD", "Ping request received from %u with data: %d", packetHeader->sender, packet->data[0]);
 
                         //Send PING_RESPONSE
@@ -166,7 +166,7 @@ void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
                         outPacket.header.receiver = packetHeader->sender;
 
                         outPacket.moduleId = moduleId;
-                        outPacket.actionType = PingModuleActionResponseMessages::PING_RESPONSE;
+                        outPacket.actionType = RSSIModuleActionResponseMessages::PING_RESPONSE;
                         outPacket.data[0] = packet->data[0];
                         outPacket.data[1] = packet->data[0];
 
@@ -205,7 +205,7 @@ void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
                         break;
 
                      default:
-                         logt("PINGMOD", "PingModuleTriggerActionMessages::TRIGGER_PING: Unknown action: %d", packet->actionType);
+                         logt("PINGMOD", "RSSIModuleTriggerActionMessages::TRIGGER_PING: Unknown action: %d", packet->actionType);
                          break;
                 }
             }
@@ -217,7 +217,7 @@ void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
             {
                 switch(packet->actionType)
                 {
-                    case PingModuleActionResponseMessages::PING_RESPONSE:
+                    case RSSIModuleActionResponseMessages::PING_RESPONSE:
 //                        logt("PINGMOD", "MESSAGE_TYPE_MODULE_ACTION_RESPONSE: Got response.");
                         break;
 
@@ -231,7 +231,7 @@ void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
 
 }
 
-void PingModule::MeshConnectionChangedHandler(Connection* connection)
+void RSSIModule::MeshConnectionChangedHandler(Connection* connection)
 {
     logt("PINGMOD", "MeshConnectionChangedHandler");
     //New connection has just been made
@@ -247,7 +247,7 @@ void PingModule::MeshConnectionChangedHandler(Connection* connection)
     }
 }
 
-void PingModule::StartConnectionRSSIMeasurement(Connection* connection){
+void RSSIModule::StartConnectionRSSIMeasurement(Connection* connection){
     u32 err = 0;
 
     if (connection->isConnected)
@@ -267,7 +267,7 @@ void PingModule::StartConnectionRSSIMeasurement(Connection* connection){
 }
 
 //This handler receives all ble events and can act on them
-void PingModule::BleEventHandler(ble_evt_t* bleEvent) {
+void RSSIModule::BleEventHandler(ble_evt_t* bleEvent) {
     //New RSSI measurement for connection received
     if(bleEvent->header.evt_id == BLE_GAP_EVT_RSSI_CHANGED)
     {

@@ -22,7 +22,7 @@
 #include <ScanningModule.h>
 #include <EnrollmentModule.h>
 #include <IoModule.h>
-#include <PingModule.h>
+#include <RSSIModule.h>
 
 extern "C"
 {
@@ -108,7 +108,7 @@ Node::Node(networkID networkId)
 	activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "scan", 5);
 	activeModules[5] = new EnrollmentModule(moduleID::ENROLLMENT_MODULE_ID, this, cm, "enroll", 6);
     activeModules[6] = new IoModule(moduleID::IO_MODULE_ID, this, cm, "io", 7);
-    activeModules[7] = new PingModule(moduleID::PING_MODULE_ID, this, cm, "ping", 8);
+    activeModules[7] = new RSSIModule(moduleID::PING_MODULE_ID, this, cm, "ping", 8);
 
 
 	//Register a pre/post transmit hook for radio events
