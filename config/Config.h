@@ -239,7 +239,7 @@ enum moduleID{
 
 	//Custom modules
     DEBUG_MODULE_ID=30000,
-    PING_MODULE_ID=30001
+    RSSI_MODULE_ID=30001
 };
 
 /*############ Regarding node ids ################*/
