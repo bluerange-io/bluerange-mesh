@@ -74,8 +74,6 @@ void RSSIModule::ConfigurationLoadedHandler()
 	nrf_gpio_cfg_output(kPinNumberGreen);
 	nrf_gpio_cfg_output(kPinNumberBlue);
 
-    Config->enableConnectionRSSIMeasurement = true;
-
 	//Start the Module...
 	logt("PINGMOD", "ConfigLoaded");
 }
