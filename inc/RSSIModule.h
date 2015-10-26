@@ -49,6 +49,8 @@ class RSSIModule: public Module
 		};
 
 		bool SendPing(nodeID targetNodeId);
+        void update_led_colour();
+        void set_led_colour(int colour);
 
 	public:
 		RSSIModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);

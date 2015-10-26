@@ -28,15 +28,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <LedWrapper.h>
 
+extern "C"
+{
+#include "nrf_gpio.h"
+#include <app_error.h>
+}
+
 #define kTimerInterval 		1*1000
 #define kPinNumberRed		18
 #define kPinNumberGreen   	19
 #define kPinNumberBlue   	20
 
-extern "C"{
-#include "nrf_gpio.h"
-#include <app_error.h>
-}
+#define kLEDColourOff       0
+#define kLEDColourRed       1
+#define kLEDColourOrange    2
+#define kLEDColourGreen     3
 
 RSSIModule::RSSIModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
 	: Module(moduleId, node, cm, name, storageSlot)
@@ -109,17 +115,16 @@ bool RSSIModule::SendPing(nodeID targetNodeId)
 {
 	// logt("PINGMOD", "Trying to ping node %u from %u", targetNodeId, node->persistentConfig.nodeId);
 
-        //Send ping packet to that node
-        connPacketModule packet;
-        packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
-        packet.header.sender = node->persistentConfig.nodeId;
-        packet.header.receiver = targetNodeId;
+    connPacketModule packet;
+    packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
+    packet.header.sender = node->persistentConfig.nodeId;
+    packet.header.receiver = targetNodeId;
 
-        packet.moduleId = moduleId;
-        packet.actionType = RSSIModuleTriggerActionMessages::TRIGGER_PING;
-       	packet.data[0] = configuration.pingCount++;
+    packet.moduleId = moduleId;
+    packet.actionType = RSSIModuleTriggerActionMessages::TRIGGER_PING;
+    packet.data[0] = configuration.pingCount++;
 
-        cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE + 1, true);
+    cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE + 1, true);
 	return(true);
 }
 
@@ -137,6 +142,61 @@ bool RSSIModule::TerminalCommandHandler(string commandName, vector<string> comma
 
 	//Must be called to allow the module to get and set the config
 	return Module::TerminalCommandHandler(commandName, commandArgs);
+}
+
+void RSSIModule::set_led_colour(int colour )
+{
+    switch (colour)
+    {
+        case kLEDColourOff:
+            nrf_gpio_pin_write(kPinNumberRed, 0);
+            nrf_gpio_pin_write(kPinNumberGreen, 0);
+            nrf_gpio_pin_write(kPinNumberBlue, 0);
+            break;
+
+        default:
+        case kLEDColourRed:
+            nrf_gpio_pin_write(kPinNumberRed, 255);
+            nrf_gpio_pin_write(kPinNumberGreen, 0);
+            nrf_gpio_pin_write(kPinNumberBlue, 0);
+            break;
+
+        case kLEDColourOrange:
+            nrf_gpio_pin_write(kPinNumberRed, 153);
+            nrf_gpio_pin_write(kPinNumberGreen, 76);
+            nrf_gpio_pin_write(kPinNumberBlue, 0);
+            break;
+
+        case kLEDColourGreen:
+            nrf_gpio_pin_write(kPinNumberRed, 0);
+            nrf_gpio_pin_write(kPinNumberGreen, 255);
+            nrf_gpio_pin_write(kPinNumberBlue, 0);
+            break;
+    }
+}
+
+void RSSIModule::update_led_colour()
+{
+    int a = cm->connections[0]->GetAverageRSSI();
+    int b = cm->connections[1]->GetAverageRSSI();
+    int c = cm->connections[2]->GetAverageRSSI();
+    int d = cm->connections[3]->GetAverageRSSI();
+    int sum = -(a+b+c+d);
+
+    if(sum == 0)
+    {
+        set_led_colour(kLEDColourOff);
+    } else
+    if(sum >= 80) {
+        set_led_colour(kLEDColourRed);
+    } else
+    if (sum >= 70) {
+        set_led_colour(kLEDColourOrange);
+    } else {
+        set_led_colour(kLEDColourGreen);
+    }
+
+    logt("PINGMOD", "RSSI: [%d] [%d] [%d] [%d] Sum: %d", a, b, c, d, sum);
 }
 
 void RSSIModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
@@ -169,37 +229,7 @@ void RSSIModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
                         outPacket.data[1] = packet->data[0];
 
                         cm->SendMessageToReceiver(NULL, (u8*)&outPacket, SIZEOF_CONN_PACKET_MODULE + 2, true);
-
-                        {
-                            int a = cm->connections[0]->GetAverageRSSI();
-                            int b = cm->connections[1]->GetAverageRSSI();
-                            int c = cm->connections[2]->GetAverageRSSI();
-                            int d = cm->connections[3]->GetAverageRSSI();
-                            int sum = -(a+b+c+d);
-
-                            if(sum == 0)
-                            {
-                                    nrf_gpio_pin_write(kPinNumberRed, 0);
-                                    nrf_gpio_pin_write(kPinNumberGreen, 0);
-                                    nrf_gpio_pin_write(kPinNumberBlue, 0);
-                            } else
-                            if(sum >= 80) {
-                                    nrf_gpio_pin_write(kPinNumberRed, 255);
-                                    nrf_gpio_pin_write(kPinNumberGreen, 0);
-                                    nrf_gpio_pin_write(kPinNumberBlue, 0);
-                            } else
-                            if (sum >= 70) {
-                                nrf_gpio_pin_write(kPinNumberRed, 153);
-                                nrf_gpio_pin_write(kPinNumberGreen, 76);
-                                nrf_gpio_pin_write(kPinNumberBlue, 0);
-                            } else {
-                                nrf_gpio_pin_write(kPinNumberRed, 0);
-                                nrf_gpio_pin_write(kPinNumberGreen, 255);
-                                nrf_gpio_pin_write(kPinNumberBlue, 0);
-                            }
-			
-                        	logt("PINGMOD", "RSSI: [%d] [%d] [%d] [%d] Sum: %d", a, b, c, d, sum);
-                        }
+                        update_led_colour();
                         break;
 
                      default:
@@ -245,7 +275,8 @@ void RSSIModule::MeshConnectionChangedHandler(Connection* connection)
     }
 }
 
-void RSSIModule::StartConnectionRSSIMeasurement(Connection* connection){
+void RSSIModule::StartConnectionRSSIMeasurement(Connection* connection)
+{
     u32 err = 0;
 
     if (connection->isConnected)
