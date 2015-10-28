@@ -102,8 +102,8 @@ void StatusReporterModule::ResetToDefaultConfiguration()
 
 	configuration.statusReportingIntervalMs = 0;
 	configuration.connectionReportingIntervalMs = 30 * 1000;
-	configuration.connectionRSSISamplingMode = RSSISampingModes::RSSI_SAMLING_HIGH;
-	configuration.advertisingRSSISamplingMode = RSSISampingModes::RSSI_SAMLING_HIGH;
+	configuration.connectionRSSISamplingMode = RSSISamplingModes::RSSI_SAMPLING_HIGH;
+	configuration.advertisingRSSISamplingMode = RSSISamplingModes::RSSI_SAMPLING_HIGH;
 
 	//Set additional config values...
 
@@ -476,7 +476,7 @@ void StatusReporterModule::MeshConnectionChangedHandler(Connection* connection)
 		//TODO: Implement low and medium rssi sampling with timer handler
 		//TODO: disable and enable rssi sampling on existing connections
 		if(Config->enableConnectionRSSIMeasurement){
-			if(configuration.connectionRSSISamplingMode == RSSISampingModes::RSSI_SAMLING_HIGH){
+			if(configuration.connectionRSSISamplingMode == RSSISamplingModes::RSSI_SAMPLING_HIGH){
 				StartConnectionRSSIMeasurement(connection);
 			}
 		}

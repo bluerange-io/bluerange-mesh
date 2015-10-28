@@ -135,8 +135,7 @@ class Conf
 		const u8 meshMaxConnections = meshMaxInConnections + meshMaxOutConnections; //for convenience
 
 		const bool enableRadioNotificationHandler = false;
-
-		const bool enableConnectionRSSIMeasurement = false;
+		const bool enableConnectionRSSIMeasurement = true;
 
 
 		// ########### ENCRYPTION ################################################
