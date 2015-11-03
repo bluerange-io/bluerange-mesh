@@ -95,6 +95,7 @@ CPP_SOURCE_FILES += ./src/utility/SimpleQueue.cpp
 CPP_SOURCE_FILES += ./src/utility/Storage.cpp
 CPP_SOURCE_FILES += ./src/utility/Terminal.cpp
 CPP_SOURCE_FILES += ./src/utility/Utility.cpp
+CPP_SOURCE_FILES += ./src_examples/RSSIModule.cpp
 
 C_SOURCE_FILES += $(EHAL_PATH)/ARM/Nordic/nRF51/src/Vectors_nRF51.c
 C_SOURCE_FILES += $(COMPONENTS)/libraries/timer/app_timer.c
@@ -110,6 +111,7 @@ C_SOURCE_FILES += $(COMPONENTS)/softdevice/common/softdevice_handler/softdevice_
 INC_PATHS += -I./inc
 INC_PATHS += -I./inc_c
 INC_PATHS += -I./config
+INC_PATHS += -I./src_examples
 
 #arm GCC
 

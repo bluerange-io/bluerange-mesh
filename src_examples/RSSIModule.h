@@ -27,11 +27,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 class RSSIModule: public Module
 {
 	private:
-        enum RSSISamplingModes{RSSI_SAMPLING_NONE=0, RSSI_SAMPLING_LOW=1, RSSI_SAMPLING_MEDIUM=2, RSSI_SAMPLING_HIGH=3};
+        enum RSSISamplingModes {
+            RSSI_SAMPLING_NONE
+            , RSSI_SAMPLING_LOW
+            , RSSI_SAMPLING_MEDIUM
+            , RSSI_SAMPLING_HIGH
+        };
 
 		//Module configuration that is saved persistently (size must be multiple of 4)
-		struct RSSIModuleConfiguration : ModuleConfiguration{
-            u8 connectionRSSISamplingMode; //typeof RSSISamplingModes
+		struct RSSIModuleConfiguration : ModuleConfiguration {
+            u8 connectionRSSISamplingMode;  //typeof RSSISamplingModes
             u8 advertisingRSSISamplingMode; //typeof RSSISamplingModes
 			int pingInterval;
 			int lastPingTimer;
@@ -40,11 +45,11 @@ class RSSIModule: public Module
 
 		RSSIModuleConfiguration configuration;
 
-		enum RSSIModuleTriggerActionMessages{
+		enum RSSIModuleTriggerActionMessages {
 			TRIGGER_PING=0
 		};
 
-		enum RSSIModuleActionResponseMessages{
+		enum RSSIModuleActionResponseMessages {
 			PING_RESPONSE=0
 		};
 
@@ -56,20 +61,12 @@ class RSSIModule: public Module
 		RSSIModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 
 		void ConfigurationLoadedHandler();
-
 		void ResetToDefaultConfiguration();
-
 		void TimerEventHandler(u16 passedTime, u32 appTimer);
-
-		//void BleEventHandler(ble_evt_t* bleEvent);
-
 		void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
-
-		//void NodeStateChangedHandler(discoveryState newState);
-
 		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
-        virtual void MeshConnectionChangedHandler(Connection* connection);
-        void StartConnectionRSSIMeasurement(Connection* connection);
-        void BleEventHandler(ble_evt_t* bleEvent);
 
+        virtual void MeshConnectionChangedHandler(Connection* connection);
+        virtual void StartConnectionRSSIMeasurement(Connection* connection);
+        virtual void BleEventHandler(ble_evt_t* bleEvent);
 };

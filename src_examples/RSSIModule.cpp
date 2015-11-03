@@ -61,27 +61,23 @@ RSSIModule::RSSIModule(u16 moduleId, Node* node, ConnectionManager* cm, const ch
     configuration.moduleActive = true;
 }
 
-void RSSIModule::ConfigurationLoadedHandler()
-{
-	//Does basic testing on the loaded configuration
-	Module::ConfigurationLoadedHandler();
+void RSSIModule::ConfigurationLoadedHandler() {
+    //Does basic testing on the loaded configuration
+    Module::ConfigurationLoadedHandler();
 
-	//Version migration can be added here
-	if(configuration.moduleVersion == 1){/* ... */};
+    //Version migration can be added here
+    if (configuration.moduleVersion == 1) {/* ... */};
 
-	//Do additional initialization upon loading the config
-	configuration.pingInterval = kTimerInterval;
-	configuration.lastPingTimer = 0;
-	configuration.pingCount = 0;
+    //Do additional initialization upon loading the config
+    configuration.pingInterval = kTimerInterval;
+    configuration.lastPingTimer = 0;
+    configuration.pingCount = 0;
     configuration.connectionRSSISamplingMode = RSSISamplingModes::RSSI_SAMPLING_HIGH;
     configuration.advertisingRSSISamplingMode = RSSISamplingModes::RSSI_SAMPLING_HIGH;
 
-	nrf_gpio_cfg_output(kPinNumberRed);
-	nrf_gpio_cfg_output(kPinNumberGreen);
-	nrf_gpio_cfg_output(kPinNumberBlue);
-
-	//Start the Module...
-	logt("PINGMOD", "ConfigLoaded");
+    nrf_gpio_cfg_output(kPinNumberRed);
+    nrf_gpio_cfg_output(kPinNumberGreen);
+    nrf_gpio_cfg_output(kPinNumberBlue);
 }
 
 void RSSIModule::TimerEventHandler(u16 passedTime, u32 appTimer)
@@ -89,15 +85,12 @@ void RSSIModule::TimerEventHandler(u16 passedTime, u32 appTimer)
 	if(configuration.pingInterval != 0 && node->appTimerMs - configuration.lastPingTimer > configuration.pingInterval)
 	{
 		configuration.lastPingTimer = node->appTimerMs;
-
-		SendPing(DEST_BOARD_ID); 
-
+		SendPing(DEST_BOARD_ID);
 	}
 }
 
 void RSSIModule::ResetToDefaultConfiguration()
 {
-	//Set default configuration values
 	configuration.moduleId = moduleId;
 	configuration.moduleActive = false;
 	configuration.moduleVersion = 1;
@@ -106,15 +99,10 @@ void RSSIModule::ResetToDefaultConfiguration()
 	configuration.lastPingTimer = 0;
     configuration.connectionRSSISamplingMode = RSSISamplingModes::RSSI_SAMPLING_HIGH;
     configuration.advertisingRSSISamplingMode = RSSISamplingModes::RSSI_SAMPLING_HIGH;
-
-	//Set additional config values...
-	logt("PINGMOD", "Reset");
 }
 
 bool RSSIModule::SendPing(nodeID targetNodeId)
 {
-	// logt("PINGMOD", "Trying to ping node %u from %u", targetNodeId, node->persistentConfig.nodeId);
-
     connPacketModule packet;
     packet.header.messageType = MESSAGE_TYPE_MODULE_TRIGGER_ACTION;
     packet.header.sender = node->persistentConfig.nodeId;
@@ -133,7 +121,7 @@ bool RSSIModule::TerminalCommandHandler(string commandName, vector<string> comma
 	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)
 	{
 		//React on commands, return true if handled, false otherwise
-		if(commandName == "pingmod"){
+		if(commandName == "pingmod") {
 			nodeID targetNodeId = atoi(commandArgs[0].c_str());
 
 			return(SendPing(targetNodeId));
@@ -183,14 +171,11 @@ void RSSIModule::update_led_colour()
     int d = cm->connections[3]->GetAverageRSSI();
     int sum = -(a+b+c+d);
 
-    if(sum == 0)
-    {
+    if(sum == 0) {
         set_led_colour(kLEDColourOff);
-    } else
-    if(sum >= 80) {
+    } else if(sum >= 80) {
         set_led_colour(kLEDColourRed);
-    } else
-    if (sum >= 70) {
+    } else if (sum >= 70) {
         set_led_colour(kLEDColourOrange);
     } else {
         set_led_colour(kLEDColourGreen);
@@ -215,7 +200,6 @@ void RSSIModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
                 switch(packet->actionType)
                 {
                     case RSSIModuleTriggerActionMessages::TRIGGER_PING:
-//                        logt("PINGMOD", "Ping request received from %u with data: %d", packetHeader->sender, packet->data[0]);
 
                         //Send PING_RESPONSE
                         connPacketModule outPacket;
@@ -246,7 +230,6 @@ void RSSIModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
                 switch(packet->actionType)
                 {
                     case RSSIModuleActionResponseMessages::PING_RESPONSE:
-//                        logt("PINGMOD", "MESSAGE_TYPE_MODULE_ACTION_RESPONSE: Got response.");
                         break;
 
                      default:
@@ -261,14 +244,10 @@ void RSSIModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket
 
 void RSSIModule::MeshConnectionChangedHandler(Connection* connection)
 {
-    logt("PINGMOD", "MeshConnectionChangedHandler");
     //New connection has just been made
     if(connection->handshakeDone){
-        logt("PINGMOD", "MeshConnectionChangedHandler::Handshake");
         if(Config->enableConnectionRSSIMeasurement){
-            logt("PINGMOD", "RSSI");
             if(configuration.connectionRSSISamplingMode == RSSISamplingModes::RSSI_SAMPLING_HIGH){
-                logt("PINGMOD", "MeshConnectionChangedHandler::sampling");
                 StartConnectionRSSIMeasurement(connection);
             }
         }
@@ -288,14 +267,9 @@ void RSSIModule::StartConnectionRSSIMeasurement(Connection* connection)
         err = sd_ble_gap_rssi_start(connection->connectionHandle, 0, 0);
         APP_ERROR_CHECK(err);
 
-        logt("PINGMOD", "************* RSSI measurement started for connection %u with code %u", connection->connectionId, err);
-    } else
-    {
-        logt("PINGMOD", "************* RSSI measurement not connected");
     }
 }
 
-//This handler receives all ble events and can act on them
 void RSSIModule::BleEventHandler(ble_evt_t* bleEvent) {
     //New RSSI measurement for connection received
     if(bleEvent->header.evt_id == BLE_GAP_EVT_RSSI_CHANGED)
@@ -306,15 +280,12 @@ void RSSIModule::BleEventHandler(ble_evt_t* bleEvent) {
         connection->rssiSamplesNum++;
         connection->rssiSamplesSum += rssi;
 
-        if(connection->rssiSamplesNum > 50){
+        if(connection->rssiSamplesNum > 50)
+        {
             connection->rssiAverage = connection->rssiSamplesSum / connection->rssiSamplesNum;
 
             connection->rssiSamplesNum = 0;
             connection->rssiSamplesSum = 0;
-
-            logt("PINGMOD", "New RSSI average %d", connection->rssiAverage);
         }
-
-
     }
 }
