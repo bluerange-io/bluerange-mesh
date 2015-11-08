@@ -5,3 +5,4 @@ _build/
 /logs/
 /Debug52/
 /deploy/current.txt
+build/
