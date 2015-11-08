@@ -49,4 +49,5 @@ If you want to work and customise this example further, you should move its file
 ### RGB LED setup
 
 Wire your node to an RGB using this schema:
+https://cloud.githubusercontent.com/assets/19006/11022371/fc4614e8-862a-11e5-9618-0ed1a32d75aa.png
 
