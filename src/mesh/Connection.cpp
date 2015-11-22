@@ -115,7 +115,6 @@ void Connection::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 
 	this->connectionHandle = bleEvent->evt.gap_evt.conn_handle;
 	this->isConnected = true;
-
 }
 
 
