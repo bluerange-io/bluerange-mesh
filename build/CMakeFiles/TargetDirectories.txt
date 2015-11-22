@@ -1,0 +1,1 @@
+/Users/ThoughtWorks/nrf/projects/fruitymesh/build/CMakeFiles/fruitymesh.elf.dir
