@@ -1059,7 +1059,7 @@ void Node::RadioEventHandler(bool radioActive)
 clusterID Node::GenerateClusterID(void)
 {
 	//Combine connection loss and nodeId to generate a unique cluster id
-	clusterID newId = this->persistentConfig.nodeId + this->persistentConfig.connectionLossCounter << 16;
+	clusterID newId = this->persistentConfig.nodeId + (this->persistentConfig.connectionLossCounter << 16);
 
 	logt("NODE", "New cluster id generated %x", newId);
 	return newId;
