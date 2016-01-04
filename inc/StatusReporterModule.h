@@ -34,7 +34,7 @@ class StatusReporterModule: public Module
 {
 	private:
 
-		enum RSSISampingModes{RSSI_SAMLING_NONE=0, RSSI_SAMLING_LOW=1, RSSI_SAMLING_MEDIUM=2, RSSI_SAMLING_HIGH=3};
+		enum RSSISamplingModes{RSSI_SAMPLING_NONE=0, RSSI_SAMPLING_LOW=1, RSSI_SAMPLING_MEDIUM=2, RSSI_SAMPLING_HIGH=3};
 
 		//Module configuration that is saved persistently (size must be multiple of 4)
 		struct StatusReporterModuleConfiguration: ModuleConfiguration
@@ -42,8 +42,8 @@ class StatusReporterModule: public Module
 				//Insert more persistent config values here
 				u16 connectionReportingIntervalMs;
 				u16 statusReportingIntervalMs;
-				u8 connectionRSSISamplingMode; //typeof RSSISampingModes
-				u8 advertisingRSSISamplingMode; //typeof RSSISampingModes
+				u8 connectionRSSISamplingMode; //typeof RSSISamplingModes
+				u8 advertisingRSSISamplingMode; //typeof RSSISamplingModes
 				u16 reserved;
 		};
 

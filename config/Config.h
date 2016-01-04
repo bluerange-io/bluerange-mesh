@@ -135,9 +135,7 @@ class Conf
 		const u8 meshMaxConnections = meshMaxInConnections + meshMaxOutConnections; //for convenience
 
 		const bool enableRadioNotificationHandler = false;
-
-		const bool enableConnectionRSSIMeasurement = false;
-
+		const bool enableConnectionRSSIMeasurement = true;
 
 		// ########### ENCRYPTION ################################################
 		//When enabling encryption, the mesh handle can only be read through an encrypted connection
@@ -239,7 +237,8 @@ enum moduleID{
 	IO_MODULE_ID=60,
 
 	//Custom modules
-	DEBUG_MODULE_ID=30000
+    DEBUG_MODULE_ID=30000,
+    RSSI_MODULE_ID=30001
 };
 
 /*############ Regarding node ids ################*/

@@ -106,8 +106,7 @@ Node::Node(networkID networkId)
 	activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "adv", 4);
 	activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "scan", 5);
 	activeModules[5] = new EnrollmentModule(moduleID::ENROLLMENT_MODULE_ID, this, cm, "enroll", 6);
-	activeModules[6] = new IoModule(moduleID::IO_MODULE_ID, this, cm, "io", 7);
-
+    activeModules[6] = new IoModule(moduleID::IO_MODULE_ID, this, cm, "io", 7);
 
 	//Register a pre/post transmit hook for radio events
 	if(Config->enableRadioNotificationHandler){
