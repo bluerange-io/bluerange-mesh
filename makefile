@@ -9,7 +9,7 @@ TARGET_BOARD         ?= BOARD_PCA10031
 # Define relative paths to SDK components
 #------------------------------------------------------------------------------
 
-SDK_BASE      := $(HOME)/nrf/sdk/nrf_sdk_9_0
+SDK_BASE      := $(HOME)/nrf/sdk/nrf51_sdk_latest
 COMPONENTS    := $(SDK_BASE)/components
 TEMPLATE_PATH := $(COMPONENTS)/toolchain/gcc
 EHAL_PATH     := $(HOME)/nrf/sdk/ehal_latest
