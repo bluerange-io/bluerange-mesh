@@ -198,16 +198,18 @@ class Conf
 // ########### COMPILE TIME SETTINGS ##########################################
 
 //Selecting the board can be done at runtime
-#ifdef NRF51
-#include <board_pca10031.h>
-#include <board_ars100748.h>
-#endif
-#ifdef NRF52
+#if defined(NRF51)
+	#include <board_pca10031.h>
+	#include <board_ars100748.h>
+	#define SET_BOARD() SET_PCA10031_BOARD()
+	//#define SET_BOARD() SET_ARS100748_BOARD()
+#elif defined(NRF52)
 	#include <board_pca10036.h>
+	#define SET_BOARD() SET_PCA10036_BOARD()
+#else
+	#error "Specify SoC model (NR51 or NRF52)"
 #endif
 
-#define SET_BOARD() SET_PCA10031_BOARD()
-//#define SET_BOARD() SET_ARS100748_BOARD()
 //#define SET_BOARD() detectBoardAndSetConfig() //Detect the board at runtime
 
 //Each of the Connections has a buffer for outgoing packets, this is its size in bytes

@@ -73,7 +73,11 @@ extern "C"{
 #include <stdio.h>
 #include <ble_gap.h>
 #include <ble_gatts.h>
+#if defined(NRF51)
 #include <nrf51.h>
+#elif defined(NRF52)
+#include <nrf52.h>
+#endif
 #include <nrf_sdm.h>
 #include <ble.h>
 
