@@ -40,7 +40,7 @@ class ConnectionManagerCallback{
 		virtual ~ConnectionManagerCallback();
 		virtual void DisconnectionHandler(ble_evt_t* bleEvent) = 0;
 		virtual void ConnectionSuccessfulHandler(ble_evt_t* bleEvent) = 0;
-		virtual void ConnectionTimeoutHandler(ble_evt_t* bleEvent) = 0;
+		virtual void ConnectingTimeoutHandler(ble_evt_t* bleEvent) = 0;
 		virtual void messageReceivedCallback(connectionPacket* inPacket) = 0;
 };
 
@@ -56,7 +56,6 @@ class ConnectionManager
 		//An outConnection is initialized before being connected (saved here during initializing phase)
 		Connection* pendingConnection;
 
-
 	public:
 		static ConnectionManager* getInstance(){
 			if(!instance){
@@ -64,6 +63,8 @@ class ConnectionManager
 			}
 			return instance;
 		}
+
+		Node* node;
 
 		ConnectionManagerCallback* connectionManagerCallback;
 
@@ -75,20 +76,13 @@ class ConnectionManager
 
 		bool doHandshake;
 
-		//Keep track if the GAP module is busy
-
-		//Keep track of outgoing packets and the transmit buffers
-		u16 pendingPackets;
-
-		u8 txBuffersPerLink;
-
 		u8 freeInConnections;
 		u8 freeOutConnections;
 
 		Connection* inConnection;
-		Connection* outConnections[MAXIMUM_CONNECTIONS];
+		Connection* outConnections[MESH_OUT_CONNECTIONS];
 
-		Connection* connections[MAXIMUM_CONNECTIONS];
+		Connection* connections[MESH_IN_CONNECTIONS + MESH_OUT_CONNECTIONS];
 
 		Connection* getFreeConnection();
 
@@ -96,12 +90,15 @@ class ConnectionManager
 		Connection* ConnectAsMaster(nodeID partnerId, ble_gap_addr_t* address, u16 writeCharacteristicHandle);
 
 		void Disconnect(u16 connectionHandle);
-		void DisconnectOtherConnections(Connection* connection);
+		void ForceDisconnectOtherConnections(Connection* connection);
 
 		//Functions used for sending messages
 		bool SendMessage(Connection* connection, u8* data, u16 dataLength, bool reliable);
 		void SendMessageOverConnections(Connection* ignoreConnection, u8* data, u16 dataLength, bool reliable);
 		void SendMessageToReceiver(Connection* originConnection, u8* data, u16 dataLength, bool reliable);
+
+		//Do not use this function because it will send packets to connections whose handshake is not yet finished
+		bool SendHandshakeMessage(Connection* connection, u8* data, u16 dataLength, bool reliable);
 
 		Connection* GetConnectionFromHandle(u16 connectionHandle);
 		Connection* GetFreeOutConnection();
@@ -109,18 +106,27 @@ class ConnectionManager
 		Connection* GetConnectionToShortestSink(Connection* excludeConnection);
 		clusterSIZE GetHopsToShortestSink(Connection* excludeConnection);
 
+		u16 GetPendingPackets();
+
+		void SetConnectionInterval(u16 connectionInterval);
+
 		//These methods can be accessed by the Connection classes
 
 		//GAPController Handlers
 		static void DisconnectionHandler(ble_evt_t* bleEvent);
 		static void ConnectionSuccessfulHandler(ble_evt_t* bleEvent);
 		static void ConnectionEncryptedHandler(ble_evt_t* bleEvent);
-		static void ConnectionTimeoutHandler(ble_evt_t* bleEvent);
+		static void ConnectingTimeoutHandler(ble_evt_t* bleEvent);
 
 		//GATTController Handlers
 		static void messageReceivedCallback(ble_evt_t* bleEvent);
 		static void handleDiscoveredCallback(u16 connectionHandle, u16 characteristicHandle);
 		static void dataTransmittedCallback(ble_evt_t* bleEvent);
+
+		void PacketSuccessfullyQueuedCallback(Connection* connection, sizedData packetData);
+
+		//Callbacks are kinda complicated, so we handle BLE events directly in this class
+		void BleEventHandler(ble_evt_t* bleEvent);
 
 };
 

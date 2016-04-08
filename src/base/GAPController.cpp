@@ -43,7 +43,7 @@ extern "C"{
 //Initialize
 void (*GAPController::connectionSuccessCallback)(ble_evt_t* bleEvent);
 void (*GAPController::connectionEncryptedCallback)(ble_evt_t* bleEvent);
-void (*GAPController::connectionTimeoutCallback)(ble_evt_t* bleEvent);
+void (*GAPController::connectingTimeoutCallback)(ble_evt_t* bleEvent);
 void (*GAPController::disconnectionCallback)(ble_evt_t* bleEvent);
 
 bool GAPController::currentlyConnecting = false;
@@ -66,11 +66,11 @@ void GAPController::bleConfigureGAP(){
 
 	//Set the GAP device name
 	err = sd_ble_gap_device_name_set(&secPermissionOpen, (u8*)DEVICE_NAME, strlen(DEVICE_NAME));
-	APP_ERROR_CHECK(err);
+	APP_ERROR_CHECK(err); //OK
 
 	//Set the appearance of the device as defined in http://developer.nordicsemi.com/nRF51_SDK/doc/7.1.0/s110/html/a00837.html
 	err = sd_ble_gap_appearance_set(BLE_APPEARANCE_GENERIC_COMPUTER);
-	APP_ERROR_CHECK(err);
+	APP_ERROR_CHECK(err); //OK
 
 	//Set gap peripheral preferred connection parameters (not used by the mesh implementation)
 	ble_gap_conn_params_t gapConnectionParams;
@@ -80,14 +80,14 @@ void GAPController::bleConfigureGAP(){
 	gapConnectionParams.slave_latency = Config->meshPeripheralSlaveLatency;
 	gapConnectionParams.conn_sup_timeout = Config->meshConnectionSupervisionTimeout;
 	err = sd_ble_gap_ppcp_set(&gapConnectionParams);
-	APP_ERROR_CHECK(err);
+	APP_ERROR_CHECK(err); //OK
 
 
 }
 
 
 //Connect to a specific peripheral
-bool GAPController::connectToPeripheral(ble_gap_addr_t* address)
+bool GAPController::connectToPeripheral(ble_gap_addr_t* address, u16 connectionInterval, u16 timeout)
 {
 	if(currentlyConnecting) return false;
 
@@ -102,16 +102,19 @@ bool GAPController::connectToPeripheral(ble_gap_addr_t* address)
 	scan_params.active = 0; /* No active scanning */
 	scan_params.interval = Config->meshConnectingScanInterval;
 	scan_params.window = Config->meshConnectingScanWindow;
-	scan_params.timeout = Config->meshConnectingScanTimeout;
+	scan_params.timeout = timeout;
 
-	conn_params.min_conn_interval = Config->meshMinConnectionInterval;
-	conn_params.max_conn_interval = Config->meshMaxConnectionInterval;
+	conn_params.min_conn_interval = connectionInterval;
+	conn_params.max_conn_interval = connectionInterval;
 	conn_params.slave_latency = Config->meshPeripheralSlaveLatency;
 	conn_params.conn_sup_timeout = Config->meshConnectionSupervisionTimeout;
 
 	//Connect to the peripheral
 	err = sd_ble_gap_connect(address, &scan_params, &conn_params);
-	APP_ERROR_CHECK(err);
+	if(err != NRF_SUCCESS){
+		//Just ignore it, the connection will not happen
+		return false;
+	}
 
 	//Set scan state off. Connecting uses scan itself and deactivates the scan procedure
 	ScanController::scanningState = SCAN_STATE_OFF;
@@ -123,12 +126,14 @@ bool GAPController::connectToPeripheral(ble_gap_addr_t* address)
 
 
 //Disconnect from paired peripheral
-void GAPController::disconnectFromPeripheral(u16 connectionHandle)
+void GAPController::disconnectFromPartner(u16 connectionHandle)
 {
 	u32 err = 0;
 
 	err = sd_ble_gap_disconnect(connectionHandle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-	APP_ERROR_CHECK(err);
+	if(err != NRF_SUCCESS){
+		//Simply ignore it, we are disconnected
+	}
 }
 
 
@@ -177,7 +182,7 @@ bool GAPController::bleConnectionEventHandler(ble_evt_t* bleEvent)
 		{
 			currentlyConnecting = false;
 
-			connectionTimeoutCallback(bleEvent);
+			connectingTimeoutCallback(bleEvent);
 		}
 		break;
 	}
@@ -187,7 +192,8 @@ bool GAPController::bleConnectionEventHandler(ble_evt_t* bleEvent)
 		//With this request, we receive the key identifier and a random number
 		//This identification is used to select the correct key
 		//We skip that process and select our mesh network key
-		//TODO: Check what to do when we want different keys for Modules e.g.
+
+		//TODO: If we want multiple keys, we need to implement some more logic to select the key
 		ble_gap_evt_sec_info_request_t securityRequest = bleEvent->evt.gap_evt.params.sec_info_request;
 
 		//This is our security key
@@ -203,7 +209,7 @@ bool GAPController::bleConnectionEventHandler(ble_evt_t* bleEvent)
 			NULL, //We do not have an identity resolving key
 			NULL //We do not have signing info
 		);
-		APP_ERROR_CHECK(err);
+		APP_ERROR_CHECK(err); //TODO: Error handling
 
 		logt("SEC", "SEC_INFO_REQUEST received, replying with key. result %d",  err);
 
@@ -226,108 +232,6 @@ bool GAPController::bleConnectionEventHandler(ble_evt_t* bleEvent)
 		break;
 
 	}
-	//Another device wants to initiate a secure connection
-	//Currently not used because the other method worked pretty good
-	/*case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
-	{
-
-		//Security parameters: What is provided and what capabilities do we have?
-		ble_gap_sec_params_t securityParameters;
-		securityParameters.bond = 0; //We do not want to bond
-		securityParameters.mitm = 1; //We need man in the middle protection
-		securityParameters.io_caps = BLE_GAP_IO_CAPS_KEYBOARD_ONLY; //Use this if we want OOB method
-		securityParameters.oob = 1; //We have out of band data (our mesh network key)
-		securityParameters.min_key_size = 16; //We want 128bit key
-		securityParameters.max_key_size = 16; //yes, we do
-		securityParameters.kdist_periph.enc = 1; //We will provide a long term key for the connection
-		securityParameters.kdist_periph.id = 0; //We do not provide an identity resolving key
-		securityParameters.kdist_periph.sign = 0; //We do not provide a signature resolving key
-		//Mhhh, ....?
-		securityParameters.kdist_central.enc = 1;
-		securityParameters.kdist_central.id = 0;
-		securityParameters.kdist_central.sign = 0;
-
-
-		ble_gap_enc_key_t key;
-		key.enc_info.auth = 1;
-		memcpy(&key.enc_info.ltk, &Config->meshNetworkKey, 16);
-		key.enc_info.ltk_len = 16;
-
-		key.master_id.ediv = 123;
-		key.master_id.rand[0] = 234;
-
-
-
-		//Keys
-		ble_gap_sec_keyset_t keys;
-
-		keys.keys_periph.p_enc_key = &key;
-		keys.keys_periph.p_id_key = NULL;
-		keys.keys_periph.p_sign_key = NULL;
-
-		keys.keys_central.p_enc_key = &key;
-		keys.keys_central.p_id_key = NULL;
-		keys.keys_central.p_sign_key = NULL;
-
-
-		//If we are central
-		if(TestModule::isCentral)
-		{
-			err = sd_ble_gap_sec_params_reply(
-					bleEvent->evt.gap_evt.conn_handle,
-					BLE_GAP_SEC_STATUS_SUCCESS,
-					NULL,
-					&keys
-				);
-
-			logt("SEC", "SEC_PARAMS_REQUEST received as central, replying with result %d", err);
-		}
-
-
-		//We assume that we are peripheral
-		else if(!TestModule::isCentral)
-		{ //TODO: Check if we are peripheral
-
-
-
-
-			err = sd_ble_gap_sec_params_reply(
-					bleEvent->evt.gap_evt.conn_handle,
-					BLE_GAP_SEC_STATUS_SUCCESS,
-					&securityParameters,
-					&keys
-			);
-			APP_ERROR_CHECK(err);
-
-
-		}
-
-		logt("SEC", "SEC_PARAMS_REQUEST received as peripheral, replying with result %d", err);
-
-
-		break;
-	}
-	case BLE_GAP_EVT_AUTH_KEY_REQUEST:
-	{
-		err = sd_ble_gap_auth_key_reply(
-			bleEvent->evt.gap_evt.conn_handle,
-			BLE_GAP_AUTH_KEY_TYPE_OOB,
-			Config->meshNetworkKey
-		);
-		APP_ERROR_CHECK(err);
-
-		logt("SEC", "AUTH_KEY_REQUEST received, replying with result %d", err);
-
-		break;
-	}
-	case BLE_GAP_EVT_AUTH_STATUS:
-	{
-		logt("SEC", "AUTH_STATUS: status %u", bleEvent->evt.gap_evt.params.auth_status.auth_status);
-		logt("SEC", "AUTH_STATUS: bonded %u", bleEvent->evt.gap_evt.params.auth_status.bonded);
-
-			break;
-	}*/
-
 
 	default:
 		break;
@@ -335,9 +239,9 @@ bool GAPController::bleConnectionEventHandler(ble_evt_t* bleEvent)
 	return false;
 }
 
-void GAPController::setConnectionTimeoutHandler(void (*callback)(ble_evt_t* bleEvent))
+void GAPController::setConnectingTimeoutHandler(void (*callback)(ble_evt_t* bleEvent))
 {
-	connectionTimeoutCallback = callback;
+	connectingTimeoutCallback = callback;
 }
 
 void GAPController::setConnectionSuccessfulHandler(void (*callback)(ble_evt_t* bleEvent))
@@ -376,29 +280,28 @@ void GAPController::startEncryptingConnection(u16 connectionHandle)
 	//http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.s130.api.v1.0.0/group___b_l_e___g_a_p___c_e_n_t_r_a_l___e_n_c___m_s_c.html
 	//http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.s130.api.v1.0.0/group___b_l_e___g_a_p___p_e_r_i_p_h___e_n_c___m_s_c.html
 	err = sd_ble_gap_encrypt(connectionHandle, &keyId, &key);
-	APP_ERROR_CHECK(err);
+	APP_ERROR_CHECK(err); //TODO: error handling
 
 	logt("SEC", "encrypting connection handle %u with key. result %u", connectionHandle, err);
+}
 
-	/*//Method 2: Central bonding: Passkey entry or OOB MSC
-		//Security parameters: What is provided and what capabilities do we have?
-		ble_gap_sec_params_t securityParameters;
-		securityParameters.bond = 0; //We do not want to bond
-		securityParameters.mitm = 1; //We need man in the middle protection
-		securityParameters.io_caps = BLE_GAP_IO_CAPS_KEYBOARD_ONLY; //Use this if we want OOB method
-		securityParameters.oob = 1; //We have out of band data (our mesh network key)
-		securityParameters.min_key_size = 16; //We want 128bit key
-		securityParameters.max_key_size = 16; //yes, we do
-		securityParameters.kdist_periph.enc = 1; //We will provide a long term key for the connection
-		securityParameters.kdist_periph.id = 0; //We do not provide an identity resolving key
-		securityParameters.kdist_periph.sign = 0; //We do not provide a signature resolving key
-		//Mhhh, ....?
-		securityParameters.kdist_central.enc = 1;
-		securityParameters.kdist_central.id = 0;
-		securityParameters.kdist_central.sign = 0;
+void GAPController::RequestConnectionParameterUpdate(u16 connectionHandle, u16 minConnectionInterval, u16 maxConnectionInterval, u16 slaveLatency, u16 supervisionTimeout)
+{
+	u32 err = 0;
 
-		err = sd_ble_gap_authenticate(connectionHandle, &securityParameters);
+	ble_gap_conn_params_t connParams;
+	connParams.min_conn_interval = minConnectionInterval;
+	connParams.max_conn_interval = maxConnectionInterval;
+	connParams.slave_latency = slaveLatency;
+	connParams.conn_sup_timeout = supervisionTimeout;
 
-		logt("SEC", "encrypting connection %u with result %u", connectionHandle, err);
-	*/
+	//TODO: Check against compatibility with gap connection parameters limits
+	err = sd_ble_gap_conn_param_update(connectionHandle, &connParams);
+	APP_ERROR_CHECK(err);
+
+	//TODO: error handling: What if it doesn't work, what if the other side does not agree, etc....
+
+	//TODO: Use connection parameters negitation library: http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v11.0.0%2Fgroup__ble__sdk__lib__conn__params.html
+
+
 }

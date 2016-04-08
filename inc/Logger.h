@@ -65,13 +65,28 @@ public:
 		return instance;
 	}
 
+
+#define NUM_ERROR_LOG_ENTRIES 100
+	typedef struct{
+			u8 errorType;
+			u32 errorCode;
+			u32 timestamp;
+	} errorLogEntry;
+
+	enum errorTypes { SD_CALL_ERROR=0, HCI_ERROR = 1, CUSTOM = 2 };
+
+	static errorLogEntry errorLog[NUM_ERROR_LOG_ENTRIES];
+	static u8 errorLogPosition;
+
 	bool logEverything = false;
 
-	enum LogType {UART_COMMUNICATION, LOG_LINE, LOG_MESSAGE_ONLY};
+	enum LogType {UART_COMMUNICATION, LOG_LINE, LOG_MESSAGE_ONLY, TRACE};
 	enum UartErrorType {NO_ERROR, COMMAND_NOT_FOUND, ARGUMENTS_WRONG};
 
 	void log_f(bool printLine, const char* file, i32 line, const char* message, ...);
 	void logTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...);
+
+	void logError(errorTypes errorType, u32 errorCode, u32 timestamp);
 
 	void uart_error_f(UartErrorType type);
 
@@ -98,7 +113,7 @@ public:
 
 	//Other printing functions
 	void blePrettyPrintAdvData(sizedData advData);
-	void convertBufferToHexString(u8* srcBuffer, u32 srcLength, char* dstBuffer);
+	void convertBufferToHexString(u8* srcBuffer, u32 srcLength, char* dstBuffer, u16 bufferLength);
 	void parseHexStringToBuffer(const char* hexString, u8* dstBuffer, u16 dstBufferSize);
 	void convertTimestampToString(u64 timestamp, char* buffer);
 
@@ -120,7 +135,7 @@ public:
 
 #ifdef ENABLE_LOGGING
 
-#define trace(message, ...) Logger::getInstance().log_f(false, __FILE_S__, __LINE__, message, ##__VA_ARGS__)
+#define trace(message, ...) Logger::getInstance().logTag_f(Logger::TRACE, __FILE_S__, __LINE__, NULL, message, ##__VA_ARGS__)
 #define log(message, ...) Logger::getInstance().log_f(true, __FILE_S__, __LINE__, message, ##__VA_ARGS__)
 #define logt(tag, message, ...) Logger::getInstance().logTag_f(Logger::LOG_LINE, __FILE_S__, __LINE__, tag, message, ##__VA_ARGS__)
 

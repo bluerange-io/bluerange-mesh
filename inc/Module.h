@@ -58,15 +58,16 @@ class Module : public StorageEventListener, public TerminalCommandListener
 protected:
 		Node* node;
 		ConnectionManager* cm;
-		u16 moduleId;
+		u8 moduleId;
 		u16 storageSlot;
 
 		//Pay attention that the module configuration is not packed and will
 		//therefore be padded by the compiler!!!
 		struct ModuleConfiguration{
-			u16 moduleId; //Id of the module, compared upon load and must match
+			u8 moduleId; //Id of the module, compared upon load and must match
 			u8 moduleVersion; //version of the configuration
 			u8 moduleActive; //Activate or deactivate the module
+			u8 reserved;
 		};
 
 
@@ -88,7 +89,7 @@ protected:
 		char moduleName[MODULE_NAME_MAX_SIZE];
 
 		//Constructor is passed
-		Module(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		Module(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 		virtual ~Module();
 
 		//These two variables must be set by the submodule in the constructor before loading the configuration

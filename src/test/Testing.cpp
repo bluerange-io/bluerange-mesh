@@ -27,6 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <Testing.h>
 #include <Logger.h>
 #include <Storage.h>
+#include <NewStorage.h>
+#include <Utility.h>
 
 extern "C"
 {
@@ -34,6 +36,7 @@ extern "C"
 #include <ble_gap.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#include <nrf_nvic.h>
 }
 
 
@@ -45,9 +48,6 @@ Testing::Testing()
 {
 
 	instance = this;
-
-
-
 
 
 
@@ -117,6 +117,65 @@ Testing::Testing()
 
 }
 
+
+
+void Testing::testPacketQueue(){
+	u8 buffer[800];
+
+	memset(buffer, 0, 800);
+
+	u8* innerBuffer = buffer + 100;
+
+	PacketQueue* queue = new PacketQueue(innerBuffer, 600);
+
+	u8 testData[200];
+	for(int i=0; i<200; i+=1){
+		testData[i] = i+1;
+	}
+
+	int i=0;
+	while(true){
+		u32 rand = (234876 % i) % 100;
+		rand += 3;
+		if(i% 100 == 0) trace("%u,",rand);
+
+		memset(testData, rand, rand);
+
+		u32 j=0;
+		for(j=0; j<rand; j++){
+			if(!queue->Put(testData, rand, true)) break;
+		}
+
+		for(; j>0; j--){
+			sizedData readData = queue->PeekNext();
+			queue->DiscardNext();
+
+			if(readData.length == 0){
+				logt("ERROR", "size is 0");
+			}
+
+			if(((u32)readData.length - 1) != rand){
+				logt("ERROR", "Wrong size read (%u instead of %u)", readData.length, rand);
+			}
+
+			//Check data
+			if(memcmp(testData, readData.data+1, rand) != 0){
+				logt("ERROR", "wrong data");
+			}
+		}
+
+		//Check bounds
+		if(buffer[99] != 0 || buffer[700] != 0){
+			logt("ERROR", "overflow");
+		}
+
+		i++;
+	}
+
+}
+
+
+
 void Testing::Step2()
 {
 
@@ -141,7 +200,7 @@ void Testing::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 
 }
 
-void Testing::ConnectionTimeoutHandler(ble_evt_t* bleEvent)
+void Testing::ConnectingTimeoutHandler(ble_evt_t* bleEvent)
 {
 	log("TIMEOUT");
 }
@@ -157,9 +216,43 @@ void Testing::messageReceivedCallback(connectionPacket* inPacket)
 
 }
 
+u32 testData;
+u32 testData2;
 
 bool Testing::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
+	if (commandName == "nswrite")
+	{
+
+		testData = 0x12345678;
+		testData2 = 0x55667744;
+
+		u32* dest = (u32*)(210 * NRF_FICR->CODEPAGESIZE);
+		u32* dest2 = (u32*)(211 * NRF_FICR->CODEPAGESIZE);
+
+		NewStorage::WriteData(&testData, dest, 4, NULL, 0);
+		NewStorage::WriteData(&testData2, dest2, 4, NULL, 0);
+
+		return true;
+	}
+	if (commandName == "nserase")
+	{
+
+		NewStorage::ErasePage(210, NULL, 0);
+
+		return true;
+	}
+	if (commandName == "nserasepages")
+	{
+
+		NewStorage::ErasePages(210, 2, NULL, 0);
+
+		return true;
+	}
+
+
+
+
 	if (commandName == "send")
 	{
 		//parameter 1: R=reliable, U=unreliable, B=both
@@ -184,25 +277,33 @@ bool Testing::TerminalCommandHandler(string commandName, vector<string> commandA
 			if(reliable == 0 || reliable == 2){
 				data.payload.data[0] = i*2;
 				data.payload.data[1] = 0;
-				if(cm->inConnection->handshakeDone) cm->SendMessage(cm->inConnection, (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false);
-				if(cm->outConnections[0]->handshakeDone) cm->SendMessage(cm->outConnections[0], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false);
-				if(cm->outConnections[1]->handshakeDone) cm->SendMessage(cm->outConnections[1], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false);
-				if(cm->outConnections[2]->handshakeDone) cm->SendMessage(cm->outConnections[2], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false);
+				cm->SendMessage(cm->inConnection, (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false);
+				cm->SendMessage(cm->outConnections[0], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false);
+				cm->SendMessage(cm->outConnections[1], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false);
+				cm->SendMessage(cm->outConnections[2], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false);
 			}
 
 			if(reliable == 1 || reliable == 2){
 				data.payload.data[0] = i*2+1;
 				data.payload.data[1] = 1;
-				if(cm->inConnection->handshakeDone) cm->SendMessage(cm->inConnection, (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true);
-				if(cm->outConnections[0]->handshakeDone) cm->SendMessage(cm->outConnections[0], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true);
-				if(cm->outConnections[1]->handshakeDone) cm->SendMessage(cm->outConnections[1], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true);
-				if(cm->outConnections[2]->handshakeDone) cm->SendMessage(cm->outConnections[2], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true);
+				cm->SendMessage(cm->inConnection, (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true);
+				cm->SendMessage(cm->outConnections[0], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true);
+				cm->SendMessage(cm->outConnections[1], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true);
+				cm->SendMessage(cm->outConnections[2], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true);
 			}
 		}
 
 	}
 	else if (commandName == "fill")
 	{
+		cm->fillTransmitBuffers();
+	}
+	else if (commandName == "forcefill")
+	{
+		cm->connections[0]->reliableBuffersFree = 1;
+		cm->connections[1]->reliableBuffersFree = 1;
+		cm->connections[2]->reliableBuffersFree = 1;
+		cm->connections[3]->reliableBuffersFree = 1;
 		cm->fillTransmitBuffers();
 	}
 	else if (commandName == "advertise")

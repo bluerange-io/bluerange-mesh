@@ -57,6 +57,7 @@ SECTIONS {
 	.ivector : ALIGN(4)
 	{
 		__text_start__ = .;
+		__application_start_address = .;
 		
 		/* At addr zero is the stack pointer */
 		LONG(__StackTop);
@@ -68,10 +69,13 @@ SECTIONS {
 	} > FLASH 
 	
 	/* This is where the firmware informaton is stored. Usefull for bootloader */
-	.Version : ALIGN(4)
+	.AppInfo : ALIGN(4)
 	{
+		KEEP(*(.AppSize))
 		KEEP(*(.Version))
+		KEEP(*(.BootloaderAddress))
 		LONG(__CheckSum);
+
 	} > FLASH
 	
 	/* Code region starts here */
@@ -100,6 +104,7 @@ SECTIONS {
 		*(.text*)
 		*(.rodata .rodata.* .rodata1)
 		*(.gnu.linkonce.r.*)
+
 	} > FLASH
     
 
@@ -128,9 +133,17 @@ SECTIONS {
 	.gcc_except_table : ONLY_IF_RO 
 	{ 
 		*(.gcc_except_table .gcc_except_table.*) 
+
+
 	} > FLASH
 	
 	__text_end__ = .;
+
+	.application_ram_start_dummy : ALIGN(4)
+   	{
+		__application_ram_start_address = .;
+   	} > RAM
+
 	
 	.eh_frame : ONLY_IF_RW 
 	{ 
@@ -178,10 +191,15 @@ SECTIONS {
 		__data_end__ = .;
 
 	} > RAM AT > FLASH
-	
+
 	__data_start__ = ADDR(.data);
    	__data_loc__ = LOADADDR(.data);
    	__data_size__ = SIZEOF(.data);
+
+   	.application_end_dummy : ALIGN(4)
+   	{
+		__application_end_address = .;
+   	} > FLASH
 	
 	.bss : ALIGN(4)
 	{
@@ -211,6 +229,8 @@ SECTIONS {
 		*(.stack*)
 	} > RAM
 
+
+
 	/* Set stack top to end of RAM, and stack limit move down by
 	 * size of stack_dummy section */
 	__StackTop = ORIGIN(RAM) + LENGTH(RAM);
@@ -219,6 +239,5 @@ SECTIONS {
 	
 	/* Check if data + heap + stack exceeds RAM limit */
 	ASSERT(__StackLimit >= __HeapLimit, "region RAM overflowed with stack")
-
 }
 

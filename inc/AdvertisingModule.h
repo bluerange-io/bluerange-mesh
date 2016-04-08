@@ -63,26 +63,17 @@ class AdvertisingModule: public Module
 		//Set all advertising messages at once, the old configuration will be overwritten
 		void SetAdvertisingMessages(u8* data, u16 dataLength);
 
-		bool broadcastDebugPackets;
-
 		#pragma pack(push)
 		#pragma pack(1)
 
 		typedef struct
 		{
 			u8 debugPacketIdentifier;
-			nodeID nodeId;
-			clusterID clusterId;
-			clusterSIZE clusterSize;
-			u8 freeIn;
-			u8 freeOut;
-			u16 connectionLossCounter;
-			u8 txBufferFreeBitmask;
-			nodeID partner0;
-			nodeID partner1;
-			nodeID partner2;
-			nodeID partner3;
-			u8 packetEnd;
+			nodeID senderId;
+			u16 connLossCounter;
+			nodeID partners[4];
+			i8 rssiVals[3];
+			u8 droppedVals[3];
 
 		} AdvertisingModuleDebugMessage;
 
@@ -91,7 +82,7 @@ class AdvertisingModule: public Module
 
 
 	public:
-		AdvertisingModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		AdvertisingModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 
 		void ConfigurationLoadedHandler();
 

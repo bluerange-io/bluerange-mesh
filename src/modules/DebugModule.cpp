@@ -30,7 +30,7 @@ extern "C"{
 #include <stdlib.h>
 }
 
-DebugModule::DebugModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
+DebugModule::DebugModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
 	: Module(moduleId, node, cm, name, storageSlot)
 {
 	//Register callbacks n' stuff
@@ -61,7 +61,17 @@ void DebugModule::ConfigurationLoadedHandler()
 
 	//Do additional initialization upon loading the config
 
+}
 
+
+void DebugModule::ResetToDefaultConfiguration()
+{
+	//Set default configuration values
+	configuration.moduleId = moduleId;
+	configuration.moduleActive = false;
+	configuration.moduleVersion = 1;
+	configuration.rebootTimeMs = 0 * 1000;
+	memcpy(&configuration.testString, "jdhdur", 7);
 }
 
 void DebugModule::TimerEventHandler(u16 passedTime, u32 appTimer){
@@ -74,10 +84,8 @@ void DebugModule::TimerEventHandler(u16 passedTime, u32 appTimer){
 	}
 
 	if(flood){
-		//FIXME: The packet queue might have problems when it is filled with too many packets
-		//This seems to break the softdevice, fix that.
 
-		while(cm->pendingPackets < 6){
+		while(cm->GetPendingPackets() < 6){
 			packetsOut++;
 
 			connPacketModule data;
@@ -98,18 +106,34 @@ void DebugModule::TimerEventHandler(u16 passedTime, u32 appTimer){
 		logt("DEBUGMOD", "Resetting!");
 		NVIC_SystemReset();
 	}
-}
 
-void DebugModule::ResetToDefaultConfiguration()
-{
-	//Set default configuration values
-	configuration.moduleId = moduleId;
-	configuration.moduleActive = true;
-	configuration.moduleVersion = 1;
-	configuration.rebootTimeMs = 0;
-	memcpy(&configuration.testString, "jdhdur", 7);
-}
 
+	if(appTimer % 10000 == 0)
+	{
+		DebugModuleInfoMessage infoMessage;
+		memset(&infoMessage, 0x00, sizeof(infoMessage));
+		for(int i=0; i<Config->meshMaxConnections; i++){
+			if(cm->connections[i]->handshakeDone()){
+				infoMessage.droppedPackets += cm->connections[i]->droppedPackets;
+				infoMessage.sentPackets += cm->connections[i]->sentReliable + cm->connections[i]->sentUnreliable;
+			}
+		}
+
+		infoMessage.connectionLossCounter = node->persistentConfig.connectionLossCounter;
+
+		SendModuleActionMessage(
+			MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+			NODE_ID_BROADCAST,
+			DebugModuleTriggerActionMessages::INFO_MESSAGE,
+			0,
+			(u8*)&infoMessage,
+			SIZEOF_DEBUG_MODULE_INFO_MESSAGE,
+			false
+		);
+
+
+	}
+}
 bool DebugModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
 	//React on commands, return true if handled, false otherwise
@@ -150,6 +174,22 @@ bool DebugModule::TerminalCommandHandler(string commandName, vector<string> comm
 
 				return true;
 			}
+			//Tell any node to generate a hardfault
+			else if(commandArgs[2] == "hardfault")
+			{
+				logt("DEBUGMOD", "send hardfault");
+				SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					destinationNode,
+					DebugModuleTriggerActionMessages::CAUSE_HARDFAULT_MESSAGE,
+					0,
+					NULL,
+					0,
+					false
+				);
+
+				return true;
+			}
 			//Flood the network with messages and count them
 			else if(commandArgs[2] == "flood")
 			{
@@ -161,9 +201,40 @@ bool DebugModule::TerminalCommandHandler(string commandName, vector<string> comm
 
 				return true;
 			}
-
 		}
 
+	}
+
+	//Reads a page of the memory (0-256) and prints it
+	if(commandName == "readpage")
+	{
+		u16 page = atoi(commandArgs[0].c_str());
+		u32 bufferSize = 32;
+		u8 buffer[bufferSize];
+		char charBuffer[bufferSize*3+1];
+
+		for(u32 i=0; i<PAGE_SIZE/bufferSize; i++)
+		{
+			memcpy(buffer, (u8*)(page*PAGE_SIZE+i*bufferSize), bufferSize);
+			Logger::getInstance().convertBufferToHexString(buffer, bufferSize, charBuffer, bufferSize*3+1);
+			trace("0x%08X :%s" EOL,(page*PAGE_SIZE)+i*bufferSize, charBuffer);
+		}
+
+		return true;
+	}
+	//Prints a map of empty (0) and used (1) memory pages
+	else if(commandName == "memorymap")
+	{
+		for(u32 j=0; j<256; j++){
+			u32 buffer = 0xFFFFFFFF;
+			for(u32 i=0; i<NRF_FICR->CODEPAGESIZE; i+=4){
+				buffer = buffer & *(u32*)(j*NRF_FICR->CODEPAGESIZE+i);
+			}
+			if(buffer == 0xFFFFFFFF) trace("0");
+			else trace("1");
+		}
+
+		return true;
 	}
 
 
@@ -171,7 +242,7 @@ bool DebugModule::TerminalCommandHandler(string commandName, vector<string> comm
 	if (commandName == "testsave")
 		{
 		char buffer[70];
-		Logger::getInstance().convertBufferToHexString((u8*) &configuration, sizeof(DebugModuleConfiguration), buffer);
+		Logger::getInstance().convertBufferToHexString((u8*) &configuration, sizeof(DebugModuleConfiguration), buffer, 70);
 
 		configuration.rebootTimeMs = 12 * 1000;
 
@@ -222,8 +293,32 @@ void DebugModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacke
 				logt("DEBUGMOD", "Resetting connection loss counter");
 
 				node->persistentConfig.connectionLossCounter = 0;
+				Logger::getInstance().errorLogPosition = 0;
 
 			}
+			else if(packet->actionType == DebugModuleTriggerActionMessages::INFO_MESSAGE){
+
+				DebugModuleInfoMessage* infoMessage = (DebugModuleInfoMessage*) packet->data;
+
+				uart("DEBUGMOD", "{\"nodeId\":%u,\"type\":\"debug_info\", \"conLoss\":%u,", packet->header.sender, infoMessage->connectionLossCounter);
+				uart("DEBUGMOD", "\"dropped\":%u,", infoMessage->droppedPackets);
+				uart("DEBUGMOD", "\"sent\":%u}" SEP, infoMessage->sentPackets);
+
+			}
+			else if(packet->actionType == DebugModuleTriggerActionMessages::CAUSE_HARDFAULT_MESSAGE){
+				logt("DEBUGMOD", "receive hardfault");
+				CauseHardfault();
+			}
 		}
+	}
+}
+
+void DebugModule::CauseHardfault()
+{
+	//Needs a for loop, the compiler will otherwise detect the unaligned access and will write generate a workaround
+	for(int i=0; i<1000; i++){
+		u32 * cause_hardfault = (u32 *) i;
+		u32 value = *cause_hardfault;
+		logt("DEBUGMOD", "%d", value);
 	}
 }

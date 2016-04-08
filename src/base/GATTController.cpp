@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <GATTController.h>
+#include <GAPController.h>
 #include <Logger.h>
 #include <Node.h>
 #include <cstring>
@@ -51,11 +52,11 @@ void GATTController::bleMeshServiceInit()
 	//Add our Service UUID to the BLE stack for management
 	ble_uuid128_t baseUUID128 = { MESH_SERVICE_BASE_UUID128 };
 	err = sd_ble_uuid_vs_add(&baseUUID128, &meshService.serviceUuid.type);
-	APP_ERROR_CHECK(err);
+	APP_ERROR_CHECK(err); //OK
 
 	//Add the service
 	err = sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY, &meshService.serviceUuid, &meshService.serviceHandle);
-	APP_ERROR_CHECK(err);
+	APP_ERROR_CHECK(err); //OK
 
 	//##### Now we need to add a characteristic to that service
 
@@ -122,39 +123,7 @@ void GATTController::bleMeshServiceInit()
 
 	//Finally, add the characteristic
 	err = sd_ble_gatts_characteristic_add(meshService.serviceHandle, &characteristicMetadata, &attribute, &meshService.sendMessageCharacteristicHandle);
-	APP_ERROR_CHECK(err);
-
-	/*
-	 //##### Last but not least, we add a descriptor
-	 // THIS PROBABLY HAS TO BE 0x2901 because that stands for the GATT_CHAR_USER_DESC_UUID
-	 //Set access Levels
-	 ble_gatts_attr_md_t     descriptorMetadata;
-	 memset(&descriptorMetadata, 0, sizeof(ble_gatts_attr_md_t));
-	 descriptorMetadata.vloc = BLE_GATTS_VLOC_STACK;
-	 descriptorMetadata.vlen = 0;
-	 BLE_GAP_CONN_SEC_MODE_SET_OPEN(&descriptorMetadata.read_perm); //Read possible for all
-	 BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(&descriptorMetadata.write_perm); // Write not possible
-
-	 //The descriptor needs a UUID handle
-	 ble_uuid_t descriptorUUID;
-	 descriptorUUID.uuid = MESH_SERVICE_CHARACTERISTIC_DESCRIPTOR_UUID;
-	 descriptorUUID.type = meshService.serviceUuid.type;
-
-	 //Our String
-	 u8 descriptorString[] = "meshWrite";
-
-	 //Now we fill the descriptor with that stuff
-	 ble_gatts_attr_t        descriptor;
-	 memset(&descriptor, 0, sizeof(ble_gatts_attr_t));
-	 descriptor.p_value = descriptorString;
-	 descriptor.init_len = sizeof(descriptorString);
-	 descriptor.max_len = sizeof(descriptorString);
-	 descriptor.p_uuid = &descriptorUUID;
-	 descriptor.p_attr_md = &descriptorMetadata;
-
-
-	 err = sd_ble_gatts_descriptor_add(BLE_GATT_HANDLE_INVALID, &descriptor, &meshService.sendMessageCharacteristicDescriptorHandle);
-	 APP_ERROR_CHECK(err);*/
+	APP_ERROR_CHECK(err); //OK
 
 }
 
@@ -210,21 +179,8 @@ void GATTController::attributeMissingHandler(ble_evt_t* bleEvent)
 	u32 err = 0;
 	//Handles missing Attributes, don't know why it is needed
 	err = sd_ble_gatts_sys_attr_set(bleEvent->evt.gatts_evt.conn_handle, NULL, 0, 0);
-	APP_ERROR_CHECK(err);
+	APP_ERROR_CHECK(err); //Unhandeled
 }
-
-/*void acquireCharacteristics(u16 connectionHandle){
- u32 err = 0;
-
- //Discover characteristic
- ble_gattc_handle_range_t handleRange;
- handleRange.start_handle = MESH_SERVICE_CHARACTERISTIC_UUID;
- handleRange.end_handle = MESH_SERVICE_CHARACTERISTIC_UUID;
- err = sd_ble_gattc_characteristics_discover(connectionHandle, &handleRange);
- APP_ERROR_CHECK(err);
-
-
- }*/
 
 //Handle discovery is not currently used and should not be used during the discovery
 //phase because it adds additional packets and time to the handshake. It is better
@@ -234,13 +190,9 @@ void GATTController::bleDiscoverHandles(u16 connectionHandle)
 {
 	u32 err = 0;
 
-	ble_gattc_handle_range_t handleRange;
-	handleRange.start_handle = 0x0001;
-	handleRange.end_handle = BLE_GATTC_HANDLE_END;
-
 	//At first we need to enumerate the services
-	err = sd_ble_gattc_primary_services_discover(connectionHandle, handleRange.start_handle, &meshService.serviceUuid);
-	APP_ERROR_CHECK(err);
+	err = sd_ble_gattc_primary_services_discover(connectionHandle, 0x0001, &meshService.serviceUuid);
+	APP_ERROR_CHECK(err); //Currently Unhandeled
 }
 
 //Called after bleDiscoverHandles from the stack as a response
@@ -259,7 +211,7 @@ void GATTController::_bleServiceDiscoveryFinishedHandler(ble_evt_t* bleEvent)
 		handleRange.end_handle = bleEvent->evt.gattc_evt.params.prim_srvc_disc_rsp.services[0].handle_range.end_handle;
 
 		err = sd_ble_gattc_characteristics_discover(bleEvent->evt.gattc_evt.conn_handle, &handleRange);
-		APP_ERROR_CHECK(err);
+		APP_ERROR_CHECK(err); //Currently Unhandeled
 	}
 }
 void GATTController::_bleCharacteristicDiscoveryFinishedHandler(ble_evt_t* bleEvent)
@@ -284,16 +236,23 @@ u16 GATTController::getMeshWriteHandle()
 	return meshService.sendMessageCharacteristicHandle.value_handle;
 }
 
+//Throws different errors that must be handeled
 u32 GATTController::bleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable)
 {
 	u32 err = 0;
 
-	if (connectionHandle == BLE_ERROR_INVALID_CONN_HANDLE || characteristicHandle == BLE_ERROR_INVALID_ATTR_HANDLE || dataLength == 0)
-	{
-		return false;
+	u8 t = ((connPacketHeader*)data)->messageType;
+
+	if( t != 20 && t != 21 && t != 22 && t != 23 && t != 30 && t != 31 && t != 50 && t != 51 && t != 52 && t != 53 && t != 56 && t != 57 && t != 60 && t != 61 && t != 62 && t != 80 && t != 81){
+		logt("ERROR", "BOOOOOOH, WRONG DATAAAAAAAAAAAAAAAAA!!!!!!!!!");
 	}
 
 	logt("CONN_DATA", "Data size is: %d, handles(%d, %d), reliable %d", dataLength, connectionHandle, characteristicHandle, reliable);
+
+	char stringBuffer[100];
+	Logger::getInstance().convertBufferToHexString(data, dataLength, stringBuffer, 100);
+	logt("CONN_DATA", "%s", stringBuffer);
+
 
 	//Configure the write parameters with reliable/unreliable, writehandle, etc...
 	ble_gattc_write_params_t writeParameters;
@@ -308,7 +267,6 @@ u32 GATTController::bleWriteCharacteristic(u16 connectionHandle, u16 characteris
 		writeParameters.write_op = BLE_GATT_OP_WRITE_REQ;
 
 		err = sd_ble_gattc_write(connectionHandle, &writeParameters);
-		APP_ERROR_CHECK(err);
 
 		return err;
 
@@ -318,7 +276,6 @@ u32 GATTController::bleWriteCharacteristic(u16 connectionHandle, u16 characteris
 		writeParameters.write_op = BLE_GATT_OP_WRITE_CMD;
 
 		err = sd_ble_gattc_write(connectionHandle, &writeParameters);
-		APP_ERROR_CHECK(err);
 
 		return err;
 	}
@@ -373,8 +330,12 @@ bool GATTController::bleMeshServiceEventHandler(ble_evt_t* bleEvent)
 			return true;
 
 		case BLE_GATTC_EVT_TIMEOUT:
-			//FIXME: must be handled.
-			//we must tear down the connection or no more writes will be supported
+			//A GATTC Timeout occurs if a WRITE_RSP is not received within 30s
+			//This essentially marks the end of a connection, we'll have to disconnect
+			logt("ERROR", "BLE_GATTC_EVT_TIMEOUT");
+			Logger::getInstance().logError(Logger::errorTypes::CUSTOM, 1, 0);
+
+			GAPController::disconnectFromPartner(bleEvent->evt.gattc_evt.conn_handle);
 
 
 			return true;

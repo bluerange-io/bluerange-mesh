@@ -79,7 +79,7 @@ typedef struct
 //####### Advertising packets => Message Types #################################################
 
 //Message types: Protocol defined, up to 19
-#define MESSAGE_TYPE_JOIN_ME 1
+#define MESSAGE_TYPE_JOIN_ME_V0 1
 
 
 //####### Advertising packets => Structs #################################################
@@ -102,11 +102,12 @@ typedef struct
 
 //JOIN_ME packet that is used for cluster discovery
 //TODO: Add  the current discovery mode/length,... which would allow other nodes to determine
-//How long they need to wait until this node scans or advertises again?
+//		How long they need to wait until this node scans or advertises again?
+
 //This is v0 of the packet, other versions will have different values in the packet,
 //Future research must show which values are the most interesting to determine the
 //best connection partner.
-#define SIZEOF_ADV_PACKET_PAYLOAD_JOIN_ME_V0 19
+#define SIZEOF_ADV_PACKET_PAYLOAD_JOIN_ME_V0 20
 typedef struct
 {
 	nodeID sender;
@@ -115,14 +116,12 @@ typedef struct
 	u8 freeInConnections : 3; //Up to 8 in-connections
 	u8 freeOutConnections : 5; //Up to 32 out-connections
 
-	//Version specific content
-	u8 version; //Different versions might have different parameters, this is a version 1 packet.
 	u8 batteryRuntime; //batteryRuntime. Contains the expected runtime of the device (1-59=minutes, 60-83=1-23hours, 84-113=1-29days, 114-233=1-119months, 234-254=10-29year, 255=infinite)
-	u8 txPower; //txPower. Send power in two's complement dbm
+	i8 txPower; //txPower. Send power in two's complement dbm
 	u8 deviceType; //Type of device => enum deviceTypes
 	u16 hopsToSink; //Number of hops to the shortest sink
 	u16 meshWriteHandle; //The GATT handle for the mesh communication characteristic
-	nodeID ackField;//Contains the acknowledgement from another node for the slave connection procedure
+	clusterID ackField;//Contains the acknowledgement from another node for the slave connection procedure
 }advPacketPayloadJoinMeV0;
 
 

@@ -42,13 +42,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //########## Message types ###############################################
 
 //Mesh clustering and handshake: Protocol defined
-#define MESSAGE_TYPE_CLUSTER_WELCOME 20 //The initial message after a connection setup
-#define MESSAGE_TYPE_CLUSTER_ACK_1 21 //Both sides must acknowledge the handshake
-#define MESSAGE_TYPE_CLUSTER_ACK_2 22 //Second ack
-#define MESSAGE_TYPE_CLUSTER_INFO_UPDATE 23 //When the cluster size changes, this message is used
+#define MESSAGE_TYPE_CLUSTER_WELCOME 20 //The initial message after a connection setup (Sent between two nodes)
+#define MESSAGE_TYPE_CLUSTER_ACK_1 21 //Both sides must acknowledge the handshake (Sent between two nodes)
+#define MESSAGE_TYPE_CLUSTER_ACK_2 22 //Second ack (Sent between two nodes)
+#define MESSAGE_TYPE_CLUSTER_INFO_UPDATE 23 //When the cluster size changes, this message is used (Sent to all nodes)
 
 //Others
 #define MESSAGE_TYPE_UPDATE_TIMESTAMP 30 //Used to enable timestamp distribution over the mesh
+#define MESSAGE_TYPE_UPDATE_CONNECTION_INTERVAL 31 //Intructs a node to use a different connection interval
 
 //Module messages: Protocol defined (yet unfinished)
 //MODULE_CONFIG: Used for many different messages that set and get the module config
@@ -66,9 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //Legacy messages: should be removed
 #define MESSAGE_TYPE_ADVINFO 60
-#define MESSAGE_TYPE_QOS_CONNECTION_DATA 61
-#define MESSAGE_TYPE_QOS_REQUEST 62
-
 
 //Other packets: User space (IDs 80 - 110)
 #define MESSAGE_TYPE_DATA_1 80
@@ -99,13 +97,14 @@ typedef struct
 }connPacketSplitHeader;
 
 //CLUSTER_WELCOME
-#define SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_WELCOME 10
+#define SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_WELCOME 11
 typedef struct
 {
 	clusterID clusterId;
 	clusterSIZE clusterSize;
 	u16 meshWriteHandle;
 	clusterSIZE hopsToSink;
+	u8 preferredConnectionInterval;
 }connPacketPayloadClusterWelcome;
 
 #define SIZEOF_CONN_PACKET_CLUSTER_WELCOME (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_WELCOME)
@@ -121,7 +120,7 @@ typedef struct
 typedef struct
 {
 	clusterSIZE hopsToSink;
-	u8 reserved;
+	u8 preferredConnectionInterval;
 }connPacketPayloadClusterAck1;
 
 #define SIZEOF_CONN_PACKET_CLUSTER_ACK_1 (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_ACK_1)
@@ -133,11 +132,12 @@ typedef struct
 
 
 //CLUSTER_ACK_2
-#define SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_ACK_2 6
+#define SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_ACK_2 8
 typedef struct
 {
 	clusterID clusterId;
 	clusterSIZE clusterSize;
+	clusterSIZE hopsToSink;
 }connPacketPayloadClusterAck2;
 
 #define SIZEOF_CONN_PACKET_CLUSTER_ACK_2 (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_ACK_2)
@@ -149,13 +149,14 @@ typedef struct
 
 
 //CLUSTER_INFO_UPDATE
-#define SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_INFO_UPDATE 12
+#define SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_INFO_UPDATE 9
 typedef struct
 {
-	clusterID currentClusterId;
 	clusterID newClusterId;
 	clusterSIZE clusterSizeChange;
 	clusterSIZE hopsToSink;
+	u8 connectionMasterBitHandover : 1; //Used to hand over the connection master bit
+	u8 reserved : 7;
 	
 }connPacketPayloadClusterInfoUpdate;
 
@@ -211,14 +212,20 @@ typedef struct
 	u64 timestamp;
 }connPacketUpdateTimestamp;
 
-//This message is used for different module request message types
-
-
-#define SIZEOF_CONN_PACKET_MODULE (SIZEOF_CONN_PACKET_HEADER + 4) //This size does not include the data reagion which is variable, add the used data region size to this size
+//Used to tell nodes to update their connection interval settings
+#define SIZEOF_CONN_PACKET_UPDATE_CONNECTION_INTERVAL (SIZEOF_CONN_PACKET_HEADER + 2)
 typedef struct
 {
 	connPacketHeader header;
-	u16 moduleId;
+	u16 newInterval;
+}connPacketUpdateConnectionInterval;
+
+//This message is used for different module request message types
+#define SIZEOF_CONN_PACKET_MODULE (SIZEOF_CONN_PACKET_HEADER + 3) //This size does not include the data reagion which is variable, add the used data region size to this size
+typedef struct
+{
+	connPacketHeader header;
+	u8 moduleId;
 	u8 requestHandle; //Set to 0 if this packet does not need to be identified for reliability (Used to implement end-to-end acknowledged requests)
 	u8 actionType;
 	u8 data[MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER - 4]; //Data can be larger and will be transmitted in subsequent packets

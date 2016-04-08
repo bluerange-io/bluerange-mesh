@@ -46,6 +46,7 @@ public:
 	static void Step3();
 
 
+	void testPacketQueue();
 
 
 	//Methods of TerminalCommandListener
@@ -54,13 +55,14 @@ public:
 	//Methods of ConnectionManagerCallback
 	void DisconnectionHandler(ble_evt_t* bleEvent);
 	void ConnectionSuccessfulHandler(ble_evt_t* bleEvent);
-	void ConnectionTimeoutHandler(ble_evt_t* bleEvent);
+	void ConnectingTimeoutHandler(ble_evt_t* bleEvent);
 	void messageReceivedCallback(connectionPacket* inPacket);
 
 private:
 	static u32 nodeId;
 
 	ConnectionManager* cm;
+
 
 
 	u32 connectedDevices;

@@ -39,7 +39,7 @@ TODO: Who's responsible for restoring the mesh-advertising packet? This module o
  * */
 
 
-AdvertisingModule::AdvertisingModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
+AdvertisingModule::AdvertisingModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
 	: Module(moduleId, node, cm, name, storageSlot)
 {
 	//Register callbacks n' stuff
@@ -51,9 +51,6 @@ AdvertisingModule::AdvertisingModule(u16 moduleId, Node* node, ConnectionManager
 
 	//Start module configuration loading
 	LoadModuleConfiguration();
-
-	//Periodically broadcast a debug packet with some stats for debugging
-	broadcastDebugPackets = false;
 }
 
 void AdvertisingModule::ConfigurationLoadedHandler()
@@ -115,7 +112,7 @@ void AdvertisingModule::NodeStateChangedHandler(discoveryState newState)
 		//Activate our advertising
 
 		//This is a small packet for debugging a node's state
-		if(broadcastDebugPackets){
+		if(Config->advertiseDebugPackets){
 			u8 buffer[31];
 			memset(buffer, 0, 31);
 
@@ -132,47 +129,45 @@ void AdvertisingModule::NodeStateChangedHandler(discoveryState newState)
 			AdvertisingModuleDebugMessage* msg = (AdvertisingModuleDebugMessage*)(buffer+7);
 
 			msg->debugPacketIdentifier = 0xDE;
-			msg->nodeId = node->persistentConfig.nodeId;
-			msg->clusterId = node->clusterId;
-			msg->clusterSize = node->clusterSize;
-			msg->freeIn = cm->freeInConnections;
-			msg->freeOut = cm->freeOutConnections;
-			msg->connectionLossCounter = node->persistentConfig.connectionLossCounter;
+			msg->senderId = node->persistentConfig.nodeId;
+			msg->connLossCounter = node->persistentConfig.connectionLossCounter;
 
-			for(u8 i = 0; i<4; i++){
-				if(cm->connections[i]){
-					if(cm->connections[i]->reliableBuffersFree > 0){
-						msg->txBufferFreeBitmask |= 1 << (i*2);
-					}
-					if(cm->connections[i]->unreliableBuffersFree > 0){
-						msg->txBufferFreeBitmask |= 1 << (i*2+1);
-					}
+			for(int i=0; i<Config->meshMaxConnections; i++){
+				if(cm->connections[i]->handshakeDone()){
+					msg->partners[i] = cm->connections[i]->partnerId;
+					msg->rssiVals[i] = cm->connections[i]->rssiAverage;
+					msg->droppedVals[i] = cm->connections[i]->droppedPackets;
+				} else {
+					msg->partners[i] = 0;
+					msg->rssiVals[i] = 0;
+					msg->droppedVals[i] = 0;
 				}
 			}
 
-			if(cm->connections[0]->isConnected) msg->partner0 = cm->connections[0]->partnerId;
-			if(cm->connections[1]->isConnected) msg->partner1 = cm->connections[1]->partnerId;
-			if(cm->connections[2]->isConnected) msg->partner2 = cm->connections[2]->partnerId;
-			if(cm->connections[3]->isConnected) msg->partner3 = cm->connections[3]->partnerId;
 
-			msg->packetEnd = 0xDE;
+
 
 			char strbuffer[200];
-			Logger::getInstance().convertBufferToHexString(buffer, 31, strbuffer);
+			Logger::getInstance().convertBufferToHexString(buffer, 31, strbuffer, 200);
 
 			logt("ADVMOD", "ADV set to %s", strbuffer);
 
 			u32 err = sd_ble_gap_adv_data_set(buffer, 31, NULL, 0);
-			APP_ERROR_CHECK(err);
+			if(err != NRF_SUCCESS){
+				logt("ADVMOD", "Debug Packet corrupt");
+			}
 
 			AdvertisingController::SetAdvertisingState(advState::ADV_STATE_HIGH);
 		}
 		else if(configuration.messageCount > 0){
 			u32 err = sd_ble_gap_adv_data_set(configuration.messageData[0].messageData, configuration.messageData[0].messageLength, NULL, 0);
-			APP_ERROR_CHECK(err);
+			if(err != NRF_SUCCESS){
+				logt("ADVMOD", "Adv msg corrupt");
+			}
+
 
 			char buffer[200];
-			Logger::getInstance().convertBufferToHexString((u8*)configuration.messageData[0].messageData, 31, buffer);
+			Logger::getInstance().convertBufferToHexString((u8*)configuration.messageData[0].messageData, 31, buffer, 200);
 
 			logt("ADVMOD", "ADV set to %s", buffer);
 
@@ -184,13 +179,13 @@ void AdvertisingModule::NodeStateChangedHandler(discoveryState newState)
 			}
 
 			//Now, start advertising
-			//TODO: Use values from config to advertise
+			//TODO: Use advertising parameters from config to advertise
 			AdvertisingController::SetAdvertisingState(advState::ADV_STATE_HIGH);
 		}
 
 	} else if (newState == discoveryState::DISCOVERY) {
 		//Do not trigger custom advertisings anymore, reset to node's advertising
-		node->UpdateJoinMePacket(NULL);
+		node->UpdateJoinMePacket();
 	}
 }
 
@@ -204,8 +199,8 @@ bool AdvertisingModule::TerminalCommandHandler(string commandName, vector<string
 
 			if(commandArgs[2] == "broadcast_debug")
 			{
-				broadcastDebugPackets = !broadcastDebugPackets;
-				logt("ADVMOD", "Debug Packets are now set to %u", broadcastDebugPackets);
+				Config->advertiseDebugPackets = !Config->advertiseDebugPackets;
+				logt("ADVMOD", "Debug Packets are now set to %u", Config->advertiseDebugPackets);
 
 				return true;
 			}

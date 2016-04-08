@@ -29,7 +29,7 @@ extern "C"{
 }
 
 
-Module::Module(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
+Module::Module(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
 {
 	this->node = node;
 	this->cm = cm;
@@ -63,7 +63,9 @@ void Module::LoadModuleConfiguration()
 		ConfigurationLoadedHandler();
 	} else {
 		//Start to load the saved configuration
-		Storage::getInstance().QueuedRead((u8*)configurationPointer, configurationLength, storageSlot, this);
+		//FIXME: only meant as hotfix, replace with NewStorage
+		memcpy((u8*)configurationPointer, (u8*)(PAGE_SIZE*254+storageSlot*STORAGE_BLOCK_SIZE), configurationLength);
+		ConfigurationLoadedHandler();
 	}
 
 }
@@ -73,7 +75,7 @@ void Module::ConfigurationLoadedHandler()
 	//Configuration is invalid because the device got flashed
 	if(configurationPointer->moduleId == 0xFF)
 	{
-		logt("MODULE", "Config resetted to default");
+		logt("MODULE", "Config resetted to default for module %d", moduleId);
 		ResetToDefaultConfiguration();
 	}
 	//Configuration has been saved by another module or is wrong
@@ -214,11 +216,11 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 						&& dataFieldLength == configurationLength
 				){
 					//Backup the module id because it must not be sent in the packet
-					u16 moduleId = configurationPointer->moduleId;
+					u8 moduleId = configurationPointer->moduleId;
 					memcpy(configurationPointer, packet->data, configurationLength);
 					configurationPointer->moduleId = moduleId;
 
-					//TODO: Save, and afterwards send saveOK message
+					//TODO: Maybe, we want to save this configuration, and afterwards send saveOK message
 
 					//Send set_config_ok message
 					connPacketModule outPacket;
@@ -234,6 +236,8 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 					cm->SendMessageToReceiver(NULL, (u8*) &outPacket, SIZEOF_CONN_PACKET_MODULE + 1, false);
 
 					ConfigurationLoadedHandler();
+
+					//SaveModuleConfiguration();
 				}
 				else
 				{
@@ -303,7 +307,7 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 			else if(packet->actionType == ModuleConfigMessages::CONFIG)
 			{
 				char* buffer[200];
-				Logger::getInstance().convertBufferToHexString(packet->data, dataFieldLength, (char*)buffer);
+				Logger::getInstance().convertBufferToHexString(packet->data, dataFieldLength, (char*)buffer, 200);
 
 				uart("MODULE", "{\"nodeId\":%u,\"type\":\"config\",\"module\":%u,\"config\":\"%s\"}" SEP, packet->header.sender, moduleId, buffer);
 

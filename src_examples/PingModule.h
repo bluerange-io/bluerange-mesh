@@ -44,7 +44,7 @@ class PingModule: public Module
 		};
 
 	public:
-		PingModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		PingModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 
 		void ConfigurationLoadedHandler();
 

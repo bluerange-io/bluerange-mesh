@@ -22,7 +22,8 @@ SET EXEC_FOLDER=C:\nrf\projects\fruitymesh\deploy
 SET NRFJPROG_PATH=C:\nrf\tools\nrf_tools\nrfjprog.exe
 
 SET FRUITYMESH_HEX=C:\nrf\projects\fruitymesh\%BUILD%\FruityMesh.hex
-SET SOFTDEVICE_HEX=C:\nrf\softdevices\sd130_1.0.0-prod\s130_nrf51_1.0.0_softdevice.hex
+SET FRUITYLOADER_HEX=C:\nrf\projects\fruityloader\Release\FruityLoader.hex
+SET SOFTDEVICE_HEX=C:\nrf\softdevices\sd130_2.0.0-prod\s130_nrf51_2.0.0_softdevice.hex
 
 echo.
 echo.
@@ -45,20 +46,28 @@ for /f "tokens=* delims=" %%x in (%IDS%) do (
 
 	echo | set /p dummyName=%%x, 
 
-	if %TYPE% == fruitymesh (
-		start /min cmd /C "%NRFJPROG_PATH% -s %%x --program %FRUITYMESH_HEX% --sectorerase --family %FAMILY% && %NRFJPROG_PATH% -s %%x --reset"
-	)
-	if %TYPE% == softdevice (
-		start /min %NRFJPROG_PATH% -s %%x --program %SOFTDEVICE_HEX% --chiperase --family %FAMILY%
-	)
-	if %TYPE% == full (
-		start /min cmd /C "%NRFJPROG_PATH% -s %%x --program %SOFTDEVICE_HEX% --chiperase --family %FAMILY% && %NRFJPROG_PATH% -s %%x --program %FRUITYMESH_HEX% --family %FAMILY% && %NRFJPROG_PATH% -s %%x --reset"
-	)
-	if %TYPE% == erase (
-		start /min nrfjprog -s %%x --eraseall --family %FAMILY%
-	)
-	if %TYPE% == reset (
-		start /min nrfjprog -s %%x --reset --family %FAMILY%
+	REM Leave my sniffing dongle alone....
+	if NOT %%x == 680603635 (
+
+		if %TYPE% == fruitymesh (
+			start /min cmd /C "%NRFJPROG_PATH% -s %%x --program %FRUITYMESH_HEX% --sectorerase --family %FAMILY% && %NRFJPROG_PATH% -s %%x --reset"
+		)
+		if %TYPE% == softdevice (
+			start /min %NRFJPROG_PATH% -s %%x --program %SOFTDEVICE_HEX% --chiperase --family %FAMILY%
+		)
+		if %TYPE% == full (
+			start /min cmd /C "%NRFJPROG_PATH% -s %%x --program %SOFTDEVICE_HEX% --chiperase --family %FAMILY% && %NRFJPROG_PATH% -s %%x --program %FRUITYMESH_HEX% --family %FAMILY% && %NRFJPROG_PATH% -s %%x --reset"
+		)
+		if %TYPE% == loader (
+			start /min cmd /C "%NRFJPROG_PATH% -s %%x --program %SOFTDEVICE_HEX% --chiperase --family %FAMILY% && %NRFJPROG_PATH% -s %%x --program %FRUITYMESH_HEX% --family %FAMILY%  && %NRFJPROG_PATH% -s %%x --program %FRUITYLOADER_HEX% --family %FAMILY% && %NRFJPROG_PATH% -s %%x --reset"
+		)
+		if %TYPE% == erase (
+			start /min nrfjprog -s %%x --eraseall --family %FAMILY%
+		)
+		if %TYPE% == reset (
+			start /min nrfjprog -s %%x --reset --family %FAMILY%
+		)
+
 	)
 
 )

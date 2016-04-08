@@ -46,37 +46,50 @@ class Connection
 		Node* node; //Reference to the own Node
 		ConnectionManager* cm;
 
-		void Init();
-
 	public:
 		//Types
 		enum ConnectionDirection { CONNECTION_DIRECTION_IN, CONNECTION_DIRECTION_OUT };
+		enum ConnectionState {DISCONNECTED=0, CONNECTING=1, CONNECTED=2, HANDSHAKING=3, HANDSHAKE_DONE=4, REESTABLISHING=5};
+		enum EncryptionState {NOT_ENCRYPTED=0, ENCRYPTING=1, ENCRYPTED=2};
 
-		bool isConnected;
-		bool handshakeDone;
+		ConnectionState connectionState;
+		EncryptionState encryptionState;
+
+
+		ConnectionState connectionStateBeforeDisconnection;
+		u8 disconnectionReason;
 
 		//Initializes connection but does not connect
 		Connection(u8 id, ConnectionManager* cm, Node* node, ConnectionDirection direction);
+		void ResetValues();
 
 		void DiscoverCharacteristicHandles(void);
 		void StartHandshake(void);
 
-		bool Connect(ble_gap_addr_t* address, u16 writeCharacteristicHandle);
-		void Disconnect(void);
-		
-		//Encryption
-		void EncryptConnection();
-		
+		bool PrepareConnection(ble_gap_addr_t* address, u16 writeCharacteristicHandle);
+
+		void PrepareDisconnect();
+		void Disconnect();
+
 		//Handler
 		void ConnectionSuccessfulHandler(ble_evt_t* bleEvent);
 		void DisconnectionHandler(ble_evt_t* bleEvent);
 		void ReceivePacketHandler(connectionPacket* inPacket);
 		//void SendNextMessageHandler(ble_evt_t* bleEvent);
+		void ClusterUpdateSentHandler();
 		
+		void BleEventHandler(ble_evt_t* bleEvent);
+
 		//Helpers
 		void PrintStatus(void);
 
 		i8 GetAverageRSSI();
+		u16 GetPendingPackets();
+
+		//Getter
+		bool isDisconnected(){ return connectionState == ConnectionState::DISCONNECTED; };
+		bool isConnected(){ return connectionState >= ConnectionState::CONNECTED; };
+		bool handshakeDone(){ return connectionState >= ConnectionState::HANDSHAKE_DONE; };
 
 		//Variables
 		u8 connectionId;
@@ -94,6 +107,13 @@ class Connection
 		PacketQueue* packetSendQueue;
 		u8 packetSendPosition; //Is used to send messages that consist of multiple parts
 
+		u8 lastSentPacket[MAX_DATA_SIZE_PER_WRITE];
+
+		//Timestamp and Clustering messages must be sent immediately and are not queued
+		//Multiple updates can accumulate in this variable
+		//This packet must not be sent during handshakes
+		connPacketClusterInfoUpdate currentClusterInfoUpdatePacket;
+
 		u8 packetReassemblyBuffer[PACKET_REASSEMBLY_BUFFER_SIZE];
 		u8 packetReassemblyPosition; //Set to 0 if no reassembly is in progress
 
@@ -102,12 +122,27 @@ class Connection
 		u16 connectionHandle; //The handle that is given from the BLE stack to identify a connection
 		ble_gap_addr_t partnerAddress;
 		u16 writeCharacteristicHandle;
+		u16 currentConnectionInterval;
+		u32 connectionHandshakedTimestamp;
 		
+		//Handshake
+		connPacketClusterAck1 clusterAck1Packet;
+		connPacketClusterAck2 clusterAck2Packet;
+
+		clusterID clusterIDBackup;
+		clusterSIZE clusterSizeBackup;
+		clusterSIZE hopsToSinkBackup;
+
 		//Mesh variables
+		u8 connectionMasterBit;
 		clusterID connectedClusterId;
 		clusterSIZE connectedClusterSize;
 		clusterSIZE hopsToSink;
 		u32 handshakeStarted;
 
+		//Debug info
+		u16 droppedPackets;
+		u16 sentReliable;
+		u16 sentUnreliable;
 
 };

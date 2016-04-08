@@ -107,7 +107,7 @@ class EnrollmentModule: public Module
 
 
 	public:
-		EnrollmentModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		EnrollmentModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 
 		void ConfigurationLoadedHandler();
 

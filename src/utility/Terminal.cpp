@@ -24,16 +24,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <Terminal.h>
 #include <Config.h>
 #include <Utility.h>
+#include <LogTransport.h>
 
 extern "C"
 {
-#include <simple_uart.h>
+#include "nrf.h"
 }
 
 
 #ifdef ENABLE_TERMINAL
 bool Terminal::terminalIsInitialized = false;
-bool Terminal::promptAndEchoMode = true;
+bool Terminal::promptAndEchoMode = TERMINAL_PROMPT_MODE_ON_BOOT;
 SimplePushStack* Terminal::registeredCallbacks;
 #endif
 
@@ -44,7 +45,7 @@ void Terminal::Init()
 	registeredCallbacks = new SimplePushStack(MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS);
 
 	//Start UART communication
-	simple_uart_config(RTS_PIN_NUMBER, TX_PIN_NUMBER, CTS_PIN_NUMBER, RX_PIN_NUMBER, HWFC);
+	log_transport_init();
 
 	char versionString[15];
 	Utility::GetVersionStringFromInt(Config->firmwareVersion, versionString);
@@ -52,27 +53,29 @@ void Terminal::Init()
 	if (promptAndEchoMode)
 	{
 		//Send Escape sequence
-		simple_uart_put(27); //ESC
-		simple_uart_putstring((const u8*) "[2J"); //Clear Screen
-		simple_uart_put(27); //ESC
-		simple_uart_putstring((const u8*) "[H"); //Cursor to Home
+		log_transport_put(27); //ESC
+		log_transport_putstring((const u8*) "[2J"); //Clear Screen
+		log_transport_put(27); //ESC
+		log_transport_putstring((const u8*) "[H"); //Cursor to Home
 
 		//Send App start header
-		simple_uart_putstring((const u8*) "--------------------------------------------------" EOL);
-		simple_uart_putstring((const u8*) "Terminal started, compile date: ");
-		simple_uart_putstring((const u8*) __DATE__);
-		simple_uart_putstring((const u8*) "  ");
-		simple_uart_putstring((const u8*) __TIME__);
-		simple_uart_putstring((const u8*) ", version: ");
-		simple_uart_putstring((const u8*) versionString);
+		log_transport_putstring((const u8*) "--------------------------------------------------" EOL);
+		log_transport_putstring((const u8*) "Terminal started, compile date: ");
+		log_transport_putstring((const u8*) __DATE__);
+		log_transport_putstring((const u8*) "  ");
+		log_transport_putstring((const u8*) __TIME__);
+		log_transport_putstring((const u8*) ", version: ");
+		log_transport_putstring((const u8*) versionString);
 
 #ifdef NRF52
-		simple_uart_putstring((const u8*) ", nRF52");
+		log_transport_putstring((const u8*) ", nRF52");
 #else
-		simple_uart_putstring((const u8*) ", nRF51");
+		log_transport_putstring((const u8*) ", nRF51");
 #endif
 
-		simple_uart_putstring((const u8*) EOL "--------------------------------------------------" EOL);
+		log_transport_putstring((const u8*) EOL "--------------------------------------------------" EOL);
+	} else {
+		uart("NODE", "{\"type\":\"reboot\"}" SEP);
 	}
 
 	terminalIsInitialized = true;
@@ -95,14 +98,14 @@ void Terminal::PollUART()
 	static char testCopy[250] = {0};
 	readBuffer[0] = 0;
 
-	if (simple_uart_get_with_timeout(0, (u8*) readBuffer))
+	if (log_transport_get_char_nonblocking((u8*)readBuffer))
 	{
 
 		//Output query string and typed symbol to terminal
 		if (promptAndEchoMode)
 		{
-			simple_uart_putstring((const u8*) EOL "mhTerm: "); //Display prompt
-			simple_uart_put(readBuffer[0]); //echo back symbol
+			log_transport_putstring((const u8*) EOL "mhTerm: "); //Display prompt
+			log_transport_put(readBuffer[0]); //echo back symbol
 		}
 
 		//Read line from uart
@@ -110,6 +113,7 @@ void Terminal::PollUART()
 
 		//FIXME: remove after finding problem
 		memcpy(testCopy, readBuffer, 250);
+		//logt("ERROR", "inpout was: %s", testCopy);
 
 		//Clear previous command
 		commandName.clear();
@@ -131,10 +135,10 @@ void Terminal::PollUART()
 		if (commandName == "cls")
 		{
 			//Send Escape sequence
-			simple_uart_put(27); //ESC
-			simple_uart_putstring((const u8*) "[2J"); //Clear Screen
-			simple_uart_put(27); //ESC
-			simple_uart_putstring((const u8*) "[H"); //Cursor to Home
+			log_transport_put(27); //ESC
+			log_transport_putstring((const u8*) "[2J"); //Clear Screen
+			log_transport_put(27); //ESC
+			log_transport_putstring((const u8*) "[H"); //Cursor to Home
 		}
 		else
 		{
@@ -147,16 +151,32 @@ void Terminal::PollUART()
 
 			if (handled == 0){
 				if(promptAndEchoMode){
-					simple_uart_putstring((const u8*)"Command not found" EOL);
+					log_transport_putstring((const u8*)"Command not found" EOL);
 				} else {
 					uart_error(Logger::COMMAND_NOT_FOUND);
 				}
 				//FIXME: to find problems with uart input
-				uart("ERROR", "{\"user_input\":\"%s\"}" SEP, testCopy);
+				//uart("ERROR", "{\"user_input\":\"%s\"}" SEP, testCopy);
+			} else if(!promptAndEchoMode){
+				uart_error(Logger::NO_ERROR);
 			}
 		}
 	}
 #endif
+}
+
+void Terminal::ReadFromUARTNonBlocking(){
+
+	    if(NRF_UART0->EVENTS_RXDRDY == 1){
+		    NRF_UART0->EVENTS_RXDRDY = 0; //Clear ready register
+		    u8 myChar = (uint8_t)NRF_UART0->RXD;
+
+		    //send char
+		    NRF_UART0->TXD = (uint8_t)myChar;
+		    while (NRF_UART0->EVENTS_TXDRDY != 1){}
+	    }
+
+	    for(u32 i=0; i<15000; i++){}
 }
 
 //reads a String from the terminal (until the user has pressed ENTER)
@@ -174,7 +194,7 @@ void Terminal::ReadlineUART(char* readBuffer, u8 readBufferLength, u8 offset)
 	while (true)
 	{
 		//Read from terminal
-		byteBuffer = simple_uart_get();
+		byteBuffer = log_transport_get_char_blocking();
 
 		//BACKSPACE
 		if (byteBuffer == 127)
@@ -182,7 +202,7 @@ void Terminal::ReadlineUART(char* readBuffer, u8 readBufferLength, u8 offset)
 			if (counter > 0)
 			{
 				//Output Backspace
-				if(promptAndEchoMode) simple_uart_put(byteBuffer);
+				if(promptAndEchoMode) log_transport_put(byteBuffer);
 
 				readBuffer[counter - 1] = 0;
 				counter--;
@@ -193,12 +213,12 @@ void Terminal::ReadlineUART(char* readBuffer, u8 readBufferLength, u8 offset)
 		{
 
 			//Display entered character in terminal
-			if(promptAndEchoMode) simple_uart_put(byteBuffer);
+			if(promptAndEchoMode) log_transport_put(byteBuffer);
 
 			if (byteBuffer == '\r' || counter >= readBufferLength || counter >= 250)
 			{
 				readBuffer[counter] = '\0';
-				if(promptAndEchoMode) simple_uart_putstring((const u8*) EOL);
+				if(promptAndEchoMode) log_transport_putstring((const u8*) EOL);
 				break;
 			}
 			else

@@ -45,12 +45,13 @@ typedef unsigned char uint8_t;
 
 
 extern "C"{
+#include <sdk_common.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <ble_gap.h>
 #include <ble_gatts.h>
-#include <cstring>
+#include <string.h>
 }
 
 
@@ -107,6 +108,33 @@ typedef struct
 }nodeAddress;
 
 
+/*############ BOOTLOADER ################*/
+//Uses word-sized variables to avoid padding problems. No need to save space in our flash-page
+typedef struct
+{
+	u32 updatePending; //Should be set to the magic number
+	u32 imageType;
+	u32 sdStartPage;
+	u32 sdNumPages;
+	u32 appStartPage;
+	u32 appNumPages;
+	u32 imageStartPage;
+	u32 imageNumPages;
+
+	u32 dfuMasterNodeId;
+	u32 dfuInProgressRequestHandle;
+
+	u32 dfuNumChunks;
+	u32 dfuChunkSize;
+
+	u32 pagesStored[60]; //bit sequence of how many pages have been stored successfully
+	u32 pagesMoved[60]; //bit sequence of how many pages the bootloader has moved so far
+
+} bootloaderSettings;
+#define BOOTLOADER_MAGIC_NUMBER 0xF0771234
+enum imageType{ IMAGE_TYPE_SOFTDEVICE, IMAGE_TYPE_APP };
+
+
 /*############ ADVERTISING ################*/	
 //Defines the different advertising intervals for each state
 typedef enum {
@@ -126,6 +154,15 @@ typedef enum {
 } scanState;
 
 
+/*############ Regarding node ids ################*/
+// Refer to protocol specification
+#define NODE_ID_BROADCAST 0
+#define NODE_ID_DEVICE_BASE 0
+#define NODE_ID_GROUP_BASE 20000
+#define NODE_ID_HOPS_BASE 30000
+#define NODE_ID_SHORTEST_SINK 31001
+
+
 //States
 //These are the different states
 //DISCOVERY_HIGH: Scanning and Advertising at high interval
@@ -135,6 +172,19 @@ typedef enum {
 //DISCOVERY_OFF: No new nodes will be discovered until discovery is switched on again.
 enum discoveryState
 {
-	INVALID_STATE, BOOTUP, DISCOVERY, DISCOVERY_HIGH, DISCOVERY_LOW, DECIDING, HANDSHAKE, CONNECTING, BACK_OFF, DISCOVERY_OFF
+	INVALID_STATE, BOOTUP, DISCOVERY, DISCOVERY_HIGH, DISCOVERY_LOW, DECIDING, HANDSHAKE, HANDSHAKE_TIMEOUT, CONNECTING, REESTABLISHING_CONNECTION, BACK_OFF, DISCOVERY_OFF
 };
 
+//Led mode that defines what the LED does (mainly for debugging)
+enum ledMode
+{
+	LED_MODE_OFF, LED_MODE_ON, LED_MODE_CONNECTIONS, LED_MODE_RADIO, LED_MODE_CLUSTERING
+};
+
+/*############ HELPFUL MACROS ################*/
+#define PAGE_SIZE NRF_FICR->CODEPAGESIZE
+#define FLASH_SIZE (NRF_FICR->CODESIZE*NRF_FICR->CODEPAGESIZE)
+
+#define TO_ADDR(page) ((u32*)(page*PAGE_SIZE))
+#define TO_PAGE(addr) ((((u32)addr)/PAGE_SIZE))
+#define TO_PAGES_CEIL(size) ((size + PAGE_SIZE - 1) / PAGE_SIZE) //Calculates the number of pages and rounds up

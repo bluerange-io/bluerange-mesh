@@ -9,10 +9,10 @@ TARGET_BOARD         ?= BOARD_PCA10031
 # Define relative paths to SDK components
 #------------------------------------------------------------------------------
 
-SDK_BASE      := $(HOME)/nrf/sdk/nrf_sdk_9_0
+SDK_BASE      := $(HOME)/nrf/sdk/nrf51_sdk_latest #C:/nrf/sdk/nrf51_sdk_latest
 COMPONENTS    := $(SDK_BASE)/components
 TEMPLATE_PATH := $(COMPONENTS)/toolchain/gcc
-EHAL_PATH     := $(HOME)/nrf/sdk/ehal_latest
+EHAL_PATH     := $(HOME)/nrf/sdk/ehal_latest #C:/nrf/sdk/ehal_latest
 LINKER_SCRIPT := ./linker/gcc_nrf51_s130_32kb.ld
 OUTPUT_NAME   := FruityMesh
 JLINK	      := jlinkexe
@@ -35,7 +35,7 @@ export GNU_INSTALL_ROOT
 MAKEFILE_NAME := $(MAKEFILE_LIST)
 MAKEFILE_DIR := $(dir $(MAKEFILE_NAME) ) 
 
-ifeq ($(OS),Windows_NT)
+ifeq ($(OS),Windows_NT) #ifeq ($(OS),CYGWIN_NT-10.0-WOW)
   include $(TEMPLATE_PATH)/Makefile.windows
 else
   include $(TEMPLATE_PATH)/Makefile.posix
@@ -72,22 +72,28 @@ CPP_SOURCE_FILES += ./src/base/AdvertisingController.cpp
 CPP_SOURCE_FILES += ./src/base/GAPController.cpp
 CPP_SOURCE_FILES += ./src/base/GATTController.cpp
 CPP_SOURCE_FILES += ./src/base/ScanController.cpp
+
 CPP_SOURCE_FILES += ./src/Main.cpp
+
 CPP_SOURCE_FILES += ./src/mesh/Connection.cpp
 CPP_SOURCE_FILES += ./src/mesh/ConnectionManager.cpp
 CPP_SOURCE_FILES += ./src/mesh/Node.cpp
+
 CPP_SOURCE_FILES += ./src/modules/AdvertisingModule.cpp
-CPP_SOURCE_FILES += ./src/modules/DFUModule.cpp
+CPP_SOURCE_FILES += ./src/modules/DebugModule.cpp
 CPP_SOURCE_FILES += ./src/modules/EnrollmentModule.cpp
+CPP_SOURCE_FILES += ./src/modules/IoModule.cpp
 CPP_SOURCE_FILES += ./src/modules/Module.cpp
 CPP_SOURCE_FILES += ./src/modules/ScanningModule.cpp
 CPP_SOURCE_FILES += ./src/modules/StatusReporterModule.cpp
-CPP_SOURCE_FILES += ./src/modules/DebugModule.cpp
-CPP_SOURCE_FILES += ./src/modules/IoModule.cpp
+
 CPP_SOURCE_FILES += ./src/test/TestBattery.cpp
 CPP_SOURCE_FILES += ./src/test/Testing.cpp
+
 CPP_SOURCE_FILES += ./src/utility/LedWrapper.cpp
 CPP_SOURCE_FILES += ./src/utility/Logger.cpp
+CPP_SOURCE_FILES += ./src/utility/LogTransport.cpp
+CPP_SOURCE_FILES += ./src/utility/NewStorage.cpp
 CPP_SOURCE_FILES += ./src/utility/PacketQueue.cpp
 CPP_SOURCE_FILES += ./src/utility/SimpleBuffer.cpp
 CPP_SOURCE_FILES += ./src/utility/SimplePushStack.cpp
@@ -96,13 +102,14 @@ CPP_SOURCE_FILES += ./src/utility/Storage.cpp
 CPP_SOURCE_FILES += ./src/utility/Terminal.cpp
 CPP_SOURCE_FILES += ./src/utility/Utility.cpp
 
-C_SOURCE_FILES += $(EHAL_PATH)/ARM/Nordic/nRF51/src/Vectors_nRF51.c
 C_SOURCE_FILES += $(COMPONENTS)/libraries/timer/app_timer.c
 C_SOURCE_FILES += $(COMPONENTS)/ble/ble_radio_notification/ble_radio_notification.c
-C_SOURCE_FILES += ./src/nrf/simple_uart.c
-C_SOURCE_FILES += $(COMPONENTS)/drivers_nrf/hal/nrf_delay.c
 C_SOURCE_FILES += $(COMPONENTS)/drivers_nrf/pstorage/pstorage.c
 C_SOURCE_FILES += $(COMPONENTS)/softdevice/common/softdevice_handler/softdevice_handler.c
+C_SOURCE_FILES += $(EHAL_PATH)/ARM/Nordic/nRF51/src/Vectors_nRF51.c
+
+C_SOURCE_FILES += ./src/nrf/simple_uart.c
+C_SOURCE_FILES += ./src/nrf/crc16.c
 
 # includes common to all targets
 
@@ -118,15 +125,24 @@ INC_PATHS += -I$(COMPONENTS)/ble/ble_radio_notification
 INC_PATHS += -I$(COMPONENTS)/ble/ble_services/ble_dfu
 INC_PATHS += -I$(COMPONENTS)/ble/common
 INC_PATHS += -I$(COMPONENTS)/device
+
 INC_PATHS += -I$(COMPONENTS)/libraries/timer
 INC_PATHS += -I$(COMPONENTS)/libraries/util
+
 INC_PATHS += -I$(COMPONENTS)/softdevice/common/softdevice_handler
+
 INC_PATHS += -I$(COMPONENTS)/softdevice/s130/headers
+INC_PATHS += -I$(COMPONENTS)/softdevice/s130/headers/nrf51
+
+
 INC_PATHS += -I$(COMPONENTS)/toolchain
 INC_PATHS += -I$(COMPONENTS)/toolchain/arm
 INC_PATHS += -I$(COMPONENTS)/toolchain/gcc
+INC_PATHS += -I$(COMPONENTS)/toolchain/CMSIS/Include
+
 INC_PATHS += -I$(COMPONENTS)/drivers_nrf/pstorage
 INC_PATHS += -I$(COMPONENTS)/drivers_nrf/hal
+INC_PATHS += -I$(COMPONENTS)/drivers_nrf/delay
 
 OBJECT_DIRECTORY = _build
 LISTING_DIRECTORY = $(OBJECT_DIRECTORY)
@@ -136,14 +152,13 @@ OUTPUT_BINARY_DIRECTORY = $(OBJECT_DIRECTORY)
 BUILD_DIRECTORIES := $(sort $(OBJECT_DIRECTORY) $(OUTPUT_BINARY_DIRECTORY) $(LISTING_DIRECTORY) )
 
 ifeq ($(BUILD_TYPE),debug)
-  DEBUG_FLAGS += -D DEBUG -g -O0
+  DEBUG_FLAGS += -DDEBUG -g -Os
 else
-  DEBUG_FLAGS += -D NDEBUG -O3
+  DEBUG_FLAGS += -DNDEBUG -Os
 endif
 
 CFLAGS += -mcpu=cortex-m0
 CFLAGS += -mthumb 
-CFLAGS += -Og
 CFLAGS += -fmessage-length=0
 CFLAGS += -fsigned-char 
 CFLAGS += -ffunction-sections 
@@ -151,39 +166,38 @@ CFLAGS += -fdata-sections
 CFLAGS += -flto
 CFLAGS += -fno-move-loop-invariants
 CFLAGS += -Wextra
-CFLAGS += -g3
 CFLAGS += -DBLE_STACK_SUPPORT_REQD
 CFLAGS += $(DEBUG_FLAGS)
 CFLAGS += -D$(TARGET_BOARD)
 CFLAGS += -DNRF51
 CFLAGS += -D__need___va_list
-CFLAGS += -w
 CFLAGS += -fabi-version=0
 CFLAGS += -fno-exceptions
-CFLAGS += -fno-rtti
-CFLAGS += -fno-use-cxa-atexit
-CFLAGS += -fno-threadsafe-statics
 
-CFLAGS += -DENABLE_LOGGING
-CFLAGS += -DDEST_BOARD_ID=0
+CPPFLAGS += -std=c++11
+CPPFLAGS += -fno-rtti
+CPPFLAGS += -fno-use-cxa-atexit
+CPPFLAGS += -fno-threadsafe-statics
+
+STDCFLAGS += -std=gnu99
 
 LDFLAGS += -mcpu=cortex-m0
 LDFLAGS += -mthumb
-LDFLAGS += -Og
+LDFLAGS += -Os
 LDFLAGS += -fmessage-length=0
 LDFLAGS += -fsigned-char
 LDFLAGS += -ffunction-sections
 LDFLAGS += -flto
 LDFLAGS += -fno-move-loop-invariants
 LDFLAGS += -Wextra
-LDFLAGS += -g3
+LDFLAGS += -g
 LDFLAGS += -T$(LINKER_SCRIPT)
 LDFLAGS += -Xlinker 
-LDFLAGS += --gc-sections
 LDFLAGS += -Wl,-Map,"_build/FruityMesh.map"
+LDFLAGS += --gc-sections
 LDFLAGS += --specs=nano.specs
 
-LIBS += -L$(EHAL_PATH)/ARM/src
+LIBS += -L./linker
 LIBS += -L$(EHAL_PATH)/ARM/Nordic/nRF51/CMSIS/Debug
 LIBS += -lCMSIS
 
@@ -206,8 +220,8 @@ OBJECTS = $(CPP_OBJECTS) $(C_OBJECTS)
 
 all: $(BUILD_DIRECTORIES) $(OBJECTS)
 	@echo Linking target: $(OUTPUT_NAME).elf
-	$(NO_ECHO)$(CPP) $(LDFLAGS) $(OBJECTS) $(LIBS) $(INC_PATHS) -o $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_NAME).elf
-	$(NO_ECHO)$(MAKE) -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e finalize
+	$(CPP) $(LDFLAGS) $(OBJECTS) $(LIBS) -o $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_NAME).elf
+	$(MAKE) -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e finalize
 
 	@echo "*****************************************************"
 	@echo "build project: $(OUTPUT_NAME)"
@@ -233,12 +247,12 @@ $(BUILD_DIRECTORIES):
 # Create objects from CPP SRC files
 $(OBJECT_DIRECTORY)/%.o: %.cpp
 	@echo Compiling file: $(notdir $<)
-	$(NO_ECHO)$(CPP) -std=c++11 $(CFLAGS) $(INC_PATHS) -c $< -o $@ > $(OUTPUT_BINARY_DIRECTORY)/$*.lst
+	$(CPP) $(CPPFLAGS) $(CFLAGS) $(INC_PATHS) -c $< -o $@ > $(OUTPUT_BINARY_DIRECTORY)/$*.lst
 
 # Create objects from C SRC files
 $(OBJECT_DIRECTORY)/%.o: %.c
 	@echo Compiling file: $(notdir $<)
-	$(NO_ECHO)$(CC) -std=gnu99 $(CFLAGS) $(INC_PATHS) -c $< -o $@ > $(OUTPUT_BINARY_DIRECTORY)/$*.lst
+	$(NO_ECHO)$(CC) $(STDCFLAGS) $(CFLAGS) $(INC_PATHS) -c $< -o $@ > $(OUTPUT_BINARY_DIRECTORY)/$*.lst
 
 # Link
 $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_NAME).elf: $(BUILD_DIRECTORIES) $(OBJECTS)
@@ -268,7 +282,7 @@ genhex:
 
 echosize:
 	-@echo ""
-	$(NO_ECHO)$(SIZE) $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_NAME).elf
+	$(NO_ECHO)$(SIZE) --format=berkeley --totals --radix=10 $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_NAME).elf
 	-@echo ""
 
 clean:

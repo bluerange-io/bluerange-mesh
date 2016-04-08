@@ -49,7 +49,9 @@ class DebugModule: public Module
 		enum DebugModuleTriggerActionMessages{
 			RESET_NODE = 0,
 			RESET_CONNECTION_LOSS_COUNTER = 1,
-			FLOOD_MESSAGE = 2
+			FLOOD_MESSAGE = 2,
+			INFO_MESSAGE = 3,
+			CAUSE_HARDFAULT_MESSAGE = 4
 
 		};
 
@@ -57,8 +59,25 @@ class DebugModule: public Module
 
 		};
 
+		#pragma pack(push)
+		#pragma pack(1)
+
+		#define SIZEOF_DEBUG_MODULE_INFO_MESSAGE 6
+		typedef struct
+		{
+			u16 connectionLossCounter;
+			u16 droppedPackets;
+			u16 sentPackets;
+
+
+		} DebugModuleInfoMessage;
+
+		#pragma pack(pop)
+
+		void CauseHardfault();
+
 	public:
-		DebugModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		DebugModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 
 		void ConfigurationLoadedHandler();
 

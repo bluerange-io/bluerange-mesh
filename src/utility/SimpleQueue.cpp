@@ -6,6 +6,8 @@ extern "C"{
 #include <cstring>
 }
 
+//TODO: This queue might hardfault because of unaligned memory access, must be fixed
+
 SimpleQueue::SimpleQueue(u8* buffer, u32 bufferLength)
 {
     this->_numElements = 0;
@@ -32,7 +34,7 @@ bool SimpleQueue::Put(u8* data, u32 dataLength)
 	//at the end is not enough && dataSize at the beginning is enough
 	if(writePointer >= readPointer && (u32)(bufferEnd - writePointer) <= elementSize && (u32)(readPointer - bufferStart) >= elementSize){
 		writePointer = bufferStart;
-		((u32*)writePointer)[0] = 0;
+		memset(writePointer, 0, 4);
 	}
 	
 	//Check if Buffer can hold the item
@@ -44,12 +46,12 @@ bool SimpleQueue::Put(u8* data, u32 dataLength)
 	    return false;
 	}
 	
-	((u32*)writePointer)[0] = dataLength;
+	memcpy(writePointer, &dataLength, 4);
 	memcpy(writePointer + 4, data, dataLength);
 	
 	writePointer += dataLength + 4; //+two for size field
 	//Set length to 0 for next datafield
-	((u32*)writePointer)[0] = 0;
+	memset(writePointer, 0, 4);
 	
 	_numElements++;
 
@@ -68,15 +70,17 @@ sizedData SimpleQueue::PeekNext(void)
 	}
 
 	//Check if we reached the end and wrap
-	if(((u32*)readPointer)[0] == 0 && writePointer < readPointer){
-		data.length = ((u32*)bufferStart)[0];
+	u32 size;
+	memcpy(&size, readPointer, 4);
+	if(size == 0 && writePointer < readPointer){
+		memcpy(&data.length, bufferStart, 4);
 		data.data = bufferStart + 4;
 
 		return data;
 	}
 	else
 	{
-		data.length = ((u32*)readPointer)[0];
+		memcpy(&data.length, readPointer, 4);
 		data.data = this->readPointer + 4;
 
 		return data;
@@ -95,9 +99,11 @@ sizedData SimpleQueue::GetNext(void)
 	}
 	
 	//Check if we reached the end and wrap
-	if(((u32*)readPointer)[0] == 0 && writePointer < readPointer) readPointer = bufferStart;
+	u32 size;
+	memcpy(&size, readPointer, 4);
+	if(size == 0 && writePointer < readPointer) readPointer = bufferStart;
 	
-	data.length = ((u32*)readPointer)[0];
+	memcpy(&data.length, readPointer, 4);
 	data.data = this->readPointer + 4;
 	
 	this->readPointer += data.length + 4;
@@ -116,9 +122,13 @@ void SimpleQueue::DiscardNext(void)
 	}
 
 	//Check if we reached the end and wrap
-	if(((u32*)readPointer)[0] == 0 && writePointer < readPointer) readPointer = bufferStart;
+	u32 size;
+	memcpy(&size, readPointer, 4);
+	if(size == 0 && writePointer < readPointer) readPointer = bufferStart;
 
-	this->readPointer += ((u32*)readPointer)[0] + 4;
+
+	memcpy(&size, readPointer, 4);
+	this->readPointer += size + 4;
 
 	_numElements--;
 }
@@ -130,7 +140,7 @@ void SimpleQueue::Clean(void)
 	_numElements = 0;
 	this->readPointer = this->bufferStart;
 	this->writePointer = this->bufferStart;
-	((u32*)writePointer)[0] = 0;
+	memset(&writePointer, 0, 4);
 }
 
 /* EOF */

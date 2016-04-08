@@ -9,8 +9,10 @@ Total RAM 32KB: 10K for S130, application can use up to 22K (data:fixed size, he
 
 MEMORY
 {
-  FLASH (rx) : ORIGIN = 0x1c000, LENGTH = 0x24000
-  RAM (rwx) :  ORIGIN = 0x20002800, LENGTH = 0x5800
+  FLASH (rx) : ORIGIN = 0x1b000, LENGTH = 0x20000
+  RAM (rwx) :  ORIGIN = 0x20002E80, LENGTH = 0x5180
+
+  BOOTLOADER (rx) : ORIGIN = 0x3c000, LENGTH = 0x4000
 }
 
 INCLUDE "gcc_arm_flash.ld"

@@ -28,21 +28,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 
+
 #include <types.h>
+#include <LedWrapper.h>
 
 extern "C"{
 #include <ble.h>
 }
 
+
+u32 pendingSysEvent;
+
 void bleDispatchEventHandler(ble_evt_t * p_ble_evt);
+void sysDispatchEventHandler(u32 sys_evt);
 
+int app_main();
 
+void detectBoardAndSetConfig(void);
 void bleInit(void);
 u32 initNodeID(void);
 
 void initTimers(void);
 
-static void timerEventDispatch(u16 passedTime, u32 appTimer);
+void timerEventDispatch(u16 passedTime, u32 appTimer);
 
 
 //These are the event handlers that are notified by the SoftDevice

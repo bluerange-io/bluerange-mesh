@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <Logger.h>
 
 extern "C"{
+#include <ble_hci.h>
 }
 
 
@@ -43,46 +44,73 @@ Connection::Connection(u8 id, ConnectionManager* cm, Node* node, ConnectionDirec
 	this->node = node;
 	this->direction = direction;
 	this->packetSendQueue = new PacketQueue(packetSendBuffer, PACKET_SEND_BUFFER_SIZE);
-	connectedClusterSize = 0;
-	packetReassemblyPosition = 0;
-	packetSendPosition = 0;
 
-	Init();
+	ResetValues();
 }
 
-void Connection::Init(){
+void Connection::ResetValues(){
 	connectedClusterId = 0;
-	unreliableBuffersFree = cm->txBuffersPerLink; //FIXME: request from softdevice
+	unreliableBuffersFree = 0;
 	reliableBuffersFree = 1;
 	partnerId = 0;
 	connectionHandle = BLE_CONN_HANDLE_INVALID;
 
-	isConnected = false;
-	handshakeDone = false;
-	handshakeStarted = 0;
-	writeCharacteristicHandle = 0;
+	connectedClusterSize = 0;
 	packetReassemblyPosition = 0;
 	packetSendPosition = 0;
+	currentConnectionInterval = 0;
+
+	connectionState = ConnectionState::DISCONNECTED;
+	encryptionState = EncryptionState::NOT_ENCRYPTED;
+
+	connectionMasterBit = 0;
+
+	memset(&clusterAck1Packet, 0x00, sizeof(connPacketClusterAck1));
+	memset(&clusterAck2Packet, 0x00, sizeof(connPacketClusterAck2));
+
+	handshakeStarted = 0;
+	writeCharacteristicHandle = BLE_GATT_HANDLE_INVALID;
 
 	rssiSamplesNum = 0;
 	rssiSamplesSum = 0;
 	rssiAverage = 0;
 
+	clusterIDBackup = 0;
+	clusterSizeBackup = 0;
+	hopsToSinkBackup = -1;
+
+	connectionStateBeforeDisconnection = ConnectionState::DISCONNECTED;
+	disconnectionReason = BLE_HCI_STATUS_CODE_SUCCESS;
+
 	hopsToSink = -1;
+
+	droppedPackets = 0;
+	sentReliable = 0;
+	sentUnreliable = 0;
+
+	memset(&currentClusterInfoUpdatePacket, 0x00, sizeof(currentClusterInfoUpdatePacket));
+	memset(&lastSentPacket, 0x00, MAX_DATA_SIZE_PER_WRITE);
 
 	this->packetSendQueue->Clean();
 }
 
 //Once a connection has been connected in the connection manager, these parameters
 //Are passed to the connect function
-bool Connection::Connect(ble_gap_addr_t* address, u16 writeCharacteristicHandle)
+bool Connection::PrepareConnection(ble_gap_addr_t* address, u16 writeCharacteristicHandle)
 {
-	if(isConnected) return false;
-
-	Init();
+	ResetValues();
 
 	memcpy(&partnerAddress, address, sizeof(ble_gap_addr_t));
 	this->writeCharacteristicHandle = writeCharacteristicHandle;
+
+	this->connectionState = ConnectionState::CONNECTING;
+
+	//Save a snapshot of the current clustering values, these are used in the handshake
+	//Changes to these values are only sent after the handshake has finished and the handshake
+	//must not use values that are saved in the node because these might have changed in the meantime
+	clusterIDBackup = node->clusterId;
+	clusterSizeBackup = node->clusterSize;
+	hopsToSinkBackup = cm->GetHopsToShortestSink(this);
 
 	return true;
 }
@@ -95,9 +123,14 @@ void Connection::DiscoverCharacteristicHandles(void)
 	GATTController::bleDiscoverHandles(connectionHandle);
 }
 
-void Connection::Disconnect(void)
+void Connection::Disconnect()
 {
-	GAPController::disconnectFromPeripheral(connectionHandle);
+	//Save connection state before disconnection
+	connectionStateBeforeDisconnection = connectionState;
+	connectionState = ConnectionState::DISCONNECTED;
+	//FIXME: This method should be able to disconnect an active connection and disconnect a connection that is in the CONNECTING state
+
+	GAPController::disconnectFromPartner(connectionHandle);
 }
 
 
@@ -106,6 +139,8 @@ void Connection::Disconnect(void)
 /*######## HANDLER ###################################*/
 void Connection::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 {
+	u32 err = 0;
+
 	this->handshakeStarted = node->appTimerMs;
 
 	if (direction == CONNECTION_DIRECTION_IN)
@@ -113,21 +148,31 @@ void Connection::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 	else
 		logt("CONN", "Outgoing connection %d connected", connectionId);
 
-	this->connectionHandle = bleEvent->evt.gap_evt.conn_handle;
-	this->isConnected = true;
+	connectionHandle = bleEvent->evt.gap_evt.conn_handle;
+	err = sd_ble_tx_packet_count_get(this->connectionHandle, &unreliableBuffersFree);
+	if(err != NRF_SUCCESS){
+		//BLE_ERROR_INVALID_CONN_HANDLE && NRF_ERROR_INVALID_ADDR can be ignored
+	}
+
+	//Save connection interval (min and max are the same values in this event)
+	currentConnectionInterval = bleEvent->evt.gap_evt.params.connected.conn_params.min_conn_interval;
+
+	connectionState = CONNECTED;
 }
 
 
 void Connection::StartHandshake(void)
 {
-	if (this->handshakeDone)
+	if (connectionState >= ConnectionState::HANDSHAKING)
 	{
-		logt("HANDSHAKE", "Handshake for connId:%d is already finished", connectionId);
+		logt("HANDSHAKE", "Handshake for connId:%d is already finished or in progress", connectionId);
 		return;
 	}
 
 
 	logt("HANDSHAKE", "############ Handshake starting ###############");
+
+	connectionState = ConnectionState::HANDSHAKING;
 
 	//After the Handles have been discovered, we start the Handshake
 	connPacketClusterWelcome packet;
@@ -135,56 +180,41 @@ void Connection::StartHandshake(void)
 	packet.header.sender = node->persistentConfig.nodeId;
 	packet.header.receiver = NODE_ID_HOPS_BASE + 1; //Node id is unknown, but this allows us to send the packet only 1 hop
 
-	packet.payload.clusterId = node->clusterId;
-	packet.payload.clusterSize = node->clusterSize;
-	packet.payload.meshWriteHandle = GATTController::getMeshWriteHandle();
+	packet.payload.clusterId = clusterIDBackup;
+	packet.payload.clusterSize = clusterSizeBackup;
+	packet.payload.meshWriteHandle = GATTController::getMeshWriteHandle(); //Our own write handle
+
 
 	//Now we set the hop counter to the closest sink
 	//If we are sink ourself, we set it to 1, otherwise we use our
 	//shortest path to reach a sink and increment it by one.
 	//If there is no known sink, we set it to 0.
-	packet.payload.hopsToSink = cm->GetHopsToShortestSink(this);
+	packet.payload.hopsToSink = hopsToSinkBackup;
 
 
-	logt("HANDSHAKE", "OUT => conn(%d) CLUSTER_WELCOME, cID:%x, cSize:%d", connectionId, packet.payload.clusterId, packet.payload.clusterSize);
+	logt("HANDSHAKE", "OUT => conn(%u) CLUSTER_WELCOME, cID:%x, cSize:%d", connectionId, packet.payload.clusterId, packet.payload.clusterSize);
 
-	cm->SendMessage(this, (u8*) &packet, SIZEOF_CONN_PACKET_CLUSTER_WELCOME, true);
-
-}
-
-void Connection::EncryptConnection(void){
-
-	/*ble_opt_t bleOption;
-
-	bleOption.gap_opt.passkey.p_passkey
-
-	sd_ble_opt_set(BLE_GAP_OPT_PASSKEY)*/
-
+	cm->SendHandshakeMessage(this, (u8*) &packet, SIZEOF_CONN_PACKET_CLUSTER_WELCOME, true);
 
 }
-
 
 #define __________________HANDLER__________________
 void Connection::DisconnectionHandler(ble_evt_t* bleEvent)
 {
 	//Reason?
-	u8 disconnectReason = bleEvent->evt.gap_evt.params.disconnected.reason;
-
-	logt("DISCONNECT", "Disconnected %d from connId:%d, HCI:%d %s", partnerId, connectionId, disconnectReason, Logger::getHciErrorString(disconnectReason));
-
-	//Decrease Cluster size
-	this->connectedClusterSize = 0;
-	node->clusterSize -= this->connectedClusterSize;
+	logt("DISCONNECT", "Disconnected %u from connId:%u, HCI:%u %s", partnerId, connectionId, disconnectionReason, Logger::getHciErrorString(disconnectionReason));
 
 
-	//Reset variables
-	this->Init();
-
+	//Save connection state before disconnection
+	if(connectionState != ConnectionState::DISCONNECTED) connectionStateBeforeDisconnection = connectionState;
+	connectionState = ConnectionState::DISCONNECTED;
 }
 
 
 void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 {
+	if(connectionState == ConnectionState::DISCONNECTED) return;
+
 	u8* data = inPacket->data;
 	u16 dataLength = inPacket->dataLength;
 	bool reliable = inPacket->reliable;
@@ -202,7 +232,7 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 			|| packetHeader->receiver == NODE_ID_HOPS_BASE + 1 //The packet was meant to travel only one hop
 			|| (packetHeader->receiver == NODE_ID_SHORTEST_SINK && node->persistentConfig.deviceType == deviceTypes::DEVICE_TYPE_SINK) //Packet was meant for the shortest sink and we are a sink
 	){
-
+		//No packet forwarding needed here.
 	}
 	//The packet should continue to the shortest sink
 	else if(packetHeader->receiver == NODE_ID_SHORTEST_SINK)
@@ -222,20 +252,16 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 	{
 		//Some packets need to be modified before relaying them
 
-		//We increment the hops to sink so that each node knows how many hops the sink is away
-		if(packetHeader->messageType == MESSAGE_TYPE_CLUSTER_INFO_UPDATE){
-			//Increment hops to sink
-			connPacketClusterInfoUpdate* packet = (connPacketClusterInfoUpdate*)packetHeader;
-			if(packet->payload.hopsToSink > -1) packet->payload.hopsToSink++;
-		}
-
 		//If the packet should travel a number of hops, we decrement that part
 		if(packetHeader->sender > NODE_ID_HOPS_BASE && packetHeader->sender < NODE_ID_HOPS_BASE + 31000){
 			packetHeader->sender--;
 		}
 
 		//Send to all other connections
-		cm->SendMessageOverConnections(this, data, dataLength, reliable);
+		if(packetHeader->messageType != MESSAGE_TYPE_CLUSTER_INFO_UPDATE){
+			//Do not forward cluster info update packets, these are handeled by the node
+			cm->SendMessageOverConnections(this, data, dataLength, reliable);
+		}
 	}
 
 
@@ -250,13 +276,11 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 		{
 			//Now, compare that packet with our data and see if he should join our cluster
 			connPacketClusterWelcome* packet = (connPacketClusterWelcome*) data;
-			//FIXME: My own cluster size might have changed since I sent my packet, that means,
-			//Thatthe other node might decide on different data than I do, which might mean
-			//That both think that they are the bigger cluster
 
 			//Save mesh write handle
 			writeCharacteristicHandle = packet->payload.meshWriteHandle;
 
+			connectionState = ConnectionState::HANDSHAKING;
 
 			logt("HANDSHAKE", "############ Handshake starting ###############");
 
@@ -264,18 +288,21 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 			logt("HANDSHAKE", "IN <= %d CLUSTER_WELCOME clustID:%x, clustSize:%d, toSink:%d", packet->header.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.hopsToSink);
 
 			//PART 1: We do have the same cluster ID. Ouuups, should not have happened, run Forest!
-			if (packet->payload.clusterId == node->clusterId)
+			if (packet->payload.clusterId == clusterIDBackup)
 			{
-				logt("HANDSHAKE", "CONN %d disconnected because it had the same clusterID before handshake", connectionId);
+				logt("HANDSHAKE", "CONN %u disconnected because it had the same clusterId before handshake", connectionId);
 				this->Disconnect();
 			}
 			//PART 2: This is more probable, he's in a different cluster
-			else if (packet->payload.clusterSize < node->clusterSize || (packet->payload.clusterSize == node->clusterSize && packet->payload.clusterId < node->clusterId))
+			else if (packet->payload.clusterSize < clusterSizeBackup || (packet->payload.clusterSize == clusterSizeBackup && packet->payload.clusterId < clusterIDBackup))
 			{
 				//I am the bigger cluster
 				logt("HANDSHAKE", "I am bigger");
 
-				if(direction == CONNECTION_DIRECTION_IN) StartHandshake();
+				if(direction == CONNECTION_DIRECTION_IN){
+					StartHandshake();
+					return;
+				}
 
 			}
 			else
@@ -285,20 +312,17 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 				logt("HANDSHAKE", "I am smaller");
 
 				//Kill other Connections
-				cm->DisconnectOtherConnections(this);
+				//FIXME: what does the disconnect function do? it should just clear these connections!!!
+				cm->ForceDisconnectOtherConnections(this);
+
+				//Because we forcefully killed our connections, we are back at square 1
+				//These values will be overwritten by the ACK2 packet that we receive from out partner
+				//But if we do never receive an ACK2, this is our new starting point
+				node->clusterSize = 1;
+				node->clusterId = node->GenerateClusterID();
 
 				//Update my own information on the connection
-				//this->connectedClusterId = packet->payload.clusterId;
-				//this->connectedClusterSize += packet->payload.clusterSize;
 				this->partnerId = packet->header.sender;
-				this->hopsToSink = packet->payload.hopsToSink < 0 ? -1 : packet->payload.hopsToSink + 1;
-
-				logt("HANDSHAKE", "ClusterSize Change from %d to %d", node->clusterSize, this->connectedClusterSize + 1);
-
-				//node->clusterId = this->connectedClusterId;
-				//node->clusterSize += this->connectedClusterSize + 1;
-				//this->handshakeDone = true;
-
 
 				//Send an update to the connected cluster to increase the size by one
 				//This is also the ACK message for our connecting node
@@ -308,17 +332,11 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 				packet.header.sender = node->persistentConfig.nodeId;
 				packet.header.receiver = this->partnerId;
 
-				packet.payload.hopsToSink = cm->GetHopsToShortestSink(this);
-				packet.payload.reserved = 0;
+				packet.payload.hopsToSink = -1;
 
 				logt("HANDSHAKE", "OUT => %d CLUSTER_ACK_1, hops:%d", packet.header.receiver, packet.payload.hopsToSink);
 
-				cm->SendMessage(this, (u8*) &packet, SIZEOF_CONN_PACKET_CLUSTER_ACK_1, true);
-
-				//Update advertisement packets
-				//node->UpdateJoinMePacket(NULL);
-
-
+				cm->SendHandshakeMessage(this, (u8*) &packet, SIZEOF_CONN_PACKET_CLUSTER_ACK_1, true);
 
 			}
 		}
@@ -326,49 +344,28 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 		{
 			logt("CONN", "wrong size for CLUSTER_WELCOME");
 		}
-		/******* Cluster ack 1 (another node confirms that it is joining our cluster) *******/
+		/******* Cluster ack 1 (another node confirms that it is joining our cluster, we are bigger) *******/
 	}
 	else if (packetHeader->messageType == MESSAGE_TYPE_CLUSTER_ACK_1)
 	{
 		if (dataLength == SIZEOF_CONN_PACKET_CLUSTER_ACK_1)
 		{
-
-			connPacketClusterAck1* packet = (connPacketClusterAck1*) data;
-
-			logt("HANDSHAKE", "IN <= %d  CLUSTER_ACK_1, hops:%d", packet->header.sender, packet->payload.hopsToSink);
-
-			//Update node data
-			node->clusterSize += 1;
-			this->hopsToSink = packet->payload.hopsToSink < 0 ? -1 : packet->payload.hopsToSink + 1;
-
-
-			logt("HANDSHAKE", "ClusterSize Change from %d to %d", node->clusterSize-1, node->clusterSize);
-
-			//Update connection data
-			this->connectedClusterId = node->clusterId;
-			this->partnerId = packet->header.sender;
-			this->connectedClusterSize += 1;
-			this->handshakeDone = true;
-
-			//Broadcast cluster update to other connections
-			connPacketClusterInfoUpdate outPacket;
-			outPacket.header.messageType = MESSAGE_TYPE_CLUSTER_INFO_UPDATE;
-			outPacket.header.sender = node->persistentConfig.nodeId;
-			outPacket.header.receiver = 0;
-
-			outPacket.payload.clusterSizeChange = 1;
-			outPacket.payload.currentClusterId = node->clusterId;
-			outPacket.payload.newClusterId = 0;
-
-
-			logt("HANDSHAKE", "OUT => ALL MESSAGE_TYPE_CLUSTER_INFO_UPDATE clustChange:1");
-
-			//Send message to all other connections and update the hops to sink accordingly
-			for(int i=0; i<Config->meshMaxConnections; i++){
-				if(cm->connections[i] == this || !cm->connections[i]->handshakeDone) continue;
-				outPacket.payload.hopsToSink = cm->GetHopsToShortestSink(cm->connections[i]);
-				cm->SendMessage(cm->connections[i], (u8*) &outPacket, SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE, true);
+			//Check if the other node does weird stuff
+			if(clusterAck1Packet.header.messageType != 0 || node->currentDiscoveryState != discoveryState::HANDSHAKE){
+				//TODO: disconnect
+				logt("ERROR", "HANDSHAKE ERROR ACI1 duplicate");
 			}
+
+			//Save ACK1 packet for later
+			memcpy(&clusterAck1Packet, data, sizeof(connPacketClusterAck1));
+
+			logt("HANDSHAKE", "IN <= %d  CLUSTER_ACK_1, hops:%d", clusterAck1Packet.header.sender, clusterAck1Packet.payload.hopsToSink);
+
+
+			//Set the master bit for the connection. If the connection would disconnect
+			//Then we could keep intact and the other one must dissolve
+			this->partnerId = clusterAck1Packet.header.sender;
+			this->connectionMasterBit = 1;
 
 			//Confirm to the new node that it just joined our cluster => send ACK2
 			connPacketClusterAck2 outPacket2;
@@ -376,22 +373,17 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 			outPacket2.header.sender = node->persistentConfig.nodeId;
 			outPacket2.header.receiver = this->partnerId;
 
-			outPacket2.payload.clusterId = node->clusterId;
-			outPacket2.payload.clusterSize = node->clusterSize;
+			outPacket2.payload.clusterId = clusterIDBackup;
+			outPacket2.payload.clusterSize = clusterSizeBackup + 1; // add +1 for the new node itself
+			outPacket2.payload.hopsToSink = hopsToSinkBackup;
 
 
-			logt("HANDSHAKE", "OUT => %d CLUSTER_ACK_2 clustId:%d, clustSize:%d", this->partnerId, node->clusterId, node->clusterSize);
+			logt("HANDSHAKE", "OUT => %d CLUSTER_ACK_2 clustId:%x, clustSize:%d", this->partnerId, outPacket2.payload.clusterId, outPacket2.payload.clusterSize);
 
-			cm->SendMessage(this, (u8*) &outPacket2, SIZEOF_CONN_PACKET_CLUSTER_ACK_2, true);
+			cm->SendHandshakeMessage(this, (u8*) &outPacket2, SIZEOF_CONN_PACKET_CLUSTER_ACK_2, true);
 
-			//Update our advertisement packet
-			node->UpdateJoinMePacket(NULL);
+			//Handshake done connection state ist set in fillTransmitbuffers when the packet is queued
 
-
-			logt("HANDSHAKE", "############ Handshake done ###############");
-
-			//Notify Node of handshakeDone
-			node->HandshakeDoneHandler(this);
 
 		}
 		else
@@ -405,30 +397,19 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 	{
 		if (dataLength == SIZEOF_CONN_PACKET_CLUSTER_ACK_2)
 		{
+			if(clusterAck2Packet.header.messageType != 0 || node->currentDiscoveryState != discoveryState::HANDSHAKE){
+				//TODO: disconnect
+				logt("ERROR", "HANDSHAKE ERROR ACK2 duplicate");
+			}
 
-			connPacketClusterAck2* packet = (connPacketClusterAck2*) data;
+			//Save Ack2 packet for later
+			memcpy(&clusterAck2Packet, data, sizeof(connPacketClusterAck2));
 
-			logt("HANDSHAKE", "IN <= %d CLUSTER_ACK_2 clusterID:%d, clusterSize:%d", packet->header.sender, packet->payload.clusterId, packet->payload.clusterSize);
-
-			logt("HANDSHAKE", "ClusterSize Change from %d to %d", node->clusterSize, packet->payload.clusterSize);
-
-			this->connectedClusterId = packet->payload.clusterId;
-			this->connectedClusterSize += packet->payload.clusterSize - 1; // minus myself
-
-			node->clusterId = packet->payload.clusterId;
-			node->clusterSize += packet->payload.clusterSize - 1; // minus myself
-
-
-			this->handshakeDone = true;
-
-			//Update our advertisement packet
-			node->UpdateJoinMePacket(NULL);
-
-
-			logt("HANDSHAKE", "############ Handshake done ###############");
+			logt("HANDSHAKE", "IN <= %d CLUSTER_ACK_2 clusterID:%x, clusterSize:%d", clusterAck2Packet.header.sender, clusterAck2Packet.payload.clusterId, clusterAck2Packet.payload.clusterSize);
 
 			//Notify Node of handshakeDone
-			node->HandshakeDoneHandler(this);
+			node->HandshakeDoneHandler(this, false);
+
 
 		}
 		else
@@ -456,6 +437,26 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 
 }
 
+//Handling general events
+void Connection::BleEventHandler(ble_evt_t* bleEvent)
+{
+	if(connectionState == ConnectionState::DISCONNECTED) return;
+
+	if(bleEvent->header.evt_id >= BLE_GAP_EVT_BASE && bleEvent->header.evt_id < BLE_GAP_EVT_LAST){
+		if(bleEvent->evt.gap_evt.conn_handle != connectionHandle) return;
+
+		switch(bleEvent->header.evt_id){
+			case BLE_GAP_EVT_CONN_PARAM_UPDATE:
+			{
+				logt("CONN", "new connection params set");
+				currentConnectionInterval = bleEvent->evt.gap_evt.params.conn_param_update.conn_params.max_conn_interval;
+
+				break;
+			}
+		}
+	}
+}
+
 #define __________________HELPER______________________
 /*######## HELPERS ###################################*/
 
@@ -463,14 +464,26 @@ void Connection::PrintStatus(void)
 {
 	const char* directionString = (direction == CONNECTION_DIRECTION_IN) ? "< IN " : "> OUT";
 
-	trace("%s %u, handshake:%u, clusterId:%x, clusterSize:%u, toSink:%d, Queue:%u-%u(%u), relBuf:%u, unrelBuf:%u" EOL, directionString, this->partnerId, this->handshakeDone, this->connectedClusterId, this->connectedClusterSize, this->hopsToSink, (packetSendQueue->readPointer - packetSendQueue->bufferStart), (packetSendQueue->writePointer - packetSendQueue->bufferStart), packetSendQueue->_numElements, reliableBuffersFree, unreliableBuffersFree);
+	trace("%s %u, state:%u, clId:%x, clSize:%d, toSink:%d, Queue:%u-%u(%u), Buf(rel:%u, unrel:%u), mb:%u, pend:%u" EOL, directionString, this->partnerId, this->connectionState, this->connectedClusterId, this->connectedClusterSize, this->hopsToSink, (packetSendQueue->readPointer - packetSendQueue->bufferStart), (packetSendQueue->writePointer - packetSendQueue->bufferStart), packetSendQueue->_numElements, reliableBuffersFree, unreliableBuffersFree, connectionMasterBit, GetPendingPackets());
 
 }
 
 i8 Connection::GetAverageRSSI()
 {
-	if(isConnected) return rssiAverage;
+	if(connectionState >= ConnectionState::CONNECTED) return rssiAverage;
 	else return 0;
+}
+
+//Returns the number of packets that this connection has not yet sent
+u16 Connection::GetPendingPackets(){
+	return packetSendQueue->_numElements
+			+ (currentClusterInfoUpdatePacket.header.messageType == MESSAGE_TYPE_CLUSTER_INFO_UPDATE ? 1 : 0);
+}
+
+void Connection::ClusterUpdateSentHandler()
+{
+	//The current cluster info update message has been sent, we can now clear the packet
+	memset((u8*)&currentClusterInfoUpdatePacket, 0x00, sizeof(currentClusterInfoUpdatePacket));
 }
 /* EOF */
 

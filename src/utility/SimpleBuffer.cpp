@@ -36,6 +36,8 @@ SimpleBuffer::SimpleBuffer(u8* buffer, u16 bufferLength, u16 itemLength)
 	
 	this->readPointer = this->buffer;
 	this->writePointer = this->buffer;
+
+	memset(buffer, 0x00, bufferLength);
 }
 
 //Put does only allow data sizes up to 128 byte per element

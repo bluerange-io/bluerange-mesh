@@ -26,13 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <algorithm>
 #include <iterator>
 #include <Terminal.h>
+#include <LogTransport.h>
 
 extern "C"
 {
 #include <ble.h>
 #include <ble_hci.h>
 #include <nrf_error.h>
-#include <simple_uart.h>
 #include <cstring>
 #include <pstorage.h>
 #include <stdarg.h>
@@ -41,6 +41,9 @@ extern "C"
 
 using namespace std;
 
+Logger::errorLogEntry Logger::errorLog[NUM_ERROR_LOG_ENTRIES];
+u8 Logger::errorLogPosition = 0;
+
 Logger::Logger()
 {
 	Terminal::AddTerminalCommandListener(this);
@@ -48,7 +51,7 @@ Logger::Logger()
 
 void Logger::log_f(bool printLine, const char* file, i32 line, const char* message, ...)
 {
-#ifdef ENABLE_LOGGING
+#if defined(ENABLE_LOGGING) || defined(ENABLE_UART)
 	memset(mhTraceBuffer, 0, TRACE_BUFFER_SIZE);
 
 	//Variable argument list must be passed to vnsprintf
@@ -60,19 +63,34 @@ void Logger::log_f(bool printLine, const char* file, i32 line, const char* messa
 	if (printLine)
 	{
 		snprintf(mhTraceBuffer2, TRACE_BUFFER_SIZE, "[%s@%d]: %s" EOL, file, line, mhTraceBuffer);
-		simple_uart_putstring((const uint8_t *) mhTraceBuffer2);
+		log_transport_putstring((const uint8_t *) mhTraceBuffer2);
 	}
 	else
 	{
-		simple_uart_putstring((const uint8_t *) mhTraceBuffer);
+		log_transport_putstring((const uint8_t *) mhTraceBuffer);
 	}
 #endif
 }
 
 void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...)
 {
-#ifdef ENABLE_LOGGING
-	if (logType == UART_COMMUNICATION || logEverything || tag == "ERROR" || find(logFilter.begin(), logFilter.end(), tag) != logFilter.end())
+#if defined(ENABLE_LOGGING) || defined(ENABLE_UART)
+	if (
+			//UART communication
+			(!Terminal::promptAndEchoMode && (
+				logType == UART_COMMUNICATION
+				|| tag == "ERROR"
+				|| find(logFilter.begin(), logFilter.end(), tag) != logFilter.end()
+			))
+
+			//User interaction
+			|| (Terminal::promptAndEchoMode && (
+				logEverything
+				|| logType == TRACE
+				|| tag == "ERROR"
+				|| find(logFilter.begin(), logFilter.end(), tag) != logFilter.end() //Logtag is activated
+			))
+		)
 	{
 		memset(mhTraceBuffer, 0, TRACE_BUFFER_SIZE);
 		memset(mhTraceBuffer2, 0, TRACE_BUFFER_SIZE);
@@ -86,16 +104,16 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
 		if (logType == LOG_LINE)
 		{
 			snprintf(mhTraceBuffer2, TRACE_BUFFER_SIZE, "[%s@%d %s]: %s" EOL, file, line, tag, mhTraceBuffer);
-			simple_uart_putstring((const uint8_t *) mhTraceBuffer2);
+			log_transport_putstring((const uint8_t *) mhTraceBuffer2);
 		}
-		else if (logType == LOG_MESSAGE_ONLY)
+		else if (logType == LOG_MESSAGE_ONLY || logType == TRACE)
 		{
-			simple_uart_putstring((const uint8_t *) mhTraceBuffer);
+			log_transport_putstring((const uint8_t *) mhTraceBuffer);
 		}
 		else if (logType == UART_COMMUNICATION)
 		{
 			snprintf(mhTraceBuffer2, TRACE_BUFFER_SIZE, "<%s|%s>", tag, mhTraceBuffer);
-			simple_uart_putstring((const uint8_t *) mhTraceBuffer2);
+			log_transport_putstring((const uint8_t *) mhTraceBuffer2);
 		}
 	}
 #endif
@@ -204,9 +222,26 @@ bool Logger::TerminalCommandHandler(string commandName, vector<string> commandAr
 
 		return true;
 	}
+	else if (commandName == "errors")
+	{
+		for(int i=0; i<errorLogPosition; i++){
+			if(errorLog[i].errorType == errorTypes::HCI_ERROR)
+			{
+				trace("HCI %u %s @%u" EOL, errorLog[i].errorCode, getHciErrorString(errorLog[i].errorCode), errorLog[i].timestamp);
+			}
+			else if(errorLog[i].errorType == errorTypes::SD_CALL_ERROR)
+			{
+				trace("SD %u %s @%u" EOL, errorLog[i].errorCode, getNrfErrorString(errorLog[i].errorCode), errorLog[i].timestamp);
+			} else {
+				trace("CUSTOM %u %u @%u" EOL, errorLog[i].errorType, errorLog[i].errorCode, errorLog[i].timestamp);
+			}
+		}
 
-	return false;
+		return true;
+	}
+
 #endif
+	return false;
 }
 
 /*################### Error codes #########################*/
@@ -255,8 +290,8 @@ const char* Logger::getNrfErrorString(u32 nrfErrorCode)
 			return "BLE_ERROR_INVALID_CONN_HANDLE";
 		case BLE_ERROR_INVALID_ATTR_HANDLE:
 			return "BLE_ERROR_INVALID_ATTR_HANDLE";
-		case BLE_ERROR_NO_TX_BUFFERS:
-			return "BLE_ERROR_NO_TX_BUFFERS";
+		case BLE_ERROR_NO_TX_PACKETS:
+			return "BLE_ERROR_NO_TX_PACKETS";
 		case 0xDEADBEEF:
 			return "DEADBEEF";
 		default:
@@ -521,11 +556,21 @@ void Logger::blePrettyPrintAdvData(sizedData advData)
 		fieldData.length = fieldSize - 1;
 
 		//Print it
-		convertBufferToHexString(fieldData.data, fieldData.length, hexString);
+		convertBufferToHexString(fieldData.data, fieldData.length, hexString, 100);
 		trace("Type %d, Data %s" EOL, fieldType, hexString);
 
 		i += fieldSize + 1;
 	}
+}
+
+void Logger::logError(errorTypes errorType, u32 errorCode, u32 timestamp)
+{
+	errorLog[errorLogPosition].errorType = errorType;
+	errorLog[errorLogPosition].errorCode = errorCode;
+	errorLog[errorLogPosition].timestamp = timestamp;
+
+	//Will fill the error log until the last entry (last entry does get overwritten with latest value)
+	if(errorLogPosition < NUM_ERROR_LOG_ENTRIES-1) errorLogPosition++;
 }
 
 //Trivial implementation for converting the timestamp in human readable format
@@ -561,11 +606,20 @@ void Logger::convertTimestampToString(u64 timestamp, char* buffer)
 
 //FIXME: This method does not know the destination buffer length and could crash the system
 //It also lets developers run into trouble while debugging....
-void Logger::convertBufferToHexString(u8* srcBuffer, u32 srcLength, char* dstBuffer)
+void Logger::convertBufferToHexString(u8* srcBuffer, u32 srcLength, char* dstBuffer, u16 bufferLength)
 {
+	memset(dstBuffer, 0x00, bufferLength);
+
+	char* dstBufferStart = dstBuffer;
 	for (u32 i = 0; i < srcLength; i++)
 	{
 		dstBuffer += sprintf(dstBuffer, i < srcLength - 1 ? "%02X:" : "%02X\0", srcBuffer[i]);
+		if(dstBuffer - dstBufferStart > bufferLength - 7){
+			dstBuffer[0] = '.';
+			dstBuffer[1] = '.';
+			dstBuffer[2] = '.';
+			break;
+		}
 	};
 }
 

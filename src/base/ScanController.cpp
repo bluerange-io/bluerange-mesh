@@ -47,7 +47,9 @@ void ScanController::SetScanState(scanState newState)
 	if (scanningState != SCAN_STATE_OFF)
 	{
 		err = sd_ble_gap_scan_stop();
-		APP_ERROR_CHECK(err);
+		if(err != NRF_SUCCESS){
+			//We'll just ignore NRF_ERROR_INVALID_STATE and hope that scanning is stopped
+		}
 		logt("C", "Scanning stopped");
 	}
 
@@ -67,8 +69,12 @@ void ScanController::SetScanState(scanState newState)
 	if (newState != SCAN_STATE_OFF)
 	{
 		err = sd_ble_gap_scan_start(&currentScanParams);
-		APP_ERROR_CHECK(err);
-		logt("C", "Scanning started");
+		if(err == NRF_SUCCESS){
+			logt("C", "Scanning started");
+		} else {
+			//Ignore all errors, scanning could not be started
+			newState = SCAN_STATE_OFF;
+		}
 	}
 
 	scanningState = newState;
@@ -80,7 +86,9 @@ void ScanController::SetScanDutyCycle(u16 interval, u16 window){
 	if (scanningState != SCAN_STATE_OFF)
 	{
 		err = sd_ble_gap_scan_stop();
-		APP_ERROR_CHECK(err);
+		if(err != NRF_SUCCESS){
+			//We'll just ignore NRF_ERROR_INVALID_STATE and hope that scanning is stopped
+		}
 		logt("C", "Scanning stopped");
 	}
 
@@ -90,8 +98,12 @@ void ScanController::SetScanDutyCycle(u16 interval, u16 window){
 		currentScanParams.window = window;
 
 		err = sd_ble_gap_scan_start(&currentScanParams);
-		APP_ERROR_CHECK(err);
-		logt("C", "Scanning started");
+		if(err == NRF_SUCCESS){
+			logt("C", "Scanning started");
+		} else {
+			//Ignore all errors, scanning could not be started
+			scanningState = SCAN_STATE_OFF;
+		}
 	}
 }
 

@@ -52,7 +52,7 @@ Storage::Storage()
 	bufferedOperationInProgress = false;
 
 	param.block_size  = STORAGE_BLOCK_SIZE; //Multiple of 4 and divisor of page size (pagesize is usually 1024) in case total size is bigger than page size
-	param.block_count = 1;
+	param.block_count = num_blocks;
 	param.cb          = PstorageEventHandler;
 
 	err = pstorage_init();
@@ -69,7 +69,6 @@ Storage::Storage()
 
 void Storage::PstorageEventHandler(pstorage_handle_t* handle, u8 opCode, u32 result, u8* data, u32 dataLength)
 {
-	//FIXME: async log messages are not good for the logger
 	//logt("STORAGE", "Event: %u, result:%d, len:%d", opCode, result, dataLength);
 	if(result != NRF_SUCCESS) logt("STORAGE", "%s", Logger::getInstance().getPstorageStatusErrorString(opCode));
 
@@ -154,6 +153,20 @@ void Storage::QueuedWrite(u8* data, u16 dataLength, u32 blockId, StorageEventLis
 
 	ProcessQueue();
 }
+/*
+void Storage::QueuedErasePage(u16 page, StorageEventListener* callback)
+{
+	taskitem task;
+	task.data = NULL;
+	task.dataLength = 0;
+	task.storageBlock = blockId;
+	task.callback = callback;
+	task.operation = operation::OPERATION_ERASE_PAGE;
+
+	taskQueue->Put((u8*)&task, sizeof(taskitem));
+
+	ProcessQueue();
+}*/
 
 void Storage::ProcessQueue()
 {

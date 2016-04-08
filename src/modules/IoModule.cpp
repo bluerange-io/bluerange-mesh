@@ -30,7 +30,7 @@ extern "C"{
 #include <stdlib.h>
 }
 
-IoModule::IoModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
+IoModule::IoModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
 	: Module(moduleId, node, cm, name, storageSlot)
 {
 	//Register callbacks n' stuff
@@ -141,7 +141,12 @@ bool IoModule::TerminalCommandHandler(string commandName, vector<string> command
 			//E.g. action 635 io led on
 			else if(commandArgs.size() >= 4 && commandArgs[2] == "led")
 			{
-				u8 ledState = commandArgs[3] == "on" ? 1: 0;
+				IoModuleSetLedMessage data;
+
+				if(commandArgs[3] == "on") data.ledMode= ledMode::LED_MODE_ON;
+				else if(commandArgs[3] == "cluster") data.ledMode = ledMode::LED_MODE_CLUSTERING;
+				else data.ledMode = ledMode::LED_MODE_CONNECTIONS;
+
 				u8 requestHandle = commandArgs.size() >= 5 ? atoi(commandArgs[4].c_str()) : 0;
 
 				SendModuleActionMessage(
@@ -149,7 +154,7 @@ bool IoModule::TerminalCommandHandler(string commandName, vector<string> command
 					destinationNode,
 					IoModuleTriggerActionMessages::SET_LED,
 					requestHandle,
-					&ledState,
+					(u8*)&data,
 					1,
 					false
 				);
@@ -182,7 +187,7 @@ void IoModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, 
 		if(packet->moduleId == moduleId){
 			if(packet->actionType == IoModuleTriggerActionMessages::SET_PIN_CONFIG){
 
-				node->currentLedMode = Node::ledMode::LED_MODE_OFF;
+				node->currentLedMode = ledMode::LED_MODE_OFF;
 
 				//Parse the data and set the gpio ports to the requested
 				for(int i=0; i<dataFieldLength; i+=SIZEOF_GPIO_PIN_CONFIG)
@@ -213,20 +218,10 @@ void IoModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, 
 			}
 			//A message to switch on the LEDs
 			else if(packet->actionType == IoModuleTriggerActionMessages::SET_LED){
-				if(packet->data[0])
-				{
-					//Switch LED on
-					node->currentLedMode = Node::ledMode::LED_MODE_OFF;
 
-					node->LedRed->On();
-					node->LedGreen->On();
-					node->LedBlue->On();
-				}
-				else
-				{
-					//Switch LEDs back to connection signaling
-					node->currentLedMode = Node::ledMode::LED_MODE_CONNECTIONS;
-				}
+				IoModuleSetLedMessage* data = (IoModuleSetLedMessage*)packet->data;
+
+				node->currentLedMode = (ledMode)data->ledMode;
 
 				//send confirmation
 				SendModuleActionMessage(

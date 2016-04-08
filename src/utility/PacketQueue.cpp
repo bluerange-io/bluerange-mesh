@@ -33,17 +33,15 @@ PacketQueue::PacketQueue(u8* buffer, u16 bufferLength)
 {
 	this->_numElements = 0;
 	this->bufferStart = buffer;
-	this->bufferEnd = buffer + bufferLength;
-	this->bufferLength = bufferLength;
+	this->bufferEnd = buffer + bufferLength - 1; //FIXME: workaround to avoid 1byte overflow of the packet queue
+	this->bufferLength = bufferLength - 1; // s.o.
 
 	this->readPointer = this->bufferStart;
 	this->writePointer = this->bufferStart;
 
-	sd_mutex_new(&queueMutex);
-
 	writePointer[0] = 0;
 
-	//memset(buffer, 0, bufferLength);
+	memset(buffer, 0, bufferLength);
 }
 
 //IF READ AND WRITE ARE EQUAL, THE QUEUE IS EMPTY
@@ -51,13 +49,6 @@ PacketQueue::PacketQueue(u8* buffer, u16 bufferLength)
 //Put does only allow data sizes up to 200 byte per element
 bool PacketQueue::Put(u8* data, u8 dataLength, bool reliable)
 {
-	u32 err = sd_mutex_acquire(&queueMutex);
-
-	if (err != NRF_SUCCESS)
-	{
-		logt("ERROR", "THREADING ERROR");
-	}
-
 	//Keep one byte for (un)reliable flag, one byte for sizeField and one byte to not let read and write pointers overlap
 	u8 elementSize = dataLength + 1 + 1 + 1;
 
@@ -72,13 +63,10 @@ bool PacketQueue::Put(u8* data, u8 dataLength, bool reliable)
 	//Check if Buffer can hold the item
 	else if (readPointer <= writePointer && writePointer + elementSize >= bufferEnd)
 	{
-
-		sd_mutex_release(&queueMutex);
 		return false;
 	}
 	else if (readPointer > writePointer && writePointer + elementSize >= readPointer)
 	{
-		sd_mutex_release(&queueMutex);
 		return false;
 	}
 
@@ -92,26 +80,17 @@ bool PacketQueue::Put(u8* data, u8 dataLength, bool reliable)
 
 	_numElements++;
 
-	sd_mutex_release(&queueMutex);
 	return true;
 }
 
 sizedData PacketQueue::PeekNext()
 {
-
-	u32 err = sd_mutex_acquire(&queueMutex);
-
-	if (err != NRF_SUCCESS)
-	{
-		logt("ERROR", "THREADING ERROR");
-	}
-
 	sizedData data;
 	//If queue has been fully read, return empty data
 	if (_numElements == 0)
 	{
 		data.length = 0;
-		sd_mutex_release(&queueMutex);
+
 		return data;
 	}
 
@@ -122,22 +101,14 @@ sizedData PacketQueue::PeekNext()
 	data.length = (this->readPointer[0]);
 	data.data = this->readPointer + 1;
 
-	sd_mutex_release(&queueMutex);
 	return data;
 }
 
-void PacketQueue::DiscardNext(){
-	u32 err = sd_mutex_acquire(&queueMutex);
-
-		if (err != NRF_SUCCESS)
-		{
-			logt("ERROR", "THREADING ERROR");
-		}
-
-		this->readPointer += (this->readPointer[0]+1);
-		_numElements--;
-
-	sd_mutex_release(&queueMutex);
+void PacketQueue::DiscardNext()
+{
+	if(_numElements < 1) return;
+	this->readPointer += (this->readPointer[0]+1);
+	_numElements--;
 }
 
 void PacketQueue::Clean(void)

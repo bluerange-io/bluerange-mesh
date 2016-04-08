@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <types.h>
 #include <Node.h>
 #include <ConnectionManager.h>
+#include <AdvertisingController.h>
 #include <GATTController.h>
 #include <GAPController.h>
 #include <Utility.h>
@@ -31,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 extern "C"{
 #include <app_error.h>
 #include <app_timer.h>
+#include <ble_hci.h>
 }
 
 
@@ -38,13 +40,11 @@ extern "C"{
 // Connected => Encrypted => Mesh handle discovered => Handshake done
 //encryption can be disabled and handle discovery can be skipped (handle from JOIN_ME packet will be used)
 
-
-
-
 ConnectionManager* ConnectionManager::instance = NULL;
 
 ConnectionManager::ConnectionManager(){
 
+	this->node = Node::getInstance();
 	connectionManagerCallback = NULL;
 
 	//Initialize GAP and GATT
@@ -55,27 +55,22 @@ ConnectionManager::ConnectionManager(){
 	doHandshake = true;
 
 	//init vars
-	pendingPackets = 0;
 	pendingConnection = NULL;
 	freeOutConnections = Config->meshMaxOutConnections;
 	freeInConnections = Config->meshMaxInConnections;
 
-	//Find out how many tx buffers we have
-	u32 err =  sd_ble_tx_buffer_count_get(&txBuffersPerLink);
-	APP_ERROR_CHECK(err);
-
 	//Create all connections
-	inConnection = connections[0] = new Connection(0, this, Node::getInstance(), Connection::CONNECTION_DIRECTION_IN);
+	inConnection = connections[0] = new Connection(0, this, node, Connection::CONNECTION_DIRECTION_IN);
 
 	for(int i=1; i<=Config->meshMaxOutConnections; i++){
-		connections[i] = outConnections[i-1] = new Connection(i, this, Node::getInstance(), Connection::CONNECTION_DIRECTION_OUT);
+		connections[i] = outConnections[i-1] = new Connection(i, this, node, Connection::CONNECTION_DIRECTION_OUT);
 	}
 
 	//Register GAPController callbacks
 	GAPController::setDisconnectionHandler(DisconnectionHandler);
 	GAPController::setConnectionSuccessfulHandler(ConnectionSuccessfulHandler);
 	GAPController::setConnectionEncryptedHandler(ConnectionEncryptedHandler);
-	GAPController::setConnectionTimeoutHandler(ConnectionTimeoutHandler);
+	GAPController::setConnectingTimeoutHandler(ConnectingTimeoutHandler);
 
 	//Set GATTController callbacks
 	GATTController::setMessageReceivedCallback(messageReceivedCallback);
@@ -84,16 +79,34 @@ ConnectionManager::ConnectionManager(){
 
 }
 
+//This method queues a packet no matter if the connection is currently in handshaking or not
+bool ConnectionManager::SendHandshakeMessage(Connection* connection, u8* data, u16 dataLength, bool reliable)
+{
+	if(connection->isConnected()){
+		QueuePacket(connection, data, dataLength, reliable);
 
-//Send message to a single connection
+		fillTransmitBuffers();
+
+		return true;
+	} else {
+		return false;
+	}
+}
+
+
+
+//Send message to a single connection (Will not send packet if connection has not finished handshake)
 bool ConnectionManager::SendMessage(Connection* connection, u8* data, u16 dataLength, bool reliable)
 {
-	//Some checks first
-	QueuePacket(connection, data, dataLength, reliable);
+	if(connection->handshakeDone()){
+		QueuePacket(connection, data, dataLength, reliable);
 
-	fillTransmitBuffers();
+		fillTransmitBuffers();
 
-	return true;
+		return true;
+	} else {
+		return false;
+	}
 }
 
 //Send a message over all connections, except one connection
@@ -101,7 +114,7 @@ void ConnectionManager::SendMessageOverConnections(Connection* ignoreConnection,
 {
 	for (int i = 0; i < Config->meshMaxConnections; i++)
 	{
-		if (connections[i] != ignoreConnection && connections[i]->handshakeDone){
+		if (connections[i] != ignoreConnection && connections[i]->handshakeDone()){
 			QueuePacket(connections[i], data, dataLength, reliable);
 		}
 	}
@@ -117,7 +130,7 @@ void ConnectionManager::SendMessageToReceiver(Connection* originConnection, u8* 
 	//This packet was only meant for us, sth. like a packet to localhost
 	//Or if we sent this as a broadcast, we want to handle it ourself as well
 	if(
-			packetHeader->receiver == Node::getInstance()->persistentConfig.nodeId
+			packetHeader->receiver == node->persistentConfig.nodeId
 			|| (originConnection == NULL && packetHeader->receiver == NODE_ID_BROADCAST)
 	)
 	{
@@ -128,7 +141,7 @@ void ConnectionManager::SendMessageToReceiver(Connection* originConnection, u8* 
 		packet.reliable = reliable;
 
 		//Send directly to our message handler in the node for processing
-		Node::getInstance()->messageReceivedCallback(&packet);
+		node->messageReceivedCallback(&packet);
 	}
 
 
@@ -141,7 +154,7 @@ void ConnectionManager::SendMessageToReceiver(Connection* originConnection, u8* 
 		if(dest) SendMessage(dest, data, dataLength, reliable);
 	}
 	//All other packets will be broadcasted, but we could and should check if the receiver is connected to us
-	else if(packetHeader->receiver != Node::getInstance()->persistentConfig.nodeId)
+	else if(packetHeader->receiver != node->persistentConfig.nodeId)
 	{
 		SendMessageOverConnections(originConnection, data, dataLength, reliable);
 	}
@@ -149,17 +162,16 @@ void ConnectionManager::SendMessageToReceiver(Connection* originConnection, u8* 
 
 void ConnectionManager::QueuePacket(Connection* connection, u8* data, u16 dataLength, bool reliable){
 	//Print packet as hex
-	char stringBuffer[200];
-	Logger::getInstance().convertBufferToHexString(data, dataLength, stringBuffer);
+	char stringBuffer[400];
+	Logger::getInstance().convertBufferToHexString(data, dataLength, stringBuffer, 400);
 
 	logt("CONN_DATA", "PUT_PACKET(%d):len:%d,type:%d, hex: %s",connection->connectionId, dataLength, data[0], stringBuffer);
 
 	//Save packet
 	bool putResult = connection->packetSendQueue->Put(data, dataLength, reliable);
 
-	if(putResult) {
-		pendingPackets++;
-	} else {
+	if(!putResult) {
+		connection->droppedPackets++;
 		//TODO: Error handling: What should happen when the queue is full?
 		//Currently, additional packets are dropped
 		logt("ERROR", "Send queue is already full");
@@ -171,7 +183,7 @@ Connection* ConnectionManager::getFreeConnection()
 {
 	for (int i = 0; i < Config->meshMaxConnections; i++)
 		{
-			if (!connections[i]->isConnected) return connections[i];
+			if (connections[i]->isDisconnected()) return connections[i];
 		}
 	return NULL;
 }
@@ -181,7 +193,7 @@ Connection* ConnectionManager::GetFreeOutConnection()
 {
 	for (int i = 0; i < Config->meshMaxOutConnections; i++)
 	{
-		if (!outConnections[i]->isConnected) return outConnections[i];
+		if (outConnections[i]->isDisconnected()) return outConnections[i];
 	}
 	return NULL;
 }
@@ -205,22 +217,26 @@ Connection* ConnectionManager::ConnectAsMaster(nodeID partnerId, ble_gap_addr_t*
 	//Only connect when not currently in another connection or when there are no more free connections
 	if (freeOutConnections <= 0 || pendingConnection != NULL) return NULL;
 
-	freeOutConnections--;
+	Connection* connection = GetFreeOutConnection();
 
-	//Get a free connection and set it as pending
-	pendingConnection = GetFreeOutConnection();
+	//Disperse connection intervals over time, maybe this leads to less connection losses
+	u16 connectionInterval = Config->meshMinConnectionInterval + connection->connectionId;
 
-	pendingConnection->writeCharacteristicHandle = writeCharacteristicHandle;
+	//Tell the GAP Layer to connect, it will return if it is trying or if there was an error
+	bool status = GAPController::connectToPeripheral(address, connectionInterval, Config->meshConnectingScanTimeout);
 
-	pendingConnection->Connect(address, writeCharacteristicHandle);
+	if(status){
+		//Get a free connection and set it as pending
+		pendingConnection = connection;
 
-	char addrString[20];
-	Logger::getInstance().convertBufferToHexString(pendingConnection->partnerAddress.addr, 6, addrString);
+		//Put address and writeHandle into the connection
+		pendingConnection->PrepareConnection(address, writeCharacteristicHandle);
 
-	bool err = GAPController::connectToPeripheral(address);
+		char addrString[20];
+		Logger::getInstance().convertBufferToHexString(pendingConnection->partnerAddress.addr, 6, addrString, 20);
 
-	logt("CONN", "Connect as Master to %d (%s) %s", partnerId, addrString, err ? "true" : "false");
-
+		logt("CONN", "Connect as Master to %d (%s) %s", partnerId, addrString, status ? "true" : "false");
+	}
 
 	return pendingConnection;
 }
@@ -237,14 +253,43 @@ void ConnectionManager::Disconnect(u16 connectionHandle)
 }
 
 //Disconnects either all connections or all except one
-void ConnectionManager::DisconnectOtherConnections(Connection* connection)
+//Cluster updates from this connection should be ignored
+void ConnectionManager::ForceDisconnectOtherConnections(Connection* connection)
 {
 	for (int i = 0; i < Config->meshMaxOutConnections+1; i++)
 	{
-		if (connections[i] != connection && connections[i]->isConnected)
+		if (connections[i] != connection && !connections[i]->isDisconnected()){
 			connections[i]->Disconnect();
+			connections[i]->connectionStateBeforeDisconnection = Connection::ConnectionState::DISCONNECTED;
+		}
 	}
 }
+
+void ConnectionManager::SetConnectionInterval(u16 connectionInterval)
+{
+	//Go through all connections that we control as a central
+	for(int i=0; i < Config->meshMaxOutConnections; i++){
+		if(outConnections[i]->handshakeDone()){
+			GAPController::RequestConnectionParameterUpdate(outConnections[i]->connectionHandle, connectionInterval, connectionInterval, 0, Config->meshConnectionSupervisionTimeout);
+		}
+	}
+}
+
+u16 ConnectionManager::GetPendingPackets(){
+	u16 pendingPackets = 0;
+	for(int i=0; i<Config->meshMaxConnections; i++){
+		pendingPackets += connections[i]->GetPendingPackets();
+	}
+	return pendingPackets;
+}
+
+
+
+
+#define _________________HANDSHAKE____________
+
+
+
 
 
 #define _________________STATIC_HANDLERS____________
@@ -252,20 +297,36 @@ void ConnectionManager::DisconnectOtherConnections(Connection* connection)
 //
 //
 
+void ConnectionManager::BleEventHandler(ble_evt_t* bleEvent)
+{
+	ConnectionManager* cm = ConnectionManager::getInstance();
+
+	for(int i=0; i<Config->meshMaxConnections; i++){
+		cm->connections[i]->BleEventHandler(bleEvent);
+	}
+}
+
 //Called as soon as a new connection is made, either as central or peripheral
 void ConnectionManager::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 {
+	ConnectionManager* cm = ConnectionManager::getInstance();
+
 	logt("CM", "Connection success");
 
 	//FIXME: There is a slim chance that another central connects to us between
 	//This call and before switching off advertising.
 	//This connection should be deferred until our handshake is finished
+	//Set a variable here that a handshake is ongoing and block any other handshake
+	//From happening in the meantime, just disconnect the intruder
 
-	if(Node::getInstance()->currentDiscoveryState == discoveryState::HANDSHAKE){
+	//If we are currently doing a Handshake, we disconnect this connection
+	//beacuse we cannot do two handshakes at the same time
+	if(cm->node->currentDiscoveryState == discoveryState::HANDSHAKE){
 		logt("ERROR", "CURRENTLY IN HANDSHAKE!!!!!!!!!!");
+
+		sd_ble_gap_disconnect(bleEvent->evt.gap_evt.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
 	}
 
-	ConnectionManager* cm = ConnectionManager::getInstance();
 
 	Connection* c = NULL;
 
@@ -275,6 +336,8 @@ void ConnectionManager::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 		c = cm->inConnection;
 		cm->freeInConnections--;
 
+		//At this point, the Write handle is still unknown
+		c->PrepareConnection(&bleEvent->evt.gap_evt.params.connected.peer_addr, BLE_GATT_HANDLE_INVALID);
 		c->ConnectionSuccessfulHandler(bleEvent);
 		cm->connectionManagerCallback->ConnectionSuccessfulHandler(bleEvent);
 
@@ -285,20 +348,25 @@ void ConnectionManager::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 		}
 		//If handshake is disabled,
 		else if(!cm->doHandshake){
-			c->handshakeDone = true;
+			c->connectionState = Connection::ConnectionState::HANDSHAKE_DONE;
 		}
 	}
 	//We are master (central)
 	else if (bleEvent->evt.gap_evt.params.connected.role == BLE_GAP_ROLE_CENTRAL)
 	{
+		cm->freeOutConnections--;
+
 		c = cm->pendingConnection;
 
+		//Call Prepare again so that the clusterID and size backup are created with up to date values
+		c->PrepareConnection(&bleEvent->evt.gap_evt.params.connected.peer_addr, c->writeCharacteristicHandle);
 		c->ConnectionSuccessfulHandler(bleEvent);
 		cm->connectionManagerCallback->ConnectionSuccessfulHandler(bleEvent);
 
 		//If encryption is enabled, the central starts to encrypt the connection
 		if(Config->encryptionEnabled)
 		{
+			c->encryptionState = Connection::EncryptionState::ENCRYPTING;
 			GAPController::startEncryptingConnection(bleEvent->evt.gap_evt.conn_handle);
 		}
 		//If no encryption is enabled, we start the handshake
@@ -309,7 +377,7 @@ void ConnectionManager::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 		//If the handshake is disabled, we just set the variable
 		else
 		{
-			c->handshakeDone = true;
+			c->connectionState = Connection::ConnectionState::HANDSHAKE_DONE;
 		}
 	}
 
@@ -323,12 +391,13 @@ void ConnectionManager::ConnectionEncryptedHandler(ble_evt_t* bleEvent)
 	Connection* c = cm->GetConnectionFromHandle(bleEvent->evt.gap_evt.conn_handle);
 
 	logt("CM", "Connection id %u is now encrypted", c->connectionId);
+	c->encryptionState = Connection::EncryptionState::ENCRYPTED;
 
 	//We are peripheral
 	if(c->direction == Connection::CONNECTION_DIRECTION_IN)
 	{
 		if(!cm->doHandshake){
-			c->handshakeDone = true;
+			c->connectionState = Connection::ConnectionState::HANDSHAKE_DONE;
 		}
 	}
 	//We are central
@@ -341,7 +410,7 @@ void ConnectionManager::ConnectionEncryptedHandler(ble_evt_t* bleEvent)
 		//If the handshake is disabled, we just set the variable
 		else
 		{
-			c->handshakeDone = true;
+			c->connectionState = Connection::ConnectionState::HANDSHAKE_DONE;
 		}
 	}
 }
@@ -364,51 +433,97 @@ void ConnectionManager::handleDiscoveredCallback(u16 connectionHandle, u16 chara
 }
 
 
-
+//Is called whenever a connection had been established and is now disconnected
+//due to a timeout, deliberate disconnection by the localhost, remote, etc,...
 void ConnectionManager::DisconnectionHandler(ble_evt_t* bleEvent)
 {
+
 	ConnectionManager* cm = ConnectionManager::getInstance();
-
 	Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gap_evt.conn_handle);
-	if (connection != NULL)
-	{
-		if (connection->direction == Connection::CONNECTION_DIRECTION_IN) cm->freeInConnections++;
-		else cm->freeOutConnections++;
 
-		//remove pending packets
-		cm->pendingPackets -= connection->packetSendQueue->_numElements;
+	if(connection == NULL) return;
 
-		connection->isConnected = false;
+	//Save disconnction reason
+	connection->disconnectionReason = bleEvent->evt.gap_evt.params.disconnected.reason;
 
-		//Notify the callback of the disconnection before notifying the connection
-		//This will ensure that the values are still set in the connection
-		cm->connectionManagerCallback->DisconnectionHandler(bleEvent);
+	//LOG disconnection reason
+	Logger::getInstance().logError(Logger::errorTypes::HCI_ERROR, bleEvent->evt.gap_evt.params.disconnected.reason, cm->node->appTimerMs);
 
-		connection->DisconnectionHandler(bleEvent);
+	logt("CM", "Connection %u to %u DISCONNECTED", connection->connectionId, connection->partnerId);
+
+	//Check if the connection should be sustained (If it's been handshaked for more than 10 seconds and ran into a timeout)
+	if(
+			cm->node->appTimerMs - connection->connectionHandshakedTimestamp > 10 * 1000
+			&& bleEvent->evt.gap_evt.params.disconnected.reason == BLE_HCI_CONNECTION_TIMEOUT
+			&& cm->node->currentDiscoveryState != discoveryState::HANDSHAKE
+			&& cm->node->currentDiscoveryState != discoveryState::REESTABLISHING_CONNECTION
+	){
+		logt("CM", "Connection should be sustained");
+
+		//TODO: implement
+
+		/*connection->connectionState = Connection::REESTABLISHING;
+
+		cm->node->ChangeState(discoveryState::REESTABLISHING_CONNECTION);
+
+		//We assume the same role as before the connection loss
+		if(connection->direction == Connection::ConnectionDirection::CONNECTION_DIRECTION_IN){
+			//We advertise
+			AdvertisingController::SetAdvertisingState(advState::ADV_STATE_HIGH);
+		} else {
+			//We try to initiate the connection
+			GAPController::connectToPeripheral(&connection->partnerAddress, Config->meshExtendedConnectionTimeout);
+
+		}*/
+
 	}
+
+
+	if (connection->direction == Connection::CONNECTION_DIRECTION_IN) cm->freeInConnections++;
+	else cm->freeOutConnections++;
+
+	//If this was the pending connection, we clear it
+	if(cm->pendingConnection == connection) cm->pendingConnection = NULL;
+
+	//Notify the connection itself
+	connection->DisconnectionHandler(bleEvent);
+
+	//Notify the callback of the disconnection (The Node probably)
+	cm->connectionManagerCallback->DisconnectionHandler(bleEvent);
+
+	//Reset connection variables
+	connection->ResetValues();
 }
 
-void ConnectionManager::ConnectionTimeoutHandler(ble_evt_t* bleEvent)
+//Called when a connecting request times out
+void ConnectionManager::ConnectingTimeoutHandler(ble_evt_t* bleEvent)
 {
 	ConnectionManager* cm = ConnectionManager::getInstance();
 
-	cm->pendingConnection = NULL;
-	cm->freeOutConnections++;
+	if(cm->pendingConnection != NULL){
+		cm->pendingConnection->ResetValues();
 
-	cm->connectionManagerCallback->ConnectionTimeoutHandler(bleEvent);
+		cm->pendingConnection = NULL;
+	}
+
+	cm->connectionManagerCallback->ConnectingTimeoutHandler(bleEvent);
+
 }
 
 void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 {
 	ConnectionManager* cm = ConnectionManager::getInstance();
 
+	//Handles BLE_GATTS_EVT_WRITE
+
 
 	//FIXME: must check for reassembly buffer size, if it is bigger, a stack overflow will occur
 
-	Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gap_evt.conn_handle);
+	Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gatts_evt.conn_handle);
 	if (connection != NULL)
 	{
 		//TODO: At this point we should check if the write was a valid operation for the mesh
+		//Invalid actions should cause a disconnect
 		/*if( bleEvent->evt.gatts_evt.params.write.handle != GATTController::getMeshWriteHandle() ){
 			connection->Disconnect();
 			logt("ERROR", "Non mesh device was disconnected");
@@ -421,16 +536,21 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 		if(packet->messageType == MESSAGE_TYPE_UPDATE_TIMESTAMP)
 		{
 			//Set our time to the received timestamp and update the time when we've received this packet
-			app_timer_cnt_get(&Node::getInstance()->globalTimeSetAt);
-			Node::getInstance()->globalTime = ((connPacketUpdateTimestamp*)packet)->timestamp;
+			app_timer_cnt_get(&cm->node->globalTimeSetAt);
+			cm->node->globalTime = ((connPacketUpdateTimestamp*)packet)->timestamp;
 
-			logt("NODE", "time updated at:%u with timestamp:%u", Node::getInstance()->globalTimeSetAt, (u32)Node::getInstance()->globalTime);
+			logt("NODE", "time updated at:%u with timestamp:%u", cm->node->globalTimeSetAt, (u32)cm->node->globalTime);
 		}
 
+		u8 t = ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->messageType;
+
+		if( t != 20 && t != 21 && t != 22 && t != 23 && t != 30 && t != 31 && t != 50 && t != 51 && t != 52 && t != 53 && t != 56 && t != 57 && t != 60 && t != 61 && t != 62 && t != 80 && t != 81){
+			logt("ERROR", "WAAAAAAAAAAAAAHHHHH, WRONG DATAAAAAAAAAAAAAAAAA!!!!!!!!!");
+		}
 
 		//Print packet as hex
 		char stringBuffer[100];
-		Logger::getInstance().convertBufferToHexString(bleEvent->evt.gatts_evt.params.write.data, bleEvent->evt.gatts_evt.params.write.len, stringBuffer);
+		Logger::getInstance().convertBufferToHexString(bleEvent->evt.gatts_evt.params.write.data, bleEvent->evt.gatts_evt.params.write.len, stringBuffer, 100);
 		logt("CONN_DATA", "Received type %d, hasMore %d, length %d, reliable %d:", ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->messageType, ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->hasMoreParts, bleEvent->evt.gatts_evt.params.write.len, bleEvent->evt.gatts_evt.params.write.op);
 		logt("CONN_DATA", "%s", stringBuffer);
 
@@ -501,119 +621,183 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 void ConnectionManager::fillTransmitBuffers(){
 
 	u32 err;
-	//TODO: Some error handling would be nice to have
-
 
 	//Fill with unreliable packets
 	for(int i=0; i<Config->meshMaxConnections; i++)
 	{
-		if(connections[i]->isConnected && connections[i]->packetSendQueue->_numElements > 0)
+		while( connections[i]->isConnected() && connections[i]->GetPendingPackets() > 0)
 		{
-			while(connections[i]->packetSendQueue->_numElements > 0)
-			{
-				bool packetCouldNotBeSent = false;
+			bool packetCouldNotBeSent = false;
 
+			bool reliable = false;
+			u8* data = NULL;
+			u16 dataSize = 0;
+
+			if(!connections[i]->handshakeDone() && connections[i]->packetSendQueue->_numElements < 1){
+				//TODO: might want to use a different method then GetPendingPackets if we are not in the handshake
+				break;
+			}
+
+			//A cluster info update is waiting, this is important to send first (but only if handshake is finished and if no split packet is eing sent)
+			if(
+					connections[i]->handshakeDone()
+					&& connections[i]->currentClusterInfoUpdatePacket.header.messageType != 0
+					&& connections[i]->packetSendPosition == 0
+			){
+				//If a clusterUpdate is available we send it immediately
+				reliable = true;
+				data = (u8*)&(connections[i]->currentClusterInfoUpdatePacket);
+				dataSize = SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE;
+
+				logt("CM", "Filling CLUSTER UPDATE for CONN %u", connections[i]->connectionId);
+			}
+			//Pick the next packet from the packet queue
+			else
+			{
 				//Get one packet from the packet queue
 				sizedData packet = connections[i]->packetSendQueue->PeekNext();
-				bool reliable = packet.data[0];
-				u8* data = packet.data + 1;
-				u16 dataSize = packet.length - 1;
-
-				//Multi-part messages are only supported reliable
-				//Switch packet to reliable if it is a multipart packet
-				if(dataSize > MAX_DATA_SIZE_PER_WRITE) reliable = true;
-				else ((connPacketHeader*) data)->hasMoreParts = 0;
-
-				//The Next packet should be sent reliably
-				if(reliable){
-					if(connections[i]->reliableBuffersFree > 0){
-						//Check if the packet can be transmitted in one MTU
-						//If not, it will be sent with message splitting and reliable
-						if(dataSize > MAX_DATA_SIZE_PER_WRITE){
-
-							//We might already have started to transmit the packet
-							if(connections[i]->packetSendPosition != 0){
-								//we need to modify the data a little and build our split
-								//message header. This does overwrite some of the old data
-								//but that's already been transmitted
-								connPacketSplitHeader* newHeader = (connPacketSplitHeader*)(data + connections[i]->packetSendPosition);
-								newHeader->hasMoreParts = (dataSize - connections[i]->packetSendPosition > MAX_DATA_SIZE_PER_WRITE) ? 1: 0;
-								newHeader->messageType = ((connPacketHeader*) data)->messageType; //We take it from the start of our packet which should still be intact
-
-								//If the packet has more parts, we send a full packet, otherwise we send the remaining bits
-								if(newHeader->hasMoreParts) dataSize = MAX_DATA_SIZE_PER_WRITE;
-								else dataSize = dataSize - connections[i]->packetSendPosition;
-
-								//Now we set the data pointer to where we left the last time minus our new header
-								data = (u8*)newHeader;
-
-							}
-							//Or maybe this is the start of the transmission
-							else
-							{
-								((connPacketHeader*) data)->hasMoreParts = 1;
-								//Data is alright, but dataSize must be set to its new value
-								dataSize = MAX_DATA_SIZE_PER_WRITE;
-							}
-						}
-
-
-						//Update packet timestamp as close as possible before sending it
-						//TODO: This could be done more accurate because we receive an event when the
-						//Packet was sent, so we could calculate the time between sending and getting the event
-						//And send a second packet with the time difference.
-						if(((connPacketHeader*) data)->messageType == MESSAGE_TYPE_UPDATE_TIMESTAMP){
-							//Add the time that it took from setting the time until it gets send
-							u32 additionalTime;
-							u32 rtc1;
-							app_timer_cnt_get(&rtc1);
-							app_timer_cnt_diff_compute(rtc1, Node::getInstance()->globalTimeSetAt, &additionalTime);
-
-							logt("NODE", "sending time:%u with prevRtc1:%u, rtc1:%u, diff:%u", (u32)Node::getInstance()->globalTime, Node::getInstance()->globalTimeSetAt, rtc1, additionalTime);
-
-							((connPacketUpdateTimestamp*) data)->timestamp = Node::getInstance()->globalTime + additionalTime;
-
-
-							/*((connPacketUpdateTimestamp*) data)->timestamp = 0;
-							((connPacketUpdateTimestamp*) data)->milliseconds = 0;*/
-						}
-
-
-						//Finally, send the packet to the SoftDevice
-						err = GATTController::bleWriteCharacteristic(connections[i]->connectionHandle, connections[i]->writeCharacteristicHandle, data, dataSize, true);
-						APP_ERROR_CHECK(err);
-
-						if(err == NRF_SUCCESS)
-						{
-							connections[i]->reliableBuffersFree--;
-						}
-
-					} else {
-						packetCouldNotBeSent = true;
-					}
+				if(packet.length > 0){
+					reliable = packet.data[0];
+					data = packet.data + 1;
+					dataSize = packet.length - 1;
+				} else {
+					break;
 				}
-
-				//The next packet is to be sent unreliably
-				if(!reliable){
-					if(connections[i]->unreliableBuffersFree > 0)
-					{
-						err = GATTController::bleWriteCharacteristic(connections[i]->connectionHandle, connections[i]->writeCharacteristicHandle, data, dataSize, false);
-
-						if(err == NRF_SUCCESS){
-							connections[i]->unreliableBuffersFree--;
-							connections[i]->packetSendQueue->DiscardNext();
-							logt("CONN", "packet to conn %u (txfree: %d)", i, connections[i]->unreliableBuffersFree);
-						}
-
-					} else {
-						packetCouldNotBeSent = true;
-					}
-				}
-
-				//Go to next connection if a packet (either reliable or unreliable)
-				//could not be sent because the corresponding buffers are full
-				if(packetCouldNotBeSent) break;
 			}
+
+			//Multi-part messages are only supported reliable
+			//Switch packet to reliable if it is a multipart packet
+			if(dataSize > MAX_DATA_SIZE_PER_WRITE) reliable = true;
+			else ((connPacketHeader*) data)->hasMoreParts = 0;
+
+			//The Next packet should be sent reliably
+			if(reliable){
+				if(connections[i]->reliableBuffersFree > 0){
+					//Check if the packet can be transmitted in one MTU
+					//If not, it will be sent with message splitting and reliable
+					if(dataSize > MAX_DATA_SIZE_PER_WRITE){
+
+						//We might already have started to transmit the packet
+						if(connections[i]->packetSendPosition != 0){
+							//we need to modify the data a little and build our split
+							//message header. This does overwrite some of the old data
+							//but that's already been transmitted
+							connPacketSplitHeader* newHeader = (connPacketSplitHeader*)(data + connections[i]->packetSendPosition);
+							newHeader->hasMoreParts = (dataSize - connections[i]->packetSendPosition > MAX_DATA_SIZE_PER_WRITE) ? 1: 0;
+							newHeader->messageType = ((connPacketHeader*) data)->messageType; //We take it from the start of our packet which should still be intact
+
+							//If the packet has more parts, we send a full packet, otherwise we send the remaining bits
+							if(newHeader->hasMoreParts) dataSize = MAX_DATA_SIZE_PER_WRITE;
+							else dataSize = dataSize - connections[i]->packetSendPosition;
+
+							//Now we set the data pointer to where we left the last time minus our new header
+							data = (u8*)newHeader;
+
+						}
+						//Or maybe this is the start of the transmission
+						else
+						{
+							((connPacketHeader*) data)->hasMoreParts = 1;
+							//Data is alright, but dataSize must be set to its new value
+							dataSize = MAX_DATA_SIZE_PER_WRITE;
+						}
+					}
+
+
+					//Update packet timestamp as close as possible before sending it
+					//TODO: This could be done more accurate because we receive an event when the
+					//Packet was sent, so we could calculate the time between sending and getting the event
+					//And send a second packet with the time difference.
+					if(((connPacketHeader*) data)->messageType == MESSAGE_TYPE_UPDATE_TIMESTAMP){
+						//Add the time that it took from setting the time until it gets send
+						u32 additionalTime;
+						u32 rtc1;
+						app_timer_cnt_get(&rtc1);
+						app_timer_cnt_diff_compute(rtc1, node->globalTimeSetAt, &additionalTime);
+
+						logt("NODE", "sending time:%u with prevRtc1:%u, rtc1:%u, diff:%u", (u32)node->globalTime, node->globalTimeSetAt, rtc1, additionalTime);
+
+						((connPacketUpdateTimestamp*) data)->timestamp = node->globalTime + additionalTime;
+
+
+						/*((connPacketUpdateTimestamp*) data)->timestamp = 0;
+						((connPacketUpdateTimestamp*) data)->milliseconds = 0;*/
+					}
+
+
+					//Finally, send the packet to the SoftDevice
+					err = GATTController::bleWriteCharacteristic(connections[i]->connectionHandle, connections[i]->writeCharacteristicHandle, data, dataSize, true);
+
+					if(err != NRF_SUCCESS) logt("ERROR", "GATT WRITE ERROR %u", err);
+
+					if(err == NRF_SUCCESS){
+						//Consume a buffer because the packet was sent
+						connections[i]->reliableBuffersFree--;
+
+						memcpy(connections[i]->lastSentPacket, data, dataSize);
+
+						//A special packet that is not from the packetqueue is emptied as soon as it is in the send buffer
+						//If it can not be sent, the connection will be disconnected because of a timeout, so we must not await
+						//A success event
+						if(((connPacketHeader*)data)->messageType == MESSAGE_TYPE_CLUSTER_INFO_UPDATE){
+							connections[i]->ClusterUpdateSentHandler();
+						} else {
+
+						}
+
+					} else if(err == NRF_ERROR_DATA_SIZE || err == NRF_ERROR_INVALID_PARAM){
+						logt("ERROR", "NRF_ERROR sending %u!!!!!!!!!!!!!", err);
+						//Drop the packet if it's faulty
+						if(((connPacketHeader*)data)->messageType == MESSAGE_TYPE_CLUSTER_INFO_UPDATE){
+							logt("ERROR", "MALFORMED CLUSTER_INFO_UPDATE packet");
+						} else {
+							logt("ERROR", "MALFORMED DATA PACKET FROM QUEUE");
+							connections[i]->packetSendQueue->DiscardNext();
+						}
+					} else {
+						//Will try to send it later
+						packetCouldNotBeSent = true;
+					}
+
+				} else {
+					packetCouldNotBeSent = true;
+				}
+			}
+
+			//The next packet is to be sent unreliably
+			if(!reliable){
+				if(connections[i]->unreliableBuffersFree > 0)
+				{
+					err = GATTController::bleWriteCharacteristic(connections[i]->connectionHandle, connections[i]->writeCharacteristicHandle, data, dataSize, false);
+
+					if(err != NRF_SUCCESS) logt("ERROR", "GATT WRITE ERROR %u", err);
+
+					if(err == NRF_SUCCESS){
+						//Consumes a send Buffer
+						connections[i]->unreliableBuffersFree--;
+						logt("CONN", "packet to conn %u (txfree: %d)", i, connections[i]->unreliableBuffersFree);
+
+						memcpy(connections[i]->lastSentPacket, data, dataSize);
+					}
+
+					//In either case (success or faulty packet) we drop the packet
+					if(err == NRF_SUCCESS || err == NRF_ERROR_DATA_SIZE || err == NRF_ERROR_INVALID_PARAM){
+
+						connections[i]->packetSendQueue->DiscardNext();
+
+					} else {
+						//Will try to send it later
+						packetCouldNotBeSent = true;
+					}
+
+				} else {
+					packetCouldNotBeSent = true;
+				}
+			}
+
+			//Go to next connection if a packet (either reliable or unreliable)
+			//could not be sent because the corresponding buffers are full
+			if(packetCouldNotBeSent) break;
 		}
 	}
 }
@@ -632,12 +816,13 @@ void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
 		logt("CONN_DATA", "write_CMD complete (n=%d)", bleEvent->evt.common_evt.params.tx_complete.count);
 
 		//This connection has just been given back some transmit buffers
-		cm->GetConnectionFromHandle(bleEvent->evt.common_evt.conn_handle)->unreliableBuffersFree += bleEvent->evt.common_evt.params.tx_complete.count;
+		Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.common_evt.conn_handle);
+		connection->unreliableBuffersFree += bleEvent->evt.common_evt.params.tx_complete.count;
 
-		cm->pendingPackets -= bleEvent->evt.common_evt.params.tx_complete.count;
+		connection->sentUnreliable++;
 
 		//Next, we should continue sending packets if there are any
-		if(cm->pendingPackets) cm->fillTransmitBuffers();
+		if(cm->GetPendingPackets()) cm->fillTransmitBuffers();
 
 	}
 	//The EVT_WRITE_RSP comes after a WRITE_REQ and notifies that a buffer
@@ -646,34 +831,56 @@ void ConnectionManager::dataTransmittedCallback(ble_evt_t* bleEvent)
 	{
 		if(bleEvent->evt.gattc_evt.gatt_status != BLE_GATT_STATUS_SUCCESS)
 		{
-			logt("CONN", "GATT status problem %d %s", bleEvent->evt.gattc_evt.gatt_status, Logger::getGattStatusErrorString(bleEvent->evt.gattc_evt.gatt_status));
+			logt("ERROR", "GATT status problem %d %s", bleEvent->evt.gattc_evt.gatt_status, Logger::getGattStatusErrorString(bleEvent->evt.gattc_evt.gatt_status));
 
 			//TODO: Error handling, but there really shouldn't be an error....;-)
+			//FIXME: Handle possible gatt status codes
+
 		}
 		else
 		{
 			logt("CONN_DATA", "write_REQ complete");
 			Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gattc_evt.conn_handle);
 
-			connPacketSplitHeader* header = (connPacketSplitHeader*)(connection->packetSendQueue->PeekNext().data + 1 + connection->packetSendPosition); //+1 to remove reliable byte
-			logt("CONN_DATA", "header is type %d and moreData %d (%d-%d)", header->messageType, header->hasMoreParts, connection->packetSendQueue->PeekNext().data, header);
+			//Connection could have been disconneced
+			if(connection == NULL) return;
 
-			//Check if the packet has more parts
-			if(header->hasMoreParts == 0){
-				//Packet was either not split at all or is completely sent
-				connection->packetSendPosition = 0;
-				connection->packetSendQueue->DiscardNext();
-				cm->pendingPackets--;
+			connection->sentReliable++;
+
+			//Check what type of Packet has just been sent
+			connPacketHeader* packetHeader = (connPacketHeader*)connection->lastSentPacket;
+
+			if(packetHeader->messageType == MESSAGE_TYPE_CLUSTER_INFO_UPDATE){
+				//Nothing to do
 			} else {
-				//Update packet send position if we have more data
-				connection->packetSendPosition += MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_SPLIT_HEADER;
+
+				logt("CONN_DATA", "Header was type %d hasMoreParts %d", packetHeader->messageType, packetHeader->hasMoreParts);
+
+				//Check if the packet has more parts
+				if(packetHeader->hasMoreParts == 0){
+					//Packet was either not split at all or is completely sent
+					connection->packetSendPosition = 0;
+
+					//Check if this was the end of a handshake, if yes, mark handshake as completed
+					if(packetHeader->messageType == MESSAGE_TYPE_CLUSTER_ACK_2)
+					{
+						//Notify Node of handshakeDone
+						cm->node->HandshakeDoneHandler(connection, true);
+					}
+
+					//Discard the last packet because it was now successfully sent
+					connection->packetSendQueue->DiscardNext();
+				} else {
+					//Update packet send position if we have more data
+					connection->packetSendPosition += MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_SPLIT_HEADER;
+				}
 			}
 
 			connection->reliableBuffersFree += 1;
 
 
 			//Now we continue sending packets
-			if(cm->pendingPackets) cm->fillTransmitBuffers();
+			if(cm->GetPendingPackets()) cm->fillTransmitBuffers();
 		}
 	}
 }
@@ -698,7 +905,7 @@ Connection* ConnectionManager::GetConnectionToShortestSink(Connection* excludeCo
 	Connection* c = NULL;
 	for(int i=0; i<Config->meshMaxConnections; i++){
 		if(excludeConnection != NULL && connections[i] == excludeConnection) continue;
-		if(connections[i]->handshakeDone && connections[i]->hopsToSink > -1 && connections[i]->hopsToSink < min){
+		if(connections[i]->handshakeDone() && connections[i]->hopsToSink > -1 && connections[i]->hopsToSink < min){
 			min = connections[i]->hopsToSink;
 			c = connections[i];
 		}
@@ -708,22 +915,22 @@ Connection* ConnectionManager::GetConnectionToShortestSink(Connection* excludeCo
 
 clusterSIZE ConnectionManager::GetHopsToShortestSink(Connection* excludeConnection)
 {
-	if(Node::getInstance()->persistentConfig.deviceType == deviceTypes::DEVICE_TYPE_SINK){
-		logt("SINK", "HOPS 1");
+	if(node->persistentConfig.deviceType == deviceTypes::DEVICE_TYPE_SINK){
+		logt("SINK", "HOPS 0, clID:%x, clSize:%d", node->clusterId, node->clusterSize);
 			return 0;
 		} else {
 
 			clusterSIZE min = INT16_MAX;
 			Connection* c = NULL;
 			for(int i=0; i<Config->meshMaxConnections; i++){
-				if(excludeConnection != NULL && connections[i] == excludeConnection) continue;
+				if(connections[i] == excludeConnection || !connections[i]->isConnected()) continue;
 				if(connections[i]->hopsToSink > -1 && connections[i]->hopsToSink < min){
 					min = connections[i]->hopsToSink;
 					c = connections[i];
 				}
 			}
 
-			logt("SINK", "HOPS %d", (c == NULL) ? -1 : c->hopsToSink);
+			logt("SINK", "HOPS %d, clID:%x, clSize:%d", (c == NULL) ? -1 : c->hopsToSink, node->clusterId, node->clusterSize);
 			return (c == NULL) ? -1 : c->hopsToSink;
 		}
 }

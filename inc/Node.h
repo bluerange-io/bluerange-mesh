@@ -62,9 +62,7 @@ class Node:
 {
 	private:
 		static Node* instance;
-		static ConnectionManager* cm;
 
-		nodeID ackFieldDebugCopy;
 
 		bool stateMachineDisabled = false;
 
@@ -77,8 +75,9 @@ class Node:
 			u16 manufacturerId; //According to the BLE company identifiers: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
 			char serialNumber[SERIAL_NUMBER_LENGTH+1];//should be 0 terminated
 			u8 networkKey[BLE_GAP_SEC_KEY_LEN]; //16 bytes
-			u16 connectionLossCounter;
+			u16 connectionLossCounter; //TODO: connection loss counter is not saved persistently, move it.
 			deviceTypes deviceType;
+			//TODO: don't know if we need receiver sensitivity,...
 			u8 dBmTX; //The average RSSI, received in a distance of 1m with a tx power of +0 dBm
 			u8 dBmRX; //Receiver sensitivity (or receied power from a packet sent at 1m distance with +0dBm?)
 			u8 reserved;
@@ -97,6 +96,9 @@ class Node:
 		#define NUM_TEST_DEVICES 10
 		static testDevice testDevices[];
 
+		#define NUM_TEST_COLOUR_IDS 12
+		static nodeID testColourIDs[];
+
 
 		void InitWithTestDeviceSettings();
 
@@ -109,11 +111,10 @@ class Node:
 			return instance;
 		}
 
-		LedWrapper* LedRed;
-		LedWrapper* LedGreen;
-		LedWrapper* LedBlue;
+		static ConnectionManager* cm;
 
 		SimpleBuffer* joinMePacketBuffer;
+		clusterID currentAckId;
 
 		NodeConfiguration persistentConfig;
 
@@ -145,13 +146,11 @@ class Node:
 
 		u8 ledBlinkPosition;
 
-		enum ledMode
-		{
-			LED_MODE_OFF, LED_MODE_CONNECTIONS, LED_MODE_RADIO
-		};
 		ledMode currentLedMode;
 
 		bool outputRawData;
+
+		bool initializedByGateway; //Can be set to true by a mesh gateway after all configuration has been set
 
 
 		// Result of the bestCluster calculation
@@ -164,11 +163,12 @@ class Node:
 		Node(networkID networkId);
 
 		//Connection
-		void HandshakeDoneHandler(Connection* connection);
+		void HandshakeTimeoutHandler();
+		void HandshakeDoneHandler(Connection* connection, bool completedAsWinner);
 
 		//Stuff
 		Node::decisionResult DetermineBestClusterAvailable(void);
-		void UpdateJoinMePacket(joinMeBufferPacket* ackCluster);
+		void UpdateJoinMePacket();
 		void UpdateScanResponsePacket(u8* newData, u8 length);
 
 		//States
@@ -182,19 +182,27 @@ class Node:
 		//Connection handlers
 		//Message handlers
 		void AdvertisementMessageHandler(ble_evt_t* bleEvent);
+		joinMeBufferPacket* findTargetBuffer(advPacketJoinMeV0* packet);
+
 		//Timers and Stuff handler
 		static void RadioEventHandler(bool radioActive);
 		void TimerTickHandler(u16 timerMs);
 
 		//Helpers
 		clusterID GenerateClusterID(void);
-		void UpdateClusterInfo(Connection* connection, connPacketClusterInfoUpdate* packet);
+
+		void SendClusterInfoUpdate(Connection* ignoreConnection, connPacketClusterInfoUpdate* packet);
+		void ReceiveClusterInfoUpdate(Connection* connection, connPacketClusterInfoUpdate* packet);
+
 		u32 CalculateClusterScoreAsMaster(joinMeBufferPacket* packet);
 		u32 CalculateClusterScoreAsSlave(joinMeBufferPacket* packet);
 		void PrintStatus(void);
 		void PrintBufferStatus(void);
 		void PrintSingleLineStatus(void);
+		void SetTerminalTitle();
 
+		void StartConnectionRSSIMeasurement(Connection* connection);
+		void StopConnectionRSSIMeasurement(Connection* connection);
 
 		//Uart communication
 		void UartSetCampaign();
@@ -208,10 +216,9 @@ class Node:
 		//Methods of ConnectionManagerCallback
 		void DisconnectionHandler(ble_evt_t* bleEvent);
 		void ConnectionSuccessfulHandler(ble_evt_t* bleEvent);
-		void ConnectionTimeoutHandler(ble_evt_t* bleEvent);
+		void ConnectingTimeoutHandler(ble_evt_t* bleEvent);
 		void messageReceivedCallback(connectionPacket* inPacket);
 
-		//Set to true, to reset the system every 25 seconds and lock it when we find invalid states
-		static bool lookingForInvalidStateErrors;
+		u8 GetBatteryRuntime();
 
 };

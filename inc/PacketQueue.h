@@ -37,20 +37,13 @@ class PacketQueue
 {
 private: 
 
-	//FIXME: Apparently, the queue mutex is needed, but it should not be
-	//There should not be any threading in the queue....
-	nrf_mutex_t queueMutex;
-
 
 public:
 //really public
 	PacketQueue(u8* buffer, u16 bufferLength);
     bool Put(u8* data, u8 dataLength, bool reliable);
-	u8* Reserve(u8 dataLength);
-	sizedData GetNext(bool peekOnly);
 	sizedData PeekNext();
 	void DiscardNext();
-	bool HasNext(void);
 	void Clean(void);
 
 	//private

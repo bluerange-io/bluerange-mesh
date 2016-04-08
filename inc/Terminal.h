@@ -93,6 +93,8 @@ public:
 	//Called every once in a while to check for UART input
 	static void PollUART();
 
+	static void ReadFromUARTNonBlocking();
+
 	//Register a class that will be notified when the activation string is entered
 	static void AddTerminalCommandListener(TerminalCommandListener* callback);
 

@@ -26,6 +26,11 @@
 	</natures>
 	<linkedResources>
 		<link>
+			<name>DFUModule</name>
+			<type>2</type>
+			<locationURI>PARENT-1-PROJECT_LOC/fruityloader/DFUModule</locationURI>
+		</link>
+		<link>
 			<name>release_notes.txt</name>
 			<type>1</type>
 			<locationURI>PARENT-1-WORKSPACE_LOC/sdk/nrf_sdk_latest/documentation/release_notes.txt</locationURI>

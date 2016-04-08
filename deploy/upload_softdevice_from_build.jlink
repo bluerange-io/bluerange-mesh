@@ -1,5 +1,0 @@
-w4 4001e504 1
-loadbin "_build/s130_softdevice.hex" 0
-r
-g
-exit

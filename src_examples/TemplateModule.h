@@ -61,7 +61,7 @@ class TemplateModule: public Module
 
 
 	public:
-		TemplateModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		TemplateModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 
 		void ConfigurationLoadedHandler();
 

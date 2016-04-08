@@ -35,6 +35,8 @@ ConnectionManager* TestBattery::cm;
 
 u16 deactivateDiscoveryAfterMs = 0;
 
+
+
 TestBattery::TestBattery()
 {
 
@@ -45,11 +47,11 @@ void TestBattery::TimerHandler(){
 
 		node->ChangeState(discoveryState::DISCOVERY_OFF);
 		node->DisableStateMachine(true);
-		node->currentLedMode = Node::LED_MODE_OFF;
+		node->currentLedMode = ledMode::LED_MODE_OFF;
 
-		node->LedRed->Off();
-		node->LedGreen->Off();
-		node->LedBlue->Off();
+		LedRed->Off();
+		LedGreen->Off();
+		LedBlue->Off();
 	}
 }
 
@@ -68,17 +70,17 @@ void TestBattery::startTesting()
 
 	//Enable or disable DC/DC
 	err = sd_power_dcdc_mode_set(NRF_POWER_DCDC_ENABLE);
-	APP_ERROR_CHECK(err);
+	APP_ERROR_CHECK(err); //OK
 
 	//Set power off mode
 	err = sd_power_mode_set(NRF_POWER_MODE_LOWPWR);
-	APP_ERROR_CHECK(err);
+	APP_ERROR_CHECK(err); //OK
 
 	//Switch off everything possible
 	node = Node::getInstance();
 	cm = ConnectionManager::getInstance();
 
-	node->currentLedMode = Node::LED_MODE_OFF;
+	node->currentLedMode = ledMode::LED_MODE_OFF;
 
 	//deactiveate node
 	node->ChangeState(discoveryState::DISCOVERY_OFF);
@@ -175,7 +177,7 @@ void TestBattery::meshWith30msConnAndDiscoveryOff()
 		node->ChangeState(discoveryState::DISCOVERY_HIGH);
 
 		//Disable discovery after 20 seconds
-		node->currentLedMode = Node::LED_MODE_CONNECTIONS;
+		node->currentLedMode = ledMode::LED_MODE_CONNECTIONS;
 		deactivateDiscoveryAfterMs = 20 * 1000;
 }
 
@@ -197,7 +199,7 @@ void TestBattery::meshWith100msConnAndDiscoveryOff()
 	node->ChangeState(discoveryState::DISCOVERY_HIGH);
 
 	//Disable discovery after 20 seconds
-	node->currentLedMode = Node::LED_MODE_CONNECTIONS;
+	node->currentLedMode = ledMode::LED_MODE_CONNECTIONS;
 	deactivateDiscoveryAfterMs = 20 * 1000;
 }
 
@@ -220,7 +222,7 @@ void TestBattery::meshWith500msConnAndDiscoveryOff()
 	node->ChangeState(discoveryState::DISCOVERY_HIGH);
 
 	//Disable discovery after 20 seconds
-	node->currentLedMode = Node::LED_MODE_CONNECTIONS;
+	node->currentLedMode = ledMode::LED_MODE_CONNECTIONS;
 	deactivateDiscoveryAfterMs = 20 * 1000;
 }
 

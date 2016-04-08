@@ -34,7 +34,7 @@ class StatusReporterModule: public Module
 {
 	private:
 
-		enum RSSISamplingModes{RSSI_SAMPLING_NONE=0, RSSI_SAMPLING_LOW=1, RSSI_SAMPLING_MEDIUM=2, RSSI_SAMPLING_HIGH=3};
+		enum RSSISampingModes{RSSI_SAMLING_NONE=0, RSSI_SAMLING_LOW=1, RSSI_SAMLING_MEDIUM=2, RSSI_SAMLING_HIGH=3};
 
 		//Module configuration that is saved persistently (size must be multiple of 4)
 		struct StatusReporterModuleConfiguration: ModuleConfiguration
@@ -42,8 +42,8 @@ class StatusReporterModule: public Module
 				//Insert more persistent config values here
 				u16 connectionReportingIntervalMs;
 				u16 statusReportingIntervalMs;
-				u8 connectionRSSISamplingMode; //typeof RSSISamplingModes
-				u8 advertisingRSSISamplingMode; //typeof RSSISamplingModes
+				u8 connectionRSSISamplingMode; //typeof RSSISampingModes
+				u8 advertisingRSSISamplingMode; //typeof RSSISampingModes
 				u16 reserved;
 		};
 
@@ -55,7 +55,8 @@ class StatusReporterModule: public Module
 			GET_STATUS = 1,
 			GET_DEVICE_INFO = 2,
 			GET_ALL_CONNECTIONS = 3,
-			GET_NEARBY_NODES = 4
+			GET_NEARBY_NODES = 4,
+			SET_INITIALIZED = 5
 		};
 
 		enum StatusModuleActionResponseMessages
@@ -64,12 +65,20 @@ class StatusReporterModule: public Module
 			STATUS = 1,
 			DEVICE_INFO = 2,
 			ALL_CONNECTIONS = 3,
-			NEARBY_NODES = 4
+			NEARBY_NODES = 4,
+			SET_INITIALIZED_RESULT = 5
 		};
 
 		//####### Module specific message structs (these need to be packed)
 		#pragma pack(push)
 		#pragma pack(1)
+
+		typedef struct
+			{
+				nodeID nodeId;
+				i32 rssiSum;
+				u16 packetCount;
+			} nodeMeasurement;
 
 			#define SIZEOF_STATUS_REPORTER_MODULE_CONNECTIONS_MESSAGE 12
 			typedef struct
@@ -112,6 +121,7 @@ class StatusReporterModule: public Module
 				u8 freeOut : 6;
 				u8 batteryInfo;
 				u8 connectionLossCounter; //Connection losses since reboot
+				u8 initializedByGateway : 1; //Set to 0 if node has been resetted and does not know its configuration
 
 			} StatusReporterModuleStatusMessage;
 
@@ -120,6 +130,9 @@ class StatusReporterModule: public Module
 
 		u32 lastConnectionReportingTimer;
 		u32 lastStatusReportingTimer;
+
+#define NUM_NODE_MEASUREMENTS 20
+		nodeMeasurement nodeMeasurements[NUM_NODE_MEASUREMENTS];
 
 
 		void SendStatus(nodeID toNode, u8 messageType);
@@ -131,7 +144,7 @@ class StatusReporterModule: public Module
 		void StopConnectionRSSIMeasurement(Connection* connection);
 
 	public:
-		StatusReporterModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		StatusReporterModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 
 		void ConfigurationLoadedHandler();
 

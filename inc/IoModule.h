@@ -65,25 +65,25 @@ class IoModule: public Module
 			u8 set : 1; // set pin or unset it
 		};
 
-		/*
+
 		//####### Module messages (these need to be packed)
 		#pragma pack(push)
 		#pragma pack(1)
 
-			#define SIZEOF_TEMPLATE_MODULE_***_MESSAGE 10
+			#define SIZEOF_IO_MODULE_SET_LED_MESSAGE 1
 			typedef struct
 			{
-				//Insert values here
+				u8 ledMode;
 
-			}IoModule***Message;
+			}IoModuleSetLedMessage;
 
 		#pragma pack(pop)
 		//####### Module messages end
-		*/
+
 
 
 	public:
-		IoModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		IoModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 
 		void ConfigurationLoadedHandler();
 

@@ -37,7 +37,7 @@ This module should allow configuration of network id, network key, nodeID and ot
  */
 
 
-EnrollmentModule::EnrollmentModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
+EnrollmentModule::EnrollmentModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
 	: Module(moduleId, node, cm, name, storageSlot)
 {
 	//Register callbacks n' stuff
@@ -232,10 +232,10 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 				node->SaveConfiguration();
 
 				//Switch to green LED, user must now reboot the node
-				node->currentLedMode = Node::ledMode::LED_MODE_OFF;
-				node->LedRed->Off();
-				node->LedGreen->On();
-				node->LedBlue->Off();
+				node->currentLedMode = ledMode::LED_MODE_OFF;
+				LedRed->Off();
+				LedGreen->On();
+				LedBlue->Off();
 
 				SendEnrollmentResponse(NODE_ID_BROADCAST, enrollmentMethods::BY_NODE_ID, packet->requestHandle, 0, (u8*)node->persistentConfig.serialNumber);
 
@@ -259,10 +259,10 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 					node->SaveConfiguration();
 
 					//Switch to green LED, user must now reboot the node
-					node->currentLedMode = Node::ledMode::LED_MODE_OFF;
-					node->LedRed->Off();
-					node->LedGreen->On();
-					node->LedBlue->Off();
+					node->currentLedMode = ledMode::LED_MODE_OFF;
+					LedRed->Off();
+					LedGreen->On();
+					LedBlue->Off();
 
 
 					SendEnrollmentResponse(NODE_ID_BROADCAST, enrollmentMethods::BY_CHIP_ID, packet->requestHandle, 0, (u8*)node->persistentConfig.serialNumber);
@@ -288,13 +288,19 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 					node->SaveConfiguration();
 
 					//Switch to green LED, user must now reboot the node
-					node->currentLedMode = Node::ledMode::LED_MODE_OFF;
-					node->LedRed->Off();
-					node->LedGreen->On();
-					node->LedBlue->Off();
+					node->currentLedMode = ledMode::LED_MODE_OFF;
+					LedRed->On();
+					LedGreen->On();
+					LedBlue->On();
 
+					//FIXME: Hotfix until NewStorage supports page swapping
+					//We wait some time until the enrollment is saved
+					for(int i=0; i<8000000; i++){
+
+					}
 
 					SendEnrollmentResponse(NODE_ID_BROADCAST, enrollmentMethods::BY_SERIAL, packet->requestHandle, 0, (u8*)node->persistentConfig.serialNumber);
+
 				}
 			}
 		}
@@ -322,8 +328,8 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 				memcpy(serialNumber, data->serialNumber, SERIAL_NUMBER_LENGTH);
 				serialNumber[SERIAL_NUMBER_LENGTH] = '\0';
 
-				uart("ENROLLMOD", "{\"type\":\"enroll_response\",\"module\":%d,\"method\":\"%s\",", moduleId, enrollmentMethodString);
-				uart("ENROLLMOD", "\"requestId\":%u,\"newNodeId\":%u,\"serial\":\"%s\"}" SEP,  packet->requestHandle, packet->header.sender, serialNumber);
+				uart("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"enroll_response_%s\",\"module\":%d,", packet->header.sender, enrollmentMethodString, moduleId);
+				uart("ENROLLMOD", "\"requestId\":%u,\"serialNumber\":\"%s\"}" SEP,  packet->requestHandle, serialNumber);
 			}
 		}
 	}

@@ -64,8 +64,8 @@ public:
 
 
 	static void Initialize(u16 networkIdentifier);
-	static void UpdateAdvertisingData(u8 messageType, sizedData* payload, bool connectable);
-	static void SetScanResponse(sizedData* payload);
+	static u32 UpdateAdvertisingData(u8 messageType, sizedData* payload, bool connectable);
+	static u32 SetScanResponse(sizedData* payload);
 	static void SetAdvertisingState(advState newState);
 	static void AdvertisingInterruptedBecauseOfIncomingConnectionHandler(void);
 	static bool AdvertiseEventHandler(ble_evt_t* bleEvent);

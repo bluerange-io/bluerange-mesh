@@ -33,6 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <Module.h>
 
 #define SCAN_FILTER_NUMBER 1 //Number of filters that can be set
+#define NUM_ADDRESSES_TRACKED 30
+#define RSSI_THRESHOLD -80
 
 #define SCAN_BUFFERS_SIZE 10 //Max number of packets that are buffered
 
@@ -88,8 +90,17 @@ class ScanningModule: public Module
 		scannedPacket groupedPackets[SCAN_BUFFERS_SIZE];
 
 		//For total message counting
+		//u32 totalMessages;
+		//i32 totalRSSI;
+
+		// Addresses of active devices
+		uint8_t addressPointer;
+		uint8_t addresses[NUM_ADDRESSES_TRACKED][BLE_GAP_ADDR_LEN];
+		u32 totalRSSIsPerAddress[NUM_ADDRESSES_TRACKED];
+		u32 totalMessagesPerAdress[NUM_ADDRESSES_TRACKED];
+
 		u32 totalMessages;
-		i32 totalRSSI;
+		u32 totalRSSI;
 
 
 		enum ScanModuleMessages{TOTAL_SCANNED_PACKETS=0};
@@ -99,8 +110,23 @@ class ScanningModule: public Module
 
 		void SendReport();
 
+		bool advertiseDataWasSentFromMobileDevice(u8* data, u8 dataLength);
+		bool advertiseDataFromAndroidDevice(u8* data, u8 dataLength);
+		bool advertiseDataFromiOSDeviceInBackgroundMode(u8* data, u8 dataLength);
+		bool advertiseDataFromiOSDeviceInForegroundMode(u8* data, u8 dataLength);
+		bool advertiseDataFromBeaconWithDifferentNetworkId(u8 *data, u8 dataLength);
+
+		bool addressAlreadyTracked(uint8_t* address);
+
+		void resetAddressTable();
+		void resetTotalRSSIsPerAddress();
+		void resetTotalMessagesPerAdress();
+		void updateTotalRssiAndTotalMessagesForDevice(i8 rssi, uint8_t* address);
+		u32 computeTotalRSSI();
+
+
 	public:
-		ScanningModule(u16 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		ScanningModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 
 		void ConfigurationLoadedHandler();
 

@@ -115,10 +115,9 @@ void AdvertisingController::SetNonConnectable()
 	currentAdvertisingParams.type = BLE_GAP_ADV_TYPE_ADV_NONCONN_IND;
 }
 
-void AdvertisingController::UpdateAdvertisingData(u8 messageType, sizedData* payload, bool connectable)
+u32 AdvertisingController::UpdateAdvertisingData(u8 messageType, sizedData* payload, bool connectable)
 {
 	u32 err = NRF_SUCCESS;
-
 
 	//Check if we  are switching to connectable / non-connectable
 	bool mustRestartAdvertising = false;
@@ -144,7 +143,10 @@ void AdvertisingController::UpdateAdvertisingData(u8 messageType, sizedData* pay
 	memcpy((u8*) header + SIZEOF_ADV_PACKET_HEADER, payload->data, payload->length);
 
 	err = sd_ble_gap_adv_data_set(currentAdvertisementPacket, SIZEOF_ADV_PACKET_HEADER + payload->length, NULL, 0);
-	APP_ERROR_CHECK(err);
+	if(err != NRF_SUCCESS){
+		advertisingPacketAwaitingUpdate = true;
+		return err;
+	}
 
 	//Now we check if we need to restart advertising
 	if (mustRestartAdvertising)
@@ -154,10 +156,10 @@ void AdvertisingController::UpdateAdvertisingData(u8 messageType, sizedData* pay
 		SetAdvertisingState(backup);
 	}
 
-	if(err != NRF_SUCCESS) advertisingPacketAwaitingUpdate = true;
+	return NRF_SUCCESS;
 }
 
-void AdvertisingController::SetScanResponse(sizedData* payload){
+u32 AdvertisingController::SetScanResponse(sizedData* payload){
 	u32 err;
 
 	scanHeader->manufacturer.len = 3 + payload->length;
@@ -165,7 +167,8 @@ void AdvertisingController::SetScanResponse(sizedData* payload){
 	memcpy(currentScanResponsePacket + SIZEOF_SCAN_PACKET_HEADER, payload->data, payload->length);
 
 	err = sd_ble_gap_adv_data_set(NULL, 0, currentScanResponsePacket, SIZEOF_SCAN_PACKET_HEADER + payload->length);
-	APP_ERROR_CHECK(err);
+
+	return err;
 }
 
 bool AdvertisingController::SetScanResponseData(Node* node, string dataString){
@@ -204,9 +207,10 @@ void AdvertisingController::SetAdvertisingState(advState newState)
 	if (advertisingState != ADV_STATE_OFF)
 	{
 		err = sd_ble_gap_adv_stop();
-		APP_ERROR_CHECK(err);
 		if(err == NRF_SUCCESS){
 			logt("ADV", "Advertising stopped");
+		} else {
+			//Was probably stopped before
 		}
 	}
 
@@ -218,18 +222,23 @@ void AdvertisingController::SetAdvertisingState(advState newState)
 	//Check if the advertisement packet did not get updated before
 	if(advertisingPacketAwaitingUpdate){
 		err = sd_ble_gap_adv_data_set(currentAdvertisementPacket, currentAdvertisementPacketLength, NULL, 0);
-		APP_ERROR_CHECK(err);
+		if(err == NRF_SUCCESS){
+			advertisingPacketAwaitingUpdate = false;
+		} else {
+			//Just don't set it if it is wrong
+		}
 
-		if(err == NRF_SUCCESS) advertisingPacketAwaitingUpdate = false;
 	}
 
 	//Start advertising if needed
 	if (newState != ADV_STATE_OFF)
 	{
 		err = sd_ble_gap_adv_start(&currentAdvertisingParams);
-		APP_ERROR_CHECK(err);
 		if(err == NRF_SUCCESS){
 			logt("ADV", "Advertising started");
+		} else {
+			//Could not be started, ignore
+			newState = ADV_STATE_OFF;
 		}
 	}
 
