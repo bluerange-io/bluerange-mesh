@@ -5,6 +5,9 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.UUID;
+
+import java.sql.PreparedStatement;
 
 public class DatabaseManager {
 	private String host;
@@ -12,6 +15,10 @@ public class DatabaseManager {
 	private String password;
 	private String schema;
 	private Connection connection;
+
+	private PreparedStatement readBeaconsStatement;
+	private PreparedStatement updateBeaconStatement;
+	private PreparedStatement insertBeaconStatement;
 
 	public DatabaseManager(String host, String schema, String user, String password) {
 		this.host = host;
@@ -26,7 +33,21 @@ public class DatabaseManager {
 		// This will load the MySQL driver, each DB has its own driver
 	      try {			
 			connection = DriverManager.getConnection(host+schema+"?user="+user+"&password="+password);
-		} catch (SQLException e) {
+		
+	      
+			//Prepare statements
+			readBeaconsStatement = connection.prepareStatement("SELECT * FROM beacons WHERE uuid=?");
+			insertBeaconStatement = connection.prepareStatement("INSERT INTO beacons"
+					+ "(uuid, chipId, serialNumber, networkKey, "
+					+ "boardId, seggerSerial, hardwareId, addressType,"
+					+ "address, firmwareId, lastFlashed)"
+					+" VALUES (?,?,?,?,?,?,?,?,?,?,NOW())");
+			updateBeaconStatement = connection.prepareStatement("UPDATE beacons SET"
+					+ " networkKey=?, boardId=?, seggerSerial=?, lastFlashed=NOW(), eraseCounter=?"
+					);
+					
+			
+	      } catch (SQLException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
@@ -44,30 +65,49 @@ public class DatabaseManager {
 	    }
 	}
 	
-	public SmartBeaconDataset queryForSerialNumber(String serialNumber) throws SQLException{
+	public SmartBeaconDataset fillWithDatabaseInformation(SmartBeaconDataset beacon) throws SQLException{
 		
 		
 		Statement stmt = connection.createStatement();
-		ResultSet rs = stmt.executeQuery("SELECT * FROM beacons");
-
-		while (rs.next()) {
-		    String test = rs.getString("serialNumber");
+		ResultSet rs = stmt.executeQuery("SELECT * FROM beacons WHERE uuid='"+beacon.getUUID()+"'");
+		
+		if(rs.next()){
+			beacon.eraseCounter = rs.getLong("eraseCounter");
+			
+			beacon.readFromDatabase = true;
+		} else {
+			beacon.readFromDatabase = false;
 		}
 		
-		
-		return new SmartBeaconDataset();
+		return beacon;
 	}
 	
-	public SmartBeaconDataset addBeaconToDatabase(SmartBeaconDataset data){
+	public void addBeaconToDatabase(SmartBeaconDataset data) throws SQLException {
+
+		insertBeaconStatement.clearParameters();
+		insertBeaconStatement.setString(1, data.getUUID().toString());
+		insertBeaconStatement.setString(2, data.chipId);
+		insertBeaconStatement.setString(3, data.serialNumber);
+		insertBeaconStatement.setString(4, data.networkKey);
+		insertBeaconStatement.setLong(5, data.boardId);
+		insertBeaconStatement.setString(6, data.seggerSerial);
+		insertBeaconStatement.setLong(7, data.hardwareId);
+		insertBeaconStatement.setLong(8, data.addressType);
+		insertBeaconStatement.setString(9, data.address);
+		insertBeaconStatement.setLong(10, data.firmwareId);
 		
-		//Add all data and data that was acquired during the test
+		insertBeaconStatement.executeUpdate();
+
+	}
+	
+	public void updateBeaconInDatabase(SmartBeaconDataset data) throws SQLException {
+			
+		updateBeaconStatement.setString(1, data.networkKey);
+		updateBeaconStatement.setLong(2, data.boardId);
+		updateBeaconStatement.setString(3, data.seggerSerial);
+		updateBeaconStatement.setLong(4, data.eraseCounter);
 		
-		//INSERT INTO beacons (beaconType, serialNumber, networkKey) VALUES ('1', "BBSS8", "afaf9875a946b");
-		//SELECT LAST_INSERT_ID();
-		
-		data.serialNumber = "BBSS8";
-		
-		//Returns the serial number that was inserted into the database
-		return data;
+		updateBeaconStatement.executeUpdate();
+			
 	}
 }

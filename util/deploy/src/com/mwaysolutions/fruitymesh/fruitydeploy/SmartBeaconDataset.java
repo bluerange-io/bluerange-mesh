@@ -1,19 +1,158 @@
 package com.mwaysolutions.fruitymesh.fruitydeploy;
 
+import java.nio.ByteBuffer;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.UUID;
+
 public class SmartBeaconDataset {
+	private UUID uuid;
+	
+	public String chipId;
+
+	public Long hardwareId;
+	public Long addressType;
+	public String address;
+	
+	public Long firmwareId;
+	
+	public Long magicNumber;
+	public Long boardId;
 	public String serialNumber;
 	public String networkKey;
-	public Long chipID0;
-	public Long chipID1;
-	public Long magicNumber;
-	public Long checksum;
-	public Long boardType;
+	
+	public Boolean readFromDatabase;
+
+	public String seggerSerial;
+	public Long eraseCounter = 0L;
+
+	
+	public static final Long MAGIC_NUMBER = 0xF077L;
 	
 	public Boolean isValid(){
 		//TODO: check for checksum
-		if(magicNumber == 0xF077){
+		if(magicNumber == MAGIC_NUMBER){
 			return true;
 		}
 		return false;
+	}
+	
+	public void setFICRData(ArrayList<Long> ficrData){
+		
+		//ChipID is read from Device ID and part of Encryption root, these are generated FIPS randomly
+		//https://devzone.nordicsemi.com/question/59455/unique-id-of-a-device-needed/
+		this.chipId = String.format("%08X", ficrData.get(24)) //DEVICEID0
+				+ String.format("%08X", ficrData.get(25)) //DEVICEID1
+				+ String.format("%08X", ficrData.get(32)) //Encryption Root 0
+				+ String.format("%08X", ficrData.get(33)); //Encryption Root 1
+		
+		this.hardwareId = (ficrData.get(23) & 0x0000FFFFL);
+		this.addressType = 0L;//ficrData.get(40);
+		
+		this.address = String.format("%08X", ficrData.get(41)) + String.format("%08X", ficrData.get(42));
+
+	}
+	
+	public void setUICRData(ArrayList<Long> uicrData){
+		
+		this.firmwareId = uicrData.get(4);
+		if(this.firmwareId.equals(0xFFFFFFFFL)) this.firmwareId = 0L;
+		
+		Long magicNumber = uicrData.get(32);
+		
+		if(magicNumber.equals(MAGIC_NUMBER)){
+			this.magicNumber = MAGIC_NUMBER;
+			this.boardId = uicrData.get(33);
+						
+			this.serialNumber = longToASCIIString(uicrData.get(34));
+			this.serialNumber += longToASCIIString(uicrData.get(35)).substring(3, 4);
+			
+			this.networkKey = "";
+			for(int i=0; i<4; i++){
+				this.networkKey += String.format("%08X", uicrData.get(36+i));
+			}
+		}
+	}
+	
+	private String longToASCIIString(long l){
+		return new String( ByteBuffer.allocate(8).putLong(l).array()).substring(4, 8);
+	}
+	
+	//Returns true if data from this chip has been read out by the debugger
+	public Boolean isReadFromChip(){
+		return magicNumber == MAGIC_NUMBER;
+	}
+	
+	//Returns true if data of this beacon has been read from the database
+	public Boolean isReadFromDatabase(){
+		return readFromDatabase;
+	}
+
+	//Sets the serial of the segger debugger that was used to flash the chip
+	public void setSeggerSerial(String serial) {
+		this.seggerSerial = serial;
+	}
+	
+	public UUID getUUID(){
+		if(chipId == null) return null;
+		
+		if(this.uuid == null){
+			byte[] randomBytes = hexStringToByteArray(chipId);
+			
+			randomBytes[6]  &= 0x0f;  /* clear version        */
+	        randomBytes[6]  |= 0x40;  /* set to version 4     */
+	        randomBytes[8]  &= 0x3f;  /* clear variant        */
+	        randomBytes[8]  |= 0x80;  /* set to IETF variant  */
+	        
+	        long msb = 0;
+	        long lsb = 0;
+	        assert randomBytes.length == 16 : "data must be 16 bytes in length";
+	        for (int i=0; i<8; i++)
+	            msb = (msb << 8) | (randomBytes[i] & 0xff);
+	        for (int i=8; i<16; i++)
+	            lsb = (lsb << 8) | (randomBytes[i] & 0xff);
+	        
+	        this.uuid = new UUID(msb, lsb);
+		}
+		return this.uuid;
+	}
+	
+	public void generateRandomNetworkKey(){
+		SecureRandom random = new SecureRandom();
+		byte bytes[] = new byte[16];
+		random.nextBytes(bytes);
+		
+		this.networkKey = byteArrayToHexString(bytes);
+	}
+	
+	@Override
+	public String toString() {
+		String result = "------------------\n";
+		result += "Beacon ("+serialNumber+") Segger ID: "+seggerSerial + " UniqueID: "+chipId+" UUID "+getUUID()+"\n";
+		result += "boardType "+boardId+" hardware id "+String.format("0x%04X", hardwareId)+" networkKey "+networkKey+" eraseCounter "+eraseCounter+"\n";
+		result += "------------------\n";
+		
+		return result;
+	}
+	
+	private byte[] hexStringToByteArray(String s) {
+	    int len = s.length();
+	    byte[] data = new byte[len / 2];
+	    for (int i = 0; i < len; i += 2) {
+	        data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
+	                             + Character.digit(s.charAt(i+1), 16));
+	    }
+	    return data;
+	}
+	
+	private String byteArrayToHexString(byte[] bytes){
+		char[] hexArray = "0123456789ABCDEF".toCharArray();
+		char[] hexChars = new char[bytes.length * 2];
+	    for ( int j = 0; j < bytes.length; j++ ) {
+	        int v = bytes[j] & 0xFF;
+	        hexChars[j * 2] = hexArray[v >>> 4];
+	        hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+	    }
+	    return new String(hexChars);
 	}
 }

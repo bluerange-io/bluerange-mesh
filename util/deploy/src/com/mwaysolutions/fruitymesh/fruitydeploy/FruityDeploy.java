@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
@@ -49,17 +50,18 @@ public class FruityDeploy {
 	@Parameter(names ={"--reset"}, description="Reset Beacon")
 	private Boolean reset = false;
 	
-	private final long NRF_FICR_CHIPID_BASE = 0x10000060;
-	private final long NRF_UICR_CUSTOMER_BASE = 0x10001080;
+	private final long NRF_FICR_CHIPID_BASE = 0x10000000;
+	private final long NRF_UICR_CUSTOMER_BASE = 0x10001000;
 	
 	private final DatabaseManager db;
 	
 	
 	public FruityDeploy(String[] args) {
 		
+			
 		System.out.println("FruityDeploy starting");
 		
-		args = "--help".split(" ");
+		args = new String[0];//"--help".split(" ");
 		
 		db = new DatabaseManager("jdbc:mysql://localhost/", "beaconproduction", "root", "asdf");
 		db.connect();
@@ -76,65 +78,82 @@ public class FruityDeploy {
         if(serialNumbers.size() == 0){
         	serialNumbers = callNrfjprogBlocking("--ids");
         }
+        
+        ArrayList<Thread> flashingThreads = new ArrayList<Thread>();
 		
         //For every device, we spawn a flashing thread
 		for(final String serial : serialNumbers){				
-			new Thread(new Runnable() {
+			Thread t = new Thread(new Runnable() {
 				public void run() {
 					ArrayList<String> tempResult;
 					String result = "Beacon "+serial+": ";
 					
 					SmartBeaconDataset beaconData = new SmartBeaconDataset();
 					
-					//At first, we gather info about the devices
-					//tempResult = callNrfjprogBlocking("-s "+serial+" --family "+family+" --memrd "+NRF_UICR_CUSTOMER_BASE+" --w 32 --n "+(4*10));
+					//Read data from FICR
+					tempResult = callNrfjprogBlocking("-s "+serial+" --family "+family+" --memrd "+NRF_FICR_CHIPID_BASE+" --w 32 --n "+(50*4));
+					ArrayList<Long> ficrData = parseNrfjprogMemoryReadings(tempResult);
 
-					tempResult = new ArrayList<String>();
-					tempResult.add("0x000000A0: 000001DF 000001E9 000001F3 000001FD   |................|");
-					tempResult.add("0x000000B0: 00000207 00000211 0000021B 00000225   |............%...|");
-					tempResult.add("0x000000C0: 46C0B51F F00046C0 B004FAEF BD1FB40F   |...F.F..........|");
-					tempResult.add("0x000000D0: 495A2008 58096809 20384708 68094957   |. ZI.h.X.G8 WI.h|");
-					
-					//Get random 64-bit chipID from the nordic chip
-					//tempResult = callNrfjprogBlocking("-s "+serial+" --family "+family+" --memrd "+NRF_FICR_CHIPID_BASE+" --w 32 --n 8");
-					ArrayList<Long> chipIDTemp = parseNrfjprogMemoryReadings(tempResult);
-					beaconData.chipID0 = chipIDTemp.get(0);
-					beaconData.chipID1 = chipIDTemp.get(1);
-					
-					//Get the other information from the chip
-					//tempResult = callNrfjprogBlocking("-s "+serial+" --family "+family+" --memrd "+NRF_UICR_CUSTOMER_BASE+" --w 32 --n 64");
-					ArrayList<Long> info = parseNrfjprogMemoryReadings(tempResult);
-					
-					Long serialTemp = info.get(0);
-					beaconData.serialNumber = new String(ByteBuffer.allocate(8).putLong(serialTemp).array()).substring(0, 5);
-					
-					//Network key
-					beaconData.networkKey = "";
-					for(int i=1; i<5; i++){
-						String networkKeyPart = Long.toHexString(info.get(i));
-						beaconData.networkKey += ("00000000" + networkKeyPart).substring(networkKeyPart.length());
-					}
+					beaconData.setFICRData(ficrData);
 
-					beaconData.magicNumber = info.get(5) & 0xFFFF;
+					//Read Data from UICR
+					tempResult = callNrfjprogBlocking("-s "+serial+" --family "+family+" --memrd "+NRF_UICR_CUSTOMER_BASE+" --w 32 --n "+(40*4));
+					ArrayList<Long> uicrData = parseNrfjprogMemoryReadings(tempResult);
 					
-					beaconData.checksum = (info.get(5) >> 2) & 0xFFFF;
+					beaconData.setUICRData(uicrData);
 					
-					beaconData.boardType = info.get(6);
+					//Additional Data
+					beaconData.setSeggerSerial(serial);
 					
+					//Query other data from database
 					try {
-						db.queryForSerialNumber("BBSS8");
-					} catch (SQLException e) {
+						db.fillWithDatabaseInformation(beaconData);
+					} catch (SQLException e1) {
 						// TODO Auto-generated catch block
-						e.printStackTrace();
+						e1.printStackTrace();
 					}
 					
+					
+					System.out.println(beaconData);
+
+					beaconData.generateRandomNetworkKey();
+					System.out.println(beaconData.networkKey);
+					
+					beaconData.generateRandomNetworkKey();
+					System.out.println(beaconData.networkKey);
+					
+					if(beaconData.readFromDatabase){
+					
+						try {
+							db.updateBeaconInDatabase(beaconData);
+						} catch (SQLException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						
+					} else {
+						
+						try {
+							db.addBeaconToDatabase(beaconData);
+						} catch (SQLException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						
+					}
+					
+
+					
+					if(true) return;
+					
+					/*
 					if(beaconData.isValid()){
 						//Keep this data
 						//maybe increment a flashed-counter in the database
 					} else {
 						beaconData = db.addBeaconToDatabase(beaconData);
-					}
-					
+					}*/
+									
 					
 					//What to save
 					/*
@@ -181,8 +200,21 @@ public class FruityDeploy {
 					
 					System.out.println(result);
 				}
-			}).start();
+			});
+			flashingThreads.add(t);
+			t.start();
 		}
+		
+		while(flashingThreads.size() > 0){
+			Thread t = flashingThreads.get(0);
+			try {
+				t.join();
+				flashingThreads.remove(0);
+			} catch (InterruptedException e) {
+			}
+		}
+
+		System.out.println("FruityDeploy finished");
 	}
 	
 	ArrayList<String> callNrfjprogBlocking(String arguments){
