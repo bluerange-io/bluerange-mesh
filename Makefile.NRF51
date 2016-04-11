@@ -1,0 +1,18 @@
+#
+# This is platform-specific configuration for nRF51 SoC included in main
+# makefile
+#
+
+CPU := cortex-m0
+LINKER_SCRIPT := linker/gcc_nrf51_s130_32kb.ld
+
+C_SOURCE_FILES   += $(COMPONENTS)/toolchain/system_nrf51.c
+ASM_SOURCE_FILES += $(COMPONENTS)/toolchain/gcc/gcc_startup_nrf51.s
+
+INC_PATHS += -I$(COMPONENTS)/softdevice/s130/headers
+INC_PATHS += -I$(COMPONENTS)/softdevice/s130/headers/nrf51
+
+SOFTDEVICE_PATH = $(COMPONENTS)/softdevice/s130/hex/s130_nrf51_2.0.0_softdevice.hex
+
+HEAP_SIZE = 2048
+STACK_SIZE = 2048

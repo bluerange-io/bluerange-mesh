@@ -1,6 +1,7 @@
-OUTPUT_FORMAT ("elf32-littlearm", "elf32-bigarm", "elf32-littlearm")
+/* Linker script to configure memory regions. */
 
-GROUP(-lgcc -lc -lnosys -lCMSIS)
+SEARCH_DIR(.)
+GROUP(-lgcc -lc -lnosys)
 
 /* 
 Total Flash 256K: 114K for s130, application starts at 0x1c000 with max size of 147K
@@ -15,5 +16,5 @@ MEMORY
   BOOTLOADER (rx) : ORIGIN = 0x3c000, LENGTH = 0x4000
 }
 
-INCLUDE "gcc_arm_flash.ld"
+INCLUDE "nrf5x_common.ld"
 
