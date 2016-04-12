@@ -10,3 +10,6 @@ Documentation is the key and therefore, you should have a look at the wiki to ge
 
 #Development
 This project is under active development at the [M-Way Solutions GmbH](http://www.mwaysolutions.com/), Germany.
+
+#Additional Features
+Over-the-mesh firmware updates are currently not open sourced. Interested parties can contact sales@mwaysolutions.com to get access to advanced features.
