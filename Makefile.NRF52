@@ -1,0 +1,18 @@
+#
+# This is platform-specific configuration for nRF52 SoC included in main
+# makefile
+#
+
+CPU := cortex-m3
+LINKER_SCRIPT := linker/gcc_nrf52_s132.ld
+
+C_SOURCE_FILES   += $(COMPONENTS)/toolchain/system_nrf52.c
+ASM_SOURCE_FILES += $(COMPONENTS)/toolchain/gcc/gcc_startup_nrf52.s
+
+INC_PATHS += -I$(COMPONENTS)/softdevice/s132/headers
+INC_PATHS += -I$(COMPONENTS)/softdevice/s132/headers/nrf52
+
+SOFTDEVICE_PATH = $(COMPONENTS)/softdevice/s132/hex/s132_nrf52_2.0.0_softdevice.hex
+
+HEAP_SIZE = 4096
+STACK_SIZE = 4096
