@@ -73,7 +73,6 @@ INC_PATHS += -I$(COMPONENTS)/ble/ble_radio_notification
 INC_PATHS += -I$(COMPONENTS)/ble/ble_services/ble_dfu
 INC_PATHS += -I$(COMPONENTS)/device
 INC_PATHS += -I$(COMPONENTS)/drivers_nrf/common
-INC_PATHS += -I$(COMPONENTS)/drivers_nrf/config
 INC_PATHS += -I$(COMPONENTS)/drivers_nrf/delay
 INC_PATHS += -I$(COMPONENTS)/drivers_nrf/gpiote
 INC_PATHS += -I$(COMPONENTS)/drivers_nrf/hal
@@ -85,11 +84,11 @@ INC_PATHS += -I$(COMPONENTS)/softdevice/common/softdevice_handler
 INC_PATHS += -I$(COMPONENTS)/toolchain
 INC_PATHS += -I$(COMPONENTS)/toolchain/gcc
 INC_PATHS += -I$(COMPONENTS)/toolchain/CMSIS/Include
-INC_PATHS += -I$(SDK_PATH)/examples/bsp
 
 OBJECT_DIRECTORY ?= _build
 LISTING_DIRECTORY ?= $(OBJECT_DIRECTORY)
 OUTPUT_BINARY_DIRECTORY ?= $(OBJECT_DIRECTORY)
+DEPEND_DIRECTORY ?= $(OBJECT_DIRECTORY)
 
 # Sorting removes duplicates
 BUILD_DIRECTORIES := $(sort $(OBJECT_DIRECTORY) $(OUTPUT_BINARY_DIRECTORY) $(LISTING_DIRECTORY) )
@@ -162,6 +161,9 @@ vpath %.s $(ASM_PATHS)
 
 OBJECTS = $(C_OBJECTS) $(CPP_OBJECTS) $(ASM_OBJECTS)
 
+DEPEND = $(patsubst %.c, $(DEPEND_DIRECTORY)/%.d, $(C_SOURCE_FILE_NAMES)) $(patsubst %.cpp, $(DEPEND_DIRECTORY)/%.d, $(CPP_SOURCE_FILE_NAMES))
+.PRECIOUS: $(DEPEND)
+
 ## Create build directories
 $(BUILD_DIRECTORIES):
 	@echo Making $@
@@ -171,11 +173,13 @@ $(BUILD_DIRECTORIES):
 $(OBJECT_DIRECTORY)/%.o: %.c
 	@echo Compiling file: $(notdir $<)
 	$(NO_ECHO)$(CC) --std=gnu99 $(CFLAGS) $(INC_PATHS) -c -o $@ $<
+	$(NO_ECHO)$(CC) --std=gnu99 $(CFLAGS) $(INC_PATHS) -MM -MT $(OBJECT_DIRECTORY)/$*.o $< -o $(DEPEND_DIRECTORY)/$*.d
 
 ## Create objects from C++ source files
 $(OBJECT_DIRECTORY)/%.o: %.cpp
 	@echo Compiling file: $(notdir $<)
 	$(NO_ECHO)$(CXX) --std=c++11 $(CXXFLAGS) $(INC_PATHS) -c -o $@ $<
+	$(NO_ECHO)$(CXX) --std=c++11 $(CXXFLAGS) $(INC_PATHS) -MM -MT $(OBJECT_DIRECTORY)/$*.o $< -o $(DEPEND_DIRECTORY)/$*.d
 
 ## Assemble files
 $(OBJECT_DIRECTORY)/%.o: %.s
@@ -227,3 +231,5 @@ serial:
 
 .NOTPARALLEL: clean
 .PHONY: flash flash_softdevice clean serial debug
+
+-include $(DEPEND)
