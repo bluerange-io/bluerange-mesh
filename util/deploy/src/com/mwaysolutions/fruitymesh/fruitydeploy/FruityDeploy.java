@@ -50,6 +50,9 @@ public class FruityDeploy {
 	@Parameter(names ={"--reset"}, description="Reset Beacon")
 	private Boolean reset = false;
 	
+	@Parameter(names ={"--verify"}, description="Verify what has been written")
+	private Boolean verify = false;
+	
 	private final long NRF_FICR_CHIPID_BASE = 0x10000000;
 	private final long NRF_UICR_CUSTOMER_BASE = 0x10001000;
 	
@@ -60,9 +63,7 @@ public class FruityDeploy {
 		
 			
 		System.out.println("FruityDeploy starting");
-		
-		args = new String[0];//"--help".split(" ");
-		
+				
 		db = new DatabaseManager("jdbc:mysql://localhost/", "beaconproduction", "root", "asdf");
 		db.connect();
 		
@@ -86,7 +87,6 @@ public class FruityDeploy {
 			Thread t = new Thread(new Runnable() {
 				public void run() {
 					ArrayList<String> tempResult;
-					String result = "Beacon "+serial+": ";
 					
 					SmartBeaconDataset beaconData = new SmartBeaconDataset();
 					
@@ -112,6 +112,10 @@ public class FruityDeploy {
 						// TODO Auto-generated catch block
 						e1.printStackTrace();
 					}
+					
+					beaconData.serialNumber = "ABCD7";
+					beaconData.boardId = 1123L;
+					beaconData.magicNumber = SmartBeaconDataset.MAGIC_NUMBER;
 					
 					
 					System.out.println(beaconData);
@@ -142,10 +146,6 @@ public class FruityDeploy {
 						
 					}
 					
-
-					
-					if(true) return;
-					
 					/*
 					if(beaconData.isValid()){
 						//Keep this data
@@ -167,11 +167,12 @@ public class FruityDeploy {
 					
 					
 					*/
-
 					
 					//Then, we flash them
+					String result = "Beacon "+serial+": ";
+					
 					if(flash){
-						//Softdevice
+						//Softdevice + Full Erase
 						result += "Softdevice: ";
 						tempResult = callNrfjprogBlocking("-s "+serial+" --program "+softdeviceHex+" --chiperase --family "+family);
 						if(String.join(", ", tempResult).contains("Programing device")) result += "OK, ";
@@ -182,6 +183,10 @@ public class FruityDeploy {
 						tempResult = callNrfjprogBlocking("-s "+serial+" --program "+fruitymeshHex+" --family "+family);
 						if(String.join(", ", tempResult).contains("Programing device")) result += "OK, ";
 						else result += "FAIL "+String.join(", ", tempResult);
+						
+						//Write UICR
+						writeUICRDataBlocking(beaconData);
+						
 					}
 					if(flash && loader){
 						//FruityLoader
@@ -191,20 +196,41 @@ public class FruityDeploy {
 						else result += "FAIL "+String.join(", ", tempResult);
 					}
 					if(flash || reset){
-						//FruityLoader
+						//Reset Beacon
 						tempResult = callNrfjprogBlocking("-s "+serial+" --reset");
 						result += "Reset: "+String.join(", ", tempResult);
 					}
 					
+					if(verify){
+						System.out.println("Verify not yet supported");
+					}
+					
 					//In the end, we need to write back the data to the beacon
 					
-					System.out.println(result);
+					System.out.println(result+" END");
+				}
+
+				private void writeUICRDataBlocking(SmartBeaconDataset beaconData) {
+					/*public Long magicNumber; //0x10001080 (4 bytes)
+					public Long boardId; //0x10001084 (4 bytes)
+					public String serialNumber; //0x10001088 (5 bytes + 1 byte \0)
+					public String networkKey; //0x10001096 (16 bytes)*/
+										
+					ArrayList<String> tempResult;
+					tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x10001080 --val "+SmartBeaconDataset.MAGIC_NUMBER);
+					tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x10001084 --val "+beaconData.boardId);
+					
+					//Serial number
+					tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x10001088 --val "+HexDecUtils.ASCIIStringToLong(beaconData.serialNumber.substring(0, 4)));
+					tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x1000108C --val "+HexDecUtils.ASCIIStringToLong(beaconData.serialNumber.substring(4, 5)));
+					
 				}
 			});
 			flashingThreads.add(t);
 			t.start();
 		}
 		
+		//Wait for all flashing threads to finish
 		while(flashingThreads.size() > 0){
 			Thread t = flashingThreads.get(0);
 			try {
@@ -217,6 +243,7 @@ public class FruityDeploy {
 		System.out.println("FruityDeploy finished");
 	}
 	
+	//This method calls nrfjprog and waits until it is finished
 	ArrayList<String> callNrfjprogBlocking(String arguments){
 		try {
 			Process p = Runtime.getRuntime().exec(nrfjprogPath + " " + arguments);

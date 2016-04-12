@@ -5,29 +5,59 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.UUID;
 
+
+/*
+ * memory layout
+
+
+FICR (0x10000000)
+
+DeviceID0 = 0x10000060
+DeviceID1 = 0x10000064
+
+HardwareID = 0x1000005C
+DeviceAddressType = 0x100000A0
+DeviceAddress0 = 0x100000A4
+DeviceAddress1 = 0x100000A8
+
+
+UICR (0x10001000)
+
+FirmwareId = 0x10001010
+
+magicNumber = 0x10001080
+boardId = 0x10001084
+serialNumber = 0x10001088 (2)
+networkKey = 0x10001096 (16)
+ * */
+
 public class SmartBeaconDataset {
+	//Database UUID unique to this beacon
 	private UUID uuid;
 	
+	//FICR Data
 	public String chipId;
 
 	public Long hardwareId;
 	public Long addressType;
 	public String address;
 	
-	public Long firmwareId;
+	//UICR Data
+	public Long firmwareId; // 
 	
-	public Long magicNumber;
-	public Long boardId;
-	public String serialNumber;
-	public String networkKey;
+	public Long magicNumber; //0x10001080 (4 bytes)
+	public Long boardId; //0x10001084 (4 bytes)
+	public String serialNumber; //0x10001088 (5 bytes + 1 byte \0)
+	public String networkKey; //0x10001096 (16 bytes)
 	
+	//Additional Data
 	public Boolean readFromDatabase;
 
 	public String seggerSerial;
 	public Long eraseCounter = 0L;
 
 	
-	public static final Long MAGIC_NUMBER = 0xF077L;
+	public static final Long MAGIC_NUMBER = 0xF07700L;
 	
 	public Boolean isValid(){
 		//TODO: check for checksum
@@ -64,18 +94,15 @@ public class SmartBeaconDataset {
 			this.magicNumber = MAGIC_NUMBER;
 			this.boardId = uicrData.get(33);
 						
-			this.serialNumber = longToASCIIString(uicrData.get(34));
-			this.serialNumber += longToASCIIString(uicrData.get(35)).substring(3, 4);
+			//Need to reverse String because of Little Endian
+			this.serialNumber = new StringBuilder(HexDecUtils.longToASCIIString(uicrData.get(34))).reverse().toString();
+			this.serialNumber += HexDecUtils.longToASCIIString(uicrData.get(35)).substring(3, 4);
 			
 			this.networkKey = "";
 			for(int i=0; i<4; i++){
 				this.networkKey += String.format("%08X", uicrData.get(36+i));
 			}
 		}
-	}
-	
-	private String longToASCIIString(long l){
-		return new String( ByteBuffer.allocate(8).putLong(l).array()).substring(4, 8);
 	}
 	
 	//Returns true if data from this chip has been read out by the debugger
@@ -97,7 +124,7 @@ public class SmartBeaconDataset {
 		if(chipId == null) return null;
 		
 		if(this.uuid == null){
-			byte[] randomBytes = hexStringToByteArray(chipId);
+			byte[] randomBytes = HexDecUtils.hexStringToByteArray(chipId);
 			
 			randomBytes[6]  &= 0x0f;  /* clear version        */
 	        randomBytes[6]  |= 0x40;  /* set to version 4     */
@@ -117,12 +144,25 @@ public class SmartBeaconDataset {
 		return this.uuid;
 	}
 	
+	public String generateSerialForIndex(long index){
+		String serial = "";
+		String alphabet = "BCDFGHJKLMNPQRSTVWXYZ123456789";
+		
+		while(serial.length() < 5){			
+			int rest = (int)(index % alphabet.length());
+			serial += alphabet.substring(rest, rest+1);
+			index /= alphabet.length();
+		}
+		
+		return new StringBuilder(serial).reverse().toString();
+	}
+	
 	public void generateRandomNetworkKey(){
 		SecureRandom random = new SecureRandom();
 		byte bytes[] = new byte[16];
 		random.nextBytes(bytes);
 		
-		this.networkKey = byteArrayToHexString(bytes);
+		this.networkKey = HexDecUtils.byteArrayToHexString(bytes);
 	}
 	
 	@Override
@@ -135,24 +175,5 @@ public class SmartBeaconDataset {
 		return result;
 	}
 	
-	private byte[] hexStringToByteArray(String s) {
-	    int len = s.length();
-	    byte[] data = new byte[len / 2];
-	    for (int i = 0; i < len; i += 2) {
-	        data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
-	                             + Character.digit(s.charAt(i+1), 16));
-	    }
-	    return data;
-	}
-	
-	private String byteArrayToHexString(byte[] bytes){
-		char[] hexArray = "0123456789ABCDEF".toCharArray();
-		char[] hexChars = new char[bytes.length * 2];
-	    for ( int j = 0; j < bytes.length; j++ ) {
-	        int v = bytes[j] & 0xFF;
-	        hexChars[j * 2] = hexArray[v >>> 4];
-	        hexChars[j * 2 + 1] = hexArray[v & 0x0F];
-	    }
-	    return new String(hexChars);
-	}
+
 }
