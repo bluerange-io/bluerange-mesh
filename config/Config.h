@@ -35,6 +35,10 @@ extern "C" {
 #include <app_util.h>
 }
 
+#define FM_VERSION_MAJOR 0 //0-400
+#define FM_VERSION_MINOR 3 //0-999
+#define FM_VERSION_PATCH 0 //0-9999
+#define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH);
 
 extern LedWrapper* LedRed;
 extern LedWrapper* LedGreen;
@@ -47,8 +51,8 @@ extern LedWrapper* LedBlue;
 extern u32 __application_start_address[]; //Variable is set in the linker script
 extern u32 __application_end_address[]; //Variable is set in the linker script
 
-
 extern u32 __application_ram_start_address[]; //Variable is set in the linker script
+
 
 //Alright, I know this is bad, but it's for readability....
 //And static classes do need a seperate declaration and definition...
@@ -64,7 +68,18 @@ class Conf
 	public:
 
 		static Conf* getInstance(){
-				if(!instance) instance = new Conf();
+				if(!instance){
+					instance = new Conf();
+
+					if(NRF_UICR->CUSTOMER[0] == 0xF07700){
+						instance->boardType = NRF_UICR->CUSTOMER[1];
+						memcpy((u8*)instance->serialNumber, (u8*)(NRF_UICR->CUSTOMER + 2), 8);
+					} else {
+						instance->boardType = 0;
+						memset((u8*)instance->serialNumber, 0x00, 8);
+					}
+				}
+
 				return instance;
 			}
 
@@ -185,11 +200,16 @@ class Conf
 
 		i8 calibratedTX = -63; // This value should be calibrated at 1m distance
 
+		// ########### UICR DATA ################################################
+		u32 boardType;
+		char serialNumber[6];
+
+
 		// ########### OTHER ################################################
-		u16 firmwareVersionMajor = 0; //0-400
-		u16 firmwareVersionMinor = 3; //0-999
-		u16 firmwareVersionPatch = 0; //0-9999
-		u32 firmwareVersion = 10000000 * firmwareVersionMajor + 10000 * firmwareVersionMinor + firmwareVersionPatch;
+		u16 firmwareVersionMajor = FM_VERSION_MAJOR; //0-400
+		u16 firmwareVersionMinor = FM_VERSION_MINOR; //0-999
+		u16 firmwareVersionPatch = FM_VERSION_PATCH; //0-9999
+		u32 firmwareVersion = FM_VERSION;
 
 		i8 radioTransmitPower = 0; //The power at which the radio transmits advertisings and data packets
 };

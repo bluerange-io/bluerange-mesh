@@ -19,6 +19,7 @@ public class DatabaseManager {
 	private PreparedStatement readBeaconsStatement;
 	private PreparedStatement updateBeaconStatement;
 	private PreparedStatement insertBeaconStatement;
+	private PreparedStatement getNewSerialNumberIndexStatement;
 
 	public DatabaseManager(String host, String schema, String user, String password) {
 		this.host = host;
@@ -32,19 +33,30 @@ public class DatabaseManager {
 	public void connect(){
 		// This will load the MySQL driver, each DB has its own driver
 	      try {			
-			connection = DriverManager.getConnection(host+schema+"?user="+user+"&password="+password);
+			connection = DriverManager.getConnection(host+schema+"?user="+user+"&password="+password+"&allowMultiQueries=true");
 		
 	      
 			//Prepare statements
 			readBeaconsStatement = connection.prepareStatement("SELECT * FROM beacons WHERE uuid=?");
+			
 			insertBeaconStatement = connection.prepareStatement("INSERT INTO beacons"
 					+ "(uuid, chipId, serialNumber, networkKey, "
 					+ "boardId, seggerSerial, hardwareId, addressType,"
-					+ "address, firmwareId, lastFlashed)"
-					+" VALUES (?,?,?,?,?,?,?,?,?,?,NOW())");
+					+ "address, firmwareId, lastFlashed, eraseCounter, fruitydeployVersion, "
+					+ "fruitymeshVersion"
+					+ "family, softdeviceVersion)"
+					+" VALUES (?,?,?,?,?,?,?,?,?,?,NOW(),0, ?, ?, ?, ?)");
+			
 			updateBeaconStatement = connection.prepareStatement("UPDATE beacons SET"
-					+ " networkKey=?, boardId=?, seggerSerial=?, lastFlashed=NOW(), eraseCounter=?"
-					);
+					+ " networkKey=?, boardId=?, seggerSerial=?, lastFlashed=NOW(),"
+					+ "eraseCounter=?, fruitydeployVersion=?, family=?, softdeviceVersion=?, "
+					+ "fruitymeshVersion=?"
+					+ " WHERE uuid=?");
+			
+			getNewSerialNumberIndexStatement = connection.prepareStatement("BEGIN; "
+					+ "SELECT counter FROM serialcounter WHERE id = 0 FOR UPDATE; "
+					+ "UPDATE serialcounter SET counter = counter+1 WHERE id = 0; "
+					+ "COMMIT;");
 					
 			
 	      } catch (SQLException e) {
@@ -72,6 +84,11 @@ public class DatabaseManager {
 		ResultSet rs = stmt.executeQuery("SELECT * FROM beacons WHERE uuid='"+beacon.getUUID()+"'");
 		
 		if(rs.next()){
+			beacon.boardId = rs.getLong("boardId");
+			beacon.serialNumber = rs.getString("serialNumber");
+			beacon.networkKey = rs.getString("networkKey");
+			
+			
 			beacon.eraseCounter = rs.getLong("eraseCounter");
 			
 			beacon.readFromDatabase = true;
@@ -95,6 +112,10 @@ public class DatabaseManager {
 		insertBeaconStatement.setLong(8, data.addressType);
 		insertBeaconStatement.setString(9, data.address);
 		insertBeaconStatement.setLong(10, data.firmwareId);
+		insertBeaconStatement.setInt(11, FruityDeploy.VERSION);
+		insertBeaconStatement.setString(12, data.deviceFamily);
+		insertBeaconStatement.setLong(13, data.softdeviceVersion);
+		insertBeaconStatement.setLong(14, data.fruitymeshVersion);
 		
 		insertBeaconStatement.executeUpdate();
 
@@ -106,8 +127,34 @@ public class DatabaseManager {
 		updateBeaconStatement.setLong(2, data.boardId);
 		updateBeaconStatement.setString(3, data.seggerSerial);
 		updateBeaconStatement.setLong(4, data.eraseCounter);
+		updateBeaconStatement.setInt(5, FruityDeploy.VERSION);
+		updateBeaconStatement.setString(6, data.deviceFamily);
+		updateBeaconStatement.setLong(7, data.softdeviceVersion);
+		updateBeaconStatement.setLong(8, data.fruitymeshVersion);
+		
+		updateBeaconStatement.setString(9, data.getUUID().toString());
 		
 		updateBeaconStatement.executeUpdate();
 			
+	}
+
+	public long getNewSerialNumberIndex() throws SQLException{
+		
+		ResultSet rs;
+		try{
+			connection.createStatement().executeQuery("BEGIN");
+			rs = connection.createStatement().executeQuery("SELECT counter FROM serialcounter WHERE id=0 FOR UPDATE");
+			connection.createStatement().executeUpdate("UPDATE serialcounter SET counter = counter+1 WHERE id=0");
+			connection.createStatement().executeQuery("COMMIT");
+		} catch(SQLException e){
+			connection.createStatement().executeQuery("ROLLBACK");
+			throw new SQLException();
+		}
+				
+		if(rs != null && rs.next()){
+			return rs.getLong("counter");
+		}
+		
+		return -1;
 	}
 }

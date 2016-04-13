@@ -83,6 +83,9 @@ LedWrapper* LedRed = NULL;
 LedWrapper* LedGreen = NULL;
 LedWrapper* LedBlue = NULL;
 
+//Put the firmware version in a special section right after the initialization vector
+uint32_t app_version __attribute__((section(".Version"), used)) = FM_VERSION;
+
 int main(void)
 {
 	u32 err;
@@ -101,6 +104,8 @@ int main(void)
 
 	//Initialize the UART Terminal
 	Terminal::Init();
+
+	logt("ERROR", "UICR DATA (boardType:%x, serial %s)", Config->boardType, Config->serialNumber);
 
 
 

@@ -33,7 +33,7 @@ public class FruityDeploy {
 	public String bootloaderHex = "C:\\nrf\\projects\\fruityloader\\Release\\FruityLoader.hex";
 	
 	@Parameter(names ={"--softdevice"}, description="Path to softdevice.hex")
-	public String softdeviceHex = "C:\\nrf\\softdevices\\sd130_2.0.0-8.alpha\\s130_nrf51_2.0.0-8.alpha_softdevice.hex";
+	public String softdeviceHex = "C:\\nrf\\softdevices\\sd130_2.0.0-prod\\s130_nrf51_2.0.0_softdevice.hex";
 
 	@Parameter(names ={"--fruitymesh"}, description="Path to fruitymesh.hex")
 	public String fruitymeshHex = "C:\\nrf\\projects\\fruitymesh\\Debug\\FruityMesh.hex";
@@ -53,8 +53,17 @@ public class FruityDeploy {
 	@Parameter(names ={"--verify"}, description="Verify what has been written")
 	private Boolean verify = false;
 	
+	@Parameter(names ={"--modSerial"}, description="Usage: --modSerial <serialNumber> to write custom serial to UICR")
+	public String modSerial = null;
+	
+	@Parameter(names ={"--modBoardId"}, description="Usage: --modBoardId <boardId> to write custom boardId to UICR")
+	public Long modBoardId = null;
+	
+	public static final int VERSION = 1;
+	
 	private final long NRF_FICR_CHIPID_BASE = 0x10000000;
 	private final long NRF_UICR_CUSTOMER_BASE = 0x10001000;
+	private final long NRF_SOFTDEVICE_VERSION_BASE = 0x3008;
 	
 	private final DatabaseManager db;
 	
@@ -90,6 +99,8 @@ public class FruityDeploy {
 					
 					SmartBeaconDataset beaconData = new SmartBeaconDataset();
 					
+					beaconData.deviceFamily = family;
+					
 					//Read data from FICR
 					tempResult = callNrfjprogBlocking("-s "+serial+" --family "+family+" --memrd "+NRF_FICR_CHIPID_BASE+" --w 32 --n "+(50*4));
 					ArrayList<Long> ficrData = parseNrfjprogMemoryReadings(tempResult);
@@ -113,65 +124,42 @@ public class FruityDeploy {
 						e1.printStackTrace();
 					}
 					
-					beaconData.serialNumber = "ABCD7";
-					beaconData.boardId = 1123L;
-					beaconData.magicNumber = SmartBeaconDataset.MAGIC_NUMBER;
-					
-					
-					System.out.println(beaconData);
-
-					beaconData.generateRandomNetworkKey();
-					System.out.println(beaconData.networkKey);
-					
-					beaconData.generateRandomNetworkKey();
-					System.out.println(beaconData.networkKey);
-					
-					if(beaconData.readFromDatabase){
-					
-						try {
-							db.updateBeaconInDatabase(beaconData);
-						} catch (SQLException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-						
-					} else {
-						
-						try {
-							db.addBeaconToDatabase(beaconData);
-						} catch (SQLException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-						
+					//Check if a manually entered serialNumber should be used / modified
+					if(modSerial != null){
+						beaconData.serialNumber = modSerial;
+						beaconData.manualInit = true;
 					}
 					
-					/*
-					if(beaconData.isValid()){
-						//Keep this data
-						//maybe increment a flashed-counter in the database
-					} else {
-						beaconData = db.addBeaconToDatabase(beaconData);
-					}*/
-									
+					//Check if entered boardId should be used or modified
+					if(modBoardId != null){
+						beaconData.boardId = modBoardId;
+						beaconData.manualInit = true;
+					}
 					
-					//What to save
-					/*
-					 Available: 32*4 Byte = 128 byte
-					  0-7: serialNumber 
-					  8-23: securityKey
-					  24-31: 2-byte magic number 0xF077 + 2 byte checksum of serial number and security key
-					  32-39: boardType (PCA10031, PCA10036, ARS100748)
-					  40-47: flags
-					  20 byte: available Sensors (1 byte each device)
-					
-					
-					*/
+					System.out.println("READ:"+ beaconData);
 					
 					//Then, we flash them
 					String result = "Beacon "+serial+": ";
 					
 					if(flash){
+						
+						//Try to generate a serialNumber from the Database if none exists
+						if (beaconData.serialNumber == null){
+							try {
+								long index = db.getNewSerialNumberIndex();
+								if(index >= 0){
+									beaconData.serialNumber = beaconData.generateSerialForIndex(index);
+								}
+							} catch (SQLException e1) {
+								e1.printStackTrace();
+							}
+						}
+						
+						//Generate a network key by random if none exists
+						if(beaconData.networkKey == null){
+							beaconData.generateRandomNetworkKey();
+						}
+						
 						//Softdevice + Full Erase
 						result += "Softdevice: ";
 						tempResult = callNrfjprogBlocking("-s "+serial+" --program "+softdeviceHex+" --chiperase --family "+family);
@@ -186,6 +174,32 @@ public class FruityDeploy {
 						
 						//Write UICR
 						writeUICRDataBlocking(beaconData);
+						
+						//Get SoftDevice version
+						tempResult = callNrfjprogBlocking("-s "+serial+" --family "+family+" --memrd "+NRF_SOFTDEVICE_VERSION_BASE+" --w 32 --n 8");
+						ArrayList<Long> softdeviceVersionData = parseNrfjprogMemoryReadings(tempResult);
+						long softdeviceSize = softdeviceVersionData.get(0);
+						beaconData.softdeviceVersion = softdeviceVersionData.get(1) & 0xFFFF;
+						
+						long appInfoAddress = softdeviceSize + 1024L/*iVector*/;
+						
+						//Get Fruitymesh version
+						tempResult = callNrfjprogBlocking("-s "+serial+" --family "+family+" --memrd "+appInfoAddress+" --w 32 --n 16");
+						ArrayList<Long> appInfo = parseNrfjprogMemoryReadings(tempResult);
+						beaconData.fruitymeshVersion = appInfo.get(0);
+						
+						
+						//Now we update or insert the beacon into our database
+						try {
+							if(beaconData.readFromDatabase){
+								beaconData.eraseCounter++;
+								db.updateBeaconInDatabase(beaconData);
+							} else {
+								db.addBeaconToDatabase(beaconData);
+							}
+						} catch (SQLException e) {
+							e.printStackTrace();
+						}
 						
 					}
 					if(flash && loader){
@@ -215,15 +229,18 @@ public class FruityDeploy {
 					public Long boardId; //0x10001084 (4 bytes)
 					public String serialNumber; //0x10001088 (5 bytes + 1 byte \0)
 					public String networkKey; //0x10001096 (16 bytes)*/
+					
+					beaconData.magicNumber = SmartBeaconDataset.MAGIC_NUMBER;
 										
 					ArrayList<String> tempResult;
 					tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x10001080 --val "+SmartBeaconDataset.MAGIC_NUMBER);
 					tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x10001084 --val "+beaconData.boardId);
 					
 					//Serial number
-					tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x10001088 --val "+HexDecUtils.ASCIIStringToLong(beaconData.serialNumber.substring(0, 4)));
-					tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x1000108C --val "+HexDecUtils.ASCIIStringToLong(beaconData.serialNumber.substring(4, 5)));
-					
+					if(beaconData.serialNumber != null && !beaconData.serialNumber.equals("")){
+						tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x10001088 --val "+HexDecUtils.ASCIIStringToLong(beaconData.serialNumber.substring(0, 4)));
+						tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x1000108C --val "+HexDecUtils.ASCIIStringToLong(beaconData.serialNumber.substring(4, 5)));
+					}
 				}
 			});
 			flashingThreads.add(t);

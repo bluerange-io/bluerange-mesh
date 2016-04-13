@@ -45,16 +45,27 @@ public class SmartBeaconDataset {
 	//UICR Data
 	public Long firmwareId; // 
 	
-	public Long magicNumber; //0x10001080 (4 bytes)
-	public Long boardId; //0x10001084 (4 bytes)
+	public Long magicNumber = 0xFFFFFFFFL; //0x10001080 (4 bytes)
+	public Long boardId = 0L; //0x10001084 (4 bytes)
 	public String serialNumber; //0x10001088 (5 bytes + 1 byte \0)
 	public String networkKey; //0x10001096 (16 bytes)
 	
+	//Data from other locations
+	public Long softdeviceVersion = 0L;
+	public Long fruitymeshVersion = 0L;
+	
 	//Additional Data
-	public Boolean readFromDatabase;
+	public String deviceFamily;
+	
+	public Boolean readFromDatabase = false;
+	public Boolean manualInit = false;
 
 	public String seggerSerial;
 	public Long eraseCounter = 0L;
+	
+	//More stuff to save
+	//nodeId, networkId
+	//available Sensors (1 byte each device)
 
 	
 	public static final Long MAGIC_NUMBER = 0xF07700L;
@@ -92,15 +103,22 @@ public class SmartBeaconDataset {
 		
 		if(magicNumber.equals(MAGIC_NUMBER)){
 			this.magicNumber = MAGIC_NUMBER;
+			
 			this.boardId = uicrData.get(33);
+			if(this.boardId.equals(0xFFFFFFFFL)) this.boardId = 0L;
 						
 			//Need to reverse String because of Little Endian
-			this.serialNumber = new StringBuilder(HexDecUtils.longToASCIIString(uicrData.get(34))).reverse().toString();
-			this.serialNumber += HexDecUtils.longToASCIIString(uicrData.get(35)).substring(3, 4);
+			if(!uicrData.get(34).equals(0xFFFFFFFFL)){
+				this.serialNumber = new StringBuilder(HexDecUtils.longToASCIIString(uicrData.get(34))).reverse().toString();
+				this.serialNumber += HexDecUtils.longToASCIIString(uicrData.get(35)).substring(3, 4);
+			}
 			
 			this.networkKey = "";
 			for(int i=0; i<4; i++){
 				this.networkKey += String.format("%08X", uicrData.get(36+i));
+			}
+			if(this.networkKey.equals("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")){
+				this.networkKey = null;
 			}
 		}
 	}
@@ -113,6 +131,11 @@ public class SmartBeaconDataset {
 	//Returns true if data of this beacon has been read from the database
 	public Boolean isReadFromDatabase(){
 		return readFromDatabase;
+	}
+	
+	//Returns true if data has been manually set and generated
+	public Boolean isManuallySet(){
+		return manualInit;
 	}
 
 	//Sets the serial of the segger debugger that was used to flash the chip
@@ -168,8 +191,9 @@ public class SmartBeaconDataset {
 	@Override
 	public String toString() {
 		String result = "------------------\n";
-		result += "Beacon ("+serialNumber+") Segger ID: "+seggerSerial + " UniqueID: "+chipId+" UUID "+getUUID()+"\n";
+		result += deviceFamily+" Beacon ("+serialNumber+") Segger ID: "+seggerSerial + " UniqueID: "+chipId+" UUID "+getUUID()+"\n";
 		result += "boardType "+boardId+" hardware id "+String.format("0x%04X", hardwareId)+" networkKey "+networkKey+" eraseCounter "+eraseCounter+"\n";
+		result += "Database: "+isReadFromDatabase()+", Chip: "+isReadFromChip()+", Manual: "+isManuallySet()+"\n";
 		result += "------------------\n";
 		
 		return result;
