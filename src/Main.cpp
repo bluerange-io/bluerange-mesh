@@ -105,10 +105,6 @@ int main(void)
 	//Initialize the UART Terminal
 	Terminal::Init();
 
-	logt("ERROR", "UICR DATA (boardType:%x, serial %s)", Config->boardType, Config->serialNumber);
-
-
-
 	//Testing* testing = new Testing();
 
 	//testing->testPacketQueue();
@@ -221,7 +217,7 @@ void detectBoardAndSetConfig(){
 void bleInit(void){
 	u32 err = 0;
 
-	logt("NODE", "Initializing Softdevice version 0x%x", SD_FWID_GET(MBR_SIZE));
+	logt("NODE", "Initializing Softdevice version 0x%x, Board %d", SD_FWID_GET(MBR_SIZE), Config->boardType);
 
     // Initialize the SoftDevice handler with the low frequency clock source
 	//And a reference to the previously allocated buffer

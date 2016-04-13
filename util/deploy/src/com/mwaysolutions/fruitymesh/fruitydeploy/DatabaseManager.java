@@ -43,8 +43,7 @@ public class DatabaseManager {
 					+ "(uuid, chipId, serialNumber, networkKey, "
 					+ "boardId, seggerSerial, hardwareId, addressType,"
 					+ "address, firmwareId, lastFlashed, eraseCounter, fruitydeployVersion, "
-					+ "fruitymeshVersion"
-					+ "family, softdeviceVersion)"
+					+ "family, softdeviceVersion, fruitymeshVersion)"
 					+" VALUES (?,?,?,?,?,?,?,?,?,?,NOW(),0, ?, ?, ?, ?)");
 			
 			updateBeaconStatement = connection.prepareStatement("UPDATE beacons SET"

@@ -1,5 +1,6 @@
 package com.mwaysolutions.fruitymesh.fruitydeploy;
 
+import java.awt.AlphaComposite;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -49,6 +50,8 @@ public class SmartBeaconDataset {
 	public Long boardId = 0L; //0x10001084 (4 bytes)
 	public String serialNumber; //0x10001088 (5 bytes + 1 byte \0)
 	public String networkKey; //0x10001096 (16 bytes)
+	public Long defaultNetworkId; //0x100010A6
+	public Long defaultNodeId; //0x100010AA
 	
 	//Data from other locations
 	public Long softdeviceVersion = 0L;
@@ -166,10 +169,11 @@ public class SmartBeaconDataset {
 		}
 		return this.uuid;
 	}
+
+	private static String alphabet = "BCDFGHJKLMNPQRSTVWXYZ123456789";
 	
 	public String generateSerialForIndex(long index){
 		String serial = "";
-		String alphabet = "BCDFGHJKLMNPQRSTVWXYZ123456789";
 		
 		while(serial.length() < 5){			
 			int rest = (int)(index % alphabet.length());
@@ -178,6 +182,17 @@ public class SmartBeaconDataset {
 		}
 		
 		return new StringBuilder(serial).reverse().toString();
+	}
+	
+	public long getNodeId(){
+		if(serialNumber == null) return 0L;
+		long index = 0L;
+		for(int i=0; i<serialNumber.length(); i++){
+			char currentChar = serialNumber.charAt(serialNumber.length()-i-1);
+			int charValue = alphabet.indexOf(currentChar);
+			index += Math.pow(alphabet.length(), i) * charValue;
+		}
+		return index % 12000 + 50;
 	}
 	
 	public void generateRandomNetworkKey(){

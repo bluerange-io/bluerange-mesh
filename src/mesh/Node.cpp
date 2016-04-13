@@ -168,7 +168,7 @@ void Node::ConfigurationLoadedHandler()
 
 	//Change window title of the Terminal
 	SetTerminalTitle();
-	logt("NODE", "====> Node %u (%s) <====", persistentConfig.nodeId, persistentConfig.serialNumber);
+	logt("NODE", "====> Node %u (%s) <====", persistentConfig.nodeId, Config->serialNumber);
 
 	//Get a random number for the connection loss counter (hard on system start,...stat)
 	persistentConfig.connectionLossCounter = Utility::GetRandomInteger();
@@ -1316,7 +1316,7 @@ void Node::PrintStatus(void)
 	ble_gap_addr_t p_addr;
 	err = sd_ble_gap_address_get(&p_addr);
 	APP_ERROR_CHECK(err); //OK
-	trace("GAP Addr is %02X:%02X:%02X:%02X:%02X:%02X, serial:%s" EOL EOL, p_addr.addr[5], p_addr.addr[4], p_addr.addr[3], p_addr.addr[2], p_addr.addr[1], p_addr.addr[0], persistentConfig.serialNumber);
+	trace("GAP Addr is %02X:%02X:%02X:%02X:%02X:%02X, serial:%s" EOL EOL, p_addr.addr[5], p_addr.addr[4], p_addr.addr[3], p_addr.addr[2], p_addr.addr[1], p_addr.addr[0], Config->serialNumber);
 
 	//Print connection info
 	trace("CONNECTIONS (freeIn:%u, freeOut:%u, pendingPackets:%u" EOL, cm->freeInConnections, cm->freeOutConnections, cm->GetPendingPackets());
@@ -1330,7 +1330,7 @@ void Node::PrintStatus(void)
 void Node::SetTerminalTitle()
 {
 	//Change putty terminal title
-	trace("\033]0;Node %u (%s) ClusterSize:%d (%x), [%u, %u, %u, %u]\007", persistentConfig.nodeId, persistentConfig.serialNumber, clusterSize, clusterId, cm->connections[0]->partnerId, cm->connections[1]->partnerId, cm->connections[2]->partnerId, cm->connections[3]->partnerId);
+	trace("\033]0;Node %u (%s) ClusterSize:%d (%x), [%u, %u, %u, %u]\007", persistentConfig.nodeId, Config->serialNumber, clusterSize, clusterId, cm->connections[0]->partnerId, cm->connections[1]->partnerId, cm->connections[2]->partnerId, cm->connections[3]->partnerId);
 }
 
 void Node::PrintBufferStatus(void)
@@ -1601,7 +1601,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	//Get the status information of this node
 	else if(commandName == "get_plugged_in")
 	{
-		uart("NODE", "{\"type\":\"plugged_in\",\"nodeId\":%u,\"serialNumber\":\"%s\"}" SEP, persistentConfig.nodeId, persistentConfig.serialNumber);
+		uart("NODE", "{\"type\":\"plugged_in\",\"nodeId\":%u,\"serialNumber\":\"%s\"}" SEP, persistentConfig.nodeId, Config->serialNumber);
 	}
 	//Query all modules from any node
 	else if((commandName == "get_modules") && commandArgs.size() == 1)
@@ -1735,23 +1735,15 @@ void Node::InitWithTestDeviceSettings()
 		logt("ERROR", "ChipId:%u did not match any testDevice, assigning random one...", NRF_FICR->DEVICEID[1]);
 
 		//Generate a "random" id between 1 and 15001
-		persistentConfig.nodeId = (nodeID)NRF_FICR->DEVICEID[1] % 15000 + 1;
+		if(Config->defaultNodeId == 0) persistentConfig.nodeId = (nodeID)NRF_FICR->DEVICEID[1] % 15000 + 1;
+		else persistentConfig.nodeId = Config->defaultNodeId;
+
 		persistentConfig.deviceType = deviceTypes::DEVICE_TYPE_STATIC;
 		err = sd_ble_gap_address_get(&persistentConfig.nodeAddress);
 		APP_ERROR_CHECK(err); //OK
 	}
 
-	//Generate a random serial number
-	//(removed vocals to prevent bad words, removed 0 because it could be mistaken for an o)
-	const char* alphabet = "BCDFGHJKLMNPQRSTVWXYZ123456789"; //30 chars
 
-	//This takes 5bit wide chunks from the device id to generate a serial number
-	//in tests, 10k serial numbers had 4 duplicates
-	for(int i=0; i<SERIAL_NUMBER_LENGTH; i++){
-		u8 fiveBitChunk = (NRF_FICR->DEVICEID[0] & 0x1F << (i*5)) >> (i*5);
-		persistentConfig.serialNumber[i] = alphabet[fiveBitChunk % 30];
-	}
-	persistentConfig.serialNumber[SERIAL_NUMBER_LENGTH] = '\0';
 	persistentConfig.manufacturerId = 0xFFFF;
 
 }

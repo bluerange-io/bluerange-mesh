@@ -53,11 +53,14 @@ public class FruityDeploy {
 	@Parameter(names ={"--verify"}, description="Verify what has been written")
 	private Boolean verify = false;
 	
-	@Parameter(names ={"--modSerial"}, description="Usage: --modSerial <serialNumber> to write custom serial to UICR")
-	public String modSerial = null;
-	
-	@Parameter(names ={"--modBoardId"}, description="Usage: --modBoardId <boardId> to write custom boardId to UICR")
-	public Long modBoardId = null;
+	@Parameter(names ={"--serial"}, description="Usage: --serial <serialNumber> to write custom serial to UICR")
+	public String serialNumber = null;
+
+	@Parameter(names ={"--boardid"}, description="Usage: --boardid <boardId> to write custom boardId to UICR")
+	public Long boardId = null;
+
+	@Parameter(names ={"--networkid"}, description="Usage: --networkid <id> network id if unenrolled")
+	public Long networkid = 1L;
 	
 	public static final int VERSION = 1;
 	
@@ -125,16 +128,18 @@ public class FruityDeploy {
 					}
 					
 					//Check if a manually entered serialNumber should be used / modified
-					if(modSerial != null){
-						beaconData.serialNumber = modSerial;
+					if(serialNumber != null){
+						beaconData.serialNumber = serialNumber;
 						beaconData.manualInit = true;
 					}
 					
 					//Check if entered boardId should be used or modified
-					if(modBoardId != null){
-						beaconData.boardId = modBoardId;
+					if(boardId != null){
+						beaconData.boardId = boardId;
 						beaconData.manualInit = true;
 					}
+					
+					beaconData.defaultNetworkId = networkid;
 					
 					System.out.println("READ:"+ beaconData);
 					
@@ -153,6 +158,11 @@ public class FruityDeploy {
 							} catch (SQLException e1) {
 								e1.printStackTrace();
 							}
+						}
+						
+						//Set default node id
+						if(beaconData.serialNumber != null){
+							beaconData.defaultNodeId = beaconData.getNodeId();
 						}
 						
 						//Generate a network key by random if none exists
@@ -228,19 +238,29 @@ public class FruityDeploy {
 					/*public Long magicNumber; //0x10001080 (4 bytes)
 					public Long boardId; //0x10001084 (4 bytes)
 					public String serialNumber; //0x10001088 (5 bytes + 1 byte \0)
-					public String networkKey; //0x10001096 (16 bytes)*/
+					public String networkKey; //0x10001096 (16 bytes)
+					public Long manufacturerid; //0x100010A0 (4 bytes)
+					public Long defaultNetworkId; //0x100010A4 (4 bytes)
+					public Long defaultNodeId; //0x100010A8 (4 bytes)*/
 					
 					beaconData.magicNumber = SmartBeaconDataset.MAGIC_NUMBER;
 										
 					ArrayList<String> tempResult;
+					//Magic number
 					tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x10001080 --val "+SmartBeaconDataset.MAGIC_NUMBER);
-					tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x10001084 --val "+beaconData.boardId);
-					
+					//boardId
+					tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x10001084 --val "+beaconData.boardId);	
 					//Serial number
 					if(beaconData.serialNumber != null && !beaconData.serialNumber.equals("")){
 						tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x10001088 --val "+HexDecUtils.ASCIIStringToLong(beaconData.serialNumber.substring(0, 4)));
 						tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x1000108C --val "+HexDecUtils.ASCIIStringToLong(beaconData.serialNumber.substring(4, 5)));
 					}
+					//Network key
+					
+					//default networkId
+					tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x100010A4 --val "+beaconData.defaultNetworkId);
+					//default nodeId
+					tempResult = callNrfjprogBlocking("-s "+beaconData.seggerSerial+" --memwr 0x100010A8 --val "+beaconData.getNodeId());
 				}
 			});
 			flashingThreads.add(t);

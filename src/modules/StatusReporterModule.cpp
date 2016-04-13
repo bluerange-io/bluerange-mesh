@@ -166,7 +166,7 @@ void StatusReporterModule::SendDeviceInfo(nodeID toNode, u8 messageType)
 	outPacketData->manufacturerId = node->persistentConfig.manufacturerId;
 	outPacketData->deviceType = node->persistentConfig.deviceType;
 	memcpy(outPacketData->chipId, (u8*)NRF_FICR->DEVICEADDR, 8);
-	memcpy(outPacketData->serialNumber, node->persistentConfig.serialNumber, SERIAL_NUMBER_LENGTH);
+	memcpy(outPacketData->serialNumber, Config->serialNumber, SERIAL_NUMBER_LENGTH);
 	err = sd_ble_gap_address_get(&outPacketData->accessAddress);
 	APP_ERROR_CHECK(err); //OK
 	outPacketData->nodeVersion = Config->firmwareVersion;

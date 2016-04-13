@@ -98,6 +98,7 @@ typedef i16 clusterSIZE;
 //Max value according to: http://developer.nordicsemi.com/nRF51_SDK/doc/7.1.0/s120/html/a00557.html
 #define MAX_DATA_SIZE_PER_WRITE 20
 
+#define EMPTY_WORD 0xFFFFFFFF
 
 /*############ OTHER STUFF ################*/	
 typedef struct
