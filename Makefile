@@ -216,14 +216,14 @@ cleanobj:
 ## Flash device
 flash: $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex
 	@echo Flashing: $<
-	$(NO_ECHO)$(NRFJPROG) --program $< -f $(PLATFORM) --sectorerase
-	$(NO_ECHO)$(NRFJPROG) --reset -f $(PLATFORM)
+	$(NO_ECHO)$(NRFJPROG) --program $< -f $(PLATFORM) --sectorerase $(PROGFLAGS)
+	$(NO_ECHO)$(NRFJPROG) --reset -f $(PLATFORM) $(PROGFLAGS)
 
 ## Flash softdevice
 flash_softdevice:
 	@echo Flashing: $(SOFTDEVICE_PATH)
-	$(NO_ECHO)$(NRFJPROG) --program $(SOFTDEVICE_PATH) -f $(PLATFORM) --chiperase
-	$(NO_ECHO)$(NRFJPROG) --reset -f $(PLATFORM)
+	$(NO_ECHO)$(NRFJPROG) --program $(SOFTDEVICE_PATH) -f $(PLATFORM) --chiperase $(PROGFLAGS)
+	$(NO_ECHO)$(NRFJPROG) --reset -f $(PLATFORM) $(PROGFLAGS)
 
 serial:
 	# FIXME use proper tools for multiple platforms
