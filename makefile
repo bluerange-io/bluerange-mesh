@@ -74,6 +74,7 @@ CPP_SOURCE_FILES += ./src/base/GATTController.cpp
 CPP_SOURCE_FILES += ./src/base/ScanController.cpp
 
 CPP_SOURCE_FILES += ./src/Main.cpp
+CPP_SOURCE_FILES += ./src/Config.cpp
 
 CPP_SOURCE_FILES += ./src/mesh/Connection.cpp
 CPP_SOURCE_FILES += ./src/mesh/ConnectionManager.cpp
