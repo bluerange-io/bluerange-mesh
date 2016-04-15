@@ -98,6 +98,7 @@ typedef i16 clusterSIZE;
 //Max value according to: http://developer.nordicsemi.com/nRF51_SDK/doc/7.1.0/s120/html/a00557.html
 #define MAX_DATA_SIZE_PER_WRITE 20
 
+#define EMPTY_WORD 0xFFFFFFFF
 
 /*############ OTHER STUFF ################*/	
 typedef struct
@@ -107,6 +108,13 @@ typedef struct
 	u8 bleAddress[BLE_GAP_ADDR_LEN];  /**< 48-bit address, LSB format. */
 }nodeAddress;
 
+/*
+ Different kind of mesh devices:
+ - 0:Static - A normal node that remains static
+ - 1:Roaming - A node that is moving constantly or often
+ - 2:Static - A static node that wants to acquire data
+ * */
+enum deviceTypes{DEVICE_TYPE_STATIC=0, DEVICE_TYPE_ROAMING=1, DEVICE_TYPE_SINK=2};
 
 /*############ BOOTLOADER ################*/
 //Uses word-sized variables to avoid padding problems. No need to save space in our flash-page

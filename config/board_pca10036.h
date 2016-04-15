@@ -40,4 +40,12 @@ do{ 									\
 										\
 } while(0)
 
+//This macro checks whether the boardId is for PCA10036 board
+#define SET_PCA10036_BOARD_IF_FIT(boardid)		\
+do{												\
+	if(boardid == 0x003){							\
+		SET_PCA10036_BOARD(); 						\
+	}												\
+} while(0)
+
 #endif // PCA10036_H

@@ -237,7 +237,7 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 				LedGreen->On();
 				LedBlue->Off();
 
-				SendEnrollmentResponse(NODE_ID_BROADCAST, enrollmentMethods::BY_NODE_ID, packet->requestHandle, 0, (u8*)node->persistentConfig.serialNumber);
+				SendEnrollmentResponse(NODE_ID_BROADCAST, enrollmentMethods::BY_NODE_ID, packet->requestHandle, 0, (u8*)Config->serialNumber);
 
 			}
 			else if(packet->actionType == EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_CHIP_ID)
@@ -265,7 +265,7 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 					LedBlue->Off();
 
 
-					SendEnrollmentResponse(NODE_ID_BROADCAST, enrollmentMethods::BY_CHIP_ID, packet->requestHandle, 0, (u8*)node->persistentConfig.serialNumber);
+					SendEnrollmentResponse(NODE_ID_BROADCAST, enrollmentMethods::BY_CHIP_ID, packet->requestHandle, 0, (u8*)Config->serialNumber);
 				}
 			}
 			//If an enrollment by serial is received
@@ -273,7 +273,7 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 			{
 				EnrollmentModuleSetEnrollmentBySerialMessage* data = (EnrollmentModuleSetEnrollmentBySerialMessage*)packet->data;
 
-				if(memcmp(data->serialNumber, node->persistentConfig.serialNumber, SERIAL_NUMBER_LENGTH) == 0)
+				if(memcmp(data->serialNumber, Config->serialNumber, SERIAL_NUMBER_LENGTH) == 0)
 				{
 					logt("ENROLLMOD", "Enrollment (by serial) received nodeId:%u, networkid:%u, key[0]=%u, key[10]=%u, key[15]=%u", data->newNodeId, data->newNetworkId, data->newNetworkKey[0], data->newNetworkKey[10], data->newNetworkKey[15]);
 
@@ -299,7 +299,7 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 
 					}
 
-					SendEnrollmentResponse(NODE_ID_BROADCAST, enrollmentMethods::BY_SERIAL, packet->requestHandle, 0, (u8*)node->persistentConfig.serialNumber);
+					SendEnrollmentResponse(NODE_ID_BROADCAST, enrollmentMethods::BY_SERIAL, packet->requestHandle, 0, (u8*)Config->serialNumber);
 
 				}
 			}
@@ -352,7 +352,7 @@ void EnrollmentModule::SendEnrollmentResponse(nodeID receiver, u8 enrollmentMeth
 
 	data->result = result;
 	data->enrollmentMethod = enrollmentMethod;
-	memcpy(data->serialNumber, node->persistentConfig.serialNumber, SERIAL_NUMBER_LENGTH);
+	memcpy(data->serialNumber, Config->serialNumber, SERIAL_NUMBER_LENGTH);
 
 
 	cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_RESPONSE, true);

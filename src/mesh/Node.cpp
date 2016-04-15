@@ -162,13 +162,15 @@ void Node::ConfigurationLoadedHandler()
 		persistentConfig.dBmRX = 10;
 		persistentConfig.dBmTX = 10;
 
-		//Get an id for our testdevices when not working with persistent storage
-		InitWithTestDeviceSettings();
+		persistentConfig.deviceType = Config->deviceType;
+		persistentConfig.nodeId = Config->defaultNodeId;
+
+		memcpy(&persistentConfig.nodeAddress, &Config->staticAccessAddress, sizeof(ble_gap_addr_t));
 	}
 
 	//Change window title of the Terminal
 	SetTerminalTitle();
-	logt("NODE", "====> Node %u (%s) <====", persistentConfig.nodeId, persistentConfig.serialNumber);
+	logt("NODE", "====> Node %u (%s) <====", persistentConfig.nodeId, Config->serialNumber);
 
 	//Get a random number for the connection loss counter (hard on system start,...stat)
 	persistentConfig.connectionLossCounter = Utility::GetRandomInteger();
@@ -176,9 +178,11 @@ void Node::ConfigurationLoadedHandler()
 	clusterId = this->GenerateClusterID();
 
 	//Set the BLE address so that we have the same on every startup, mostly for debugging
-	err = sd_ble_gap_address_set(BLE_GAP_ADDR_CYCLE_MODE_NONE, &persistentConfig.nodeAddress);
-	if(err != NRF_SUCCESS){
-		//Can be ignored and will not happen
+	if(persistentConfig.nodeAddress.addr_type != 0xFF){
+		err = sd_ble_gap_address_set(BLE_GAP_ADDR_CYCLE_MODE_NONE, &persistentConfig.nodeAddress);
+		if(err != NRF_SUCCESS){
+			//Can be ignored and will not happen
+		}
 	}
 
 	//Init softdevice and c libraries
@@ -1204,7 +1208,7 @@ void Node::TimerTickHandler(u16 timerMs)
 		for(int i=0; i<NUM_TEST_COLOUR_IDS; i++){
 			nodeID nodeIdFromClusterId = clusterId & 0xffff;
 
-			if(testColourIDs[i] == nodeIdFromClusterId){
+			if(Config->testColourIDs[i] == nodeIdFromClusterId){
 				c = (i+1) % 8;
 
 				if(c & (1 << 0)) LedRed->On();
@@ -1316,7 +1320,7 @@ void Node::PrintStatus(void)
 	ble_gap_addr_t p_addr;
 	err = sd_ble_gap_address_get(&p_addr);
 	APP_ERROR_CHECK(err); //OK
-	trace("GAP Addr is %02X:%02X:%02X:%02X:%02X:%02X, serial:%s" EOL EOL, p_addr.addr[5], p_addr.addr[4], p_addr.addr[3], p_addr.addr[2], p_addr.addr[1], p_addr.addr[0], persistentConfig.serialNumber);
+	trace("GAP Addr is %02X:%02X:%02X:%02X:%02X:%02X, serial:%s, netKey: %02X:%02X:%02X:%02X:...:%02X:%02X:%02X:%02X" EOL EOL, p_addr.addr[5], p_addr.addr[4], p_addr.addr[3], p_addr.addr[2], p_addr.addr[1], p_addr.addr[0], Config->serialNumber, Config->meshNetworkKey[0], Config->meshNetworkKey[1], Config->meshNetworkKey[2], Config->meshNetworkKey[3], Config->meshNetworkKey[12], Config->meshNetworkKey[13], Config->meshNetworkKey[14], Config->meshNetworkKey[15]);
 
 	//Print connection info
 	trace("CONNECTIONS (freeIn:%u, freeOut:%u, pendingPackets:%u" EOL, cm->freeInConnections, cm->freeOutConnections, cm->GetPendingPackets());
@@ -1330,7 +1334,7 @@ void Node::PrintStatus(void)
 void Node::SetTerminalTitle()
 {
 	//Change putty terminal title
-	trace("\033]0;Node %u (%s) ClusterSize:%d (%x), [%u, %u, %u, %u]\007", persistentConfig.nodeId, persistentConfig.serialNumber, clusterSize, clusterId, cm->connections[0]->partnerId, cm->connections[1]->partnerId, cm->connections[2]->partnerId, cm->connections[3]->partnerId);
+	trace("\033]0;Node %u (%s) ClusterSize:%d (%x), [%u, %u, %u, %u]\007", persistentConfig.nodeId, Config->serialNumber, clusterSize, clusterId, cm->connections[0]->partnerId, cm->connections[1]->partnerId, cm->connections[2]->partnerId, cm->connections[3]->partnerId);
 }
 
 void Node::PrintBufferStatus(void)
@@ -1533,11 +1537,11 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	{
 		for (int i = 0; i <NUM_TEST_DEVICES ; i++)
 		{
-			if (strcmp(commandArgs[0].c_str(), testDevices[i].name) == 0)
+			if (strtol(commandArgs[0].c_str(), NULL, 10) == Config->testDevices[i].id)
 			{
-				trace("Trying to connecting to node %s", testDevices[i].name);
+				trace("Trying to connecting to node %d", Config->testDevices[i].id);
 
-				cm->ConnectAsMaster(testDevices[i].id, &testDevices[i].addr, 14);
+				cm->ConnectAsMaster(Config->testDevices[i].id, &Config->testDevices[i].addr, 14);
 			}
 		}
 	}
@@ -1601,7 +1605,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	//Get the status information of this node
 	else if(commandName == "get_plugged_in")
 	{
-		uart("NODE", "{\"type\":\"plugged_in\",\"nodeId\":%u,\"serialNumber\":\"%s\"}" SEP, persistentConfig.nodeId, persistentConfig.serialNumber);
+		uart("NODE", "{\"type\":\"plugged_in\",\"nodeId\":%u,\"serialNumber\":\"%s\"}" SEP, persistentConfig.nodeId, Config->serialNumber);
 	}
 	//Query all modules from any node
 	else if((commandName == "get_modules") && commandArgs.size() == 1)
@@ -1656,104 +1660,6 @@ u8 buffer[SIZEOF_CONN_PACKET_MODULE + MAX_MODULE_COUNT*4];
 */
 
 		cm->SendMessageToReceiver(NULL, (u8*)outPacket, SIZEOF_CONN_PACKET_MODULE + MAX_MODULE_COUNT*4, true);
-}
-
-
-/*
-IDs for development devices:
-	Use this section to map the nRF chip id to some of your desired values
-	This makes it easy to deploy the same firmware to a number of nodes and have them use Fixed settings
-
-Parameters:
-	- chipID: Boot the device with this firmware, enter "status" in the terminal and copy the chipID that is read from the NRF_FICR->DEVICEID[1] register
-	- nodeID: Enter the desired nodeID here (the last 3 digits of the segger id for example)
-	- deviceType: whether the node is a data endpoint, moving around or static
-	- string representation of the node id for the terminal
-	- desired BLE access address: Must comply to the spec (only modify the first byte for starters)
-*/
-Node::testDevice Node::testDevices[NUM_TEST_DEVICES] = {
-
-		{ 1650159794, 45, DEVICE_TYPE_SINK, "045", {BLE_GAP_ADDR_TYPE_RANDOM_STATIC, { 0x45, 0x16, 0xE8, 0x52, 0x4E, 0xc0 } } },
-
-		{ 2267790660, 72, DEVICE_TYPE_SINK, "072", {BLE_GAP_ADDR_TYPE_RANDOM_STATIC, { 0x72, 0x16, 0xE8, 0x52, 0x4E, 0xc0 } } },
-
-		{ 931144702, 458, DEVICE_TYPE_STATIC, "458", {BLE_GAP_ADDR_TYPE_RANDOM_STATIC, { 0x58, 0x16, 0xE8, 0x52, 0x4E, 0xc0 } } },
-
-		{ 1952379473, 635, DEVICE_TYPE_STATIC, "635", {BLE_GAP_ADDR_TYPE_RANDOM_STATIC, { 0x35, 0x16, 0xE8, 0x52, 0x4E, 0xc0 } } },
-
-		{ 3505517882, 847, DEVICE_TYPE_STATIC, "847", {BLE_GAP_ADDR_TYPE_RANDOM_STATIC, { 0x47, 0x16, 0xE8, 0x52, 0x4E, 0xc0 } } },
-
-		{ 0xFFFF, 667, DEVICE_TYPE_STATIC, "667", {BLE_GAP_ADDR_TYPE_RANDOM_STATIC, { 0x67, 0x16, 0xE8, 0x52, 0x4E, 0xc0 } } },
-
-		{ 1812994605, 304, DEVICE_TYPE_STATIC, "304", {BLE_GAP_ADDR_TYPE_RANDOM_STATIC, { 0x04, 0x16, 0xE8, 0x52, 0x4E, 0xc0 } } },
-
-		{ 449693942, 493, DEVICE_TYPE_STATIC, "493", {BLE_GAP_ADDR_TYPE_RANDOM_STATIC, { 0x93, 0x16, 0xE8, 0x52, 0x4E, 0xc0 } } },
-
-		{ 3062062265, 309, DEVICE_TYPE_STATIC, "309", {BLE_GAP_ADDR_TYPE_RANDOM_STATIC, { 0x09, 0x16, 0xE8, 0x52, 0x4E, 0xc0 } } },
-
-		{ 1040859205, 880, DEVICE_TYPE_STATIC, "880", {BLE_GAP_ADDR_TYPE_RANDOM_STATIC, { 0x80, 0x16, 0xE8, 0x52, 0x4E, 0xc0 } } }
-
-	};
-
-nodeID Node::testColourIDs[NUM_TEST_COLOUR_IDS] = {
-		45,
-		880,
-		304,
-		4290,
-		9115,
-		309,
-
-		14980,
-		2807,
-		583,
-		6574,
-		12583,
-		6388
-
-};
-
-//Uses the testDevice array and copies the configured values to the node settings
-void Node::InitWithTestDeviceSettings()
-{
-	u32 err;
-	u8 found = 0;
-
-	//Find our testDevice
-	for(u32 i=0; i<NUM_TEST_DEVICES; i++){
-		if(testDevices[i].chipID == NRF_FICR->DEVICEID[1])
-		{
-			persistentConfig.nodeId = testDevices[i].id;
-			persistentConfig.deviceType = testDevices[i].deviceType;
-			memcpy(&persistentConfig.nodeAddress, &testDevices[i].addr, sizeof(ble_gap_addr_t));
-			found = 1;
-
-			break;
-		}
-	}
-	if(!found)
-	{
-		logt("ERROR", "ChipId:%u did not match any testDevice, assigning random one...", NRF_FICR->DEVICEID[1]);
-
-		//Generate a "random" id between 1 and 15001
-		persistentConfig.nodeId = (nodeID)NRF_FICR->DEVICEID[1] % 15000 + 1;
-		persistentConfig.deviceType = deviceTypes::DEVICE_TYPE_STATIC;
-		err = sd_ble_gap_address_get(&persistentConfig.nodeAddress);
-		APP_ERROR_CHECK(err); //OK
-	}
-
-	//Generate a random serial number
-	//(removed vocals to prevent bad words, removed 0 because it could be mistaken for an o)
-	const char* alphabet = "BCDFGHJKLMNPQRSTVWXYZ123456789"; //30 chars
-
-	//This takes 5bit wide chunks from the device id to generate a serial number
-	//in tests, 10k serial numbers had 4 duplicates
-	for(int i=0; i<SERIAL_NUMBER_LENGTH; i++){
-		u8 fiveBitChunk = (NRF_FICR->DEVICEID[0] & 0x1F << (i*5)) >> (i*5);
-		persistentConfig.serialNumber[i] = alphabet[fiveBitChunk % 30];
-	}
-	persistentConfig.serialNumber[SERIAL_NUMBER_LENGTH] = '\0';
-	persistentConfig.manufacturerId = 0xFFFF;
-
 }
 
 u8 Node::GetBatteryRuntime()

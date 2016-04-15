@@ -73,6 +73,15 @@ void Terminal::Init()
 		log_transport_putstring((const u8*) ", nRF51");
 #endif
 
+		if(Config->deviceConfigOrigin == Conf::deviceConfigOrigins::RANDOM_CONFIG){
+			log_transport_putstring((const u8*) ", RANDOM Config");
+		} else if(Config->deviceConfigOrigin == Conf::deviceConfigOrigins::UICR_CONFIG){
+			log_transport_putstring((const u8*) ", UICR Config");
+		} else if(Config->deviceConfigOrigin == Conf::deviceConfigOrigins::TESTDEVICE_CONFIG){
+			log_transport_putstring((const u8*) ", TESTDEVICE Config");
+		}
+
+
 		log_transport_putstring((const u8*) EOL "--------------------------------------------------" EOL);
 	} else {
 		uart("NODE", "{\"type\":\"reboot\"}" SEP);

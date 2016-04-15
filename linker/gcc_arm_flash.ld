@@ -71,8 +71,8 @@ SECTIONS {
 	/* This is where the firmware informaton is stored. Usefull for bootloader */
 	.AppInfo : ALIGN(4)
 	{
-		KEEP(*(.AppSize))
 		KEEP(*(.Version))
+		KEEP(*(.AppSize))
 		KEEP(*(.BootloaderAddress))
 		LONG(__CheckSum);
 

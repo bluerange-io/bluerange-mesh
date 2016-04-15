@@ -35,6 +35,10 @@ extern "C" {
 #include <app_util.h>
 }
 
+#define FM_VERSION_MAJOR 0 //0-400
+#define FM_VERSION_MINOR 3 //0-999
+#define FM_VERSION_PATCH 0 //0-9999
+#define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH);
 
 extern LedWrapper* LedRed;
 extern LedWrapper* LedGreen;
@@ -47,8 +51,15 @@ extern LedWrapper* LedBlue;
 extern u32 __application_start_address[]; //Variable is set in the linker script
 extern u32 __application_end_address[]; //Variable is set in the linker script
 
-
 extern u32 __application_ram_start_address[]; //Variable is set in the linker script
+
+typedef enum {
+	PCA_10031	 		= 0x000, //nRF51 Dongle
+	PCA_10028	 		= 0x001, //nRF51-DK
+	ARS_100748		 	= 0x002, //ARSv1
+	PCA_10036	 		= 0x003, //nRF52-Preview-DK
+	PCA_10040	 		= 0x004, //nRF52-DK
+} boardTypes;
 
 //Alright, I know this is bad, but it's for readability....
 //And static classes do need a seperate declaration and definition...
@@ -60,13 +71,12 @@ class Conf
 	private:
 		Conf(){};
 		static Conf* instance;
+		static void generateRandomSerial();
+		static bool isEmpty(u32* mem, u8 numWords);
 
 	public:
 
-		static Conf* getInstance(){
-				if(!instance) instance = new Conf();
-				return instance;
-			}
+		static Conf* getInstance();
 
 		// ########### DEBUGGING ################################################
 
@@ -148,10 +158,6 @@ class Conf
 
 		// ########### CONNECTION ################################################
 
-		//Allows a number of mesh networks to coexist in the same physical space without collision
-		//Allowed range is 0x0000 - 0xFF00 (0 - 65280), others are reserved for special purpose
-		u16 meshNetworkIdentifier = 3;
-
 		const u8 meshMaxInConnections = MESH_IN_CONNECTIONS; // Will probably never change and code will not allow this to change without modifications
 		const u8 meshMaxOutConnections = MESH_OUT_CONNECTIONS; //Configurable from 1-7
 		const u8 meshMaxConnections = meshMaxInConnections + meshMaxOutConnections; //for convenience
@@ -161,35 +167,77 @@ class Conf
 		const bool enableConnectionRSSIMeasurement = true;
 
 
-		// ########### ENCRYPTION ################################################
-		//When enabling encryption, the mesh handle can only be read through an encrypted connection
-		//And connections will perform an encryption before the handshake
-		const bool encryptionEnabled = false;
-		const u8 meshNetworkKey[16] = {1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6}; //16 byte Long term key in little endian format
-		//06050403020100090807060504030201 => How to enter it in the MCP
-		//01:02:03:04:05:06:07:08:09:00:01:02:03:04:05:06 => Format for TI Sniffer
-
-
 		// ########### BOARD_SPECIFICS ################################################
-		//Below settings are defaults for the nRF51 Dongle, use a board header file to set different values
-		u8 Led1Pin = 21;
-		u8 Led2Pin = 22;
-		u8 Led3Pin = 23;
-		bool LedActiveHigh = false; //Defines if writing 0 or 1 to an LED turns it on
+		//Default board is pca10031, modify SET_BOARD if different board is required
+		//Or flash config data to UICR
+		u8 Led1Pin;
+		u8 Led2Pin;
+		u8 Led3Pin;
+		bool LedActiveHigh; //Defines if writing 0 or 1 to an LED turns it on
 
-		u8 uartRXPin = 11;
-		u8 uartTXPin = 9;
-		u8 uartCTSPin = 10;
-		u8 uartRTSPin = 8;
-		bool uartFlowControl = true;
+		u8 uartRXPin;
+		u8 uartTXPin;
+		u8 uartCTSPin;
+		u8 uartRTSPin;
+		bool uartFlowControl;
 
 		i8 calibratedTX = -63; // This value should be calibrated at 1m distance
 
+		// ########### VALUES from UICR / TEST_DEVICE (initialized in Config.cpp) #############
+		enum deviceConfigOrigins{ RANDOM_CONFIG, UICR_CONFIG, TESTDEVICE_CONFIG };
+		u8 deviceConfigOrigin = RANDOM_CONFIG;
+
+		//Set a default boardId for NRF51 and NRF52 in case no other data is available
+#if defined(NRF51)
+		u32 boardType = PCA_10031;
+#elif defined(NRF52)
+		u32 boardType = PCA_10040;
+#else
+#error "Specify SoC model (NR51 or NRF52)"
+#endif
+
+		char serialNumber[6];;
+		u16 manufacturerId = 0; //According to the BLE company identifiers: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
+
+		//When enabling encryption, the mesh handle can only be read through an encrypted connection
+		//And connections will perform an encryption before the handshake
+		const bool encryptionEnabled = false;
+		u8 meshNetworkKey[16] = {1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6}; //16 byte Long term key in little endian format
+		//06050403020100090807060504030201 => How to enter it in the MCP
+		//01:02:03:04:05:06:07:08:09:00:01:02:03:04:05:06 => Format for TI Sniffer
+
+		//Allows a number of mesh networks to coexist in the same physical space without collision
+		//Allowed range is 0x0000 - 0xFF00 (0 - 65280), others are reserved for special purpose
+		networkID meshNetworkIdentifier = 1;
+		nodeID defaultNodeId = 0;
+		deviceTypes deviceType = deviceTypes::DEVICE_TYPE_STATIC;
+
+		ble_gap_addr_t staticAccessAddress = {0xFF, {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}};
+
+
+		// ########### TEST DEVICES ################################################
+		//For our test devices
+		typedef struct{
+			u32 chipID;
+			nodeID id;
+			deviceTypes deviceType;
+			ble_gap_addr_t addr;
+		} testDevice;
+
+		#define NUM_TEST_DEVICES 10
+		static testDevice testDevices[];
+
+		#define NUM_TEST_COLOUR_IDS 12
+		static nodeID testColourIDs[];
+
+		Conf::testDevice* getTestDevice();
+
+
 		// ########### OTHER ################################################
-		u16 firmwareVersionMajor = 0; //0-400
-		u16 firmwareVersionMinor = 3; //0-999
-		u16 firmwareVersionPatch = 0; //0-9999
-		u32 firmwareVersion = 10000000 * firmwareVersionMajor + 10000 * firmwareVersionMinor + firmwareVersionPatch;
+		u16 firmwareVersionMajor = FM_VERSION_MAJOR; //0-400
+		u16 firmwareVersionMinor = FM_VERSION_MINOR; //0-999
+		u16 firmwareVersionPatch = FM_VERSION_PATCH; //0-9999
+		u32 firmwareVersion = FM_VERSION;
 
 		i8 radioTransmitPower = 0; //The power at which the radio transmits advertisings and data packets
 };
@@ -198,17 +246,15 @@ class Conf
 // ########### COMPILE TIME SETTINGS ##########################################
 
 //Selecting the board can be done at runtime
-#ifdef NRF51
 #include <board_pca10031.h>
 #include <board_ars100748.h>
-#endif
-#ifdef NRF52
-	#include <board_pca10036.h>
-#endif
+#include <board_pca10036.h>
 
-#define SET_BOARD() SET_PCA10031_BOARD()
-//#define SET_BOARD() SET_ARS100748_BOARD()
-//#define SET_BOARD() detectBoardAndSetConfig() //Detect the board at runtime
+#define SET_BOARD() do{					\
+		SET_PCA10031_BOARD_IF_FIT(Config->boardType);		\
+		SET_PCA10036_BOARD_IF_FIT(Config->boardType);		\
+		SET_ARS100748_BOARD_IF_FIT(Config->boardType);	\
+}while(0);
 
 //Each of the Connections has a buffer for outgoing packets, this is its size in bytes
 #define PACKET_SEND_BUFFER_SIZE 600

@@ -72,8 +72,6 @@ class Node:
 			ble_gap_addr_t nodeAddress; //7 bytes
 			networkID networkId;
 			nodeID nodeId;
-			u16 manufacturerId; //According to the BLE company identifiers: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
-			char serialNumber[SERIAL_NUMBER_LENGTH+1];//should be 0 terminated
 			u8 networkKey[BLE_GAP_SEC_KEY_LEN]; //16 bytes
 			u16 connectionLossCounter; //TODO: connection loss counter is not saved persistently, move it.
 			deviceTypes deviceType;
@@ -81,26 +79,8 @@ class Node:
 			u8 dBmTX; //The average RSSI, received in a distance of 1m with a tx power of +0 dBm
 			u8 dBmRX; //Receiver sensitivity (or receied power from a packet sent at 1m distance with +0dBm?)
 			u8 reserved;
+			u8 reserved2;
 		};
-
-		//For our test devices
-		typedef struct{
-			u32 chipID;
-			nodeID id;
-			deviceTypes deviceType;
-			char name[4];
-			ble_gap_addr_t addr;
-		} testDevice;
-
-
-		#define NUM_TEST_DEVICES 10
-		static testDevice testDevices[];
-
-		#define NUM_TEST_COLOUR_IDS 12
-		static nodeID testColourIDs[];
-
-
-		void InitWithTestDeviceSettings();
 
 		void SendModuleList(nodeID toNode, u8 requestHandle);
 
