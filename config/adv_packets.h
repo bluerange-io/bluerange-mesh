@@ -128,14 +128,6 @@ typedef struct
 //####### Further definitions #################################################
 
 /*
- Different kind of mesh devices:
- - 0:Static - A normal node that remains static
- - 1:Roaming - A node that is moving constantly or often
- - 2:Static - A static node that wants to acquire data
- * */
-enum deviceTypes{DEVICE_TYPE_STATIC=0, DEVICE_TYPE_ROAMING=1, DEVICE_TYPE_SINK=2};
-
-/*
  * Explanation:
 The JOIN_ME packet can have a number of different fields that contain different information.
 The version number indicates the JOIN_ME packet type

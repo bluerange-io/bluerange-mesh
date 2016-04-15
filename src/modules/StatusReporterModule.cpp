@@ -163,7 +163,7 @@ void StatusReporterModule::SendDeviceInfo(nodeID toNode, u8 messageType)
 
 	StatusReporterModuleDeviceInfoMessage* outPacketData = (StatusReporterModuleDeviceInfoMessage*)(outPacket->data);
 
-	outPacketData->manufacturerId = node->persistentConfig.manufacturerId;
+	outPacketData->manufacturerId = Config->manufacturerId;
 	outPacketData->deviceType = node->persistentConfig.deviceType;
 	memcpy(outPacketData->chipId, (u8*)NRF_FICR->DEVICEADDR, 8);
 	memcpy(outPacketData->serialNumber, Config->serialNumber, SERIAL_NUMBER_LENGTH);

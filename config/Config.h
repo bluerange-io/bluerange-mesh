@@ -72,7 +72,7 @@ class Conf
 		Conf(){};
 		static Conf* instance;
 		static void generateRandomSerial();
-		static bool isEmpty(u8* mem, u16 numBytes);
+		static bool isEmpty(u32* mem, u8 numWords);
 
 	public:
 
@@ -158,11 +158,6 @@ class Conf
 
 		// ########### CONNECTION ################################################
 
-		//Allows a number of mesh networks to coexist in the same physical space without collision
-		//Allowed range is 0x0000 - 0xFF00 (0 - 65280), others are reserved for special purpose
-		networkID meshNetworkIdentifier = 3;
-		nodeID defaultNodeId = 0;
-
 		const u8 meshMaxInConnections = MESH_IN_CONNECTIONS; // Will probably never change and code will not allow this to change without modifications
 		const u8 meshMaxOutConnections = MESH_OUT_CONNECTIONS; //Configurable from 1-7
 		const u8 meshMaxConnections = meshMaxInConnections + meshMaxOutConnections; //for convenience
@@ -170,15 +165,6 @@ class Conf
 		const bool enableRadioNotificationHandler = false;
 
 		const bool enableConnectionRSSIMeasurement = true;
-
-
-		// ########### ENCRYPTION ################################################
-		//When enabling encryption, the mesh handle can only be read through an encrypted connection
-		//And connections will perform an encryption before the handshake
-		const bool encryptionEnabled = false;
-		u8 meshNetworkKey[16] = {1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6}; //16 byte Long term key in little endian format
-		//06050403020100090807060504030201 => How to enter it in the MCP
-		//01:02:03:04:05:06:07:08:09:00:01:02:03:04:05:06 => Format for TI Sniffer
 
 
 		// ########### BOARD_SPECIFICS ################################################
@@ -197,7 +183,11 @@ class Conf
 
 		i8 calibratedTX = -63; // This value should be calibrated at 1m distance
 
-		// ########### UICR DATA ################################################
+		// ########### VALUES from UICR / TEST_DEVICE (initialized in Config.cpp) #############
+		enum deviceConfigOrigins{ RANDOM_CONFIG, UICR_CONFIG, TESTDEVICE_CONFIG };
+		u8 deviceConfigOrigin = RANDOM_CONFIG;
+
+		//Set a default boardId for NRF51 and NRF52 in case no other data is available
 #if defined(NRF51)
 		u32 boardType = PCA_10031;
 #elif defined(NRF52)
@@ -205,7 +195,42 @@ class Conf
 #else
 #error "Specify SoC model (NR51 or NRF52)"
 #endif
-		char serialNumber[6];
+
+		char serialNumber[6];;
+		u16 manufacturerId = 0; //According to the BLE company identifiers: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
+
+		//When enabling encryption, the mesh handle can only be read through an encrypted connection
+		//And connections will perform an encryption before the handshake
+		const bool encryptionEnabled = false;
+		u8 meshNetworkKey[16] = {1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6}; //16 byte Long term key in little endian format
+		//06050403020100090807060504030201 => How to enter it in the MCP
+		//01:02:03:04:05:06:07:08:09:00:01:02:03:04:05:06 => Format for TI Sniffer
+
+		//Allows a number of mesh networks to coexist in the same physical space without collision
+		//Allowed range is 0x0000 - 0xFF00 (0 - 65280), others are reserved for special purpose
+		networkID meshNetworkIdentifier = 1;
+		nodeID defaultNodeId = 0;
+		deviceTypes deviceType = deviceTypes::DEVICE_TYPE_STATIC;
+
+		ble_gap_addr_t staticAccessAddress = {0xFF, {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}};
+
+
+		// ########### TEST DEVICES ################################################
+		//For our test devices
+		typedef struct{
+			u32 chipID;
+			nodeID id;
+			deviceTypes deviceType;
+			ble_gap_addr_t addr;
+		} testDevice;
+
+		#define NUM_TEST_DEVICES 10
+		static testDevice testDevices[];
+
+		#define NUM_TEST_COLOUR_IDS 12
+		static nodeID testColourIDs[];
+
+		Conf::testDevice* getTestDevice();
 
 
 		// ########### OTHER ################################################
