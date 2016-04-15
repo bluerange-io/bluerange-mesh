@@ -37,7 +37,7 @@ extern "C" {
 
 #define FM_VERSION_MAJOR 0 //0-400
 #define FM_VERSION_MINOR 3 //0-999
-#define FM_VERSION_PATCH 0 //0-9999
+#define FM_VERSION_PATCH 1 //0-9999
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH);
 
 extern LedWrapper* LedRed;
