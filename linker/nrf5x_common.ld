@@ -21,7 +21,7 @@ OUTPUT_FORMAT ("elf32-littlearm", "elf32-bigarm", "elf32-littlearm")
  * with other linker script that defines memory regions FLASH and RAM.
  * It references following symbols, which must be defined in code:
  *   Reset_Handler : Entry of reset handler
- * 
+ *
  * It defines following symbols, which code can use without definition:
  *   __exidx_start
  *   __exidx_end
@@ -49,13 +49,16 @@ SECTIONS
 {
 	/* Code region starts here */
 	.text : ALIGN(4)
-	{	
-		/* Application Entry point starts here.  Normaly is the ResetEntry function */ 
+	{
 		KEEP(*(.isr_vector))
+
+		KEEP(*(.Version))
+		KEEP(*(.AppSize))
+		KEEP(*(.BootloaderAddress))
 
 		KEEP(*(.init))
 		KEEP(*(.fini))
-		
+
 		/* .ctors */
 		*crtbegin.o(.ctors)
 		*crtbegin?.o(.ctors)
@@ -73,11 +76,9 @@ SECTIONS
 		*(.text*)
 		*(.rodata .rodata.* .rodata1)
 		*(.gnu.linkonce.r.*)
-
 	} > FLASH
-    
 
-	.ARM.extab : 
+	.ARM.extab :
 	{
 		*(.ARM.extab* .gnu.linkonce.armextab.*)
 	} > FLASH
@@ -89,43 +90,39 @@ SECTIONS
 	} > FLASH
 	PROVIDE (__exidx_end = .);
 
-	.eh_frame_hdr : 
-	{ 
-		*(.eh_frame_hdr) 
+	.eh_frame_hdr :
+	{
+		*(.eh_frame_hdr)
 	} > FLASH
-	
-	.eh_frame : ONLY_IF_RO 
-	{ 
+
+	.eh_frame : ONLY_IF_RO
+	{
 		*(.eh_frame)
 	} > FLASH
-	
-	.gcc_except_table : ONLY_IF_RO 
-	{ 
-		*(.gcc_except_table .gcc_except_table.*) 
 
-
+	.gcc_except_table : ONLY_IF_RO
+	{
+		*(.gcc_except_table .gcc_except_table.*)
 	} > FLASH
-	
+
 	__etext = .;
 	.application_ram_start_dummy : ALIGN(4)
    	{
 		__application_ram_start_address = .;
    	} > RAM
 
-	
-	.eh_frame : ONLY_IF_RW 
-	{ 
+	.eh_frame : ONLY_IF_RW
+	{
 		. = ALIGN(4);
-		*(.eh_frame) 
+		*(.eh_frame)
 	} > RAM
-	
-	.gcc_except_table : ONLY_IF_RW 
-	{ 
+
+	.gcc_except_table : ONLY_IF_RW
+	{
 		. = ALIGN(4);
-		*(.gcc_except_table .gcc_except_table.*) 
+		*(.gcc_except_table .gcc_except_table.*)
 	} > RAM
-	
-		
+
 	.data : ALIGN(4)
 	{
 		/* preinit data */
@@ -147,7 +144,7 @@ SECTIONS
 		KEEP(*(.fini_array))
 		PROVIDE (__fini_array_end = .);
 
-		. = ALIGN(4);        
+		. = ALIGN(4);
 
 		*(vtable)
 		*(.data*)
@@ -161,25 +158,26 @@ SECTIONS
 	} > RAM AT > FLASH
 
 	__data_start__ = ADDR(.data);
-   	__data_loc__ = LOADADDR(.data);
-   	__data_size__ = SIZEOF(.data);
+	__data_loc__ = LOADADDR(.data);
+	__data_size__ = SIZEOF(.data);
 
    	.application_end_dummy : ALIGN(4)
    	{
 		__application_end_address = .;
    	} > FLASH
-	
+
 	.bss : ALIGN(4)
 	{
 		__bss_start__ = .;
 		*(.bss*)
 		*(COMMON)
-      	*(.gnu.linkonce.b.*)
+		*(.gnu.linkonce.b.*)
 		__bss_end__ = .;
-		PROVIDE(end = .);		              
+		PROVIDE(end = .);
 	} > RAM
+
         __bss_size__ = SIZEOF(.bss);
-	
+
 	.heap : ALIGN(4)
 	{
 		__end__ = .;
@@ -197,14 +195,12 @@ SECTIONS
 		*(.stack*)
 	} > RAM
 
-
-
 	/* Set stack top to end of RAM, and stack limit move down by
 	 * size of stack_dummy section */
 	__StackTop = ORIGIN(RAM) + LENGTH(RAM);
 	__StackLimit = __StackTop - SIZEOF(.stack_dummy);
 	PROVIDE(__stack = __StackTop);
-	
+
 	/* Check if data + heap + stack exceeds RAM limit */
 	ASSERT(__StackLimit >= __HeapLimit, "region RAM overflowed with stack")
 }
