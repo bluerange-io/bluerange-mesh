@@ -249,10 +249,12 @@ class Conf
 #include <board_pca10031.h>
 #include <board_ars100748.h>
 #include <board_pca10036.h>
+#include <board_pca10040.h>
 
 #define SET_BOARD() do{					\
 		SET_PCA10031_BOARD_IF_FIT(Config->boardType);		\
 		SET_PCA10036_BOARD_IF_FIT(Config->boardType);		\
+		SET_PCA10040_BOARD_IF_FIT(Config->boardType);		\
 		SET_ARS100748_BOARD_IF_FIT(Config->boardType);	\
 }while(0);
 
