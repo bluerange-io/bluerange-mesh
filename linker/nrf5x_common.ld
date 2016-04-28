@@ -50,6 +50,7 @@ SECTIONS
 	/* Code region starts here */
 	.text : ALIGN(4)
 	{
+		__application_start_address = .;
 		KEEP(*(.isr_vector))
 
 		KEEP(*(.Version))

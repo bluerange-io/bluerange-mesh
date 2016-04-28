@@ -10,8 +10,8 @@ SERIAL_DEVICE ?= /dev/ttyACM0  # FIXME Use proper matching for OSX compatiblity
 
 OUTPUT_FILENAME = $(PROJECT_NAME)
 
-SDK_PATH      ?= $(HOME)/nrf/sdk/nrf5_sdk_latest
-COMPONENTS     = $(SDK_PATH)/components
+NRF5_SDK_PATH ?= $(HOME)/nrf/sdk/nrf5_sdk_latest
+COMPONENTS     = $(NRF5_SDK_PATH)/components
 TEMPLATE_PATH  = $(COMPONENTS)/toolchain/gcc
 
 ifeq ($(OS),Windows_NT)
@@ -27,7 +27,12 @@ NO_ECHO := @
 endif
 
 # Tools
-MK              := mkdir
+ifeq ($(OS),Windows_NT)
+  MK := mkdir $(subst /,\,$@) > nul 2>&1 || (exit 0)
+else
+  MK := mkdir $@
+endif
+
 RM              := rm -rf
 NRFJPROG        := nrfjprog
 
@@ -102,9 +107,9 @@ endif
 
 # Board specific flags
 ifneq ($(filter $(BOARD),PCA10031 ARS100748),)
-	PLATFORM ?= NRF51
+  PLATFORM ?= NRF51
 else ifneq ($(filter $(BOARD),PCA10036 PCA10040),)
-	PLATFORM ?= NRF52
+  PLATFORM ?= NRF52
 endif
 
 # Platform specific flags
@@ -132,13 +137,14 @@ ASMFLAGS += $(CFLAGS) -x assembler-with-cpp -D__HEAP_SIZE=$(HEAP_SIZE) -D__STACK
 LIBS += -lgcc -lc -lnosys
 
 ## Building all targets
-all: $(BUILD_DIRECTORIES) $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex echosize
+all: $(OUTPUT_BINARY_DIRECTORY) $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex echosize
 
 ## Target for printing all targets (ayyyyyyy)
 help:
 	@echo following targets are available:
 	@echo   all
 	@echo 	flash
+	@echo 	flash_app
 	@echo 	flash_softdevice
 	@echo   serial
 
@@ -213,13 +219,20 @@ clean:
 cleanobj:
 	$(NO_ECHO)$(RM) $(BUILD_DIRECTORIES)/*.o
 
-## Flash device
+## Flash
 flash: $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex
+	@echo Flashing: $< + softdevice
+	$(NO_ECHO)$(NRFJPROG) --program $(SOFTDEVICE_PATH) -f $(PLATFORM) --chiperase $(PROGFLAGS)
+	$(NO_ECHO)$(NRFJPROG) --program $< -f $(PLATFORM) $(PROGFLAGS)
+	$(NO_ECHO)$(NRFJPROG) --reset -f $(PLATFORM) $(PROGFLAGS)
+
+## Flash app only
+flash_app: $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex
 	@echo Flashing: $<
 	$(NO_ECHO)$(NRFJPROG) --program $< -f $(PLATFORM) --sectorerase $(PROGFLAGS)
 	$(NO_ECHO)$(NRFJPROG) --reset -f $(PLATFORM) $(PROGFLAGS)
 
-## Flash softdevice
+## Flash softdevice only
 flash_softdevice:
 	@echo Flashing: $(SOFTDEVICE_PATH)
 	$(NO_ECHO)$(NRFJPROG) --program $(SOFTDEVICE_PATH) -f $(PLATFORM) --chiperase $(PROGFLAGS)
