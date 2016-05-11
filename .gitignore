@@ -1,6 +1,7 @@
 /Debug/
 /Release/
 _build/
+/Makefile.local
 /doc/
 /logs/
 /Debug52/
