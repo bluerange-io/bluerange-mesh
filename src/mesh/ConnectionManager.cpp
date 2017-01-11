@@ -188,6 +188,15 @@ Connection* ConnectionManager::getFreeConnection()
 	return NULL;
 }
 
+u32 ConnectionManager::getNumConnections(){
+	u32 count = 0;
+	for (int i = 0; i < Config->meshMaxConnections; i++)
+	{
+		if (!connections[i]->isDisconnected()) count++;
+	}
+	return count;
+}
+
 //Looks if there is a free connection available
 Connection* ConnectionManager::GetFreeOutConnection()
 {
@@ -239,6 +248,70 @@ Connection* ConnectionManager::ConnectAsMaster(nodeID partnerId, ble_gap_addr_t*
 	}
 
 	return pendingConnection;
+}
+
+/** Tries to reestablish connections */
+int ConnectionManager::ReestablishConnections(){
+
+	//Check if any of the reestablish connections should be disconnected forever
+	for(int i=0; i<Config->meshMaxConnections; i++){
+		if(
+			connections[i]->connectionState == Connection::ConnectionState::REESTABLISHING
+			&& node->appTimerDs - connections[i]->disconnectedTimestampDs > SEC_TO_DS(connections[i]->reestablishTimeSec)
+		){
+			Disconnect(connections[i]->connectionHandle);
+			//FIXME: must implement
+			logt("ERROR", "REAL DISCONNECT, must implement");
+		}
+	}
+
+	//First, check which connection needs reestablishing
+	//TODO: We could use a whitelist of connection partner is we need to reestablish
+	//multiple
+	Connection* connection = NULL;
+	for(int i=0; i<Config->meshMaxConnections; i++){
+		if(connections[i]->connectionState == Connection::ConnectionState::REESTABLISHING){
+			connection = connections[i];
+			break;
+		}
+	}
+
+
+
+	//Do not reestablish if nothing was found
+	if(connection == NULL) return 0;
+
+	//We have been a Peripheral in this connection, start to advertise
+	if(connection->direction == Connection::ConnectionDirection::CONNECTION_DIRECTION_IN){
+		logt("CM", "Waiting for node %u to reconnect", connection->partnerId);
+		//Update packet to make it connectable
+		node->UpdateJoinMePacket();
+
+		return 1;
+
+	} else {
+		logt("CM", "Should reconnect to node %u, %02x:..:%02x", connection->partnerId, connection->partnerAddress.addr[0], connection->partnerAddress.addr[5]);
+
+		//try to connect with same settings as previous connection as master
+		bool result = GAPController::connectToPeripheral(
+				&connection->partnerAddress,
+				connection->currentConnectionIntervalMs,
+				connection->reestablishTimeSec);
+
+		if(result){
+			logt("CM", "Waiting for connection to node %u", connection->partnerId);
+			//Put this connection in the pending connection
+			//not needed, can be compared to address
+			//pendingConnection = connection;
+
+			return 2;
+
+		} else {
+			logt("CM", "Connection not possible right now");
+
+			return 0;
+		}
+	}
 }
 
 
@@ -306,12 +379,25 @@ void ConnectionManager::BleEventHandler(ble_evt_t* bleEvent)
 	}
 }
 
+
 //Called as soon as a new connection is made, either as central or peripheral
 void ConnectionManager::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 {
 	ConnectionManager* cm = ConnectionManager::getInstance();
 
 	logt("CM", "Connection success");
+
+	Connection* connection = cm->IsConnectionReestablishment(bleEvent);
+
+	/* Part A: We have a connection reestablishment */
+	if(connection != NULL)
+	{
+		connection->ReconnectionSuccessfulHandler(bleEvent);
+		cm->fillTransmitBuffers();
+		cm->node->ChangeState(discoveryState::DISCOVERY);
+		return;
+	}
+	/* Part B: A normal incoming connection */
 
 	//FIXME: There is a slim chance that another central connects to us between
 	//This call and before switching off advertising.
@@ -384,6 +470,21 @@ void ConnectionManager::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 	cm->pendingConnection = NULL;
 }
 
+Connection* ConnectionManager::IsConnectionReestablishment(ble_evt_t* bleEvent)
+{
+	//Check if we already have a connection for this peer, identified by its address
+	ble_gap_addr_t* peerAddress = &bleEvent->evt.gap_evt.params.connected.peer_addr;
+	for(int i=0; i<Config->meshMaxConnections; i++){
+		if(connections[i]->connectionState == Connection::ConnectionState::REESTABLISHING){
+			if(memcmp(&connections[i]->partnerAddress, peerAddress, sizeof(ble_gap_addr_t)) == 0){
+				logt("CM", "Found existing connection id %u" , connections[i]->connectionId);
+				return connections[i];
+			}
+		}
+	}
+	return NULL;
+}
+
 //When a connection changes to encrypted
 void ConnectionManager::ConnectionEncryptedHandler(ble_evt_t* bleEvent)
 {
@@ -435,6 +536,8 @@ void ConnectionManager::handleDiscoveredCallback(u16 connectionHandle, u16 chara
 
 //Is called whenever a connection had been established and is now disconnected
 //due to a timeout, deliberate disconnection by the localhost, remote, etc,...
+//We might however decide to sustain it. it will only be lost after
+//the finalDisconnectionHander is called
 void ConnectionManager::DisconnectionHandler(ble_evt_t* bleEvent)
 {
 
@@ -446,38 +549,42 @@ void ConnectionManager::DisconnectionHandler(ble_evt_t* bleEvent)
 	//Save disconnction reason
 	connection->disconnectionReason = bleEvent->evt.gap_evt.params.disconnected.reason;
 
-	//LOG disconnection reason
-	Logger::getInstance().logError(Logger::errorTypes::HCI_ERROR, bleEvent->evt.gap_evt.params.disconnected.reason, cm->node->appTimerMs);
-
-	logt("CM", "Connection %u to %u DISCONNECTED", connection->connectionId, connection->partnerId);
-
-	//Check if the connection should be sustained (If it's been handshaked for more than 10 seconds and ran into a timeout)
+	//Check if the connection should be sustained
+	//(e.g. If it's been handshaked for more than 7 seconds and ran into a timeout)
 	if(
-			cm->node->appTimerMs - connection->connectionHandshakedTimestamp > 10 * 1000
-			&& bleEvent->evt.gap_evt.params.disconnected.reason == BLE_HCI_CONNECTION_TIMEOUT
-			&& cm->node->currentDiscoveryState != discoveryState::HANDSHAKE
-			&& cm->node->currentDiscoveryState != discoveryState::REESTABLISHING_CONNECTION
+			connection->handshakeDone()
+			&& cm->node->appTimerDs - connection->connectionHandshakedTimestampDs > SEC_TO_DS(60)
+			//&& bleEvent->evt.gap_evt.params.disconnected.reason == BLE_HCI_CONNECTION_TIMEOUT => problematic since there are multiple reasons, including the ominous BLE_GATTC_EVT_TIMEOUT
+			&& connection->reestablishTimeSec != 0
 	){
 		logt("CM", "Connection should be sustained");
 
-		//TODO: implement
+		//Log connection suspension
+		Logger::getInstance().logError(Logger::errorTypes::CUSTOM, Logger::customErrorTypes::TRYING_CONNECTION_SUSTAIN, connection->partnerId);
 
-		/*connection->connectionState = Connection::REESTABLISHING;
-
-		cm->node->ChangeState(discoveryState::REESTABLISHING_CONNECTION);
-
-		//We assume the same role as before the connection loss
-		if(connection->direction == Connection::ConnectionDirection::CONNECTION_DIRECTION_IN){
-			//We advertise
-			AdvertisingController::SetAdvertisingState(advState::ADV_STATE_HIGH);
-		} else {
-			//We try to initiate the connection
-			GAPController::connectToPeripheral(&connection->partnerAddress, Config->meshExtendedConnectionTimeout);
-
-		}*/
-
+		//Mark the connection as reestablishing, the state machine of the node
+		//will then try to reestablish it.
+		connection->disconnectedTimestampDs = cm->node->appTimerDs;
+		connection->connectionState = Connection::ConnectionState::REESTABLISHING;
 	}
+	//Connection will not be sustained
+	else
+	{
+		cm->FinalDisconnectionHandler(connection);
+	}
+}
 
+//Is called when a connection is closed after
+void ConnectionManager::FinalDisconnectionHandler(Connection* connection)
+{
+	ConnectionManager* cm = ConnectionManager::getInstance();
+
+	Logger::getInstance().logError(Logger::errorTypes::CUSTOM, Logger::customErrorTypes::FINAL_DISCONNECTION, connection->partnerId);
+
+	//LOG disconnection reason
+	Logger::getInstance().logError(Logger::errorTypes::HCI_ERROR, connection->disconnectionReason, connection->partnerId);
+
+	logt("CM", "Connection %u to %u DISCONNECTED", connection->connectionId, connection->partnerId);
 
 	if (connection->direction == Connection::CONNECTION_DIRECTION_IN) cm->freeInConnections++;
 	else cm->freeOutConnections++;
@@ -486,10 +593,10 @@ void ConnectionManager::DisconnectionHandler(ble_evt_t* bleEvent)
 	if(cm->pendingConnection == connection) cm->pendingConnection = NULL;
 
 	//Notify the connection itself
-	connection->DisconnectionHandler(bleEvent);
+	connection->DisconnectionHandler();
 
 	//Notify the callback of the disconnection (The Node probably)
-	cm->connectionManagerCallback->DisconnectionHandler(bleEvent);
+	cm->connectionManagerCallback->DisconnectionHandler(connection);
 
 	//Reset connection variables
 	connection->ResetValues();
@@ -535,11 +642,11 @@ void ConnectionManager::messageReceivedCallback(ble_evt_t* bleEvent)
 		//At first, some special treatment for out timestamp packet
 		if(packet->messageType == MESSAGE_TYPE_UPDATE_TIMESTAMP)
 		{
-			//Set our time to the received timestamp and update the time when we've received this packet
-			app_timer_cnt_get(&cm->node->globalTimeSetAt);
-			cm->node->globalTime = ((connPacketUpdateTimestamp*)packet)->timestamp;
+			//Set our time to the received timestamp
+			cm->node->globalTimeSec = ((connPacketUpdateTimestamp*)packet)->timestampSec;
+			cm->node->globalTimeRemainderTicks = ((connPacketUpdateTimestamp*)packet)->remainderTicks;
 
-			logt("NODE", "time updated at:%u with timestamp:%u", cm->node->globalTimeSetAt, (u32)cm->node->globalTime);
+			logt("NODE", "time updated with timestamp:%u", (u32)cm->node->globalTimeSec);
 		}
 
 		u8 t = ((connPacketHeader*)bleEvent->evt.gatts_evt.params.write.data)->messageType;
@@ -708,20 +815,13 @@ void ConnectionManager::fillTransmitBuffers(){
 					//TODO: This could be done more accurate because we receive an event when the
 					//Packet was sent, so we could calculate the time between sending and getting the event
 					//And send a second packet with the time difference.
+					//FIXME: Currently, half of the connection interval is added to make up for this
 					if(((connPacketHeader*) data)->messageType == MESSAGE_TYPE_UPDATE_TIMESTAMP){
-						//Add the time that it took from setting the time until it gets send
-						u32 additionalTime;
-						u32 rtc1;
-						app_timer_cnt_get(&rtc1);
-						app_timer_cnt_diff_compute(rtc1, node->globalTimeSetAt, &additionalTime);
+						logt("NODE", "sending time");
 
-						logt("NODE", "sending time:%u with prevRtc1:%u, rtc1:%u, diff:%u", (u32)node->globalTime, node->globalTimeSetAt, rtc1, additionalTime);
-
-						((connPacketUpdateTimestamp*) data)->timestamp = node->globalTime + additionalTime;
-
-
-						/*((connPacketUpdateTimestamp*) data)->timestamp = 0;
-						((connPacketUpdateTimestamp*) data)->milliseconds = 0;*/
+						node->UpdateGlobalTime();
+						((connPacketUpdateTimestamp*) data)->timestampSec = node->globalTimeSec;
+						((connPacketUpdateTimestamp*) data)->remainderTicks = node->globalTimeRemainderTicks + (connections[i]->currentConnectionIntervalMs * APP_TIMER_CLOCK_FREQ / 1000 / 2);
 					}
 
 

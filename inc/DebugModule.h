@@ -32,11 +32,14 @@ class DebugModule: public Module
 {
 	private:
 
-		//Module configuration that is saved persistently (size must be multiple of 4)
+		#pragma pack(push, 1)
+		//Module configuration that is saved persistently
 		struct DebugModuleConfiguration : ModuleConfiguration{
-			u32 rebootTimeMs; //Time until reboot
-			char testString[12];
+			u32 rebootTimeDs; //Time until reboot
+			//Insert more persistent config values here
+			u32 reserved; //Mandatory, read Module.h
 		};
+		#pragma pack(pop)
 
 		//Counters for flood messages
 		u8 flood;
@@ -51,12 +54,13 @@ class DebugModule: public Module
 			RESET_CONNECTION_LOSS_COUNTER = 1,
 			FLOOD_MESSAGE = 2,
 			INFO_MESSAGE = 3,
-			CAUSE_HARDFAULT_MESSAGE = 4
+			CAUSE_HARDFAULT_MESSAGE = 4,
+			SET_REESTABLISH_TIMEOUT = 5
 
 		};
 
 		enum DebugModuleActionResponseMessages{
-
+			REESTABLISH_TIMEOUT_RESPONSE = 5
 		};
 
 		#pragma pack(push)
@@ -72,6 +76,13 @@ class DebugModule: public Module
 
 		} DebugModuleInfoMessage;
 
+		#define SIZEOF_DEBUG_MODULE_REESTABLISH_TIMEOUT_MESSAGE 2
+		typedef struct
+		{
+			u16 reestablishTimeoutSec;
+
+		} DebugModuleReestablishTimeoutMessage;
+
 		#pragma pack(pop)
 
 		void CauseHardfault();
@@ -83,7 +94,7 @@ class DebugModule: public Module
 
 		void ResetToDefaultConfiguration();
 
-		void TimerEventHandler(u16 passedTime, u32 appTimer);
+		void TimerEventHandler(u16 passedTimeDs, u32 appTimerDs);
 
 		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
 

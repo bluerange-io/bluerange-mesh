@@ -51,7 +51,8 @@ Module::~Module()
 
 void Module::SaveModuleConfiguration()
 {
-	Storage::getInstance().QueuedWrite((u8*)configurationPointer, configurationLength, storageSlot, this);
+	int paddedLength = configurationLength - (configurationLength % 4);
+	Storage::getInstance().QueuedWrite((u8*)configurationPointer, paddedLength, storageSlot, this);
 }
 
 void Module::LoadModuleConfiguration()
@@ -63,8 +64,13 @@ void Module::LoadModuleConfiguration()
 		ConfigurationLoadedHandler();
 	} else {
 		//Start to load the saved configuration
+
+		bool bootloaderAvailable = (NRF_UICR->BOOTLOADERADDR != 0xFFFFFFFF);
+		u32 bootloaderAddress = bootloaderAvailable ? NRF_UICR->BOOTLOADERADDR : FLASH_SIZE;
+		u32 appSettingsAddress = bootloaderAddress - (PSTORAGE_NUM_OF_PAGES+1) * PAGE_SIZE;
+
 		//FIXME: only meant as hotfix, replace with NewStorage
-		memcpy((u8*)configurationPointer, (u8*)(PAGE_SIZE*254+storageSlot*STORAGE_BLOCK_SIZE), configurationLength);
+		memcpy((u8*)configurationPointer, (u8*)(appSettingsAddress + storageSlot*STORAGE_BLOCK_SIZE), configurationLength);
 		ConfigurationLoadedHandler();
 	}
 
@@ -213,11 +219,12 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 				ModuleConfiguration* newConfig = (ModuleConfiguration*)packet->data;
 				if(
 						newConfig->moduleVersion == configurationPointer->moduleVersion
-						&& dataFieldLength == configurationLength
+						&& dataFieldLength == configurationLength - sizeof(u32) //substract u32 reserved padding
 				){
 					//Backup the module id because it must not be sent in the packet
 					u8 moduleId = configurationPointer->moduleId;
-					memcpy(configurationPointer, packet->data, configurationLength);
+					memset(configurationPointer, 0x00, configurationLength);
+					memcpy(configurationPointer, packet->data, dataFieldLength);
 					configurationPointer->moduleId = moduleId;
 
 					//TODO: Maybe, we want to save this configuration, and afterwards send saveOK message
@@ -237,12 +244,12 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 
 					ConfigurationLoadedHandler();
 
-					//SaveModuleConfiguration();
+					SaveModuleConfiguration();
 				}
 				else
 				{
 					if(newConfig->moduleVersion != configurationPointer->moduleVersion) uart("ERROR", "{\"type\":\"error\",\"module\":%u,\"code\":1,\"text\":\"wrong config version.\"}" SEP, moduleId);
-					else uart("ERROR", "{\"type\":\"error\",\"module\":%u,\"code\":2,\"text\":\"wrong configuration length. \"}" SEP, moduleId);
+					else uart("ERROR", "{\"type\":\"error\",\"module\":%u,\"code\":2,\"text\":\"wrong config length %u instead of %u \"}" SEP, moduleId, dataFieldLength, configurationLength - sizeof(u32));
 				}
 			}
 			else if(packet->actionType == ModuleConfigMessages::GET_CONFIG)
@@ -315,6 +322,8 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 			}
 		}
 	}
+}
 
+void Module::ButtonHandler(u8 buttonId, u32 holdTime){
 
 }

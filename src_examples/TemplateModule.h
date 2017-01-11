@@ -67,7 +67,7 @@ class TemplateModule: public Module
 
 		void ResetToDefaultConfiguration();
 
-		void TimerEventHandler(u16 passedTime, u32 appTimer);
+		void TimerEventHandler(u16 passedTimeDs, u32 appTimerDs);
 
 		//void BleEventHandler(ble_evt_t* bleEvent);
 

@@ -58,7 +58,10 @@ void Connection::ResetValues(){
 	connectedClusterSize = 0;
 	packetReassemblyPosition = 0;
 	packetSendPosition = 0;
-	currentConnectionInterval = 0;
+	currentConnectionIntervalMs = 0;
+
+	disconnectedTimestampDs = 0;
+	reestablishTimeSec = Config->meshExtendedConnectionTimeoutSec;
 
 	connectionState = ConnectionState::DISCONNECTED;
 	encryptionState = EncryptionState::NOT_ENCRYPTED;
@@ -68,7 +71,7 @@ void Connection::ResetValues(){
 	memset(&clusterAck1Packet, 0x00, sizeof(connPacketClusterAck1));
 	memset(&clusterAck2Packet, 0x00, sizeof(connPacketClusterAck2));
 
-	handshakeStarted = 0;
+	handshakeStartedDs = 0;
 	writeCharacteristicHandle = BLE_GATT_HANDLE_INVALID;
 
 	rssiSamplesNum = 0;
@@ -130,7 +133,12 @@ void Connection::Disconnect()
 	connectionState = ConnectionState::DISCONNECTED;
 	//FIXME: This method should be able to disconnect an active connection and disconnect a connection that is in the CONNECTING state
 
-	GAPController::disconnectFromPartner(connectionHandle);
+	if(connectionStateBeforeDisconnection == ConnectionState::REESTABLISHING){
+		//A disconnect on a reestablishing connection will kill it
+		cm->FinalDisconnectionHandler(this);
+	} else {
+		GAPController::disconnectFromPartner(connectionHandle);
+	}
 }
 
 
@@ -141,7 +149,7 @@ void Connection::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 {
 	u32 err = 0;
 
-	this->handshakeStarted = node->appTimerMs;
+	this->handshakeStartedDs = node->appTimerDs;
 
 	if (direction == CONNECTION_DIRECTION_IN)
 		logt("CONN", "Incoming connection %d connected", connectionId);
@@ -155,11 +163,22 @@ void Connection::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 	}
 
 	//Save connection interval (min and max are the same values in this event)
-	currentConnectionInterval = bleEvent->evt.gap_evt.params.connected.conn_params.min_conn_interval;
+	currentConnectionIntervalMs = bleEvent->evt.gap_evt.params.connected.conn_params.min_conn_interval;
 
-	connectionState = CONNECTED;
+	connectionState = ConnectionState::CONNECTED;
 }
 
+void Connection::ReconnectionSuccessfulHandler(ble_evt_t* bleEvent){
+	logt("CONN", "Reconnection Successful");
+
+	connectionHandle = bleEvent->evt.gap_evt.conn_handle;
+	sd_ble_tx_packet_count_get(this->connectionHandle, &unreliableBuffersFree);
+	reliableBuffersFree = 1;
+
+	connectionState = ConnectionState::HANDSHAKE_DONE;
+
+	//TODO: do we have to get the tx_packet_count or update any other variables?
+}
 
 void Connection::StartHandshake(void)
 {
@@ -199,11 +218,10 @@ void Connection::StartHandshake(void)
 }
 
 #define __________________HANDLER__________________
-void Connection::DisconnectionHandler(ble_evt_t* bleEvent)
+void Connection::DisconnectionHandler()
 {
 	//Reason?
 	logt("DISCONNECT", "Disconnected %u from connId:%u, HCI:%u %s", partnerId, connectionId, disconnectionReason, Logger::getHciErrorString(disconnectionReason));
-
 
 	//Save connection state before disconnection
 	if(connectionState != ConnectionState::DISCONNECTED) connectionStateBeforeDisconnection = connectionState;
@@ -265,6 +283,14 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 	}
 
 
+
+	/*#################### RECONNETING_HANDSHAKE ############################*/
+	if(packetHeader->messageType == MESSAGE_TYPE_RECONNECT)
+	{
+		if(dataLength == SIZEOF_CONN_PACKET_RECONNECT){
+
+		}
+	}
 
 
 	/*#################### HANDSHAKE ############################*/
@@ -449,7 +475,7 @@ void Connection::BleEventHandler(ble_evt_t* bleEvent)
 			case BLE_GAP_EVT_CONN_PARAM_UPDATE:
 			{
 				logt("CONN", "new connection params set");
-				currentConnectionInterval = bleEvent->evt.gap_evt.params.conn_param_update.conn_params.max_conn_interval;
+				currentConnectionIntervalMs = bleEvent->evt.gap_evt.params.conn_param_update.conn_params.max_conn_interval;
 
 				break;
 			}

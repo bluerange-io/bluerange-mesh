@@ -55,6 +55,7 @@ AdvertisingModule::AdvertisingModule(u8 moduleId, Node* node, ConnectionManager*
 
 void AdvertisingModule::ConfigurationLoadedHandler()
 {
+	u32 err = 0;
 	//Does basic testing on the loaded configuration
 	Module::ConfigurationLoadedHandler();
 
@@ -62,18 +63,39 @@ void AdvertisingModule::ConfigurationLoadedHandler()
 	if(configuration.moduleVersion == 1){/* ... */};
 
 	//Do additional initialization upon loading the config
-
+	if(configuration.txPower != 0xFF){
+		//Error code is not checked, will silently fail
+		err = sd_ble_gap_tx_power_set(configuration.txPower);
+		if(err == NRF_SUCCESS){
+			//Update value from config
+			Config->radioTransmitPower = configuration.txPower;
+		}
+	}
 
 	//Start the Module...
-	logt("ADVMOD", "Config set");
+	logt("ADVMOD", "Config set, txPower %d");
 
 
 
 }
 
-void AdvertisingModule::TimerEventHandler(u16 passedTime, u32 appTimer)
+void AdvertisingModule::TimerEventHandler(u16 passedTimeDs, u32 appTimerDs)
 {
-	//Do stuff on timer...
+	//Activate asset adv message only after some time
+	//because if we had connections, the node would have reset the packet
+	//to a join_me packet (that's a hack,...)
+	//The assetId is 50 less than the nodeId because of another hack
+	//while implementing serialNumbers .... :-(
+	if(assetMode != 0 && assetMode < 11) assetMode++;
+	if(assetMode == 10){
+		const char* command = "set_config this adv 01:01:01:00:64:00:01:04:05:61:02:01:06:08:FF:4D:02:02:%02x:%02x:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00 0";
+		char tmp[strlen(command)];
+		sprintf(tmp, command, Config->serialNumberIndex & 0xFF, (Config->serialNumberIndex) >> 8);
+
+		Terminal::ProcessLine(tmp);
+		node->Stop();
+
+	}
 
 }
 
@@ -100,6 +122,7 @@ void AdvertisingModule::ResetToDefaultConfiguration()
 
 	configuration.advertisingIntervalMs = 100;
 	configuration.messageCount = 1;
+	configuration.txPower = 0xFF; //Set to invalid value
 
 	configuration.messageData[0].messageLength = 31;
 	memcpy(configuration.messageData[0].messageData, &flags, SIZEOF_ADV_STRUCTURE_FLAGS);
@@ -188,6 +211,21 @@ void AdvertisingModule::NodeStateChangedHandler(discoveryState newState)
 		node->UpdateJoinMePacket();
 	}
 }
+
+void AdvertisingModule::ButtonHandler(u8 buttonId, u32 holdTimeDs)
+{
+	//Put beacon into Asset mode, it will broadcast it's nodeId as an assetId
+	if(buttonId == 0 && holdTimeDs > SEC_TO_DS(3)){
+		logt("ADVMOD", "Asset mode activated");
+		assetMode = 1;
+		LedRed->On();
+		LedGreen->On();
+		LedBlue->On();
+		node->currentLedMode = ledMode::LED_MODE_ASSET;
+		cm->ForceDisconnectOtherConnections(NULL);
+	}
+}
+
 
 bool AdvertisingModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {

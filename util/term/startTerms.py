@@ -1,3 +1,5 @@
+#must uses pip install pyserial before using this script
+
 import sys
 import glob
 import serial

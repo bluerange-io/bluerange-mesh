@@ -41,7 +41,7 @@ extern "C"
 #define JOIN_ME_PACKET_BUFFER_MAX_ELEMENTS 5
 joinMeBufferPacket raw_joinMePacketBuffer[JOIN_ME_PACKET_BUFFER_MAX_ELEMENTS];
 
-#define MAX_JOIN_ME_PACKET_AGE_MS (15 * 1000)
+#define MAX_JOIN_ME_PACKET_AGE_DS (15 * 10)
 
 Node* Node::instance;
 ConnectionManager* Node::cm;
@@ -57,22 +57,23 @@ Node::Node(networkID networkId)
 	this->currentAckId = 0;
 
 	this->noNodesFoundCounter = 0;
-	this->passsedTimeSinceLastTimerHandler = 0;
+	this->passsedTimeSinceLastTimerHandlerDs = 0;
 
 	this->outputRawData = false;
 
-	this->lastRadioActiveCountResetTimerMs = 0;
 	this->radioActiveCount = 0;
 
-	globalTimeSetAt = 0;
-	globalTime = 0;
+	globalTimeSec = 0;
+	globalTimeRemainderTicks = 0;
+	previousRtcTicks = 0;
 
 	//Set the current state and its timeout
-	currentStateTimeoutMs = 0;
+	currentStateTimeoutDs = 0;
 	currentDiscoveryState = discoveryState::BOOTUP;
 	nextDiscoveryState = discoveryState::INVALID_STATE;
-	this->appTimerMs = 0;
-	this->lastDecisionTimeMs = 0;
+	this->appTimerDs = 0;
+	this->lastDecisionTimeDs = 0;
+	this->appTimerRandomOffsetDs = 0;
 
 	initializedByGateway = false;
 
@@ -168,6 +169,9 @@ void Node::ConfigurationLoadedHandler()
 		memcpy(&persistentConfig.nodeAddress, &Config->staticAccessAddress, sizeof(ble_gap_addr_t));
 	}
 
+	//Random offset that can be used to disperse packets from different nodes over time
+	this->appTimerRandomOffsetDs = (persistentConfig.nodeId % 100);
+
 	//Change window title of the Terminal
 	SetTerminalTitle();
 	logt("NODE", "====> Node %u (%s) <====", persistentConfig.nodeId, Config->serialNumber);
@@ -222,7 +226,6 @@ void Node::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 //Is called after a connection has ended its handshake
 void Node::HandshakeDoneHandler(Connection* connection, bool completedAsWinner)
 {
-
 	logt("HANDSHAKE", "############ Handshake done (asWinner:%u) ###############", completedAsWinner);
 
 	//We can now commit the changes that were part of the handshake
@@ -231,7 +234,6 @@ void Node::HandshakeDoneHandler(Connection* connection, bool completedAsWinner)
 		//Update node data
 		clusterSize += 1;
 		connection->hopsToSink = connection->clusterAck1Packet.payload.hopsToSink < 0 ? -1 : connection->clusterAck1Packet.payload.hopsToSink + 1;
-
 
 		logt("HANDSHAKE", "ClusterSize Change from %d to %d", clusterSize-1, clusterSize);
 
@@ -275,9 +277,10 @@ void Node::HandshakeDoneHandler(Connection* connection, bool completedAsWinner)
 		logt("HANDSHAKE", "ClusterSize set to %d", clusterSize);
 	}
 
+	uart("CLUSTER", "{\"type\":\"cluster_handshake\",\"winner\":%u,\"size\":%d}" SEP, completedAsWinner, clusterSize);
 
 	connection->connectionState = Connection::ConnectionState::HANDSHAKE_DONE;
-	connection->connectionHandshakedTimestamp = appTimerMs;
+	connection->connectionHandshakedTimestampDs = appTimerDs;
 
 	//Call our lovely modules
 	for(int i=0; i<MAX_MODULE_COUNT; i++){
@@ -319,11 +322,9 @@ void Node::ConnectingTimeoutHandler(ble_evt_t* bleEvent)
 	ChangeState(discoveryState::DISCOVERY);
 }
 
-void Node::DisconnectionHandler(ble_evt_t* bleEvent)
+void Node::DisconnectionHandler(Connection* connection)
 {
 	this->persistentConfig.connectionLossCounter++;
-
-	Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gap_evt.conn_handle);
 
 	//If the handshake was already done, this node was part of our cluster
 	//If the local host terminated the connection, we do not count it as a cluster Size change
@@ -385,6 +386,8 @@ void Node::DisconnectionHandler(ble_evt_t* bleEvent)
 
 	}
 
+	uart("CLUSTER", "{\"type\":\"cluster_disconnect\",\"size\":%d}" SEP, clusterSize);
+
 	//In either case, we must update our advertising packet
 	UpdateJoinMePacket();
 
@@ -402,7 +405,6 @@ void Node::DisconnectionHandler(ble_evt_t* bleEvent)
 void Node::ReceiveClusterInfoUpdate(Connection* connection, connPacketClusterInfoUpdate* packet)
 {
 	//Prepare cluster update packet for other connections
-
 	connPacketClusterInfoUpdate outPacket;
 	memset((u8*)&outPacket, 0x00, sizeof(connPacketClusterInfoUpdate));
 
@@ -432,11 +434,13 @@ void Node::ReceiveClusterInfoUpdate(Connection* connection, connPacketClusterInf
 		connection->connectionMasterBit = 1;
 	}
 
-
 	//hops to sink are updated in the send method
 	//current cluster id is updated in the send method
 
 	SendClusterInfoUpdate(connection, &outPacket);
+
+	//Log Cluster change to UART
+	uart("CLUSTER", "{\"type\":\"cluster_update\",\"size\":%d,\"newId\":%u,\"masterBit\":%u}" SEP, clusterSize, clusterId, packet->payload.connectionMasterBitHandover);
 
 	//Update adverting packet
 	this->UpdateJoinMePacket();
@@ -476,6 +480,7 @@ void Node::SendClusterInfoUpdate(Connection* ignoreConnection, connPacketCluster
 					cm->connections[i]->connectionMasterBit
 					&& cm->connections[i]->connectedClusterSize > (clusterSize - cm->connections[i]->connectedClusterSize)
 			){
+				cm->connections[i]->connectionMasterBit = 0;
 				currentPacket->payload.connectionMasterBitHandover = 1;
 			}
 
@@ -646,7 +651,9 @@ void Node::UpdateJoinMePacket()
 	logt("JOIN", "JOIN_ME updated clusterId:%x, clusterSize:%d, freeIn:%u, freeOut:%u, handle:%u, ack:%u", packet.clusterId, packet.clusterSize, packet.freeInConnections, packet.freeOutConnections, packet.meshWriteHandle, packet.ackField);
 
 	//Broadcast connectable advertisement if we have a free inConnection, otherwise, we can only act as master
-	if (cm->inConnection->isDisconnected()) AdvertisingController::UpdateAdvertisingData(MESSAGE_TYPE_JOIN_ME_V0, &data, true);
+	if (cm->inConnection->isDisconnected() || cm->inConnection->connectionState == Connection::ConnectionState::REESTABLISHING){
+		AdvertisingController::UpdateAdvertisingData(MESSAGE_TYPE_JOIN_ME_V0, &data, true);
+	}
 	else AdvertisingController::UpdateAdvertisingData(MESSAGE_TYPE_JOIN_ME_V0, &data, false);
 }
 
@@ -773,7 +780,7 @@ u32 Node::CalculateClusterScoreAsMaster(joinMeBufferPacket* packet)
 {
 
 	//If the packet is too old, filter it out
-	if (appTimerMs - packet->receivedTime > MAX_JOIN_ME_PACKET_AGE_MS) return 0;
+	if (appTimerDs - packet->receivedTimeDs > MAX_JOIN_ME_PACKET_AGE_DS) return 0;
 
 	//If we are already connected to that cluster, the score is 0
 	if (packet->payload.clusterId == this->clusterId) return 0;
@@ -820,7 +827,7 @@ u32 Node::CalculateClusterScoreAsSlave(joinMeBufferPacket* packet)
 {
 
 	//If the packet is too old, filter it out
-	if (appTimerMs - packet->receivedTime > MAX_JOIN_ME_PACKET_AGE_MS) return 0;
+	if (appTimerDs - packet->receivedTimeDs > MAX_JOIN_ME_PACKET_AGE_DS) return 0;
 
 	//If we are already connected to that cluster, the score is 0
 	if (packet->payload.clusterId == this->clusterId) return 0;
@@ -880,7 +887,7 @@ void Node::AdvertisementMessageHandler(ble_evt_t* bleEvent)
 					targetBuffer->payload.ackField = packet->payload.ackField;
 					targetBuffer->connectable = bleEvent->evt.gap_evt.params.adv_report.type;
 					targetBuffer->rssi = bleEvent->evt.gap_evt.params.adv_report.rssi;
-					targetBuffer->receivedTime = appTimerMs;
+					targetBuffer->receivedTimeDs = appTimerDs;
 				}
 			}
 			break;
@@ -923,8 +930,8 @@ joinMeBufferPacket* Node::findTargetBuffer(advPacketJoinMeV0* packet)
 	{
 		joinMeBufferPacket* tmpPacket = (joinMeBufferPacket*) joinMePacketBuffer->PeekItemAt(i);
 
-		if(tmpPacket->payload.clusterId == clusterId && tmpPacket->receivedTime < oldestTimestamp){
-			oldestTimestamp = tmpPacket->receivedTime;
+		if(tmpPacket->payload.clusterId == clusterId && tmpPacket->receivedTimeDs < oldestTimestamp){
+			oldestTimestamp = tmpPacket->receivedTimeDs;
 			targetBuffer = tmpPacket;
 		}
 	}
@@ -941,8 +948,8 @@ joinMeBufferPacket* Node::findTargetBuffer(advPacketJoinMeV0* packet)
 	{
 		joinMeBufferPacket* tmpPacket = (joinMeBufferPacket*) joinMePacketBuffer->PeekItemAt(i);
 
-		if(tmpPacket->receivedTime < oldestTimestamp){
-			oldestTimestamp = tmpPacket->receivedTime;
+		if(tmpPacket->receivedTimeDs < oldestTimestamp){
+			oldestTimestamp = tmpPacket->receivedTimeDs;
 			targetBuffer = tmpPacket;
 		}
 	}
@@ -1003,11 +1010,12 @@ void Node::ChangeState(discoveryState newState)
 			ChangeState(discoveryState::DISCOVERY_LOW);
 		}
 
+		//FIXME: this disables discovery low mode
 		ChangeState(discoveryState::DISCOVERY_HIGH);
 	}
 	else if (newState == discoveryState::DISCOVERY_HIGH)
 	{
-		currentStateTimeoutMs = Config->meshStateTimeoutHigh;
+		currentStateTimeoutDs = Config->meshStateTimeoutHighDs;
 		nextDiscoveryState = discoveryState::DECIDING;
 
 		logt("STATES", "-- DISCOVERY HIGH --");
@@ -1017,7 +1025,7 @@ void Node::ChangeState(discoveryState newState)
 	}
 	else if (newState == discoveryState::DISCOVERY_LOW)
 	{
-		currentStateTimeoutMs = Config->meshStateTimeoutLow;
+		currentStateTimeoutDs = Config->meshStateTimeoutLowDs;
 		nextDiscoveryState = discoveryState::DECIDING;
 
 		logt("STATES", "-- DISCOVERY LOW --");
@@ -1035,31 +1043,46 @@ void Node::ChangeState(discoveryState newState)
 		AdvertisingController::SetAdvertisingState(ADV_STATE_OFF);
 		ScanController::SetScanState(SCAN_STATE_OFF);
 
-		Node::decisionResult decision = DetermineBestClusterAvailable();
+		//Check if we want to reestablish a connection
+		int result = cm->ReestablishConnections();
 
-
-		if (decision == Node::DECISION_NO_NODES_FOUND)
-		{
-			if (noNodesFoundCounter < 100) //Do not overflow
-				noNodesFoundCounter++;
-			ChangeState(discoveryState::BACK_OFF);
-		}
-		else if (decision == Node::DECISION_CONNECT_AS_MASTER)
-		{
+		if(result == 1){
+			//as peripheral
+			ChangeState(discoveryState::DISCOVERY_HIGH);
+		} else if(result == 2){
 			ChangeState(discoveryState::CONNECTING);
-			noNodesFoundCounter = 0;
+		} else if (result == 0){
+
+			//Check if there is a good cluster
+			Node::decisionResult decision = DetermineBestClusterAvailable();
+
+
+			if (decision == Node::DECISION_NO_NODES_FOUND)
+			{
+				if (noNodesFoundCounter < 100) //Do not overflow
+					noNodesFoundCounter++;
+				ChangeState(discoveryState::BACK_OFF);
+			}
+			else if (decision == Node::DECISION_CONNECT_AS_MASTER)
+			{
+				ChangeState(discoveryState::CONNECTING);
+				noNodesFoundCounter = 0;
+			}
+			else if (decision == Node::DECISION_CONNECT_AS_SLAVE)
+			{
+				noNodesFoundCounter = 0;
+				ChangeState(discoveryState::DISCOVERY);
+			}
+
 		}
-		else if (decision == Node::DECISION_CONNECT_AS_SLAVE)
-		{
-			noNodesFoundCounter = 0;
-			ChangeState(discoveryState::DISCOVERY);
-		}
+
+
 	}
 	else if (newState == discoveryState::BACK_OFF)
 	{
 		nextDiscoveryState = discoveryState::DISCOVERY;
-		if(Config->meshStateTimeoutBackOff == 0) currentStateTimeoutMs = Config->meshStateTimeoutBackOff;
-		else currentStateTimeoutMs = (Config->meshStateTimeoutBackOff + (Utility::GetRandomInteger() % Config->meshStateTimeoutBackOffVariance)); // 5 - 8 sec
+		if(Config->meshStateTimeoutBackOffDs == 0) currentStateTimeoutDs = Config->meshStateTimeoutBackOffDs;
+		else currentStateTimeoutDs = (Config->meshStateTimeoutBackOffDs + (Utility::GetRandomInteger() % Config->meshStateTimeoutBackOffVarianceDs)); // 5 - 8 sec
 
 		logt("STATES", "-- BACK OFF --");
 		AdvertisingController::SetAdvertisingState(ADV_STATE_OFF);
@@ -1071,7 +1094,7 @@ void Node::ChangeState(discoveryState newState)
 		//This might be a timeout, or a success
 		//Which will call the Handshake state
 		//But we will set a high timeout in case anything fails
-		currentStateTimeoutMs = 30 * 1000;
+		currentStateTimeoutDs = SEC_TO_DS(30);
 		nextDiscoveryState = discoveryState::DECIDING;
 
 
@@ -1080,22 +1103,12 @@ void Node::ChangeState(discoveryState newState)
 		ScanController::SetScanState(SCAN_STATE_OFF);
 
 	}
-	else if (newState == discoveryState::REESTABLISHING_CONNECTION)
-	{
-		//Connection Manager handles reconnecting
-		currentStateTimeoutMs = Config->meshExtendedConnectionTimeout;
-		nextDiscoveryState = discoveryState::DECIDING;
-
-
-		logt("STATES", "-- REESTABLISHING_CONNECTION --");
-		AdvertisingController::SetAdvertisingState(ADV_STATE_OFF);
-		ScanController::SetScanState(SCAN_STATE_OFF);
-
-	}
 	else if (newState == discoveryState::HANDSHAKE)
 	{
 		//Use a timeout that is high enough for the handshake to finish
-		currentStateTimeoutMs = 2 * 1000;
+		if(Config->meshHandshakeTimeoutDs != 0){
+			currentStateTimeoutDs = Config->meshHandshakeTimeoutDs;
+		}
 		nextDiscoveryState = discoveryState::HANDSHAKE_TIMEOUT;
 
 
@@ -1145,27 +1158,17 @@ void Node::Stop(){
 	DisableStateMachine(true);
 }
 
-void Node::TimerTickHandler(u16 timerMs)
+void Node::TimerTickHandler(u16 timerDs)
 {
-	passsedTimeSinceLastTimerHandler = timerMs;
+	//Update the app timer (The app timer has a drift when comparing it to the
+	//config value in deciseconds because these do not convert nicely into ticks)
+	appTimerDs += timerDs;
+	currentStateTimeoutDs -= timerDs;
 
-	appTimerMs += timerMs;
-	currentStateTimeoutMs -= timerMs;
-
-	//Update our global time
-	//TODO: should take care of PRESCALER register value as well
-	//FIXME: This timer will wrap after around 30 days, this should be changed
-	u32 rtc1, passedTime;
-	app_timer_cnt_get(&rtc1);
-	app_timer_cnt_diff_compute(rtc1, globalTimeSetAt, &passedTime);
-
-	globalTime += passedTime;
-	app_timer_cnt_get(&globalTimeSetAt); //Update the time that the timestamp was last updated
-
-	//logt("TIMER", "Tick, appTimer %d, stateTimeout:%d, lastDecisionTime:%d, state:%d=>%d", appTimerMs, currentStateTimeoutMs, lastDecisionTimeMs, currentDiscoveryState, nextDiscoveryState);
+	UpdateGlobalTime();
 
 	//Check if we should switch states because of timeouts
-	if (nextDiscoveryState != INVALID_STATE && currentStateTimeoutMs <= 0)
+	if (nextDiscoveryState != INVALID_STATE && currentStateTimeoutDs <= 0)
 	{
 
 		//Go to the next state
@@ -1240,6 +1243,25 @@ void Node::TimerTickHandler(u16 timerMs)
 		LedGreen->Off();
 		LedBlue->Off();
 	}
+	else if(currentLedMode == ledMode::LED_MODE_ASSET)
+	{
+		LedRed->Toggle();
+		LedGreen->Toggle();
+		LedBlue->Toggle();
+	}
+}
+
+void Node::UpdateGlobalTime(){
+	//Request the Realtimeclock counter
+	u32 rtc1, passedTime;
+	app_timer_cnt_get(&rtc1);
+	app_timer_cnt_diff_compute(rtc1, previousRtcTicks, &passedTime);
+	previousRtcTicks = rtc1;
+
+	//Update the global time seconds and save the remainder for the next iteration
+	passedTime += globalTimeRemainderTicks;
+	globalTimeSec += passedTime / APP_TIMER_CLOCK_FREQ;
+	globalTimeRemainderTicks = passedTime % APP_TIMER_CLOCK_FREQ;
 }
 
 #pragma endregion States
@@ -1377,14 +1399,15 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	{
 		sd_nvic_SystemReset(); //OK
 	}
-	else if (commandName == "startterm")
+	/************ TESTING ************/
+	else if (commandName == "sustain")
 	{
-		Terminal::promptAndEchoMode = true;
-	}
-	else if (commandName == "stopterm")
-	{
-		Terminal::promptAndEchoMode = false;
-		Logger::getInstance().disableAll();
+		for(int i=0; i<4; i++){
+			if(cm->connections[i]->isConnected()){
+				cm->connections[i]->reestablishTimeSec = 40;
+				logt("ERROR", "sustain time set");
+			}
+		}
 	}
 	/************* NODE ***************/
 	//Get a full status of the node
@@ -1452,22 +1475,17 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	//Set a timestamp for this node
 	else if (commandName == "settime")
 	{
-		u64 timeStamp = (atoi(commandArgs[0].c_str()) * (u64)APP_TIMER_CLOCK_FREQ);
-
 		//Set the time for our node
-		globalTime = timeStamp;
-		app_timer_cnt_get(&globalTimeSetAt);
+		globalTimeSec = atoi(commandArgs[0].c_str());
+		globalTimeRemainderTicks = 0;
 	}
 	//Display the time of this node
 	else if(commandName == "gettime")
 	{
-		u32 rtc1;
-		app_timer_cnt_get(&rtc1);
-
 		char timestring[50];
-		Logger::getInstance().convertTimestampToString(globalTime, timestring);
+		Logger::getInstance().convertTimestampToString(globalTimeSec, globalTimeRemainderTicks, timestring);
 
-		trace("Time is currently %s, setAt:%d, rtc1:%u" EOL, timestring, globalTimeSetAt, rtc1);
+		trace("Time is currently %s" EOL, timestring);
 	}
 	//Generate a timestamp packet and send it to all other nodes
 	else if (commandName == "sendtime")
@@ -1555,6 +1573,15 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 			cm->connections[connectionNumber]->Disconnect();
 		}
 	}
+	//tell the gap layer to loose a connection
+	else if (commandName == "gap_disconnect" || commandName == "dis")
+	{
+		if (commandArgs.size() > 0)
+		{
+			u8 connectionNumber = atoi(commandArgs[0].c_str());
+			GAPController::disconnectFromPartner(cm->connections[connectionNumber]->connectionHandle);
+		}
+	}
 	else if(commandName == "update_iv")
 	{
 		nodeID nodeId = atoi(commandArgs[0].c_str());
@@ -1627,6 +1654,11 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		return false;
 	}
 	return true;
+}
+
+void Node::ButtonHandler(u8 buttonId, u32 holdTimeDs)
+{
+
 }
 
 inline void Node::SendModuleList(nodeID toNode, u8 requestHandle)

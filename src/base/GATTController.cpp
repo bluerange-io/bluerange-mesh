@@ -148,14 +148,14 @@ void GATTController::meshServiceDisconnectHandler(ble_evt_t* bleEvent)
 }
 
 /**@brief Write event handler.
- *
- * @param[in]   p_lbs       LEDButton Service structure.
- * @param[in]   p_ble_evt   Event received from the BLE stack.
+ *	reveices a BLE_GATTS_EVT_WRITE
  */
 void GATTController::meshServiceWriteHandler(ble_evt_t* bleEvent)
 {
 	//Send packet to Node which is responsible for sanity checking the packet
-	messageReceivedCallback(bleEvent);
+	if(bleEvent->evt.gatts_evt.params.write.handle == 14){
+		messageReceivedCallback(bleEvent);
+	}
 
 }
 
@@ -333,7 +333,7 @@ bool GATTController::bleMeshServiceEventHandler(ble_evt_t* bleEvent)
 			//A GATTC Timeout occurs if a WRITE_RSP is not received within 30s
 			//This essentially marks the end of a connection, we'll have to disconnect
 			logt("ERROR", "BLE_GATTC_EVT_TIMEOUT");
-			Logger::getInstance().logError(Logger::errorTypes::CUSTOM, 1, 0);
+			Logger::getInstance().logError(Logger::errorTypes::CUSTOM, Logger::customErrorTypes::BLE_GATTC_EVT_TIMEOUT_FORCED_US, 0);
 
 			GAPController::disconnectFromPartner(bleEvent->evt.gattc_evt.conn_handle);
 

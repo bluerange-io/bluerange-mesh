@@ -57,7 +57,6 @@ private:
 	vector<string>::iterator logFilterIterator;
 
 	char mhTraceBuffer[TRACE_BUFFER_SIZE] = { 0 };
-	char mhTraceBuffer2[TRACE_BUFFER_SIZE] = { 0 };
 
 public:
 	static Logger& getInstance(){
@@ -69,11 +68,18 @@ public:
 #define NUM_ERROR_LOG_ENTRIES 100
 	typedef struct{
 			u8 errorType;
+			u16 extraInfo;
 			u32 errorCode;
 			u32 timestamp;
 	} errorLogEntry;
 
 	enum errorTypes { SD_CALL_ERROR=0, HCI_ERROR = 1, CUSTOM = 2 };
+
+	enum customErrorTypes{
+		BLE_GATTC_EVT_TIMEOUT_FORCED_US=1,
+		TRYING_CONNECTION_SUSTAIN=2,
+		FINAL_DISCONNECTION=3
+	};
 
 	static errorLogEntry errorLog[NUM_ERROR_LOG_ENTRIES];
 	static u8 errorLogPosition;
@@ -86,7 +92,7 @@ public:
 	void log_f(bool printLine, const char* file, i32 line, const char* message, ...);
 	void logTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...);
 
-	void logError(errorTypes errorType, u32 errorCode, u32 timestamp);
+	void logError(errorTypes errorType, u32 errorCode, u16 extraInfo);
 
 	void uart_error_f(UartErrorType type);
 
@@ -115,7 +121,7 @@ public:
 	void blePrettyPrintAdvData(sizedData advData);
 	void convertBufferToHexString(u8* srcBuffer, u32 srcLength, char* dstBuffer, u16 bufferLength);
 	void parseHexStringToBuffer(const char* hexString, u8* dstBuffer, u16 dstBufferSize);
-	void convertTimestampToString(u64 timestamp, char* buffer);
+	void convertTimestampToString(u32 timestamp, u16 remainderTicks, char* buffer);
 
 };
 
@@ -124,7 +130,7 @@ public:
  * */
 
 //Used for UART communication between node and attached pc
-#ifdef ENABLE_UART
+#ifdef USE_UART
 #define uart(tag, message, ...) Logger::getInstance().log_f(false, __FILE_S__, __LINE__, message, ##__VA_ARGS__)
 #define uart_error(type) Logger::getInstance().uart_error_f(type)
 #else

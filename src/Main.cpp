@@ -77,8 +77,6 @@ static u16 sizeOfCurrentEvent = sizeOfEvent;
 //Reference to Node
 Node* node = NULL;
 
-Conf* Conf::instance;
-
 LedWrapper* LedRed = NULL;
 LedWrapper* LedGreen = NULL;
 LedWrapper* LedBlue = NULL;
@@ -116,15 +114,19 @@ int main(void)
 	Logger::getInstance().enableTag("STORAGE");
 	Logger::getInstance().enableTag("DATA");
 	Logger::getInstance().enableTag("SEC");
-//	Logger::getInstance().enableTag("HANDSHAKE");
+	Logger::getInstance().enableTag("HANDSHAKE");
 //	Logger::getInstance().enableTag("DISCOVERY");
 //	Logger::getInstance().enableTag("CONN");
 //	Logger::getInstance().enableTag("STATES");
 //	Logger::getInstance().enableTag("ADV");
 //	Logger::getInstance().enableTag("SINK");
-//	Logger::getInstance().enableTag("CM");
-//	Logger::getInstance().enableTag("CONN");
+	Logger::getInstance().enableTag("CM");
+	Logger::getInstance().enableTag("CONN");
 //	Logger::getInstance().enableTag("CONN_DATA");
+//	Logger::getInstance().enableTag("STATES");
+
+	//Initialize GPIOTE for Buttons
+	initGpioteButtons();
 
 	//Initialialize the SoftDevice and the BLE stack
 	bleInit();
@@ -138,13 +140,39 @@ int main(void)
 	//Init the magic
 	node = new Node(Config->meshNetworkIdentifier);
 
+	//Entrance 1,1
+	//string line = "set_config this adv 01:01:01:00:64:00:01:04:01:F1:02:01:06:1A:FF:4C:00:02:15:E6:C9:4B:91:13:99:42:0B:AB:B7:30:AF:D2:45:03:94:00:01:00:01:CB:00 0";
+
+	//Entrance 1,2
+//	string line = "set_config this adv 01:01:01:00:64:00:01:04:01:F1:02:01:06:1A:FF:4C:00:02:15:E6:C9:4B:91:13:99:42:0B:AB:B7:30:AF:D2:45:03:94:00:01:00:02:CB:00 0";
+//
+//	//Garage 1,3
+//	string line = "set_config this adv 01:01:01:00:64:00:01:04:01:F1:02:01:06:1A:FF:4C:00:02:15:A6:C9:4B:91:13:99:42:0B:AB:B7:30:AF:D2:45:03:94:00:01:00:03:CB:00 0";
+//
+//	//Garage 1,4
+//	string line = "set_config this adv 01:01:01:00:64:00:01:04:01:F1:02:01:06:1A:FF:4C:00:02:15:A6:C9:4B:91:13:99:42:0B:AB:B7:30:AF:D2:45:03:94:00:01:00:04:CB:00 0";
+
+	//Asset 11
+	//string line = "set_config this adv 01:01:01:00:64:00:01:04:05:61:02:01:06:08:FF:4D:02:02:0B:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00 0";
+
+	//Asset 7 (kleiner beacon)
+	//string line = "set_config this adv 01:01:01:00:64:00:01:04:05:61:02:01:06:08:FF:4D:02:02:07:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00 0";
+
+	//Terminal::ProcessLine((char*)line.c_str());
+
+	//node->Stop();
 
 
-	new Testing();
+
+	//new Testing();
 
 
 	//Start Timers
 	initTimers();
+
+	//TestBattery* testBattery = new TestBattery();
+	//testBattery->startTesting();
+	//testBattery->scanAt50Percent();
 
 	pendingSysEvent = 0;
 
@@ -153,7 +181,7 @@ int main(void)
 		u32 err = NRF_ERROR_NOT_FOUND;
 
 		//Check if there is input on uart
-		Terminal::PollUART();
+		Terminal::CheckAndProcessLine();
 
 		do
 		{
@@ -170,17 +198,30 @@ int main(void)
 			//No more events available
 			else if (err == NRF_ERROR_NOT_FOUND)
 			{
+				//Handle waiting button event
+				if(button1HoldTimeDs != 0){
+					u32 holdTimeDs = button1HoldTimeDs;
+					button1HoldTimeDs = 0;
+
+					node->ButtonHandler(0, holdTimeDs);
+
+					dispatchButtonEvents(0, holdTimeDs);
+				}
 
 				//Handle Timer event that was waiting
-				if (node && node->passsedTimeSinceLastTimerHandler > 0)
+				if (node && node->passsedTimeSinceLastTimerHandlerDs > 0)
 				{
+					u16 timerDs = node->passsedTimeSinceLastTimerHandlerDs;
+
 					//Call the timer handler from the node
-					node->TimerTickHandler(node->passsedTimeSinceLastTimerHandler);
+					node->TimerTickHandler(timerDs);
 
 					//Dispatch timer to all other modules
-					timerEventDispatch(node->passsedTimeSinceLastTimerHandler, node->appTimerMs);
+					timerEventDispatch(timerDs, node->appTimerDs);
 
-					node->passsedTimeSinceLastTimerHandler = 0;
+					//FIXME: Should protect this with a semaphore
+					//because the timerInterrupt works asynchronously
+					node->passsedTimeSinceLastTimerHandlerDs -= timerDs;
 				}
 
 				//If a pending system event is waiting, call the handler
@@ -312,21 +353,6 @@ volatile uint32_t keepInfo;
 			nrf_delay_us(50000);
 		}
 
-		//Output Error message to UART
-		if(error_code != NRF_SUCCESS){
-			const char* errorString = Logger::getNrfErrorString(error_code);
-			logt("ERROR", "ERROR CODE %d: %s in file %s@%d", error_code, errorString, p_file_name, line_num);
-		}
-
-		//NRF_ERROR_BUSY is not an error(tm)
-		//FIXME: above statement is not true
-		if (error_code == NRF_ERROR_BUSY)
-		{
-			return;
-		}
-
-		//All other errors will run into endless loop for debugging
-		if(Config->debugMode) while(1){}
 		else NVIC_SystemReset();
 	}
 
@@ -370,25 +396,23 @@ volatile uint32_t keepInfo;
 			nrf_delay_us(50000);
 		}
 		else NVIC_SystemReset();
-		NVIC_SystemReset();
-		for (;;)
-		{
-			// Endless debugger loop
-			LedRed->On();
-			for(int i=0; i<100000; i++){}
-			LedRed->Off();
-			for(int i=0; i<100000; i++){}
-			// Endless debugger loop
-		}
 	}
 
-//	void UART0_IRQHandler(void){
-//		LedBlue->Toggle();
-//
-//		// Clear UART ERROR event flag.
-//		NRF_UART0->EVENTS_ERROR = 0;
-//	}
+	//This handler receives UART interrupts if terminal mode is disabled
+	void UART0_IRQHandler(void)
+	{
+		dispatchUartInterrupt();
+	}
 
+}
+
+void dispatchButtonEvents(u8 buttonId, u32 buttonHoldTime)
+{
+	for(int i=0; i<MAX_MODULE_COUNT; i++){
+		if(node != NULL && node->activeModules[i] != 0  && node->activeModules[i]->configurationPointer->moduleActive){
+			node->activeModules[i]->ButtonHandler(buttonId, buttonHoldTime);
+		}
+	}
 }
 
 void bleDispatchEventHandler(ble_evt_t * bleEvent)
@@ -454,7 +478,7 @@ static void ble_timer_dispatch(void * p_context)
 
     //We just increase the time that has passed since the last handler
     //And call the timer from our main event handling queue
-    node->passsedTimeSinceLastTimerHandler += Config->mainTimerTickMs;
+    node->passsedTimeSinceLastTimerHandlerDs += Config->mainTimerTickDs;
 
     //Timer handlers are called from the main event handling queue and from timerEventDispatch
 }
@@ -478,9 +502,58 @@ void initTimers(void){
 	err = app_timer_create(&mainTimerMsId, APP_TIMER_MODE_REPEATED, ble_timer_dispatch);
     APP_ERROR_CHECK(err);
 
-	err = app_timer_start(mainTimerMsId, APP_TIMER_TICKS(Config->mainTimerTickMs, APP_TIMER_PRESCALER), NULL);
+	err = app_timer_start(mainTimerMsId, APP_TIMER_TICKS(Config->mainTimerTickDs * 100, APP_TIMER_PRESCALER), NULL);
     APP_ERROR_CHECK(err);
 }
+
+// ######################### UART
+void dispatchUartInterrupt(){
+#ifdef USE_UART
+	Terminal::UartInterruptHandler();
+#endif
+}
+
+// ######################### GPIO Tasks and Events
+void initGpioteButtons(){
+#ifdef USE_BUTTONS
+	//Activate GPIOTE if not already active
+	nrf_drv_gpiote_init();
+
+	//Register for both HighLow and LowHigh events
+	//IF this returns NO_MEM, increase GPIOTE_CONFIG_NUM_OF_LOW_POWER_EVENTS
+	nrf_drv_gpiote_in_config_t buttonConfig;
+	buttonConfig.sense = NRF_GPIOTE_POLARITY_TOGGLE;
+	buttonConfig.pull = NRF_GPIO_PIN_PULLUP;
+	buttonConfig.is_watcher = false;
+	buttonConfig.hi_accuracy = false;
+
+	//This uses the SENSE low power feature, all pin events are reported
+	//at the same GPIOTE channel
+	u32 err =  nrf_drv_gpiote_in_init(Config->Button1Pin, &buttonConfig, buttonInterruptHandler);
+
+	//Enable the events
+	nrf_drv_gpiote_in_event_enable(Config->Button1Pin, true);
+#endif
+}
+
+void buttonInterruptHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action){
+	LedGreen->Toggle();
+
+	//Because we don't know which state the button is in, we have to read it
+	u32 state = nrf_gpio_pin_read(pin);
+
+	//An interrupt generated by our button
+	if(pin == (u8)Config->Button1Pin){
+		if(state == Config->ButtonsActiveHigh){
+			button1PressTimeDs = node->appTimerDs;
+		} else if(state == !Config->ButtonsActiveHigh && button1PressTimeDs != 0){
+			button1HoldTimeDs = node->appTimerDs - button1PressTimeDs;
+			button1PressTimeDs = 0;
+		}
+	}
+}
+
+
 
 /**
  *@}

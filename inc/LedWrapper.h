@@ -28,23 +28,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
-extern "C"{
-	#include <stdint.h>
-}
+#include <types.h>
+
 
 class LedWrapper
 {
 private: 
-    uint32_t m_io_msk;
+    u32 m_io_msk;
     bool m_active_high;
     bool active;
 
 public:
-    LedWrapper(uint32_t io_num, bool active_high);
+    LedWrapper(i8 io_num, bool active_high);
     void On(void);
     void Off(void);
     void Toggle(void);
-
-    uint32_t lastStateChangeMs;
 };
 

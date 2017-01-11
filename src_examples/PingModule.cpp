@@ -61,7 +61,7 @@ void PingModule::ConfigurationLoadedHandler()
 
 }
 
-void PingModule::TimerEventHandler(u16 passedTime, u32 appTimer)
+void PingModule::TimerEventHandler(u16 passedTimeDs, u32 appTimerDs)
 {
 	//Do stuff on timer...
 

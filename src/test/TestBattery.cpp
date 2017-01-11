@@ -33,7 +33,7 @@ extern "C"{
 Node* TestBattery::node;
 ConnectionManager* TestBattery::cm;
 
-u16 deactivateDiscoveryAfterMs = 0;
+u16 deactivateDiscoveryAfterDs = 0;
 
 
 
@@ -43,7 +43,7 @@ TestBattery::TestBattery()
 }
 
 void TestBattery::TimerHandler(){
-	if(deactivateDiscoveryAfterMs != 0 && deactivateDiscoveryAfterMs < node->appTimerMs){
+	if(deactivateDiscoveryAfterDs != 0 && deactivateDiscoveryAfterDs < node->appTimerDs){
 
 		node->ChangeState(discoveryState::DISCOVERY_OFF);
 		node->DisableStateMachine(true);
@@ -132,10 +132,10 @@ void TestBattery::meshWith100MsConnAndHighDiscovery()
 	Config->meshScanIntervalHigh = MSEC_TO_UNITS(40, UNIT_0_625_MS);	//(20-1024) Determines scan interval in units of 0.625 millisecond.
 	Config->meshScanWindowHigh = MSEC_TO_UNITS(20, UNIT_0_625_MS);
 
-	Config->meshStateTimeoutHigh = 3 * 1000;
+	Config->meshStateTimeoutHighDs = SEC_TO_DS(3);
 
-	Config->meshStateTimeoutBackOff = 1 * 1000;
-	Config->meshStateTimeoutBackOffVariance = 1 * 1000;
+	Config->meshStateTimeoutBackOffDs = SEC_TO_DS(1);
+	Config->meshStateTimeoutBackOffVarianceDs = SEC_TO_DS(1);
 
 	node->DisableStateMachine(false);
 	node->ChangeState(discoveryState::DISCOVERY_HIGH);
@@ -150,10 +150,10 @@ void TestBattery::meshWith100msConnAndLowDiscovery()
 	Config->meshScanIntervalHigh = MSEC_TO_UNITS(2000, UNIT_0_625_MS);	//(20-1024) Determines scan interval in units of 0.625 millisecond.
 	Config->meshScanWindowHigh = MSEC_TO_UNITS(10, UNIT_0_625_MS);
 
-	Config->meshStateTimeoutHigh = 8 * 1000;
+	Config->meshStateTimeoutHighDs = SEC_TO_DS(8);
 
-	Config->meshStateTimeoutBackOff = 5 * 1000;
-	Config->meshStateTimeoutBackOffVariance = 5 * 1000;
+	Config->meshStateTimeoutBackOffDs = SEC_TO_DS(5);
+	Config->meshStateTimeoutBackOffVarianceDs = SEC_TO_DS(5);
 
 	node->DisableStateMachine(false);
 	node->ChangeState(discoveryState::DISCOVERY_HIGH);
@@ -168,17 +168,17 @@ void TestBattery::meshWith30msConnAndDiscoveryOff()
 		Config->meshScanIntervalHigh = MSEC_TO_UNITS(40, UNIT_0_625_MS);	//(20-1024) Determines scan interval in units of 0.625 millisecond.
 		Config->meshScanWindowHigh = MSEC_TO_UNITS(20, UNIT_0_625_MS);
 
-		Config->meshStateTimeoutHigh = 3 * 1000;
+		Config->meshStateTimeoutHighDs = SEC_TO_DS(3);
 
-		Config->meshStateTimeoutBackOff = 1 * 1000;
-		Config->meshStateTimeoutBackOffVariance = 1 * 1000;
+		Config->meshStateTimeoutBackOffDs = SEC_TO_DS(1);
+		Config->meshStateTimeoutBackOffVarianceDs = SEC_TO_DS(1);
 
 		node->DisableStateMachine(false);
 		node->ChangeState(discoveryState::DISCOVERY_HIGH);
 
 		//Disable discovery after 20 seconds
 		node->currentLedMode = ledMode::LED_MODE_CONNECTIONS;
-		deactivateDiscoveryAfterMs = 20 * 1000;
+		deactivateDiscoveryAfterDs = SEC_TO_DS(20);
 }
 
 void TestBattery::meshWith100msConnAndDiscoveryOff()
@@ -190,17 +190,17 @@ void TestBattery::meshWith100msConnAndDiscoveryOff()
 	Config->meshScanIntervalHigh = MSEC_TO_UNITS(40, UNIT_0_625_MS);	//(20-1024) Determines scan interval in units of 0.625 millisecond.
 	Config->meshScanWindowHigh = MSEC_TO_UNITS(20, UNIT_0_625_MS);
 
-	Config->meshStateTimeoutHigh = 3 * 1000;
+	Config->meshStateTimeoutHighDs = SEC_TO_DS(3);
 
-	Config->meshStateTimeoutBackOff = 1 * 1000;
-	Config->meshStateTimeoutBackOffVariance = 1 * 1000;
+	Config->meshStateTimeoutBackOffDs = SEC_TO_DS(1);
+	Config->meshStateTimeoutBackOffVarianceDs = SEC_TO_DS(1);
 
 	node->DisableStateMachine(false);
 	node->ChangeState(discoveryState::DISCOVERY_HIGH);
 
 	//Disable discovery after 20 seconds
 	node->currentLedMode = ledMode::LED_MODE_CONNECTIONS;
-	deactivateDiscoveryAfterMs = 20 * 1000;
+	deactivateDiscoveryAfterDs = SEC_TO_DS(20);
 }
 
 
@@ -213,16 +213,16 @@ void TestBattery::meshWith500msConnAndDiscoveryOff()
 	Config->meshScanIntervalHigh = MSEC_TO_UNITS(40, UNIT_0_625_MS);	//(20-1024) Determines scan interval in units of 0.625 millisecond.
 	Config->meshScanWindowHigh = MSEC_TO_UNITS(20, UNIT_0_625_MS);
 
-	Config->meshStateTimeoutHigh = 3 * 1000;
+	Config->meshStateTimeoutHighDs = SEC_TO_DS(3);
 
-	Config->meshStateTimeoutBackOff = 1 * 1000;
-	Config->meshStateTimeoutBackOffVariance = 1 * 1000;
+	Config->meshStateTimeoutBackOffDs = SEC_TO_DS(1);
+	Config->meshStateTimeoutBackOffVarianceDs = SEC_TO_DS(1);
 
 	node->DisableStateMachine(false);
 	node->ChangeState(discoveryState::DISCOVERY_HIGH);
 
 	//Disable discovery after 20 seconds
 	node->currentLedMode = ledMode::LED_MODE_CONNECTIONS;
-	deactivateDiscoveryAfterMs = 20 * 1000;
+	deactivateDiscoveryAfterDs = SEC_TO_DS(20);
 }
 

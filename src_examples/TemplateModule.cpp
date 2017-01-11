@@ -60,7 +60,7 @@ void TemplateModule::ConfigurationLoadedHandler()
 
 }
 
-void TemplateModule::TimerEventHandler(u16 passedTime, u32 appTimer)
+void TemplateModule::TimerEventHandler(u16 passedTimeDs, u32 appTimerDs)
 {
 	//Do stuff on timer...
 

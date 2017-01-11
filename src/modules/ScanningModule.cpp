@@ -34,6 +34,8 @@ ScanningModule::ScanningModule(u8 moduleId, Node* node, ConnectionManager* cm, c
 		scanFilters[i].active = 0;
 	}
 
+	resetAssetTrackingTable();
+
 	//Start module configuration loading
 	LoadModuleConfiguration();
 }
@@ -69,7 +71,9 @@ void ScanningModule::ResetToDefaultConfiguration()
 	configuration.moduleVersion = 1;
 
 	//Set additional config values...
-	configuration.reportingIntervalMs = 20 * 1000;
+	configuration.assetReportingIntervalDs = SEC_TO_DS(3);
+	configuration.groupedReportingIntervalDs = SEC_TO_DS(25);
+	configuration.groupedPacketRssiThreshold = -70;
 
 	//TODO: This is for testing only
 	scanFilterEntry filter;
@@ -101,12 +105,12 @@ bool ScanningModule::setScanFilter(scanFilterEntry* filter)
 	}
 }
 
-void ScanningModule::TimerEventHandler(u16 passedTime, u32 appTimer)
+void ScanningModule::TimerEventHandler(u16 passedTimeDs, u32 appTimerDs)
 {
-	//Do stuff on timer...
-	if (configuration.reportingIntervalMs != 0 && node->appTimerMs - lastReportingTimerMs > configuration.reportingIntervalMs)
+	if(SHOULD_IV_TRIGGER(appTimerDs, passedTimeDs, configuration.groupedReportingIntervalDs))
 	{
 
+		//Send grouped packets
 		SendReport();
 
 		resetAddressTable();
@@ -115,10 +119,13 @@ void ScanningModule::TimerEventHandler(u16 passedTime, u32 appTimer)
 
 		totalMessages = 0;
 		totalRSSI = 0;
-
-		lastReportingTimerMs = node->appTimerMs;
 	}
 
+	if(SHOULD_IV_TRIGGER(appTimerDs, passedTimeDs, configuration.assetReportingIntervalDs)){
+		//Send asset tracking packets
+		SendTrackedAssets();
+		resetAssetTrackingTable();
+	}
 }
 
 void ScanningModule::SendReport()
@@ -157,6 +164,32 @@ void ScanningModule::SendReport()
 	}
 }
 
+void ScanningModule::SendTrackedAssets()
+{
+	//Do not send a packet if no assets have been tracked
+	if(assetPackets[0].assetId == 0){
+		return;
+	}
+
+	//FIXME: only send best three trackings
+	ScanModuleTrackedAssetsMessage message;
+	for(int i=0; i<3; i++){
+		message.trackedAssets[i].assetId = assetPackets[i].assetId;
+		message.trackedAssets[i].rssiAvg = -(assetPackets[i].rssiSum / assetPackets[i].count);
+		message.trackedAssets[i].packetCount = assetPackets[i].count;
+	}
+
+	SendModuleActionMessage(
+		MESSAGE_TYPE_MODULE_GENERAL,
+		NODE_ID_BROADCAST,
+		ScanModuleMessages::ASSET_TRACKING_PACKET,
+		0,
+		(u8*)&message,
+		SIZEOF_SCAN_MODULE_TRACKED_ASSETS_MESSAGE,
+		false
+	);
+}
+
 void ScanningModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
 {
 	//Must call superclass for handling
@@ -178,8 +211,25 @@ void ScanningModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPa
 				memcpy(&totalDevices, packet->data + 0, 4);
 				memcpy(&totalRSSI, packet->data + 4, 4);
 
-				uart("SCANMOD", "{\"nodeId\":%d, \"type\":\"sum_packets\", \"module\":%d, \"packets\":%u, \"rssi\":%d}" SEP, packet->header.sender, moduleId, totalDevices, totalRSSI);
+				uart("SCANMOD", "{\"nodeId\":%d,\"type\":\"sum_packets\",\"module\":%d,\"packets\":%u,\"rssi\":%d}" SEP, packet->header.sender, moduleId, totalDevices, totalRSSI);
 			}
+		}
+	}
+	else if(packetHeader->messageType == MESSAGE_TYPE_MODULE_GENERAL)
+	{
+		connPacketModule* packet = (connPacketModule*) packetHeader;
+
+		if(packet->actionType == ScanModuleMessages::ASSET_TRACKING_PACKET)
+		{
+			ScanModuleTrackedAssetsMessage* message = (ScanModuleTrackedAssetsMessage*)packet->data;
+			uart("SCANMOD", "{\"nodeId\":%d,\"type\":\"tracked_assets\",\"module\":%d,\"assets\":[", packet->header.sender, packet->moduleId);
+			for(int i=0; i<3; i++){
+				if(message->trackedAssets[i].assetId != 0){
+					if(i != 0) uart("SCANMOD", ",");
+					uart("SCANMOD", "{\"id\":%u,\"rssi\":%d,\"count\":%u}", message->trackedAssets[i].assetId, message->trackedAssets[i].rssiAvg, message->trackedAssets[i].packetCount);
+				}
+			}
+			uart("SCANMOD", "]}" SEP);
 		}
 	}
 }
@@ -212,8 +262,8 @@ void ScanningModule::BleEventHandler(ble_evt_t* bleEvent)
 				// If advertise data is sent by a mobile device
 				if (advertiseDataWasSentFromMobileDevice(data, dataLength))
 				{
-					// Only consider mobile devices that are at most 5 meters away...
-					if (rssi > RSSI_THRESHOLD)
+					// Only consider mobile devices that are within a certain range...
+					if (rssi > configuration.groupedPacketRssiThreshold)
 					{
 						totalMessages++;
 						totalRSSI += rssi;
@@ -231,6 +281,33 @@ void ScanningModule::BleEventHandler(ble_evt_t* bleEvent)
 						}
 						// Update RSSI for the mobile device
 						updateTotalRssiAndTotalMessagesForDevice(rssi, address->addr);
+					}
+				}
+
+				u16 assetId = 0;
+
+				if(isAssetTrackingData(data, dataLength)){
+					//Extract the id from the packet
+					memcpy(&assetId, data + 8, 2);
+				}
+				else if(isAssetTrackingDataFromiOSDeviceInForegroundMode(data, dataLength))
+				{
+					logt("SCANMOD", "ios AT");
+					//Use id 7 for all iOS packets, just because
+					assetId = 7;
+				}
+				if(assetId != 0){
+					//Fill info into assetTracking table
+					for(int i = 0; i<NUM_ASSET_PACKETS; i++){
+						if(assetPackets[i].assetId == assetId || assetPackets[i].assetId == 0){
+
+							logt("SCANMOD", "Tracked packet %u in slot %u", assetId, i);
+							assetPackets[i].assetId = assetId;
+							assetPackets[i].count++;
+							assetPackets[i].rssiSum += (u32) (-rssi);
+
+							break;
+						}
 					}
 				}
 
@@ -284,7 +361,19 @@ void ScanningModule::BleEventHandler(ble_evt_t* bleEvent)
 		}
 	}
 }
-;
+
+bool ScanningModule::isAssetTrackingData(u8* data, u8 dataLength){
+	//02 01 06 XX FF 4D 02 02
+	if(data[4] == 0xFF && data[5] == 0x4D && data[6] == 0x02){
+		//Identifier for telemetry packet v1
+		if(data[7] == 0x02){
+			if(!(data[8] == 0 && data[9] == 0 && data[10] == 0 && data[11] == 0)){
+				return true;
+			}
+		}
+	}
+	return false;
+}
 
 void ScanningModule::NodeStateChangedHandler(discoveryState newState)
 {
@@ -301,6 +390,19 @@ void ScanningModule::NodeStateChangedHandler(discoveryState newState)
 bool ScanningModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
 	//React on commands, return true if handled, false otherwise
+	if(commandName == "send_tracked"){
+		SendTrackedAssets();
+		resetAssetTrackingTable();
+
+		return true;
+	}
+	if(commandName == "get_tracked"){
+		for(int i=0; i<3; i++){
+			logt("SCANMOD", "id:%u, rssi:%d, count:%u",assetPackets[i].assetId, -(assetPackets[i].rssiSum / assetPackets[i].count), assetPackets[i].count);
+		}
+		return true;
+	}
+
 
 	//Must be called to allow the module to get and set the config
 	return Module::TerminalCommandHandler(commandName, commandArgs);
@@ -372,6 +474,32 @@ bool ScanningModule::advertiseDataFromiOSDeviceInForegroundMode(u8* data, u8 dat
 	return false;
 }
 
+bool ScanningModule::isAssetTrackingDataFromiOSDeviceInForegroundMode(u8* data, u8 dataLength)
+{
+	// https://devzone.nordicsemi.com/documentation/nrf51/4.3.0/html/group___b_l_e___g_a_p___a_d___t_y_p_e___d_e_f_i_n_i_t_i_o_n_s.html
+	// advertising data -> local name
+	// = "iOS" = "69 4F 53"
+	int i = 0;
+	while (i < dataLength)
+	{
+		if (data[i + 1] == BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME)
+		{
+			if (data[i + 2] == 0x61 &&	// a
+					data[i + 3] == 0x74 &&	// t
+					data[i + 4] == 0x69	&&	// i
+					data[i + 5] == 0x4f	&&	// O
+					data[i + 6] == 0x53		// S
+							)
+			{
+				//logt("SCANMOD", "iOS device advertising (foreground).");
+				return true;
+			}
+		}
+		i += data[i] + 1;
+	}
+	return false;
+}
+
 bool ScanningModule::advertiseDataFromBeaconWithDifferentNetworkId(u8 *data, u8 dataLength)
 {
 	// advertising data -> manufacturer specific data
@@ -385,6 +513,10 @@ bool ScanningModule::advertiseDataFromBeaconWithDifferentNetworkId(u8 *data, u8 
 	{
 		return false;
 	}
+}
+
+void ScanningModule::resetAssetTrackingTable(){
+	memset(assetPackets, 0x00, sizeof(assetPackets));
 }
 
 bool ScanningModule::addressAlreadyTracked(uint8_t* address)

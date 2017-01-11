@@ -31,11 +31,12 @@ do{ 									\
 	Config->Led2Pin = 18;				\
 	Config->Led3Pin = 19;				\
 	Config->LedActiveHigh = false;				\
+	Config->Button1Pin = 13;			\
+	Config->ButtonsActiveHigh = false;			\
 	Config->uartRXPin = 8;				\
 	Config->uartTXPin = 6;				\
 	Config->uartCTSPin = 7;				\
 	Config->uartRTSPin = 5;				\
-	Config->uartFlowControl = true;				\
 	Config->calibratedTX = -60;				\
 										\
 } while(0)

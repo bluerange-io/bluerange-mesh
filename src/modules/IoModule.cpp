@@ -60,7 +60,7 @@ void IoModule::ConfigurationLoadedHandler()
 
 }
 
-void IoModule::TimerEventHandler(u16 passedTime, u32 appTimer)
+void IoModule::TimerEventHandler(u16 passedTimeDs, u32 appTimerDs)
 {
 	//Do stuff on timer...
 
@@ -70,7 +70,7 @@ void IoModule::ResetToDefaultConfiguration()
 {
 	//Set default configuration values
 	configuration.moduleId = moduleId;
-	configuration.moduleActive = false;
+	configuration.moduleActive = true;
 	configuration.moduleVersion = 1;
 
 	//Set additional config values...

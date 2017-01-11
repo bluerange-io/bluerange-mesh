@@ -43,6 +43,8 @@ EnrollmentModule::EnrollmentModule(u8 moduleId, Node* node, ConnectionManager* c
 	//Register callbacks n' stuff
 	Logger::getInstance().enableTag("ENROLLMOD");
 
+	rebootTimeDs = 0;
+
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
 	configurationPointer = &configuration;
@@ -67,17 +69,19 @@ void EnrollmentModule::ConfigurationLoadedHandler()
 
 }
 
-void EnrollmentModule::TimerEventHandler(u16 passedTime, u32 appTimer)
+void EnrollmentModule::TimerEventHandler(u16 passedTimeDs, u32 appTimerDs)
 {
-	//Do stuff on timer...
-
+	if(rebootTimeDs != 0 && rebootTimeDs < appTimerDs){
+		logt("ENROLLMOD", "Rebooting");
+		NVIC_SystemReset();
+	}
 }
 
 void EnrollmentModule::ResetToDefaultConfiguration()
 {
 	//Set default configuration values
 	configuration.moduleId = moduleId;
-	configuration.moduleActive = false;
+	configuration.moduleActive = true;
 	configuration.moduleVersion = 1;
 
 	//Set additional config values...
@@ -293,14 +297,12 @@ void EnrollmentModule::ConnectionPacketReceivedEventHandler(connectionPacket* in
 					LedGreen->On();
 					LedBlue->On();
 
-					//FIXME: Hotfix until NewStorage supports page swapping
-					//We wait some time until the enrollment is saved
-					for(int i=0; i<8000000; i++){
-
-					}
-
+					//FIXME: Should only send response after enrollment is saved
 					SendEnrollmentResponse(NODE_ID_BROADCAST, enrollmentMethods::BY_SERIAL, packet->requestHandle, 0, (u8*)Config->serialNumber);
 
+					//FIXME: Hotfix until NewStorage supports page swapping
+					//We wait some time until the enrollment is saved
+					rebootTimeDs = node->appTimerDs + SEC_TO_DS(8);
 				}
 			}
 		}

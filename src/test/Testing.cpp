@@ -253,48 +253,7 @@ bool Testing::TerminalCommandHandler(string commandName, vector<string> commandA
 
 
 
-	if (commandName == "send")
-	{
-		//parameter 1: R=reliable, U=unreliable, B=both
-		//parameter 2: count
-
-		connPacketData1 data;
-		data.header.messageType = MESSAGE_TYPE_DATA_1;
-		data.header.sender = nodeId;
-		data.header.receiver = 0;
-
-		data.payload.length = 7;
-		data.payload.data[2] = 7;
-
-
-		u8 reliable = (commandArgs.size() < 1 || commandArgs[0] == "b") ? 2 : (commandArgs[0] == "u" ? 0 : 1);
-
-		//Second parameter is number of messages
-		u8 count = commandArgs.size() > 1 ? atoi(commandArgs[1].c_str()) : 5;
-
-		for (int i = 0; i < count; i++)
-		{
-			if(reliable == 0 || reliable == 2){
-				data.payload.data[0] = i*2;
-				data.payload.data[1] = 0;
-				cm->SendMessage(cm->inConnection, (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false);
-				cm->SendMessage(cm->outConnections[0], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false);
-				cm->SendMessage(cm->outConnections[1], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false);
-				cm->SendMessage(cm->outConnections[2], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false);
-			}
-
-			if(reliable == 1 || reliable == 2){
-				data.payload.data[0] = i*2+1;
-				data.payload.data[1] = 1;
-				cm->SendMessage(cm->inConnection, (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true);
-				cm->SendMessage(cm->outConnections[0], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true);
-				cm->SendMessage(cm->outConnections[1], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true);
-				cm->SendMessage(cm->outConnections[2], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true);
-			}
-		}
-
-	}
-	else if (commandName == "fill")
+	if (commandName == "fill")
 	{
 		cm->fillTransmitBuffers();
 	}

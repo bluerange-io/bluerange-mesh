@@ -19,34 +19,32 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
-#ifndef PCA10040_H
-#define PCA10040_H
+#pragma once
 
-// Definitions for PCA10040 (nrf52 development kit)
+// Definitions for ARS101694 (Meshgateway Beacon v2)
 
 
-#define SET_PCA10040_BOARD()			\
+#define SET_ARS101694_BOARD()			\
 do{ 									\
-	Config->Led1Pin = 17;				\
-	Config->Led2Pin = 18;				\
-	Config->Led3Pin = 19;				\
-	Config->LedActiveHigh = false;		\
-	Config->Button1Pin = 13;			\
+	Config->Led1Pin = 15;				\
+	Config->Led2Pin = -1;				\
+	Config->Led3Pin = 14;				\
+	Config->LedActiveHigh = true;		\
+	Config->Button1Pin = 7;			\
 	Config->ButtonsActiveHigh = false;			\
-	Config->uartRXPin = 8;				\
-	Config->uartTXPin = 6;				\
-	Config->uartCTSPin = 7;				\
-	Config->uartRTSPin = 5;				\
+	Config->uartRXPin = 11;				\
+	Config->uartTXPin = 9;				\
+	Config->uartCTSPin = 10;			\
+	Config->uartRTSPin = 8;				\
 	Config->calibratedTX = -60;				\
+	Config->terminalPromptMode = false;    \
 										\
 } while(0)
 
-//This macro checks whether the boardId is for PCA10040 board
-#define SET_PCA10040_BOARD_IF_FIT(boardid)		\
+//This macro checks whether the boardId is for ARS101694 board
+#define SET_ARS101694_BOARD_IF_FIT(boardid)		\
 do{												\
-	if(boardid == 0x004){							\
-		SET_PCA10040_BOARD(); 						\
+	if(boardid == 0x008){							\
+		SET_ARS101694_BOARD(); 						\
 	}												\
 } while(0)
-
-#endif // PCA10040_H

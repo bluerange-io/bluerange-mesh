@@ -110,6 +110,10 @@ void AdvertisingController::Initialize(u16 networkIdentifier)
 
 }
 
+void AdvertisingController::SetConnectable()
+{
+	currentAdvertisingParams.type = BLE_GAP_ADV_TYPE_ADV_IND;
+}
 void AdvertisingController::SetNonConnectable()
 {
 	currentAdvertisingParams.type = BLE_GAP_ADV_TYPE_ADV_NONCONN_IND;

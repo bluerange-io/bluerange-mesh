@@ -68,17 +68,16 @@ void DebugModule::ResetToDefaultConfiguration()
 {
 	//Set default configuration values
 	configuration.moduleId = moduleId;
-	configuration.moduleActive = false;
+	configuration.moduleActive = true;
 	configuration.moduleVersion = 1;
-	configuration.rebootTimeMs = 0 * 1000;
-	memcpy(&configuration.testString, "jdhdur", 7);
+	configuration.rebootTimeDs = 0;
 }
 
-void DebugModule::TimerEventHandler(u16 passedTime, u32 appTimer){
+void DebugModule::TimerEventHandler(u16 passedTimeDs, u32 appTimerDs){
 
 	if(!configuration.moduleActive) return;
 
-	if(appTimer % 1000 == 0 && (packetsIn > 0 || packetsOut > 0))
+	if(SHOULD_IV_TRIGGER(appTimerDs, passedTimeDs, SEC_TO_DS(5)) && (packetsIn > 0 || packetsOut > 0))
 	{
 		logt("DEBUGMOD", "Flood Packets out: %u, in:%u", packetsOut, packetsIn);
 	}
@@ -101,14 +100,14 @@ void DebugModule::TimerEventHandler(u16 passedTime, u32 appTimer){
 		}
 	}
 
-	//Reset every few seconds
-	if(configuration.rebootTimeMs != 0 && configuration.rebootTimeMs < appTimer){
+	//Reset if a reset time is set
+	if(configuration.rebootTimeDs != 0 && configuration.rebootTimeDs < appTimerDs){
 		logt("DEBUGMOD", "Resetting!");
 		NVIC_SystemReset();
 	}
 
 
-	if(appTimer % 10000 == 0)
+	if(false && SHOULD_IV_TRIGGER(appTimerDs, passedTimeDs, SEC_TO_DS(10)))
 	{
 		DebugModuleInfoMessage infoMessage;
 		memset(&infoMessage, 0x00, sizeof(infoMessage));
@@ -201,6 +200,27 @@ bool DebugModule::TerminalCommandHandler(string commandName, vector<string> comm
 
 				return true;
 			}
+			//Sets the reestablishing time, in the debug module until ready
+			else if(commandArgs[2] == "set_reestablish_time" && commandArgs.size() == 4)
+			{
+				u16 timeout = atoi(commandArgs[3].c_str());
+
+				DebugModuleReestablishTimeoutMessage data;
+
+				data.reestablishTimeoutSec = timeout;
+
+				SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					destinationNode,
+					DebugModuleTriggerActionMessages::SET_REESTABLISH_TIMEOUT,
+					0,
+					(u8*)&data,
+					SIZEOF_DEBUG_MODULE_REESTABLISH_TIMEOUT_MESSAGE,
+					true
+				);
+
+				return true;
+			}
 		}
 
 	}
@@ -236,7 +256,16 @@ bool DebugModule::TerminalCommandHandler(string commandName, vector<string> comm
 
 		return true;
 	}
+	if (commandName == "log_error")
+	{
 
+		u32 errorCode = atoi(commandArgs[0].c_str());
+		u16 extra = atoi(commandArgs[1].c_str());
+
+		Logger::getInstance().logError(Logger::errorTypes::CUSTOM, errorCode, extra);
+
+		return true;
+		}
 
 	// Some old stuff to reboot the node every once in a while
 	if (commandName == "testsave")
@@ -244,7 +273,7 @@ bool DebugModule::TerminalCommandHandler(string commandName, vector<string> comm
 		char buffer[70];
 		Logger::getInstance().convertBufferToHexString((u8*) &configuration, sizeof(DebugModuleConfiguration), buffer, 70);
 
-		configuration.rebootTimeMs = 12 * 1000;
+		configuration.rebootTimeDs = SEC_TO_DS(12);
 
 		logt("DEBUGMOD", "Saving config %s (%d)", buffer, sizeof(DebugModuleConfiguration));
 
@@ -257,6 +286,47 @@ bool DebugModule::TerminalCommandHandler(string commandName, vector<string> comm
 
 		LoadModuleConfiguration();
 
+		return true;
+	}
+	else if (commandName == "send")
+	{
+		//parameter 1: R=reliable, U=unreliable, B=both
+		//parameter 2: count
+
+		connPacketData1 data;
+		data.header.messageType = MESSAGE_TYPE_DATA_1;
+		data.header.sender = node->persistentConfig.nodeId;
+		data.header.receiver = 0;
+
+		data.payload.length = 7;
+		data.payload.data[2] = 7;
+
+
+		u8 reliable = (commandArgs.size() < 1 || commandArgs[0] == "b") ? 2 : (commandArgs[0] == "u" ? 0 : 1);
+
+		//Second parameter is number of messages
+		u8 count = commandArgs.size() > 1 ? atoi(commandArgs[1].c_str()) : 5;
+
+		for (int i = 0; i < count; i++)
+		{
+			if(reliable == 0 || reliable == 2){
+				data.payload.data[0] = i*2;
+				data.payload.data[1] = 0;
+				cm->SendMessage(cm->inConnection, (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false);
+				cm->SendMessage(cm->outConnections[0], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false);
+				cm->SendMessage(cm->outConnections[1], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false);
+				cm->SendMessage(cm->outConnections[2], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false);
+			}
+
+			if(reliable == 1 || reliable == 2){
+				data.payload.data[0] = i*2+1;
+				data.payload.data[1] = 1;
+				cm->SendMessage(cm->inConnection, (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true);
+				cm->SendMessage(cm->outConnections[0], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true);
+				cm->SendMessage(cm->outConnections[1], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true);
+				cm->SendMessage(cm->outConnections[2], (u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true);
+			}
+		}
 		return true;
 	}
 
@@ -285,7 +355,7 @@ void DebugModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacke
 				logt("DEBUGMOD", "Scheduled reboot in 10 seconds");
 
 				//Schedule a reboot in a few seconds
-				configuration.rebootTimeMs = node->appTimerMs + 10 * 1000;
+				configuration.rebootTimeDs = node->appTimerDs + SEC_TO_DS(10);
 
 			}
 			else if(packet->actionType == DebugModuleTriggerActionMessages::RESET_CONNECTION_LOSS_COUNTER){
@@ -309,6 +379,43 @@ void DebugModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacke
 				logt("DEBUGMOD", "receive hardfault");
 				CauseHardfault();
 			}
+			else if(packet->actionType == DebugModuleTriggerActionMessages::SET_REESTABLISH_TIMEOUT){
+
+				DebugModuleReestablishTimeoutMessage* data = (DebugModuleReestablishTimeoutMessage*) packet->data;
+
+				//Set the config
+				Config->meshExtendedConnectionTimeoutSec = data->reestablishTimeoutSec;
+
+				//Apply for all active connections
+				for(int i=0; i<Config->meshMaxConnections; i++){
+					cm->connections[i]->reestablishTimeSec = data->reestablishTimeoutSec;
+				}
+
+				logt("DEBUGMOD", "SustainTime set to %u", data->reestablishTimeoutSec);
+
+				//Acknowledge over the mesh
+				SendModuleActionMessage(
+						MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+						packet->header.sender,
+						DebugModuleActionResponseMessages::REESTABLISH_TIMEOUT_RESPONSE,
+						0,
+						NULL,
+						0,
+						false
+					);
+			}
+		}
+	}
+	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_ACTION_RESPONSE){
+		connPacketModule* packet = (connPacketModule*)packetHeader;
+
+		//Check if our module is meant
+		if(packet->moduleId == moduleId){
+			if(packet->actionType == DebugModuleActionResponseMessages::REESTABLISH_TIMEOUT_RESPONSE){
+				uart("DEBUGMOD", "{\"type\":\"reestablish_time_response\",\"nodeId\":%u,\"module\":%u,\"code\":0}" SEP, packet->header.sender, moduleId);
+
+			}
+
 		}
 	}
 }

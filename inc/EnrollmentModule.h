@@ -28,15 +28,18 @@ class EnrollmentModule: public Module
 {
 	private:
 
-		//Module configuration that is saved persistently (size must be multiple of 4)
+		#pragma pack(push, 1)
+		//Module configuration that is saved persistently
 		struct EnrollmentModuleConfiguration : ModuleConfiguration{
 			u8 enrollmentState;
-			u8 reserved;
-			u16 reserved2;
 			//Insert more persistent config values here
+			u32 reserved; //Mandatory, read Module.h
 		};
+		#pragma pack(pop)
 
-		EnrollmentModuleConfiguration configuration;
+		DECLARE_CONFIG_AND_PACKED_STRUCT(EnrollmentModuleConfiguration);
+
+		u32 rebootTimeDs;
 
 		enum enrollmentStates {NOT_ENROLLED, ENROLLED};
 
@@ -113,7 +116,7 @@ class EnrollmentModule: public Module
 
 		void ResetToDefaultConfiguration();
 
-		void TimerEventHandler(u16 passedTime, u32 appTimer);
+		void TimerEventHandler(u16 passedTimeDs, u32 appTimerDs);
 
 		//void BleEventHandler(ble_evt_t* bleEvent);
 

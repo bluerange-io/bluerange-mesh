@@ -32,6 +32,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
+#define INVALID_U8_CONFIG 0xFF
+#define INVALID_U16_CONFIG 0xFFFF
+#define INVALID_U32_CONFIG 0xFFFFFFFF
+
 
 #include <conn_packets.h>
 #include <Config.h>
@@ -39,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <ConnectionManager.h>
 #include <Terminal.h>
 #include <Storage.h>
+#include <ButtonListener.h>
 
 extern "C"{
 #include <ble.h>
@@ -50,7 +55,10 @@ class Node;
 
 #define MODULE_NAME_MAX_SIZE 10
 
-class Module : public StorageEventListener, public TerminalCommandListener
+class Module:
+		public StorageEventListener,
+		public TerminalCommandListener,
+		public ButtonListener
 {
 	private:
 
@@ -61,13 +69,16 @@ protected:
 		u8 moduleId;
 		u16 storageSlot;
 
-		//Pay attention that the module configuration is not packed and will
-		//therefore be padded by the compiler!!!
+		//All module configs have to be packed with #pragma pack and their declarations
+		//have to be aligned on a 4 byte boundary to be able to save them
 		struct ModuleConfiguration{
 			u8 moduleId; //Id of the module, compared upon load and must match
 			u8 moduleVersion; //version of the configuration
 			u8 moduleActive; //Activate or deactivate the module
 			u8 reserved;
+			//IMPORTANT: Each individual module configuration should add a reserved u32 at
+			//its end that is set to 0. Because we can only save data that is a
+			//multiple of 4 bytes. We use this variable to pad the data.
 		};
 
 
@@ -122,7 +133,7 @@ protected:
 		virtual void SystemEventHandler(u32 systemEvent){};
 
 		//This handler receives all timer events
-		virtual void TimerEventHandler(u16 passedTime, u32 appTimer){};
+		virtual void TimerEventHandler(u16 passedTimeDs, u32 appTimerDs){};
 
 		//This handler receives all ble events and can act on them
 		virtual void BleEventHandler(ble_evt_t* bleEvent){};
@@ -141,6 +152,12 @@ protected:
 		virtual bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
 #else
 		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+#endif
+
+#ifdef USE_BUTTONS
+		virtual void ButtonHandler(u8 buttonId, u32 holdTime);
+#else
+		void ButtonHandler(u8 buttonId, u32 holdTime);
 #endif
 
 };

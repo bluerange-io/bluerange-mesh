@@ -115,7 +115,11 @@ bool Storage::BufferedRead(u8* data, u32 block, u32 len)
 
 bool Storage::BufferedWrite(u8* data, u32 block,u32 len)
 {
-
+	//Must be a multiple of 4 bytes and must be aligned
+	if(len % 4 != 0 || (u32)data % 4 != 0){
+		logt("ERROR", "Write fail: %u, %u", data, len);
+		return false;
+	}
 	logt("STORAGE", "Writing len:%u to block:%u", len, block);
 
 	//Call clear first before writing to the flash

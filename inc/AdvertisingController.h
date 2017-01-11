@@ -75,6 +75,7 @@ public:
 	static bool SetScanResponseData(Node* node, string dataString);
 
 	//FIXME: Only for testing, should be managed in a better way
+	static void SetConnectable();
 	static void SetNonConnectable();
 
 

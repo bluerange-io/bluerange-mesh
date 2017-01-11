@@ -38,7 +38,7 @@ class ConnectionManagerCallback{
 	public:
 		ConnectionManagerCallback();
 		virtual ~ConnectionManagerCallback();
-		virtual void DisconnectionHandler(ble_evt_t* bleEvent) = 0;
+		virtual void DisconnectionHandler(Connection* connection) = 0;
 		virtual void ConnectionSuccessfulHandler(ble_evt_t* bleEvent) = 0;
 		virtual void ConnectingTimeoutHandler(ble_evt_t* bleEvent) = 0;
 		virtual void messageReceivedCallback(connectionPacket* inPacket) = 0;
@@ -52,6 +52,9 @@ class ConnectionManager
 
 		//Used within the send methods
 		void QueuePacket(Connection* connection, u8* data, u16 dataLength, bool reliable);
+
+		//Checks wether a successful connection is from a reestablishment
+		Connection* IsConnectionReestablishment(ble_evt_t* bleEvent);
 
 		//An outConnection is initialized before being connected (saved here during initializing phase)
 		Connection* pendingConnection;
@@ -85,12 +88,16 @@ class ConnectionManager
 		Connection* connections[MESH_IN_CONNECTIONS + MESH_OUT_CONNECTIONS];
 
 		Connection* getFreeConnection();
+		u32 getNumConnections();
 
 
 		Connection* ConnectAsMaster(nodeID partnerId, ble_gap_addr_t* address, u16 writeCharacteristicHandle);
 
 		void Disconnect(u16 connectionHandle);
 		void ForceDisconnectOtherConnections(Connection* connection);
+
+
+		int ReestablishConnections();
 
 		//Functions used for sending messages
 		bool SendMessage(Connection* connection, u8* data, u16 dataLength, bool reliable);
@@ -117,6 +124,9 @@ class ConnectionManager
 		static void ConnectionSuccessfulHandler(ble_evt_t* bleEvent);
 		static void ConnectionEncryptedHandler(ble_evt_t* bleEvent);
 		static void ConnectingTimeoutHandler(ble_evt_t* bleEvent);
+
+		//Other handler
+		void FinalDisconnectionHandler(Connection* connection);
 
 		//GATTController Handlers
 		static void messageReceivedCallback(ble_evt_t* bleEvent);

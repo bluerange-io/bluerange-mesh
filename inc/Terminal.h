@@ -36,11 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <types.h>
 #include <SimplePushStack.h>
 
+
 using namespace std;
 
+#if defined(USE_SEGGER_RTT) || defined(USE_UART)
+#define TERMINAL_ENABLED
+#endif
 
 #define MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS 20
-
 
 class TerminalCommandListener
 {
@@ -50,7 +53,7 @@ public:
 	TerminalCommandListener();
 	virtual ~TerminalCommandListener();
 
-#ifdef ENABLE_TERMINAL
+#ifdef TERMINAL_ENABLED
 	//This method can be implemented by any subclass and will be notified when
 	//a command is entered via uart.
 	virtual bool TerminalCommandHandler(string commandName, vector<string> commandArgs) = 0;
@@ -59,45 +62,86 @@ public:
 };
 
 
-/*
-#ifndef ENABLE_TERMINAL
-#define TerminalCommandHandler(...){} TerminalCommandHandler(...){  }
-#endif
-*/
-
 class Terminal
 {
 private:
 
-
 	static string commandName;
 	static vector<string> commandArgs;
 
-
-
 	static SimplePushStack* registeredCallbacks;
 
-	//Used to Read a line into the buffer
-	static void ReadlineUART(char* readBuffer, u8 readBufferLength, u8 offset);
+	static u8 readBufferOffset;
+	static char readBuffer[];
 
-public:
-	//Can be set to true or false
+	//After the terminal has been initialized (all transports), this is true
 	static bool terminalIsInitialized;
 
-	//Whether to behave as user terminal or as an interface to another program
-	static bool promptAndEchoMode;
+	//Will be false after a timeout and true after input is received
+	static bool uartActive;
 
-	//Must be called before using the Terminal
-	static void Init();
 
-	//Called every once in a while to check for UART input
-	static void PollUART();
+public:
+	static bool lineToReadAvailable;
 
-	static void ReadFromUARTNonBlocking();
+	//###### General ######
+	//Checks if a line is available or reads a line if input is detected
+	static void CheckAndProcessLine();
+	static void ProcessLine(char* line);
 
 	//Register a class that will be notified when the activation string is entered
 	static void AddTerminalCommandListener(TerminalCommandListener* callback);
 
+	//###### Log Transport ######
+	//Must be called before using the Terminal
+	static void Init();
+	static void PutString(const char* buffer);
+	static void PutChar(const char character);
 
+private:
+	//##### General #####
+
+	//##### UART ######
+#ifdef USE_UART
+	static void UartEnable(bool promptAndEchoMode);
+	static void UartDisable();
+	static void UartCheckAndProcessLine();
+	static void UartHandleError(u32 error);
+	//Read - blocking (non-interrupt based)
+	static bool UartCheckInputAvailable();
+	static void UartReadLineBlocking();
+	static char UartReadCharBlocking();
+	//Write (always blocking)
+	static void UartPutStringBlockingWithTimeout(const char* message);
+	static void UartPutCharBlockingWithTimeout(const char character);
+	//Read - Interrupt driven
+public: static void UartInterruptHandler(); private:
+	static void UartHandleInterruptRX(char byte);
+	static void UartEnableReadInterrupt();
+#endif
+
+
+	//###### Segger RTT ######
+#ifdef USE_SEGGER_RTT
+	static void SeggerRttInit();
+	static void SeggerRttCheckAndProcessLine();
+public: static void SeggerRttPrintf(const char* message, ...);
+public: static void SeggerRttPutString(const char* message);
+public: static void SeggerRttPutChar(const char character);
+
+#endif
 };
+
+#ifdef TERMINAL_ENABLED
+	//Some sort of logging is used
+	#define log_transport_init() Terminal::Init(Terminal::promptAndEchoMode);
+	#define log_transport_putstring(message) Terminal::PutString(message)
+	#define log_transport_put(character) Terminal::PutChar(character)
+#else
+	//logging is completely disabled
+	#define log_transport_init() do{}while(0)
+	#define log_transport_putstring(message) do{}while(0)
+	#define log_transport_put(character) do{}while(0)
+#endif
+
 

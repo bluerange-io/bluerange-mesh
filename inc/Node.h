@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <Storage.h>
 #include <Module.h>
 #include <Terminal.h>
+#include <ButtonListener.h>
 
 extern "C"
 {
@@ -51,14 +52,15 @@ typedef struct
 	u8 bleAddress[BLE_GAP_ADDR_LEN];  /**< 48-bit address, LSB format. */
 	u8 connectable;
 	i8 rssi;
-	u32 receivedTime;
+	u32 receivedTimeDs;
 	advPacketPayloadJoinMeV0 payload;
 }joinMeBufferPacket;
 
 class Node:
 		public TerminalCommandListener,
 		public ConnectionManagerCallback,
-		public StorageEventListener
+		public StorageEventListener,
+		public ButtonListener
 {
 	private:
 		static Node* instance;
@@ -105,16 +107,19 @@ class Node:
 		discoveryState currentDiscoveryState;
 		discoveryState nextDiscoveryState;
 
-		//The global time is saved as 32768 ticks per second (APP_TIMER_CLOCK_FREQ)
-		//Any node that uses a prescaler must therefore adapt to this
+		//The globel time is saved in seconds as UNIX timestamp
+		u32 globalTimeSec;
+		u32 previousRtcTicks;
+		u16 globalTimeRemainderTicks; //remainder (second fraction) is saved as ticks (32768 per second) see APP_TIMER_CLOCK_FREQ
 
-		u64 globalTime; //Hooray to the compiler for abstracting 64bit operations :-)
-		u32 globalTimeSetAt; //The value of the RTC timer when the globalTime was set
+		//All of the mesh timings are save in deciseconds (Ds) because milliseconds
+		//will overflow a u32 too fast
+		u32 appTimerDs;
+		i32 currentStateTimeoutDs;
+		u16 passsedTimeSinceLastTimerHandlerDs;
+		u32 lastDecisionTimeDs;
+		u16 appTimerRandomOffsetDs;
 
-		u16 passsedTimeSinceLastTimerHandler;
-		i32 currentStateTimeoutMs;
-		u32 appTimerMs;
-		u32 lastDecisionTimeMs;
 		u8 noNodesFoundCounter; //Incremented every time that no interesting cluster packets are found
 
 		//Variables (kinda private, but I'm too lazy to write getters)
@@ -122,7 +127,6 @@ class Node:
 		clusterID clusterId;
 
 		u32 radioActiveCount;
-		u32 lastRadioActiveCountResetTimerMs;
 
 		u8 ledBlinkPosition;
 
@@ -166,7 +170,8 @@ class Node:
 
 		//Timers and Stuff handler
 		static void RadioEventHandler(bool radioActive);
-		void TimerTickHandler(u16 timerMs);
+		void TimerTickHandler(u16 timerDs);
+		void UpdateGlobalTime();
 
 		//Helpers
 		clusterID GenerateClusterID(void);
@@ -190,11 +195,14 @@ class Node:
 		//Methods of TerminalCommandListener
 		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
 
+		//Will be called if a button has been clicked
+		void ButtonHandler(u8 buttonId, u32 holdTimeDs);
+
 		//Implements Storage Callback for loading the configuration
 		void ConfigurationLoadedHandler();
 
 		//Methods of ConnectionManagerCallback
-		void DisconnectionHandler(ble_evt_t* bleEvent);
+		void DisconnectionHandler(Connection* connection);
 		void ConnectionSuccessfulHandler(ble_evt_t* bleEvent);
 		void ConnectingTimeoutHandler(ble_evt_t* bleEvent);
 		void messageReceivedCallback(connectionPacket* inPacket);

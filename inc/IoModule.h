@@ -32,12 +32,15 @@ class IoModule: public Module
 {
 	private:
 
-		//Module configuration that is saved persistently (size must be multiple of 4)
+		#pragma pack(push, 1)
+		//Module configuration that is saved persistently
 		struct IoModuleConfiguration : ModuleConfiguration{
 			//Insert more persistent config values here
+			u32 reserved; //Mandatory, read Module.h
 		};
+		#pragma pack(pop)
 
-		IoModuleConfiguration configuration;
+		DECLARE_CONFIG_AND_PACKED_STRUCT(IoModuleConfiguration);
 
 		enum IoModuleTriggerActionMessages{
 			SET_PIN_CONFIG = 0,
@@ -89,7 +92,7 @@ class IoModule: public Module
 
 		void ResetToDefaultConfiguration();
 
-		void TimerEventHandler(u16 passedTime, u32 appTimer);
+		void TimerEventHandler(u16 passedTimeDs, u32 appTimerDs);
 
 		//void BleEventHandler(ble_evt_t* bleEvent);
 

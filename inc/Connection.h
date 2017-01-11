@@ -73,7 +73,8 @@ class Connection
 
 		//Handler
 		void ConnectionSuccessfulHandler(ble_evt_t* bleEvent);
-		void DisconnectionHandler(ble_evt_t* bleEvent);
+		void ReconnectionSuccessfulHandler(ble_evt_t* bleEvent);
+		void DisconnectionHandler();
 		void ReceivePacketHandler(connectionPacket* inPacket);
 		//void SendNextMessageHandler(ble_evt_t* bleEvent);
 		void ClusterUpdateSentHandler();
@@ -122,9 +123,12 @@ class Connection
 		u16 connectionHandle; //The handle that is given from the BLE stack to identify a connection
 		ble_gap_addr_t partnerAddress;
 		u16 writeCharacteristicHandle;
-		u16 currentConnectionInterval;
-		u32 connectionHandshakedTimestamp;
+		u16 currentConnectionIntervalMs;
+		u32 connectionHandshakedTimestampDs;
 		
+		u32 disconnectedTimestampDs;
+		u16 reestablishTimeSec;
+
 		//Handshake
 		connPacketClusterAck1 clusterAck1Packet;
 		connPacketClusterAck2 clusterAck2Packet;
@@ -138,7 +142,7 @@ class Connection
 		clusterID connectedClusterId;
 		clusterSIZE connectedClusterSize;
 		clusterSIZE hopsToSink;
-		u32 handshakeStarted;
+		u32 handshakeStartedDs;
 
 		//Debug info
 		u16 droppedPackets;

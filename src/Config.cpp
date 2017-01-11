@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <Config.h>
 
 //Config.cpp initializes variables defined in Config.h with values from UICR
+Conf* Conf::instance;
 
 Conf* Conf::getInstance(){
 	if(!instance){
@@ -37,6 +38,7 @@ Conf* Conf::getInstance(){
 		 * [9] DEFAULT_NETWORK_ID, network id to be used if not enrolled
 		 * [10] DEFAULT_NODE_ID, node id to be used if not enrolled
 		 * [11] DEVICE_TYPE, type of device (sink, mobile, etc,..)
+		 * [12] SERIAL_NUMBER_INDEX, unique index that represents the serial number
 		 */
 
 		//If magic number exists, fill Config with valid data from UICR
@@ -57,6 +59,7 @@ Conf* Conf::getInstance(){
 			if(NRF_UICR->CUSTOMER[9] != EMPTY_WORD) instance->meshNetworkIdentifier = (u16)NRF_UICR->CUSTOMER[9];
 			if(NRF_UICR->CUSTOMER[10] != EMPTY_WORD) instance->defaultNodeId = (u16)NRF_UICR->CUSTOMER[10];
 			if(NRF_UICR->CUSTOMER[11] != EMPTY_WORD) instance->deviceType = (deviceTypes)NRF_UICR->CUSTOMER[11];
+			if(NRF_UICR->CUSTOMER[12] != EMPTY_WORD) instance->serialNumberIndex = (u32)NRF_UICR->CUSTOMER[12];
 
 		//If no UICR data is available, we try to find a device in the testDevice array
 		} else if (instance->getTestDevice() != NULL){

@@ -29,6 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <types.h>
 
+#define ADV_PACKET_MAX_SIZE 31
+
 //Start packing all these structures
 //These are packed so that they can be transmitted savely over the air
 //Smaller datatypes could be implemented with bitfields?
@@ -78,7 +80,8 @@ typedef struct
 
 //####### Advertising packets => Message Types #################################################
 
-//Message types: Protocol defined, up to 19
+//Message types: Protocol defined, up to 19 because we want to have a unified
+//type across advertising and connection packets if we need to unify these.
 #define MESSAGE_TYPE_JOIN_ME_V0 1
 
 
@@ -123,6 +126,24 @@ typedef struct
 	u16 meshWriteHandle; //The GATT handle for the mesh communication characteristic
 	clusterID ackField;//Contains the acknowledgement from another node for the slave connection procedure
 }advPacketPayloadJoinMeV0;
+
+
+//####### Flooding packet #################################################
+/*
+ * This packet is used to send information over the advertising channels in
+ * a flooding manner. This is very inefficient and only one packet can be sent at once
+ */
+
+#define SIZEOF_ADV_PACKET_FLOOD (SIZEOF_ADV_PACKET_HEADER + 5) //Data region is variable, add its size in bytes
+typedef struct
+{
+	advPacketHeader header;
+	nodeID senderId;
+	nodeID receiverId;
+	u8 packetId; //A packet id in combination with the senderId is unique for a long time period
+	u8 data[ADV_PACKET_MAX_SIZE - SIZEOF_ADV_PACKET_FLOOD]; //Data can be larger and will be transmitted in subsequent packets
+
+}advPacketFlood;
 
 
 //####### Further definitions #################################################

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <algorithm>
 #include <iterator>
 #include <Terminal.h>
-#include <LogTransport.h>
+#include <Node.h>
 
 extern "C"
 {
@@ -51,7 +51,6 @@ Logger::Logger()
 
 void Logger::log_f(bool printLine, const char* file, i32 line, const char* message, ...)
 {
-#if defined(ENABLE_LOGGING) || defined(ENABLE_UART)
 	memset(mhTraceBuffer, 0, TRACE_BUFFER_SIZE);
 
 	//Variable argument list must be passed to vnsprintf
@@ -62,19 +61,21 @@ void Logger::log_f(bool printLine, const char* file, i32 line, const char* messa
 
 	if (printLine)
 	{
-		snprintf(mhTraceBuffer2, TRACE_BUFFER_SIZE, "[%s@%d]: %s" EOL, file, line, mhTraceBuffer);
-		log_transport_putstring((const uint8_t *) mhTraceBuffer2);
+		char tmp[40];
+		snprintf(tmp, 40, "[%s@%d]: ", file, line);
+		log_transport_putstring(tmp);
+		log_transport_putstring(mhTraceBuffer);
+		log_transport_putstring(EOL);
 	}
 	else
 	{
-		log_transport_putstring((const uint8_t *) mhTraceBuffer);
+		log_transport_putstring(mhTraceBuffer);
 	}
-#endif
 }
 
 void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...)
 {
-#if defined(ENABLE_LOGGING) || defined(ENABLE_UART)
+#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	if (
 			//UART communication
 			(!Terminal::promptAndEchoMode && (
@@ -93,7 +94,6 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
 		)
 	{
 		memset(mhTraceBuffer, 0, TRACE_BUFFER_SIZE);
-		memset(mhTraceBuffer2, 0, TRACE_BUFFER_SIZE);
 
 		//Variable argument list must be passed to vsnprintf
 		va_list aptr;
@@ -101,19 +101,25 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
 		vsnprintf(mhTraceBuffer, TRACE_BUFFER_SIZE, message, aptr);
 		va_end(aptr);
 
-		if (logType == LOG_LINE)
-		{
-			snprintf(mhTraceBuffer2, TRACE_BUFFER_SIZE, "[%s@%d %s]: %s" EOL, file, line, tag, mhTraceBuffer);
-			log_transport_putstring((const uint8_t *) mhTraceBuffer2);
-		}
-		else if (logType == LOG_MESSAGE_ONLY || logType == TRACE)
-		{
-			log_transport_putstring((const uint8_t *) mhTraceBuffer);
-		}
-		else if (logType == UART_COMMUNICATION)
-		{
-			snprintf(mhTraceBuffer2, TRACE_BUFFER_SIZE, "<%s|%s>", tag, mhTraceBuffer);
-			log_transport_putstring((const uint8_t *) mhTraceBuffer2);
+		if(Terminal::promptAndEchoMode){
+			if (logType == LOG_LINE)
+			{
+				char tmp[50];
+				snprintf(tmp, 50, "[%s@%d %s]: ", file, line, tag);
+				log_transport_putstring(tmp);
+				log_transport_putstring(mhTraceBuffer);
+				log_transport_putstring(EOL);
+			}
+			else if (logType == LOG_MESSAGE_ONLY || logType == TRACE)
+			{
+				log_transport_putstring(mhTraceBuffer);
+			}
+		} else {
+			char tmp[150];
+			snprintf(tmp, 150, "{\"type\":\"log\",\"tag\":\"%s\",\"file\":\"%s\",\"line\":%d,\"message\":\"", tag, file, line);
+			log_transport_putstring(tmp);
+			log_transport_putstring(mhTraceBuffer);
+			log_transport_putstring("\"}" SEP);
 		}
 	}
 #endif
@@ -124,23 +130,23 @@ void Logger::uart_error_f(UartErrorType type)
 	switch (type)
 	{
 		case UartErrorType::NO_ERROR:
-			uart("ERROR", "{\"module\":0, \"type\":\"error\", \"code\":0, \"text\":\"OK\"}" SEP);
+			uart("ERROR", "{\"type\":\"error\",\"code\":0,\"text\":\"OK\"}" SEP);
 			break;
 		case UartErrorType::COMMAND_NOT_FOUND:
-			uart("ERROR", "{\"module\":0, \"type\":\"error\", \"code\":1, \"text\":\"Command not found\"}" SEP);
+			uart("ERROR", "{\"type\":\"error\",\"code\":1,\"text\":\"Command not found\"}" SEP);
 			break;
 		case UartErrorType::ARGUMENTS_WRONG:
-			uart("ERROR", "{\"module\":0, \"type\":\"error\", \"code\":2, \"text\":\"Wrong Arguments\"}" SEP);
+			uart("ERROR", "{\"type\":\"error\",\"code\":2,\"text\":\"Wrong Arguments\"}" SEP);
 			break;
 		default:
-			uart("ERROR", "{\"module\":0, \"type\":\"error\", \"code\":99, \"text\":\"Unknown Error\"}" SEP);
+			uart("ERROR", "{\"type\":\"error\",\"code\":99,\"text\":\"Unknown Error\"}" SEP);
 			break;
 	}
 }
 
 void Logger::enableTag(string tag)
 {
-#ifdef ENABLE_LOGGING
+#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	transform(tag.begin(), tag.end(), tag.begin(), ::toupper);
 	logFilterIterator = find(logFilter.begin(), logFilter.end(), tag);
 	//Only push tag if not found
@@ -152,7 +158,7 @@ void Logger::enableTag(string tag)
 
 void Logger::disableTag(string tag)
 {
-#ifdef ENABLE_LOGGING
+#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	transform(tag.begin(), tag.end(), tag.begin(), ::toupper);
 	logFilterIterator = find(logFilter.begin(), logFilter.end(), tag);
 
@@ -165,7 +171,7 @@ void Logger::disableTag(string tag)
 
 void Logger::printEnabledTags()
 {
-#ifdef ENABLE_LOGGING
+#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	if(logEverything) trace("LOG ALL IS ACTIVE" EOL);
 	for (string tag : logFilter)
 	{
@@ -176,7 +182,7 @@ void Logger::printEnabledTags()
 
 void Logger::toggleTag(string tag)
 {
-#ifdef ENABLE_LOGGING
+#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	transform(tag.begin(), tag.end(), tag.begin(), ::toupper);
 	logFilterIterator = find(logFilter.begin(), logFilter.end(), tag);
 
@@ -193,7 +199,7 @@ void Logger::toggleTag(string tag)
 
 bool Logger::TerminalCommandHandler(string commandName, vector<string> commandArgs)
 {
-#ifdef ENABLE_LOGGING
+#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	if (commandName == "debug" && commandArgs.size() == 1)
 	{
 		if (commandArgs[0] == "all")
@@ -247,7 +253,7 @@ bool Logger::TerminalCommandHandler(string commandName, vector<string> commandAr
 /*################### Error codes #########################*/
 const char* Logger::getNrfErrorString(u32 nrfErrorCode)
 {
-#ifdef ENABLE_LOGGING
+#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	switch (nrfErrorCode)
 	{
 		case NRF_SUCCESS:
@@ -302,7 +308,7 @@ const char* Logger::getNrfErrorString(u32 nrfErrorCode)
 
 const char* Logger::getBleEventNameString(u16 bleEventId)
 {
-#ifdef ENABLE_LOGGING
+#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	switch (bleEventId)
 	{
 		case BLE_EVT_TX_COMPLETE:
@@ -379,7 +385,7 @@ const char* Logger::getBleEventNameString(u16 bleEventId)
 
 const char* Logger::getHciErrorString(u8 hciErrorCode)
 {
-#ifdef ENABLE_LOGGING
+#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	switch (hciErrorCode)
 	{
 
@@ -468,7 +474,7 @@ const char* Logger::getHciErrorString(u8 hciErrorCode)
 
 const char* Logger::getGattStatusErrorString(u16 gattStatusCode)
 {
-#ifdef ENABLE_LOGGING
+#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	switch (gattStatusCode)
 	{
 		case BLE_GATT_STATUS_SUCCESS:
@@ -563,11 +569,12 @@ void Logger::blePrettyPrintAdvData(sizedData advData)
 	}
 }
 
-void Logger::logError(errorTypes errorType, u32 errorCode, u32 timestamp)
+void Logger::logError(errorTypes errorType, u32 errorCode, u16 extraInfo)
 {
 	errorLog[errorLogPosition].errorType = errorType;
 	errorLog[errorLogPosition].errorCode = errorCode;
-	errorLog[errorLogPosition].timestamp = timestamp;
+	errorLog[errorLogPosition].extraInfo = extraInfo;
+	errorLog[errorLogPosition].timestamp = Node::getInstance()->globalTimeSec;
 
 	//Will fill the error log until the last entry (last entry does get overwritten with latest value)
 	if(errorLogPosition < NUM_ERROR_LOG_ENTRIES-1) errorLogPosition++;
@@ -575,33 +582,27 @@ void Logger::logError(errorTypes errorType, u32 errorCode, u32 timestamp)
 
 //Trivial implementation for converting the timestamp in human readable format
 //This does not pay respect to any leap seconds, gap years, whatever
-void Logger::convertTimestampToString(u64 timestamp, char* buffer)
+void Logger::convertTimestampToString(u32 timestampSec, u16 remainderTicks, char* buffer)
 {
-	u64 yearDivider = (u64)APP_TIMER_CLOCK_FREQ * 60 * 60 * 24 * 365;
-	u16 years = timestamp / yearDivider + 1970;
-	timestamp = timestamp % yearDivider;
+	u32 yearDivider = 60 * 60 * 24 * 365;
+	u16 years = timestampSec / yearDivider + 1970;
+	timestampSec = timestampSec % yearDivider;
 
-	u64 dayDivider = (u64)APP_TIMER_CLOCK_FREQ * 60 * 60 * 24;
-	u16 days = timestamp / dayDivider + 1;
-	timestamp = timestamp % dayDivider;
+	u32 dayDivider = 60 * 60 * 24;
+	u16 days = timestampSec / dayDivider + 1;
+	timestampSec = timestampSec % dayDivider;
 
-	u32 hourDivider = APP_TIMER_CLOCK_FREQ * 60 * 60;
-	u16 hours = timestamp / hourDivider;
-	timestamp = timestamp % hourDivider;
+	u32 hourDivider = 60 * 60;
+	u16 hours = timestampSec / hourDivider;
+	timestampSec = timestampSec % hourDivider;
 
-	u32 minuteDivider = APP_TIMER_CLOCK_FREQ * 60;
-	u16 minutes = timestamp / minuteDivider;
-	timestamp = timestamp % minuteDivider;
+	u32 minuteDivider = 60;
+	u16 minutes = timestampSec / minuteDivider;
+	timestampSec = timestampSec % minuteDivider;
 
-	u32 secondDivider = APP_TIMER_CLOCK_FREQ;
-	u16 seconds = timestamp / secondDivider;
-	timestamp = timestamp % secondDivider;
+	u32 seconds = timestampSec;
 
-	u32 millisecondDivider = APP_TIMER_CLOCK_FREQ / 1000;
-	u16 milliseconds = timestamp / millisecondDivider;
-	timestamp = timestamp % millisecondDivider;
-
-	sprintf(buffer, "approx. %u years, %u days, %02uh:%02um:%02us,%03ums", years, days, hours, minutes, seconds, milliseconds);
+	sprintf(buffer, "approx. %u years, %u days, %02uh:%02um:%02us,%u ticks", years, days, hours, minutes, seconds, remainderTicks);
 }
 
 //FIXME: This method does not know the destination buffer length and could crash the system
@@ -641,7 +642,7 @@ void Logger::disableAll()
 
 const char* Logger::getPstorageStatusErrorString(u16 operationCode)
 {
-#ifdef ENABLE_LOGGING
+#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	switch(operationCode){
 		case PSTORAGE_CLEAR_OP_CODE:
 			return "Error when Clear Operation was requested";

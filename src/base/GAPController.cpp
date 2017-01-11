@@ -112,6 +112,7 @@ bool GAPController::connectToPeripheral(ble_gap_addr_t* address, u16 connectionI
 	//Connect to the peripheral
 	err = sd_ble_gap_connect(address, &scan_params, &conn_params);
 	if(err != NRF_SUCCESS){
+		logt("ERROR", "GATT fail %d", err);
 		//Just ignore it, the connection will not happen
 		return false;
 	}

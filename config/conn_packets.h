@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MESSAGE_TYPE_CLUSTER_ACK_1 21 //Both sides must acknowledge the handshake (Sent between two nodes)
 #define MESSAGE_TYPE_CLUSTER_ACK_2 22 //Second ack (Sent between two nodes)
 #define MESSAGE_TYPE_CLUSTER_INFO_UPDATE 23 //When the cluster size changes, this message is used (Sent to all nodes)
+#define MESSAGE_TYPE_RECONNECT 24 //Sent while trying to reestablish a connection
 
 //Others
 #define MESSAGE_TYPE_UPDATE_TIMESTAMP 30 //Used to enable timestamp distribution over the mesh
@@ -168,6 +169,22 @@ typedef struct
 }connPacketClusterInfoUpdate;
 
 
+//CLUSTER_RECONNECT
+#define SIZEOF_CONN_PACKET_PAYLOAD_RECONNECT 0
+typedef struct
+{
+
+}connPacketPayloadReconnect;
+
+#define SIZEOF_CONN_PACKET_RECONNECT (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_RECONNECT)
+typedef struct
+{
+	connPacketHeader header;
+	connPacketPayloadReconnect payload;
+}connPacketReconnect;
+
+
+
 //DATA_PACKET
 #define SIZEOF_CONN_PACKET_PAYLOAD_DATA_1 (MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER)
 typedef struct
@@ -205,11 +222,12 @@ typedef struct
 
 
 //Timestamp synchronization packet
-#define SIZEOF_CONN_PACKET_UPDATE_TIMESTAMP (SIZEOF_CONN_PACKET_HEADER + 8)
+#define SIZEOF_CONN_PACKET_UPDATE_TIMESTAMP (SIZEOF_CONN_PACKET_HEADER + 6)
 typedef struct
 {
 	connPacketHeader header;
-	u64 timestamp;
+	u32 timestampSec;
+	u16 remainderTicks;
 }connPacketUpdateTimestamp;
 
 //Used to tell nodes to update their connection interval settings

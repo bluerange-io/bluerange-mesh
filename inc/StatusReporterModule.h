@@ -36,18 +36,22 @@ class StatusReporterModule: public Module
 
 		enum RSSISampingModes{RSSI_SAMLING_NONE=0, RSSI_SAMLING_LOW=1, RSSI_SAMLING_MEDIUM=2, RSSI_SAMLING_HIGH=3};
 
-		//Module configuration that is saved persistently (size must be multiple of 4)
+		#pragma pack(push, 1)
+		//Module configuration that is saved persistently
 		struct StatusReporterModuleConfiguration: ModuleConfiguration
 		{
-				//Insert more persistent config values here
-				u16 connectionReportingIntervalMs;
-				u16 statusReportingIntervalMs;
+				u16 connectionReportingIntervalDs;
+				u16 statusReportingIntervalDs;
 				u8 connectionRSSISamplingMode; //typeof RSSISampingModes
 				u8 advertisingRSSISamplingMode; //typeof RSSISampingModes
-				u16 reserved;
+				u16 nearbyReportingIntervalDs;
+				u16 deviceInfoReportingIntervalDs;
+				//Insert more persistent config values here
+				u32 reserved; //Mandatory, read Module.h
 		};
+		#pragma pack(pop)
 
-		StatusReporterModuleConfiguration configuration;
+		DECLARE_CONFIG_AND_PACKED_STRUCT(StatusReporterModuleConfiguration);
 
 		enum StatusModuleTriggerActionMessages
 		{
@@ -56,7 +60,8 @@ class StatusReporterModule: public Module
 			GET_DEVICE_INFO = 2,
 			GET_ALL_CONNECTIONS = 3,
 			GET_NEARBY_NODES = 4,
-			SET_INITIALIZED = 5
+			SET_INITIALIZED = 5,
+			GET_ERRORS = 6
 		};
 
 		enum StatusModuleActionResponseMessages
@@ -66,7 +71,8 @@ class StatusReporterModule: public Module
 			DEVICE_INFO = 2,
 			ALL_CONNECTIONS = 3,
 			NEARBY_NODES = 4,
-			SET_INITIALIZED_RESULT = 5
+			SET_INITIALIZED_RESULT = 5,
+			ERROR_LOG_ENTRY = 6
 		};
 
 		//####### Module specific message structs (these need to be packed)
@@ -125,11 +131,19 @@ class StatusReporterModule: public Module
 
 			} StatusReporterModuleStatusMessage;
 
+			//This message delivers often changing information and info about the incoming connection
+			#define SIZEOF_STATUS_REPORTER_MODULE_ERROR_LOG_ENTRY_MESSAGE 11
+			typedef struct
+			{
+				u8 errorType;
+				u16 extraInfo;
+				u32 errorCode;
+				u32 timestamp;
+			} StatusReporterModuleErrorLogEntryMessage;
+
 		#pragma pack(pop)
 		//####### Module messages end
 
-		u32 lastConnectionReportingTimer;
-		u32 lastStatusReportingTimer;
 
 #define NUM_NODE_MEASUREMENTS 20
 		nodeMeasurement nodeMeasurements[NUM_NODE_MEASUREMENTS];
@@ -150,13 +164,15 @@ class StatusReporterModule: public Module
 
 		void ResetToDefaultConfiguration();
 
-		void TimerEventHandler(u16 passedTime, u32 appTimer);
+		void TimerEventHandler(u16 passedTimeDs, u32 appTimerDs);
 
 		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
 
 		void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
 
 		void BleEventHandler(ble_evt_t* bleEvent);
+
+		void ButtonHandler(u8 buttonId, u32 holdTime);
 
 		void MeshConnectionChangedHandler(Connection* connection);
 

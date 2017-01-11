@@ -19,10 +19,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
-#ifndef ARS10047_H
-#define ARS10047_H
+#ifndef ARS100748_H
+#define ARS100748_H
 
-// Definitions for ARS10047 v1.0
+// Definitions for ARS100748 v1.0
 
 
 #define SET_ARS100748_BOARD()			\
@@ -31,11 +31,9 @@ do{ 									\
 	Config->Led2Pin = 1;				\
 	Config->Led3Pin = 1;				\
 	Config->LedActiveHigh = true;				\
-	Config->uartRXPin = 11;				\
-	Config->uartTXPin = 9;				\
-	Config->uartCTSPin = 10;				\
-	Config->uartRTSPin = 8;				\
-	Config->uartFlowControl = true;				\
+	Config->Button1Pin = 3;			\
+	Config->ButtonsActiveHigh = false;			\
+	Config->uartRXPin = -1;				\
 	Config->calibratedTX = -65;				\
 										\
 } while(0)
@@ -44,14 +42,13 @@ do{ 									\
 //This macro checks whether the boardId is for ARS100748 board
 #define SET_ARS100748_BOARD_IF_FIT(boardid)		\
 do{												\
-	if(boardid == 0x002){							\
+	if(boardid == 0x006){							\
 		SET_ARS100748_BOARD(); 						\
 	}												\
 } while(0)
 
 
 
-#endif // ARS10047_H
-
+#endif // ARS100748_H
 
 

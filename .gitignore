@@ -1,7 +1,10 @@
 /Debug/
 /Release/
 _build/
+/Makefile.local
 /doc/
 /logs/
 /Debug52/
 /deploy/current.txt
+/.settings/
+/src_mway/

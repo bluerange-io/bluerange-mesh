@@ -19,35 +19,28 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
+#pragma once
 
-#include <LogTransport.h>
+// Definitions for ARS101693 (Beacon v2)
 
-#ifdef USE_SEGGER_RTT_INSTEAD_OF_UART
 
-extern "C"{
-	void log_transport_putstring(const u8* message){
-		SEGGER_RTT_WriteString(0, (const char*) message);
-	}
+#define SET_ARS101693_BOARD()			\
+do{ 									\
+	Config->Led1Pin = 15;				\
+	Config->Led2Pin = -1;				\
+	Config->Led3Pin = 14;				\
+	Config->LedActiveHigh = true;		\
+	Config->Button1Pin = 7;			\
+	Config->ButtonsActiveHigh = false;			\
+	Config->uartRXPin = -1;				\
+	Config->calibratedTX = -60;				\
+										\
+} while(0)
 
-	void log_transport_put(u8 character){
-		u8 buffer[1];
-		buffer[0] = character;
-		SEGGER_RTT_Write(0, (const char*)buffer, 1);
-	}
-
-	bool log_transport_get_char_nonblocking(u8* buffer){
-		if(SEGGER_RTT_HasKey()){
-			char a = SEGGER_RTT_WaitKey();
-			buffer[0] = a;
-
-			return true;
-		} else {
-			return false;
-		}
-	}
-	u8 log_transport_get_char_blocking(){
-		return SEGGER_RTT_WaitKey();
-	}
-}
-
-#endif
+//This macro checks whether the boardId is for ARS101693 board
+#define SET_ARS101693_BOARD_IF_FIT(boardid)		\
+do{												\
+	if(boardid == 0x007){							\
+		SET_ARS101693_BOARD(); 						\
+	}												\
+} while(0)

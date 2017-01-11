@@ -33,8 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <Module.h>
 
 #define SCAN_FILTER_NUMBER 1 //Number of filters that can be set
-#define NUM_ADDRESSES_TRACKED 30
-#define RSSI_THRESHOLD -80
+#define NUM_ADDRESSES_TRACKED 50
+
+#define NUM_ASSET_PACKETS 10
 
 #define SCAN_BUFFERS_SIZE 10 //Max number of packets that are buffered
 
@@ -74,20 +75,33 @@ class ScanningModule: public Module
 			u16 count;
 		} scannedPacket;
 
-		//Module configuration that is saved persistently (size must be multiple of 4)
+		typedef struct
+		{
+			u16 assetId;
+			u32 rssiSum;
+			u16 count;
+		} scannedAssetTrackingPacket;
+
+		#pragma pack(push, 1)
+		//Module configuration that is saved persistently
 		struct ScanningModuleConfiguration : ModuleConfiguration{
+			u16 groupedReportingIntervalDs;
+			u16 assetReportingIntervalDs;
+			i8 groupedPacketRssiThreshold;
 			//Insert more persistent config values here
-				u16 reportingIntervalMs;
+			u32 reserved; //Mandatory, read Module.h
 		};
+		#pragma pack(pop)
 
-		u32 lastReportingTimerMs = 0;
-
-		ScanningModuleConfiguration configuration;
+		DECLARE_CONFIG_AND_PACKED_STRUCT(ScanningModuleConfiguration);
 
 
 		scanFilterEntry scanFilters[SCAN_FILTER_NUMBER];
 
 		scannedPacket groupedPackets[SCAN_BUFFERS_SIZE];
+
+		scannedAssetTrackingPacket assetPackets[NUM_ASSET_PACKETS];
+
 
 		//For total message counting
 		//u32 totalMessages;
@@ -103,12 +117,42 @@ class ScanningModule: public Module
 		u32 totalRSSI;
 
 
-		enum ScanModuleMessages{TOTAL_SCANNED_PACKETS=0};
+		enum ScanModuleMessages{
+			TOTAL_SCANNED_PACKETS=0,
+			ASSET_TRACKING_PACKET=1
+		};
+
+		//####### Module specific message structs (these need to be packed)
+		#pragma pack(push)
+		#pragma pack(1)
+
+		typedef struct
+		{
+			u16 assetId;
+			i8 rssiAvg;
+			u8 packetCount;
+		} trackedAsset;
+
+		#define SIZEOF_SCAN_MODULE_TRACKED_ASSETS_MESSAGE 12
+		typedef struct
+		{
+				trackedAsset trackedAssets[3];
+
+		} ScanModuleTrackedAssetsMessage;
+
+		//####### End of Module specitic messages
+		#pragma pack(pop)
+
 
 		//Byte muss gesetzt sein, byte darf nicht gesetzt sein, byte ist egal
 		bool setScanFilter(scanFilterEntry* filter);
 
 		void SendReport();
+
+		bool isAssetTrackingData(u8* data, u8 dataLength);
+		void resetAssetTrackingTable();
+		void SendTrackedAssets();
+		bool isAssetTrackingDataFromiOSDeviceInForegroundMode(u8* data, u8 dataLength);
 
 		bool advertiseDataWasSentFromMobileDevice(u8* data, u8 dataLength);
 		bool advertiseDataFromAndroidDevice(u8* data, u8 dataLength);
@@ -132,7 +176,7 @@ class ScanningModule: public Module
 
 		void ResetToDefaultConfiguration();
 
-		void TimerEventHandler(u16 passedTime, u32 appTimer);
+		void TimerEventHandler(u16 passedTimeDs, u32 appTimerDs);
 
 		void BleEventHandler(ble_evt_t* bleEvent);
 

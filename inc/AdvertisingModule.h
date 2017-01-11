@@ -36,7 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 class AdvertisingModule: public Module
 {
 	private:
+
+		u32 assetMode = false;
+
+		#pragma pack(push, 1)
 		struct AdvertisingMessage{
+			u8 messageId;
 			u8 forceNonConnectable : 1; //Always send this message non-connectable
 			u8 forceConnectable : 1; //Message is only sent, when it is possible to send it in connectable mode (if we have a free slave connection)
 			u8 reserved : 1;
@@ -44,21 +49,23 @@ class AdvertisingModule: public Module
 			u8 messageData[ADVERTISING_MODULE_MAX_MESSAGE_LENGTH];
 		};
 
-		//Module configuration that is saved persistently (size must be multiple of 4)
+		//Module configuration that is saved persistently
 		struct AdvertisingModuleConfiguration : ModuleConfiguration{
-			//Insert more persistent config values here
 			//The interval at which the device advertises
 			//If multiple messages are configured, they will be distributed round robin
 			u16 advertisingIntervalMs;
 			//Number of messages
 			u8 messageCount;
-			u8 reserved;
+			u8 txPower;
 			AdvertisingMessage messageData[ADVERTISING_MODULE_MAX_MESSAGES];
+			//Insert more persistent config values here
+			u32 reserved; //Mandatory, read Module.h
 		};
+		#pragma pack(pop)
+
+		DECLARE_CONFIG_AND_PACKED_STRUCT(AdvertisingModuleConfiguration);
 
 		u16 maxMessages = ADVERTISING_MODULE_MAX_MESSAGES; //Save this, so that it can be requested
-
-		AdvertisingModuleConfiguration configuration;
 
 		//Set all advertising messages at once, the old configuration will be overwritten
 		void SetAdvertisingMessages(u8* data, u16 dataLength);
@@ -80,7 +87,6 @@ class AdvertisingModule: public Module
 		#pragma pack(pop)
 
 
-
 	public:
 		AdvertisingModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
 
@@ -88,9 +94,11 @@ class AdvertisingModule: public Module
 
 		void ResetToDefaultConfiguration();
 
-		void TimerEventHandler(u16 passedTime, u32 appTimer);
+		void TimerEventHandler(u16 passedTimeDs, u32 appTimerDs);
 
 		void NodeStateChangedHandler(discoveryState newState);
+
+		void ButtonHandler(u8 buttonId, u32 holdTime);
 
 		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
 };

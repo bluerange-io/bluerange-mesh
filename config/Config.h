@@ -33,11 +33,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 extern "C" {
 #include <ble_gap.h>
 #include <app_util.h>
+#include <nrf_uart.h>
 }
 
-#define FM_VERSION_MAJOR 0 //0-400
-#define FM_VERSION_MINOR 3 //0-999
-#define FM_VERSION_PATCH 1 //0-9999
+//major (0-400), minor (0-999), patch (0-9999)
+#define FM_VERSION_MAJOR 0
+#define FM_VERSION_MINOR 3
+#define FM_VERSION_PATCH 46
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH);
 
 extern LedWrapper* LedRed;
@@ -56,14 +58,20 @@ extern u32 __application_ram_start_address[]; //Variable is set in the linker sc
 typedef enum {
 	PCA_10031	 		= 0x000, //nRF51 Dongle
 	PCA_10028	 		= 0x001, //nRF51-DK
-	ARS_100748		 	= 0x002, //ARSv1
+	ARS_100748_ADAPTER	= 0x002, //ARSv1-with-adapterboard
 	PCA_10036	 		= 0x003, //nRF52-Preview-DK
 	PCA_10040	 		= 0x004, //nRF52-DK
+	ARS_100748_CABLE	= 0x005, //ARSv1-with-cable
+	ARS_100748			= 0x006, //ARSv1-beacon
+	ARS_101693			= 0x007, //ARSv2-beacon
+	ARS_101694			= 0x008, //ARSv2-meshgw-beacon
 } boardTypes;
 
 //Alright, I know this is bad, but it's for readability....
 //And static classes do need a seperate declaration and definition...
+#ifndef Config
 #define Config Conf::getInstance()
+#endif
 
 //This class holds the configuration and some bits are changeable at runtime
 class Conf
@@ -93,31 +101,34 @@ class Conf
 		bool breakpointToggleActive = false;
 
 		//If in debug mode, the node will run in endless loops when errors occur
-		bool debugMode = true;
+		bool debugMode = false;
 
 		//Instruct the Advertising Module to advertise Debug Packets
 		bool advertiseDebugPackets = false;
 
 		ledMode defaultLedMode = ledMode::LED_MODE_CONNECTIONS;
 
+		//Configures whether the terminal will start in interactive mode or not
+		bool terminalPromptMode = true;
+
 
 		// ########### TIMINGS ################################################
 
-		//Main timer tick interval
-		u32 mainTimerTickMs = 200;
+		//Main timer tick interval, must be set to a multiple of 1 decisecond (1/10th o a second)
+		const u16 mainTimerTickDs = 2;
 
 		//Mesh connection parameters (used when a connection is set up)
-		u16 meshMinConnectionInterval = MSEC_TO_UNITS(10, UNIT_1_25_MS);   	//(7.5-4000) Minimum acceptable connection interval
-		u16 meshMaxConnectionInterval = MSEC_TO_UNITS(10, UNIT_1_25_MS);   	//(7.5-4000) Maximum acceptable connection interval
+		u16 meshMinConnectionInterval = MSEC_TO_UNITS(100, UNIT_1_25_MS);   	//(7.5-4000) Minimum acceptable connection interval
+		u16 meshMaxConnectionInterval = MSEC_TO_UNITS(100, UNIT_1_25_MS);   	//(7.5-4000) Maximum acceptable connection interval
 		u16 meshPeripheralSlaveLatency = 0;                  					//(0-...) Slave latency in number of connection events
 		u16 meshConnectionSupervisionTimeout = MSEC_TO_UNITS(6000, UNIT_10_MS);   	//(100-32000) Connection supervisory timeout
-		u16 meshExtendedConnectionTimeout = 10000;	//(0 - 65000) Extended timeout which is used to reconnect a known connection upon connection timeout
+		u16 meshExtendedConnectionTimeoutSec = 0;	//(0 - 65000) Extended timeout which is used to reconnect a known connection upon connection timeout
 
 		//Mesh discovery parameters
 		//DISCOVERY_HIGH
 		u16 meshAdvertisingIntervalHigh = MSEC_TO_UNITS(100, UNIT_0_625_MS);	//(20-1024) (100-1024 for non connectable advertising!) Determines advertising interval in units of 0.625 millisecond.
 		u16 meshScanIntervalHigh = MSEC_TO_UNITS(20, UNIT_0_625_MS);	//(20-1024) Determines scan interval in units of 0.625 millisecond.
-		u16 meshScanWindowHigh = MSEC_TO_UNITS(4, UNIT_0_625_MS);	//(2.5-1024) Determines scan window in units of 0.625 millisecond.
+		u16 meshScanWindowHigh = MSEC_TO_UNITS(3, UNIT_0_625_MS);	//(2.5-1024) Determines scan window in units of 0.625 millisecond.
 
 
 		//DISCOVERY_LOW
@@ -132,14 +143,14 @@ class Conf
 		u16 meshConnectingScanTimeout = 1; //(0-...) in seconds
 
 		//HANDSHAKE
-		u16 meshHandshakeTimeout = 10; //If the handshake has not finished after this time, the connection will be disconnected
+		u16 meshHandshakeTimeoutDs = SEC_TO_DS(4); //If the handshake has not finished after this time, the connection will be disconnected
 
 
 		//STATE timeouts
-		u16 meshStateTimeoutHigh = 1 * 1000; //Timeout of the High discovery state before deciding to which partner to connect
-		u16 meshStateTimeoutLow = 10 * 1000; //Timeout of the Low discovery state before deciding to which partner to connect
-		u16 meshStateTimeoutBackOff = 0 * 1000; //Timeout until the back_off state will return to discovery
-		u16 meshStateTimeoutBackOffVariance = 1 * 1000;  //Up to ... ms will be added randomly to the back off state timeout
+		u16 meshStateTimeoutHighDs = SEC_TO_DS(2); //Timeout of the High discovery state before deciding to which partner to connect
+		u16 meshStateTimeoutLowDs = SEC_TO_DS(10); //Timeout of the Low discovery state before deciding to which partner to connect
+		u16 meshStateTimeoutBackOffDs = SEC_TO_DS(0); //Timeout until the back_off state will return to discovery
+		u16 meshStateTimeoutBackOffVarianceDs = SEC_TO_DS(1);  //Up to ... ms will be added randomly to the back off state timeout
 
 		u16 discoveryHighToLowTransitionDuration = 10; // When discovery returns # times without results, the node will switch to low discovery
 
@@ -153,8 +164,8 @@ class Conf
 
 		// ########### ADVERTISING ################################################
 		u8 advertiseOnChannel37 = 1;
-		u8 advertiseOnChannel38 = 0;
-		u8 advertiseOnChannel39 = 0;
+		u8 advertiseOnChannel38 = 1;
+		u8 advertiseOnChannel39 = 1;
 
 		// ########### CONNECTION ################################################
 
@@ -170,16 +181,18 @@ class Conf
 		// ########### BOARD_SPECIFICS ################################################
 		//Default board is pca10031, modify SET_BOARD if different board is required
 		//Or flash config data to UICR
-		u8 Led1Pin;
-		u8 Led2Pin;
-		u8 Led3Pin;
+		i8 Led1Pin;
+		i8 Led2Pin;
+		i8 Led3Pin;
 		bool LedActiveHigh; //Defines if writing 0 or 1 to an LED turns it on
 
-		u8 uartRXPin;
-		u8 uartTXPin;
-		u8 uartCTSPin;
-		u8 uartRTSPin;
-		bool uartFlowControl;
+		i8 Button1Pin;
+		bool ButtonsActiveHigh;
+
+		i8 uartRXPin; //Set RX-Pin to -1 to disable UART
+		i8 uartTXPin;
+		i8 uartCTSPin;
+		i8 uartRTSPin;
 
 		i8 calibratedTX = -63; // This value should be calibrated at 1m distance
 
@@ -196,7 +209,8 @@ class Conf
 #error "Specify SoC model (NR51 or NRF52)"
 #endif
 
-		char serialNumber[6];;
+		char serialNumber[6];
+		u32 serialNumberIndex;
 		u16 manufacturerId = 0; //According to the BLE company identifiers: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
 
 		//When enabling encryption, the mesh handle can only be read through an encrypted connection
@@ -239,7 +253,7 @@ class Conf
 		u16 firmwareVersionPatch = FM_VERSION_PATCH; //0-9999
 		u32 firmwareVersion = FM_VERSION;
 
-		i8 radioTransmitPower = 0; //The power at which the radio transmits advertisings and data packets
+		i8 radioTransmitPower = 4; //The power at which the radio transmits advertisings and data packets
 };
 
 
@@ -248,14 +262,22 @@ class Conf
 //Selecting the board can be done at runtime
 #include <board_pca10031.h>
 #include <board_ars100748.h>
+#include <board_ars100748_adapter.h>
+#include <board_ars100748_cable.h>
 #include <board_pca10036.h>
 #include <board_pca10040.h>
+#include <board_ars101693.h>
+#include <board_ars101694.h>
 
 #define SET_BOARD() do{					\
 		SET_PCA10031_BOARD_IF_FIT(Config->boardType);		\
 		SET_PCA10036_BOARD_IF_FIT(Config->boardType);		\
 		SET_PCA10040_BOARD_IF_FIT(Config->boardType);		\
 		SET_ARS100748_BOARD_IF_FIT(Config->boardType);	\
+		SET_ARS100748_CABLE_BOARD_IF_FIT(Config->boardType);	\
+		SET_ARS100748_ADAPTER_BOARD_IF_FIT(Config->boardType);	\
+		SET_ARS101693_BOARD_IF_FIT(Config->boardType);	\
+		SET_ARS101694_BOARD_IF_FIT(Config->boardType);	\
 }while(0);
 
 //Each of the Connections has a buffer for outgoing packets, this is its size in bytes
@@ -263,15 +285,6 @@ class Conf
 
 //Each connection does also have a buffer to assemble packets that were split into 20 byte chunks
 #define PACKET_REASSEMBLY_BUFFER_SIZE 200
-
-//Maximum length that can be read
-#define TERMINAL_READ_BUFFER
-//Size for tracing messages to UART, if it is too short, messages will get truncated
-#define TRACE_BUFFER_SIZE 500
-
-//If this is defined, message logging is done via segger RTT instead of UART
-//In J-Link RTT view, set line ending to CR and send input on enter, echo input to off
-//#define USE_SEGGER_RTT_INSTEAD_OF_UART
 
 //Number of supported Modules
 #define MAX_MODULE_COUNT 10
@@ -297,18 +310,24 @@ class Conf
 #define STORAGE_BLOCK_SIZE 128 //Determines the maximum size for a module configuration
 #define STORAGE_BLOCK_NUMBER 8 //Determines the number of blocks that are available
 
-//Terminal
-#define TERMINAL_PROMPT_MODE_ON_BOOT true
+/*############ TERMINAL AND LOGGER ################*/
 
-/*############ LOGGER ################*/
+//Size for tracing messages to the log transport, if it is too short, messages will get truncated
+#define TRACE_BUFFER_SIZE 500
+
+//Define to enable terminal in-/output through UART
+#define USE_UART
+//Use the SEGGER RTT protocol for in and output
+//In J-Link RTT view, set line ending to CR and send input on enter, echo input to off
+//#define USE_SEGGER_RTT
+
+#define USE_BUTTONS
 
 #define EOL "\r\n"
 #define SEP "\r\n"
 
 //If undefined, the final build will have no logging / Terminal functionality built in
-#define ENABLE_LOGGING
-#define ENABLE_TERMINAL
-#define ENABLE_UART
+//#define ENABLE_LOGGING
 
 
 /*############ SERVICES ################*/
@@ -343,9 +362,9 @@ enum moduleID{
 
 //Activate and deactivate modules by un-/commenting these defines
 #define ACTIVATE_ADVERTISING_MODULE
-//#define ACTIVATE_SCANNING_MODULE
+#define ACTIVATE_SCANNING_MODULE
 #define ACTIVATE_STATUS_REPORTER_MODULE
-//#define ACTIVATE_DFU_MODULE
+#define ACTIVATE_DFU_MODULE
 #define ACTIVATE_ENROLLMENT_MODULE
 #define ACTIVATE_IO_MODULE
 #define ACTIVATE_DEBUG_MODULE

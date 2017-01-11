@@ -64,7 +64,7 @@ extern "C"{
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
-typedef uint64_t u64;
+typedef uint32_t u64; //WARNING: u64 caused alignement fault when used
 
 //Signed ints
 typedef int8_t i8;
@@ -94,6 +94,15 @@ typedef u16 nodeID;
 typedef u32 clusterID;
 typedef i16 clusterSIZE;
 
+/*############ Regarding node ids ################*/
+// Refer to protocol specification @https://github.com/mwaylabs/fruitymesh/wiki/Protocol-Specification
+#define NODE_ID_BROADCAST 0
+#define NODE_ID_DEVICE_BASE 0
+#define NODE_ID_GROUP_BASE 20000
+#define NODE_ID_HOPS_BASE 30000
+#define NODE_ID_SHORTEST_SINK 31001
+
+
 //Maximum data that can be transmitted with one write
 //Max value according to: http://developer.nordicsemi.com/nRF51_SDK/doc/7.1.0/s120/html/a00557.html
 #define MAX_DATA_SIZE_PER_WRITE 20
@@ -118,9 +127,12 @@ enum deviceTypes{DEVICE_TYPE_STATIC=0, DEVICE_TYPE_ROAMING=1, DEVICE_TYPE_SINK=2
 
 /*############ BOOTLOADER ################*/
 //Uses word-sized variables to avoid padding problems. No need to save space in our flash-page
+#define BOOTLOADER_MAGIC_NUMBER 0xF0771234
+#define BOOTLOADER_BITMASK_SIZE 60
+enum imageType{ IMAGE_TYPE_SOFTDEVICE, IMAGE_TYPE_APP, IMAGE_TYPE_APP_FORCED };
 typedef struct
 {
-	u32 updatePending; //Should be set to the magic number
+	u32 updatePending; //Should be set to the magic number, don't move!
 	u32 imageType;
 	u32 sdStartPage;
 	u32 sdNumPages;
@@ -132,15 +144,16 @@ typedef struct
 	u32 dfuMasterNodeId;
 	u32 dfuInProgressRequestHandle;
 
+	u32 dfuFirmwareVersion;
 	u32 dfuNumChunks;
 	u32 dfuChunkSize;
+	u32 dfuImageCRC;
 
-	u32 pagesStored[60]; //bit sequence of how many pages have been stored successfully
-	u32 pagesMoved[60]; //bit sequence of how many pages the bootloader has moved so far
+
+	u32 pagesStored[BOOTLOADER_BITMASK_SIZE]; //bit sequence of how many pages have been stored successfully
+	u32 pagesMoved[BOOTLOADER_BITMASK_SIZE]; //bit sequence of how many pages the bootloader has moved so far
 
 } bootloaderSettings;
-#define BOOTLOADER_MAGIC_NUMBER 0xF0771234
-enum imageType{ IMAGE_TYPE_SOFTDEVICE, IMAGE_TYPE_APP };
 
 
 /*############ ADVERTISING ################*/	
@@ -162,15 +175,6 @@ typedef enum {
 } scanState;
 
 
-/*############ Regarding node ids ################*/
-// Refer to protocol specification
-#define NODE_ID_BROADCAST 0
-#define NODE_ID_DEVICE_BASE 0
-#define NODE_ID_GROUP_BASE 20000
-#define NODE_ID_HOPS_BASE 30000
-#define NODE_ID_SHORTEST_SINK 31001
-
-
 //States
 //These are the different states
 //DISCOVERY_HIGH: Scanning and Advertising at high interval
@@ -180,14 +184,29 @@ typedef enum {
 //DISCOVERY_OFF: No new nodes will be discovered until discovery is switched on again.
 enum discoveryState
 {
-	INVALID_STATE, BOOTUP, DISCOVERY, DISCOVERY_HIGH, DISCOVERY_LOW, DECIDING, HANDSHAKE, HANDSHAKE_TIMEOUT, CONNECTING, REESTABLISHING_CONNECTION, BACK_OFF, DISCOVERY_OFF
+	INVALID_STATE, BOOTUP, DISCOVERY, DISCOVERY_HIGH, DISCOVERY_LOW, DECIDING, HANDSHAKE, HANDSHAKE_TIMEOUT, CONNECTING, BACK_OFF, DISCOVERY_OFF
 };
 
 //Led mode that defines what the LED does (mainly for debugging)
 enum ledMode
 {
-	LED_MODE_OFF, LED_MODE_ON, LED_MODE_CONNECTIONS, LED_MODE_RADIO, LED_MODE_CLUSTERING
+	LED_MODE_OFF, LED_MODE_ON, LED_MODE_CONNECTIONS, LED_MODE_RADIO, LED_MODE_CLUSTERING, LED_MODE_ASSET
 };
+
+/*########## Alignment ###########*/
+//In order to send data packets across the mesh in an efficiant manner
+//we have to keep the size as small as possible which is why all network structures
+//are packed. Storing module data also has to be as small as possible to save flash
+//space, but we need to align each module configuration on a 4-byte boundary
+//to be able to save it.
+#ifdef __GNUC__
+#define PACK_AND_ALIGN_4 __attribute__((aligned(4)))
+
+//Because the sizeof operator does not work in the intended way when a struct
+//is aligned, we have to calculate the size by extending the struct and aligning it
+#define DECLARE_CONFIG_AND_PACKED_STRUCT(structname) struct structname##Aligned : structname {} __attribute__((packed, aligned(4))); structname##Aligned configuration
+#endif
+
 
 /*############ HELPFUL MACROS ################*/
 #define PAGE_SIZE NRF_FICR->CODEPAGESIZE
@@ -196,3 +215,9 @@ enum ledMode
 #define TO_ADDR(page) ((u32*)(page*PAGE_SIZE))
 #define TO_PAGE(addr) ((((u32)addr)/PAGE_SIZE))
 #define TO_PAGES_CEIL(size) ((size + PAGE_SIZE - 1) / PAGE_SIZE) //Calculates the number of pages and rounds up
+
+//Returns true if the timer should have trigered the interval in the passedTime
+#define SHOULD_IV_TRIGGER(timer, passedTime, interval) (((timer)-(passedTime)) % (interval) >= (timer) % (interval))
+
+//Converts Seconds to Deciseconds
+#define SEC_TO_DS(sec) ((sec)*10)
