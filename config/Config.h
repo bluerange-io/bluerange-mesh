@@ -39,7 +39,7 @@ extern "C" {
 //major (0-400), minor (0-999), patch (0-9999)
 #define FM_VERSION_MAJOR 0
 #define FM_VERSION_MINOR 3
-#define FM_VERSION_PATCH 46
+#define FM_VERSION_PATCH 50
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH);
 
 extern LedWrapper* LedRed;
@@ -327,7 +327,7 @@ class Conf
 #define SEP "\r\n"
 
 //If undefined, the final build will have no logging / Terminal functionality built in
-//#define ENABLE_LOGGING
+#define ENABLE_LOGGING
 
 
 /*############ SERVICES ################*/
@@ -364,7 +364,7 @@ enum moduleID{
 #define ACTIVATE_ADVERTISING_MODULE
 #define ACTIVATE_SCANNING_MODULE
 #define ACTIVATE_STATUS_REPORTER_MODULE
-#define ACTIVATE_DFU_MODULE
+//#define ACTIVATE_DFU_MODULE
 #define ACTIVATE_ENROLLMENT_MODULE
 #define ACTIVATE_IO_MODULE
 #define ACTIVATE_DEBUG_MODULE

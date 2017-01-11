@@ -120,8 +120,8 @@ int main(void)
 //	Logger::getInstance().enableTag("STATES");
 //	Logger::getInstance().enableTag("ADV");
 //	Logger::getInstance().enableTag("SINK");
-	Logger::getInstance().enableTag("CM");
-	Logger::getInstance().enableTag("CONN");
+//	Logger::getInstance().enableTag("CM");
+//	Logger::getInstance().enableTag("CONN");
 //	Logger::getInstance().enableTag("CONN_DATA");
 //	Logger::getInstance().enableTag("STATES");
 
@@ -422,10 +422,10 @@ void bleDispatchEventHandler(ble_evt_t * bleEvent)
 
 	logt("EVENTS", "BLE EVENT %s (%d)", Logger::getBleEventNameString(eventId), eventId);
 
-	if(
-			bleEvent->header.evt_id != BLE_GAP_EVT_RSSI_CHANGED &&
-			bleEvent->header.evt_id != BLE_GAP_EVT_ADV_REPORT
-	) trace("<");
+//	if(
+//			bleEvent->header.evt_id != BLE_GAP_EVT_RSSI_CHANGED &&
+//			bleEvent->header.evt_id != BLE_GAP_EVT_ADV_REPORT
+//	) trace("<");
 
 	//Give events to all controllers
 	GAPController::bleConnectionEventHandler(bleEvent);
@@ -446,10 +446,10 @@ void bleDispatchEventHandler(ble_evt_t * bleEvent)
 
 	logt("EVENTS", "End of event");
 
-	if(
-				bleEvent->header.evt_id != BLE_GAP_EVT_RSSI_CHANGED &&
-				bleEvent->header.evt_id != BLE_GAP_EVT_ADV_REPORT
-		) trace(">");
+//	if(
+//				bleEvent->header.evt_id != BLE_GAP_EVT_RSSI_CHANGED &&
+//				bleEvent->header.evt_id != BLE_GAP_EVT_ADV_REPORT
+//		) trace(">");
 }
 
 void sysDispatchEventHandler(u32 sys_evt)

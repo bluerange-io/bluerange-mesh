@@ -1,3 +1,21 @@
+## FruityMesh 0.3.50
+New Features:
+- New Terminal implementation, interrupt based and blocking
+- Adds Button Handler
+- Can be built using a simple makefile with GCC
+- Adds ASSET mode for configuring the beacon as an asset with a buttonclick
+- Implements some basic connection reconnection
+- will now track assets
+- adds macro for recurring timers
+- allows segger RTT and UART simultaniously
+
+Bugfixes:
+- ModuleConfigs will now save with or without bootloader
+- ignores non-mesh communication on other write handles
+- uses deciseconds (1/10th seconds) to avoid timer overflows while enabling good enough resolution
+- fixes bug with connection master bit handover
+- various fixes
+
 ## FruityMesh 0.3
 
 Important:

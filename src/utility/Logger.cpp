@@ -78,14 +78,14 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
 #if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	if (
 			//UART communication
-			(!Terminal::promptAndEchoMode && (
+			(!Config->terminalPromptMode && (
 				logType == UART_COMMUNICATION
 				|| tag == "ERROR"
 				|| find(logFilter.begin(), logFilter.end(), tag) != logFilter.end()
 			))
 
 			//User interaction
-			|| (Terminal::promptAndEchoMode && (
+			|| (Config->terminalPromptMode && (
 				logEverything
 				|| logType == TRACE
 				|| tag == "ERROR"
@@ -101,7 +101,7 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
 		vsnprintf(mhTraceBuffer, TRACE_BUFFER_SIZE, message, aptr);
 		va_end(aptr);
 
-		if(Terminal::promptAndEchoMode){
+		if(Config->terminalPromptMode){
 			if (logType == LOG_LINE)
 			{
 				char tmp[50];
