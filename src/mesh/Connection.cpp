@@ -271,8 +271,8 @@ void Connection::ReceivePacketHandler(connectionPacket* inPacket)
 		//Some packets need to be modified before relaying them
 
 		//If the packet should travel a number of hops, we decrement that part
-		if(packetHeader->sender > NODE_ID_HOPS_BASE && packetHeader->sender < NODE_ID_HOPS_BASE + 31000){
-			packetHeader->sender--;
+		if(packetHeader->receiver > NODE_ID_HOPS_BASE && packetHeader->receiver < NODE_ID_HOPS_BASE + 1000){
+			packetHeader->receiver--;
 		}
 
 		//Send to all other connections
