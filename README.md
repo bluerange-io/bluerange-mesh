@@ -13,3 +13,13 @@ This project is under active development at the [M-Way Solutions GmbH](http://ww
 
 # Additional Features
 Over-the-mesh firmware updates are currently not open sourced. Interested parties can contact sales@mwaysolutions.com to get access to advanced features.
+
+# Accepting the Contribution Agreement
+ 
+We appreciate contributions from external developers, but we require all contributors to accept the M-Way Solutions Contribution Agreement so that we have the legal right to include the contribution in our commercial products under any license that we choose. The contribution agreement is attached available on request to legal@mwaysolutions.com
+ 
+Our contribution agreement states that you (1) grant M-Way Solutions a license to use the contribution in any way we choose, and (2) confirm that the contributed code is your original work. An important thing to note is that we do NOT require an assignment of the copyright in the contributed code.  This means that a contributor maintains ownership of his or her code while also giving M-Way Solutions the rights and assurances it needs in order to use the contribution.
+ 
+If you have any questions about the Contribution Agreement, please email legal@mwaysolutions.com
+ 
+It is not necessary to attach a signed copy of the agreement to a pull request or issue submission.
