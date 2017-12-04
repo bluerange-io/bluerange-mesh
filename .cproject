@@ -126,19 +126,7 @@
 				</configuration>
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
-			<storageModule moduleId="ilg.gnuarmeclipse.managedbuild.packs">
-				<option id="cmsis.device.name" value="nRF51422_xxAC"/>
-				<option id="cmsis.family.name" value="nRF51 Series"/>
-				<option id="cmsis.device.vendor.name" value="Nordic Semiconductor"/>
-				<option id="cmsis.device.vendor.id" value="54"/>
-				<option id="cmsis.device.pack.vendor" value="NordicSemiconductor"/>
-				<option id="cmsis.device.pack.name" value="nRF_DeviceFamilyPack"/>
-				<option id="cmsis.device.pack.version" value="8.3.2"/>
-				<option id="cmsis.core.name" value="Cortex-M0"/>
-				<option id="cmsis.compiler.define" value="NRF51"/>
-				<memory section="IRAM1" size="0x8000" start="0x20000000" startup="0"/>
-				<memory section="IROM1" size="0x40000" start="0x00000000" startup="true"/>
-			</storageModule>
+			<storageModule moduleId="ilg.gnuarmeclipse.managedbuild.packs"/>
 		</cconfiguration>
 		<cconfiguration id="ilg.gnuarmeclipse.managedbuild.cross.toolchain.base.1246642613.2134243887">
 			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="ilg.gnuarmeclipse.managedbuild.cross.toolchain.base.1246642613.2134243887" moduleId="org.eclipse.cdt.core.settings" name="NRF52_BOARD">
@@ -281,9 +269,6 @@
 		</configuration>
 		<configuration configurationName="Default">
 			<resource resourceType="PROJECT" workspacePath="/fruitymesh"/>
-		</configuration>
-		<configuration configurationName="Release">
-			<resource resourceType="PROJECT" workspacePath="/FruityMesh"/>
 		</configuration>
 		<configuration configurationName="NRF51">
 			<resource resourceType="PROJECT" workspacePath="/FruityMesh"/>

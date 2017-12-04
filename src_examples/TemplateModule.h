@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -61,7 +61,7 @@ class TemplateModule: public Module
 
 
 	public:
-		TemplateModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		TemplateModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name);
 
 		void ConfigurationLoadedHandler();
 
@@ -75,5 +75,5 @@ class TemplateModule: public Module
 
 		//void NodeStateChangedHandler(discoveryState newState);
 
-		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+		bool TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs);
 };

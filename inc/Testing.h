@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -35,7 +35,7 @@ extern "C"{
 
 
 
-class Testing : public TerminalCommandListener, public ConnectionManagerCallback
+class Testing : public TerminalCommandListener
 {
 public:
 	Testing();
@@ -44,19 +44,11 @@ public:
 
 	static void Step2();
 	static void Step3();
-
-
-	void testPacketQueue();
-
+	
 
 	//Methods of TerminalCommandListener
-	bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+	bool TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs);
 
-	//Methods of ConnectionManagerCallback
-	void DisconnectionHandler(ble_evt_t* bleEvent);
-	void ConnectionSuccessfulHandler(ble_evt_t* bleEvent);
-	void ConnectingTimeoutHandler(ble_evt_t* bleEvent);
-	void messageReceivedCallback(connectionPacket* inPacket);
 
 private:
 	static u32 nodeId;

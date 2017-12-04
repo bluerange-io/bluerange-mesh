@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <Logger.h>
 #include <AdvertisingController.h>
 #include <ScanController.h>
+#include <IoModule.h>
 
 extern "C"{
 #include <app_error.h>
@@ -47,18 +48,18 @@ void TestBattery::TimerHandler(){
 
 		node->ChangeState(discoveryState::DISCOVERY_OFF);
 		node->DisableStateMachine(true);
-		node->currentLedMode = ledMode::LED_MODE_OFF;
+		((IoModule*)node->GetModuleById(moduleID::IO_MODULE_ID))->currentLedMode = ledMode::LED_MODE_OFF;
 
-		LedRed->Off();
-		LedGreen->Off();
-		LedBlue->Off();
+		GS->ledRed->Off();
+		GS->ledGreen->Off();
+		GS->ledBlue->Off();
 	}
 }
 
 void TestBattery::prepareTesting()
 {
 
-	Logger::getInstance().logEverything = true;
+	Logger::getInstance()->logEverything = true;
 
 
 
@@ -80,7 +81,7 @@ void TestBattery::startTesting()
 	node = Node::getInstance();
 	cm = ConnectionManager::getInstance();
 
-	node->currentLedMode = ledMode::LED_MODE_OFF;
+	((IoModule*)node->GetModuleById(moduleID::IO_MODULE_ID))->currentLedMode = ledMode::LED_MODE_OFF;
 
 	//deactiveate node
 	node->ChangeState(discoveryState::DISCOVERY_OFF);
@@ -92,19 +93,19 @@ void TestBattery::startTesting()
 void TestBattery::advertiseAt100ms()
 {
 	Config->meshAdvertisingIntervalHigh = MSEC_TO_UNITS(25, UNIT_0_625_MS);
-	AdvertisingController::SetAdvertisingState(advState::ADV_STATE_HIGH);
+	//TODO: ADVREF AdvertisingController::getInstance()->SetAdvertisingState(advState::ADV_STATE_HIGH);
 }
 
 void TestBattery::advertiseAt2000ms()
 {
 	Config->meshAdvertisingIntervalHigh = MSEC_TO_UNITS(2000, UNIT_0_625_MS);
-	AdvertisingController::SetAdvertisingState(advState::ADV_STATE_HIGH);
+	//TODO: ADVREF AdvertisingController::getInstance()->SetAdvertisingState(advState::ADV_STATE_HIGH);
 }
 
 void TestBattery::advertiseAt5000ms()
 {
 	Config->meshAdvertisingIntervalHigh = MSEC_TO_UNITS(5000, UNIT_0_625_MS);
-	AdvertisingController::SetAdvertisingState(advState::ADV_STATE_HIGH);
+	//TODO: ADVREF AdvertisingController::getInstance()->SetAdvertisingState(advState::ADV_STATE_HIGH);
 }
 
 void TestBattery::scanAt50Percent()
@@ -112,7 +113,7 @@ void TestBattery::scanAt50Percent()
 	Config->meshScanIntervalHigh = MSEC_TO_UNITS(1000, UNIT_0_625_MS);	//(20-1024) Determines scan interval in units of 0.625 millisecond.
 	Config->meshScanWindowHigh = MSEC_TO_UNITS(500, UNIT_0_625_MS);
 
-	ScanController::SetScanState(scanState::SCAN_STATE_HIGH);
+	ScanController::getInstance()->SetScanState(scanState::SCAN_STATE_HIGH);
 }
 
 void TestBattery::scanAt100Percent()
@@ -120,7 +121,7 @@ void TestBattery::scanAt100Percent()
 	Config->meshScanIntervalHigh = MSEC_TO_UNITS(1000, UNIT_0_625_MS);	//(20-1024) Determines scan interval in units of 0.625 millisecond.
 	Config->meshScanWindowHigh = MSEC_TO_UNITS(980, UNIT_0_625_MS);
 
-	ScanController::SetScanState(scanState::SCAN_STATE_HIGH);
+	ScanController::getInstance()->SetScanState(scanState::SCAN_STATE_HIGH);
 }
 
 void TestBattery::meshWith100MsConnAndHighDiscovery()
@@ -177,7 +178,7 @@ void TestBattery::meshWith30msConnAndDiscoveryOff()
 		node->ChangeState(discoveryState::DISCOVERY_HIGH);
 
 		//Disable discovery after 20 seconds
-		node->currentLedMode = ledMode::LED_MODE_CONNECTIONS;
+		((IoModule*)node->GetModuleById(moduleID::IO_MODULE_ID))->currentLedMode = ledMode::LED_MODE_CONNECTIONS;
 		deactivateDiscoveryAfterDs = SEC_TO_DS(20);
 }
 
@@ -199,7 +200,7 @@ void TestBattery::meshWith100msConnAndDiscoveryOff()
 	node->ChangeState(discoveryState::DISCOVERY_HIGH);
 
 	//Disable discovery after 20 seconds
-	node->currentLedMode = ledMode::LED_MODE_CONNECTIONS;
+	((IoModule*)node->GetModuleById(moduleID::IO_MODULE_ID))->currentLedMode = ledMode::LED_MODE_CONNECTIONS;
 	deactivateDiscoveryAfterDs = SEC_TO_DS(20);
 }
 
@@ -222,7 +223,7 @@ void TestBattery::meshWith500msConnAndDiscoveryOff()
 	node->ChangeState(discoveryState::DISCOVERY_HIGH);
 
 	//Disable discovery after 20 seconds
-	node->currentLedMode = ledMode::LED_MODE_CONNECTIONS;
+	((IoModule*)node->GetModuleById(moduleID::IO_MODULE_ID))->currentLedMode = ledMode::LED_MODE_CONNECTIONS;
 	deactivateDiscoveryAfterDs = SEC_TO_DS(20);
 }
 

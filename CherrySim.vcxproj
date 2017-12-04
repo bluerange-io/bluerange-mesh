@@ -1,0 +1,241 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>15.0</VCProjectVersion>
+    <ProjectGuid>{4689A2C1-1523-434B-88C0-4364A204C4BA}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(SolutionDir)\_build\VS\$(Configuration)\</OutDir>
+    <IntDir>_build\VS\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName)3</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(SolutionDir)\_build\VS\$(Configuration)\</OutDir>
+    <IntDir>_build\VS\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;SIM_ENABLED;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>stdafx.h;C:\mway\projects\fruitymesh\inc\SystemTest.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>inc_c;inc;src_mway;config;C:\nrf\sdk\nrf5_sdk_latest\components\softdevice\s130\headers;C:\nrf\sdk\nrf5_sdk_latest\components\libraries\util;C:\nrf\sdk\nrf5_sdk_latest\components\device;C:\nrf\sdk\nrf5_sdk_latest\components\softdevice\common\softdevice_handler;C:\nrf\sdk\nrf5_sdk_latest\components\drivers_nrf\pstorage;C:\nrf\sdk\nrf5_sdk_latest\components\libraries\timer;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <DisableSpecificWarnings>4099;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <Link>
+      <TargetMachine>MachineX86</TargetMachine>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <RandomizedBaseAddress>true</RandomizedBaseAddress>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;SIM_ENABLED;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>C:\mway\projects\fruitymesh\inc\SystemTest.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <AdditionalIncludeDirectories>inc_c;inc;src_mway;config;C:\nrf\sdk\nrf5_sdk_latest\components\softdevice\s130\headers;C:\nrf\sdk\nrf5_sdk_latest\components\libraries\util;C:\nrf\sdk\nrf5_sdk_latest\components\device;C:\nrf\sdk\nrf5_sdk_latest\components\softdevice\common\softdevice_handler;C:\nrf\sdk\nrf5_sdk_latest\components\drivers_nrf\pstorage;C:\nrf\sdk\nrf5_sdk_latest\components\libraries\timer;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <Link>
+      <TargetMachine>MachineX86</TargetMachine>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="cherrysim\aes.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="cherrysim\CherrySim.cpp" />
+    <ClCompile Include="cherrysim\FruitySimPipe.cpp" />
+    <ClCompile Include="cherrysim\stdafx.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\base\AdvertisingController.cpp" />
+    <ClCompile Include="src\base\FruityHal.cpp" />
+    <ClCompile Include="src\base\GAPController.cpp" />
+    <ClCompile Include="src\base\GATTController.cpp" />
+    <ClCompile Include="src\base\ScanController.cpp" />
+    <ClCompile Include="src\Boardconfig.cpp" />
+    <ClCompile Include="src\Config.cpp" />
+    <ClCompile Include="src\GlobalState.cpp" />
+    <ClCompile Include="src\Main.cpp" />
+    <ClCompile Include="src\mesh\AppConnection.cpp" />
+    <ClCompile Include="src\mesh\BaseConnection.cpp" />
+    <ClCompile Include="src\mesh\ConnectionManager.cpp" />
+    <ClCompile Include="src\mesh\MeshConnection.cpp" />
+    <ClCompile Include="src\mesh\Node.cpp" />
+    <ClCompile Include="src\mesh\ResolverConnection.cpp" />
+    <ClCompile Include="src\modules\AdvertisingModule.cpp" />
+    <ClCompile Include="src\modules\DebugModule.cpp" />
+    <ClCompile Include="src\modules\EnrollmentModule.cpp" />
+    <ClCompile Include="src\modules\IoModule.cpp" />
+    <ClCompile Include="src\modules\Module.cpp" />
+    <ClCompile Include="src\modules\ScanningModule.cpp" />
+    <ClCompile Include="src\modules\StatusReporterModule.cpp" />
+    <ClCompile Include="src\segger_rtt\RTT_Syscalls_GCC.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\segger_rtt\SEGGER_RTT.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\test\SystemTest.cpp" />
+    <ClCompile Include="src\test\TestBattery.cpp" />
+    <ClCompile Include="src\test\Testing.cpp" />
+    <ClCompile Include="src\test\TestPacketQueue.cpp" />
+    <ClCompile Include="src\test\TestRecordStorage.cpp" />
+    <ClCompile Include="src\utility\ButtonListener.cpp" />
+    <ClCompile Include="src\utility\LedWrapper.cpp" />
+    <ClCompile Include="src\utility\Logger.cpp" />
+    <ClCompile Include="src\utility\NewStorage.cpp" />
+    <ClCompile Include="src\utility\PacketQueue.cpp" />
+    <ClCompile Include="src\utility\RecordStorage.cpp" />
+    <ClCompile Include="src\utility\SimpleBuffer.cpp" />
+    <ClCompile Include="src\utility\SimplePushStack.cpp" />
+    <ClCompile Include="src\utility\Terminal.cpp" />
+    <ClCompile Include="src\utility\Utility.cpp" />
+    <ClCompile Include="src_mway\ClcAppConnection.cpp" />
+    <ClCompile Include="src_mway\ClcComm.cpp" />
+    <ClCompile Include="src_mway\ClcModule.cpp" />
+    <ClCompile Include="src_mway\DFUModule.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="cherrysim\targetver.h" />
+    <ClInclude Include="config\adv_packets.h" />
+    <ClInclude Include="config\Boardconfig.h" />
+    <ClInclude Include="config\board_ars100748.h" />
+    <ClInclude Include="config\board_ars100748_adapter.h" />
+    <ClInclude Include="config\board_ars100748_cable.h" />
+    <ClInclude Include="config\board_ars101693.h" />
+    <ClInclude Include="config\board_ars101694.h" />
+    <ClInclude Include="config\board_pca10031.h" />
+    <ClInclude Include="config\board_pca10036.h" />
+    <ClInclude Include="config\board_pca10040.h" />
+    <ClInclude Include="config\Config.h" />
+    <ClInclude Include="config\conn_packets.h" />
+    <ClInclude Include="config\featureset.h" />
+    <ClInclude Include="config\nrf_drv_config.h" />
+    <ClInclude Include="config\nrf_drv_config_validation.h" />
+    <ClInclude Include="config\SEGGER_RTT_Conf.h" />
+    <ClInclude Include="config\types.h" />
+    <ClInclude Include="inc\AdvertisingController.h" />
+    <ClInclude Include="inc\AdvertisingModule.h" />
+    <ClInclude Include="inc\AppConnection.h" />
+    <ClInclude Include="inc\BaseConnection.h" />
+    <ClInclude Include="inc\ButtonListener.h" />
+    <ClInclude Include="inc\CherrySim.h" />
+    <ClInclude Include="inc\ConnectionManager.h" />
+    <ClInclude Include="inc\DebugModule.h" />
+    <ClInclude Include="inc\EnrollmentModule.h" />
+    <ClInclude Include="inc\FruityHal.h" />
+    <ClInclude Include="inc\FruitySimPipe.h" />
+    <ClInclude Include="inc\GAPController.h" />
+    <ClInclude Include="inc\GATTController.h" />
+    <ClInclude Include="inc\GlobalState.h" />
+    <ClInclude Include="inc\IoModule.h" />
+    <ClInclude Include="inc\LedWrapper.h" />
+    <ClInclude Include="inc\Logger.h" />
+    <ClInclude Include="inc\Main.h" />
+    <ClInclude Include="inc\MeshConnection.h" />
+    <ClInclude Include="inc\Module.h" />
+    <ClInclude Include="inc\NewStorage.h" />
+    <ClInclude Include="inc\Node.h" />
+    <ClInclude Include="inc\PacketQueue.h" />
+    <ClInclude Include="inc\RecordStorage.h" />
+    <ClInclude Include="inc\ResolverConnection.h" />
+    <ClInclude Include="inc\ScanController.h" />
+    <ClInclude Include="inc\ScanningModule.h" />
+    <ClInclude Include="inc\SimpleBuffer.h" />
+    <ClInclude Include="inc\SimplePushStack.h" />
+    <ClInclude Include="inc\StatusReporterModule.h" />
+    <ClInclude Include="inc\SystemTest.h" />
+    <ClInclude Include="inc\Terminal.h" />
+    <ClInclude Include="inc\TestBattery.h" />
+    <ClInclude Include="inc\Testing.h" />
+    <ClInclude Include="inc\TestPacketQueue.h" />
+    <ClInclude Include="inc\TestRecordStorage.h" />
+    <ClInclude Include="inc\Utility.h" />
+    <ClInclude Include="inc_c\aes.h" />
+    <ClInclude Include="inc_c\SEGGER_RTT.h" />
+    <ClInclude Include="src_examples\TemplateModule.h" />
+    <ClInclude Include="src_mway\ClcAppConnection.h" />
+    <ClInclude Include="src_mway\ClcComm.h" />
+    <ClInclude Include="src_mway\ClcModule.h" />
+    <ClInclude Include="src_mway\DFUModule.h" />
+    <ClInclude Include="stdafx.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

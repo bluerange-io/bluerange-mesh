@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -44,7 +44,7 @@ class PingModule: public Module
 		};
 
 	public:
-		PingModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		PingModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name);
 
 		void ConfigurationLoadedHandler();
 
@@ -54,9 +54,9 @@ class PingModule: public Module
 
 		//void BleEventHandler(ble_evt_t* bleEvent);
 
-		void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
+		void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, MeshConnection* connection, connPacketHeader* packetHeader, u16 dataLength);
 
 		//void NodeStateChangedHandler(discoveryState newState);
 
-		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+		bool TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs);
 };

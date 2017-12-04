@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -28,48 +28,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 #include "types.h"
+#include "GlobalState.h"
 
 extern "C"{
 	#include <ble.h>
 }
 
+class GAPControllerHandler
+{
+public:
+		GAPControllerHandler(){};
+	virtual ~GAPControllerHandler(){};
+
+	virtual void  GapConnectingTimeoutHandler(ble_evt_t* bleEvent) = 0;
+	virtual void  GapConnectionConnectedHandler(ble_evt_t* bleEvent) = 0;
+	virtual void  GapConnectionEncryptedHandler(ble_evt_t* bleEvent) = 0;
+	virtual void  GapConnectionDisconnectedHandler(ble_evt_t* bleEvent) = 0;
+
+};
+
 class GAPController
 {
 
 private:
-	static void (*connectingTimeoutCallback)(ble_evt_t* bleEvent);
-	static void (*connectionSuccessCallback)(ble_evt_t* bleEvent);
-	static void (*connectionEncryptedCallback)(ble_evt_t* bleEvent);
-	static void (*disconnectionCallback)(ble_evt_t* bleEvent);
+	GAPController();
 
 	//Set to true if a connection procedure is ongoing
-	static bool currentlyConnecting;
+	bool currentlyConnecting;
+	GAPControllerHandler* gapControllerHandler;
 
 
 public:
+	static GAPController* getInstance(){
+		if(!GS->gapController){
+			GS->gapController = new GAPController();
+		}
+		return GS->gapController;
+	}
 	//Initialize the GAP module
-	static void bleConfigureGAP();
+	void bleConfigureGAP();
 
 	//Configure the callbacks
-	static void setConnectingTimeoutHandler(void (*callback)(ble_evt_t* bleEvent));
-	static void setConnectionSuccessfulHandler(void (*callback)(ble_evt_t* bleEvent));
-	static void setConnectionEncryptedHandler(void (*callback)(ble_evt_t* bleEvent));
-	static void setDisconnectionHandler(void (*callback)(ble_evt_t* bleEvent));
+	void setGAPControllerHandler(GAPControllerHandler* handler);
 
 	//Connects to a peripheral with the specified address and calls the corresponding callbacks
-	static bool connectToPeripheral(ble_gap_addr_t* address, u16 connectionInterval, u16 timeout);
+	bool connectToPeripheral(fh_ble_gap_addr_t* address, u16 connectionInterval, u16 timeout);
 	//Disconnects from a peripheral when given a connection handle
-	static void disconnectFromPartner(u16 connectionHandle);
+	void disconnectFromPartner(u16 connectionHandle);
 
 	//Encryption
-	static void startEncryptingConnection(u16 connectionHandle);
+	void startEncryptingConnection(u16 connectionHandle);
 
 	//Update the connection interval
-	static void RequestConnectionParameterUpdate(u16 connectionHandle, u16 minConnectionInterval, u16 maxConnectionInterval, u16 slaveLatency, u16 supervisionTimeout);
+	void RequestConnectionParameterUpdate(u16 connectionHandle, u16 minConnectionInterval, u16 maxConnectionInterval, u16 slaveLatency, u16 supervisionTimeout);
 
 
 
 	//This handler is called with bleEvents from the softdevice
-	static bool bleConnectionEventHandler(ble_evt_t* bleEvent);
+	bool bleConnectionEventHandler(ble_evt_t* bleEvent);
 };
 

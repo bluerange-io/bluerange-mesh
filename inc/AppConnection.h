@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -19,36 +19,23 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
-#ifndef ARS100748_H
-#define ARS100748_H
 
-// Definitions for ARS100748 v1.0
+#pragma once
 
-
-#define SET_ARS100748_BOARD()			\
-do{ 									\
-	Config->Led1Pin = 0;				\
-	Config->Led2Pin = 1;				\
-	Config->Led3Pin = 1;				\
-	Config->LedActiveHigh = true;				\
-	Config->Button1Pin = 3;			\
-	Config->ButtonsActiveHigh = false;			\
-	Config->uartRXPin = -1;				\
-	Config->calibratedTX = -65;				\
-										\
-} while(0)
+#include <types.h>
+#include <BaseConnection.h>
 
 
-//This macro checks whether the boardId is for ARS100748 board
-#define SET_ARS100748_BOARD_IF_FIT(boardid)		\
-do{												\
-	if(boardid == 0x006){							\
-		SET_ARS100748_BOARD(); 						\
-	}												\
-} while(0)
+class AppConnection
+		: public BaseConnection
+{
+private:
+public:
+	AppConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress);
 
+	bool SendData(BaseConnectionSendData* sendData, u8* data);
 
+	void PrintStatus();
 
-#endif // ARS100748_H
-
+};
 

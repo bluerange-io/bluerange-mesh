@@ -7,4 +7,13 @@ _build/
 /Debug52/
 /deploy/current.txt
 /.settings/
-/src_mway/
+/NRF51_BOARD/
+enc_temp_folder
+
+# Visual Studio ignore
+.vs/
+*.suo
+*.userosscache
+*.sln.docstates
+*.user
+*.userprefs

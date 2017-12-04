@@ -7,6 +7,8 @@ CPU := cortex-m0
 LINKER_SCRIPT := linker/gcc_nrf51_s130_32kb.ld
 
 C_SOURCE_FILES   += $(COMPONENTS)/toolchain/system_nrf51.c
+C_SOURCE_FILES += $(COMPONENTS)/softdevice/common/softdevice_handler/softdevice_handler.c
+
 ASM_SOURCE_FILES += $(COMPONENTS)/toolchain/gcc/gcc_startup_nrf51.s
 
 INC_PATHS += -I$(COMPONENTS)/softdevice/s130/headers

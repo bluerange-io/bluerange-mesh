@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -30,13 +30,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 #include <types.h>
+#ifdef SIM_ENABLED
+#include <SystemTest.h>
+#endif
+#include <GlobalState.h>
 #include <adv_packets.h>
 #include <conn_packets.h>
 #include <LedWrapper.h>
+#include <AdvertisingController.h>
 #include <ConnectionManager.h>
-#include <Connection.h>
+#include "MeshConnection.h"
 #include <SimpleBuffer.h>
-#include <Storage.h>
+#include <RecordStorage.h>
 #include <Module.h>
 #include <Terminal.h>
 #include <ButtonListener.h>
@@ -45,6 +50,25 @@ extern "C"
 {
 #include <ble.h>
 }
+
+#pragma pack(push)
+#pragma pack(1)
+		//Persistently saved configuration (should be multiple of 4 bytes long)
+		//Serves to store settings that are changeable, e.g. by enrolling the node
+		struct NodeConfiguration : ModuleConfiguration {
+			i8 dBmTX; //Transmit power used for meshing
+
+			//TODO: These should probably be put in the enrollment module
+			deviceTypes deviceType : 8;
+			nodeID nodeId;
+			networkID networkId;
+			u8 networkKey[BLE_GAP_SEC_KEY_LEN]; //16 bytes
+			fh_ble_gap_addr_t nodeAddress; //7 bytes
+
+			//Insert more persistent config values here
+			u32 reserved; //Mandatory, read Module.h
+		};
+#pragma pack(pop)
 
 typedef struct
 {
@@ -56,33 +80,40 @@ typedef struct
 	advPacketPayloadJoinMeV0 payload;
 }joinMeBufferPacket;
 
+//meshServiceStruct that contains all information about the meshService
+typedef struct meshServiceStruct_temporary
+{
+	u16                     		serviceHandle;
+	ble_gatts_char_handles_t		sendMessageCharacteristicHandle;
+	ble_uuid_t						serviceUuid;
+} meshServiceStruct;
+
 class Node:
 		public TerminalCommandListener,
-		public ConnectionManagerCallback,
-		public StorageEventListener,
+		public RecordStorageEventListener,
 		public ButtonListener
 {
 	private:
-		static Node* instance;
 
+
+		enum NodeModuleTriggerActionMessages
+		{
+			SET_DISCOVERY = 0
+		};
+
+		enum NodeModuleActionResponseMessages
+		{
+			SET_DISCOVERY_RESULT = 0
+		};
 
 		bool stateMachineDisabled = false;
 
-		//Persistently saved configuration (should be multiple of 4 bytes long)
-		struct NodeConfiguration{
-			u32 version;
-			ble_gap_addr_t nodeAddress; //7 bytes
-			networkID networkId;
-			nodeID nodeId;
-			u8 networkKey[BLE_GAP_SEC_KEY_LEN]; //16 bytes
-			u16 connectionLossCounter; //TODO: connection loss counter is not saved persistently, move it.
-			deviceTypes deviceType;
-			//TODO: don't know if we need receiver sensitivity,...
-			u8 dBmTX; //The average RSSI, received in a distance of 1m with a tx power of +0 dBm
-			u8 dBmRX; //Receiver sensitivity (or receied power from a packet sent at 1m distance with +0dBm?)
-			u8 reserved;
-			u8 reserved2;
-		};
+
+		//Buffer that keeps a predefined number of join me packets
+		#define MAX_JOIN_ME_PACKET_AGE_DS (10 * 10)
+		#define JOIN_ME_PACKET_BUFFER_MAX_ELEMENTS 10
+		joinMeBufferPacket raw_joinMePacketBuffer[JOIN_ME_PACKET_BUFFER_MAX_ELEMENTS];
+
 
 		void SendModuleList(nodeID toNode, u8 requestHandle);
 
@@ -90,13 +121,14 @@ class Node:
 	public:
 		static Node* getInstance()
 		{
-			return instance;
+			return GS->node;
 		}
-
-		static ConnectionManager* cm;
 
 		SimpleBuffer* joinMePacketBuffer;
 		clusterID currentAckId;
+		u16 connectionLossCounter;
+
+		AdvJob* meshAdvJobHandle;
 
 		NodeConfiguration persistentConfig;
 
@@ -128,14 +160,11 @@ class Node:
 
 		u32 radioActiveCount;
 
-		u8 ledBlinkPosition;
-
-		ledMode currentLedMode;
-
 		bool outputRawData;
 
 		bool initializedByGateway; //Can be set to true by a mesh gateway after all configuration has been set
 
+		meshServiceStruct meshService;
 
 		// Result of the bestCluster calculation
 		enum decisionResult
@@ -144,16 +173,20 @@ class Node:
 		};
 
 		//Node
-		Node(networkID networkId);
+		Node();
+
+		void Initialize();
+		void LoadDefaults();
+		void InitializeMeshGattService();
+		void CharacteristicsDiscoveredHandler(ble_evt_t* bleEvent);
 
 		//Connection
 		void HandshakeTimeoutHandler();
-		void HandshakeDoneHandler(Connection* connection, bool completedAsWinner);
+		void HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinner);
 
 		//Stuff
 		Node::decisionResult DetermineBestClusterAvailable(void);
 		void UpdateJoinMePacket();
-		void UpdateScanResponsePacket(u8* newData, u8 length);
 
 		//States
 		void ChangeState(discoveryState newState);
@@ -176,24 +209,33 @@ class Node:
 		//Helpers
 		clusterID GenerateClusterID(void);
 
-		void SendClusterInfoUpdate(Connection* ignoreConnection, connPacketClusterInfoUpdate* packet);
-		void ReceiveClusterInfoUpdate(Connection* connection, connPacketClusterInfoUpdate* packet);
+		Module* GetModuleById(moduleID id);
+
+		void SendClusterInfoUpdate(MeshConnection* ignoreConnection, connPacketClusterInfoUpdate* packet);
+		void SendModuleActionMessage(u8 messageType, nodeID toNode, u8 actionType, u8 requestHandle, u8* additionalData, u16 additionalDataSize, bool reliable);
+		void ReceiveClusterInfoUpdate(MeshConnection* connection, connPacketClusterInfoUpdate* packet);
+
+		void HandOverMasterBitIfNecessary(MeshConnection * connection);
+		
+		bool HasAllMasterBits();
 
 		u32 CalculateClusterScoreAsMaster(joinMeBufferPacket* packet);
 		u32 CalculateClusterScoreAsSlave(joinMeBufferPacket* packet);
-		void PrintStatus(void);
-		void PrintBufferStatus(void);
-		void PrintSingleLineStatus(void);
+		void PrintStatus();
+		void PrintBufferStatus();
 		void SetTerminalTitle();
 
-		void StartConnectionRSSIMeasurement(Connection* connection);
-		void StopConnectionRSSIMeasurement(Connection* connection);
+		void StartConnectionRSSIMeasurement(MeshConnection* connection);
+		void StopConnectionRSSIMeasurement(MeshConnection* connection);
+
+		//Receiving
+		void MeshMessageReceivedHandler(MeshConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader);
 
 		//Uart communication
 		void UartSetCampaign();
 
 		//Methods of TerminalCommandListener
-		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+		bool TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs);
 
 		//Will be called if a button has been clicked
 		void ButtonHandler(u8 buttonId, u32 holdTimeDs);
@@ -202,10 +244,13 @@ class Node:
 		void ConfigurationLoadedHandler();
 
 		//Methods of ConnectionManagerCallback
-		void DisconnectionHandler(Connection* connection);
-		void ConnectionSuccessfulHandler(ble_evt_t* bleEvent);
-		void ConnectingTimeoutHandler(ble_evt_t* bleEvent);
-		void messageReceivedCallback(connectionPacket* inPacket);
+		void MeshConnectionDisconnectedHandler(MeshConnection* connection);
+		void MeshConnectionConnectedHandler();
+		void MeshConnectingTimeoutHandler(ble_evt_t* bleEvent);
+
+		//RecordStorage Listener
+		void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength);
+
 
 		u8 GetBatteryRuntime();
 

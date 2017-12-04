@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -19,28 +19,28 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
+
 #pragma once
 
-// Definitions for ARS101693 (Beacon v2)
+#include <types.h>
+#include <BaseConnection.h>
 
 
-#define SET_ARS101693_BOARD()			\
-do{ 									\
-	Config->Led1Pin = 15;				\
-	Config->Led2Pin = -1;				\
-	Config->Led3Pin = 14;				\
-	Config->LedActiveHigh = true;		\
-	Config->Button1Pin = 7;			\
-	Config->ButtonsActiveHigh = false;			\
-	Config->uartRXPin = -1;				\
-	Config->calibratedTX = -60;				\
-										\
-} while(0)
 
-//This macro checks whether the boardId is for ARS101693 board
-#define SET_ARS101693_BOARD_IF_FIT(boardid)		\
-do{												\
-	if(boardid == 0x007){							\
-		SET_ARS101693_BOARD(); 						\
-	}												\
-} while(0)
+class ResolverConnection
+		: public BaseConnection
+{
+private:
+public:
+	ResolverConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress);
+
+	void ConnectionSuccessfulHandler(u16 connectionHandle, u16 connInterval);
+
+	void ReceiveDataHandler(BaseConnectionSendData* sendData, u8* data);
+
+	void PrintStatus();
+
+	bool SendData(u8* data, u8 dataLength, DeliveryPriority priority, bool reliable);
+
+};
+

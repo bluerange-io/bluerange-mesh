@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -39,18 +39,25 @@ extern "C"{
 class ScanController
 {
 private:
+	fh_ble_gap_scan_params_t currentScanParams;
 
+	ScanController();
 
 public:
+	static ScanController* getInstance(){
+		if(!GS->scanController){
+			GS->scanController = new ScanController();
+		}
+		return GS->scanController;
+	}
 
-	static scanState scanningState; //The current state of scanning
+	scanState scanningState; //The current state of scanning
 
-	static void Initialize(void);
-	static void SetScanState(scanState newState);
+	void SetScanState(scanState newState);
 
-	static void SetScanDutyCycle(u16 interval, u16 window);
+	void SetScanDutyCycle(u16 interval, u16 window);
 
-	static bool ScanEventHandler(ble_evt_t * p_ble_evt);
+	bool ScanEventHandler(ble_evt_t * p_ble_evt);
 
 
 };

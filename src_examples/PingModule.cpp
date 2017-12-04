@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <Logger.h>
 #include <Utility.h>
-#include <Storage.h>
 #include <Node.h>
 #include <PingModule.h>
 #include <stdlib.h>
@@ -31,11 +30,10 @@ extern "C"{
 
 }
 
-PingModule::PingModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
-	: Module(moduleId, node, cm, name, storageSlot)
+PingModule::PingModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name)
+	: Module(moduleId, node, cm, name)
 {
 	//Register callbacks n' stuff
-	Logger::getInstance().enableTag("PINGMOD");
 
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
@@ -52,7 +50,7 @@ void PingModule::ConfigurationLoadedHandler()
 	Module::ConfigurationLoadedHandler();
 
 	//Version migration can be added here
-	if(configuration.moduleVersion == 1){/* ... */};
+	if(configuration.moduleVersion == this->moduleVersion){/* ... */};
 
 	//Do additional initialization upon loading the config
 
@@ -78,7 +76,7 @@ void PingModule::ResetToDefaultConfiguration()
 
 }
 
-bool PingModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
+bool PingModule::TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs)
 {
 	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)
 	{
@@ -109,7 +107,7 @@ bool PingModule::TerminalCommandHandler(string commandName, vector<string> comma
 	return Module::TerminalCommandHandler(commandName, commandArgs);
 }
 
-void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
+void PingModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, MeshConnection* connection, connPacketHeader* packetHeader, u16 dataLength)
 {
 	//Must call superclass for handling
 	Module::ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);

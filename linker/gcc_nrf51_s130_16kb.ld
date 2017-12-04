@@ -12,7 +12,7 @@ For 16KB devices, we have ram up 0x20004000  - 1536 bytes SoftDevice callstack
 
 MEMORY
 {
-  FLASH (rx) : ORIGIN = 0x1c000, LENGTH = 0x24000
+  FLASH (rx) : ORIGIN = 0x1b000, LENGTH = 0x24000
   RAM (rwx) :  ORIGIN = 0x20002e80, LENGTH = 0x1C00
 }
 

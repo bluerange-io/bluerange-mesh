@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -39,6 +39,7 @@ class SimplePushStack
 
 	public:
 		SimplePushStack(u16 maxSize);
+		~SimplePushStack();
 		bool Push(u8* element);
 		u8* GetItemAt(u16 position);
 		u16 size();

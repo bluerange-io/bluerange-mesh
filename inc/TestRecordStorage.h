@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -19,43 +19,41 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
-
 /*
- * This Queue can work with variable length data, it is only slightly different
- * from the packet queue, but has been copied because the packet queue
- * has to work with reliable / unreliable packets which offsets the storage
+ * This class will test the battery
  */
-
 
 
 #pragma once
 
+
+
+#ifdef SIM_ENABLED
+
 #include <types.h>
+#include <RecordStorage.h>
 
-extern "C" {
-}
-
-class SimpleQueue
+class TestRecordStorage : public RecordStorageEventListener
 {
-private: 
+	private:
+		u8* startPage;
+		u16 numPages;
 
+	public:
+		TestRecordStorage();
 
-public:
-//private.....
-	  u8* bufferStart;
-	  u8* bufferEnd;
-		u16 bufferLength;
+		void Start();
+		void TestCleanup();
+		void TestSave();
+		void TestRandomSingleRecordUpdates();
+		void TestGetNonExistentRecord();
+		void TestGetNonExistentRecordAfterStore();
+		void TestDeactivateRecord();
+		void TestFlashBusy();
+		void TestAsyncQueuing();
+		void TestRandomMultiRecordUpdates();
 
-		u8* readPointer;
-		u8* writePointer;
-//really public
-    SimpleQueue(u8* buffer, u32 bufferLength);
-    bool Put(u8* data, u32 dataLength);
-	sizedData GetNext();
-	sizedData PeekNext();
-	void DiscardNext();
-	void Clean(void);
-
-	u16 _numElements;
+		void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength);
 };
 
+#endif

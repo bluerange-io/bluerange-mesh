@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -26,7 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <Node.h>
 #include <Testing.h>
 #include <Logger.h>
-#include <Storage.h>
 #include <NewStorage.h>
 #include <Utility.h>
 
@@ -36,7 +35,9 @@ extern "C"
 #include <ble_gap.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#ifndef SIM_ENABLED
 #include <nrf_nvic.h>
+#endif
 }
 
 
@@ -53,34 +54,33 @@ Testing::Testing()
 
 	connectedDevices = 0;
 
-	nodeId = Node::getInstance()->persistentConfig.nodeId;
+	//nodeId = Node::getInstance()->persistentConfig.nodeId;
 
 	//Used to test stuff
 
-	Terminal::AddTerminalCommandListener(this);
+	Terminal::getInstance()->AddTerminalCommandListener(this);
 
-	//Storage::getInstance();
 
-//	Logger::getInstance().enableTag("STORAGE");
-//	Logger::getInstance().enableTag("STATES");
-//	Logger::getInstance().enableTag("CONN_QUEUE");
-	Logger::getInstance().enableTag("HANDSHAKE");
-//	Logger::getInstance().enableTag("TESTING");
-//	Logger::getInstance().enableTag("CONN");
-//	Logger::getInstance().enableTag("DATA");
-//	Logger::getInstance().enableTag("ADV");
-//	Logger::getInstance().enableTag("C");
-	Logger::getInstance().enableTag("DISCONNECT");
-//	Logger::getInstance().enableTag("JOIN");
-//	Logger::getInstance().enableTag("CONN");
-	Logger::getInstance().enableTag("MODULE");
-
+//	Logger::getInstance()->enableTag("STORAGE");
+//	Logger::getInstance()->enableTag("STATES");
+//	Logger::getInstance()->enableTag("CONN_QUEUE");
+	Logger::getInstance()->enableTag("HANDSHAKE");
+//	Logger::getInstance()->enableTag("TESTING");
+//	Logger::getInstance()->enableTag("CONN");
+//	Logger::getInstance()->enableTag("DATA");
+//	Logger::getInstance()->enableTag("ADV");
+//	Logger::getInstance()->enableTag("C");
+	Logger::getInstance()->enableTag("DISCONNECT");
+//	Logger::getInstance()->enableTag("JOIN");
+//	Logger::getInstance()->enableTag("CONN");
+	Logger::getInstance()->enableTag("MODULE");
 
 
 
-	//Logger::getInstance().enableTag("SCAN");
 
-	//Logger::getInstance().logEverything = true;
+	//Logger::getInstance()->enableTag("SCAN");
+
+	//Logger::getInstance()->logEverything = true;
 
 	cm = ConnectionManager::getInstance();
 	//cm->setConnectionManagerCallback(this);
@@ -98,7 +98,7 @@ Testing::Testing()
 	filter.minRSSI = -100;
 	filter.maxRSSI = 100;*/
 
-	//ScanController::setScanFilter(&filter);
+	//ScanController::getInstance()->setScanFilter(&filter);
 
 
 
@@ -111,68 +111,12 @@ Testing::Testing()
 
 	if(nodeId == 880 || nodeId == 458 || nodeId == 847)
 	{
-		//AdvertisingController::bleSetAdvertisingState(advState::ADV_STATE_HIGH);
+		//AdvertisingController::getInstance()->bleSetAdvertisingState(advState::ADV_STATE_HIGH);
 	}
 
 
 }
 
-
-
-void Testing::testPacketQueue(){
-	u8 buffer[800];
-
-	memset(buffer, 0, 800);
-
-	u8* innerBuffer = buffer + 100;
-
-	PacketQueue* queue = new PacketQueue(innerBuffer, 600);
-
-	u8 testData[200];
-	for(int i=0; i<200; i+=1){
-		testData[i] = i+1;
-	}
-
-	int i=0;
-	while(true){
-		u32 rand = (234876 % i) % 100;
-		rand += 3;
-		if(i% 100 == 0) trace("%u,",rand);
-
-		memset(testData, rand, rand);
-
-		u32 j=0;
-		for(j=0; j<rand; j++){
-			if(!queue->Put(testData, rand, true)) break;
-		}
-
-		for(; j>0; j--){
-			sizedData readData = queue->PeekNext();
-			queue->DiscardNext();
-
-			if(readData.length == 0){
-				logt("ERROR", "size is 0");
-			}
-
-			if(((u32)readData.length - 1) != rand){
-				logt("ERROR", "Wrong size read (%u instead of %u)", readData.length, rand);
-			}
-
-			//Check data
-			if(memcmp(testData, readData.data+1, rand) != 0){
-				logt("ERROR", "wrong data");
-			}
-		}
-
-		//Check bounds
-		if(buffer[99] != 0 || buffer[700] != 0){
-			logt("ERROR", "overflow");
-		}
-
-		i++;
-	}
-
-}
 
 
 
@@ -189,66 +133,24 @@ void Testing::Step3()
 
 int discoveredHandles = 0;
 
-void Testing::DisconnectionHandler(ble_evt_t* bleEvent)
-{
-	log("DISCONNECT");
-}
-void Testing::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
-{
-	log("CONNECTED");
 
-
-}
-
-void Testing::ConnectingTimeoutHandler(ble_evt_t* bleEvent)
-{
-	log("TIMEOUT");
-}
-
-void Testing::messageReceivedCallback(connectionPacket* inPacket)
-{
-	/*log("message incoming, reliable:%d", bleEvent->evt.gatts_evt.params.write.op);
-
-	u8* data = bleEvent->evt.gatts_evt.params.write.data;
-	u16 len = bleEvent->evt.gatts_evt.params.write.len;
-
-	log("Message IN: %d %d %d", data[0], data[1], data[2]);*/
-
-}
+//void Testing::messageReceivedCallback(connectionPacket* inPacket)
+//{
+//	/*logs("message incoming, reliable:%d", bleEvent->evt.gatts_evt.params.write.op);
+//
+//	u8* data = bleEvent->evt.gatts_evt.params.write.data;
+//	u16 len = bleEvent->evt.gatts_evt.params.write.len;
+//
+//	logs("Message IN: %d %d %d", data[0], data[1], data[2]);*/
+//
+//}
 
 u32 testData;
 u32 testData2;
 
-bool Testing::TerminalCommandHandler(string commandName, vector<string> commandArgs)
+bool Testing::TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs)
 {
-	if (commandName == "nswrite")
-	{
 
-		testData = 0x12345678;
-		testData2 = 0x55667744;
-
-		u32* dest = (u32*)(210 * NRF_FICR->CODEPAGESIZE);
-		u32* dest2 = (u32*)(211 * NRF_FICR->CODEPAGESIZE);
-
-		NewStorage::WriteData(&testData, dest, 4, NULL, 0);
-		NewStorage::WriteData(&testData2, dest2, 4, NULL, 0);
-
-		return true;
-	}
-	if (commandName == "nserase")
-	{
-
-		NewStorage::ErasePage(210, NULL, 0);
-
-		return true;
-	}
-	if (commandName == "nserasepages")
-	{
-
-		NewStorage::ErasePages(210, 2, NULL, 0);
-
-		return true;
-	}
 
 
 
@@ -257,29 +159,21 @@ bool Testing::TerminalCommandHandler(string commandName, vector<string> commandA
 	{
 		cm->fillTransmitBuffers();
 	}
-	else if (commandName == "forcefill")
-	{
-		cm->connections[0]->reliableBuffersFree = 1;
-		cm->connections[1]->reliableBuffersFree = 1;
-		cm->connections[2]->reliableBuffersFree = 1;
-		cm->connections[3]->reliableBuffersFree = 1;
-		cm->fillTransmitBuffers();
-	}
 	else if (commandName == "advertise")
 	{
 
-		AdvertisingController::SetAdvertisingState(advState::ADV_STATE_HIGH);
+		//TODO: ADVREF AdvertisingController::getInstance()->SetAdvertisingState(advState::ADV_STATE_HIGH);
 
 	}
 	else if (commandName == "scan")
 	{
 
-		ScanController::SetScanState(scanState::SCAN_STATE_HIGH);
+		ScanController::getInstance()->SetScanState(scanState::SCAN_STATE_HIGH);
 
 	}
 	else if (commandName == "reset")
 	{
-		sd_nvic_SystemReset();
+		FruityHal::SystemReset();
 
 	}
 	else

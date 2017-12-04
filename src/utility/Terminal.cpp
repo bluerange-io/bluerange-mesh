@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -25,6 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <Config.h>
 #include <Utility.h>
 
+#ifdef USE_SIM_PIPE
+#include <FruitySimPipe.h>
+#endif
+
+
 extern "C"
 {
 #include "nrf.h"
@@ -34,51 +39,58 @@ extern "C"
 #include "nrf_uart.h"
 #include "nrf_gpio.h"
 #include "nrf_delay.h"
+#include "nrf_nvic.h"
 #endif
 #ifdef USE_SEGGER_RTT
 #include "SEGGER_RTT.h"
+#include <stdarg.h>
+#endif
+#ifdef USE_STDIO
+#include <conio.h>
 #endif
 }
 
-
-#ifdef TERMINAL_ENABLED
-
-#define READ_BUFFER_LENGTH 250
-
-bool Terminal::terminalIsInitialized = false;
-SimplePushStack* Terminal::registeredCallbacks;
-string Terminal::commandName;
-vector<string> Terminal::commandArgs;
-
-//UART
-bool Terminal::uartActive = false;
-bool Terminal::lineToReadAvailable = false;
-u8 Terminal::readBufferOffset = 0;
-char Terminal::readBuffer[READ_BUFFER_LENGTH];
-#endif
-
 // ######################### GENERAL
 #define ________________GENERAL___________________
+
+Terminal::Terminal(){
+	terminalIsInitialized = false;
+}
 
 //Initialize the mhTerminal
 void Terminal::Init()
 {
 #ifdef TERMINAL_ENABLED
-	registeredCallbacks = new SimplePushStack(MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS);
+	std::string commandName;
+	std::vector<std::string> commandArgs;
+
+	//UART
+	uartActive = false;
+	lineToReadAvailable = false;
+	readBufferOffset = 0;
+	readBuffer[READ_BUFFER_LENGTH];
+
+	registeredCallbacksNum = 0;
+	memset(&registeredCallbacks, 0x00, sizeof(registeredCallbacks));
 
 #ifdef USE_UART
-	UartEnable(Config->terminalPromptMode);
+	if(Config->terminalMode != TerminalMode::TERMINAL_DISABLED){
+		UartEnable(Config->terminalMode == TerminalMode::TERMINAL_PROMPT_MODE);
+	}
 #endif
 #ifdef USE_SEGGER_RTT
 	SeggerRttInit();
+#endif
+#ifdef USE_STDIO
+	StdioInit();
 #endif
 
 	terminalIsInitialized = true;
 
 	char versionString[15];
-	Utility::GetVersionStringFromInt(Config->firmwareVersion, versionString);
+	Utility::GetVersionStringFromInt(fruityMeshVersion, versionString);
 
-	if (Config->terminalPromptMode)
+	if (Config->terminalMode == TerminalMode::TERMINAL_PROMPT_MODE)
 	{
 		//Send Escape sequence
 		log_transport_put(27); //ESC
@@ -101,18 +113,18 @@ void Terminal::Init()
 		log_transport_putstring(", nRF51");
 #endif
 
-		if(Config->deviceConfigOrigin == Conf::deviceConfigOrigins::RANDOM_CONFIG){
+		if(Config->deviceConfigOrigin == deviceConfigOrigins::RANDOM_CONFIG){
 			log_transport_putstring(", RANDOM Config");
-		} else if(Config->deviceConfigOrigin == Conf::deviceConfigOrigins::UICR_CONFIG){
+		} else if(Config->deviceConfigOrigin == deviceConfigOrigins::UICR_CONFIG){
 			log_transport_putstring(", UICR Config");
-		} else if(Config->deviceConfigOrigin == Conf::deviceConfigOrigins::TESTDEVICE_CONFIG){
+		} else if(Config->deviceConfigOrigin == deviceConfigOrigins::TESTDEVICE_CONFIG){
 			log_transport_putstring(", TESTDEVICE Config");
 		}
 
 
 		log_transport_putstring(EOL "--------------------------------------------------" EOL);
 	} else {
-		uart("NODE", "{\"type\":\"reboot\"}" SEP);
+		
 	}
 #endif
 }
@@ -127,6 +139,9 @@ void Terminal::PutString(const char* buffer)
 #ifdef USE_SEGGER_RTT
 	Terminal::SeggerRttPutString(buffer);
 #endif
+#ifdef USE_STDIO
+	Terminal::StdioPutString(buffer);
+#endif
 }
 
 void Terminal::PutChar(const char character)
@@ -138,6 +153,9 @@ void Terminal::PutChar(const char character)
 #endif
 #ifdef USE_SEGGER_RTT
 	SeggerRttPutChar(character);
+#endif
+#ifdef USE_STDIO
+	Terminal::StdioPutChar(character);
 #endif
 }
 
@@ -152,6 +170,9 @@ void Terminal::CheckAndProcessLine()
 #endif
 #ifdef USE_SEGGER_RTT
 	SeggerRttCheckAndProcessLine();
+#endif
+#ifdef USE_STDIO
+	StdioCheckAndProcessLine();
 #endif
 }
 
@@ -175,30 +196,35 @@ void Terminal::ProcessLine(char* line)
 	{
 		token = strtok(NULL, " ");
 		if (token != NULL)
-			commandArgs.push_back(string(token));
+			commandArgs.push_back(std::string(token));
 	}
 
 	//Call all callbacks
 	int handled = 0;
 
-	for(u32 i=0; i<registeredCallbacks->size(); i++){
-		handled += ((TerminalCommandListener*)registeredCallbacks->GetItemAt(i))->TerminalCommandHandler(commandName, commandArgs);
+	for(u32 i=0; i<MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS; i++){
+		if(registeredCallbacks[i]){
+			handled += (registeredCallbacks[i])->TerminalCommandHandler(commandName, commandArgs);
+		}
 	}
 
 	//Output result
 	if (handled == 0){
-		if(Config->terminalPromptMode){
+		if(Config->terminalMode == TerminalMode::TERMINAL_PROMPT_MODE){
 			log_transport_putstring("Command not found" EOL);
 		} else {
-			uart_error(Logger::COMMAND_NOT_FOUND);
+			logjson_error(Logger::COMMAND_NOT_FOUND);
 		}
-	} else if(!Config->terminalPromptMode){
-		uart_error(Logger::NO_ERROR);
+	} else if(Config->terminalMode == TerminalMode::TERMINAL_JSON_MODE){
+		logjson_error(Logger::NO_ERROR);
 	}
 #endif
 }
 
 // ############################### UART
+// Uart communication expects a \r delimiter after a line to process the command
+// Results such as JSON objects are delimtied by \r\n
+
 #define ________________UART___________________
 #ifdef USE_UART
 
@@ -206,7 +232,7 @@ void Terminal::ProcessLine(char* line)
 void Terminal::UartDisable()
 {
 	//Disable UART interrupt
-	NVIC_DisableIRQ(UART0_IRQn);
+	sd_nvic_DisableIRQ(UART0_IRQn);
 
 	//Disable all UART Events
 	nrf_uart_int_disable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY |
@@ -228,18 +254,20 @@ void Terminal::UartDisable()
 	nrf_uart_txrx_pins_disconnect(NRF_UART0);
 	nrf_uart_hwfc_pins_disconnect(NRF_UART0);
 
-	nrf_gpio_cfg_default(Config->uartTXPin);
-	nrf_gpio_cfg_default(Config->uartRXPin);
+	nrf_gpio_cfg_default(Boardconfig->uartTXPin);
+	nrf_gpio_cfg_default(Boardconfig->uartRXPin);
 
-	if (NRF_UART0->PSELRTS != NRF_UART_PSEL_DISCONNECTED) nrf_gpio_cfg_default(Config->uartRTSPin);
-	if (NRF_UART0->PSELCTS != NRF_UART_PSEL_DISCONNECTED) nrf_gpio_cfg_default(Config->uartCTSPin);
+	if(Boardconfig->uartRTSPin != -1){
+		if (NRF_UART0->PSELRTS != NRF_UART_PSEL_DISCONNECTED) nrf_gpio_cfg_default(Boardconfig->uartRTSPin);
+		if (NRF_UART0->PSELCTS != NRF_UART_PSEL_DISCONNECTED) nrf_gpio_cfg_default(Boardconfig->uartCTSPin);
+	}
 }
 
 void Terminal::UartEnable(bool promptAndEchoMode)
 {
 	u32 err = 0;
 
-	if(!Config->uartRXPin == -1) return;
+	if(Boardconfig->uartRXPin == -1) return;
 
 	//Disable UART if it was active before
 	UartDisable();
@@ -247,35 +275,34 @@ void Terminal::UartEnable(bool promptAndEchoMode)
 	//Delay to fix successive stop or startterm commands
 	nrf_delay_us(10000);
 
-	//Set variables
-	Config->terminalPromptMode = promptAndEchoMode;
-
 	readBufferOffset = 0;
 	lineToReadAvailable = false;
 
 	//Configure pins
-	nrf_gpio_pin_set(Config->uartTXPin);
-	nrf_gpio_cfg_output(Config->uartTXPin);
-	nrf_gpio_cfg_input(Config->uartRXPin, NRF_GPIO_PIN_NOPULL);
+	nrf_gpio_pin_set(Boardconfig->uartTXPin);
+	nrf_gpio_cfg_output(Boardconfig->uartTXPin);
+	nrf_gpio_cfg_input(Boardconfig->uartRXPin, NRF_GPIO_PIN_NOPULL);
 
-	nrf_uart_baudrate_set(NRF_UART0, NRF_UART_BAUDRATE_38400);
-	nrf_uart_configure(NRF_UART0, NRF_UART_PARITY_EXCLUDED, NRF_UART_HWFC_ENABLED);
-	nrf_uart_txrx_pins_set(NRF_UART0, Config->uartTXPin, Config->uartRXPin);
+	nrf_uart_baudrate_set(NRF_UART0, (nrf_uart_baudrate_t) Boardconfig->uartBaudRate);
+	nrf_uart_configure(NRF_UART0, NRF_UART_PARITY_EXCLUDED, Boardconfig->uartRTSPin != -1 ? NRF_UART_HWFC_ENABLED : NRF_UART_HWFC_DISABLED);
+	nrf_uart_txrx_pins_set(NRF_UART0, Boardconfig->uartTXPin, Boardconfig->uartRXPin);
 
-	//Configure RTS/CTS
-	nrf_gpio_cfg_input(Config->uartCTSPin, NRF_GPIO_PIN_NOPULL);
-	nrf_gpio_pin_set(Config->uartRTSPin);
-	nrf_gpio_cfg_output(Config->uartRTSPin);
-	nrf_uart_hwfc_pins_set(NRF_UART0, Config->uartRTSPin, Config->uartCTSPin);
+	//Configure RTS/CTS (if RTS is -1, disable flow control)
+	if(Boardconfig->uartRTSPin != -1){
+		nrf_gpio_cfg_input(Boardconfig->uartCTSPin, NRF_GPIO_PIN_NOPULL);
+		nrf_gpio_pin_set(Boardconfig->uartRTSPin);
+		nrf_gpio_cfg_output(Boardconfig->uartRTSPin);
+		nrf_uart_hwfc_pins_set(NRF_UART0, Boardconfig->uartRTSPin, Boardconfig->uartCTSPin);
+	}
 
 	//Enable Interrupts + timeout events
 	if(!promptAndEchoMode){
 		nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXTO);
 		nrf_uart_int_enable(NRF_UART0, NRF_UART_INT_MASK_RXTO);
 
-		NVIC_SetPriority(UART0_IRQn, APP_IRQ_PRIORITY_LOW);
-		NVIC_ClearPendingIRQ(UART0_IRQn);
-		NVIC_EnableIRQ(UART0_IRQn);
+		sd_nvic_SetPriority(UART0_IRQn, APP_IRQ_PRIORITY_LOW);
+		sd_nvic_ClearPendingIRQ(UART0_IRQn);
+		sd_nvic_EnableIRQ(UART0_IRQn);
 	}
 
 	//Enable UART
@@ -290,18 +317,18 @@ void Terminal::UartEnable(bool promptAndEchoMode)
 	nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_TXDRDY);
 	nrf_uart_task_trigger(NRF_UART0, NRF_UART_TASK_STARTTX);
 
+	uartActive = true;
+
 	//Start receiving RX events
 	if(!promptAndEchoMode){
 		UartEnableReadInterrupt();
 	}
-
-	uartActive = true;
 }
 
 //Checks whether a character is waiting on the input line
 void Terminal::UartCheckAndProcessLine(){
 	//Check if a line is available
-	if(Config->terminalPromptMode && UartCheckInputAvailable()){
+	if(Config->terminalMode == TerminalMode::TERMINAL_PROMPT_MODE && UartCheckInputAvailable()){
 		UartReadLineBlocking();
 	}
 
@@ -321,10 +348,12 @@ void Terminal::UartCheckAndProcessLine(){
 		UartPutStringBlockingWithTimeout("[H"); //Cursor to Home
 	}
 	else if(strcmp(readBuffer, "startterm") == 0){
+		Config->terminalMode = TerminalMode::TERMINAL_PROMPT_MODE;
 		UartEnable(true);
 		return;
 	}
 	else if(strcmp(readBuffer, "stopterm") == 0){
+		Config->terminalMode = TerminalMode::TERMINAL_JSON_MODE;
 		UartEnable(false);
 		return;
 	}
@@ -338,7 +367,7 @@ void Terminal::UartCheckAndProcessLine(){
 	lineToReadAvailable = false;
 
 	//Re-enable Read interrupt after line was processed
-	if(!Config->terminalPromptMode){
+	if(Config->terminalMode != TerminalMode::TERMINAL_PROMPT_MODE){
 		UartEnableReadInterrupt();
 	}
 }
@@ -372,7 +401,7 @@ bool Terminal::UartCheckInputAvailable()
 // a non-interrupt driven UART will not generate an event
 void Terminal::UartReadLineBlocking()
 {
-	if (!terminalIsInitialized)
+	if (!uartActive)
 		return;
 
 	UartPutStringBlockingWithTimeout("mhTerm: ");
@@ -453,8 +482,7 @@ void Terminal::UartPutStringBlockingWithTimeout(const char* message)
 		int i=0;
 		while (NRF_UART0->EVENTS_TXDRDY != 1){
 			//Timeout if it was not possible to put the character
-			if(i > 100000){
-				uartActive = false;
+			if(i > 10000){
 				return;
 			}
 			i++;
@@ -478,6 +506,8 @@ void Terminal::UartPutCharBlockingWithTimeout(const char character)
 
 void Terminal::UartInterruptHandler()
 {
+	if(!uartActive) return;
+
 	//SeggerRttPrintf("Intrpt <");
 	//Checks if an error occured
 	if (nrf_uart_int_enable_check(NRF_UART0, NRF_UART_INT_MASK_ERROR) &&
@@ -556,8 +586,8 @@ void Terminal::SeggerRttInit()
 
 }
 
-void Terminal::SeggerRttCheckAndProcessLine(){
-
+void Terminal::SeggerRttCheckAndProcessLine()
+{
 	char byte = 0;
 	if(SEGGER_RTT_HasKey()){
 		while(byte != '\r' || readBufferOffset >= READ_BUFFER_LENGTH - 1){
@@ -604,7 +634,68 @@ void Terminal::SeggerRttPutChar(char character)
 #endif
 
 
+//############################ STDIO
+#define ________________STDIO___________________
+#if defined(USE_STDIO)
+void Terminal::StdioInit()
+{
+	setbuf(stdout, NULL);
+}
+char * getline(void) {
+    char * line = (char*)malloc(100);
+    char * linep = line;
+    size_t lenmax = 100, len = lenmax;
+    int c;
 
+    if(line == NULL)
+        return NULL;
+
+    for(;;) {
+        c = fgetc(stdin);
+        if(c == EOF)
+            break;
+
+        if(--len == 0) {
+            len = lenmax;
+            char * linen = (char*)realloc(linep, lenmax *= 2);
+
+            if(linen == NULL) {
+                free(linep);
+                return NULL;
+            }
+            line = linen + (line - linep);
+            linep = linen;
+        }
+
+        if((*line++ = c) == '\n')
+            break;
+    }
+    *line = '\0';
+    return linep;
+}
+void Terminal::StdioCheckAndProcessLine()
+{
+	if(_kbhit() != 0){ //FIXME: Not supported by eclipse console
+		printf("mhTerm: ");
+		char* input = getline();
+		input[strlen(input)-1] = '\0';
+		//printf("!%s!, len %d", input, strlen(input));
+
+		Terminal::ProcessLine(input);
+	}
+}
+void Terminal::StdioPutString(const char*message)
+{
+	FruitySimPipe::WriteToPipe(message);
+	printf("%s", message);
+}
+void Terminal::StdioPutChar(char character)
+{
+
+}
+
+
+#endif
 
 
 /*############## Terminal Listener ####################*/
@@ -614,7 +705,8 @@ void Terminal::SeggerRttPutChar(char character)
 void Terminal::AddTerminalCommandListener(TerminalCommandListener* callback)
 {
 #ifdef TERMINAL_ENABLED
-	registeredCallbacks->Push((u8*)callback);
+	registeredCallbacks[registeredCallbacksNum] = callback;
+	registeredCallbacksNum++;
 #endif
 }
 

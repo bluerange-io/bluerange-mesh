@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -32,18 +32,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <vector>
 
 #include <Config.h>
+#include <Boardconfig.h>
 
 #include <types.h>
-#include <SimplePushStack.h>
+
+//UART does not work with the SIM
+#ifdef SIM_ENABLED
+#undef USE_UART
+#endif
 
 
-using namespace std;
-
-#if defined(USE_SEGGER_RTT) || defined(USE_UART)
+#if defined(USE_SEGGER_RTT) || defined(USE_UART) || defined(USE_STDIO)
 #define TERMINAL_ENABLED
 #endif
 
 #define MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS 20
+#define READ_BUFFER_LENGTH 250
 
 class TerminalCommandListener
 {
@@ -56,7 +60,7 @@ public:
 #ifdef TERMINAL_ENABLED
 	//This method can be implemented by any subclass and will be notified when
 	//a command is entered via uart.
-	virtual bool TerminalCommandHandler(string commandName, vector<string> commandArgs) = 0;
+	virtual bool TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs) = 0;
 #endif
 
 };
@@ -64,79 +68,105 @@ public:
 
 class Terminal
 {
+		friend class DebugModule;
+
 private:
+	std::string commandName;
+	std::vector<std::string> commandArgs;
 
-	static string commandName;
-	static vector<string> commandArgs;
+	u8 registeredCallbacksNum;
+	TerminalCommandListener* registeredCallbacks[MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS];
 
-	static SimplePushStack* registeredCallbacks;
+	u8 readBufferOffset;
+	char readBuffer[READ_BUFFER_LENGTH];
 
-	static u8 readBufferOffset;
-	static char readBuffer[];
-
-	//After the terminal has been initialized (all transports), this is true
-	static bool terminalIsInitialized;
 
 	//Will be false after a timeout and true after input is received
-	static bool uartActive;
+	bool uartActive;
 
 
 public:
-	static bool lineToReadAvailable;
+	static Terminal* getInstance(){
+		if(!GS->terminal){
+			GS->terminal = new Terminal();
+		}
+		return GS->terminal;
+	}
+
+	//After the terminal has been initialized (all transports), this is true
+	bool terminalIsInitialized;
+
+	bool lineToReadAvailable;
 
 	//###### General ######
 	//Checks if a line is available or reads a line if input is detected
-	static void CheckAndProcessLine();
-	static void ProcessLine(char* line);
+	void CheckAndProcessLine();
+	void ProcessLine(char* line);
 
 	//Register a class that will be notified when the activation string is entered
-	static void AddTerminalCommandListener(TerminalCommandListener* callback);
+	void AddTerminalCommandListener(TerminalCommandListener* callback);
 
 	//###### Log Transport ######
 	//Must be called before using the Terminal
-	static void Init();
-	static void PutString(const char* buffer);
-	static void PutChar(const char character);
+	Terminal();
+	void Init();
+	void PutString(const char* buffer);
+	void PutChar(const char character);
 
-private:
 	//##### General #####
 
 	//##### UART ######
 #ifdef USE_UART
-	static void UartEnable(bool promptAndEchoMode);
-	static void UartDisable();
-	static void UartCheckAndProcessLine();
-	static void UartHandleError(u32 error);
+private:
+	void UartEnable(bool promptAndEchoMode);
+	void UartDisable();
+	void UartCheckAndProcessLine();
+	void UartHandleError(u32 error);
 	//Read - blocking (non-interrupt based)
-	static bool UartCheckInputAvailable();
-	static void UartReadLineBlocking();
-	static char UartReadCharBlocking();
+	bool UartCheckInputAvailable();
+	void UartReadLineBlocking();
+	char UartReadCharBlocking();
 	//Write (always blocking)
-	static void UartPutStringBlockingWithTimeout(const char* message);
-	static void UartPutCharBlockingWithTimeout(const char character);
+	void UartPutStringBlockingWithTimeout(const char* message);
+	void UartPutCharBlockingWithTimeout(const char character);
 	//Read - Interrupt driven
-public: static void UartInterruptHandler(); private:
-	static void UartHandleInterruptRX(char byte);
-	static void UartEnableReadInterrupt();
+public:
+	void UartInterruptHandler();
+private:
+	void UartHandleInterruptRX(char byte);
+	void UartEnableReadInterrupt();
 #endif
 
 
 	//###### Segger RTT ######
 #ifdef USE_SEGGER_RTT
-	static void SeggerRttInit();
-	static void SeggerRttCheckAndProcessLine();
-public: static void SeggerRttPrintf(const char* message, ...);
-public: static void SeggerRttPutString(const char* message);
-public: static void SeggerRttPutChar(const char character);
+private:
+	void SeggerRttInit();
+	void SeggerRttCheckAndProcessLine();
+public:
+	void SeggerRttPrintf(const char* message, ...);
+	void SeggerRttPutString(const char* message);
+	void SeggerRttPutChar(const char character);
+
+#endif
+
+	//###### Stdio ######
+#ifdef USE_STDIO
+private:
+	void StdioInit();
+	void StdioCheckAndProcessLine();
+public:
+	void StdioPutString(const char* message);
+	void StdioPutChar(const char character);
 
 #endif
 };
 
 #ifdef TERMINAL_ENABLED
 	//Some sort of logging is used
-	#define log_transport_init() Terminal::Init(Terminal::promptAndEchoMode);
-	#define log_transport_putstring(message) Terminal::PutString(message)
-	#define log_transport_put(character) Terminal::PutChar(character)
+	#define log_transport_init() Terminal::getInstance()->Init(Terminal::promptAndEchoMode);
+	#define log_transport_putstring(message) Terminal::getInstance()->PutString(message)
+	#define log_transport_put(character) Terminal::getInstance()->PutChar(character)
 #else
 	//logging is completely disabled
 	#define log_transport_init() do{}while(0)

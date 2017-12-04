@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <Module.h>
-#include <Storage.h>
+#include <RecordStorage.h>
 #include <Node.h>
 
 extern "C"{
@@ -29,76 +29,38 @@ extern "C"{
 }
 
 
-Module::Module(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
+Module::Module(u8 moduleId, Node* node, ConnectionManager* cm, const char* name)
 {
 	this->node = node;
 	this->cm = cm;
 	this->moduleId  = moduleId;
-	this->storageSlot = storageSlot;
+
+	//Overwritten by Modules
+	this->moduleVersion = 0;
 	this->configurationPointer = NULL;
 	this->configurationLength = 0;
 	memcpy(moduleName, name, MODULE_NAME_MAX_SIZE);
 
-	Terminal::AddTerminalCommandListener(this);
-
-	Logger::getInstance().enableTag("MODULE");
+	Terminal::getInstance()->AddTerminalCommandListener(this);
 }
 
 Module::~Module()
 {
 }
 
-
-void Module::SaveModuleConfiguration()
-{
-	int paddedLength = configurationLength - (configurationLength % 4);
-	Storage::getInstance().QueuedWrite((u8*)configurationPointer, paddedLength, storageSlot, this);
-}
-
 void Module::LoadModuleConfiguration()
 {
-	if(Config->ignorePersistentModuleConfigurationOnBoot){
-		//Invalidate config and load default
-		configurationPointer->moduleId = 0xFF;
-		ResetToDefaultConfiguration();
-		ConfigurationLoadedHandler();
-	} else {
-		//Start to load the saved configuration
+	ResetToDefaultConfiguration();
 
-		bool bootloaderAvailable = (NRF_UICR->BOOTLOADERADDR != 0xFFFFFFFF);
-		u32 bootloaderAddress = bootloaderAvailable ? NRF_UICR->BOOTLOADERADDR : FLASH_SIZE;
-		u32 appSettingsAddress = bootloaderAddress - (PSTORAGE_NUM_OF_PAGES+1) * PAGE_SIZE;
+	Conf::LoadSettingsFromFlash((moduleID)this->moduleId, this->configurationPointer, this->configurationLength);
 
-		//FIXME: only meant as hotfix, replace with NewStorage
-		memcpy((u8*)configurationPointer, (u8*)(appSettingsAddress + storageSlot*STORAGE_BLOCK_SIZE), configurationLength);
-		ConfigurationLoadedHandler();
-	}
-
-}
-
-void Module::ConfigurationLoadedHandler()
-{
-	//Configuration is invalid because the device got flashed
-	if(configurationPointer->moduleId == 0xFF)
-	{
-		logt("MODULE", "Config resetted to default for module %d", moduleId);
-		ResetToDefaultConfiguration();
-	}
-	//Configuration has been saved by another module or is wrong
-	else if (configurationPointer->moduleId != moduleId)
-	{
-		logt("ERROR", "Wrong module conf loaded %d vs %d", configurationPointer->moduleId, moduleId);
-	}
-	//Config-> loaded and ok
-	else {
-		logt("MODULE", "Module %u config loaded version:%d", moduleId, configurationPointer->moduleVersion);
-	}
+	ConfigurationLoadedHandler();
 }
 
 //Constructs a simple trigger action message and can take aditional payload data
 void Module::SendModuleActionMessage(u8 messageType, nodeID toNode, u8 actionType, u8 requestHandle, u8* additionalData, u16 additionalDataSize, bool reliable)
 {
-	u8 buffer[SIZEOF_CONN_PACKET_MODULE + additionalDataSize];
+	DYNAMIC_ARRAY(buffer, SIZEOF_CONN_PACKET_MODULE + additionalDataSize);
 
 	connPacketModule* outPacket = (connPacketModule*)buffer;
 	outPacket->header.messageType = messageType;
@@ -114,10 +76,10 @@ void Module::SendModuleActionMessage(u8 messageType, nodeID toNode, u8 actionTyp
 		memcpy(&outPacket->data, additionalData, additionalDataSize);
 	}
 
-	cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE + additionalDataSize, reliable);
+	cm->SendMeshMessage(buffer, SIZEOF_CONN_PACKET_MODULE + additionalDataSize, DeliveryPriority::DELIVERY_PRIORITY_LOW, reliable);
 }
 
-bool Module::TerminalCommandHandler(string commandName, vector<string> commandArgs)
+bool Module::TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs)
 {
 	//If somebody wants to set the module config over uart, he's welcome
 	//First, check if our module is meant
@@ -132,12 +94,12 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 			{
 				//calculate configuration size
 				const char* configString = commandArgs[2].c_str();
-				u16 configLength = (commandArgs[2].length()+1)/3;
+				u16 configLength = (u16) (commandArgs[2].length()+1)/3;
 
 				u8 requestHandle = commandArgs.size() >= 4 ? atoi(commandArgs[3].c_str()) : 0;
 
 				//Send the configuration to the destination node
-				u8 packetBuffer[configLength + SIZEOF_CONN_PACKET_MODULE];
+				DYNAMIC_ARRAY(packetBuffer, configLength + SIZEOF_CONN_PACKET_MODULE);
 				connPacketModule* packet = (connPacketModule*)packetBuffer;
 				packet->header.messageType = MESSAGE_TYPE_MODULE_CONFIG;
 				packet->header.sender = node->persistentConfig.nodeId;
@@ -147,9 +109,9 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 				packet->moduleId = moduleId;
 				packet->requestHandle = requestHandle;
 				//Fill data region with module config
-				Logger::getInstance().parseHexStringToBuffer(configString, packet->data, configLength);
+				Logger::getInstance()->parseHexStringToBuffer(configString, packet->data, configLength);
 
-				cm->SendMessageToReceiver(NULL, packetBuffer, configLength + SIZEOF_CONN_PACKET_MODULE, true);
+				cm->SendMeshMessage(packetBuffer, configLength + SIZEOF_CONN_PACKET_MODULE, DeliveryPriority::DELIVERY_PRIORITY_LOW, true);
 
 				return true;
 			}
@@ -167,7 +129,7 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 				packet.moduleId = moduleId;
 				packet.actionType = ModuleConfigMessages::GET_CONFIG;
 
-				cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_MODULE, false);
+				cm->SendMeshMessage((u8*)&packet, SIZEOF_CONN_PACKET_MODULE, DeliveryPriority::DELIVERY_PRIORITY_LOW, false);
 
 				return true;
 			}
@@ -187,7 +149,7 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 			packet.requestHandle = requestHandle;
 			packet.data[0] = moduleState;
 
-			cm->SendMessageToReceiver(NULL, (u8*) &packet, SIZEOF_CONN_PACKET_MODULE + 1, true);
+			cm->SendMeshMessage((u8*) &packet, SIZEOF_CONN_PACKET_MODULE + 1, DeliveryPriority::DELIVERY_PRIORITY_LOW, true);
 
 			return true;
 		}
@@ -196,7 +158,7 @@ bool Module::TerminalCommandHandler(string commandName, vector<string> commandAr
 	return false;
 }
 
-void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
+void Module::MeshMessageReceivedHandler(MeshConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
 {
 	//We want to handle incoming packets that change the module configuration
 	if(
@@ -206,20 +168,20 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 		if(packet->moduleId == moduleId)
 		{
 
-			u16 dataFieldLength = inPacket->dataLength - SIZEOF_CONN_PACKET_MODULE;
+			u16 dataFieldLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE;
 
 			if(packet->actionType == ModuleConfigMessages::SET_CONFIG)
 			{
 				//Log the config to the terminal
 				/*char* buffer[200];
-				Logger::getInstance().convertBufferToHexString((u8*)packet->data, dataFieldLength, (char*)buffer);
+				Logger::getInstance()->convertBufferToHexString((u8*)packet->data, dataFieldLength, (char*)buffer);
 				logt("MODULE", "rx (%d): %s", dataFieldLength,  buffer);*/
 
 				//Check if this config seems right
 				ModuleConfiguration* newConfig = (ModuleConfiguration*)packet->data;
 				if(
 						newConfig->moduleVersion == configurationPointer->moduleVersion
-						&& dataFieldLength == configurationLength - sizeof(u32) //substract u32 reserved padding
+						&& dataFieldLength == configurationLength
 				){
 					//Backup the module id because it must not be sent in the packet
 					u8 moduleId = configurationPointer->moduleId;
@@ -227,35 +189,33 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 					memcpy(configurationPointer, packet->data, dataFieldLength);
 					configurationPointer->moduleId = moduleId;
 
-					//TODO: Maybe, we want to save this configuration, and afterwards send saveOK message
-
-					//Send set_config_ok message
-					connPacketModule outPacket;
-					outPacket.header.messageType = MESSAGE_TYPE_MODULE_CONFIG;
-					outPacket.header.sender = node->persistentConfig.nodeId;
-					outPacket.header.receiver = packet->header.sender;
-
-					outPacket.moduleId = moduleId;
-					outPacket.requestHandle = packet->requestHandle;
-					outPacket.actionType = ModuleConfigMessages::SET_CONFIG_RESULT;
-					outPacket.data[0] = NRF_SUCCESS; //Return ok
-
-					cm->SendMessageToReceiver(NULL, (u8*) &outPacket, SIZEOF_CONN_PACKET_MODULE + 1, false);
-
+					//Call the configuration loaded handler to reinitialize stuff if necessary (RAM config is already set)
 					ConfigurationLoadedHandler();
 
-					SaveModuleConfiguration();
+					//Save the module config to flash
+					SaveModuleConfigAction userData;
+					userData.moduleId = (moduleID)moduleId;
+					userData.sender = packetHeader->sender;
+					userData.requestHandle = packet->requestHandle;
+
+					Conf::SaveModuleSettingsToFlash(
+						(moduleID)this->moduleId,
+						this->configurationPointer,
+						this->configurationLength,
+						this,
+						ModuleSaveAction::SAVE_MODULE_CONFIG_ACTION,
+						(u8*)&userData,
+						sizeof(SaveModuleConfigAction));
 				}
 				else
 				{
-					if(newConfig->moduleVersion != configurationPointer->moduleVersion) uart("ERROR", "{\"type\":\"error\",\"module\":%u,\"code\":1,\"text\":\"wrong config version.\"}" SEP, moduleId);
-					else uart("ERROR", "{\"type\":\"error\",\"module\":%u,\"code\":2,\"text\":\"wrong config length %u instead of %u \"}" SEP, moduleId, dataFieldLength, configurationLength - sizeof(u32));
+					if(newConfig->moduleVersion != configurationPointer->moduleVersion) logjson("ERROR", "{\"type\":\"error\",\"module\":%u,\"code\":1,\"text\":\"wrong config version.\"}" SEP, moduleId);
+					else logjson("ERROR", "{\"type\":\"error\",\"module\":%u,\"code\":2,\"text\":\"wrong config length %u instead of %u \"}" SEP, moduleId, dataFieldLength, configurationLength);
 				}
 			}
 			else if(packet->actionType == ModuleConfigMessages::GET_CONFIG)
 			{
-
-				u8 buffer[SIZEOF_CONN_PACKET_MODULE + configurationLength];
+				DYNAMIC_ARRAY(buffer, SIZEOF_CONN_PACKET_MODULE + configurationLength);
 
 				connPacketModule* outPacket = (connPacketModule*)buffer;
 				outPacket->header.messageType = MESSAGE_TYPE_MODULE_CONFIG;
@@ -268,8 +228,7 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 
 				memcpy(outPacket->data, (u8*)configurationPointer, configurationLength);
 
-				cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE + configurationLength, false);
-
+				cm->SendMeshMessage(buffer, SIZEOF_CONN_PACKET_MODULE + configurationLength, DeliveryPriority::DELIVERY_PRIORITY_LOW, false);
 			}
 			else if(packet->actionType == ModuleConfigMessages::SET_ACTIVE)
 			{
@@ -278,6 +237,8 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 					if(node->activeModules[i] && node->activeModules[i]->moduleId == packet->moduleId)
 					{
 						node->activeModules[i]->configurationPointer->moduleActive = packet->data[0];
+						//Reinitialize the module
+						node->activeModules[i]->ConfigurationLoadedHandler();
 
 						//Send confirmation that the module is now active
 						connPacketModule outPacket;
@@ -290,7 +251,7 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 						outPacket.actionType = ModuleConfigMessages::SET_ACTIVE_RESULT;
 						outPacket.data[0] = NRF_SUCCESS; //Return ok
 
-						cm->SendMessageToReceiver(NULL, (u8*) &outPacket, SIZEOF_CONN_PACKET_MODULE + 1, false);
+						cm->SendMeshMessage((u8*) &outPacket, SIZEOF_CONN_PACKET_MODULE + 1, DeliveryPriority::DELIVERY_PRIORITY_LOW, false);
 
 						break;
 					}
@@ -303,20 +264,20 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 			 * */
 			if(packet->actionType == ModuleConfigMessages::SET_CONFIG_RESULT)
 			{
-				uart("MODULE", "{\"nodeId\":%u,\"type\":\"set_config_result\",\"module\":%u,", packet->header.sender, packet->moduleId);
-				uart("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, packet->data[0]);
+				logjson("MODULE", "{\"nodeId\":%u,\"type\":\"set_config_result\",\"module\":%u,", packet->header.sender, packet->moduleId);
+				logjson("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, packet->data[0]);
 			}
 			else if(packet->actionType == ModuleConfigMessages::SET_ACTIVE_RESULT)
 			{
-				uart("MODULE", "{\"nodeId\":%u,\"type\":\"set_active_result\",\"module\":%u,", packet->header.sender, packet->moduleId);
-				uart("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, packet->data[0]);
+				logjson("MODULE", "{\"nodeId\":%u,\"type\":\"set_active_result\",\"module\":%u,", packet->header.sender, packet->moduleId);
+				logjson("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, packet->data[0]);
 			}
 			else if(packet->actionType == ModuleConfigMessages::CONFIG)
 			{
 				char* buffer[200];
-				Logger::getInstance().convertBufferToHexString(packet->data, dataFieldLength, (char*)buffer, 200);
+				Logger::getInstance()->convertBufferToHexString(packet->data, dataFieldLength, (char*)buffer, 200);
 
-				uart("MODULE", "{\"nodeId\":%u,\"type\":\"config\",\"module\":%u,\"config\":\"%s\"}" SEP, packet->header.sender, moduleId, buffer);
+				logjson("MODULE", "{\"nodeId\":%u,\"type\":\"config\",\"module\":%u,\"config\":\"%s\"}" SEP, packet->header.sender, moduleId, buffer);
 
 
 			}
@@ -326,4 +287,25 @@ void Module::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Co
 
 void Module::ButtonHandler(u8 buttonId, u32 holdTime){
 
+}
+
+void Module::RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength)
+{
+	if (userType == ModuleSaveAction::SAVE_MODULE_CONFIG_ACTION) {
+
+		SaveModuleConfigAction* data = (SaveModuleConfigAction*)userData;
+
+		//Send set_config_ok message
+		connPacketModule outPacket;
+		outPacket.header.messageType = MESSAGE_TYPE_MODULE_CONFIG;
+		outPacket.header.sender = GS->node->persistentConfig.nodeId;
+		outPacket.header.receiver = data->sender;
+
+		outPacket.moduleId = data->moduleId;
+		outPacket.requestHandle = data->requestHandle;
+		outPacket.actionType = Module::ModuleConfigMessages::SET_CONFIG_RESULT;
+		outPacket.data[0] = resultCode;
+
+		GS->cm->SendMeshMessage((u8*)&outPacket, SIZEOF_CONN_PACKET_MODULE + 1, DeliveryPriority::DELIVERY_PRIORITY_LOW, false);
+	}
 }

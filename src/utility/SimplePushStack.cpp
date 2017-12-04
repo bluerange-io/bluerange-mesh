@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -23,7 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <SimplePushStack.h>
 
 extern "C"{
+#ifdef __ICCARM__
+#include <stdlib.h>
+#else
 #include <malloc.h>
+#endif
 }
 
 SimplePushStack::SimplePushStack(u16 maxSize)
@@ -32,6 +36,10 @@ SimplePushStack::SimplePushStack(u16 maxSize)
 	buffer = (u8**)malloc(maxSize*sizeof(u8*));
 	numItems = 0;
 	this->maxSize = maxSize;
+}
+
+SimplePushStack::~SimplePushStack(){
+	free(buffer);
 }
 
 bool SimplePushStack::Push(u8* element)

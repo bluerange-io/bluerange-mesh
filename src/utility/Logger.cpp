@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -34,19 +34,20 @@ extern "C"
 #include <ble_hci.h>
 #include <nrf_error.h>
 #include <cstring>
-#include <pstorage.h>
 #include <stdarg.h>
 #include <app_timer.h>
 }
 
 using namespace std;
 
-Logger::errorLogEntry Logger::errorLog[NUM_ERROR_LOG_ENTRIES];
-u8 Logger::errorLogPosition = 0;
-
 Logger::Logger()
 {
-	Terminal::AddTerminalCommandListener(this);
+	errorLogPosition = 0;
+}
+
+void Logger::Init()
+{
+	Terminal::getInstance()->AddTerminalCommandListener(this);
 }
 
 void Logger::log_f(bool printLine, const char* file, i32 line, const char* message, ...)
@@ -78,17 +79,17 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
 #if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	if (
 			//UART communication
-			(!Config->terminalPromptMode && (
+			(Config->terminalMode != TerminalMode::TERMINAL_PROMPT_MODE && (
 				logType == UART_COMMUNICATION
-				|| tag == "ERROR"
+				|| strcmp(tag, "ERROR") == 0
 				|| find(logFilter.begin(), logFilter.end(), tag) != logFilter.end()
 			))
 
 			//User interaction
-			|| (Config->terminalPromptMode && (
+			|| (Config->terminalMode == TerminalMode::TERMINAL_PROMPT_MODE && (
 				logEverything
 				|| logType == TRACE
-				|| tag == "ERROR"
+				|| strcmp(tag, "ERROR") == 0
 				|| find(logFilter.begin(), logFilter.end(), tag) != logFilter.end() //Logtag is activated
 			))
 		)
@@ -101,11 +102,15 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
 		vsnprintf(mhTraceBuffer, TRACE_BUFFER_SIZE, message, aptr);
 		va_end(aptr);
 
-		if(Config->terminalPromptMode){
+		if(Config->terminalMode == TerminalMode::TERMINAL_PROMPT_MODE){
 			if (logType == LOG_LINE)
 			{
 				char tmp[50];
+#ifndef SIM_ENABLED
 				snprintf(tmp, 50, "[%s@%d %s]: ", file, line, tag);
+#else
+				snprintf(tmp, 50, "%u:[%s@%d %s]: ", Config->defaultNodeId, file, line, tag);
+#endif
 				log_transport_putstring(tmp);
 				log_transport_putstring(mhTraceBuffer);
 				log_transport_putstring(EOL);
@@ -130,16 +135,16 @@ void Logger::uart_error_f(UartErrorType type)
 	switch (type)
 	{
 		case UartErrorType::NO_ERROR:
-			uart("ERROR", "{\"type\":\"error\",\"code\":0,\"text\":\"OK\"}" SEP);
+			logjson("ERROR", "{\"type\":\"error\",\"code\":0,\"text\":\"OK\"}" SEP);
 			break;
 		case UartErrorType::COMMAND_NOT_FOUND:
-			uart("ERROR", "{\"type\":\"error\",\"code\":1,\"text\":\"Command not found\"}" SEP);
+			logjson("ERROR", "{\"type\":\"error\",\"code\":1,\"text\":\"Command not found\"}" SEP);
 			break;
 		case UartErrorType::ARGUMENTS_WRONG:
-			uart("ERROR", "{\"type\":\"error\",\"code\":2,\"text\":\"Wrong Arguments\"}" SEP);
+			logjson("ERROR", "{\"type\":\"error\",\"code\":2,\"text\":\"Wrong Arguments\"}" SEP);
 			break;
 		default:
-			uart("ERROR", "{\"type\":\"error\",\"code\":99,\"text\":\"Unknown Error\"}" SEP);
+			logjson("ERROR", "{\"type\":\"error\",\"code\":99,\"text\":\"Unknown Error\"}" SEP);
 			break;
 	}
 }
@@ -296,13 +301,17 @@ const char* Logger::getNrfErrorString(u32 nrfErrorCode)
 			return "BLE_ERROR_INVALID_CONN_HANDLE";
 		case BLE_ERROR_INVALID_ATTR_HANDLE:
 			return "BLE_ERROR_INVALID_ATTR_HANDLE";
+#if defined(NRF51)
 		case BLE_ERROR_NO_TX_PACKETS:
 			return "BLE_ERROR_NO_TX_PACKETS";
+#endif
 		case 0xDEADBEEF:
 			return "DEADBEEF";
 		default:
 			return "UNKNOWN_ERROR";
 	}
+#else
+	return NULL;
 #endif
 }
 
@@ -311,8 +320,10 @@ const char* Logger::getBleEventNameString(u16 bleEventId)
 #if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	switch (bleEventId)
 	{
+#if defined(NRF51)
 		case BLE_EVT_TX_COMPLETE:
 			return "BLE_EVT_TX_COMPLETE";
+#endif
 		case BLE_EVT_USER_MEM_REQUEST:
 			return "BLE_EVT_USER_MEM_REQUEST";
 		case BLE_EVT_USER_MEM_RELEASE:
@@ -380,6 +391,8 @@ const char* Logger::getBleEventNameString(u16 bleEventId)
 		default:
 			return "Unknown Error";
 	}
+#else
+	return NULL;
 #endif
 }
 
@@ -469,6 +482,8 @@ const char* Logger::getHciErrorString(u8 hciErrorCode)
 		default:
 			return "Unknown HCI error";
 	}
+#else
+	return NULL;
 #endif
 }
 
@@ -542,6 +557,8 @@ const char* Logger::getGattStatusErrorString(u16 gattStatusCode)
 		default:
 			return "Unknown GATT status";
 	}
+#else
+	return NULL;
 #endif
 }
 
@@ -614,49 +631,36 @@ void Logger::convertBufferToHexString(u8* srcBuffer, u32 srcLength, char* dstBuf
 	char* dstBufferStart = dstBuffer;
 	for (u32 i = 0; i < srcLength; i++)
 	{
-		dstBuffer += sprintf(dstBuffer, i < srcLength - 1 ? "%02X:" : "%02X\0", srcBuffer[i]);
-		if(dstBuffer - dstBufferStart > bufferLength - 7){
-			dstBuffer[0] = '.';
-			dstBuffer[1] = '.';
-			dstBuffer[2] = '.';
+		//We need to have at least 3 chars to place our .. if the string is too long
+		if(dstBuffer - dstBufferStart + 3 < bufferLength){
+			dstBuffer += sprintf(dstBuffer, i < srcLength - 1 ? "%02X:" : "%02X\0", srcBuffer[i]);
+		} else {
+			dstBuffer[-3] = '.';
+			dstBuffer[-2] = '.';
+			dstBuffer[-1] = '\0';
 			break;
 		}
+
 	};
 }
 
-void Logger::parseHexStringToBuffer(const char* hexString, u8* dstBuffer, u16 dstBufferSize)
+u32 Logger::parseHexStringToBuffer(const char* hexString, u8* dstBuffer, u16 dstBufferSize)
 {
 	u32 length = (strlen(hexString)+1)/3;
-	if(length > dstBufferSize) logt("ERROR", "too long for dstBuffer");
+	if(length > dstBufferSize){
+		logt("ERROR", "too long for dstBuffer");
+		length = dstBufferSize;
+	}
 
 	for(u32 i = 0; i<length; i++){
 		dstBuffer[i] = (u8)strtoul(hexString + (i*3), NULL, 16);
 	}
+
+	return length;
 }
 
 void Logger::disableAll()
 {
 	logFilter.clear();
 	logEverything = false;
-}
-
-const char* Logger::getPstorageStatusErrorString(u16 operationCode)
-{
-#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
-	switch(operationCode){
-		case PSTORAGE_CLEAR_OP_CODE:
-			return "Error when Clear Operation was requested";
-
-		case PSTORAGE_LOAD_OP_CODE:
-			return "Error when Load Operation was requested";
-
-		case PSTORAGE_STORE_OP_CODE:
-			return "Error when Store Operation was requested";
-
-		case PSTORAGE_UPDATE_OP_CODE:
-			return "Update an already touched storage block";
-		default:
-			return "Unknown operation code";
-	}
-#endif
 }

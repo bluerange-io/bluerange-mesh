@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -69,6 +69,16 @@ typedef struct
 	u8 uuid[16];
 }advStructureUUID128;
 
+
+//BLE AD Type list of 16-bit service UUIDs
+#define SIZEOF_ADV_STRUCTURE_UUID16 4
+typedef struct
+{
+	u8 len;
+	u8 type;
+	u16 uuid;
+}advStructureUUID16;
+
 //BLE AD Type Manufacturer specific data
 #define SIZEOF_ADV_STRUCTURE_MANUFACTURER 4
 typedef struct
@@ -89,8 +99,8 @@ typedef struct
 
 
 //Header that is common to all mesh advertising messages
-#define SIZEOF_ADV_PACKET_HEADER (SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_MANUFACTURER + 1 + 2 + 1) //11 byte
-#define SIZEOF_ADV_PACKET_STUFF_AFTER_MANUFACTURER 7 //1byte type + 2byte company id + 1byte mesh identifier + 2 byte networkid + 1 byte message type
+#define SIZEOF_ADV_PACKET_STUFF_AFTER_MANUFACTURER 4 //1byte mesh identifier + 2 byte networkid + 1 byte message type
+#define SIZEOF_ADV_PACKET_HEADER (SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_MANUFACTURER + SIZEOF_ADV_PACKET_STUFF_AFTER_MANUFACTURER) //11 byte
 typedef struct
 {
 	advStructureFlags flags;
@@ -116,8 +126,8 @@ typedef struct
 	nodeID sender;
 	clusterID clusterId; //Consists of the founding node's id and the connection loss / restart counter
 	clusterSIZE clusterSize;
-	u8 freeInConnections : 3; //Up to 8 in-connections
-	u8 freeOutConnections : 5; //Up to 32 out-connections
+	u8 freeMeshInConnections : 3; //Up to 8 in-connections
+	u8 freeMeshOutConnections : 5; //Up to 32 out-connections
 
 	u8 batteryRuntime; //batteryRuntime. Contains the expected runtime of the device (1-59=minutes, 60-83=1-23hours, 84-113=1-29days, 114-233=1-119months, 234-254=10-29year, 255=infinite)
 	i8 txPower; //txPower. Send power in two's complement dbm

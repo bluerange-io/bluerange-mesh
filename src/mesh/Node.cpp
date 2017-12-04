@@ -1,15 +1,33 @@
 /**
- OS_LICENSE_PLACEHOLDER
- */
+
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
+FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
+
+This file is part of FruityMesh
+
+FruityMesh is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+*/
 
 #include <Config.h>
 
 #include <Node.h>
 #include <LedWrapper.h>
-#include <Connection.h>
 #include <SimpleBuffer.h>
 #include <AdvertisingController.h>
 #include <GAPController.h>
+#include <GlobalState.h>
 #include <GATTController.h>
 #include <ConnectionManager.h>
 #include <ScanController.h>
@@ -21,9 +39,15 @@
 #include <ScanningModule.h>
 #include <EnrollmentModule.h>
 #include <IoModule.h>
+#include <MeshConnection.h>
+#include <conn_packets.h>
 
 #ifdef ACTIVATE_DFU_MODULE
 #include <DFUModule.h>
+#endif
+
+#ifdef ACTIVATE_CLC_MODULE
+#include <ClcModule.h>
 #endif
 
 extern "C"
@@ -34,25 +58,30 @@ extern "C"
 #include <app_error.h>
 #include <app_timer.h>
 #include <ble_hci.h>
-#include <ble_radio_notification.h>
+#ifndef SIM_ENABLED
+#include <nrf_nvic.h>
+#endif
 }
 
-//Buffer that keeps a predefined number of join me packets
-#define JOIN_ME_PACKET_BUFFER_MAX_ELEMENTS 5
-joinMeBufferPacket raw_joinMePacketBuffer[JOIN_ME_PACKET_BUFFER_MAX_ELEMENTS];
 
-#define MAX_JOIN_ME_PACKET_AGE_DS (15 * 10)
-
-Node* Node::instance;
-ConnectionManager* Node::cm;
-
-Node::Node(networkID networkId)
+Node::Node()
 {
+
+}
+
+void Node::Initialize()
+{
+	LoadDefaults();
+
+	Conf::LoadSettingsFromFlash(moduleID::NODE_ID, &persistentConfig, sizeof(NodeConfiguration));
+
 	//Initialize variables
-	instance = this;
+	GS->node = this;
 
 	this->clusterId = 0;
 	this->clusterSize = 1;
+
+	memset(this->raw_joinMePacketBuffer, 0x00, sizeof(raw_joinMePacketBuffer));
 
 	this->currentAckId = 0;
 
@@ -62,6 +91,8 @@ Node::Node(networkID networkId)
 	this->outputRawData = false;
 
 	this->radioActiveCount = 0;
+
+	meshAdvJobHandle = NULL;
 
 	globalTimeSec = 0;
 	globalTimeRemainderTicks = 0;
@@ -77,24 +108,13 @@ Node::Node(networkID networkId)
 
 	initializedByGateway = false;
 
-	LedRed->Off();
-	LedGreen->Off();
-	LedBlue->Off();
-
-	ledBlinkPosition = 0;
-
-
-
 	//Register terminal listener
-	Terminal::AddTerminalCommandListener(this);
-
-	currentLedMode = Config->defaultLedMode;
-
+	Terminal::getInstance()->AddTerminalCommandListener(this);
 
 	//Receive ConnectionManager events
-	cm = ConnectionManager::getInstance();
-	cm->setConnectionManagerCallback(this);
+	GS->cm = ConnectionManager::getInstance();
 
+	ConfigurationLoadedHandler();
 
 	//Initialize all Modules
 	//Module ids start with 1, this id is also used for saving persistent
@@ -102,32 +122,30 @@ Node::Node(networkID networkId)
 	//Module ids must persist when nodes are updated to guearantee that the
 	//same module receives the same storage slot
 #ifdef ACTIVATE_DEBUG_MODULE
-	activeModules[0] = new DebugModule(moduleID::DEBUG_MODULE_ID, this, cm, "debug", 1);
+	activeModules[0] = new DebugModule(moduleID::DEBUG_MODULE_ID, this, GS->cm, "debug");
 #endif
 #ifdef ACTIVATE_DFU_MODULE
-	activeModules[1] = new DFUModule(moduleID::DFU_MODULE_ID, this, cm, "dfu", 2);
+	activeModules[1] = new DFUModule(moduleID::DFU_MODULE_ID, this, GS->cm, "dfu");
 #endif
 #ifdef ACTIVATE_STATUS_REPORTER_MODULE
-	activeModules[2] = new StatusReporterModule(moduleID::STATUS_REPORTER_MODULE_ID, this, cm, "status", 3);
+	activeModules[2] = new StatusReporterModule(moduleID::STATUS_REPORTER_MODULE_ID, this, GS->cm, "status");
 #endif
 #ifdef ACTIVATE_ADVERTISING_MODULE
-	activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, cm, "adv", 4);
+	activeModules[3] = new AdvertisingModule(moduleID::ADVERTISING_MODULE_ID, this, GS->cm, "adv");
 #endif
 #ifdef ACTIVATE_SCANNING_MODULE
-	activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, cm, "scan", 5);
+	activeModules[4] = new ScanningModule(moduleID::SCANNING_MODULE_ID, this, GS->cm, "scan");
 #endif
 #ifdef ACTIVATE_ENROLLMENT_MODULE
-	activeModules[5] = new EnrollmentModule(moduleID::ENROLLMENT_MODULE_ID, this, cm, "enroll", 6);
+	activeModules[5] = new EnrollmentModule(moduleID::ENROLLMENT_MODULE_ID, this, GS->cm, "enroll");
 #endif
 #ifdef ACTIVATE_IO_MODULE
-	activeModules[6] = new IoModule(moduleID::IO_MODULE_ID, this, cm, "io", 7);
+	activeModules[6] = new IoModule(moduleID::IO_MODULE_ID, this, GS->cm, "io");
+#endif
+#ifdef ACTIVATE_CLC_MODULE
+	activeModules[7] = new ClcModule(moduleID::CLC_MODULE_ID, this, GS->cm, "clc");
 #endif
 
-
-	//Register a pre/post transmit hook for radio events
-	if(Config->enableRadioNotificationHandler){
-		ble_radio_notification_init(3, NRF_RADIO_NOTIFICATION_DISTANCE_800US, RadioEventHandler);
-	}
 	joinMePacketBuffer = new SimpleBuffer((u8*) raw_joinMePacketBuffer, sizeof(joinMeBufferPacket) * JOIN_ME_PACKET_BUFFER_MAX_ELEMENTS, sizeof(joinMeBufferPacket));
 
 	//Fills buffer with empty packets
@@ -135,15 +153,28 @@ Node::Node(networkID networkId)
 		joinMePacketBuffer->Reserve();
 	}
 
+	Logger::getInstance()->logError(Logger::errorTypes::CUSTOM, Logger::customErrorTypes::REBOOT, 0);
 
-	//Load Node configuration from slot 0
-	if(Config->ignorePersistentNodeConfigurationOnBoot){
-		logt("NODE", "ignoring persistent config!");
-		persistentConfig.version = 0xFFFFFFFF;
-		ConfigurationLoadedHandler();
-	} else {
-		Storage::getInstance().QueuedRead((u8*) &persistentConfig, sizeof(NodeConfiguration), 0, this);
-	}
+}
+
+void Node::LoadDefaults()
+{
+	persistentConfig.moduleId = moduleID::NODE_ID;
+	persistentConfig.moduleVersion = 1;
+	persistentConfig.moduleActive = 1;
+
+	//TODO: Do not copy settings to node
+	persistentConfig.networkId = Config->meshNetworkIdentifier;
+	memcpy(&persistentConfig.networkKey, &Config->meshNetworkKey, 16);
+	persistentConfig.dBmTX = Config->defaultDBmTX;
+
+	persistentConfig.nodeId = Config->defaultNodeId;
+	persistentConfig.networkId = Config->meshNetworkIdentifier;
+
+	persistentConfig.deviceType = Config->deviceType;
+	persistentConfig.nodeId = Config->defaultNodeId;
+
+	memcpy(&persistentConfig.nodeAddress, &Config->staticAccessAddress, sizeof(ble_gap_addr_t));
 
 }
 
@@ -151,23 +182,18 @@ void Node::ConfigurationLoadedHandler()
 {
 	u32 err;
 
-
-	//If config is unset, set to default
-	if (persistentConfig.version == 0xFFFFFFFF)
-	{
-		logt("NODE", "Config was empty, default config set");
-		persistentConfig.version = 0;
-		persistentConfig.connectionLossCounter = 0;
-		persistentConfig.networkId = Config->meshNetworkIdentifier;
-		memcpy(&persistentConfig.networkKey, &Config->meshNetworkKey, 16);
-		persistentConfig.dBmRX = 10;
-		persistentConfig.dBmTX = 10;
-
-		persistentConfig.deviceType = Config->deviceType;
-		persistentConfig.nodeId = Config->defaultNodeId;
-
-		memcpy(&persistentConfig.nodeAddress, &Config->staticAccessAddress, sizeof(ble_gap_addr_t));
+	//Check if some of the values are not set, use the ones from UICR
+	if(persistentConfig.networkId == 0xFFFF) persistentConfig.networkId = Config->meshNetworkIdentifier;
+	bool allBitsSet = true;
+	for(int i=0; i<16; i++){
+		if(persistentConfig.networkKey[i] != 0xFF){
+			allBitsSet = false;
+		}
 	}
+	if(allBitsSet) memcpy(&persistentConfig.networkKey, &Config->meshNetworkKey, 16);
+	if(persistentConfig.nodeId == 0xFFFF) persistentConfig.nodeId = Config->defaultNodeId;
+	if(persistentConfig.deviceType == 0xFF) persistentConfig.deviceType = Config->deviceType;
+
 
 	//Random offset that can be used to disperse packets from different nodes over time
 	this->appTimerRandomOffsetDs = (persistentConfig.nodeId % 100);
@@ -177,31 +203,153 @@ void Node::ConfigurationLoadedHandler()
 	logt("NODE", "====> Node %u (%s) <====", persistentConfig.nodeId, Config->serialNumber);
 
 	//Get a random number for the connection loss counter (hard on system start,...stat)
-	persistentConfig.connectionLossCounter = Utility::GetRandomInteger();
+	connectionLossCounter = Utility::GetRandomInteger();
 
 	clusterId = this->GenerateClusterID();
 
 	//Set the BLE address so that we have the same on every startup, mostly for debugging
 	if(persistentConfig.nodeAddress.addr_type != 0xFF){
-		err = sd_ble_gap_address_set(BLE_GAP_ADDR_CYCLE_MODE_NONE, &persistentConfig.nodeAddress);
+		err = FruityHal::BleGapAddressSet(&persistentConfig.nodeAddress);
 		if(err != NRF_SUCCESS){
 			//Can be ignored and will not happen
 		}
 	}
 
 	//Init softdevice and c libraries
-	ScanController::Initialize();
-	AdvertisingController::Initialize(persistentConfig.networkId);
+	ScanController::getInstance();
 
-	//Fill JOIN_ME packet with data
-	this->UpdateJoinMePacket();
+	//Set preferred TX power
+	err = sd_ble_gap_tx_power_set(persistentConfig.dBmTX);
 
 	//Print configuration and start node
-	logt("NODE", "Config loaded nodeId:%d, connLossCount:%u, networkId:%d", persistentConfig.nodeId, persistentConfig.connectionLossCounter, persistentConfig.networkId);
+	logt("NODE", "Config loaded nodeId:%d, connLossCount:%u, networkId:%d", persistentConfig.nodeId, connectionLossCounter, persistentConfig.networkId);
 
+	//Register the mesh service in the GATT table
+	InitializeMeshGattService();
 
-	//Go to Discovery
-	ChangeState(discoveryState::DISCOVERY);
+	//Remove Advertising job if it's been registered before
+	AdvertisingController::getInstance()->RemoveJob(meshAdvJobHandle);
+
+	if(persistentConfig.moduleActive){
+		//Register Job with AdvertisingController
+		AdvJob job = {
+			AdvJobTypes::ADV_JOB_TYPE_SCHEDULED,
+			5, //Slots
+			0, //Delay
+			MSEC_TO_UNITS(100, UNIT_0_625_MS), //AdvInterval
+			0, //CurrentSlots
+			0, //CurrentDelay
+			BLE_GAP_ADV_TYPE_ADV_IND, //Advertising Mode
+			{0}, //AdvData
+			0, //AdvDataLength
+			{0}, //ScanData
+			0 //ScanDataLength
+		};
+		meshAdvJobHandle = AdvertisingController::getInstance()->AddJob(&job);
+	}
+
+	//Go to Discovery if node is active
+	if(persistentConfig.moduleActive != 0){
+		//Fill JOIN_ME packet with data
+		this->UpdateJoinMePacket();
+
+		ChangeState(discoveryState::DISCOVERY);
+	}
+}
+
+void Node::RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength)
+{
+
+}
+
+void Node::InitializeMeshGattService()
+{
+	u32 err = 0;
+
+	//##### At first, we register our custom service
+	//Add our Service UUID to the BLE stack for management
+	ble_uuid128_t baseUUID128 = { MESH_SERVICE_BASE_UUID128 };
+	err = sd_ble_uuid_vs_add(&baseUUID128, &meshService.serviceUuid.type);
+	APP_ERROR_CHECK(err); //OK
+
+	//Add the service
+	err = sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY, &meshService.serviceUuid, &meshService.serviceHandle);
+	APP_ERROR_CHECK(err); //OK
+
+	//##### Now we need to add a characteristic to that service
+
+	//BLE GATT Attribute Metadata http://developer.nordicsemi.com/nRF51_SDK/doc/7.1.0/s120/html/a00163.html
+	//Read and write permissions, variable length, etc...
+	ble_gatts_attr_md_t attributeMetadata;
+	memset(&attributeMetadata, 0, sizeof(ble_gatts_attr_md_t));
+
+	//If encryption is enabled, we want our mesh handle only to be accessable over an
+	//encrypted connection with authentication
+	if(Config->encryptionEnabled){
+		BLE_GAP_CONN_SEC_MODE_SET_ENC_NO_MITM(&attributeMetadata.read_perm);
+		BLE_GAP_CONN_SEC_MODE_SET_ENC_NO_MITM(&attributeMetadata.write_perm);
+	}
+	else
+	{
+		BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attributeMetadata.read_perm);
+		BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attributeMetadata.write_perm);
+	}
+
+	attributeMetadata.vloc = BLE_GATTS_VLOC_STACK; //We currently have the value on the SoftDevice stack, we might port that to the application space
+	attributeMetadata.rd_auth = 0;
+	attributeMetadata.wr_auth = 0;
+	attributeMetadata.vlen = 1; //Make it a variable length attribute
+
+	//Characteristic metadata, whatever....
+	ble_gatts_char_md_t characteristicMetadata;
+	memset(&characteristicMetadata, 0, sizeof(ble_gatts_char_md_t));
+	characteristicMetadata.char_props.read = 1; /*Reading value permitted*/
+	characteristicMetadata.char_props.write = 1; /*Writing value with Write Request permitted*/
+	characteristicMetadata.char_props.write_wo_resp = 1; /*Writing value with Write Command permitted*/
+	characteristicMetadata.char_props.auth_signed_wr = 0; /*Writing value with Signed Write Command not permitted*/
+	characteristicMetadata.char_props.notify = 1; /*Notications of value permitted*/
+	characteristicMetadata.char_props.indicate = 0; /*Indications of value not permitted*/
+	characteristicMetadata.p_cccd_md = NULL;
+
+	//Finally, the attribute
+	ble_gatts_attr_t attribute;
+	memset(&attribute, 0, sizeof(ble_gatts_attr_t));
+
+	ble_uuid_t attributeUUID;
+	attributeUUID.type = meshService.serviceUuid.type;
+	attributeUUID.uuid = MESH_SERVICE_CHARACTERISTIC_UUID;
+
+	attribute.p_uuid = &attributeUUID; /* The UUID of the Attribute*/
+	attribute.p_attr_md = &attributeMetadata; /* The previously defined attribute Metadata */
+	attribute.max_len = MESH_CHARACTERISTIC_MAX_LENGTH;
+	attribute.init_len = 0;
+	attribute.init_offs = 0;
+
+	//Finally, add the characteristic
+	err = sd_ble_gatts_characteristic_add(meshService.serviceHandle, &characteristicMetadata, &attribute, &meshService.sendMessageCharacteristicHandle);
+	APP_ERROR_CHECK(err); //OK
+}
+
+//TODO: Currently not called
+void Node::CharacteristicsDiscoveredHandler(ble_evt_t* bleEvent)
+{
+	u32 err = 0;
+
+	//Service has been found
+	if (bleEvent->evt.gattc_evt.params.char_disc_rsp.count > 0)
+	{
+		//Characteristics have been found (FIXME: more could be requested by calling discovery again see:https://devzone.nordicsemi.com/documentation/nrf51/4.3.0/html/group___b_l_e___g_a_t_t_c___c_h_a_r___d_i_s_c___m_s_c.html)
+		if (bleEvent->evt.gattc_evt.params.char_disc_rsp.chars[0].uuid.uuid == MESH_SERVICE_CHARACTERISTIC_UUID && bleEvent->evt.gattc_evt.params.char_disc_rsp.chars[0].uuid.type == meshService.serviceUuid.type)
+		{
+			u16 characteristicHandle = bleEvent->evt.gattc_evt.params.char_disc_rsp.chars[0].handle_value;
+			logt("C", "Found mesh write characteristic");
+			BaseConnection* connection = GS->cm->GetConnectionFromHandle(bleEvent->evt.gattc_evt.conn_handle);
+			if (connection != NULL)
+			{
+				connection->GATTHandleDiscoveredHandler(characteristicHandle);
+			}
+		}
+	}
 }
 
 /*
@@ -213,7 +361,7 @@ void Node::ConfigurationLoadedHandler()
 #pragma region connections
 
 //Is called as soon as a connection is connected, before the handshake
-void Node::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
+void Node::MeshConnectionConnectedHandler()
 {
 	logt("NODE", "Connection initiated");
 
@@ -224,9 +372,11 @@ void Node::ConnectionSuccessfulHandler(ble_evt_t* bleEvent)
 }
 
 //Is called after a connection has ended its handshake
-void Node::HandshakeDoneHandler(Connection* connection, bool completedAsWinner)
+void Node::HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinner)
 {
 	logt("HANDSHAKE", "############ Handshake done (asWinner:%u) ###############", completedAsWinner);
+
+	Logger::getInstance()->logError(Logger::errorTypes::CUSTOM, Logger::customErrorTypes::HANDSHAKE_DONE, connection->partnerId);
 
 	//We can now commit the changes that were part of the handshake
 	//This node was the winner of the handshake and successfully acquired a new member
@@ -277,9 +427,9 @@ void Node::HandshakeDoneHandler(Connection* connection, bool completedAsWinner)
 		logt("HANDSHAKE", "ClusterSize set to %d", clusterSize);
 	}
 
-	uart("CLUSTER", "{\"type\":\"cluster_handshake\",\"winner\":%u,\"size\":%d}" SEP, completedAsWinner, clusterSize);
+	logjson("CLUSTER", "{\"type\":\"cluster_handshake\",\"winner\":%u,\"size\":%d}" SEP, completedAsWinner, clusterSize);
 
-	connection->connectionState = Connection::ConnectionState::HANDSHAKE_DONE;
+	connection->connectionState = ConnectionState::CONNECTION_STATE_HANDSHAKE_DONE;
 	connection->connectionHandshakedTimestampDs = appTimerDs;
 
 	//Call our lovely modules
@@ -292,6 +442,9 @@ void Node::HandshakeDoneHandler(Connection* connection, bool completedAsWinner)
 	//Update our advertisement packet
 	UpdateJoinMePacket();
 
+	//Pass on the masterbit to someone if necessary
+	HandOverMasterBitIfNecessary(connection);
+
 	//Go back to Discovery
 	ChangeState(discoveryState::DISCOVERY);
 }
@@ -299,12 +452,15 @@ void Node::HandshakeDoneHandler(Connection* connection, bool completedAsWinner)
 //TODO: part of the connection manager
 void Node::HandshakeTimeoutHandler()
 {
-	logt("HANDSHAKE", "############ Handshake TIMEOUT ###############");
+	logt("HANDSHAKE", "############ Handshake TIMEOUT/FAIL ###############");
 
 	//Disconnect the hanging connection
-	for(int i=0; i<Config->meshMaxConnections; i++){
-		if(cm->connections[i]->isConnected() && !cm->connections[i]->handshakeDone()){
-			cm->connections[i]->Disconnect();
+	BaseConnections conn = GS->cm->GetBaseConnections(ConnectionDirection::CONNECTION_DIRECTION_INVALID);
+	for(int i=0; i<conn.count; i++){
+		if(conn.connections[i]->isConnected() && !conn.connections[i]->handshakeDone()){
+			u32 handshakeTimePassed = appTimerDs - conn.connections[i]->handshakeStartedDs;
+			logt("HANDSHAKE", "Disconnecting conn %u, timePassed:%u", conn.connections[i]->connectionId, handshakeTimePassed);
+			conn.connections[i]->Disconnect();
 		}
 	}
 
@@ -314,7 +470,7 @@ void Node::HandshakeTimeoutHandler()
 
 //TODO: part of the connection manager
 //If we wanted to connect but our connection timed out (only outgoing connections)
-void Node::ConnectingTimeoutHandler(ble_evt_t* bleEvent)
+void Node::MeshConnectingTimeoutHandler(ble_evt_t* bleEvent)
 {
 	logt("NODE", "Connecting Timeout");
 
@@ -322,39 +478,27 @@ void Node::ConnectingTimeoutHandler(ble_evt_t* bleEvent)
 	ChangeState(discoveryState::DISCOVERY);
 }
 
-void Node::DisconnectionHandler(Connection* connection)
+void Node::MeshConnectionDisconnectedHandler(MeshConnection* connection)
 {
-	this->persistentConfig.connectionLossCounter++;
+	//TODO: If the local host disconnected this connection, it was already increased, we do not have to count the disconnect here
+	this->connectionLossCounter++;
 
 	//If the handshake was already done, this node was part of our cluster
 	//If the local host terminated the connection, we do not count it as a cluster Size change
 	if (
-		connection->connectionStateBeforeDisconnection >= Connection::ConnectionState::HANDSHAKE_DONE
+		connection->connectionStateBeforeDisconnection >= ConnectionState::CONNECTION_STATE_HANDSHAKE_DONE
 	){
 		//CASE 1: if our partner has the connection master bit, we must dissolve
-		//It may happen that the connection master bit was just passed over and that neither node has it
+		//It may happen rarely that the connection master bit was just passed over and that neither node has it
 		//This will result in two clusters dissolving
 		if (!connection->connectionMasterBit)
 		{
-			this->clusterId = GenerateClusterID();
+			GS->cm->ForceDisconnectOtherMeshConnections(NULL);
 
-			logt("HANDSHAKE", "ClusterSize Change from %d to %d", this->clusterSize, this->clusterSize - connection->connectedClusterSize);
+			clusterSize = 1;
+			clusterId = GenerateClusterID();
 
-			this->clusterSize -= connection->connectedClusterSize;
-
-			//Inform the rest of the cluster of our new ID and size
-			connPacketClusterInfoUpdate packet;
-			memset((u8*)&packet, 0x00, sizeof(connPacketClusterInfoUpdate));
-
-			packet.header.messageType = MESSAGE_TYPE_CLUSTER_INFO_UPDATE;
-			packet.header.sender = this->persistentConfig.nodeId;
-			packet.header.receiver = NODE_ID_BROADCAST;
-
-			packet.payload.newClusterId = this->clusterId;
-			packet.payload.clusterSizeChange = -connection->connectedClusterSize;
-
-			SendClusterInfoUpdate(connection, &packet);
-
+			UpdateJoinMePacket();
 
 		}
 
@@ -386,23 +530,34 @@ void Node::DisconnectionHandler(Connection* connection)
 
 	}
 
-	uart("CLUSTER", "{\"type\":\"cluster_disconnect\",\"size\":%d}" SEP, clusterSize);
+	logjson("CLUSTER", "{\"type\":\"cluster_disconnect\",\"size\":%d}" SEP, clusterSize);
 
 	//In either case, we must update our advertising packet
 	UpdateJoinMePacket();
+
+	//Pass on the masterbit to someone if necessary
+	HandOverMasterBitIfNecessary(connection);
 
 	//Go to discovery mode, and force high mode
 	noNodesFoundCounter = 0;
 
 	//At this point we can start discovery again if we are in a stable mesh
-	//That has discovery disabled. IMPORTANT: Do not change states if we are in Handshake
+	//That has discovery disabled.
 	if(currentDiscoveryState == discoveryState::DISCOVERY_OFF){
 		ChangeState(discoveryState::DISCOVERY);
+	}
+
+	//If this connection was part of the current handshake, we trigger a handshake timeout/fail
+	if (
+		currentDiscoveryState == discoveryState::HANDSHAKE
+		&& connection->connectionStateBeforeDisconnection == ConnectionState::CONNECTION_STATE_HANDSHAKING
+	) {
+		ChangeState(discoveryState::HANDSHAKE_TIMEOUT);
 	}
 }
 
 //Handles incoming cluster info update
-void Node::ReceiveClusterInfoUpdate(Connection* connection, connPacketClusterInfoUpdate* packet)
+void Node::ReceiveClusterInfoUpdate(MeshConnection* connection, connPacketClusterInfoUpdate* packet)
 {
 	//Prepare cluster update packet for other connections
 	connPacketClusterInfoUpdate outPacket;
@@ -426,7 +581,7 @@ void Node::ReceiveClusterInfoUpdate(Connection* connection, connPacketClusterInf
 
 	connection->hopsToSink = packet->payload.hopsToSink > -1 ? packet->payload.hopsToSink + 1 : -1;
 
-	this->clusterId = packet->payload.newClusterId;
+	//this->clusterId = packet->payload.newClusterId;
 	outPacket.payload.newClusterId = packet->payload.newClusterId;
 
 	//Now look if our partner has passed over the connection master bit
@@ -434,13 +589,16 @@ void Node::ReceiveClusterInfoUpdate(Connection* connection, connPacketClusterInf
 		connection->connectionMasterBit = 1;
 	}
 
+	//Pass on the masterbit to someone else if necessary
+	HandOverMasterBitIfNecessary(connection);
+
 	//hops to sink are updated in the send method
 	//current cluster id is updated in the send method
 
 	SendClusterInfoUpdate(connection, &outPacket);
 
 	//Log Cluster change to UART
-	uart("CLUSTER", "{\"type\":\"cluster_update\",\"size\":%d,\"newId\":%u,\"masterBit\":%u}" SEP, clusterSize, clusterId, packet->payload.connectionMasterBitHandover);
+	logjson("CLUSTER", "{\"type\":\"cluster_update\",\"size\":%d,\"newId\":%u,\"masterBit\":%u}" SEP, clusterSize, clusterId, packet->payload.connectionMasterBitHandover);
 
 	//Update adverting packet
 	this->UpdateJoinMePacket();
@@ -455,105 +613,165 @@ void Node::ReceiveClusterInfoUpdate(Connection* connection, connPacketClusterInf
 	 */
 }
 
-//Saves a cluster update or all connections (except the one that caused it)
-//This update will then be sent by a connection as soon as the connection is ready (handshakeDone)
-void Node::SendClusterInfoUpdate(Connection* ignoreConnection, connPacketClusterInfoUpdate* packet)
-{
-	for(int i=0; i<Config->meshMaxConnections; i++){
-		if(!cm->connections[i]->isConnected() || cm->connections[i] == ignoreConnection) continue;
+void Node::HandOverMasterBitIfNecessary(MeshConnection* connection) {
+	//If we have all masterbits, we can give 1 at max
+	//We do this, if the connected cluster size is bigger than all the other connected cluster sizes summed together
+	bool hasAllMasterBits = HasAllMasterBits();
+	if (hasAllMasterBits) {
+		MeshConnections conn = GS->cm->GetMeshConnections(ConnectionDirection::CONNECTION_DIRECTION_INVALID);
+		for (u32 i = 0; i < conn.count; i++) {
+			MeshConnection* c2 = conn.connections[i];
+			if (c2->connectedClusterSize > clusterSize - c2->connectedClusterSize) {
+				//Remove the masterbit from this connection
+				connection->connectionMasterBit = 0;
+				//Put the masterbit handover in the correct packet.
+				c2->currentClusterInfoUpdatePacket.header.messageType = MESSAGE_TYPE_CLUSTER_INFO_UPDATE;
+				c2->currentClusterInfoUpdatePacket.payload.connectionMasterBitHandover = 1;
+			}
+		}
+	}
+}
 
-		packet->payload.hopsToSink = cm->GetHopsToShortestSink(cm->connections[i]);
+bool Node::HasAllMasterBits() {
+	MeshConnections conn = GS->cm->GetMeshConnections(ConnectionDirection::CONNECTION_DIRECTION_INVALID);
+	for (u32 i = 0; i < conn.count; i++) {
+		MeshConnection* connection = conn.connections[i];
+		//Connection must be handshaked, if yes check if we have its masterbit
+		if (connection->handshakeDone() && !connection->connectionMasterBit) {
+			return false;
+		}
+	}
+	return true;
+}
+
+
+
+//Saves a cluster update for all connections (except the one that caused it)
+//This update will then be sent by a connection as soon as the connection is ready (handshakeDone)
+void Node::SendClusterInfoUpdate(MeshConnection* ignoreConnection, connPacketClusterInfoUpdate* packet)
+{
+	MeshConnections conn = GS->cm->GetMeshConnections(ConnectionDirection::CONNECTION_DIRECTION_INVALID);
+	for (u32 i = 0; i < conn.count; i++) {
+		if(!conn.connections[i]->isConnected() || conn.connections[i] == ignoreConnection) continue;
+
+		packet->payload.hopsToSink = GS->cm->GetMeshHopsToShortestSink(conn.connections[i]);
 
 		//Get the current packet
-		connPacketClusterInfoUpdate* currentPacket = &(cm->connections[i]->currentClusterInfoUpdatePacket);
+		connPacketClusterInfoUpdate* currentPacket = &(conn.connections[i]->currentClusterInfoUpdatePacket);
 
 		//If another clusterUpdate message is about to be sent
 		if(currentPacket->header.messageType == MESSAGE_TYPE_CLUSTER_INFO_UPDATE){
-			logt("HANDSHAKE", "TO NODE %u Adding to clusterSize change:%d, id:%x, hops:%d", cm->connections[i]->partnerId, packet->payload.clusterSizeChange, packet->payload.newClusterId, packet->payload.hopsToSink);
+			logt("HANDSHAKE", "TO NODE %u Adding to clusterSize change:%d, id:%u, hops:%d", conn.connections[i]->partnerId, packet->payload.clusterSizeChange, packet->payload.newClusterId, packet->payload.hopsToSink);
 
 			currentPacket->payload.clusterSizeChange += packet->payload.clusterSizeChange;
 			currentPacket->payload.newClusterId = packet->payload.newClusterId; //TODO: we could intelligently choose our clusterID
-			currentPacket->payload.hopsToSink = cm->GetHopsToShortestSink(cm->connections[i]);
+			currentPacket->payload.hopsToSink = GS->cm->GetMeshHopsToShortestSink(conn.connections[i]);
 
-			//Check if our connection partner has a bigger cluster on his side, if yes, hand over the connection master bit if we have it
-			if(
-					cm->connections[i]->connectionMasterBit
-					&& cm->connections[i]->connectedClusterSize > (clusterSize - cm->connections[i]->connectedClusterSize)
-			){
-				cm->connections[i]->connectionMasterBit = 0;
-				currentPacket->payload.connectionMasterBitHandover = 1;
-			}
+			HandOverMasterBitIfNecessary(conn.connections[i]);
 
 		//If no other clusterUpdate message is waiting to be sent
 		} else {
-			logt("HANDSHAKE", "TO NODE %u clusterSize change:%d, id:%x, hops:%d", cm->connections[i]->partnerId,  packet->payload.clusterSizeChange, packet->payload.newClusterId, packet->payload.hopsToSink);
+			logt("HANDSHAKE", "TO NODE %u clusterSize change:%d, id:%u, hops:%d", conn.connections[i]->partnerId,  packet->payload.clusterSizeChange, packet->payload.newClusterId, packet->payload.hopsToSink);
 			memcpy((u8*)currentPacket, (u8*)packet, sizeof(connPacketClusterInfoUpdate));
 		}
 	}
 	//TODO: If we call fillTransmitBuffers after a timeout, they would accumulate more,...
-	cm->fillTransmitBuffers();
+	GS->cm->fillTransmitBuffers();
 }
 
-void Node::messageReceivedCallback(connectionPacket* inPacket)
+//Constructs a simple trigger action message and can take aditional payload data
+void Node::SendModuleActionMessage(u8 messageType, nodeID toNode, u8 actionType, u8 requestHandle, u8* additionalData, u16 additionalDataSize, bool reliable)
 {
-	Connection* connection = cm->GetConnectionFromHandle(inPacket->connectionHandle);
-	u8* data = inPacket->data;
-	u16 dataLength = inPacket->dataLength;
+	DYNAMIC_ARRAY(buffer, SIZEOF_CONN_PACKET_MODULE + additionalDataSize);
 
-	connPacketHeader* packetHeader = (connPacketHeader*) data;
+	connPacketModule* outPacket = (connPacketModule*)buffer;
+	outPacket->header.messageType = messageType;
+	outPacket->header.sender = persistentConfig.nodeId;
+	outPacket->header.receiver = toNode;
 
+	outPacket->moduleId = moduleID::NODE_ID;
+	outPacket->requestHandle = requestHandle;
+	outPacket->actionType = actionType;
+
+	if(additionalData != NULL && additionalDataSize > 0)
+	{
+		memcpy(&outPacket->data, additionalData, additionalDataSize);
+	}
+
+	GS->cm->SendMeshMessage(buffer, SIZEOF_CONN_PACKET_MODULE + additionalDataSize, DeliveryPriority::DELIVERY_PRIORITY_LOW, reliable);
+}
+
+void Node::MeshMessageReceivedHandler(MeshConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
+{
 	//If the packet is a handshake packet it will not be forwarded to the node but will be
 	//handled in the connection. All other packets go here for further processing
 	switch (packetHeader->messageType)
 	{
 		case MESSAGE_TYPE_CLUSTER_INFO_UPDATE:
-			if (dataLength == SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE)
+			if (
+					connection != NULL
+					&& connection->connectionType == ConnectionTypes::CONNECTION_TYPE_FRUITYMESH
+					&& sendData->dataLength >= SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE)
 			{
-				connPacketClusterInfoUpdate* packet = (connPacketClusterInfoUpdate*) data;
-				logt("HANDSHAKE", "IN <= %d CLUSTER_INFO_UPDATE newClstId:%x, sizeChange:%d, hop:%d", connection->partnerId, packet->payload.newClusterId, packet->payload.clusterSizeChange, packet->payload.hopsToSink);
-				ReceiveClusterInfoUpdate(connection, packet);
+				connPacketClusterInfoUpdate* packet = (connPacketClusterInfoUpdate*) packetHeader;
+				logt("HANDSHAKE", "IN <= %d CLUSTER_INFO_UPDATE newClstId:%u, sizeChange:%d, hop:%d", connection->partnerId, packet->payload.newClusterId, packet->payload.clusterSizeChange, packet->payload.hopsToSink);
+				ReceiveClusterInfoUpdate((MeshConnection*)connection, packet);
 
 			}
 			break;
 
 		case MESSAGE_TYPE_DATA_1:
-			if (dataLength >= SIZEOF_CONN_PACKET_DATA_1)
+			if (sendData->dataLength >= SIZEOF_CONN_PACKET_DATA_1)
 			{
-				connPacketData1* packet = (connPacketData1*) data;
+				connPacketData1* packet = (connPacketData1*) packetHeader;
+				nodeID partnerId = connection == NULL ? 0 : connection->partnerId;
 
-				logt("DATA", "IN <= %d ################## Got Data packet %d:%d:%d (len:%d) ##################", connection->partnerId, packet->payload.data[0], packet->payload.data[1], packet->payload.data[2], inPacket->dataLength);
+				logt("DATA", "IN <= %d ################## Got Data packet %d:%d:%d (len:%d) ##################", partnerId, packet->payload.data[0], packet->payload.data[1], packet->payload.data[2], sendData->dataLength);
 
 				//tracef("data is %u/%u/%u" EOL, packet->payload.data[0], packet->payload.data[1], packet->payload.data[2]);
 			}
 			break;
 
 		case MESSAGE_TYPE_DATA_2:
-			if (dataLength == SIZEOF_CONN_PACKET_DATA_2)
+			if (sendData->dataLength >= SIZEOF_CONN_PACKET_DATA_2)
 			{
-				connPacketData2* packet = (connPacketData2*) data;
+				connPacketData2* packet = (connPacketData2*) packetHeader;
+				nodeID partnerId = connection == NULL ? 0 : connection->partnerId;
 
-				//Update our scan response with the data from this campaign
-				this->UpdateScanResponsePacket(packet->payload.data, packet->payload.length);
-				logt("DATA", "IN <= %d ################## Got Data 2 packet %c ##################", connection->partnerId, packet->payload.data[0]);
+				logt("DATA", "IN <= %d ################## Got Data 2 packet %c ##################", partnerId, packet->payload.data[0]);
+			}
+			break;
+
+		case MESSAGE_TYPE_DATA_3:
+			{
+				connPacketData3* packet = (connPacketData3*) packetHeader;
+
+				char dataString[16*3];
+				Logger::getInstance()->convertBufferToHexString(packet->payload.data, packet->payload.len, dataString, 15*3+1);
+
+				logjson("NODE", "{\"module\":0,\"type\":\"tunnel\",\"nodeId\":%u,\"data\":\"%s\"}" SEP,
+					packet->header.sender,
+					dataString
+				);
 			}
 			break;
 
 		case MESSAGE_TYPE_ADVINFO:
-			if (dataLength == SIZEOF_CONN_PACKET_ADV_INFO)
+			if (sendData->dataLength >= SIZEOF_CONN_PACKET_ADV_INFO)
 			{
-				connPacketAdvInfo* packet = (connPacketAdvInfo*) data;
+				connPacketAdvInfo* packet = (connPacketAdvInfo*) packetHeader;
 
-				uart("ADVINFO", "{\"sender\":\"%d\",\"addr\":\"%x:%x:%x:%x:%x:%x\",\"count\":%d,\"rssiSum\":%d}" SEP, packet->header.sender, packet->payload.peerAddress[0], packet->payload.peerAddress[1], packet->payload.peerAddress[2], packet->payload.peerAddress[3], packet->payload.peerAddress[4], packet->payload.peerAddress[5], packet->payload.packetCount, packet->payload.inverseRssiSum);
+				logjson("ADVINFO", "{\"sender\":\"%d\",\"addr\":\"%x:%x:%x:%x:%x:%x\",\"count\":%d,\"rssiSum\":%d}" SEP, packet->header.sender, packet->payload.peerAddress[0], packet->payload.peerAddress[1], packet->payload.peerAddress[2], packet->payload.peerAddress[3], packet->payload.peerAddress[4], packet->payload.peerAddress[5], packet->payload.packetCount, packet->payload.inverseRssiSum);
 
 			}
 			break;
 
 		case MESSAGE_TYPE_UPDATE_CONNECTION_INTERVAL:
-			if(dataLength == SIZEOF_CONN_PACKET_UPDATE_CONNECTION_INTERVAL)
+			if(sendData->dataLength == SIZEOF_CONN_PACKET_UPDATE_CONNECTION_INTERVAL)
 			{
-				connPacketUpdateConnectionInterval* packet = (connPacketUpdateConnectionInterval*) data;
+				connPacketUpdateConnectionInterval* packet = (connPacketUpdateConnectionInterval*) packetHeader;
 
-				cm->SetConnectionInterval(packet->newInterval);
+				GS->cm->SetMeshConnectionInterval(packet->newInterval);
 			}
 			break;
 
@@ -566,19 +784,19 @@ void Node::messageReceivedCallback(connectionPacket* inPacket)
 
 		if(packet->actionType == Module::ModuleConfigMessages::GET_MODULE_LIST)
 		{
-			SendModuleList(packet->header.sender, 7);
+			SendModuleList(packet->header.sender, packet->requestHandle);
 
 		}
 		else if(packet->actionType == Module::ModuleConfigMessages::MODULE_LIST)
 		{
 
-			uart("MODULE", "{\"nodeId\":%u,\"type\":\"module_list\",\"modules\":[", packet->header.sender);
+			logjson("MODULE", "{\"nodeId\":%u,\"type\":\"module_list\",\"modules\":[", packet->header.sender);
 
-			u16 moduleCount = (dataLength - SIZEOF_CONN_PACKET_MODULE) / 4;
+			u16 moduleCount = (sendData->dataLength - SIZEOF_CONN_PACKET_MODULE) / 4;
 			bool first = true;
 			for(int i=0; i<moduleCount; i++){
 				u8 moduleId = 0, version = 0, active = 0;
-				memcpy(&moduleId, packet->data + i*4+0, 2);
+				memcpy(&moduleId, packet->data + i*4+0, 1);
 				memcpy(&version, packet->data + i*4+2, 1);
 				memcpy(&active, packet->data + i*4+3, 1);
 
@@ -586,24 +804,58 @@ void Node::messageReceivedCallback(connectionPacket* inPacket)
 				{
 					//comma seperator issue,....
 					if(!first){
-						uart("MODULE", ",");
+						logjson("MODULE", ",");
 					}
-					uart("MODULE", "{\"id\":%u,\"version\":%u,\"active\":%u}", moduleId, version, active);
+					logjson("MODULE", "{\"id\":%u,\"version\":%u,\"active\":%u}", moduleId, version, active);
 
 					first = false;
 				}
 			}
-			uart("MODULE", "]}" SEP);
+			logjson("MODULE", "]}" SEP);
 		}
 	}
 
-	//Now we must pass the message to all of our modules for further processing
-	for(int i=0; i<MAX_MODULE_COUNT; i++){
-		if(activeModules[i] != 0){
-			activeModules[i]->ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
+	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
+		connPacketModule* packet = (connPacketModule*)packetHeader;
+
+		//Check if our module is meant and we should trigger an action
+		if(packet->moduleId == moduleID::NODE_ID){
+
+			if(packet->actionType == NodeModuleTriggerActionMessages::SET_DISCOVERY){
+
+				u8 ds = packet->data[0];
+
+				if(ds == 0){
+					ChangeState(discoveryState::DISCOVERY_OFF);
+				} else {
+					ChangeState(discoveryState::DISCOVERY_HIGH);
+				}
+
+				SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+					packetHeader->sender,
+					NodeModuleActionResponseMessages::SET_DISCOVERY_RESULT,
+					0,
+					NULL,
+					0,
+					false
+				);
+			}
 		}
 	}
 
+	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_ACTION_RESPONSE){
+			connPacketModule* packet = (connPacketModule*)packetHeader;
+
+			//Check if our module is meant and we should trigger an action
+			if(packet->moduleId == moduleID::NODE_ID){
+
+				if(packet->actionType == NodeModuleActionResponseMessages::SET_DISCOVERY_RESULT){
+
+					logjson("NODE", "{\"type\":\"set_discovery_result\",\"nodeId\":%d,\"module\":%d}" SEP, packetHeader->sender, moduleID::NODE_ID);
+				}
+			}
+		}
 }
 
 //Processes incoming CLUSTER_INFO_UPDATE packets
@@ -619,53 +871,53 @@ void Node::messageReceivedCallback(connectionPacket* inPacket)
 //Start to broadcast our own clusterInfo, set ackID if we want to have an ack or an ack response
 void Node::UpdateJoinMePacket()
 {
+	if(!persistentConfig.moduleActive) return;
+
 	SetTerminalTitle();
 
+	u8* buffer = meshAdvJobHandle->advData;
+	u8* bufferPointer = buffer;
+
+	advPacketHeader* advPacket = (advPacketHeader*)bufferPointer;
+	advPacket->flags.len = SIZEOF_ADV_STRUCTURE_FLAGS-1; //minus length field itself
+	advPacket->flags.type = BLE_GAP_AD_TYPE_FLAGS;
+	advPacket->flags.flags = BLE_GAP_ADV_FLAG_LE_GENERAL_DISC_MODE | BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED;
+
+	advPacket->manufacturer.len = (SIZEOF_ADV_STRUCTURE_MANUFACTURER + SIZEOF_ADV_PACKET_STUFF_AFTER_MANUFACTURER + SIZEOF_ADV_PACKET_PAYLOAD_JOIN_ME_V0) - 1;
+	advPacket->manufacturer.type = BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA;
+	advPacket->manufacturer.companyIdentifier = COMPANY_IDENTIFIER;
+
+	advPacket->meshIdentifier = MESH_IDENTIFIER;
+	advPacket->networkId = persistentConfig.networkId;
+	advPacket->messageType = MESSAGE_TYPE_JOIN_ME_V0;
+
 	//Build a JOIN_ME packet and set it in the advertisement data
-	advPacketPayloadJoinMeV0 packet;
+	advPacketPayloadJoinMeV0* packet = (advPacketPayloadJoinMeV0*)(bufferPointer+SIZEOF_ADV_PACKET_HEADER);
+	packet->sender = this->persistentConfig.nodeId;
+	packet->clusterId = this->clusterId;
+	packet->clusterSize = this->clusterSize;
+	packet->freeMeshInConnections = GS->cm->freeMeshInConnections;
+	packet->freeMeshOutConnections = GS->cm->freeMeshOutConnections;
 
-	packet.sender = this->persistentConfig.nodeId;
-	packet.clusterId = this->clusterId;
-	packet.clusterSize = this->clusterSize;
-	packet.freeInConnections = cm->freeInConnections;
-	packet.freeOutConnections = cm->freeOutConnections;
-
-	packet.batteryRuntime = GetBatteryRuntime();
-	packet.txPower = Config->radioTransmitPower;
-	packet.deviceType = persistentConfig.deviceType;
-	packet.hopsToSink = cm->GetHopsToShortestSink(NULL);
-	packet.meshWriteHandle = GATTController::getMeshWriteHandle();
+	packet->batteryRuntime = GetBatteryRuntime();
+	packet->txPower = persistentConfig.dBmTX;
+	packet->deviceType = persistentConfig.deviceType;
+	packet->hopsToSink = GS->cm->GetMeshHopsToShortestSink(NULL);
+	packet->meshWriteHandle = meshService.sendMessageCharacteristicHandle.value_handle;
 
 	if (currentAckId != 0)
 	{
-		packet.ackField = currentAckId;
+		packet->ackField = currentAckId;
 
 	} else {
-		packet.ackField = 0;
+		packet->ackField = 0;
 	}
 
-	sizedData data;
-	data.data = (u8*) &packet;
-	data.length = SIZEOF_ADV_PACKET_PAYLOAD_JOIN_ME_V0;
+	meshAdvJobHandle->advDataLength = SIZEOF_ADV_PACKET_HEADER + SIZEOF_ADV_PACKET_PAYLOAD_JOIN_ME_V0;
 
-	logt("JOIN", "JOIN_ME updated clusterId:%x, clusterSize:%d, freeIn:%u, freeOut:%u, handle:%u, ack:%u", packet.clusterId, packet.clusterSize, packet.freeInConnections, packet.freeOutConnections, packet.meshWriteHandle, packet.ackField);
+	logt("JOIN", "JOIN_ME updated clusterId:%x, clusterSize:%d, freeIn:%u, freeOut:%u, handle:%u, ack:%u", packet->clusterId, packet->clusterSize, packet->freeMeshInConnections, packet->freeMeshOutConnections, packet->meshWriteHandle, packet->ackField);
 
-	//Broadcast connectable advertisement if we have a free inConnection, otherwise, we can only act as master
-	if (cm->inConnection->isDisconnected() || cm->inConnection->connectionState == Connection::ConnectionState::REESTABLISHING){
-		AdvertisingController::UpdateAdvertisingData(MESSAGE_TYPE_JOIN_ME_V0, &data, true);
-	}
-	else AdvertisingController::UpdateAdvertisingData(MESSAGE_TYPE_JOIN_ME_V0, &data, false);
-}
-
-void Node::UpdateScanResponsePacket(u8* newData, u8 length)
-{
-
-	sizedData data;
-	data.data = newData;
-	data.length = length;
-
-	AdvertisingController::SetScanResponse(&data);
-
+	AdvertisingController::getInstance()->RefreshJob(meshAdvJobHandle);
 }
 
 //STEP 3: After collecting all available clusters, we want to connect to the best cluster that is available
@@ -675,7 +927,7 @@ Node::decisionResult Node::DetermineBestClusterAvailable(void)
 	//If no clusters have been advertised since the first time, there is no work to do
 	if (joinMePacketBuffer->_numElements == 0)
 	{
-		logt("DISCOVERY", "No other nodes discovered");
+		logt("DECISION", "No other nodes discovered");
 		return Node::DECISION_NO_NODES_FOUND;
 	}
 
@@ -684,7 +936,7 @@ Node::decisionResult Node::DetermineBestClusterAvailable(void)
 	joinMeBufferPacket* packet = NULL;
 
 	//Determine the best Cluster to connect to as a master
-	if (cm->freeOutConnections > 0)
+	if (GS->cm->freeMeshOutConnections > 0)
 	{
 		for (int i = 0; i < joinMePacketBuffer->_numElements; i++)
 		{
@@ -704,11 +956,11 @@ Node::decisionResult Node::DetermineBestClusterAvailable(void)
 		{
 			currentAckId = 0;
 
-			ble_gap_addr_t address;
+			fh_ble_gap_addr_t address;
 			address.addr_type = bestCluster->bleAddressType;
 			memcpy(address.addr, bestCluster->bleAddress, BLE_GAP_ADDR_LEN);
 
-			cm->ConnectAsMaster(bestCluster->payload.sender, &address, bestCluster->payload.meshWriteHandle);
+			GS->cm->ConnectAsMaster(bestCluster->payload.sender, &address, bestCluster->payload.meshWriteHandle);
 
 			//We clear this packet from the buffer, because if the connetion fails, we want to try a different node
 			memset(bestCluster, 0x00, sizeof(joinMeBufferPacket));
@@ -740,16 +992,16 @@ Node::decisionResult Node::DetermineBestClusterAvailable(void)
 	//Set our ack field to the best Cluster
 	if (bestCluster != NULL)
 	{
-		logt("DISCOVERY", "Other clusters are bigger, we are going to be a slave");
+		logt("DECISION", "Other clusters are bigger, we are going to be a slave");
 
 		currentAckId = bestCluster->payload.clusterId;
 
 		//CASE 1: The ack field is already set to our cluster id, we can reach each other
 		//Kill connections and broadcast our preferred partner with the ack field
 		//so that he connects to us
-		if (bestCluster->payload.ackField == clusterId)
+		if (bestCluster->payload.ackField == clusterId && bestCluster->payload.clusterSize >= clusterSize)
 		{
-			cm->ForceDisconnectOtherConnections(NULL);
+			GS->cm->ForceDisconnectOtherMeshConnections(NULL);
 
 			clusterSize = 1;
 			clusterId = GenerateClusterID();
@@ -769,10 +1021,12 @@ Node::decisionResult Node::DetermineBestClusterAvailable(void)
 		return Node::DECISION_CONNECT_AS_SLAVE;
 	}
 
-	logt("DISCOVERY", "no cluster found");
+	logt("DECISION", "no cluster found");
 
 	return Node::DECISION_NO_NODES_FOUND;
 }
+
+#define STABLE_CONNECTION_RSSI_THRESHOLD -85
 
 //Calculates the score for a cluster
 //Connect to big clusters but big clusters must connect nodes that are not able 
@@ -786,19 +1040,19 @@ u32 Node::CalculateClusterScoreAsMaster(joinMeBufferPacket* packet)
 	if (packet->payload.clusterId == this->clusterId) return 0;
 
 	//If there are zero free in connections, we cannot connect as master
-	if (packet->payload.freeInConnections == 0) return 0;
+	if (packet->payload.freeMeshInConnections == 0) return 0;
 
 	//If his cluster is bigger, but only if it is not faked (when setting an ack)
-	if (packet->payload.ackField == 0 && (packet->payload.clusterSize > this->clusterSize || (packet->payload.clusterSize == this->clusterSize && packet->payload.clusterId > this->clusterId)))
+	if (packet->payload.ackField == 0 && packet->payload.clusterSize >= this->clusterSize)
 	{
 		return 0;
 	}
 
 	//Connection should have a minimum of stability
-	if(packet->rssi < -88) return 0;
+	if(packet->rssi < STABLE_CONNECTION_RSSI_THRESHOLD) return 0;
 
 	//If the ack field is not 0 and set to a different nodeID than ours, somebody else wants to connect to him
-	if (packet->payload.ackField != 0 && packet->payload.ackField != this->persistentConfig.nodeId)
+	if (packet->payload.ackField != 0 && packet->payload.ackField != this->clusterId)
 	{
 		//Override ack field if our clustersize is similar or bigger
 		if (packet->payload.clusterSize <= this->clusterSize)
@@ -809,16 +1063,11 @@ u32 Node::CalculateClusterScoreAsMaster(joinMeBufferPacket* packet)
 			return 0;
 		}
 	}
-	u32 rssiScore = 0;
-	if(packet->payload.freeOutConnections > 2){
-		rssiScore = (100+packet->rssi)*(1000);
-	} else {
-		rssiScore = (100+packet->rssi)*(1);
-	}
+	u32 rssiScore = 100 + packet->rssi;
 
 	//Free in connections are best, free out connections are good as well
 	//TODO: RSSI should be factored into the score as well, maybe battery runtime, device type, etc...
-	return packet->payload.freeInConnections * 1000 + packet->payload.freeOutConnections * 100 + rssiScore;
+	return packet->payload.freeMeshInConnections * 10000 + packet->payload.freeMeshOutConnections * 100 + rssiScore;
 }
 
 //If there are only bigger clusters around, we want to find the best
@@ -833,21 +1082,26 @@ u32 Node::CalculateClusterScoreAsSlave(joinMeBufferPacket* packet)
 	if (packet->payload.clusterId == this->clusterId) return 0;
 
 	//If the ack field is set, we do not want to connect as slave
-	if (packet->payload.ackField != 0) return 0;
+	//if (packet->payload.ackField != 0/* && packet->payload.ackField != this->clusterId*/) return 0;
+
+	//if (packet->payload.clusterSize < this->clusterSize) return 0;
 
 	//He could not connect to us, leave him alone
-	if (packet->payload.freeOutConnections == 0) return 0;
+	if (packet->payload.freeMeshOutConnections == 0) return 0;
 
 	//Connection should have a minimum of stability
-	if(packet->rssi < -88) return 0;
+	if(packet->rssi < STABLE_CONNECTION_RSSI_THRESHOLD) return 0;
+
+	u32 rssiScore = 100 + packet->rssi;
 
 	//Choose the one with the biggest cluster size, if there are more, prefer the most outConnections
-	return packet->payload.clusterSize * 1000 + packet->payload.freeOutConnections;
+	return packet->payload.clusterSize * 10000 + packet->payload.freeMeshOutConnections * 100 + rssiScore;
 }
 
 //All advertisement packets are received here if they are valid
 void Node::AdvertisementMessageHandler(ble_evt_t* bleEvent)
 {
+	if(!persistentConfig.moduleActive) return;
 
 	u8* data = bleEvent->evt.gap_evt.params.adv_report.data;
 	u16 dataLength = bleEvent->evt.gap_evt.params.adv_report.dlen;
@@ -867,7 +1121,7 @@ void Node::AdvertisementMessageHandler(ble_evt_t* bleEvent)
 			{
 				advPacketJoinMeV0* packet = (advPacketJoinMeV0*) data;
 
-				logt("DISCOVERY", "JOIN_ME: sender:%u, clusterId:%x, clusterSize:%d, freeIn:%u, freeOut:%u, ack:%u", packet->payload.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.freeInConnections, packet->payload.freeOutConnections, packet->payload.ackField);
+				logt("DISCOVERY", "JOIN_ME: sender:%u, clusterId:%x, clusterSize:%d, freeIn:%u, freeOut:%u, ack:%u", packet->payload.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.freeMeshInConnections, packet->payload.freeMeshOutConnections, packet->payload.ackField);
 
 				//Look through the buffer and determine a space where we can put the packet in
 				joinMeBufferPacket* targetBuffer = findTargetBuffer(packet);
@@ -880,8 +1134,8 @@ void Node::AdvertisementMessageHandler(ble_evt_t* bleEvent)
 
 					targetBuffer->payload.clusterId = packet->payload.clusterId;
 					targetBuffer->payload.clusterSize = packet->payload.clusterSize;
-					targetBuffer->payload.freeInConnections = packet->payload.freeInConnections;
-					targetBuffer->payload.freeOutConnections = packet->payload.freeOutConnections;
+					targetBuffer->payload.freeMeshInConnections = packet->payload.freeMeshInConnections;
+					targetBuffer->payload.freeMeshOutConnections = packet->payload.freeMeshOutConnections;
 					targetBuffer->payload.sender = packet->payload.sender;
 					targetBuffer->payload.meshWriteHandle = packet->payload.meshWriteHandle;
 					targetBuffer->payload.ackField = packet->payload.ackField;
@@ -902,7 +1156,7 @@ joinMeBufferPacket* Node::findTargetBuffer(advPacketJoinMeV0* packet)
 	//First, look if a packet from this node is already in the buffer, if yes, we use this space
 	for (int i = 0; i < joinMePacketBuffer->_numElements; i++)
 	{
-		targetBuffer = (joinMeBufferPacket*) joinMePacketBuffer->PeekItemAt(i);
+		targetBuffer = (joinMeBufferPacket*)joinMePacketBuffer->PeekItemAt(i);
 
 		if (packet->payload.sender == targetBuffer->payload.sender)
 		{
@@ -910,19 +1164,20 @@ joinMeBufferPacket* Node::findTargetBuffer(advPacketJoinMeV0* packet)
 			return targetBuffer;
 		}
 	}
+	targetBuffer = NULL;
 
 	//Next, we look if there's an empty space
 	for (int i = 0; i < joinMePacketBuffer->_numElements; i++)
 	{
-		if(((joinMeBufferPacket*) joinMePacketBuffer->PeekItemAt(i))->payload.sender == 0){
-			targetBuffer = (joinMeBufferPacket*) joinMePacketBuffer->PeekItemAt(i);
+		targetBuffer = (joinMeBufferPacket*)joinMePacketBuffer->PeekItemAt(i);
+
+		if(targetBuffer->payload.sender == 0)
+		{
+			logt("DISCOVERY", "Used empty space");
+			return targetBuffer;
 		}
 	}
-
-	if(targetBuffer != NULL){
-		logt("DISCOVERY", "Used empty space");
-		return targetBuffer;
-	}
+	targetBuffer = NULL;
 
 	//Next, we can overwrite the oldest packet that we saved from our own cluster
 	u32 oldestTimestamp = UINT32_MAX;
@@ -943,18 +1198,26 @@ joinMeBufferPacket* Node::findTargetBuffer(advPacketJoinMeV0* packet)
 
 	//If there's still no space, we overwrite the oldest packet that we received, this will not fail
 	//TODO: maybe do not use oldest one but worst candidate?? Use clusterScore on all packets to find the least interesting
-	oldestTimestamp = UINT32_MAX;
+	u32 minScore = UINT32_MAX;
 	for (int i = 0; i < joinMePacketBuffer->_numElements; i++)
 	{
 		joinMeBufferPacket* tmpPacket = (joinMeBufferPacket*) joinMePacketBuffer->PeekItemAt(i);
 
-		if(tmpPacket->receivedTimeDs < oldestTimestamp){
-			oldestTimestamp = tmpPacket->receivedTimeDs;
+		u32 score = 0;
+		if (packet->payload.clusterSize >= clusterSize) {
+			score = CalculateClusterScoreAsMaster(tmpPacket);
+		}
+		else {
+			score = CalculateClusterScoreAsSlave(tmpPacket);
+		}
+
+		if(score < minScore){
+			minScore = score;
 			targetBuffer = tmpPacket;
 		}
 	}
 
-	logt("DISCOVERY", "Overwrote oldest packet from different cluster");
+	logt("DISCOVERY", "Overwrote worst packet from different cluster");
 	return targetBuffer;
 }
 
@@ -971,7 +1234,8 @@ joinMeBufferPacket* Node::findTargetBuffer(advPacketJoinMeV0* packet)
 
 void Node::SaveConfiguration()
 {
-	Storage::getInstance().QueuedWrite((u8*) &persistentConfig, sizeof(NodeConfiguration), 0, this);
+	logt("ERROR", "save node conf");
+	Conf::SaveModuleSettingsToFlash(moduleID::NODE_ID, &persistentConfig, sizeof(NodeConfiguration), this, 0, NULL, 0);
 }
 
 
@@ -988,7 +1252,7 @@ void Node::SaveConfiguration()
 
 void Node::ChangeState(discoveryState newState)
 {
-	if (currentDiscoveryState == newState || stateMachineDisabled) return;
+	if (currentDiscoveryState == newState || stateMachineDisabled || !persistentConfig.moduleActive) return;
 
 	discoveryState oldState = currentDiscoveryState;
 	currentDiscoveryState = newState;
@@ -1019,8 +1283,8 @@ void Node::ChangeState(discoveryState newState)
 		nextDiscoveryState = discoveryState::DECIDING;
 
 		logt("STATES", "-- DISCOVERY HIGH --");
-		AdvertisingController::SetAdvertisingState(ADV_STATE_HIGH);
-		ScanController::SetScanState(SCAN_STATE_HIGH);
+		//TODO: ADVREF AdvertisingController::getInstance()->SetAdvertisingState(ADV_STATE_HIGH);
+		ScanController::getInstance()->SetScanState(SCAN_STATE_HIGH);
 
 	}
 	else if (newState == discoveryState::DISCOVERY_LOW)
@@ -1029,8 +1293,8 @@ void Node::ChangeState(discoveryState newState)
 		nextDiscoveryState = discoveryState::DECIDING;
 
 		logt("STATES", "-- DISCOVERY LOW --");
-		AdvertisingController::SetAdvertisingState(ADV_STATE_LOW);
-		ScanController::SetScanState(SCAN_STATE_LOW);
+		//TODO: ADVREF AdvertisingController::getInstance()->SetAdvertisingState(ADV_STATE_LOW);
+		ScanController::getInstance()->SetScanState(SCAN_STATE_LOW);
 
 	}
 	else if (newState == discoveryState::DECIDING)
@@ -1039,19 +1303,18 @@ void Node::ChangeState(discoveryState newState)
 
 		logt("STATES", "-- DECIDING --");
 
-		//Disable scanning and advertising first
-		AdvertisingController::SetAdvertisingState(ADV_STATE_OFF);
-		ScanController::SetScanState(SCAN_STATE_OFF);
+		//Disable scanning first
+		ScanController::getInstance()->SetScanState(SCAN_STATE_OFF);
 
 		//Check if we want to reestablish a connection
-		int result = cm->ReestablishConnections();
-
-		if(result == 1){
-			//as peripheral
-			ChangeState(discoveryState::DISCOVERY_HIGH);
-		} else if(result == 2){
-			ChangeState(discoveryState::CONNECTING);
-		} else if (result == 0){
+//		int result = GS->cm->ReestablishConnections();
+//
+//		if(result == 1){
+//			//as peripheral
+//			ChangeState(discoveryState::DISCOVERY_HIGH);
+//		} else if(result == 2){
+//			ChangeState(discoveryState::CONNECTING);
+//		} else if (result == 0){
 
 			//Check if there is a good cluster
 			Node::decisionResult decision = DetermineBestClusterAvailable();
@@ -1074,7 +1337,7 @@ void Node::ChangeState(discoveryState newState)
 				ChangeState(discoveryState::DISCOVERY);
 			}
 
-		}
+//		}
 
 
 	}
@@ -1085,8 +1348,7 @@ void Node::ChangeState(discoveryState newState)
 		else currentStateTimeoutDs = (Config->meshStateTimeoutBackOffDs + (Utility::GetRandomInteger() % Config->meshStateTimeoutBackOffVarianceDs)); // 5 - 8 sec
 
 		logt("STATES", "-- BACK OFF --");
-		AdvertisingController::SetAdvertisingState(ADV_STATE_OFF);
-		ScanController::SetScanState(SCAN_STATE_OFF);
+		ScanController::getInstance()->SetScanState(SCAN_STATE_OFF);
 	}
 	else if (newState == discoveryState::CONNECTING)
 	{
@@ -1099,22 +1361,24 @@ void Node::ChangeState(discoveryState newState)
 
 
 		logt("STATES", "-- CONNECT_AS_MASTER --");
-		AdvertisingController::SetAdvertisingState(ADV_STATE_OFF);
-		ScanController::SetScanState(SCAN_STATE_OFF);
+		ScanController::getInstance()->SetScanState(SCAN_STATE_OFF);
 
 	}
 	else if (newState == discoveryState::HANDSHAKE)
 	{
 		//Use a timeout that is high enough for the handshake to finish
-		if(Config->meshHandshakeTimeoutDs != 0){
+		if(Config->meshHandshakeTimeoutDs == 0){
+			currentStateTimeoutDs = discoveryState::INVALID_STATE;
+		} else {
 			currentStateTimeoutDs = Config->meshHandshakeTimeoutDs;
 		}
 		nextDiscoveryState = discoveryState::HANDSHAKE_TIMEOUT;
 
 
 		logt("STATES", "-- HANDSHAKE --");
-		AdvertisingController::SetAdvertisingState(ADV_STATE_OFF);
-		ScanController::SetScanState(SCAN_STATE_OFF);
+		//TODO: ADVREF AdvertisingController::getInstance()->SetAdvertisingState(ADV_STATE_OFF); ?? Should be disable advertising?
+
+		ScanController::getInstance()->SetScanState(SCAN_STATE_OFF);
 
 
 	}
@@ -1122,7 +1386,7 @@ void Node::ChangeState(discoveryState newState)
 	{
 		nextDiscoveryState = discoveryState::INVALID_STATE;
 
-		logt("STATES", "-- HANDSHAKE TIMEOUT --");
+		logt("STATES", "-- HANDSHAKE TIMEOUT/FAIL --");
 		HandshakeTimeoutHandler();
 
 
@@ -1133,8 +1397,11 @@ void Node::ChangeState(discoveryState newState)
 
 
 		logt("STATES", "-- DISCOVERY OFF --");
-		AdvertisingController::SetAdvertisingState(ADV_STATE_OFF);
-		ScanController::SetScanState(SCAN_STATE_OFF);
+
+		meshAdvJobHandle->slots = 0;
+		AdvertisingController::getInstance()->RefreshJob(meshAdvJobHandle);
+
+		ScanController::getInstance()->SetScanState(SCAN_STATE_OFF);
 
 	}
 
@@ -1170,92 +1437,16 @@ void Node::TimerTickHandler(u16 timerDs)
 	//Check if we should switch states because of timeouts
 	if (nextDiscoveryState != INVALID_STATE && currentStateTimeoutDs <= 0)
 	{
-
 		//Go to the next state
 		ChangeState(nextDiscoveryState);
-	}
-
-
-	if (currentLedMode == ledMode::LED_MODE_CONNECTIONS)
-	{
-		//Now we test for blinking lights
-		u8 countHandshake = (cm->inConnection->handshakeDone() ? 1 : 0) + (cm->outConnections[0]->handshakeDone() ? 1 : 0) + (cm->outConnections[1]->handshakeDone() ? 1 : 0) + (cm->outConnections[2]->handshakeDone() ? 1 : 0);
-		u8 countConnected = (cm->inConnection->isConnected() ? 1 : 0) + (cm->outConnections[0]->isConnected() ? 1 : 0) + (cm->outConnections[1]->isConnected() ? 1 : 0) + (cm->outConnections[2]->isConnected() ? 1 : 0);
-
-		u8 i = ledBlinkPosition / 2;
-
-		if(i < Config->meshMaxConnections){
-			if(ledBlinkPosition % 2 == 0){
-				//Connected and handshake done
-				if(cm->connections[i]->handshakeDone()) { LedBlue->On(); }
-				//Connected and handshake not done
-				if(!cm->connections[i]->handshakeDone() && cm->connections[i]->isConnected()) { LedGreen->On(); }
-				//A free connection
-				if(!cm->connections[i]->isConnected()) {  }
-				//No connections
-				if(countHandshake == 0 && countConnected == 0) { LedRed->On(); }
-			} else {
-				LedRed->Off();
-				LedGreen->Off();
-				LedBlue->Off();
-			}
-		}
-
-		ledBlinkPosition = (ledBlinkPosition + 1) % ((Config->meshMaxConnections + 2) * 2);
-	}
-	else if(currentLedMode == ledMode::LED_MODE_CLUSTERING)
-	{
-		ledBlinkPosition++;
-
-		int c = 0;
-		for(int i=0; i<NUM_TEST_COLOUR_IDS; i++){
-			nodeID nodeIdFromClusterId = clusterId & 0xffff;
-
-			if(Config->testColourIDs[i] == nodeIdFromClusterId){
-				c = (i+1) % 8;
-
-				if(c & (1 << 0)) LedRed->On();
-				else LedRed->Off();
-
-				if(c & (1 << 1)) LedGreen->On();
-				else LedGreen->Off();
-
-				if(c & (1 << 2)) LedBlue->On();
-				else LedBlue->Off();
-
-				if(i >= 8 && ledBlinkPosition %2 == 0){
-					LedRed->Off();
-					LedGreen->Off();
-					LedBlue->Off();
-				}
-			}
-		}
-	}
-	else if(currentLedMode == ledMode::LED_MODE_ON)
-	{
-		LedRed->On();
-		LedGreen->On();
-		LedBlue->On();
-	}
-	else if(currentLedMode == ledMode::LED_MODE_OFF)
-	{
-		LedRed->Off();
-		LedGreen->Off();
-		LedBlue->Off();
-	}
-	else if(currentLedMode == ledMode::LED_MODE_ASSET)
-	{
-		LedRed->Toggle();
-		LedGreen->Toggle();
-		LedBlue->Toggle();
 	}
 }
 
 void Node::UpdateGlobalTime(){
 	//Request the Realtimeclock counter
 	u32 rtc1, passedTime;
-	app_timer_cnt_get(&rtc1);
-	app_timer_cnt_diff_compute(rtc1, previousRtcTicks, &passedTime);
+	rtc1 = FruityHal::GetRtc();
+	passedTime = FruityHal::GetRtcDifference(rtc1, previousRtcTicks);
 	previousRtcTicks = rtc1;
 
 	//Update the global time seconds and save the remainder for the next iteration
@@ -1275,6 +1466,7 @@ void Node::UpdateGlobalTime(){
 
 //This will get called before every packet that is sent and can be used to modify packets before sending
 //
+
 void Node::RadioEventHandler(bool radioActive)
 {
 	//Let's do some logging
@@ -1306,10 +1498,10 @@ void Node::RadioEventHandler(bool radioActive)
 
 /*
  #########################################################################################################
- ### Qos
+ ### Actions
  #########################################################################################################
  */
-#define ________________QOS___________________
+#define ________________ACTIONS___________________
 
 
 
@@ -1324,10 +1516,20 @@ void Node::RadioEventHandler(bool radioActive)
 clusterID Node::GenerateClusterID(void)
 {
 	//Combine connection loss and nodeId to generate a unique cluster id
-	clusterID newId = this->persistentConfig.nodeId + (this->persistentConfig.connectionLossCounter << 16);
+	clusterID newId = this->persistentConfig.nodeId + (this->connectionLossCounter << 16);
 
 	logt("NODE", "New cluster id generated %x", newId);
 	return newId;
+}
+
+Module* Node::GetModuleById(moduleID id)
+{
+	for(int i=0; i<MAX_MODULE_COUNT; i++){
+		if(activeModules[i]->moduleId == id){
+			return activeModules[i];
+		}
+	}
+	return NULL;
 }
 
 void Node::PrintStatus(void)
@@ -1336,27 +1538,45 @@ void Node::PrintStatus(void)
 
 	trace("**************" EOL);
 	SetTerminalTitle();
-	trace("This is Node %u in clusterId:%x with clusterSize:%d, networkId:%u" EOL, this->persistentConfig.nodeId, this->clusterId, this->clusterSize, persistentConfig.networkId);
-	trace("Ack Field:%d, ChipIdA:%u, ChipIdB:%u, ConnectionLossCounter:%u, nodeType:%d" EOL, currentAckId, NRF_FICR->DEVICEID[0], NRF_FICR->DEVICEID[1], persistentConfig.connectionLossCounter, this->persistentConfig.deviceType);
+	trace("This is Node %u in clusterId:%u with clusterSize:%d, networkId:%u, version:%u" EOL, this->persistentConfig.nodeId, this->clusterId, this->clusterSize, persistentConfig.networkId, fruityMeshVersion);
+	trace("Ack Field:%u, ChipIdA:%u, ChipIdB:%u, ConnectionLossCounter:%u, nodeType:%d" EOL, currentAckId, NRF_FICR->DEVICEID[0], NRF_FICR->DEVICEID[1], connectionLossCounter, this->persistentConfig.deviceType);
 
-	ble_gap_addr_t p_addr;
-	err = sd_ble_gap_address_get(&p_addr);
+	fh_ble_gap_addr_t p_addr;
+	err = FruityHal::BleGapAddressGet(&p_addr);
 	APP_ERROR_CHECK(err); //OK
-	trace("GAP Addr is %02X:%02X:%02X:%02X:%02X:%02X, serial:%s, netKey: %02X:%02X:%02X:%02X:...:%02X:%02X:%02X:%02X" EOL EOL, p_addr.addr[5], p_addr.addr[4], p_addr.addr[3], p_addr.addr[2], p_addr.addr[1], p_addr.addr[0], Config->serialNumber, Config->meshNetworkKey[0], Config->meshNetworkKey[1], Config->meshNetworkKey[2], Config->meshNetworkKey[3], Config->meshNetworkKey[12], Config->meshNetworkKey[13], Config->meshNetworkKey[14], Config->meshNetworkKey[15]);
+	trace("GAP Addr is %02X:%02X:%02X:%02X:%02X:%02X, serial:%s, netKey: %02X:%02X:%02X:%02X:...:%02X:%02X:%02X:%02X, state:%u" EOL EOL,
+			p_addr.addr[5],
+			p_addr.addr[4],
+			p_addr.addr[3],
+			p_addr.addr[2],
+			p_addr.addr[1],
+			p_addr.addr[0],
+			Config->serialNumber,
+			persistentConfig.networkKey[0],
+			persistentConfig.networkKey[1],
+			persistentConfig.networkKey[2],
+			persistentConfig.networkKey[3],
+			persistentConfig.networkKey[12],
+			persistentConfig.networkKey[13],
+			persistentConfig.networkKey[14],
+			persistentConfig.networkKey[15],
+			currentDiscoveryState);
 
 	//Print connection info
-	trace("CONNECTIONS (freeIn:%u, freeOut:%u, pendingPackets:%u" EOL, cm->freeInConnections, cm->freeOutConnections, cm->GetPendingPackets());
-	cm->inConnection->PrintStatus();
-	for (int i = 0; i < Config->meshMaxOutConnections; i++)
-	{
-		cm->outConnections[i]->PrintStatus();
+	BaseConnections conn = GS->cm->GetBaseConnections(ConnectionDirection::CONNECTION_DIRECTION_INVALID);
+	trace("CONNECTIONS %u (freeIn:%u, freeOut:%u, pendingPackets:%u" EOL, conn.count, GS->cm->freeMeshInConnections, GS->cm->freeMeshOutConnections, GS->cm->GetPendingPackets());
+	for (u32 i = 0; i < conn.count; i++) {
+		conn.connections[i]->PrintStatus();
 	}
+	trace("**************" EOL);
 }
 
 void Node::SetTerminalTitle()
 {
+#ifdef SET_TERMINAL_TITLE
 	//Change putty terminal title
-	trace("\033]0;Node %u (%s) ClusterSize:%d (%x), [%u, %u, %u, %u]\007", persistentConfig.nodeId, Config->serialNumber, clusterSize, clusterId, cm->connections[0]->partnerId, cm->connections[1]->partnerId, cm->connections[2]->partnerId, cm->connections[3]->partnerId);
+	if(Config->terminalPromptMode) trace("\033]0;Node %u (%s) ClusterSize:%d (%x), [%u, %u, %u, %u]\007", persistentConfig.nodeId, Config->serialNumber, clusterSize, clusterId, GS->cm->connections[0]->partnerId, GS->cm->connections[1]->partnerId, GS->cm->connections[2]->partnerId, GS->cm->connections[3]->partnerId);
+#endif
 }
 
 void Node::PrintBufferStatus(void)
@@ -1367,7 +1587,7 @@ void Node::PrintBufferStatus(void)
 	for (int i = 0; i < joinMePacketBuffer->_numElements; i++)
 	{
 		packet = (joinMeBufferPacket*) joinMePacketBuffer->PeekItemAt(i);
-		trace("=> %d, clusterId:%x, clusterSize:%d, freeIn:%u, freeOut:%u, writeHandle:%u, ack:%u, rssi:%d", packet->payload.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.freeInConnections, packet->payload.freeOutConnections, packet->payload.meshWriteHandle, packet->payload.ackField, packet->rssi);
+		trace("=> %d, clstId:%u, clstSize:%d, freeIn:%u, freeOut:%u, writeHndl:%u, ack:%u, rssi:%d, ageDs:%d", packet->payload.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.freeMeshInConnections, packet->payload.freeMeshOutConnections, packet->payload.meshWriteHandle, packet->payload.ackField, packet->rssi, appTimerDs - packet->receivedTimeDs);
 		if (packet->connectable == BLE_GAP_ADV_TYPE_ADV_IND)
 		trace(" ADV_IND" EOL);
 		else if (packet->connectable == BLE_GAP_ADV_TYPE_ADV_NONCONN_IND)
@@ -1379,12 +1599,6 @@ void Node::PrintBufferStatus(void)
 	trace("**************" EOL);
 }
 
-void Node::PrintSingleLineStatus(void)
-{
-	trace("NodeId: %u, clusterId:%x, clusterSize:%d (%d:%d, %d:%d, %d:%d, %d:%d)" EOL, persistentConfig.nodeId, clusterId, clusterSize, cm->inConnection->partnerId, cm->inConnection->connectedClusterSize, cm->outConnections[0]->partnerId, cm->outConnections[0]->connectedClusterSize, cm->outConnections[1]->partnerId, cm->outConnections[1]->connectedClusterSize, cm->outConnections[2]->partnerId,
-			cm->outConnections[2]->connectedClusterSize);
-}
-
 
 /*
  #########################################################################################################
@@ -1392,23 +1606,54 @@ void Node::PrintSingleLineStatus(void)
  #########################################################################################################
  */
 
-bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs)
+bool Node::TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs)
 {
-	/************* SYSTEM ***************/
-	if (commandName == "reset")
+
+	//React on commands, return true if handled, false otherwise
+	if(commandArgs.size() >= 2 && commandArgs[1] == "node")
 	{
-		sd_nvic_SystemReset(); //OK
-	}
-	/************ TESTING ************/
-	else if (commandName == "sustain")
-	{
-		for(int i=0; i<4; i++){
-			if(cm->connections[i]->isConnected()){
-				cm->connections[i]->reestablishTimeSec = 40;
-				logt("ERROR", "sustain time set");
+		if(commandName == "action")
+		{
+			//Rewrite "this" to our own node id, this will actually build the packet
+			//But reroute it to our own node
+			nodeID destinationNode = (commandArgs[0] == "this") ? persistentConfig.nodeId : atoi(commandArgs[0].c_str());
+
+			if(commandArgs.size() == 4 && commandArgs[2] == "discovery")
+			{
+				u8 discoveryState = commandArgs[3] == "off" ? 0 : 1;
+
+				SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					destinationNode,
+					NodeModuleTriggerActionMessages::SET_DISCOVERY,
+					0,
+					&discoveryState,
+					1,
+					false
+				);
+
+				return true;
 			}
 		}
 	}
+
+	/************* SYSTEM ***************/
+	if (commandName == "reset")
+	{
+		//Do not reboot in safe mode
+		*GS->rebootMagicNumberPtr = REBOOT_MAGIC_NUMBER;
+		FruityHal::SystemReset(); //OK
+	}
+	/************ TESTING ************/
+//	else if (commandName == "sustain")
+//	{
+//		for(int i=0; i<4; i++){
+//			if(GS->cm->connections[i]->isConnected()){
+//				GS->cm->connections[i]->reestablishTimeSec = 40;
+//				logt("ERROR", "sustain time set");
+//			}
+//		}
+//	}
 	/************* NODE ***************/
 	//Get a full status of the node
 	else if (commandName == "status")
@@ -1419,11 +1664,6 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	else if (commandName == "bufferstat")
 	{
 		PrintBufferStatus();
-	}
-	//Get a one-lined stat for the node
-	else if (commandName == "stat")
-	{
-		PrintSingleLineStatus();
 	}
 	//Broadcast some data over all connections
 	else if (commandName == "data")
@@ -1436,6 +1676,8 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		}
 
 		connPacketData1 data;
+		memset(&data, 0x00, sizeof(connPacketData1));
+
 		data.header.messageType = MESSAGE_TYPE_DATA_1;
 		data.header.sender = persistentConfig.nodeId;
 		data.header.receiver = receiverId;
@@ -1447,12 +1689,14 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 
 		bool reliable = (commandArgs.size() == 0) ? false : true;
 
-		cm->SendMessageToReceiver(NULL, (u8*) &data, SIZEOF_CONN_PACKET_DATA_1, reliable);
+		GS->cm->SendMeshMessage((u8*) &data, SIZEOF_CONN_PACKET_DATA_1, DeliveryPriority::DELIVERY_PRIORITY_LOW, reliable);
 	}
 	//Send some large data that is split over a few messages
 	else if(commandName == "datal")
 	{
-		const u8 dataLength = 45;
+		bool reliable = (commandArgs.size() > 0 && commandArgs[0] == "r");
+
+		const u8 dataLength = 145;
 		u8 _packet[dataLength];
 		connPacketHeader* packet = (connPacketHeader*)_packet;
 		packet->messageType = MESSAGE_TYPE_DATA_1;
@@ -1463,12 +1707,12 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 			_packet[i+5] = i+1;
 		}
 
-		cm->SendMessageToReceiver(NULL, _packet, dataLength, true);
+		GS->cm->SendMeshMessage(_packet, dataLength, DeliveryPriority::DELIVERY_PRIORITY_LOW, reliable);
 	}
 	//Simulate connection loss which generates a new cluster id
 	else if (commandName == "loss")
 	{
-		this->persistentConfig.connectionLossCounter++;
+		this->connectionLossCounter++;
 		clusterId = this->GenerateClusterID();
 		this->UpdateJoinMePacket();
 	}
@@ -1482,8 +1726,8 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	//Display the time of this node
 	else if(commandName == "gettime")
 	{
-		char timestring[50];
-		Logger::getInstance().convertTimestampToString(globalTimeSec, globalTimeRemainderTicks, timestring);
+		char timestring[80];
+		Logger::getInstance()->convertTimestampToString(globalTimeSec, globalTimeRemainderTicks, timestring);
 
 		trace("Time is currently %s" EOL, timestring);
 	}
@@ -1502,7 +1746,7 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 
 		//It is then received and processed in the Connectionmanager::messageReceivedCallback
 
-		cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_UPDATE_TIMESTAMP, true);
+		GS->cm->SendMeshMessage((u8*)&packet, SIZEOF_CONN_PACKET_UPDATE_TIMESTAMP,DeliveryPriority::DELIVERY_PRIORITY_HIGH, true);
 
 	}
 	//Switch to another discovery mode
@@ -1524,11 +1768,6 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 			ChangeState(discoveryState::DISCOVERY_OFF);
 		}
 	}
-	//Save the current node configuration
-	else if (commandName == "savenode")
-	{
-		Storage::getInstance().QueuedWrite((u8*) &persistentConfig, sizeof(NodeConfiguration), 0, this);
-	}
 	//Stop the state machine
 	else if (commandName == "stop")
 	{
@@ -1539,12 +1778,6 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	{
 		DisableStateMachine(false);
 	}
-	//Clear the persistant storage of the node configuration
-	else if (commandName == "clearstorage")
-	{
-		persistentConfig.version = 0xFFFFFFFF;
-		Storage::getInstance().QueuedWrite((u8*) &persistentConfig, sizeof(NodeConfiguration), 0, this);
-	}
 	//This variable can be used to toggle conditional breakpoints
 	else if (commandName == "break")
 	{
@@ -1553,33 +1786,51 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	//Try to connect to one of the nodes in the test devices array
 	else if (commandName == "connect")
 	{
+#ifdef ENABLE_TEST_DEVICES
 		for (int i = 0; i <NUM_TEST_DEVICES ; i++)
 		{
 			if (strtol(commandArgs[0].c_str(), NULL, 10) == Config->testDevices[i].id)
 			{
-				trace("Trying to connecting to node %d", Config->testDevices[i].id);
+				logt("NODE", "Trying to connecting to node %d", Config->testDevices[i].id);
 
 				cm->ConnectAsMaster(Config->testDevices[i].id, &Config->testDevices[i].addr, 14);
 			}
 		}
+#else
+		//Allows us to connect to any node when giving the GAP Address
+		nodeID partnerId = atoi(commandArgs[0].c_str());
+		u8 buffer[6];
+		Logger::getInstance()->parseHexStringToBuffer(commandArgs[1].c_str(), buffer, 6);
+		fh_ble_gap_addr_t addr;
+		addr.addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC;
+		addr.addr[0] = buffer[5];
+		addr.addr[1] = buffer[4];
+		addr.addr[2] = buffer[3];
+		addr.addr[3] = buffer[2];
+		addr.addr[4] = buffer[1];
+		addr.addr[5] = buffer[0];
+
+		//Using the same GATT handle as our own will probably work if our partner has the same implementation
+		GS->cm->ConnectAsMaster(partnerId, &addr, meshService.sendMessageCharacteristicHandle.value_handle);
+#endif
 	}
 	//Disconnect a connection by id (0-4)
 	else if (commandName == "disconnect")
 	{
 		if (commandArgs.size() > 0)
 		{
-			u8 connectionNumber = atoi(commandArgs[0].c_str());
+			u8 connectionId = atoi(commandArgs[0].c_str());
 
-			cm->connections[connectionNumber]->Disconnect();
+			GS->cm->allConnections[connectionId]->Disconnect();
 		}
 	}
 	//tell the gap layer to loose a connection
-	else if (commandName == "gap_disconnect" || commandName == "dis")
+	else if (commandName == "gap_disconnect")
 	{
 		if (commandArgs.size() > 0)
 		{
-			u8 connectionNumber = atoi(commandArgs[0].c_str());
-			GAPController::disconnectFromPartner(cm->connections[connectionNumber]->connectionHandle);
+			u8 connectionId = atoi(commandArgs[0].c_str());
+			GAPController::getInstance()->disconnectFromPartner(GS->cm->allConnections[connectionId]->connectionHandle);
 		}
 	}
 	else if(commandName == "update_iv")
@@ -1593,20 +1844,15 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		packet.header.receiver = nodeId;
 
 		packet.newInterval = newConnectionInterval;
-		cm->SendMessageToReceiver(NULL, (u8*)&packet, SIZEOF_CONN_PACKET_UPDATE_CONNECTION_INTERVAL, false);
-	}
-	//Display the free heap
-	else if (commandName == "heap")
-	{
-		Utility::CheckFreeHeap();
+		GS->cm->SendMeshMessage((u8*)&packet, SIZEOF_CONN_PACKET_UPDATE_CONNECTION_INTERVAL, DeliveryPriority::DELIVERY_PRIORITY_HIGH, false);
 	}
 	//Encrypt a connection by id
 	else if (commandName == "security")
 	{
-		u16 connectionId = strtol(commandArgs[0].c_str(), NULL, 10);
+		u16 connectionId = (u16) strtol(commandArgs[0].c_str(), NULL, 10);
 
 		//Enable connection security
-		GAPController::startEncryptingConnection(cm->connections[connectionId]->connectionHandle);
+		GAPController::getInstance()->startEncryptingConnection(GS->cm->allConnections[connectionId]->connectionHandle);
 	}
 	//Configure the current node to be a data endpoint
 	else if (commandName == "yousink")
@@ -1618,21 +1864,11 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 	{
 		this->persistentConfig.nodeId = atoi(commandArgs[0].c_str());
 	}
-
 	/************* UART COMMANDS ***************/
-	//
-	else if (commandName == "uart_scan_response")
-	{
-		if (commandArgs.size() > 0){
-			AdvertisingController::SetScanResponseData(this, commandArgs[0]);
-		} else {
-			uart_error(Logger::ARGUMENTS_WRONG);
-		}
-	}
 	//Get the status information of this node
 	else if(commandName == "get_plugged_in")
 	{
-		uart("NODE", "{\"type\":\"plugged_in\",\"nodeId\":%u,\"serialNumber\":\"%s\"}" SEP, persistentConfig.nodeId, Config->serialNumber);
+		logjson("NODE", "{\"type\":\"plugged_in\",\"nodeId\":%u,\"serialNumber\":\"%s\"}" SEP, persistentConfig.nodeId, Config->serialNumber);
 	}
 	//Query all modules from any node
 	else if((commandName == "get_modules") && commandArgs.size() == 1)
@@ -1644,10 +1880,11 @@ bool Node::TerminalCommandHandler(string commandName, vector<string> commandArgs
 		packet.header.sender = persistentConfig.nodeId;
 		packet.header.receiver = receiver;
 
-		packet.moduleId = moduleID::NODE;
+		packet.moduleId = moduleID::NODE_ID;
+		packet.requestHandle = 0;
 		packet.actionType = Module::ModuleConfigMessages::GET_MODULE_LIST;
 
-		cm->SendMessageToReceiver(NULL, (u8*) &packet, SIZEOF_CONN_PACKET_MODULE, true);
+		GS->cm->SendMeshMessage((u8*) &packet, SIZEOF_CONN_PACKET_MODULE, DeliveryPriority::DELIVERY_PRIORITY_LOW, true);
 	}
 	else
 	{
@@ -1671,7 +1908,7 @@ u8 buffer[SIZEOF_CONN_PACKET_MODULE + MAX_MODULE_COUNT*4];
 		outPacket->header.sender = persistentConfig.nodeId;
 		outPacket->header.receiver = toNode;
 
-		outPacket->moduleId = moduleID::NODE;
+		outPacket->moduleId = moduleID::NODE_ID;
 		outPacket->requestHandle = requestHandle;
 		outPacket->actionType = Module::ModuleConfigMessages::MODULE_LIST;
 
@@ -1687,11 +1924,11 @@ u8 buffer[SIZEOF_CONN_PACKET_MODULE + MAX_MODULE_COUNT*4];
 
 		/*
 		char* strbuffer[200];
-		Logger::getInstance().convertBufferToHexString(buffer, SIZEOF_CONN_PACKET_MODULE + MAX_MODULE_COUNT*4, (char*)strbuffer);
+		Logger::getInstance()->convertBufferToHexString(buffer, SIZEOF_CONN_PACKET_MODULE + MAX_MODULE_COUNT*4, (char*)strbuffer);
 		logt("MODULE", "Sending: %s", strbuffer);
 */
 
-		cm->SendMessageToReceiver(NULL, (u8*)outPacket, SIZEOF_CONN_PACKET_MODULE + MAX_MODULE_COUNT*4, true);
+		GS->cm->SendMeshMessage((u8*)outPacket, SIZEOF_CONN_PACKET_MODULE + MAX_MODULE_COUNT*4, DeliveryPriority::DELIVERY_PRIORITY_LOW, true);
 }
 
 u8 Node::GetBatteryRuntime()

@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -35,16 +35,24 @@ class DebugModule: public Module
 		#pragma pack(push, 1)
 		//Module configuration that is saved persistently
 		struct DebugModuleConfiguration : ModuleConfiguration{
-			u32 rebootTimeDs; //Time until reboot
+			u8 debugButtonRemoveEnrollmentDs;
+			u8 debugButtonEnableUartDs;
 			//Insert more persistent config values here
-			u32 reserved; //Mandatory, read Module.h
 		};
 		#pragma pack(pop)
+
+		u32 rebootTimeDs; //Time until reboot
 
 		//Counters for flood messages
 		u8 flood;
 		u32 packetsOut;
 		u32 packetsIn;
+
+		//Counters for ping
+		u32 pingSentTicks;
+		u8 pingHandle;
+		u16 pingCount;
+		u16 pingCountResponses;
 
 		DebugModuleConfiguration configuration;
 
@@ -55,12 +63,19 @@ class DebugModule: public Module
 			FLOOD_MESSAGE = 2,
 			INFO_MESSAGE = 3,
 			CAUSE_HARDFAULT_MESSAGE = 4,
-			SET_REESTABLISH_TIMEOUT = 5
+			SET_REESTABLISH_TIMEOUT = 5,
+			PING = 6,
+			PINGPONG = 7,
+			SET_DISCOVERY = 8,
+			LPING = 9
 
 		};
 
 		enum DebugModuleActionResponseMessages{
-			REESTABLISH_TIMEOUT_RESPONSE = 5
+			REESTABLISH_TIMEOUT_RESPONSE = 5,
+			PING_RESPONSE = 6,
+			SET_DISCOVERY_RESPONSE = 8,
+			LPING_RESPONSE = 9
 		};
 
 		#pragma pack(push)
@@ -83,12 +98,36 @@ class DebugModule: public Module
 
 		} DebugModuleReestablishTimeoutMessage;
 
+		#define SIZEOF_DEBUG_MODULE_PINGPONG_MESSAGE 1
+		typedef struct
+		{
+			u8 ttl;
+
+		} DebugModulePingpongMessage;
+
+		#define SIZEOF_DEBUG_MODULE_LPING_MESSAGE 4
+		typedef struct
+		{
+			nodeID leafNodeId;
+			u16 hops;
+
+		} DebugModuleLpingMessage;
+
+
+		#define SIZEOF_DEBUG_MODULE_SET_DISCOVERY_MESSAGE 1
+		typedef struct
+		{
+			u8 discoveryMode;
+
+		} DebugModuleSetDiscoveryMessage;
+
 		#pragma pack(pop)
 
 		void CauseHardfault();
 
+
 	public:
-		DebugModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		DebugModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name);
 
 		void ConfigurationLoadedHandler();
 
@@ -96,9 +135,11 @@ class DebugModule: public Module
 
 		void TimerEventHandler(u16 passedTimeDs, u32 appTimerDs);
 
-		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+		void ButtonHandler(u8 buttonId, u32 holdTimeDs);
 
-		void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
+		bool TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs);
+
+		void MeshMessageReceivedHandler(MeshConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader);
 
 };
 

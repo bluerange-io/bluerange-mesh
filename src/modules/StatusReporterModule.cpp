@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <Logger.h>
 #include <StatusReporterModule.h>
 #include <Utility.h>
-#include <Storage.h>
 #include <Node.h>
 #include <Config.h>
 
@@ -32,11 +31,14 @@ extern "C"{
 #include <stdlib.h>
 }
 
-StatusReporterModule::StatusReporterModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
-	: Module(moduleId, node, cm, name, storageSlot)
+#ifdef ACTIVATE_STATUS_REPORTER_MODULE
+
+StatusReporterModule::StatusReporterModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name)
+	: Module(moduleId, node, cm, name)
 {
+	moduleVersion = 1;
+
 	//Register callbacks n' stuff
-	Logger::getInstance().enableTag("STATUSMOD");
 
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
@@ -53,7 +55,7 @@ void StatusReporterModule::ConfigurationLoadedHandler()
 	Module::ConfigurationLoadedHandler();
 
 	//Version migration can be added here
-	if(configuration.moduleVersion == 1){/* ... */};
+	if(configuration.moduleVersion == this->moduleVersion){/* ... */};
 
 	//Start the Module...
 
@@ -64,14 +66,14 @@ void StatusReporterModule::ResetToDefaultConfiguration()
 {
 	//Set default configuration values
 	configuration.moduleId = moduleId;
-	configuration.moduleActive = true;
+	configuration.moduleActive = false;
 	configuration.moduleVersion = 1;
 
 	configuration.statusReportingIntervalDs = SEC_TO_DS(80);
-	configuration.connectionReportingIntervalDs = SEC_TO_DS(85);
+	configuration.connectionReportingIntervalDs = 0;
 	configuration.connectionRSSISamplingMode = RSSISampingModes::RSSI_SAMLING_HIGH;
 	configuration.advertisingRSSISamplingMode = RSSISampingModes::RSSI_SAMLING_HIGH;
-	configuration.nearbyReportingIntervalDs = SEC_TO_DS(180);
+	configuration.nearbyReportingIntervalDs = 0;
 	configuration.deviceInfoReportingIntervalDs = SEC_TO_DS(100);
 
 	memset(nodeMeasurements, 0x00, sizeof(nodeMeasurements));
@@ -99,64 +101,65 @@ void StatusReporterModule::TimerEventHandler(u16 passedTimeDs, u32 appTimerDs)
 	if(SHOULD_IV_TRIGGER(node->appTimerDs+node->appTimerRandomOffsetDs, passedTimeDs, configuration.nearbyReportingIntervalDs)){
 		SendNearbyNodes(NODE_ID_BROADCAST, MESSAGE_TYPE_MODULE_ACTION_RESPONSE);
 	}
+//	//ErrorLog
+//	if(SHOULD_IV_TRIGGER(node->appTimerDs+node->appTimerRandomOffsetDs, passedTimeDs, SEC_TO_DS(4))){
+//		SendErrors(0);
+//	}
 }
 
 
 //This method sends the node's status over the network
 void StatusReporterModule::SendStatus(nodeID toNode, u8 messageType)
 {
-	u16 packetSize = SIZEOF_CONN_PACKET_MODULE + SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE;
-		u8 buffer[packetSize];
-		connPacketModule* outPacket = (connPacketModule*)buffer;
-		outPacket->header.messageType = messageType;
-		outPacket->header.receiver = toNode;
-		outPacket->header.sender = node->persistentConfig.nodeId;
-		outPacket->moduleId = moduleId;
-		outPacket->actionType = StatusModuleActionResponseMessages::STATUS;
+	MeshConnections conn = GS->cm->GetMeshConnections(ConnectionDirection::CONNECTION_DIRECTION_IN);
 
-		StatusReporterModuleStatusMessage* outPacketData = (StatusReporterModuleStatusMessage*)(outPacket->data);
+	StatusReporterModuleStatusMessage data;
 
-		outPacketData->batteryInfo = node->GetBatteryRuntime();
-		outPacketData->clusterSize = node->clusterSize;
-		outPacketData->connectionLossCounter = node->persistentConfig.connectionLossCounter; //TODO: connectionlosscounter is random at the moment
-		outPacketData->freeIn = cm->freeInConnections;
-		outPacketData->freeOut = cm->freeOutConnections;
-		outPacketData->inConnectionPartner = cm->inConnection->partnerId;
-		outPacketData->inConnectionRSSI = cm->inConnection->rssiAverage;
-		outPacketData->initializedByGateway = node->initializedByGateway;
+	data.batteryInfo = node->GetBatteryRuntime();
+	data.clusterSize = node->clusterSize;
+	data.connectionLossCounter = (u8) node->connectionLossCounter; //TODO: connectionlosscounter is random at the moment, and the u8 will wrap
+	data.freeIn = cm->freeMeshInConnections;
+	data.freeOut = cm->freeMeshOutConnections;
+	data.inConnectionPartner = conn.connections[0] == NULL ? 0 : conn.connections[0]->partnerId;
+	data.inConnectionRSSI = conn.connections[0] == NULL ? 0 : conn.connections[0]->rssiAverage;
+	data.initializedByGateway = node->initializedByGateway;
 
-		cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE + SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE, false);
+	SendModuleActionMessage(
+		messageType,
+		toNode,
+		StatusModuleActionResponseMessages::STATUS,
+		0,
+		(u8*)&data,
+		SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE,
+		false
+	);
 }
 
 //Message type can be either MESSAGE_TYPE_MODULE_ACTION_RESPONSE or MESSAGE_TYPE_MODULE_GENERAL
 void StatusReporterModule::SendDeviceInfo(nodeID toNode, u8 messageType)
 {
-	u32 err;
+	StatusReporterModuleDeviceInfoMessage data;
 
-	u16 packetSize = SIZEOF_CONN_PACKET_MODULE + SIZEOF_STATUS_REPORTER_MODULE_DEVICE_INFO_MESSAGE;
-	u8 buffer[packetSize];
-	connPacketModule* outPacket = (connPacketModule*)buffer;
-	outPacket->header.messageType = messageType;
-	outPacket->header.receiver = toNode;
-	outPacket->header.sender = node->persistentConfig.nodeId;
-	outPacket->moduleId = moduleId;
-	outPacket->actionType = StatusModuleActionResponseMessages::DEVICE_INFO;
+	data.manufacturerId = Config->manufacturerId;
+	data.deviceType = node->persistentConfig.deviceType;
+	memcpy(data.chipId, (u8*)NRF_FICR->DEVICEADDR, 8);
+	memcpy(data.serialNumber, Config->serialNumber, NODE_SERIAL_NUMBER_LENGTH);
+	FruityHal::BleGapAddressGet(&data.accessAddress);
+	data.nodeVersion = fruityMeshVersion;
+	data.networkId = node->persistentConfig.networkId;
+	data.dBmRX = Boardconfig->dBmRX;
+	data.dBmTX = node->persistentConfig.dBmTX;
+	data.calibratedTX = Boardconfig->calibratedTX;
 
-	StatusReporterModuleDeviceInfoMessage* outPacketData = (StatusReporterModuleDeviceInfoMessage*)(outPacket->data);
-
-	outPacketData->manufacturerId = Config->manufacturerId;
-	outPacketData->deviceType = node->persistentConfig.deviceType;
-	memcpy(outPacketData->chipId, (u8*)NRF_FICR->DEVICEADDR, 8);
-	memcpy(outPacketData->serialNumber, Config->serialNumber, SERIAL_NUMBER_LENGTH);
-	err = sd_ble_gap_address_get(&outPacketData->accessAddress);
-	APP_ERROR_CHECK(err); //OK
-	outPacketData->nodeVersion = Config->firmwareVersion;
-	outPacketData->networkId = node->persistentConfig.networkId;
-	outPacketData->dBmRX = node->persistentConfig.dBmRX;
-	outPacketData->dBmTX = node->persistentConfig.dBmTX;
-
-
-	cm->SendMessageToReceiver(NULL, buffer, SIZEOF_CONN_PACKET_MODULE + SIZEOF_STATUS_REPORTER_MODULE_DEVICE_INFO_MESSAGE, false);
+	SendModuleActionMessage(
+		messageType,
+		toNode,
+		StatusModuleActionResponseMessages::DEVICE_INFO,
+		0,
+		(u8*)&data,
+		SIZEOF_STATUS_REPORTER_MODULE_DEVICE_INFO_MESSAGE,
+		false
+	);
 }
 
 void StatusReporterModule::SendNearbyNodes(nodeID toNode, u8 messageType)
@@ -166,15 +169,8 @@ void StatusReporterModule::SendNearbyNodes(nodeID toNode, u8 messageType)
 		if(nodeMeasurements[i].nodeId != 0) numMeasurements++;
 	}
 
-
-	u16 packetSize = SIZEOF_CONN_PACKET_MODULE + numMeasurements * 3;
-	u8 buffer[packetSize];
-	connPacketModule* outPacket = (connPacketModule*)buffer;
-	outPacket->header.messageType = messageType;
-	outPacket->header.receiver = toNode;
-	outPacket->header.sender = node->persistentConfig.nodeId;
-	outPacket->moduleId = moduleId;
-	outPacket->actionType = StatusModuleActionResponseMessages::NEARBY_NODES;
+	u8 packetSize = (u8)(numMeasurements * 3);
+	DYNAMIC_ARRAY(buffer, packetSize);
 
 	u16 j = 0;
 	for(int i=0; i<NUM_NODE_MEASUREMENTS; i++)
@@ -183,8 +179,8 @@ void StatusReporterModule::SendNearbyNodes(nodeID toNode, u8 messageType)
 			nodeID sender = nodeMeasurements[i].nodeId;
 			i8 rssi = (i8)(nodeMeasurements[i].rssiSum / nodeMeasurements[i].packetCount);
 
-			memcpy(outPacket->data + j*3 + 0, &sender, 2);
-			memcpy(outPacket->data + j*3 + 2, &rssi, 1);
+			memcpy(buffer + j*3 + 0, &sender, 2);
+			memcpy(buffer + j*3 + 2, &rssi, 1);
 
 			j++;
 		}
@@ -193,42 +189,80 @@ void StatusReporterModule::SendNearbyNodes(nodeID toNode, u8 messageType)
 	//Clear node measurements
 	memset(nodeMeasurements, 0x00, sizeof(nodeMeasurements));
 
-	cm->SendMessageToReceiver(NULL, buffer, packetSize, false);
+	SendModuleActionMessage(
+		messageType,
+		toNode,
+		StatusModuleActionResponseMessages::NEARBY_NODES,
+		0,
+		buffer,
+		packetSize,
+		false
+	);
 }
 
 
 //This method sends information about the current connections over the network
 void StatusReporterModule::SendAllConnections(nodeID toNode, u8 messageType)
 {
-	//Build response and send
-	u16 packetSize = SIZEOF_CONN_PACKET_MODULE + SIZEOF_STATUS_REPORTER_MODULE_CONNECTIONS_MESSAGE;
-	u8 buffer[packetSize];
-	connPacketModule* outPacket = (connPacketModule*)buffer;
+	StatusReporterModuleConnectionsMessage message;
+	memset(&message, 0x00, sizeof(StatusReporterModuleConnectionsMessage));
 
-	outPacket->header.messageType = MESSAGE_TYPE_MODULE_ACTION_RESPONSE;
-	outPacket->header.receiver = NODE_ID_BROADCAST;
-	outPacket->header.sender = node->persistentConfig.nodeId;
+	MeshConnections conn = GS->cm->GetMeshConnections(ConnectionDirection::CONNECTION_DIRECTION_INVALID);
 
-	outPacket->moduleId = moduleId;
-	outPacket->actionType = StatusModuleActionResponseMessages::ALL_CONNECTIONS;
+	u8* buffer = (u8*)&message;
+	for(u32 i=0; i<conn.count; i++){
+		memcpy(buffer + i*3, &conn.connections[i]->partnerId, 2);
+		i8 avgRssi = conn.connections[i]->GetAverageRSSI();
+		memcpy(buffer + i*3 + 2, &avgRssi, 1);
+	}
 
-	StatusReporterModuleConnectionsMessage* outPacketData = (StatusReporterModuleConnectionsMessage*)(outPacket->data);
-
-	outPacketData->partner1 = cm->connections[0]->partnerId;
-	outPacketData->partner2 = cm->connections[1]->partnerId;
-	outPacketData->partner3 = cm->connections[2]->partnerId;
-	outPacketData->partner4 = cm->connections[3]->partnerId;
-
-	outPacketData->rssi1 = cm->connections[0]->GetAverageRSSI();
-	outPacketData->rssi2 = cm->connections[1]->GetAverageRSSI();
-	outPacketData->rssi3 = cm->connections[2]->GetAverageRSSI();
-	outPacketData->rssi4 = cm->connections[3]->GetAverageRSSI();
-
-
-	cm->SendMessageToReceiver(NULL, buffer, packetSize, true);
+	SendModuleActionMessage(
+		MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+		NODE_ID_BROADCAST,
+		StatusModuleActionResponseMessages::ALL_CONNECTIONS,
+		0,
+		(u8*)&message,
+		SIZEOF_STATUS_REPORTER_MODULE_CONNECTIONS_MESSAGE,
+		false
+	);
 }
 
-void StatusReporterModule::StartConnectionRSSIMeasurement(Connection* connection){
+void StatusReporterModule::SendRebootReason(nodeID toNode)
+{
+	SendModuleActionMessage(
+		MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+		toNode,
+		StatusModuleActionResponseMessages::REBOOT_REASON,
+		0,
+		(u8*)GS->ramRetainStructPtr,
+		SIZEOF_RAM_RETAIN_STRUCT - sizeof(u32), //crc32 not needed
+		false
+	);
+}
+void StatusReporterModule::SendErrors(nodeID toNode){
+	StatusReporterModuleErrorLogEntryMessage data;
+	for(int i=0; i< Logger::getInstance()->errorLogPosition; i++){
+		data.errorType = Logger::getInstance()->errorLog[i].errorType;
+		data.extraInfo = Logger::getInstance()->errorLog[i].extraInfo;
+		data.errorCode = Logger::getInstance()->errorLog[i].errorCode;
+		data.timestamp = Logger::getInstance()->errorLog[i].timestamp;
+
+		SendModuleActionMessage(
+			MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+			toNode,
+			StatusModuleActionResponseMessages::ERROR_LOG_ENTRY,
+			0,
+			(u8*)&data,
+			SIZEOF_STATUS_REPORTER_MODULE_ERROR_LOG_ENTRY_MESSAGE,
+			false
+		);
+	}
+
+	//Reset the error log
+	Logger::getInstance()->errorLogPosition = 0;
+}
+
+void StatusReporterModule::StartConnectionRSSIMeasurement(MeshConnection* connection){
 	u32 err = 0;
 
 	if (connection->isConnected())
@@ -248,7 +282,7 @@ void StatusReporterModule::StartConnectionRSSIMeasurement(Connection* connection
 	}
 }
 
-void StatusReporterModule::StopConnectionRSSIMeasurement(Connection* connection){
+void StatusReporterModule::StopConnectionRSSIMeasurement(MeshConnection* connection){
 	u32 err = 0;
 
 	if (connection->isConnected())
@@ -271,19 +305,21 @@ void StatusReporterModule::BleEventHandler(ble_evt_t* bleEvent){
 	//New RSSI measurement for connection received
 	if(bleEvent->header.evt_id == BLE_GAP_EVT_RSSI_CHANGED)
 	{
-		Connection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gap_evt.conn_handle);
-		i8 rssi = bleEvent->evt.gap_evt.params.rssi_changed.rssi;
+		BaseConnection* connection = cm->GetConnectionFromHandle(bleEvent->evt.gap_evt.conn_handle);
+		if (connection != NULL) {
+			i8 rssi = bleEvent->evt.gap_evt.params.rssi_changed.rssi;
 
-		connection->rssiSamplesNum++;
-		connection->rssiSamplesSum += rssi;
+			connection->rssiSamplesNum++;
+			connection->rssiSamplesSum += rssi;
 
-		if(connection->rssiSamplesNum > 50){
-			connection->rssiAverage = connection->rssiSamplesSum / connection->rssiSamplesNum;
+			if (connection->rssiSamplesNum > 50) {
+				connection->rssiAverage = connection->rssiSamplesSum / connection->rssiSamplesNum;
 
-			connection->rssiSamplesNum = 0;
-			connection->rssiSamplesSum = 0;
+				connection->rssiSamplesNum = 0;
+				connection->rssiSamplesSum = 0;
 
-			//logt("STATUSMOD", "New RSSI average %d", connection->rssiAverage);
+				//logt("STATUSMOD", "New RSSI average %d", connection->rssiAverage);
+			}
 		}
 	} else if(bleEvent->header.evt_id == BLE_GAP_EVT_ADV_REPORT){
 
@@ -303,6 +339,10 @@ void StatusReporterModule::BleEventHandler(ble_evt_t* bleEvent){
 
 					for(int i=0; i<NUM_NODE_MEASUREMENTS; i++){
 						if(nodeMeasurements[i].nodeId == packet->payload.sender){
+							if(nodeMeasurements[i].packetCount == UINT16_MAX){
+								nodeMeasurements[i].packetCount = 0;
+								nodeMeasurements[i].rssiSum = 0;
+							}
 							nodeMeasurements[i].packetCount++;
 							nodeMeasurements[i].rssiSum += bleEvent->evt.gap_evt.params.adv_report.rssi;
 							found = true;
@@ -324,27 +364,44 @@ void StatusReporterModule::BleEventHandler(ble_evt_t* bleEvent){
 				}
 		}
 
+	} else if(bleEvent->header.evt_id == BLE_GATTC_EVT_TIMEOUT){
+		SendModuleActionMessage(
+				MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+				0,
+				StatusModuleActionResponseMessages::DISCONNECT_REASON,
+				0,
+				NULL,
+				0,
+				false
+			);
+
+
+	} else if(bleEvent->header.evt_id == BLE_GAP_EVT_DISCONNECTED){
+
 	}
 }
-;
 
-bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
+bool StatusReporterModule::TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs)
 {
-
-	if(commandName == "rssistart")
+	if(commandName == "rebootreason")
 	{
-		for (int i = 0; i < Config->meshMaxConnections; i++)
-		{
-			StartConnectionRSSIMeasurement(cm->connections[i]);
+		SendRebootReason(0);
+		return true;
+	}
+	else if(commandName == "rssistart")
+	{
+		MeshConnections conn = GS->cm->GetMeshConnections(ConnectionDirection::CONNECTION_DIRECTION_INVALID);
+		for(u32 i=0; i<conn.count; i++){
+			StartConnectionRSSIMeasurement(conn.connections[i]);
 		}
 
 		return true;
 	}
 	else if(commandName == "rssistop")
 	{
-		for (int i = 0; i < Config->meshMaxConnections; i++)
-		{
-			StopConnectionRSSIMeasurement(cm->connections[i]);
+		MeshConnections conn = GS->cm->GetMeshConnections(ConnectionDirection::CONNECTION_DIRECTION_INVALID);
+			for(u32 i=0; i<conn.count; i++){
+			StopConnectionRSSIMeasurement(conn.connections[i]);
 		}
 
 		return true;
@@ -429,12 +486,40 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 
 				return true;
 			}
+			else if(commandArgs.size() == 3 && commandArgs[2] == "keep_alive")
+			{
+				SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					destinationNode,
+					StatusModuleTriggerActionMessages::SET_KEEP_ALIVE,
+					0,
+					NULL,
+					0,
+					false
+				);
+
+				return true;
+			}
 			else if(commandArgs.size() == 3 && commandArgs[2] == "get_errors")
 			{
 				SendModuleActionMessage(
 					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
 					destinationNode,
 					StatusModuleTriggerActionMessages::GET_ERRORS,
+					0,
+					NULL,
+					0,
+					false
+				);
+
+				return true;
+			}
+			else if(commandArgs.size() == 3 && commandArgs[2] == "get_rebootreason")
+			{
+				SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					destinationNode,
+					StatusModuleTriggerActionMessages::GET_REBOOT_REASON,
 					0,
 					NULL,
 					0,
@@ -450,11 +535,10 @@ bool StatusReporterModule::TerminalCommandHandler(string commandName, vector<str
 	return Module::TerminalCommandHandler(commandName, commandArgs);
 }
 
-
-void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
+void StatusReporterModule::MeshMessageReceivedHandler(MeshConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
 {
 	//Must call superclass for handling
-	Module::ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
+	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
 	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
 		connPacketModule* packet = (connPacketModule*)packetHeader;
@@ -487,6 +571,9 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 			else if(packet->actionType == StatusModuleTriggerActionMessages::SET_INITIALIZED)
 			{
 				node->initializedByGateway = true;
+				GS->ramRetainStructPtr->rebootReason = 0;
+				FruityHal::ClearRebootReason();
+
 				SendModuleActionMessage(
 					MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
 					packet->header.sender,
@@ -497,26 +584,19 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 					false
 				);
 			}
+			else if(packet->actionType == StatusModuleTriggerActionMessages::SET_KEEP_ALIVE)
+			{
+				FruityHal::FeedWatchdog();
+			}
 			//Send back the errors
 			else if(packet->actionType == StatusModuleTriggerActionMessages::GET_ERRORS)
 			{
-				StatusReporterModuleErrorLogEntryMessage data;
-				for(int i=0; i< Logger::errorLogPosition; i++){
-					data.errorType = Logger::errorLog[i].errorType;
-					data.extraInfo = Logger::errorLog[i].extraInfo;
-					data.errorCode = Logger::errorLog[i].errorCode;
-					data.timestamp = Logger::errorLog[i].timestamp;
-
-					SendModuleActionMessage(
-						MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
-						packet->header.sender,
-						StatusModuleActionResponseMessages::ERROR_LOG_ENTRY,
-						0,
-						(u8*)&data,
-						SIZEOF_STATUS_REPORTER_MODULE_ERROR_LOG_ENTRY_MESSAGE,
-						false
-					);
-				}
+				SendErrors(packet->header.sender);
+			}
+			//Send back the reboot reason
+			else if(packet->actionType == StatusModuleTriggerActionMessages::GET_REBOOT_REASON)
+			{
+				SendRebootReason(packet->header.sender);
 			}
 		}
 	}
@@ -533,7 +613,7 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 			if(packet->actionType == StatusModuleActionResponseMessages::ALL_CONNECTIONS)
 			{
 				StatusReporterModuleConnectionsMessage* packetData = (StatusReporterModuleConnectionsMessage*) (packet->data);
-				uart("STATUSMOD", "{\"type\":\"connections\",\"nodeId\":%d,\"module\":%d,\"partners\":[%d,%d,%d,%d],\"rssiValues\":[%d,%d,%d,%d]}" SEP, packet->header.sender, moduleId, packetData->partner1, packetData->partner2, packetData->partner3, packetData->partner4, packetData->rssi1, packetData->rssi2, packetData->rssi3, packetData->rssi4);
+				logjson("STATUSMOD", "{\"type\":\"connections\",\"nodeId\":%d,\"module\":%d,\"partners\":[%d,%d,%d,%d],\"rssiValues\":[%d,%d,%d,%d]}" SEP, packet->header.sender, moduleId, packetData->partner1, packetData->partner2, packetData->partner3, packetData->partner4, packetData->rssi1, packetData->rssi2, packetData->rssi3, packetData->rssi4);
 			}
 			else if(packet->actionType == StatusModuleActionResponseMessages::DEVICE_INFO)
 			{
@@ -542,13 +622,13 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 
 				u8* addr = data->accessAddress.addr;
 
-				uart("STATUSMOD", "{\"nodeId\":%u,\"type\":\"device_info\",\"module\":%d,", packet->header.sender, moduleId);
-				uart("STATUSMOD", "\"dBmRX\":%u,\"dBmTX\":%u,", data->dBmRX, data->dBmTX);
-				uart("STATUSMOD", "\"deviceType\":%u,\"manufacturerId\":%u,", data->deviceType, data->manufacturerId);
-				uart("STATUSMOD", "\"networkId\":%u,\"nodeVersion\":%u,", data->networkId, data->nodeVersion);
-				uart("STATUSMOD", "\"chipId\":\"%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\",", data->chipId[0], data->chipId[1], data->chipId[2], data->chipId[3], data->chipId[4], data->chipId[5], data->chipId[6], data->chipId[7]);
-				uart("STATUSMOD", "\"serialNumber\":\"%.*s\",\"accessAddress\":\"%02X:%02X:%02X:%02X:%02X:%02X\"", SERIAL_NUMBER_LENGTH, data->serialNumber, addr[5], addr[4], addr[3], addr[2], addr[1], addr[0]);
-				uart("STATUSMOD", "}" SEP);
+				logjson("STATUSMOD", "{\"nodeId\":%u,\"type\":\"device_info\",\"module\":%d,", packet->header.sender, moduleId);
+				logjson("STATUSMOD", "\"dBmRX\":%d,\"dBmTX\":%d,\"calibratedTX\":%d,", data->dBmRX, data->dBmTX, data->calibratedTX);
+				logjson("STATUSMOD", "\"deviceType\":%u,\"manufacturerId\":%u,", data->deviceType, data->manufacturerId);
+				logjson("STATUSMOD", "\"networkId\":%u,\"nodeVersion\":%u,", data->networkId, data->nodeVersion);
+				logjson("STATUSMOD", "\"chipId\":\"%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\",", data->chipId[0], data->chipId[1], data->chipId[2], data->chipId[3], data->chipId[4], data->chipId[5], data->chipId[6], data->chipId[7]);
+				logjson("STATUSMOD", "\"serialNumber\":\"%.*s\",\"accessAddress\":\"%02X:%02X:%02X:%02X:%02X:%02X\"", NODE_SERIAL_NUMBER_LENGTH, data->serialNumber, addr[5], addr[4], addr[3], addr[2], addr[1], addr[0]);
+				logjson("STATUSMOD", "}" SEP);
 
 			}
 			else if(packet->actionType == StatusModuleActionResponseMessages::STATUS)
@@ -556,19 +636,19 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 				//Print packet to console
 				StatusReporterModuleStatusMessage* data = (StatusReporterModuleStatusMessage*) (packet->data);
 
-				uart("STATUSMOD", "{\"nodeId\":%u,\"type\":\"status\",\"module\":%d,", packet->header.sender, moduleId);
-				uart("STATUSMOD", "\"batteryInfo\":%u,\"clusterSize\":%u,", data->batteryInfo, data->clusterSize);
-				uart("STATUSMOD", "\"connectionLossCounter\":%u,\"freeIn\":%u,", data->connectionLossCounter, data->freeIn);
-				uart("STATUSMOD", "\"freeOut\":%u,\"inConnectionPartner\":%u,", data->freeOut, data->inConnectionPartner);
-				uart("STATUSMOD", "\"inConnectionRSSI\":%d, \"initialized\":%u", data->inConnectionRSSI, data->initializedByGateway);
-				uart("STATUSMOD", "}" SEP);
+				logjson("STATUSMOD", "{\"nodeId\":%u,\"type\":\"status\",\"module\":%d,", packet->header.sender, moduleId);
+				logjson("STATUSMOD", "\"batteryInfo\":%u,\"clusterSize\":%u,", data->batteryInfo, data->clusterSize);
+				logjson("STATUSMOD", "\"connectionLossCounter\":%u,\"freeIn\":%u,", data->connectionLossCounter, data->freeIn);
+				logjson("STATUSMOD", "\"freeOut\":%u,\"inConnectionPartner\":%u,", data->freeOut, data->inConnectionPartner);
+				logjson("STATUSMOD", "\"inConnectionRSSI\":%d, \"initialized\":%u", data->inConnectionRSSI, data->initializedByGateway);
+				logjson("STATUSMOD", "}" SEP);
 			}
 			else if(packet->actionType == StatusModuleActionResponseMessages::NEARBY_NODES)
 			{
 				//Print packet to console
-				uart("STATUSMOD", "{\"nodeId\":%u,\"type\":\"nearby_nodes\",\"module\":%u,\"nodes\":[", packet->header.sender, moduleId);
+				logjson("STATUSMOD", "{\"nodeId\":%u,\"type\":\"nearby_nodes\",\"module\":%u,\"nodes\":[", packet->header.sender, moduleId);
 
-				u16 nodeCount = (dataLength - SIZEOF_CONN_PACKET_MODULE) / 3;
+				u16 nodeCount = (sendData->dataLength - SIZEOF_CONN_PACKET_MODULE) / 3;
 				bool first = true;
 				for(int i=0; i<nodeCount; i++){
 					u16 nodeId;
@@ -577,31 +657,42 @@ void StatusReporterModule::ConnectionPacketReceivedEventHandler(connectionPacket
 					memcpy(&nodeId, packet->data + i*3+0, 2);
 					memcpy(&rssi, packet->data + i*3+2, 1);
 					if(!first){
-						uart("STATUSMOD", ",");
+						logjson("STATUSMOD", ",");
 					}
-					uart("STATUSMOD", "{\"nodeId\":%u,\"rssi\":%d}", nodeId, rssi);
+					logjson("STATUSMOD", "{\"nodeId\":%u,\"rssi\":%d}", nodeId, rssi);
 					first = false;
 				}
 
-				uart("STATUSMOD", "]}" SEP);
+				logjson("STATUSMOD", "]}" SEP);
 			}
 			else if(packet->actionType == StatusModuleActionResponseMessages::SET_INITIALIZED_RESULT)
 			{
-				uart("STATUSMOD", "{\"type\":\"set_init_result\",\"nodeId\":%u,\"module\":%u}" SEP, packet->header.sender, moduleId);
+				logjson("STATUSMOD", "{\"type\":\"set_init_result\",\"nodeId\":%u,\"module\":%u}" SEP, packet->header.sender, moduleId);
 			}
 			else if(packet->actionType == StatusModuleActionResponseMessages::ERROR_LOG_ENTRY)
 			{
 				StatusReporterModuleErrorLogEntryMessage* data = (StatusReporterModuleErrorLogEntryMessage*) (packet->data);
 
-				uart("STATUSMOD", "{\"type\":\"error_log_entry\",\"nodeId\":%u,\"module\":%u,", packet->header.sender, moduleId);
-				uart("STATUSMOD", "\"errType\":%u,\"code\":%u,\"extra\":%u,\"time\":%u", data->errorType, data->errorCode, data->extraInfo, data->timestamp);
-				uart("STATUSMOD", "}" SEP);
+				logjson("STATUSMOD", "{\"type\":\"error_log_entry\",\"nodeId\":%u,\"module\":%u,", packet->header.sender, moduleId);
+				logjson("STATUSMOD", "\"errType\":%u,\"code\":%u,\"extra\":%u,\"time\":%u", data->errorType, data->errorCode, data->extraInfo, data->timestamp);
+				logjson("STATUSMOD", "}" SEP);
+			}
+			else if(packet->actionType == StatusModuleActionResponseMessages::REBOOT_REASON)
+			{
+				RamRetainStruct* data = (RamRetainStruct*) (packet->data);
+
+				logjson("STATUSMOD", "{\"type\":\"reboot_reason\",\"nodeId\":%u,\"module\":%u,", packet->header.sender, moduleId);
+				logjson("STATUSMOD", "\"reason\":%u,\"code1\":%u,\"code2\":%u,\"code3\":%u,\"stack\":[", data->rebootReason, data->code1, data->code2, data->code3);
+				for(u8 i=0; i<data->stacktraceSize; i++){
+					logjson("STATUSMOD", (i < data->stacktraceSize-1) ? "%x," : "%x", data->stacktrace[i]);
+				}
+				logjson("STATUSMOD", "]}" SEP);
 			}
 		}
 	}
 }
 
-void StatusReporterModule::MeshConnectionChangedHandler(Connection* connection)
+void StatusReporterModule::MeshConnectionChangedHandler(MeshConnection* connection)
 {
 	//New connection has just been made
 	if(connection->handshakeDone()){
@@ -617,5 +708,7 @@ void StatusReporterModule::MeshConnectionChangedHandler(Connection* connection)
 
 void StatusReporterModule::ButtonHandler(u8 buttonId, u32 holdTime)
 {
-	logt("STATUSMOD", "Button %u clicked for %u", buttonId, holdTime);
+
 }
+
+#endif

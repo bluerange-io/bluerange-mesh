@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <Module.h>
 
+
 class EnrollmentModule: public Module
 {
 	private:
@@ -33,7 +34,6 @@ class EnrollmentModule: public Module
 		struct EnrollmentModuleConfiguration : ModuleConfiguration{
 			u8 enrollmentState;
 			//Insert more persistent config values here
-			u32 reserved; //Mandatory, read Module.h
 		};
 		#pragma pack(pop)
 
@@ -41,14 +41,21 @@ class EnrollmentModule: public Module
 
 		u32 rebootTimeDs;
 
-		enum enrollmentStates {NOT_ENROLLED, ENROLLED};
+		enum EnrollmentModuleSaveActions { SAVE_ENROLLMENT_ACTION };
 
-		enum enrollmentMethods {BY_NODE_ID=0, BY_CHIP_ID=1, BY_SERIAL=2};
+		enum enrollmentStates { NOT_ENROLLED, ENROLLED };
 
+		enum enrollmentMethods { BY_NODE_ID = 0, BY_CHIP_ID = 1, BY_SERIAL = 2 };
 
+		struct SaveEnrollmentAction {
+			nodeID sender;
+			u8 enrollmentMethod;
+			u8 requestHandle;
+		};
+		
 		enum EnrollmentModuleTriggerActionMessages{
-			SET_ENROLLMENT_BY_NODE_ID=0,
-			SET_ENROLLMENT_BY_CHIP_ID=1,
+			//SET_ENROLLMENT_BY_NODE_ID=0, => Deprecated since 0.5
+			//SET_ENROLLMENT_BY_CHIP_ID=1, => Deprecated since 0.5
 			SET_ENROLLMENT_BY_SERIAL=2
 		};
 
@@ -60,30 +67,10 @@ class EnrollmentModule: public Module
 		#pragma pack(push)
 		#pragma pack(1)
 
-			#define SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_NODE_ID_MESSAGE 20
+			#define SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE (20+NODE_SERIAL_NUMBER_LENGTH)
 			typedef struct
 			{
-				nodeID nodeId;
-				networkID networkId;
-				u8 networkKey[16];
-
-			}EnrollmentModuleSetEnrollmentByNodeIdMessage;
-
-			#define SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_CHIP_ID_MESSAGE 28
-			typedef struct
-			{
-				u32 chipIdA;
-				u32 chipIdB;
-				nodeID nodeId;
-				networkID networkId;
-				u8 networkKey[16];
-
-			}EnrollmentModuleSetEnrollmentByChipIdMessage;
-
-			#define SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE (20+SERIAL_NUMBER_LENGTH)
-			typedef struct
-			{
-				u8 serialNumber[SERIAL_NUMBER_LENGTH];
+				u8 serialNumber[NODE_SERIAL_NUMBER_LENGTH];
 				nodeID newNodeId;
 				networkID newNetworkId;
 				u8 newNetworkKey[16];
@@ -92,12 +79,12 @@ class EnrollmentModule: public Module
 
 
 			//Answers
-			#define SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_RESPONSE (10+SERIAL_NUMBER_LENGTH)
+			#define SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_RESPONSE (10+NODE_SERIAL_NUMBER_LENGTH)
 			typedef struct
 			{
 				u8 enrollmentMethod;
 				u8 result;
-				u8 serialNumber[SERIAL_NUMBER_LENGTH];
+				u8 serialNumber[NODE_SERIAL_NUMBER_LENGTH];
 
 			}EnrollmentModuleEnrollmentResponse;
 
@@ -110,7 +97,8 @@ class EnrollmentModule: public Module
 
 
 	public:
-		EnrollmentModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+
+		EnrollmentModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name);
 
 		void ConfigurationLoadedHandler();
 
@@ -120,9 +108,11 @@ class EnrollmentModule: public Module
 
 		//void BleEventHandler(ble_evt_t* bleEvent);
 
-		void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
+		void MeshMessageReceivedHandler(MeshConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader);
 
 		//void NodeStateChangedHandler(discoveryState newState);
 
-		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+		bool TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs);
+
+		void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength);
 };

@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -28,55 +28,107 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 #include <types.h>
+#include <GlobalState.h>
 #include <adv_packets.h>
-#include <Node.h>
 
 extern "C"{
 #include <ble.h>
 #include <ble_gap.h>
 }
 
+enum AdvJobTypes {
+	ADV_JOB_TYPE_INVALID,
+	ADV_JOB_TYPE_SCHEDULED, //Automatically scheduled with other jobs
+	ADV_JOB_TYPE_IMMEDIATE //Will be executed immediately until done
+
+};
+
+typedef struct AdvJob {
+	AdvJobTypes type;
+	//For Scheduler
+	u8 slots; //Number of slots this advertising message will get (1-10), 0 = Invalid
+	u8 delay; //Number of slots that this message will be delayed
+	u16 advertisingInterval; //In units of 0.625ms
+
+	//Internal Scheduling
+	u8 currentSlots;
+	u8 currentDelay;
+
+	//Advertising Data
+	i8 advertisingType; //BLE_GAP_ADV_TYPES
+	u8 advData[31];
+	u8 advDataLength;
+	u8 scanData[31];
+	u8 scanDataLength;
+
+} AdvJob;
+
+
+#define ADVERTISING_CONTROLLER_MAX_NUM_JOBS 3
+
 class AdvertisingController
 {
 private:
 	AdvertisingController();
-	static AdvertisingController* instance;
+
+	u32 sumSlots;
+	u16 currentAdvertisingInterval;
+
+	//The address that should be used for advertising, the Least Significant Byte
+	//May be changed by the advertiser to account for different advertising services
+	fh_ble_gap_addr_t baseGapAddress;
 
 public:
 
-	static advState advertisingState; //The current state of advertising
+	AdvJob jobs[ADVERTISING_CONTROLLER_MAX_NUM_JOBS];
 
-	static AdvertisingController* getInstance();
-	~AdvertisingController();
+	enum AdvertisingState {
+		ADVERTISING_STATE_DISABLED,
+		ADVERTISING_STATE_ENABLED
+	};
 
-	//The currently used parameters for advertising
-	static ble_gap_adv_params_t currentAdvertisingParams;
+	enum AdvertisingStateAction {
+		ADVERTISING_STATE_ACTION_OK,
+		ADVERTISING_STATE_ACTION_SHOULD_DISABLE,
+		ADVERTISING_STATE_ACTION_SHOULD_RESTART,
+	};
 
-	//The current advertisement packet and its header
-	static u8 currentAdvertisementPacket[40];
-	static u8 currentScanResponsePacket[40];
-	static advPacketHeader* header;
-	static scanPacketHeader* scanHeader;
-	static u8 currentAdvertisementPacketLength;
+	AdvertisingState advertisingState;
+	AdvertisingStateAction advertisingStateAction;
 
-	static bool advertisingPacketAwaitingUpdate; //If there was an error updating the packet
-
-
-
-	static void Initialize(u16 networkIdentifier);
-	static u32 UpdateAdvertisingData(u8 messageType, sizedData* payload, bool connectable);
-	static u32 SetScanResponse(sizedData* payload);
-	static void SetAdvertisingState(advState newState);
-	static void AdvertisingInterruptedBecauseOfIncomingConnectionHandler(void);
-	static bool AdvertiseEventHandler(ble_evt_t* bleEvent);
+	fh_ble_gap_adv_params_t currentAdvertisingParams;
+	u8 currentNumJobs;
 
 
+	AdvJob* jobToSet;
 
-	static bool SetScanResponseData(Node* node, string dataString);
+	static AdvertisingController* getInstance(){
+		if(!GS->advertisingController){
+			GS->advertisingController = new AdvertisingController();
+		}
+		return GS->advertisingController;
+	}
 
-	//FIXME: Only for testing, should be managed in a better way
-	static void SetConnectable();
-	static void SetNonConnectable();
+
+	void Initialize();
+
+	//Job Scheduling
+	void InitJobScheduling();
+	AdvJob* AddJob(AdvJob* job);
+	void RefreshJob(AdvJob* jobHandle);
+	void RemoveJob(AdvJob* jobHandle);
+	AdvJob* DetermineCurrentAdvertisingJob();
+
+	//Change Advertising with Softdevice
+	void SetAdvertisingData();
+	void SetAdvertisingState(AdvJob* job);
+
+
+	void TimerHandler(u16 passedTimeDs);
+
+	void Test();
+
+	bool AdvertiseEventHandler(ble_evt_t* bleEvent);
 
 
 };

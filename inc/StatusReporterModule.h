@@ -1,6 +1,6 @@
 /**
 
- Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+ Copyright (c) 2014-2017 "M-Way Solutions GmbH"
  FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
  This file is part of FruityMesh
@@ -46,11 +46,11 @@ class StatusReporterModule: public Module
 				u8 advertisingRSSISamplingMode; //typeof RSSISampingModes
 				u16 nearbyReportingIntervalDs;
 				u16 deviceInfoReportingIntervalDs;
+
 				//Insert more persistent config values here
-				u32 reserved; //Mandatory, read Module.h
 		};
 		#pragma pack(pop)
-
+		
 		DECLARE_CONFIG_AND_PACKED_STRUCT(StatusReporterModuleConfiguration);
 
 		enum StatusModuleTriggerActionMessages
@@ -61,7 +61,9 @@ class StatusReporterModule: public Module
 			GET_ALL_CONNECTIONS = 3,
 			GET_NEARBY_NODES = 4,
 			SET_INITIALIZED = 5,
-			GET_ERRORS = 6
+			GET_ERRORS = 6,
+			GET_REBOOT_REASON = 8,
+			SET_KEEP_ALIVE = 9
 		};
 
 		enum StatusModuleActionResponseMessages
@@ -72,7 +74,9 @@ class StatusReporterModule: public Module
 			ALL_CONNECTIONS = 3,
 			NEARBY_NODES = 4,
 			SET_INITIALIZED_RESULT = 5,
-			ERROR_LOG_ENTRY = 6
+			ERROR_LOG_ENTRY = 6,
+			DISCONNECT_REASON = 7,
+			REBOOT_REASON = 8
 		};
 
 		//####### Module specific message structs (these need to be packed)
@@ -90,29 +94,30 @@ class StatusReporterModule: public Module
 			typedef struct
 			{
 				nodeID partner1;
-				nodeID partner2;
-				nodeID partner3;
-				nodeID partner4;
 				i8 rssi1;
+				nodeID partner2;
 				i8 rssi2;
+				nodeID partner3;
 				i8 rssi3;
+				nodeID partner4;
 				i8 rssi4;
 
 			} StatusReporterModuleConnectionsMessage;
 
 			//This message delivers non- (or not often)changing information
-			#define SIZEOF_STATUS_REPORTER_MODULE_DEVICE_INFO_MESSAGE (25 + SERIAL_NUMBER_LENGTH)
+			#define SIZEOF_STATUS_REPORTER_MODULE_DEVICE_INFO_MESSAGE (27 + NODE_SERIAL_NUMBER_LENGTH)
 			typedef struct
 			{
 				u16 manufacturerId;
-				u8 serialNumber[SERIAL_NUMBER_LENGTH];
+				u8 serialNumber[NODE_SERIAL_NUMBER_LENGTH];
 				u8 chipId[8];
-				ble_gap_addr_t accessAddress;
+				fh_ble_gap_addr_t accessAddress;
 				networkID networkId;
 				u32 nodeVersion;
-				u8 dBmRX;
-				u8 dBmTX;
+				i8 dBmRX;
+				i8 dBmTX;
 				u8 deviceType;
+				i8 calibratedTX;
 
 			} StatusReporterModuleDeviceInfoMessage;
 
@@ -153,12 +158,14 @@ class StatusReporterModule: public Module
 		void SendDeviceInfo(nodeID toNode, u8 messageType);
 		void SendNearbyNodes(nodeID toNode, u8 messageType);
 		void SendAllConnections(nodeID toNode, u8 messageType);
+		void SendErrors(nodeID toNode);
+		void SendRebootReason(nodeID toNode);
 
-		void StartConnectionRSSIMeasurement(Connection* connection);
-		void StopConnectionRSSIMeasurement(Connection* connection);
+		void StartConnectionRSSIMeasurement(MeshConnection* connection);
+		void StopConnectionRSSIMeasurement(MeshConnection* connection);
 
 	public:
-		StatusReporterModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		StatusReporterModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name);
 
 		void ConfigurationLoadedHandler();
 
@@ -166,14 +173,14 @@ class StatusReporterModule: public Module
 
 		void TimerEventHandler(u16 passedTimeDs, u32 appTimerDs);
 
-		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+		bool TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs);
 
-		void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
+		void MeshMessageReceivedHandler(MeshConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader);
 
 		void BleEventHandler(ble_evt_t* bleEvent);
 
 		void ButtonHandler(u8 buttonId, u32 holdTime);
 
-		void MeshConnectionChangedHandler(Connection* connection);
+		void MeshConnectionChangedHandler(MeshConnection* connection);
 
 };

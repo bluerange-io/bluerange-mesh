@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -27,116 +27,126 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
-#include <Connection.h>
-#include <types.h>
+#include <GAPController.h>
+#include <GATTController.h>
+#include <BaseConnection.h>
+#include <AppConnection.h>
+#ifdef ACTIVATE_CLC_MODULE
+#include <ClcAppConnection.h>
+#endif
+#include <MeshConnection.h>
 
 extern "C"{
 #include <ble.h>
 }
 
-class ConnectionManagerCallback{
-	public:
-		ConnectionManagerCallback();
-		virtual ~ConnectionManagerCallback();
-		virtual void DisconnectionHandler(Connection* connection) = 0;
-		virtual void ConnectionSuccessfulHandler(ble_evt_t* bleEvent) = 0;
-		virtual void ConnectingTimeoutHandler(ble_evt_t* bleEvent) = 0;
-		virtual void messageReceivedCallback(connectionPacket* inPacket) = 0;
-};
+typedef struct BaseConnections{
+	u8 count;
+	BaseConnection* connections[MAX_NUM_CONNECTIONS];
+} BaseConnections;
+typedef struct MeshConnections{
+	u8 count;
+	MeshConnection* connections[MESH_IN_CONNECTIONS + MESH_OUT_CONNECTIONS];
+} MeshConnections;
+#ifdef ACTIVATE_CLC_MODULE
+typedef struct ClcAppConnections{
+	u8 count;
+	ClcAppConnection* connections[APP_IN_CONNECTIONS + APP_OUT_CONNECTIONS];
+} ClcAppConnections;
+#endif
 
-class ConnectionManager
+typedef BaseConnection* (*ConnTypeResolver)(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8* data);
+
+class ConnectionManager: public GAPControllerHandler, public GATTControllerHandler
 {
 	private:
 		ConnectionManager();
-		static ConnectionManager* instance;
-
-		//Used within the send methods
-		void QueuePacket(Connection* connection, u8* data, u16 dataLength, bool reliable);
+		
+		//Used within the send methods to put data
+		void QueuePacket(BaseConnection* connection, u8* data, u8 dataLength, bool reliable);
 
 		//Checks wether a successful connection is from a reestablishment
-		Connection* IsConnectionReestablishment(ble_evt_t* bleEvent);
-
-		//An outConnection is initialized before being connected (saved here during initializing phase)
-		Connection* pendingConnection;
+		BaseConnection* IsConnectionReestablishment(ble_evt_t* bleEvent);
 
 	public:
 		static ConnectionManager* getInstance(){
-			if(!instance){
-				instance = new ConnectionManager();
+			if(!GS->cm){
+				GS->cm = new ConnectionManager();
 			}
-			return instance;
+			return GS->cm;
 		}
-
-		Node* node;
-
-		ConnectionManagerCallback* connectionManagerCallback;
 
 		//This method is called when empty buffers are available and there is data to send
 		void fillTransmitBuffers();
-		void fillTransmitBuffersOld();
 
-		void setConnectionManagerCallback(ConnectionManagerCallback* cb);
+		u8 freeMeshInConnections;
+		u8 freeMeshOutConnections;
 
-		bool doHandshake;
+		BaseConnection* pendingConnection;
 
-		u8 freeInConnections;
-		u8 freeOutConnections;
-
-		Connection* inConnection;
-		Connection* outConnections[MESH_OUT_CONNECTIONS];
-
-		Connection* connections[MESH_IN_CONNECTIONS + MESH_OUT_CONNECTIONS];
-
-		Connection* getFreeConnection();
-		u32 getNumConnections();
+		//ConnectionType Resolving
+		void ResolveConnection(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8* data);
 
 
-		Connection* ConnectAsMaster(nodeID partnerId, ble_gap_addr_t* address, u16 writeCharacteristicHandle);
+		BaseConnections GetBaseConnections(ConnectionDirection direction);
+		MeshConnections GetMeshConnections(ConnectionDirection direction);
+		BaseConnections GetConnectionsOfType(ConnectionTypes connectionType, ConnectionDirection direction);
+
+		BaseConnection* allConnections[MESH_IN_CONNECTIONS + MESH_OUT_CONNECTIONS + APP_IN_CONNECTIONS + APP_OUT_CONNECTIONS];
+
+		BaseConnection** getFreeConnectionSpot();
+
+		void ConnectAsMaster(nodeID partnerId, fh_ble_gap_addr_t* address, u16 writeCharacteristicHandle);
 
 		void Disconnect(u16 connectionHandle);
-		void ForceDisconnectOtherConnections(Connection* connection);
-
+		void ForceDisconnectOtherMeshConnections(MeshConnection* connection);
 
 		int ReestablishConnections();
 
 		//Functions used for sending messages
-		bool SendMessage(Connection* connection, u8* data, u16 dataLength, bool reliable);
-		void SendMessageOverConnections(Connection* ignoreConnection, u8* data, u16 dataLength, bool reliable);
-		void SendMessageToReceiver(Connection* originConnection, u8* data, u16 dataLength, bool reliable);
+		void SendMeshMessage(u8* data, u8 dataLength, DeliveryPriority priority, bool reliable);
 
-		//Do not use this function because it will send packets to connections whose handshake is not yet finished
-		bool SendHandshakeMessage(Connection* connection, u8* data, u16 dataLength, bool reliable);
+		void BroadcastMeshPacket(u8* data, u8 dataLength, DeliveryPriority priority, bool reliable);
 
-		Connection* GetConnectionFromHandle(u16 connectionHandle);
-		Connection* GetFreeOutConnection();
+		void RouteMeshData(MeshConnection* connection, BaseConnectionSendData* sendData, u8* data);
+		void BroadcastMeshData(MeshConnection* ignoreConnection, BaseConnectionSendData* sendData, u8* data);
 
-		Connection* GetConnectionToShortestSink(Connection* excludeConnection);
-		clusterSIZE GetHopsToShortestSink(Connection* excludeConnection);
+		BaseConnection* GetConnectionFromHandle(u16 connectionHandle);
+
+		MeshConnection* GetMeshConnectionToShortestSink(MeshConnection* excludeConnection);
+		clusterSIZE GetMeshHopsToShortestSink(MeshConnection* excludeConnection);
 
 		u16 GetPendingPackets();
 
-		void SetConnectionInterval(u16 connectionInterval);
+		void SetMeshConnectionInterval(u16 connectionInterval);
+
+		void DeleteConnection(BaseConnection* connection);
+
+		//Connection callbacks
+		void ConnectingTimeoutHandler(ble_evt_t* bleEvent);
+		void MessageReceivedCallback(BaseConnectionSendData* sendData, u8* data);
 
 		//These methods can be accessed by the Connection classes
 
 		//GAPController Handlers
-		static void DisconnectionHandler(ble_evt_t* bleEvent);
-		static void ConnectionSuccessfulHandler(ble_evt_t* bleEvent);
-		static void ConnectionEncryptedHandler(ble_evt_t* bleEvent);
-		static void ConnectingTimeoutHandler(ble_evt_t* bleEvent);
+		void GapConnectingTimeoutHandler(ble_evt_t* bleEvent);
+		void GapConnectionConnectedHandler(ble_evt_t* bleEvent);
+		void GapConnectionEncryptedHandler(ble_evt_t* bleEvent);
+		void GapConnectionDisconnectedHandler(ble_evt_t* bleEvent);
 
 		//Other handler
-		void FinalDisconnectionHandler(Connection* connection);
+		void FinalDisconnectionHandler(BaseConnection* connection);
 
 		//GATTController Handlers
-		static void messageReceivedCallback(ble_evt_t* bleEvent);
-		static void handleDiscoveredCallback(u16 connectionHandle, u16 characteristicHandle);
-		static void dataTransmittedCallback(ble_evt_t* bleEvent);
+		void GattDataReceivedHandler(ble_evt_t* bleEvent);
+		void GATTHandleDiscoveredHandler(u16 connectionHandle, u16 characteristicHandle);
+		void GATTDataTransmittedHandler(ble_evt_t* bleEvent);
 
-		void PacketSuccessfullyQueuedCallback(Connection* connection, sizedData packetData);
+		void PacketSuccessfullyQueuedCallback(MeshConnection* connection, sizedData packetData);
 
 		//Callbacks are kinda complicated, so we handle BLE events directly in this class
 		void BleEventHandler(ble_evt_t* bleEvent);
+		void TimerEventHandler(u16 passedTimeDs, u32 appTimerDs);
 
 };
 

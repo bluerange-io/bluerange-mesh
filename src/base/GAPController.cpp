@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -34,19 +34,16 @@ extern "C"{
 #include <ble.h>
 #include <ble_gap.h>
 #include <ble_hci.h>
-#include <ble_radio_notification.h>
 }
 
 
 
 
-//Initialize
-void (*GAPController::connectionSuccessCallback)(ble_evt_t* bleEvent);
-void (*GAPController::connectionEncryptedCallback)(ble_evt_t* bleEvent);
-void (*GAPController::connectingTimeoutCallback)(ble_evt_t* bleEvent);
-void (*GAPController::disconnectionCallback)(ble_evt_t* bleEvent);
-
-bool GAPController::currentlyConnecting = false;
+GAPController::GAPController()
+{
+	currentlyConnecting = false;
+	gapControllerHandler = NULL;
+}
 
 //This function configures the Generic access Profile
 //GAP is a service that must be implemented on all BLE devices
@@ -65,7 +62,7 @@ void GAPController::bleConfigureGAP(){
 	BLE_GAP_CONN_SEC_MODE_SET_OPEN(&secPermissionOpen);
 
 	//Set the GAP device name
-	err = sd_ble_gap_device_name_set(&secPermissionOpen, (u8*)DEVICE_NAME, strlen(DEVICE_NAME));
+	err = sd_ble_gap_device_name_set(&secPermissionOpen, (u8*)DEVICE_NAME, (u16)strlen(DEVICE_NAME));
 	APP_ERROR_CHECK(err); //OK
 
 	//Set the appearance of the device as defined in http://developer.nordicsemi.com/nRF51_SDK/doc/7.1.0/s110/html/a00837.html
@@ -81,13 +78,11 @@ void GAPController::bleConfigureGAP(){
 	gapConnectionParams.conn_sup_timeout = Config->meshConnectionSupervisionTimeout;
 	err = sd_ble_gap_ppcp_set(&gapConnectionParams);
 	APP_ERROR_CHECK(err); //OK
-
-
 }
 
 
 //Connect to a specific peripheral
-bool GAPController::connectToPeripheral(ble_gap_addr_t* address, u16 connectionInterval, u16 timeout)
+bool GAPController::connectToPeripheral(fh_ble_gap_addr_t* address, u16 connectionInterval, u16 timeout)
 {
 	if(currentlyConnecting) return false;
 
@@ -95,22 +90,22 @@ bool GAPController::connectToPeripheral(ble_gap_addr_t* address, u16 connectionI
 
 	u32 err = 0;
 
-	ble_gap_scan_params_t scan_params;
-	ble_gap_conn_params_t conn_params;
+	fh_ble_gap_scan_params_t scanParams;
+	memset(&scanParams, 0x00, sizeof(scanParams));
+	fh_ble_gap_conn_params_t connectionParams;
+	memset(&connectionParams, 0x00, sizeof(connectionParams));
 
-	scan_params.selective = 0;
-	scan_params.active = 0; /* No active scanning */
-	scan_params.interval = Config->meshConnectingScanInterval;
-	scan_params.window = Config->meshConnectingScanWindow;
-	scan_params.timeout = timeout;
+	scanParams.interval = Config->meshConnectingScanInterval;
+	scanParams.window = Config->meshConnectingScanWindow;
+	scanParams.timeout = timeout;
 
-	conn_params.min_conn_interval = connectionInterval;
-	conn_params.max_conn_interval = connectionInterval;
-	conn_params.slave_latency = Config->meshPeripheralSlaveLatency;
-	conn_params.conn_sup_timeout = Config->meshConnectionSupervisionTimeout;
+	connectionParams.min_conn_interval = connectionInterval;
+	connectionParams.max_conn_interval = connectionInterval;
+	connectionParams.slave_latency = Config->meshPeripheralSlaveLatency;
+	connectionParams.conn_sup_timeout = Config->meshConnectionSupervisionTimeout;
 
 	//Connect to the peripheral
-	err = sd_ble_gap_connect(address, &scan_params, &conn_params);
+	err = FruityHal::BleGapConnect(address, &scanParams, &connectionParams);
 	if(err != NRF_SUCCESS){
 		logt("ERROR", "GATT fail %d", err);
 		//Just ignore it, the connection will not happen
@@ -118,7 +113,7 @@ bool GAPController::connectToPeripheral(ble_gap_addr_t* address, u16 connectionI
 	}
 
 	//Set scan state off. Connecting uses scan itself and deactivates the scan procedure
-	ScanController::scanningState = SCAN_STATE_OFF;
+	ScanController::getInstance()->scanningState = SCAN_STATE_OFF;
 
 	logt("CONN", "pairing");
 
@@ -155,15 +150,12 @@ bool GAPController::bleConnectionEventHandler(ble_evt_t* bleEvent)
 	{
 		currentlyConnecting = false;
 
-		// Our advertisement stopped because we received a connection on this packet (we are peripheral)
-		if (bleEvent->evt.gap_evt.params.connected.role == BLE_GAP_ROLE_PERIPH){
-			AdvertisingController::AdvertisingInterruptedBecauseOfIncomingConnectionHandler();
-		}
-
 		logt("C", "Connected device");
 
 		//Connection stops advertising
-		connectionSuccessCallback(bleEvent);
+		if(gapControllerHandler != NULL){
+			gapControllerHandler->GapConnectionConnectedHandler(bleEvent);
+		}
 
 		return true;
 	}
@@ -171,7 +163,9 @@ bool GAPController::bleConnectionEventHandler(ble_evt_t* bleEvent)
 	case BLE_GAP_EVT_DISCONNECTED:
 	{
 		logt("C", "Disconnected device %d", bleEvent->evt.gap_evt.params.disconnected.reason);
-		disconnectionCallback(bleEvent);
+		if(gapControllerHandler != NULL){
+			gapControllerHandler->GapConnectionDisconnectedHandler(bleEvent);
+		}
 
 		return true;
 	}
@@ -182,8 +176,9 @@ bool GAPController::bleConnectionEventHandler(ble_evt_t* bleEvent)
 		if (bleEvent->evt.gap_evt.params.timeout.src == BLE_GAP_TIMEOUT_SRC_CONN)
 		{
 			currentlyConnecting = false;
-
-			connectingTimeoutCallback(bleEvent);
+			if(gapControllerHandler != NULL){
+				gapControllerHandler->GapConnectingTimeoutHandler(bleEvent);
+			}
 		}
 		break;
 	}
@@ -199,6 +194,7 @@ bool GAPController::bleConnectionEventHandler(ble_evt_t* bleEvent)
 
 		//This is our security key
 		ble_gap_enc_info_t key;
+		key.lesc = 0;
 		key.auth = 1; //This key is authenticated
 		memcpy(&key.ltk, Node::getInstance()->persistentConfig.networkKey, 16); //Copy our mesh network key
 		key.ltk_len = 16;
@@ -212,7 +208,7 @@ bool GAPController::bleConnectionEventHandler(ble_evt_t* bleEvent)
 		);
 		APP_ERROR_CHECK(err); //TODO: Error handling
 
-		logt("SEC", "SEC_INFO_REQUEST received, replying with key. result %d",  err);
+		logt("SEC", "SEC_INFO_REQUEST received, replying with key %02x:%02x:%02x...%02x:%02x. result %d", key.ltk[0], key.ltk[1], key.ltk[2], key.ltk[14], key.ltk[15], err);
 
 		break;
 	}
@@ -226,13 +222,30 @@ bool GAPController::bleConnectionEventHandler(ble_evt_t* bleEvent)
 
 		logt("SEC", "Connection key is now %u bytes, level %u, securityMode %u", keySize, level, securityMode);
 
-		if(connectionEncryptedCallback) connectionEncryptedCallback(bleEvent);
+		if(gapControllerHandler != NULL){
+			gapControllerHandler->GapConnectionEncryptedHandler(bleEvent);
+		}
+		break;
+	}
 
+#ifdef NRF52
+	case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
+	{
+		ble_gap_phys_t phy;
+		phy.rx_phys = BLE_GAP_PHY_1MBPS;
+		phy.tx_phys = BLE_GAP_PHY_1MBPS;
 
+		err = sd_ble_gap_phy_update(bleEvent->evt.gap_evt.conn_handle, &phy);
 
 		break;
-
 	}
+	case BLE_GAP_EVT_DATA_LENGTH_UPDATE_REQUEST:
+	{
+		err = sd_ble_gap_data_length_update(bleEvent->evt.gap_evt.conn_handle, NULL, NULL);
+
+		break;
+	}
+#endif
 
 	default:
 		break;
@@ -240,24 +253,9 @@ bool GAPController::bleConnectionEventHandler(ble_evt_t* bleEvent)
 	return false;
 }
 
-void GAPController::setConnectingTimeoutHandler(void (*callback)(ble_evt_t* bleEvent))
+void GAPController::setGAPControllerHandler(GAPControllerHandler* handler)
 {
-	connectingTimeoutCallback = callback;
-}
-
-void GAPController::setConnectionSuccessfulHandler(void (*callback)(ble_evt_t* bleEvent))
-{
-	connectionSuccessCallback = callback;
-}
-
-void GAPController::setConnectionEncryptedHandler(void (*callback)(ble_evt_t* bleEvent))
-{
-	connectionEncryptedCallback = callback;
-}
-
-void GAPController::setDisconnectionHandler(void (*callback)(ble_evt_t* bleEvent))
-{
-	disconnectionCallback = callback;
+	gapControllerHandler = handler;
 }
 
 void GAPController::startEncryptingConnection(u16 connectionHandle)
@@ -268,12 +266,12 @@ void GAPController::startEncryptingConnection(u16 connectionHandle)
 	//We do not need a key identification currently, because we only have one
 	ble_gap_master_id_t keyId;
 	keyId.ediv = 0;
-	memset(&keyId.rand, 0, 16);
+	memset(&keyId.rand, 0x00, BLE_GAP_SEC_RAND_LEN);
 
 	//Our mesh network key
 	ble_gap_enc_info_t key;
 	key.auth = 1;
-	memcpy(&key.ltk, Node::getInstance()->persistentConfig.networkKey, 16);
+	memcpy(&key.ltk, Node::getInstance()->persistentConfig.networkKey, BLE_GAP_SEC_KEY_LEN);
 	key.ltk_len = 16;
 
 

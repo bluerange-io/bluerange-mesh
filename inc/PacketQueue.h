@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -41,9 +41,12 @@ private:
 public:
 //really public
 	PacketQueue(u8* buffer, u16 bufferLength);
-    bool Put(u8* data, u8 dataLength, bool reliable);
+	u8* Reserve(u8 dataLength);
+    bool Put(u8* data, u8 dataLength);
 	sizedData PeekNext();
 	void DiscardNext();
+	sizedData PeekLast();
+	void DiscardLast();
 	void Clean(void);
 
 	//private

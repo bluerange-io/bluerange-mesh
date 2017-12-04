@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -35,7 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define SCAN_FILTER_NUMBER 1 //Number of filters that can be set
 #define NUM_ADDRESSES_TRACKED 50
 
-#define NUM_ASSET_PACKETS 10
+#define NUM_ASSET_PACKETS 30
+#define ASSET_PACKET_RSSI_SEND_THRESHOLD -88
 
 #define SCAN_BUFFERS_SIZE 10 //Max number of packets that are buffered
 
@@ -45,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		{
 			u8 active;
 			u8 grouping;
-			ble_gap_addr_t address;
+			fh_ble_gap_addr_t address;
 			i8 minRSSI;
 			i8 maxRSSI;
 			u8 advertisingType;
@@ -70,7 +71,7 @@ class ScanningModule: public Module
 
 		typedef struct
 		{
-			ble_gap_addr_t address;
+			fh_ble_gap_addr_t address;
 			u32 rssiSum;
 			u16 count;
 		} scannedPacket;
@@ -78,8 +79,8 @@ class ScanningModule: public Module
 		typedef struct
 		{
 			u16 assetId;
-			u32 rssiSum;
-			u16 count;
+			u16 rssiSum;
+			u8 count;
 		} scannedAssetTrackingPacket;
 
 		#pragma pack(push, 1)
@@ -89,7 +90,6 @@ class ScanningModule: public Module
 			u16 assetReportingIntervalDs;
 			i8 groupedPacketRssiThreshold;
 			//Insert more persistent config values here
-			u32 reserved; //Mandatory, read Module.h
 		};
 		#pragma pack(pop)
 
@@ -150,6 +150,7 @@ class ScanningModule: public Module
 		void SendReport();
 
 		bool isAssetTrackingData(u8* data, u8 dataLength);
+		bool addTrackedAsset(u16 assetId, i8 rssi);
 		void resetAssetTrackingTable();
 		void SendTrackedAssets();
 		bool isAssetTrackingDataFromiOSDeviceInForegroundMode(u8* data, u8 dataLength);
@@ -170,7 +171,7 @@ class ScanningModule: public Module
 
 
 	public:
-		ScanningModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		ScanningModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name);
 
 		void ConfigurationLoadedHandler();
 
@@ -182,7 +183,7 @@ class ScanningModule: public Module
 
 		void NodeStateChangedHandler(discoveryState newState);
 
-		void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
+		void MeshMessageReceivedHandler(MeshConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader);
 
-		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+		bool TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs);
 };

@@ -10,7 +10,16 @@ SERIAL_DEVICE ?= /dev/ttyACM0  # FIXME Use proper matching for OSX compatiblity
 
 OUTPUT_FILENAME = $(PROJECT_NAME)
 
-NRF5_SDK_PATH ?= $(HOME)/nrf/sdk/nrf5_sdk_latest
+# NRF51 and NRF52 need different SDKs because the latest SDK isn't compatible with nRF51 anymore
+NRF51_SDK_PATH ?= $(HOME)/nrf/sdk/nrf_sdk_11_0
+NRF52_SDK_PATH ?= $(HOME)/nrf/sdk/nrf5_sdk_14
+
+ifeq ($(BOARD),NRF51_BOARD)
+NRF5_SDK_PATH = $(NRF51_SDK_PATH)
+else
+NRF5_SDK_PATH = $(NRF52_SDK_PATH)
+endif
+
 COMPONENTS     = $(NRF5_SDK_PATH)/components
 TEMPLATE_PATH  = $(COMPONENTS)/toolchain/gcc
 
@@ -54,12 +63,8 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 #source common to all targets
 C_SOURCE_FILES += $(COMPONENTS)/ble/ble_radio_notification/ble_radio_notification.c
 C_SOURCE_FILES += $(COMPONENTS)/drivers_nrf/common/nrf_drv_common.c
-C_SOURCE_FILES += $(COMPONENTS)/drivers_nrf/pstorage/pstorage.c
 C_SOURCE_FILES += $(COMPONENTS)/drivers_nrf/gpiote/nrf_drv_gpiote.c
 C_SOURCE_FILES += $(COMPONENTS)/libraries/timer/app_timer.c
-C_SOURCE_FILES += $(COMPONENTS)/softdevice/common/softdevice_handler/softdevice_handler.c
-C_SOURCE_FILES += src/nrf/simple_uart.c
-C_SOURCE_FILES += src/nrf/crc16.c
 C_SOURCE_FILES += src/segger_rtt/RTT_Syscalls_GCC.c
 C_SOURCE_FILES += src/segger_rtt/SEGGER_RTT.c
 
@@ -86,11 +91,11 @@ INC_PATHS += -I$(COMPONENTS)/drivers_nrf/common
 INC_PATHS += -I$(COMPONENTS)/drivers_nrf/delay
 INC_PATHS += -I$(COMPONENTS)/drivers_nrf/gpiote
 INC_PATHS += -I$(COMPONENTS)/drivers_nrf/hal
-INC_PATHS += -I$(COMPONENTS)/drivers_nrf/pstorage
 INC_PATHS += -I$(COMPONENTS)/libraries/button
 INC_PATHS += -I$(COMPONENTS)/libraries/timer
 INC_PATHS += -I$(COMPONENTS)/libraries/util
 INC_PATHS += -I$(COMPONENTS)/libraries/uart
+INC_PATHS += -I$(COMPONENTS)/softdevice/common/
 INC_PATHS += -I$(COMPONENTS)/softdevice/common/softdevice_handler
 INC_PATHS += -I$(COMPONENTS)/toolchain
 INC_PATHS += -I$(COMPONENTS)/toolchain/gcc
@@ -118,6 +123,8 @@ BUILD_DIRECTORIES := $(sort $(OBJECT_DIRECTORY) $(OUTPUT_BINARY_DIRECTORY) $(LIS
 # Debug flags
 ifeq ($(BUILD_TYPE),debug)
   DEBUG_FLAGS += -D DEBUG -Os -g
+else ifeq ($(BUILD_TYPE),fulldebug)
+  DEBUG_FLAGS += -D DEBUG -Og -g
 else
   DEBUG_FLAGS += -D NDEBUG -Os
 endif
@@ -126,7 +133,7 @@ endif
 include Makefile.$(PLATFORM)
 
 # Flags common to all targets
-CFLAGS += -mcpu=$(CPU) -mthumb -fmessage-length=0 -fsigned-char
+CFLAGS += -mcpu=$(CPU) -mthumb -fmessage-length=0 -fsigned-char -funwind-tables
 CFLAGS += -ffunction-sections -fdata-sections -flto -fno-move-loop-invariants
 CFLAGS += -Wextra -DBLE_STACK_SUPPORT_REQD $(DEBUG_FLAGS) -D$(BOARD)
 CFLAGS += -D$(PLATFORM) -D__need___va_list
@@ -252,7 +259,7 @@ serial:
 	# FIXME use proper tools for multiple platforms
 	$(NO_ECHO)screen $(SERIAL_DEVICE) 38400
 
-.NOTPARALLEL: clean
+#.NOTPARALLEL: clean (Does not work because http://stackoverflow.com/questions/16829933/how-to-use-makefile-with-notparallel-label)
 .PHONY: flash flash_softdevice clean serial debug
 
 -include $(DEPEND)

@@ -1,6 +1,24 @@
 /**
- OS_LICENSE_PLACEHOLDER
- */
+
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
+FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
+
+This file is part of FruityMesh
+
+FruityMesh is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+*/
 
 #include <Node.h>
 #include <ScanController.h>
@@ -13,27 +31,14 @@ extern "C"
 #include <app_error.h>
 }
 
-
-
-
-scanState ScanController::scanningState = SCAN_STATE_OFF; //The current state of scanning
-
-//The currently used parameters for scanning
-ble_gap_scan_params_t currentScanParams;
-
-void ScanController::Initialize(void)
+ScanController::ScanController()
 {
-
 	//Define scanning Parameters
-	currentScanParams.active = 0;					// Active scanning set.
-	currentScanParams.selective = 0;				// Selective scanning not set.
-	currentScanParams.p_whitelist = NULL;				// White-list not set.
 	currentScanParams.interval = (u16) Config->meshScanIntervalHigh;				// Scan interval.
 	currentScanParams.window = (u16) Config->meshScanWindowHigh;	// Scan window.
 	currentScanParams.timeout = 0;					// Never stop scanning unless explicit asked to.
 
 	scanningState = SCAN_STATE_OFF;
-
 }
 
 
@@ -46,7 +51,7 @@ void ScanController::SetScanState(scanState newState)
 	//Stop scanning to either leave it stopped or update it
 	if (scanningState != SCAN_STATE_OFF)
 	{
-		err = sd_ble_gap_scan_stop();
+		err = FruityHal::BleGapScanStop();
 		if(err != NRF_SUCCESS){
 			//We'll just ignore NRF_ERROR_INVALID_STATE and hope that scanning is stopped
 		}
@@ -68,7 +73,7 @@ void ScanController::SetScanState(scanState newState)
 
 	if (newState != SCAN_STATE_OFF)
 	{
-		err = sd_ble_gap_scan_start(&currentScanParams);
+		err = FruityHal::BleGapScanStart(&currentScanParams);
 		if(err == NRF_SUCCESS){
 			logt("C", "Scanning started");
 		} else {
@@ -85,7 +90,7 @@ void ScanController::SetScanDutyCycle(u16 interval, u16 window){
 	u32 err;
 	if (scanningState != SCAN_STATE_OFF)
 	{
-		err = sd_ble_gap_scan_stop();
+		err = FruityHal::BleGapScanStop();
 		if(err != NRF_SUCCESS){
 			//We'll just ignore NRF_ERROR_INVALID_STATE and hope that scanning is stopped
 		}
@@ -97,7 +102,7 @@ void ScanController::SetScanDutyCycle(u16 interval, u16 window){
 		currentScanParams.interval = interval;
 		currentScanParams.window = window;
 
-		err = sd_ble_gap_scan_start(&currentScanParams);
+		err = FruityHal::BleGapScanStart(&currentScanParams);
 		if(err == NRF_SUCCESS){
 			logt("C", "Scanning started");
 		} else {
@@ -106,9 +111,6 @@ void ScanController::SetScanDutyCycle(u16 interval, u16 window){
 		}
 	}
 }
-
-//BLE addresses, 6 Byte (48bit), can be either random, public, etc...
-ble_gap_addr_t blePeripheralAdresses[1] = { BLE_GAP_ADDR_TYPE_RANDOM_STATIC, { 0x25, 0xED, 0xA4, 0x6B, 0xC6, 0xE7 } /*0xD91220800D00*/};
 
 //If a BLE event occurs, this handler will be called to do the work
 bool ScanController::ScanEventHandler(ble_evt_t * bleEvent)

@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -27,7 +27,9 @@ extern "C"{
 #include <nrf_soc.h>
 #include <nrf_error.h>
 #include <stdlib.h>
+#ifndef __ICCARM__
 #include <malloc.h>
+#endif
 }
 
 u32 Utility::GetRandomInteger(void)
@@ -51,10 +53,12 @@ u32 Utility::GetRandomInteger(void)
 
 void Utility::CheckFreeHeap(void)
 {
+#ifdef __GNUC__
 	struct mallinfo used = mallinfo();
 	u32 size = used.uordblks + used.hblkhd;
 
-	uart("NODE", "{\"heap\":%u}" SEP, size);
+	logjson("NODE", "{\"heap\":%u}" SEP, size);
+#endif
 }
 
 //buffer should have a length of 15 bytes
@@ -78,3 +82,85 @@ void Utility::GetVersionStringFromInts(u16 major, char* outputBuffer)
 	sprintf(outputBuffer, "%u.%u.%u", major, minor, patch);
 
 }*/
+
+
+uint8_t Utility::CalculateCrc8(u8* data, u16 dataLength)
+{
+	uint8_t CRC = 0x00;
+	uint16_t tmp;
+
+	while (dataLength > 0)
+	{
+		tmp = CRC << 1;
+		tmp += *data;
+		CRC = (tmp & 0xFF) + (tmp >> 8);
+		data++;
+		--dataLength;
+	}
+
+	return CRC;
+}
+
+//void Utility::CalculateCRC16
+/**@brief Function for calculating CRC-16 in blocks.
+ *
+ * Feed each consecutive data block into this function, along with the current value of p_crc as
+ * returned by the previous call of this function. The first call of this function should pass NULL
+ * as the initial value of the crc in p_crc.
+ *
+ * @param[in] p_data The input data block for computation.
+ * @param[in] size   The size of the input data block in bytes.
+ * @param[in] p_crc  The previous calculated CRC-16 value or NULL if first call.
+ *
+ * @return The updated CRC-16 value, based on the input supplied.
+ */
+uint16_t Utility::CalculateCrc16(const uint8_t * p_data, uint32_t size, const uint16_t * p_crc){
+	uint32_t i;
+	uint16_t crc = (p_crc == NULL) ? 0xffff : *p_crc;
+
+	for (i = 0; i < size; i++)
+	{
+		crc  = (unsigned char)(crc >> 8) | (crc << 8);
+		crc ^= p_data[i];
+		crc ^= (unsigned char)(crc & 0xff) >> 4;
+		crc ^= (crc << 8) << 4;
+		crc ^= ((crc & 0xff) << 4) << 1;
+	}
+
+	return crc;
+}
+
+//Taken from http://www.hackersdelight.org/hdcodetxt/crc.c.txt
+u32 Utility::CalculateCrc32(u8* message, i32 messageLength) {
+#pragma warning( push )
+#pragma warning( disable : 4146)
+   i32 i, j;
+   unsigned int byte, crc, mask;
+
+   i = 0;
+   crc = 0xFFFFFFFF;
+   while (i < messageLength) {
+	  byte = message[i];            // Get next byte.
+	  crc = crc ^ byte;
+	  for (j = 7; j >= 0; j--) {    // Do eight times.
+		 mask = -(crc & 1);
+		 crc = (crc >> 1) ^ (0xEDB88320 & mask);
+	  }
+	  i = i + 1;
+   }
+   return ~crc;
+#pragma warning( pop ) 
+}
+
+//Encrypts a message
+void Utility::Aes128BlockEncrypt(Aes128Block* messageBlock, Aes128Block* key, Aes128Block* encryptedMessage)
+{
+	u32 err;
+
+	nrf_ecb_hal_data_t blockToEncrypt;
+	memcpy(blockToEncrypt.key, key->data, 16);
+	memcpy(blockToEncrypt.cleartext, messageBlock->data, 16);
+
+	err = sd_ecb_block_encrypt(&blockToEncrypt);
+	memcpy(encryptedMessage->data, blockToEncrypt.ciphertext, 16);
+}

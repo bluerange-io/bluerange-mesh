@@ -48,28 +48,21 @@ ENTRY(Reset_Handler)
 SECTIONS
 {
 	/* Code region starts here with 1024bytes of interrupt vector table */
-	.ivector : ALIGN(4)
+	.text : ALIGN(4)
 	{
-		__text_start__ = .;
 		__application_start_address = .;
-		
 		KEEP(*(.isr_vector))
+		
+		. = __application_start_address + 0x400; /* constant offset to keep version at same address */
 
-		FILL(0xff)  /* fill unsused area to have consistant checksum */
-		. = __text_start__ + 0x400;
-	} > FLASH 
-	
-	/* Some bytes general information about the app */
-	.AppInfo : ALIGN(4)
-	{
 		KEEP(*(.Version))
 		KEEP(*(.AppSize))
 		KEEP(*(.BootloaderAddress))
+		
+		PROVIDE(__start_conn_type_resolvers = .);
+		KEEP(*(.ConnTypeResolvers))
+		PROVIDE(__stop_conn_type_resolvers = .);
 
-	} > FLASH
-	
-	.text : ALIGN(4)
-	{
 		KEEP(*(.init))
 		KEEP(*(.fini))
 
@@ -191,6 +184,13 @@ SECTIONS
 	} > RAM
 
         __bss_size__ = SIZEOF(.bss);
+        
+    .noinit (NOLOAD): ALIGN(4)
+	{
+		__noinit_start__ = .;
+		*(.noinit .noinit.*)
+		__noinit_end__ = .;
+	} > RAM
 
 	.heap : ALIGN(4)
 	{

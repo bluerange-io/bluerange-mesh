@@ -1,13 +1,31 @@
 /**
- OS_LICENSE_PLACEHOLDER
- */
+
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
+FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
+
+This file is part of FruityMesh
+
+FruityMesh is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+*/
 
 #include <Logger.h>
 #include <ScanController.h>
 #include <ScanningModule.h>
 #include <Utility.h>
-#include <Storage.h>
 #include <Node.h>
+#include <stdlib.h>
 
 extern "C"
 {
@@ -17,11 +35,10 @@ extern "C"
 //This implementation is currently very basic and should just illustrate how
 //such functionality could be implemented
 
-ScanningModule::ScanningModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot) :
-		Module(moduleId, node, cm, name, storageSlot)
+ScanningModule::ScanningModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name) :
+		Module(moduleId, node, cm, name)
 {
 	//Register callbacks n' stuff
-	Logger::getInstance().enableTag("SCANMOD");
 
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
@@ -46,7 +63,7 @@ void ScanningModule::ConfigurationLoadedHandler()
 	Module::ConfigurationLoadedHandler();
 
 	//Version migration can be added here
-	if (configuration.moduleVersion == 1)
+	if (configuration.moduleVersion == this->moduleVersion)
 	{/* ... */
 	};
 
@@ -65,9 +82,11 @@ void ScanningModule::ConfigurationLoadedHandler()
 
 void ScanningModule::ResetToDefaultConfiguration()
 {
+	moduleVersion = 1;
+
 	//Set default configuration values
 	configuration.moduleId = moduleId;
-	configuration.moduleActive = true;
+	configuration.moduleActive = false;
 	configuration.moduleVersion = 1;
 
 	//Set additional config values...
@@ -101,8 +120,8 @@ bool ScanningModule::setScanFilter(scanFilterEntry* filter)
 
 			return true;
 		}
-		return false;
 	}
+	return false;
 }
 
 void ScanningModule::TimerEventHandler(u16 passedTimeDs, u32 appTimerDs)
@@ -160,40 +179,55 @@ void ScanningModule::SendReport()
 		memcpy(data.data + 0, &totalDevices, 4);
 		memcpy(data.data + 4, &totalRSSI, 4);
 
-		cm->SendMessageToReceiver(NULL, (u8*) &data, SIZEOF_CONN_PACKET_MODULE + 8, false);
+		SendModuleActionMessage(
+			MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+			NODE_ID_BROADCAST,
+			ScanModuleMessages::TOTAL_SCANNED_PACKETS,
+			0,
+			(u8*)&data,
+			SIZEOF_CONN_PACKET_MODULE + 8,
+			false
+		);
 	}
 }
 
 void ScanningModule::SendTrackedAssets()
 {
-	//Do not send a packet if no assets have been tracked
-	if(assetPackets[0].assetId == 0){
-		return;
-	}
+	ScanModuleTrackedAssetsMessage message = {0, 0, 0};
+	u8 counter = 0;
+	bool packetFull = false;
+	for(int i=0; i<NUM_ASSET_PACKETS; i++){
+		if(assetPackets[i].assetId == 0) break;
 
-	//FIXME: only send best three trackings
-	ScanModuleTrackedAssetsMessage message;
-	for(int i=0; i<3; i++){
-		message.trackedAssets[i].assetId = assetPackets[i].assetId;
-		message.trackedAssets[i].rssiAvg = -(assetPackets[i].rssiSum / assetPackets[i].count);
-		message.trackedAssets[i].packetCount = assetPackets[i].count;
-	}
+		i8 avg = -(assetPackets[i].rssiSum / assetPackets[i].count);
+		if(avg > ASSET_PACKET_RSSI_SEND_THRESHOLD){
+			message.trackedAssets[counter].assetId = assetPackets[i].assetId;
+			message.trackedAssets[counter].rssiAvg = avg;
+			message.trackedAssets[counter].packetCount = assetPackets[i].count;
+			if(counter == 2) packetFull = true;
+			counter = (counter + 1) % 3;
+		}
+		//Send if: packet full, end of buffer or next buffer item is empty
+		if(packetFull || i + 1 == NUM_ASSET_PACKETS || assetPackets[i+1].assetId == 0){
+			packetFull = false;
 
-	SendModuleActionMessage(
-		MESSAGE_TYPE_MODULE_GENERAL,
-		NODE_ID_BROADCAST,
-		ScanModuleMessages::ASSET_TRACKING_PACKET,
-		0,
-		(u8*)&message,
-		SIZEOF_SCAN_MODULE_TRACKED_ASSETS_MESSAGE,
-		false
-	);
+			SendModuleActionMessage(
+					MESSAGE_TYPE_MODULE_GENERAL,
+					NODE_ID_BROADCAST,
+					ScanModuleMessages::ASSET_TRACKING_PACKET,
+					0,
+					(u8*)&message,
+					SIZEOF_SCAN_MODULE_TRACKED_ASSETS_MESSAGE,
+					false
+				);
+		}
+	}
 }
 
-void ScanningModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength)
+void ScanningModule::MeshMessageReceivedHandler(MeshConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
 {
 	//Must call superclass for handling
-	Module::ConnectionPacketReceivedEventHandler(inPacket, connection, packetHeader, dataLength);
+	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
 	if (packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION)
 	{
@@ -211,7 +245,7 @@ void ScanningModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPa
 				memcpy(&totalDevices, packet->data + 0, 4);
 				memcpy(&totalRSSI, packet->data + 4, 4);
 
-				uart("SCANMOD", "{\"nodeId\":%d,\"type\":\"sum_packets\",\"module\":%d,\"packets\":%u,\"rssi\":%d}" SEP, packet->header.sender, moduleId, totalDevices, totalRSSI);
+				logjson("SCANMOD", "{\"nodeId\":%d,\"type\":\"sum_packets\",\"module\":%d,\"packets\":%u,\"rssi\":%d}" SEP, packet->header.sender, moduleId, totalDevices, totalRSSI);
 			}
 		}
 	}
@@ -222,14 +256,14 @@ void ScanningModule::ConnectionPacketReceivedEventHandler(connectionPacket* inPa
 		if(packet->actionType == ScanModuleMessages::ASSET_TRACKING_PACKET)
 		{
 			ScanModuleTrackedAssetsMessage* message = (ScanModuleTrackedAssetsMessage*)packet->data;
-			uart("SCANMOD", "{\"nodeId\":%d,\"type\":\"tracked_assets\",\"module\":%d,\"assets\":[", packet->header.sender, packet->moduleId);
+			logjson("SCANMOD", "{\"nodeId\":%d,\"type\":\"tracked_assets\",\"module\":%d,\"assets\":[", packet->header.sender, packet->moduleId);
 			for(int i=0; i<3; i++){
 				if(message->trackedAssets[i].assetId != 0){
-					if(i != 0) uart("SCANMOD", ",");
-					uart("SCANMOD", "{\"id\":%u,\"rssi\":%d,\"count\":%u}", message->trackedAssets[i].assetId, message->trackedAssets[i].rssiAvg, message->trackedAssets[i].packetCount);
+					if(i != 0) logjson("SCANMOD", ",");
+					logjson("SCANMOD", "{\"id\":%u,\"rssi\":%d,\"count\":%u}", message->trackedAssets[i].assetId, message->trackedAssets[i].rssiAvg, message->trackedAssets[i].packetCount);
 				}
 			}
-			uart("SCANMOD", "]}" SEP);
+			logjson("SCANMOD", "]}" SEP);
 		}
 	}
 }
@@ -296,20 +330,8 @@ void ScanningModule::BleEventHandler(ble_evt_t* bleEvent)
 					//Use id 7 for all iOS packets, just because
 					assetId = 7;
 				}
-				if(assetId != 0){
-					//Fill info into assetTracking table
-					for(int i = 0; i<NUM_ASSET_PACKETS; i++){
-						if(assetPackets[i].assetId == assetId || assetPackets[i].assetId == 0){
+				addTrackedAsset(assetId, rssi);
 
-							logt("SCANMOD", "Tracked packet %u in slot %u", assetId, i);
-							assetPackets[i].assetId = assetId;
-							assetPackets[i].count++;
-							assetPackets[i].rssiSum += (u32) (-rssi);
-
-							break;
-						}
-					}
-				}
 
 				//logt("SCAN", "Other packet, rssi:%d, dataLength:%d", rssi, dataLength);
 
@@ -346,7 +368,7 @@ void ScanningModule::BleEventHandler(ble_evt_t* bleEvent)
 										data.payload.packetCount = 1;
 										data.payload.inverseRssiSum = -rssi;
 
-										cm->SendMessageToReceiver(NULL, (u8*) &data, SIZEOF_CONN_PACKET_ADV_INFO, false);
+										cm->SendMeshMessage((u8*) &data, SIZEOF_CONN_PACKET_ADV_INFO, DeliveryPriority::DELIVERY_PRIORITY_LOW, false);
 
 									}
 
@@ -360,6 +382,55 @@ void ScanningModule::BleEventHandler(ble_evt_t* bleEvent)
 			}
 		}
 	}
+}
+
+bool ScanningModule::addTrackedAsset(u16 assetId, i8 rssi){
+	if(assetId == 0) return false;
+	rssi = -rssi; //Make rssi positive
+	if(rssi < 10 || rssi > 90) return false; //filter out wrong rssis
+
+	scannedAssetTrackingPacket* slot = NULL;
+
+	//Look for an old entry of this asset or a free space
+	for(int i = 0; i<NUM_ASSET_PACKETS; i++){
+		if(assetPackets[i].assetId == assetId || assetPackets[i].assetId == 0){
+			slot = &assetPackets[i];
+			break;
+		}
+	}
+
+	//Look for the worst Rssi of all old packets and check if we should overwrite it
+	if(slot == NULL){
+		u16 worstRssi = 0;
+		for(int i = 0; i<NUM_ASSET_PACKETS; i++){
+			u16 rssiAvgOldPacket = assetPackets[i].rssiSum / assetPackets[i].count;
+			if(rssiAvgOldPacket > rssi && rssiAvgOldPacket > worstRssi){
+				slot = &assetPackets[i];
+				worstRssi = rssiAvgOldPacket;
+			}
+		}
+	}
+
+	//If a slot was found, add the packet
+	if(slot != NULL){
+		u16 slotNum = ((u32)assetPackets - (u32)slot) / sizeof(scannedAssetTrackingPacket);
+		logt("SCANMOD", "Tracked packet %u in slot %u", assetId, slotNum);
+		//Clean up first, if we overwrite another assetId
+		if(slot->assetId != assetId){
+			slot->count = 0;
+			slot->rssiSum = 0;
+		}
+		slot->assetId = assetId;
+		if(slot->count == UINT8_MAX){
+			slot->count = 0;
+			slot->rssiSum = 0;
+		}
+		slot->count++;
+		slot->rssiSum += (u16) rssi;
+
+		return true;
+	}
+	return false;
 }
 
 bool ScanningModule::isAssetTrackingData(u8* data, u8 dataLength){
@@ -379,7 +450,7 @@ void ScanningModule::NodeStateChangedHandler(discoveryState newState)
 {
 	if (newState == discoveryState::BACK_OFF)
 	{
-		ScanController::SetScanState(scanState::SCAN_STATE_LOW);
+		ScanController::getInstance()->SetScanState(scanState::SCAN_STATE_LOW);
 	}
 	else
 	{
@@ -387,7 +458,7 @@ void ScanningModule::NodeStateChangedHandler(discoveryState newState)
 	}
 }
 
-bool ScanningModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
+bool ScanningModule::TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs)
 {
 	//React on commands, return true if handled, false otherwise
 	if(commandName == "send_tracked"){
@@ -397,10 +468,16 @@ bool ScanningModule::TerminalCommandHandler(string commandName, vector<string> c
 		return true;
 	}
 	if(commandName == "get_tracked"){
-		for(int i=0; i<3; i++){
-			logt("SCANMOD", "id:%u, rssi:%d, count:%u",assetPackets[i].assetId, -(assetPackets[i].rssiSum / assetPackets[i].count), assetPackets[i].count);
+		for(int i=0; i<NUM_ASSET_PACKETS; i++){
+			logt("SCANMOD", "id:%u, rssi:%d, count:%u", assetPackets[i].assetId, -(assetPackets[i].rssiSum / assetPackets[i].count), assetPackets[i].count);
 		}
 		return true;
+	}
+	if(commandName == "track"){
+		u16 assetId = atoi(commandArgs[0].c_str());
+		i8 rssi = atoi(commandArgs[1].c_str());
+
+		addTrackedAsset(assetId, rssi);
 	}
 
 
@@ -574,7 +651,9 @@ u32 ScanningModule::computeTotalRSSI()
 	}
 
 	// Compute the mean of all RSSI values for each address.
-	u32 meanRSSIsPerAddress[addressPointer];
+	DYNAMIC_ARRAY(meanRSSIsPerAddressBuffer, addressPointer);
+	u32* meanRSSIsPerAddress = (u32*) meanRSSIsPerAddressBuffer;
+
 	for (int i = 0; i < addressPointer; i++)
 	{
 		meanRSSIsPerAddress[i] = totalRSSIsPerAddress[i] / totalMessagesPerAdress[i];

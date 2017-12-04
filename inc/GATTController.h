@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -30,63 +30,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 #include <types.h>
+#include <GlobalState.h>
 
 extern "C"{
 #include <ble.h>
 #include <ble_gap.h>
 }
 
-//meshServiceStruct that contains all information about the service
-typedef struct meshServiceStruct_temporary
+class GATTControllerHandler
 {
-	u16                     		serviceHandle;
-	ble_gatts_char_handles_t		testValCharacteristicHandle;
-	ble_gatts_char_handles_t		sendMessageCharacteristicHandle;
-	u16								sendMessageCharacteristicDescriptorHandle;
-	ble_uuid_t						serviceUuid;
-	u16								connectionHandle;  // Holds the current connection handle (can only be one at a time)
-	bool							isNotifying;
-} meshServiceStruct;
+public:
+		GATTControllerHandler(){};
+	virtual ~GATTControllerHandler(){};
 
+	virtual void  GattDataReceivedHandler(ble_evt_t* bleEvent) = 0;
+	virtual void  GATTDataTransmittedHandler(ble_evt_t* bleEvent) = 0;
+
+};
 
 class GATTController
 {
 public:
+	static GATTController* getInstance(){
+		if(!GS->gattController){
+			GS->gattController = new GATTController();
+		}
+		return GS->gattController;
+	}
+
 	//FUNCTIONS
-	static void bleMeshServiceInit(void);
 
+	bool bleMeshServiceEventHandler(ble_evt_t * p_ble_evt);
+	void bleDiscoverHandles(u16 connectionHandle, ble_uuid_t* startUuid);
 
-	//Configure the callbacks
-	static void setMessageReceivedCallback(void (*callback)(ble_evt_t* bleEvent));
-	static void setHandleDiscoveredCallback(void (*callback)(u16 connectionHandle, u16 characteristicHandle));
-	static void setDataTransmittedCallback(void (*callback)(ble_evt_t* bleEvent));
+	u32 bleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable);
+	u32 bleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength);
 
-	static bool bleMeshServiceEventHandler(ble_evt_t * p_ble_evt);
-	static void bleDiscoverHandles(u16 connectionHandle);
-
-	static u32 bleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable);
-
-
-	//Returns the handle that is used to write to the mesh characteristic
-	static u16 getMeshWriteHandle();
+	void setGATTControllerHandler(GATTControllerHandler* handler);
 
 private:
-	static meshServiceStruct meshService;
+	GATTController();
 
-	static void (*messageReceivedCallback)(ble_evt_t* bleEvent);
-	static void (*handleDiscoveredCallback)(u16 connectionHandle, u16 characteristicHandle);
-	static void (*dataTransmittedCallback)(ble_evt_t* bleEvent);
+	GATTControllerHandler* gattControllerHandler;
 
 	//Private stuff only meant as forward declaration
-	static void _bleDiscoverCharacteristics(u16 startHandle, u16 endHandle);
-	static void _bleServiceDiscoveryFinishedHandler(ble_evt_t* bleEvent);
+	void _bleDiscoverCharacteristics(u16 startHandle, u16 endHandle);
+	void _bleServiceDiscoveryFinishedHandler(ble_evt_t* bleEvent);
 
-	static void _bleCharacteristicDiscoveryFinishedHandler(ble_evt_t* bleEvent);
+	void _bleCharacteristicDiscoveryFinishedHandler(ble_evt_t* bleEvent);
 
 
-	static void meshServiceConnectHandler(ble_evt_t* bleEvent);
-	static void meshServiceDisconnectHandler(ble_evt_t* bleEvent);
-	static void meshServiceWriteHandler(ble_evt_t* bleEvent);
-	static void attributeMissingHandler(ble_evt_t* bleEvent);
+	void meshServiceConnectHandler(ble_evt_t* bleEvent);
+	void meshServiceDisconnectHandler(ble_evt_t* bleEvent);
+	void attributeMissingHandler(ble_evt_t* bleEvent);
 
 };

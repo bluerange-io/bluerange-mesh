@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -39,10 +39,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <conn_packets.h>
 #include <Config.h>
+#include <Boardconfig.h>
 #include <Logger.h>
 #include <ConnectionManager.h>
 #include <Terminal.h>
-#include <Storage.h>
+#include <RecordStorage.h>
 #include <ButtonListener.h>
 
 extern "C"{
@@ -50,13 +51,12 @@ extern "C"{
 }
 
 
-
 class Node;
 
 #define MODULE_NAME_MAX_SIZE 10
 
 class Module:
-		public StorageEventListener,
+		public RecordStorageEventListener,
 		public TerminalCommandListener,
 		public ButtonListener
 {
@@ -66,27 +66,14 @@ class Module:
 protected:
 		Node* node;
 		ConnectionManager* cm;
-		u8 moduleId;
-		u16 storageSlot;
 
-		//All module configs have to be packed with #pragma pack and their declarations
-		//have to be aligned on a 4 byte boundary to be able to save them
-		struct ModuleConfiguration{
-			u8 moduleId; //Id of the module, compared upon load and must match
-			u8 moduleVersion; //version of the configuration
-			u8 moduleActive; //Activate or deactivate the module
-			u8 reserved;
-			//IMPORTANT: Each individual module configuration should add a reserved u32 at
-			//its end that is set to 0. Because we can only save data that is a
-			//multiple of 4 bytes. We use this variable to pad the data.
+		struct ModuleInformation {
+			u8 moduleId;
+			u8 moduleVersion;
 		};
-
-
-		//This function is called by the module itself when it wants to save its configuration
-		virtual void SaveModuleConfiguration();
-
+		
 		//This function is called by the module to get its configuration on startup
-		virtual void LoadModuleConfiguration();
+		void LoadModuleConfiguration();
 
 		//Called when the load failed
 		virtual void ResetToDefaultConfiguration(){};
@@ -95,12 +82,13 @@ protected:
 		void SendModuleActionMessage(u8 messageType, nodeID toNode, u8 actionType, u8 requestHandle, u8* additionalData, u16 additionalDataSize, bool reliable);
 
 
-
 	public:
+		u8 moduleId;
+		u8 moduleVersion;
 		char moduleName[MODULE_NAME_MAX_SIZE];
 
 		//Constructor is passed
-		Module(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		Module(u8 moduleId, Node* node, ConnectionManager* cm, const char* name);
 		virtual ~Module();
 
 		//These two variables must be set by the submodule in the constructor before loading the configuration
@@ -115,13 +103,21 @@ protected:
 			GET_MODULE_LIST = 6, MODULE_LIST = 7
 		};
 
+		enum ModuleSaveAction { SAVE_MODULE_CONFIG_ACTION };
+
+		struct SaveModuleConfigAction {
+			nodeID sender;
+			moduleID moduleId;
+			u8 requestHandle;
+		};
+
 
 		//##### Handlers that can be implemented by any module, but are implemented empty here
 
 		//This function is called as soon as the module settings have been loaded or updated
 		//A basic error-checking implementation is provided and can be called by the subclass
 		//before reading the configuration
-		void ConfigurationLoadedHandler();
+		virtual void ConfigurationLoadedHandler(){};
 
 		//Called when the module should update configuration parameters
 		virtual void SetConfigurationHandler(u8* configuration, u8 length){};
@@ -139,19 +135,25 @@ protected:
 		virtual void BleEventHandler(ble_evt_t* bleEvent){};
 
 		//When a mesh connection is connected with handshake and everything or if it is disconnected, the ConnectionManager will call this handler
-		virtual void MeshConnectionChangedHandler(Connection* connection){};
+		virtual void MeshConnectionChangedHandler(MeshConnection* connection){};
 
 		//This handler receives all connection packets
-		virtual void ConnectionPacketReceivedEventHandler(connectionPacket* inPacket, Connection* connection, connPacketHeader* packetHeader, u16 dataLength);
+		virtual void MeshMessageReceivedHandler(MeshConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader);
 
 		//Changing the node state will affect some module's behaviour
 		virtual void NodeStateChangedHandler(discoveryState newState){};
 
+		virtual void ConnectionDisconnectedHandler(MeshConnection* connection){};
+
+		virtual void ConnectionTimeoutHandler(ConnectionTypes connectionType, ble_evt_t* bleEvent){};
+
+		virtual void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength);
+
 		//The Terminal Command handler is called for all modules with the user input
 #ifdef TERMINAL_ENABLED
-		virtual bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+		virtual bool TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs);
 #else
-		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+		bool TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs);
 #endif
 
 #ifdef USE_BUTTONS

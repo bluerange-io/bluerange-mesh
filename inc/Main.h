@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -26,25 +26,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
-
+#ifndef SIM_ENABLED
 
 
 #include <types.h>
+#include <GlobalState.h>
 #include <LedWrapper.h>
 
 extern "C"{
-#include <ble.h>
+
 
 
 #include <nrf_gpiote.h>
 #include <nrf_drv_gpiote.h>
 }
-
-//Time when the button 1 was pressed down and how long it was held
-u32 button1PressTimeDs = 0;
-u32 button1HoldTimeDs = 0;
-
-u32 pendingSysEvent;
 
 void bleDispatchEventHandler(ble_evt_t * p_ble_evt);
 void sysDispatchEventHandler(u32 sys_evt);
@@ -52,17 +47,20 @@ void sysDispatchEventHandler(u32 sys_evt);
 int app_main();
 
 void detectBoardAndSetConfig(void);
-void bleInit(void);
 u32 initNodeID(void);
 
-void initTimers(void);
+
+u8* GetNodeConfigurationFlashPointer();
 
 void timerEventDispatch(u16 passedTime, u32 appTimer);
 void dispatchUartInterrupt();
+void radioEventDispatcher(bool radioActive);
 
 void initGpioteButtons();
 void buttonInterruptHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action);
 void dispatchButtonEvents(u8 buttonId, u32 buttonHoldTime);
+
+void checkRamRetainStruct();
 
 //These are the event handlers that are notified by the SoftDevice
 //The events are then broadcasted throughout the application
@@ -74,5 +72,5 @@ extern "C"{
 
 
 
-
+#endif
 /** @} */

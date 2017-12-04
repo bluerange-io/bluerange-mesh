@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -40,6 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 //########## Message types ###############################################
+//First 15 types may be taken by advertising message types
+
+#define MESSAGE_TYPE_SPLIT_WRITE_CMD 16 //Used if a WRITE_CMD message is split
+#define MESSAGE_TYPE_SPLIT_WRITE_CMD_END 17 //Used if a WRITE_CMD message is split
 
 //Mesh clustering and handshake: Protocol defined
 #define MESSAGE_TYPE_CLUSTER_WELCOME 20 //The initial message after a connection setup (Sent between two nodes)
@@ -72,6 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //Other packets: User space (IDs 80 - 110)
 #define MESSAGE_TYPE_DATA_1 80
 #define MESSAGE_TYPE_DATA_2 81
+#define MESSAGE_TYPE_DATA_3 82
+#define MESSAGE_TYPE_CLC_DATA 83
 
 
 //########## Message structs and sizes ###############################################
@@ -82,19 +88,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define SIZEOF_CONN_PACKET_HEADER 5
 typedef struct
 {
-	u8 hasMoreParts : 1; //Set to true if message is split and has more data in the next packet
-	u8 messageType : 7;
+	u8 messageType;
 	nodeID sender;
 	nodeID receiver;
 }connPacketHeader;
 
-//Used for message splitting for all packets after the first one
-//This way, we do not need to resend the sender and receiver
-#define SIZEOF_CONN_PACKET_SPLIT_HEADER 1
+
+//Used for new message splitting
+//Each split packet uses this header (first one, subsequent ones)
+//First byte must be identical in with connPacketHeader
+#define SIZEOF_CONN_PACKET_SPLIT_HEADER 2
 typedef struct
 {
-	u8 hasMoreParts : 1;
-	u8 messageType : 7;
+	u8 splitMessageType;
+	u8 splitCounter;
 }connPacketSplitHeader;
 
 //CLUSTER_WELCOME
@@ -219,6 +226,40 @@ typedef struct
 	connPacketHeader header;
 	connPacketPayloadData1 payload;
 }connPacketData2;
+
+
+//DATA_3_PACKET
+#define SIZEOF_CONN_PACKET_PAYLOAD_DATA_3 (MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER)
+typedef struct
+{
+	u8 len;
+	u8 data[SIZEOF_CONN_PACKET_PAYLOAD_DATA_3-1];
+
+}connPacketPayloadData3;
+
+#define SIZEOF_CONN_PACKET_DATA_3 (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_DATA_3)
+typedef struct
+{
+	connPacketHeader header;
+	connPacketPayloadData3 payload;
+}connPacketData3;
+
+
+
+//CLC_DATA_PACKET
+#define SIZEOF_CONN_PACKET_PAYLOAD_CLC_DATA (MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER)
+typedef struct
+{
+	u8 data[SIZEOF_CONN_PACKET_PAYLOAD_CLC_DATA];
+
+}connPacketPayloadClcData;
+
+#define SIZEOF_CONN_PACKET_CLC_DATA (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_CLC_DATA)
+typedef struct
+{
+	connPacketHeader header;
+	connPacketPayloadClcData payload;
+}connPacketDataClcData;
 
 
 //Timestamp synchronization packet

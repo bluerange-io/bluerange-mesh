@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -56,12 +56,13 @@ class AdvertisingModule: public Module
 			u16 advertisingIntervalMs;
 			//Number of messages
 			u8 messageCount;
-			u8 txPower;
+			i8 txPower;
 			AdvertisingMessage messageData[ADVERTISING_MODULE_MAX_MESSAGES];
 			//Insert more persistent config values here
-			u32 reserved; //Mandatory, read Module.h
 		};
 		#pragma pack(pop)
+
+		AdvJob* advJobHandle;
 
 		DECLARE_CONFIG_AND_PACKED_STRUCT(AdvertisingModuleConfiguration);
 
@@ -88,17 +89,13 @@ class AdvertisingModule: public Module
 
 
 	public:
-		AdvertisingModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot);
+		AdvertisingModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name);
 
 		void ConfigurationLoadedHandler();
 
 		void ResetToDefaultConfiguration();
 
-		void TimerEventHandler(u16 passedTimeDs, u32 appTimerDs);
-
-		void NodeStateChangedHandler(discoveryState newState);
-
 		void ButtonHandler(u8 buttonId, u32 holdTime);
 
-		bool TerminalCommandHandler(string commandName, vector<string> commandArgs);
+		bool TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs);
 };

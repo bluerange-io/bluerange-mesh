@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -28,11 +28,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <types.h>
 
+typedef struct Aes128Block {
+	uint8_t data[16];
+}Aes128Block;
+
 class Utility
 {
 public:
 	static u32 GetRandomInteger(void);
 	static void CheckFreeHeap(void);
 	static void GetVersionStringFromInt(u32 version, char* outputBuffer);
+	static uint8_t CalculateCrc8(u8* data, u16 dataLength);
+	static uint16_t CalculateCrc16(const uint8_t * p_data, uint32_t size, const uint16_t * p_crc);
+	static u32 CalculateCrc32(u8* message, i32 messageLength);
+	static void Aes128BlockEncrypt(Aes128Block* messageBlock, Aes128Block* key, Aes128Block* encryptedMessage);
 };
 

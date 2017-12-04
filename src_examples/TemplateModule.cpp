@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
+Copyright (c) 2014-2017 "M-Way Solutions GmbH"
 FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
 
 This file is part of FruityMesh
@@ -23,18 +23,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <TemplateModule.h>
 #include <Logger.h>
 #include <Utility.h>
-#include <Storage.h>
 #include <Node.h>
 
 extern "C"{
 
 }
 
-TemplateModule::TemplateModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name, u16 storageSlot)
-	: Module(moduleId, node, cm, name, storageSlot)
+TemplateModule::TemplateModule(u8 moduleId, Node* node, ConnectionManager* cm, const char* name)
+	: Module(moduleId, node, cm, name)
 {
 	//Register callbacks n' stuff
-	Logger::getInstance().enableTag("TEMPLATEMOD");
 
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
@@ -51,7 +49,7 @@ void TemplateModule::ConfigurationLoadedHandler()
 	Module::ConfigurationLoadedHandler();
 
 	//Version migration can be added here
-	if(configuration.moduleVersion == 1){/* ... */};
+	if(configuration.moduleVersion == this->moduleVersion){/* ... */};
 
 	//Do additional initialization upon loading the config
 
@@ -77,7 +75,7 @@ void TemplateModule::ResetToDefaultConfiguration()
 
 }
 
-bool TemplateModule::TerminalCommandHandler(string commandName, vector<string> commandArgs)
+bool TemplateModule::TerminalCommandHandler(std::string commandName, std::vector<std::string> commandArgs)
 {
 	//React on commands, return true if handled, false otherwise
 	if(commandArgs.size() >= 2 && commandArgs[1] == moduleName)

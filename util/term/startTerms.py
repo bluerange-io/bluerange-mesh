@@ -16,7 +16,7 @@ def main():
         processes = []
 
         for i in range(len(ports)):
-            command = terminalPath+" -serial "+ports[i]+" -sercfg 38400,8,n,1,R"
+            command = terminalPath+" -load fruitymesh -serial "+ports[i]+" -sercfg 38400,8,n,1,R"
             p = subprocess.Popen(command, shell=True)
             processes.append(p)
 

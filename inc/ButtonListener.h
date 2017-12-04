@@ -2,6 +2,9 @@
 
 #include <Config.h>
 
+/**
+ * Only used as an interface to be implemented by other classes when a Button is pressed
+ */
 class ButtonListener
 {
 private:
