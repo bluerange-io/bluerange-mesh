@@ -12,6 +12,7 @@ This is a beta version of FruityMesh that includes a set of new Features not ava
 - **Refactored**: A lot.
 - **Bugfixes**: Countless
 - **Watchdog**: Basic Watchdog implementation, including Safe boot mode.
+- **Fast packet splitting**: Packets are now splitted using WRITE_CMD which allows a lot more throughput over the mesh
 
 There is currently not much documentation available for this release, so contact us if anything is not clear.
 
