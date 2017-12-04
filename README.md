@@ -2,7 +2,7 @@
 
 FruityMesh is the reference implementation of the **BlueRange** initiative. It is the first open source implementation of a **mesh network** that is based on standard Bluetooth Low Energy 4.1 connections. In contrast to meshes that use advertising and scanning, this allows for a network run with battery powered devices. FruityMesh works with the **Nordic nRF51** and **nRF52** chipsets in combination with the **S130/S132 SoftDevices** and enables tons of devices to connect to each other with its auto-meshing capabilities.
 
-# BETA RELEASE
+# BETA RELEASE 0.7.2
 This is a beta version of FruityMesh that includes a set of new Features not available in the currently published master:
 - **MultiAdvertister**: Does support a number of advertising jobs that it will schedule in slots
 - **FruityHal**: Small HAL that will be used to abstract platform specific functions over time
