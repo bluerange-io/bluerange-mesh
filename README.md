@@ -15,6 +15,15 @@ This is a beta version of FruityMesh that includes a set of new Features not ava
 
 There is currently not much documentation available for this release, so contact us if anything is not clear.
 
+# BETA RELEASE SETUP
+- In order to compile this release, you need the nRF5 11 SDK for nRF51 and the nRF5 14 SDK for nRF52.
+- Setup steps for the nRF51 SDK are documented in the Make toolchain.pdf file
+- For the nRF52 SDK, you need to adjust three more things:
+	- Change the file /components/toolchain/gcc/Makefile.posix/windows to point to your compiler
+	- In the components/toolchain/gcc folder, the gcc_startup*.S files need to be renamed with a lowercase .s
+	- The /components/ble/ble_radio_notification/ble_radio_notification.h file is missing an import: #include "nrf_nvic.h"
+
+
 # Documentation in the Wiki
 [![Documentation](https://cloud.githubusercontent.com/assets/5893428/8722473/5a89169c-2bc5-11e5-9aea-02a16b3b189e.png)](https://github.com/mwaylabs/fruitymesh/wiki)
 
