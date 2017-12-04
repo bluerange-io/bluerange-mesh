@@ -7,7 +7,7 @@ This is a beta version of FruityMesh that includes a set of new Features not ava
 - **MultiAdvertister**: Does support a number of advertising jobs that it will schedule in slots
 - **FruityHal**: Small HAL that will be used to abstract platform specific functions over time
 - **nRF52 SDK 14 compatibility**: This release compiles with SDK14 for nRF52 and SDK11 for nRF51. The Softdevice S132 5.0 must be used for the nRF52.
-- **AppConnections**: Includes an abstraction Layer for manaaging not only mesh connections, but different connections to offer services for e.g. Smartphones
+- **AppConnections**: Includes an abstraction Layer for managing not only mesh connections, but different connections to offer services for e.g. Smartphones
 - **RecordStorage**: Implements a small file system for providing power-loss safe storage of module configurations
 - **Refactored**: A lot.
 - **Bugfixes**: Countless
