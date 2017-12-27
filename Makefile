@@ -3,7 +3,7 @@
 
 PROJECT_NAME ?= FruityMesh
 BUILD_TYPE   ?= debug
-BOARD        ?= NRF51_BOARD
+BOARD        ?= NRF52_BOARD
 VERBOSE      ?= 0
 
 SERIAL_DEVICE ?= /dev/ttyACM0  # FIXME Use proper matching for OSX compatiblity

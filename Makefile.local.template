@@ -1,5 +1,0 @@
-# Rename this file to Makefile.local and set the correct path
-#gnu arm eclipse build tools should be in path
-#gcc path has to be entered in Makefile.windows in the nordic sdk
-
-NRF5_SDK_PATH=C:/nrf/sdk/nrf5_sdk_latest
