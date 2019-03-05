@@ -1,6 +1,5 @@
 = Contents
 
-* <<Home.adoc#,Home>>
 * <<Quick-Start.adoc#,Quick Start>>
 * <<Usage.adoc#,Usage>>
 * <<Features.adoc#,Features>>

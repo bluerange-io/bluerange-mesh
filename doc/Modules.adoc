@@ -103,6 +103,6 @@ open source release:
 
 == Proprietary Modules
 
-* <<DebugModule.adoc#,DfuModule (moduleID 4)>>
+* <<DfuModule.adoc#,DfuModule (moduleID 4)>>
 * We also have EnOcean, Eink, Asset and other prorietory modules upon
 request.
