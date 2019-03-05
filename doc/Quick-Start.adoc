@@ -1,4 +1,4 @@
-<<_index.adoc#,Home>>
+<<README.adoc#,Home>>
 
 = Quick start 
 image:img/eclipse.png[eclipse-luna]

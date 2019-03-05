@@ -1,4 +1,4 @@
-<<_index.adoc#,Home>>
+<<README.adoc#,Home>>
 
 = DFU Module (ID 4)
 > The DfuModule is not open source at the moment, but can be used by our customers. Don't hesitate to contact us.

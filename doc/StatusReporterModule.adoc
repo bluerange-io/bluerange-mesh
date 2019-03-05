@@ -1,4 +1,4 @@
-<<_index.adoc#,Home>>
+<<README.adoc#,Home>>
 
 = StatusReporterModule (moduleId 3)
 
