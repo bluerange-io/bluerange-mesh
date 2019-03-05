@@ -1,0 +1,2 @@
+//Sidebar is used for GitHub and just includes the index
+include::_index.adoc[]

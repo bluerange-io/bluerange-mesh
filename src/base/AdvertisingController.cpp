@@ -1,36 +1,46 @@
-/**
-
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
-FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
-
-This file is part of FruityMesh
-
-FruityMesh is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-*/
+////////////////////////////////////////////////////////////////////////////////
+// /****************************************************************************
+// **
+// ** Copyright (C) 2015-2019 M-Way Solutions GmbH
+// ** Contact: https://www.blureange.io/licensing
+// **
+// ** This file is part of the Bluerange/FruityMesh implementation
+// **
+// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
+// ** Commercial License Usage
+// ** Licensees holding valid commercial Bluerange licenses may use this file in
+// ** accordance with the commercial license agreement provided with the
+// ** Software or, alternatively, in accordance with the terms contained in
+// ** a written agreement between them and M-Way Solutions GmbH. 
+// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
+// ** information use the contact form at https://www.bluerange.io/contact.
+// **
+// ** GNU General Public License Usage
+// ** Alternatively, this file may be used under the terms of the GNU
+// ** General Public License version 3 as published by the Free Software
+// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+// ** included in the packaging of this file. Please review the following
+// ** information to ensure the GNU General Public License requirements will
+// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// **
+// ** $BR_END_LICENSE$
+// **
+// ****************************************************************************/
+////////////////////////////////////////////////////////////////////////////////
 
 #include <AdvertisingController.h>
 #include <ConnectionManager.h>
 #include <Logger.h>
 #include <Config.h>
+#include <Utility.h>
 
 extern "C"{
 #include <nrf_error.h>
 #include <app_error.h>
 }
 
-//
+
+
 
 /*
 TODO:
@@ -40,267 +50,431 @@ TODO:
  */
 
 
-advState AdvertisingController::advertisingState = ADV_STATE_OFF; //The current state of advertising
-
-
-ble_gap_adv_params_t AdvertisingController::currentAdvertisingParams;
-u8 AdvertisingController::currentAdvertisementPacket[40] = { 0 };
-u8 AdvertisingController::currentScanResponsePacket[40] = { 0 };
-advPacketHeader* AdvertisingController::header = NULL;
-scanPacketHeader* AdvertisingController::scanHeader = NULL;
-u8 AdvertisingController::currentAdvertisementPacketLength = 0;
-bool AdvertisingController::advertisingPacketAwaitingUpdate = false;
-
 
 AdvertisingController::AdvertisingController()
 {
+	advertisingState = AdvertisingState::DISABLED; //The current state of advertising
+	advertisingStateAction = AdvertisingStateAction::OK;
+	memset(&currentAdvertisingParams, 0x00, sizeof(currentAdvertisingParams));
 
+	jobs.zeroData();
+	sumSlots = 0;
+	currentNumJobs = 0;
+	currentAdvertisingInterval = UINT16_MAX;
+	jobToSet = nullptr;
+	currentActiveJob = nullptr;
 }
 
-void AdvertisingController::Initialize(u16 networkIdentifier)
+void AdvertisingController::Initialize()
 {
-	u32 err = 0;
-
-	advertisingPacketAwaitingUpdate = false;
-	currentAdvertisementPacketLength = 0;
-
-	//Define default Advertisement params
-	currentAdvertisingParams.type = BLE_GAP_ADV_TYPE_ADV_SCAN_IND; //Connectable
-	currentAdvertisingParams.p_peer_addr = NULL; //Unidirected, not directed
-	currentAdvertisingParams.fp = BLE_GAP_ADV_FP_ANY; //Filter policy
-	currentAdvertisingParams.p_whitelist = NULL;
-	currentAdvertisingParams.interval = 0x0200; // Advertising interval between 0x0020 and 0x4000 in 0.625 ms units (20ms to 10.24s), see @ref BLE_GAP_ADV_INTERVALS
+	memset(&currentAdvertisingParams, 0x00, sizeof(currentAdvertisingParams));
+	currentAdvertisingParams.type = BLE_GAP_ADV_TYPE_ADV_IND; //Connectable
+	currentAdvertisingParams.interval = MSEC_TO_UNITS(100, UNIT_0_625_MS); // Advertising interval between 0x0020 and 0x4000 in 0.625 ms units (20ms to 10.24s), see @ref BLE_GAP_ADV_INTERVALS
 	currentAdvertisingParams.timeout = 0;
 	currentAdvertisingParams.channel_mask.ch_37_off = Config->advertiseOnChannel37 ? 0 : 1;
 	currentAdvertisingParams.channel_mask.ch_38_off = Config->advertiseOnChannel38 ? 0 : 1;
 	currentAdvertisingParams.channel_mask.ch_39_off = Config->advertiseOnChannel39 ? 0 : 1;
 
-	//Set state
-	advertisingState = ADV_STATE_OFF;
-
-	//----------------- Prefill advertisement header
-	header = (advPacketHeader*) currentAdvertisementPacket;
-	header->flags.len = SIZEOF_ADV_STRUCTURE_FLAGS-1; //minus length field itself
-	header->flags.type = BLE_GAP_AD_TYPE_FLAGS;
-	header->flags.flags = BLE_GAP_ADV_FLAG_LE_GENERAL_DISC_MODE | BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED;
-
-	// LENGTH will be set later //
-
-	header->manufacturer.type = BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA;
-	header->manufacturer.companyIdentifier = COMPANY_IDENTIFIER;
-
-	//The specific instance of a mesh network
-	header->meshIdentifier = MESH_IDENTIFIER;
-	header->networkId = networkIdentifier;
-
-	//---------------- Prefill scan response header
-	u16 size = 0;
-
-
-	scanHeader = (scanPacketHeader*) currentScanResponsePacket;
-
-	scanHeader->name.len = 3;
-	scanHeader->name.type = BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME;
-	scanHeader->name.name[0] = 'F';
-	scanHeader->name.name[1] = 'M';
-
-	scanHeader->manufacturer.len = 3;
-	scanHeader->manufacturer.type = BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA;
-	scanHeader->manufacturer.companyIdentifier = COMPANY_IDENTIFIER;
-
+	//Read used GAP address, will always succeed
+	FruityHal::BleGapAddressGet(&baseGapAddress);
 }
 
-void AdvertisingController::SetConnectable()
+void AdvertisingController::DeleteAllJobs()
 {
-	currentAdvertisingParams.type = BLE_GAP_ADV_TYPE_ADV_IND;
-}
-void AdvertisingController::SetNonConnectable()
-{
-	currentAdvertisingParams.type = BLE_GAP_ADV_TYPE_ADV_NONCONN_IND;
-}
-
-u32 AdvertisingController::UpdateAdvertisingData(u8 messageType, sizedData* payload, bool connectable)
-{
-	u32 err = NRF_SUCCESS;
-
-	//Check if we  are switching to connectable / non-connectable
-	bool mustRestartAdvertising = false;
-	if (connectable && currentAdvertisingParams.type != BLE_GAP_ADV_TYPE_ADV_IND)
-	{
-
-		logt("ADV", "Switching to connectable Advertising");
-		currentAdvertisingParams.type = BLE_GAP_ADV_TYPE_ADV_IND;
-		mustRestartAdvertising = true;
+	//Clear all jobs
+	for(int i=0; i<jobs.length; i++){
+		jobs[i].type = AdvJobTypes::INVALID;
 	}
-	else if (!connectable && currentAdvertisingParams.type != BLE_GAP_ADV_TYPE_ADV_SCAN_IND)
-	{
-		logt("ADV", "Switching to non-connectable Advertising");
-		currentAdvertisingParams.type = BLE_GAP_ADV_TYPE_ADV_SCAN_IND;
-		mustRestartAdvertising = true;
+	currentNumJobs = 0;
+	sumSlots = 0;
+	advertisingStateAction = AdvertisingStateAction::DISABLE;
+
+	FruityHal::BleGapAdvStop();
+}
+
+/**
+ * The Advertising Job Scheduler accepts a number of jobs with slots and delay
+ * Each job is give its number of slots uniformly distributed over a cycle where all jobs
+ * are processed. After all jobs have been processed, a new cycle is started. A delay can
+ * span multiple cycles and enables advertising e.g. each hour for 10 slots.
+ * Afterwards, the delay is reloaded
+ */
+
+AdvJob* AdvertisingController::AddJob(const AdvJob& job){
+	if (job.type == AdvJobTypes::INVALID) return nullptr;
+
+	for(int i=0; i< jobs.length; i++){
+		if(jobs[i].type == AdvJobTypes::INVALID){
+			currentNumJobs++;
+			jobs[i] = job;
+
+			if(jobs[i].type == AdvJobTypes::IMMEDIATE){
+				jobs[i].currentSlots = jobs[i].slots;
+			}
+			logt("ADV", "Adding job %u", i);
+			RefreshJob(&(jobs[i]));
+			return &(jobs[i]);
+		}
 	}
 
-	currentAdvertisementPacketLength = SIZEOF_ADV_PACKET_HEADER + payload->length;
+	advertisingStateAction = AdvertisingStateAction::RESTART;
 
-	//Set the data payload
-	header->messageType = messageType;
-	header->manufacturer.len = payload->length + SIZEOF_ADV_PACKET_STUFF_AFTER_MANUFACTURER;
-	memcpy((u8*) header + SIZEOF_ADV_PACKET_HEADER, payload->data, payload->length);
+	return nullptr;
+}
 
-	err = sd_ble_gap_adv_data_set(currentAdvertisementPacket, SIZEOF_ADV_PACKET_HEADER + payload->length, NULL, 0);
+//Must be called after a jobHandle was used to modify a job currently in use
+void AdvertisingController::RefreshJob(const AdvJob* jobHandle){
+	if(jobHandle == nullptr) return;
+
+	logt("ADV", "Refreshing job");
+	//Reset current active job if it was the same one so that it gets sent to the softdevice
+	if(jobHandle == currentActiveJob) currentActiveJob = nullptr;
+
+	//Update advertising interval if necessary, reschedule current cycle
+	if(
+		GetLowestAdvertisingInterval() != currentAdvertisingInterval
+		|| jobHandle->advertisingChannelMask != *(u8*)&currentAdvertisingParams.channel_mask
+		)
+	{
+		currentAdvertisingInterval = GetLowestAdvertisingInterval();
+		advertisingStateAction = AdvertisingStateAction::RESTART;
+	}
+}
+
+u16 AdvertisingController::GetLowestAdvertisingInterval()
+{
+	u16 newInterval = UINT16_MAX;
+	for (int i = 0; i< jobs.length; i++) {
+		if (jobs[i].type == AdvJobTypes::SCHEDULED && jobs[i].advertisingInterval < newInterval) {
+			newInterval = jobs[i].advertisingInterval;
+		}
+	}
+
+	return newInterval;
+}
+
+void AdvertisingController::RemoveJob(AdvJob* jobHandle)
+{
+	if(jobHandle == nullptr) return;
+
+	for (int i = 0; i < jobs.length; i++) {
+		if (&(jobs[i]) == jobHandle && jobs[i].type != AdvJobTypes::INVALID) {
+			logt("ADV", "Removing job %u", i);
+			currentNumJobs--;
+
+			//Remove the remaining slots from our currently active scheduling
+			if (jobHandle->type == AdvJobTypes::SCHEDULED) {
+				sumSlots -= jobHandle->currentSlots;
+			}
+
+			jobHandle->type = AdvJobTypes::INVALID;
+
+			//Update Advertising interval
+			currentAdvertisingInterval = GetLowestAdvertisingInterval();
+
+			if (currentNumJobs == 0) {
+				advertisingStateAction = AdvertisingStateAction::DISABLE;
+			}
+			else {
+				advertisingStateAction = AdvertisingStateAction::RESTART;
+			}
+		}
+	}	
+
+	//In case the job is currently running, stop it
+	if(currentActiveJob == jobHandle){
+		DetermineAndSetAdvertisingJob();
+	}
+}
+
+void AdvertisingController::TimerEventHandler(u16 passedTimeDs)
+{
+	if(SHOULD_IV_TRIGGER(GS->appTimerDs, passedTimeDs, 4)){
+		DetermineAndSetAdvertisingJob();
+	}
+}
+
+void AdvertisingController::DetermineAndSetAdvertisingJob()
+{
+	//Find the job that should advertise
+	jobToSet = DetermineCurrentAdvertisingJob();
+
+	//Set the selected advertising job to the SoftDevice
+	if(jobToSet != currentActiveJob || advertisingStateAction != AdvertisingStateAction::OK){
+		SetAdvertisingData(jobToSet);
+	}
+
+	//Must be called every time as this will restart advertising if necessary
+	SetAdvertisingState(jobToSet);
+}
+
+//Must be called once upfront before using Advertising Job Scheduler
+//Is automatically called by the scheduler as soon as a cycle has finished
+void AdvertisingController::InitJobScheduling(){
+	logt("ADVS", "Resetting Scheduling" SEP);
+	sumSlots = 0;
+	for(int i=0; i< jobs.length; i++){
+		if (jobs[i].type == AdvJobTypes::SCHEDULED) {
+			//Refill slots, but only if there are none left (happens if a delay is set)
+			if (jobs[i].currentSlots == 0) {
+				jobs[i].currentSlots = jobs[i].slots;
+				jobs[i].currentDelay = jobs[i].delay;
+			}
+			//Count the max number of slots (Only the ones that aren't delayed)
+			if (jobs[i].currentDelay == 0) {
+				sumSlots += jobs[i].currentSlots;
+			}
+		}
+	}
+	logt("ADVS", "sumSlots %u" SEP, sumSlots);
+}
+
+AdvJob* AdvertisingController::DetermineCurrentAdvertisingJob()
+{
+	logt("ADVS", "###### DETERMINE ADV JOB");
+	//Some logging
+	for (int i = 0; i < jobs.length; i++) {
+		if (jobs[i].type != AdvJobTypes::INVALID) {
+			logt("ADVS", "job %u: slots: %u, currentSlots: %u", i, jobs[i].slots, jobs[i].currentSlots);
+		}
+	}
+
+
+	if(currentNumJobs == 0){
+		return nullptr;
+	}
+
+	//Check if we reached the end of this scheduling cycle
+	if (sumSlots == 0) {
+		InitJobScheduling();
+	}
+
+	AdvJob* selectedJob = nullptr;
+
+	//Generate a random number between 0 and sumSlots
+	//TODO: Don't use hardware random
+	i32 rnd = sumSlots == 0 ? 0 : Utility::GetRandomInteger() % sumSlots;
+
+	logt("ADVS", "Rnd: %u, sumCurrentSlots %u", rnd, sumSlots);
+
+	//Go through list to pick the right job by random
+	//This loop must run to the end to
+	for(int i=0; i< jobs.length; i++){
+		//If we have an immediate job, select it
+		if(jobs[i].type == AdvJobTypes::IMMEDIATE){
+			//An immediate job does not count against sumSlots and delay is not considered
+			jobs[i].currentSlots--;
+			//Clear job if done
+			if(jobs[i].currentSlots == 0){
+				RemoveJob(&(jobs[i]));
+			}
+			//Select job
+			selectedJob = &(jobs[i]);
+		}
+		//Job is checked only if it exists and if it still has available slots
+		if(jobs[i].type == AdvJobTypes::SCHEDULED && jobs[i].currentSlots != 0){
+			if(jobs[i].currentDelay > 0){
+				jobs[i].currentDelay--; //Decrement delay for all jobs
+				if(jobs[i].currentDelay == 0){
+					//If a delay of 0 was reached, we must account for this job in the current scheduling cycle
+					sumSlots += jobs[i].currentSlots;
+				} else {
+					//Job still delayed
+					continue;
+				}
+			}
+			//This job should advertise its message
+			if(selectedJob == nullptr && rnd >= 0 && rnd < jobs[i].currentSlots){
+				jobs[i].currentSlots--;
+				sumSlots--;
+
+				selectedJob = &(jobs[i]);
+
+				logt("ADVS", "Advertising job %u selected", i);
+			}
+			//Jump to next job, this one wasn't selected
+			else
+			{
+			}
+			//Decrement rnd, as soon as it is below 0, it can not trigger a job anymore
+			rnd -= jobs[i].currentSlots;
+		}
+	}
+
+	if(selectedJob == nullptr){
+		logt("ADVS", "No advertising job selected");
+	}
+
+	logt("ADVS", "Timer advState %u, numJobs %u, sumSlots %u", advertisingState, currentNumJobs, sumSlots);
+
+	return selectedJob;
+}
+
+//Will set the advertising data in the softdevice
+void AdvertisingController::SetAdvertisingData(AdvJob* job)
+{
+	u32 err;
+
+	if(job == nullptr) return;
+
+	//Stop advertising before changing the data if the channel mask changed
+	//because we do not want to advertise the wrong channel data
+	if(job->advertisingChannelMask != *(u8*)&currentAdvertisingParams.channel_mask){
+		err = FruityHal::BleGapAdvStop();
+
+		if(err == NRF_SUCCESS){
+			advertisingState = AdvertisingState::DISABLED;
+		}
+	}
+
+	err = FruityHal::BleGapAdvDataSet(
+			job->advData,
+			job->advDataLength,
+			job->scanData,
+			job->scanDataLength
+		);
+
 	if(err != NRF_SUCCESS){
-		advertisingPacketAwaitingUpdate = true;
-		return err;
-	}
+		char buffer[100];
+		GS->logger->convertBufferToHexString(job->advData, job->advDataLength, buffer, sizeof(buffer));
 
-	//Now we check if we need to restart advertising
-	if (mustRestartAdvertising)
-	{
-		advState backup = advertisingState;
-		SetAdvertisingState(ADV_STATE_OFF);
-		SetAdvertisingState(backup);
-	}
-
-	return NRF_SUCCESS;
-}
-
-u32 AdvertisingController::SetScanResponse(sizedData* payload){
-	u32 err;
-
-	scanHeader->manufacturer.len = 3 + payload->length;
-
-	memcpy(currentScanResponsePacket + SIZEOF_SCAN_PACKET_HEADER, payload->data, payload->length);
-
-	err = sd_ble_gap_adv_data_set(NULL, 0, currentScanResponsePacket, SIZEOF_SCAN_PACKET_HEADER + payload->length);
-
-	return err;
-}
-
-bool AdvertisingController::SetScanResponseData(Node* node, string dataString){
-	//Send data over all connections
-	connPacketData1 data;
-	data.header.messageType = MESSAGE_TYPE_DATA_2;
-	data.header.sender = node->persistentConfig.nodeId;
-	data.header.receiver = 0;
-
-	if(dataString.empty() || dataString.length() > 20){
-		uart_error(Logger::ARGUMENTS_WRONG);
-		return false;
+		logt("ERROR", "Setting Adv data err %u: %s (%u)", err, buffer, job->advDataLength);
 	} else {
-		data.payload.length = dataString.length();
-		memcpy(data.payload.data, dataString.c_str(), data.payload.length);
-
-		ConnectionManager::getInstance()->SendMessageOverConnections(NULL, (u8*) &data, SIZEOF_CONN_PACKET_DATA_2, true);
-
-		//Update the node's scan response as well
-		node->UpdateScanResponsePacket((u8*)dataString.c_str(), data.payload.length);
-
-		uart_error(Logger::NO_ERROR);
-
-		return true;
+		currentActiveJob = job;
 	}
 }
 
-void AdvertisingController::SetAdvertisingState(advState newState)
+void AdvertisingController::SetAdvertisingState(AdvJob* job)
 {
-	if (newState == advertisingState)
-		return;
-
 	u32 err;
 
-	//Stop if it should be stopped or because it is currently running
-	if (advertisingState != ADV_STATE_OFF)
+	//Stop advertising if no job was given
+	if(job == nullptr && advertisingState != AdvertisingState::DISABLED){
+		advertisingStateAction = AdvertisingStateAction::DISABLE;
+	}
+	//Restart advertising if job is given again
+	if(job != nullptr && advertisingState == AdvertisingState::DISABLED){
+		advertisingStateAction = AdvertisingStateAction::RESTART;
+	}
+
+	//Nothing to do
+	if(advertisingStateAction == AdvertisingStateAction::OK){
+		return;
+	}
+
+	//Nothing to do
+	if(
+		advertisingStateAction == AdvertisingStateAction::DISABLE
+		&& advertisingState == AdvertisingState::DISABLED
+	){
+		advertisingStateAction = AdvertisingStateAction::OK;
+		return;
+	}
+
+	//Determine new advertising parameters
+	currentAdvertisingParams.interval = currentAdvertisingInterval;
+	if (job != nullptr) {
+		*((u8*)&currentAdvertisingParams.channel_mask) = job->advertisingChannelMask;
+	}
+
+	//TODO: Check if our job needs special settings
+
+	BaseConnections connections = GS->cm->GetBaseConnections(ConnectionDirection::DIRECTION_IN);
+	u8 connectedConnections = 0;
+	for(int i=0; i<connections.count; i++){
+		BaseConnection* conn = GS->cm->allConnections[connections.connectionIndizes[i]];
+		if (conn != nullptr) {
+			if (
+				conn->connectionState == ConnectionState::CONNECTED
+				|| conn->connectionState == ConnectionState::HANDSHAKING
+				|| conn->connectionState == ConnectionState::HANDSHAKE_DONE
+				) {
+				connectedConnections++;
+			}
+		}
+	}
+
+	if(connectedConnections < Config->totalInConnections){
+		currentAdvertisingParams.type = BLE_GAP_ADV_TYPE_ADV_IND; //Connectable
+	} else {
+		currentAdvertisingParams.type = BLE_GAP_ADV_TYPE_ADV_NONCONN_IND; // Non-Connectable
+		//Non connectable advertising must not be faster than 100ms
+		if(currentAdvertisingParams.interval < MSEC_TO_UNITS(100, UNIT_0_625_MS)){
+			currentAdvertisingParams.interval = MSEC_TO_UNITS(100, UNIT_0_625_MS);
+		}
+	}
+
+	logt("ADV", "iv %u", currentAdvertisingParams.interval);
+
+	//Try to stop the advertiser if it should be stopped or restartet
+	//TODO: What if stop always returns an error because it was already stopped?
+	if(advertisingStateAction == AdvertisingStateAction::DISABLE)
 	{
-		err = sd_ble_gap_adv_stop();
+		err = FruityHal::BleGapAdvStop();
+
 		if(err == NRF_SUCCESS){
-			logt("ADV", "Advertising stopped");
-		} else {
-			//Was probably stopped before
+			advertisingStateAction = AdvertisingStateAction::OK;
+			advertisingState = AdvertisingState::DISABLED;
+			logt("ADV", "Adv Stopped %u", err);
 		}
 	}
 
-	if (newState == ADV_STATE_HIGH)
-		currentAdvertisingParams.interval = Config->meshAdvertisingIntervalHigh;
-	else if (newState == ADV_STATE_LOW)
-		currentAdvertisingParams.interval = Config->meshAdvertisingIntervalLow;
-
-	//Check if the advertisement packet did not get updated before
-	if(advertisingPacketAwaitingUpdate){
-		err = sd_ble_gap_adv_data_set(currentAdvertisementPacket, currentAdvertisementPacketLength, NULL, 0);
-		if(err == NRF_SUCCESS){
-			advertisingPacketAwaitingUpdate = false;
-		} else {
-			//Just don't set it if it is wrong
-		}
-
-	}
-
-	//Start advertising if needed
-	if (newState != ADV_STATE_OFF)
+	//Start or restart with different advertising parameters
+	else if(advertisingStateAction == AdvertisingStateAction::RESTART)
 	{
-		err = sd_ble_gap_adv_start(&currentAdvertisingParams);
-		if(err == NRF_SUCCESS){
-			logt("ADV", "Advertising started");
-		} else {
-			//Could not be started, ignore
-			newState = ADV_STATE_OFF;
+		//If advertising is still enabled, we have to stop it first
+		if(advertisingState == AdvertisingState::ENABLED){
+			err = FruityHal::BleGapAdvStop();
+
+			//Probably worked
+			advertisingState = AdvertisingState::DISABLED;
+			logt("ADV", "Adv Stopped %u", err);
+		}
+
+		//We can only restart advertising if stopping worked
+		if(advertisingState == AdvertisingState::DISABLED){
+			err = FruityHal::BleGapAdvStart(&currentAdvertisingParams);
+
+			if(err == NRF_SUCCESS){
+				logt("ADV", "Advertising enabled");
+				advertisingStateAction = AdvertisingStateAction::OK;
+				advertisingState = AdvertisingState::ENABLED;
+			} else {
+				logt("ERROR", "Error restarting advertisement %u", err);
+			}
 		}
 	}
-
-	advertisingState = newState;
 }
 
-//If Advertising was interrupted, restart in previous state
-void AdvertisingController::AdvertisingInterruptedBecauseOfIncomingConnectionHandler(void)
+void AdvertisingController::RestartAdvertising()
 {
-	logt("ADV", "advertising interrupted");
-	advertisingState = ADV_STATE_OFF;
-	currentAdvertisingParams.type = BLE_GAP_ADV_TYPE_ADV_SCAN_IND;
-
+	advertisingStateAction = AdvertisingStateAction::RESTART;
 }
 
-
-//If a BLE event occurs, this handler will be called to do the work
-//BLE events can either come from GAP, GATT client, GATT server or L2CAP
-//Returns true or false, weather the event has been handled
-bool AdvertisingController::AdvertiseEventHandler(ble_evt_t* bleEvent)
+bool AdvertisingController::AdvertiseEventHandler(const ble_evt_t &bleEvent)
 {
 	u32 err = 0;
+	switch (bleEvent.header.evt_id)
+	{
+		case BLE_GAP_EVT_CONNECTED: {
+			if(bleEvent.evt.gap_evt.params.connected.role == BLE_GAP_ROLE_PERIPH){
+				//If a peripheral connection got connected, we can only advertise non-connectable, reschedule
+				//Also, we must restart because the advertising was stopped automatically
+				if(advertisingState == AdvertisingState::ENABLED){
+					advertisingState = AdvertisingState::DISABLED;
+					RestartAdvertising();
+				}
+			}
+		}
+		break;
 
-	//Depending on the type of the BLE event, we have to do different stuff
-	//Further Events: http://developer.nordicsemi.com/nRF51_SDK/doc/7.1.0/s120/html/a00746.html#gada486dd3c0cce897b23a887bed284fef
-	switch (bleEvent->header.evt_id)
-	{
-	//************************** GAP *****************************
-	//########## Connection with other device
-	case BLE_GAP_EVT_CONNECTED:
-	{
-		break;
-	}
-	case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
-	{
-		break;
-	}
-		//########## 
-	case BLE_GAP_EVT_AUTH_STATUS:
-	{
-		break;
-	}
-		//########## 
-	case BLE_GAP_EVT_SEC_INFO_REQUEST:
-	{
-		break;
-	}
-		//########## 
-	case BLE_GAP_EVT_TIMEOUT:
-	{
-		break;
-	}
-
-		//************************** GATT server *****************************
-
-		//************************** GATT client *****************************
-
-	default:
+		case BLE_GAP_EVT_DISCONNECTED: {
+			//TODO: Should check if this was a peripheral connection
+			//If a peripheral connection is lost, we can restart advertising in connectable mode
+			if(advertisingState == AdvertisingState::ENABLED){
+				RestartAdvertising();
+			}
+		}
 		break;
 	}
 	return false;

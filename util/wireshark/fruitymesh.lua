@@ -30,18 +30,28 @@ end
 -- Create a new dissector
 Proto_Fruitymesh = Proto("fruitymesh", "FruityMesh Protocol")
 Proto_Fruitymesh_Debug = Proto("fruitymesh_debug", "FruityMesh Debug")
+Proto_Fruitymesh_MeshAccess = Proto("fruitymesh_mesh_access", "FruityMesh MeshAccess")
+Proto_Fruitymesh_Asset = Proto("fruitymesh_asset", "FruityMesh Asset")
+
+-- ######################################################################################################################
 
 -- The dissector function
 function Proto_Fruitymesh.dissector (buffer, pinfo, tree)
 	nordic_dissector:call(buffer, pinfo, tree)
   
   local manufacturer_id = buffer(34, 2)
-  local manufacturer_data = buffer(36, 23)
+
+  local service_uuid16 = buffer(34, 2)
   
   -- check if this packet was sent from our manufacturer id
-  if manufacturer_id(0, 2):uint() == 0x4d02 then
+  if manufacturer_id(0, 2):le_uint() == 0x024d then
+
+    local first_byte = buffer(36, 1)
+
     -- check if it is a fruitymesh message
-    if manufacturer_data(0, 1):uint() == 0xf0 then
+    if first_byte(0, 1):uint() == 0xf0 then
+
+      local manufacturer_data = buffer(36, 25)
     
       -- Add fruitymesh protocol to the tree
       local t = tree:add(Proto_Fruitymesh);
@@ -68,11 +78,14 @@ function Proto_Fruitymesh.dissector (buffer, pinfo, tree)
       t:add(deviceType, manufacturer_data(15,1):le_uint())
       t:add(hopsToSink, manufacturer_data(16,2):le_uint())
       t:add(meshWriteHandle, manufacturer_data(18,2):le_uint())
-      t:add(ackField, manufacturer_data(20,2):le_uint())
+      t:add(ackField, manufacturer_data(20,4):le_uint())
     end
 
     -- check if it is a debug message
-    if manufacturer_data(0, 1):uint() == 0xde then
+    if first_byte(0, 1):uint() == 0xde then
+
+      local manufacturer_data = buffer(36, 22)
+
       local t = tree:add(Proto_Fruitymesh_Debug);
 
       t:add(packet_identifier, manufacturer_data(0,1):le_uint())
@@ -92,10 +105,61 @@ function Proto_Fruitymesh.dissector (buffer, pinfo, tree)
       t:add(debug_droppedVal4, manufacturer_data(20,1):le_uint())
 
     end
+  end
+
+  debug("test1")
+
+  
+  -- check if this packet was sent from our service
+  if service_uuid16(0, 2):le_uint() == 0xfe12 then
+
+    debug("tes22t")
+
+    local message_type = buffer(40, 2)
+
+    -- check if it is a mesh access packet
+    if message_type(0, 2):le_uint() == 0x03 then
+
+      local ma_data = buffer(40, 12)
+    
+      -- Add fruitymesh mesh access protocol to the tree
+      local t = tree:add(Proto_Fruitymesh_MeshAccess);
+     
+      -- Add values
+      t:add(ma_message_type, ma_data(0, 2):le_uint())
+      t:add(ma_network_id, ma_data(2,2):le_uint())
+      t:add(ma_flags, ma_data(4,1):le_uint())
+      t:add(ma_serial_index, ma_data(5,4):le_uint())
+      t:add(ma_module_id1, ma_data(9,1):le_uint())
+      t:add(ma_module_id2, ma_data(10,1):le_uint())
+      t:add(ma_module_id3, ma_data(11,1):le_uint())
+    end
 
 
-  end  
+    -- check if it is a asset packet
+    if message_type(0, 2):le_uint() == 0x02 then
+
+      local asset_data = buffer(40, 15)
+    
+      -- Add fruitymesh mesh access protocol to the tree
+      local t = tree:add(Proto_Fruitymesh_Asset);
+     
+      -- Add values
+      t:add(asset_message_type, asset_data(0, 2):le_uint())
+      t:add(asset_timestamp, asset_data(2, 2):le_uint())
+      t:add(asset_mac, asset_data(4, 4):le_uint())
+      t:add(asset_serial_index, asset_data(8, 4):le_uint())
+      t:add(asset_battery, asset_data(12, 1):le_uint())
+      t:add(asset_acc, asset_data(13, 1):le_uint())
+      t:add(asset_barometer, asset_data(14, 1):le_uint())
+    end
+
+  end
+
 end
+
+
+-- ######################################################################################################################
 
 -- Create the protocol fields for the JOIN_ME message
 packet_identifier = ProtoField.uint8("fruitymesh.packet_identifier","Mesh Identifier",base.HEX)
@@ -113,7 +177,7 @@ txPower = ProtoField.int8("fruitymesh.txPower","TX Power",base.DEC)
 deviceType = ProtoField.uint8("fruitymesh.deviceType","Device Type",base.DEC)
 hopsToSink = ProtoField.uint16("fruitymesh.hopsToSink","Hops to Sink",base.DEC)
 meshWriteHandle = ProtoField.uint16("fruitymesh.meshWriteHandle","Write Handle",base.DEC)
-ackField = ProtoField.uint16("fruitymesh.ackField","Ack Field",base.DEC)
+ackField = ProtoField.uint16("fruitymesh.ackField","Ack Field",base.HEX)
 
 -- add the fields to the protocol
 Proto_Fruitymesh.fields = {
@@ -132,6 +196,9 @@ Proto_Fruitymesh.fields = {
   meshWriteHandle,
   ackField,
 }
+
+
+-- ######################################################################################################################
 
 -- Create the protocol fields for the Debug Packet
 debug_connLossCounter = ProtoField.uint16("fruitymesh_debug.connLossCounter","Loss Counter",base.DEC)
@@ -164,6 +231,54 @@ Proto_Fruitymesh_Debug.fields = {
   debug_droppedVal3,
   debug_droppedVal4
 }
+
+
+-- ######################################################################################################################
+
+-- Create the protocol fields for the Mesh Access message
+ma_message_type = ProtoField.uint16("fruitymesh_ma.message_type","Message Type",base.HEX)
+ma_network_id = ProtoField.uint16("fruitymesh_ma.network_id","Network Id",base.DEC)
+ma_flags = ProtoField.uint8("fruitymesh_ma.flags","Flags",base.HEX)
+ma_serial_index = ProtoField.uint32("fruitymesh_ma.serialindex","Serial index",base.DEC)
+ma_module_id1 = ProtoField.uint8("fruitymesh_ma.ma_module_id1","Module Id1",base.DEC)
+ma_module_id2 = ProtoField.uint8("fruitymesh_ma.ma_module_id2","Module Id2",base.DEC)
+ma_module_id3 = ProtoField.uint8("fruitymesh_ma.ma_module_id3","Module Id3",base.DEC)
+
+-- add the fields to the protocol
+Proto_Fruitymesh_MeshAccess.fields = {
+  ma_message_type,
+  ma_network_id,
+  ma_flags,
+  ma_serial_index,
+  ma_module_id1,
+  ma_module_id2,
+  ma_module_id3
+}
+
+
+-- ######################################################################################################################
+
+-- Create the protocol fields for the Asset message
+asset_message_type = ProtoField.uint16("fruitymesh_asset.message_type","Message Type",base.HEX)
+asset_timestamp = ProtoField.uint16("fruitymesh_asset.timestamp","Timestamp",base.DEC)
+asset_mac = ProtoField.uint32("fruitymesh_asset.mac","MAC",base.HEX)
+asset_serial_index = ProtoField.uint32("fruitymesh_asset.serialindex","Serial index",base.DEC)
+asset_battery = ProtoField.uint8("fruitymesh_asset.battery","Serial index",base.DEC)
+asset_acc = ProtoField.uint8("fruitymesh_asset.acc","Accelerometer",base.DEC)
+asset_barometer = ProtoField.uint8("fruitymesh_asset.barometer","Barometer",base.DEC)
+
+-- add the fields to the protocol
+Proto_Fruitymesh_Asset.fields = {
+  asset_message_type,
+  asset_timestamp,
+  asset_mac,
+  asset_serial_index,
+  asset_battery,
+  asset_acc,
+  asset_barometer
+}
+
+-- ######################################################################################################################
 
 -- Register the dissector
 wtap_table = DissectorTable.get("wtap_encap")

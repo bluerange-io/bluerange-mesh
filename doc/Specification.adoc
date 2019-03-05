@@ -1,0 +1,254 @@
+<<_index.adoc#,Home>>
+
+= Specification 
+
+Most parts of the protocol should not be modified to
+enable interoperability. Some of the protocol decisions are found on
+this page and ongoing discussions will show whether some of these
+specifications should be changed.
+
+== Advertising Packets 
+FruityMesh uses a number of advertising packets,
+the most important one being the JOIN_ME packet that is used for
+discovery of nearby nodes that also run FruityMesh.
+
+=== Advertising Packet with Manufacturer Specific Data
+
+There are two types of advertising packets used by FruityMesh. One uses the manufacturer specific adv structure, the other uses the serviceData adv structure.
+
+.Advertising Header with Manufacturer Specific Data
+|===
+|Bytes|Type|Name|Description
+
+|3|advStructureFlags|Flags|Mandatory Flags Adv Structure
+|4|advStructureManufacturer|Manufacturer Data|Manufacturer Specific Adv Structure with 0x024D as company identifier.
+|1|u8|meshIdentifier|Identifies this as a mesh advertising packet
+|2|NetworkId|networkId|The networkId of this node
+|1|u8|messageType|Used to identify a number of different advertising messages within the mesh
+|===
+
+==== Manufacturer id 
+The company id 0x024D (M-Way Solutions GmbH) is registered with the Bluetooth SIG and may be used by any implementation that conforms to the latest specifications of the FruityMesh protocol.
+
+==== Mesh identifier 
+The mesh identifier is 0xF0. No other identifier shall be used. Future versions might change this identifier. The purpose of the mesh identifier is to enable different protocols under the same manufacturer id.
+
+==== Network identifier 
+The network identifier can be changed by the user. In combination with the networkKey, this allows different meshes to co-exist in the same physical area. It is set either during flashing or during enrollment.
+
+==== Message Type
+The messageType is used to distinguish between different messages. The same messageType definitions are used for advertising packets and for connection packets. This allows us to send the same message over another "transport" if desired and compatible with the message format.
+
+=== JOIN_ME packet (MessageType 1)
+The JOIN_ME packet contains all the information that other nodes can use to determine their best connection partner. MessageId in the header must be set to 1. Future JOIN_ME packets can have a different messageId and different values that can then be used in the Cluster Score Function. The current implementation uses the clusterSize and the number of freeIn and freeOut connections.
+
+|===
+|Bytes| Type| Name| Description
+
+|11|advHeaderManufacturerSpecific|header|The above depicted manufacturer specific header
+|2| NodeId|sender|The nodeId of the sending node
+|4|ClusterId|clusterId|Consists of the founding node's id and the connection loss / restart counter
+|2|ClusterSize|clusterSize|The number of nodes in this cluster
+|3 bit|u8 : 3| freeMeshInConnections | Number of free in connections (as peripheral)
+|5 bit|u8 : 5| freeMeshOutConnections| Number of free out connections (as central)
+|1| u8| batteryRuntime| Contains the expected runtime of the device (1-59=minutes, 60-83=1-23hours, 84-113=1-29days, 114-233=1-119months, 234-254=10-29year, 255=infinite)
+|1| i8| txPower | power of two's complement in dBm
+|1| u8| deviceType| check <<DeviceTypes>>
+|2| u16 | hopsToSink| Number of hops to the shortest sink
+|2| u16 | meshWriteHandle | The GATT handle for the mesh communication characteristic
+|4| ClusterId | ackField| Contains the acknowledgement from another node for the slave connection procedure
+|===
+
+=== Advertising Packet with Service Data
+Another type of advertising packets used by FruityMesh uses the Service Data Adv Structure. This is important when dealing with mobile devices as some have hardware filtering with no support for manufacturer specific data.
+
+|===
+|Bytes|Type|Name|Description
+
+|**Mandatory data**|-|-|-
+|3|Flags|advStructureFlags|(len, type, flags byte)
+|4|Service UUID complete|advStructureUUID16|(len, type, 2 byte UUID 0xFE12)
+|4|Service Data header|advStructureServiceData|(len, type, 2 byte UUID 0xFE12)
+|**CustomDataHeader**|-|-|-
+|2|u16|messageType|Used to determine between different messages.
+
+|===
+
+=== Other Advertising Packets
+FruityMesh can be used to distribute all advertising packets that conform to the BLE specification. These can be Eddystone, iBeacon or any other kind of advertising messages. These are however not essential for FruityMesh itself and are therefore not documented here. Have a look at the <<AdvertisingModule.adoc#,AdvertisingModule>> for more information.
+
+== Connection Packets 
+The mesh uses a number of packets that are sent
+over connections. Most packets that are sent over connections must have this header. There are some exceptions to this (e.g. split packets use a two byte message header for less overhead. The messageType is used to identify if the connPacketHeader is used or not.
+
+=== Connection Packet Header
+
+.Format of a connPacketHeader
+|===
+|Bytes| Type| Name| Description
+
+|1| u8| messageType | The type of message
+|2| u16 | senderId| The nodeId of the sender
+|2| u16 | receiverId| The nodeId of the receiver
+|===
+
+=== Module Connection Packet Header
+Modules use an extended message header to guarantee that there are no collisions between different functionality. This extended header is used for the following messageTypes:
+
+|===
+|MessageType|Name|Description
+
+|51 / 0x33|MESSAGE_TYPE_MODULE_TRIGGER_ACTION|A request for a node to perform an action
+|52 / 0x33|MESSAGE_TYPE_MODULE_ACTION_RESPONSE|Response message for a previous request
+|53 / 0x33|MESSAGE_TYPE_MODULE_GENERAL|An event that does not need a response
+|===
+
+The following describes the format of the extended header:
+
+.Format of a connPacketModuleHeader
+|===
+|Bytes| Type| Name| Description
+
+|5|connPacketHeader |header | The standard connPacketHeader used for all messages.
+
+|1|u8 |moduleId | The id of a module, a module provides different functionality for one specific task.
+
+|1|u8 |requestHandle| A handle that can be used e.g. like a counter. Responses will always be returned with the same handle given in the request.
+
+|1|u8 |actionType | This is the type of action that should be executed by the module. An individual list of subCommands is available for each of the messageTypes given above. E.g. there could be a MODULE_TRIGGER_ACTION message with the actionType set to 1 (PING) to execute a ping. The response would be a MODULE_ACTION_RESPONSE message with the actionType set to 1 (PING_RESPONSE).
+
+|...|u8[] |data | additional payload data for the command
+
+|===
+== NodeIDs
+A nodeId is a way of addressing devices in a network. Each
+device in a network must have a unique nodeId assigned to it that must
+not clash with the nodeId of another device.
+
+There are different nodeId ranges that are used for different purposes:
+
+* *0:* is used as the broadcast address to reach all nodes in a network
+* *1 - 1999:* is used to uniquely address devices (nodes, sinks, ...)
+* *2000 - 19 999:* is used for virtual addresses to address smartphones
+connected to the mesh
+* *20 000 - 20 999:* is used to address groups
+* *30000:* is the address for the current node itself
+* *30 001 - 30 999:* is used to specify the number of hops that a packet
+can travel. (30 001 e.g. specifies that the packet must only reach the
+direct neighbours)
+* *31 000:* - is used when a packet should travel to the shortest sink
+possible (not yet implemented)
+* *33000 - 39 999* - Can be used to assign nodeIds uniquely over
+multiple meshes for the same organization
+* All other nodeIds are currently reserved
+
+== Serial Numbers / SerialNumberIndex 
+The serial numbers are assigned
+randomly using the chipId when developing with the open source variant.
+They should however be uniquely assigned using the UICR once devices go
+into production. Contact us before using serial numbers in production
+with the M-Way manufacturing id. The serialNumberIndex is a 32 bit
+unsigned integer that can be uniquely mapped from and to a serial number
+using the GenerateBeaconSerialForIndex and GetIndexForSerial methods in
+the Utility class.
+
+== EncryptionKeys 
+There are a number of different keys used throughout
+FruityMesh. These are all 128 bit keys that are used for AES encryption
+between the nodes and for communication with Smartphones or other
+devices.
+
+==== No Key (KEY_ID_NONE = 0) 
+Can only be used if a node is not enrolled
+and uses a key filled with 0x00 for encryption.
+
+==== Node Key (FM_KEY_ID_NODE = 1) 
+This key is used for the lifetime of
+a device and is uniquely generated during production. It must be kept
+secure because it allows full configuration access, e.g. enrolling and
+removing the enrollment.
+
+==== Network key (FM_KEY_ID_NETWORK = 2) 
+The network key is shared
+between all nodes that belong to a mesh network. Whoever is in posession
+of this key can configure all nodes in the network and can sent any
+message he likes. It is important to keep this key secret, but it is
+possible to change it if it ever leaks out.
+
+==== UserBase Key (FM_KEY_ID_BASE_USER = 3) 
+This is a key that cannot be
+used to connect, but only to derive all other user keys from it.
+
+==== Organization Key (FM_KEY_ID_ORGANIZATION = 4) 
+The organization key
+is shared between all networks of an organization. It allows access to a
+limited set of functionality, e.g. necessary for tracking assets between
+differen meshes. If the organization key leaks, it is necessary to
+reconfigure all meshes of the organization.
+
+==== User Keys (FM_KEY_ID_USER_DERIVED_START = 10 to UINT32_MAX) 
+The
+user base key is used to generate a range of many million user keys that
+can be given to users or user groups. A user key allows access to a
+limited set of commands and can be restricted to functionality depending
+on the use case. If the userBaseKey leaks, all userKeys have to be
+regenerated and distributed to users.
+
+____
+Note: A key that is filled with 0xFF is considered invalid and cannot be
+used.
+____
+
+== DeviceTypes
+There are different device types that are given to nodes with specific functionality:
+
+|===
+|DeviceType |Name |Description
+
+|0 |DEVICE_TYPE_INVALID |Not used
+|1 |DEVICE_TYPE_STATIC |A node that is installed somewhere with a
+position that will not change much over time.
+|2 |DEVICE_TYPE_ROAMING |A node that can move around freely.
+|3 |DEVICE_TYPE_SINK |A node that is installed at a fix place and
+collects all the data (typically a MeshGateway).
+|4 |DEVICE_TYPE_ASSET |A node that moves around and broadcasts its
+presence so that it can be detected by a mesh.
+|5 |DEVICE_TYPE_LEAF |A node that will only connect to the mesh as a
+leaf but will not relay data (Useful if its position changes but it
+needs a constant data connection)
+|===
+
+== UICR
+The UICR is a special persistant storage that is used to store
+factory defaults once a node is flashed. The NRF_UICR->CUSTOMER area is
+used to store the data on nRF chips.
+
+If you want to store a serial number, nodeKey, etc,... for a node, you
+must write the UICR during flashing. The NRF_UICR->CUSTOMER area is used
+for that purpose and starts at 0x10001080. You can use
+http://srecord.sourceforge.net/[srec_cat] to produce a .hex file
+containing the desired UICR data. This can then be merged with the SoftDevice and Application or you can flash each one after the other.
+
+FruityMesh will boot with random data (random nodeId / serialNumber /
+...) if no data is present in the UICR. The data will however be
+persistent across reboots as it is generated according to the internal chip id from the FICR. The layout of UICR memory: 
+
+|===
+|Offset|Size(Bytes)|Name|Description 
+
+|0|4|MAGIC_NUMBER|Must be set
+to 0xF07700 when UICR data is available |4|4|BOARD_TYPE|Accepts an
+integer that defines the hardware board that fruitymesh should be
+running on (boardId aka. boardType) |8|8|SERIAL_NUMBER|The given serial
+number as ASCII (zero terminated) |16|16|NODE_KEY|Should be securely
+randomly generated |32|4|MANUFACTURER_ID|Set to manufacturer id
+according to the
+https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers[BLE
+company identifiers] |36|4|DEFAULT_NETWORK_ID|Set to 0 for unenrolled,
+to 1 if using an enrollment network or to any other number for using a
+default enrollment |40|4|DEFAULT_NODE_ID|NodeId to be used if not
+enrolled |44|4|DEVICE_TYPE|Type of device according to
+<<Specification.adoc#DeviceTypes,DeviceTypes>> |48|4|SERIAL_NUMBER_INDEX|Unique index
+that represents the serial number |52|16|NETWORK_KEY|Default network key
+if preenrollment is used 
+|===

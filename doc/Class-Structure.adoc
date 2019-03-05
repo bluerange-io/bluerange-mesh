@@ -1,0 +1,32 @@
+<<_index.adoc#,Home>>
+
+= Class Structure
+
+==== src/Main.cpp
+This is the entry point of the application. It will just call two functions from FruityMesh.cpp where the first will boot the node and the second will run an endless loop to fetch and process events.
+
+==== src/FruityMesh.cpp
+During bootup, the SoftDevice, Terminal, Logger, Storage, and other classes are initialized. The event handling routine will take over after everything has been started. All event dispatching routines and interrupt or error handlers are implemented here.
+
+==== src/base/
+The base folder contains a few classes that are meant as wrappers to the S130 API. The most central being the FruityHal which wraps all nRF functionality (not yet complete).
+
+==== src/mesh/Node.cpp
+The Node class is responsible for building mesh connections and works hand in hand with the MeshConnection and ConnectionManager classes to accomplish its tasks.
+
+==== src/mesh/ConnectionManager.cpp
+The ConnectionManager is responsible for handling and scheduling all BLE connections. It handles connects, disconnects and reestablishing as a central point.
+
+==== src/mesh/MeshConnection.cpp
+All connections between nodes are using the MeshConnection class. This, together with the ConnectionManager and the Node, handles clustering and meshing in general.
+
+==== src/mesh/
+Other classes, all derived from BaseConnection are also in this folder and they enable Smartphones for example to connect to the mesh and send and receive data. The most important one is the MeshAccessConnection which implements a custom encryption protocol for communicating with external devices independant from their operating system.
+
+==== src/modules/
+This folder contains a number of modules that provide specific functionality apart from the meshing protocol. If you want to implement a new Module, you should take the template from the `fruitymesh/src_examples/` folder to get started and have a look at the StatusReporterModule to get an idea of how to implement additional functionality.
+
+If you want to learn more about modules, either read the [Modules](Modules.adoc) chapter or have at look at this tutorial about [Implementing a Custom Module](Implementing-a-Custom-Module.adoc)
+
+==== src/utility/
+A basic circular queue implementation, a filesystem, utility classes, implementation of the terminal, logger, etc,...

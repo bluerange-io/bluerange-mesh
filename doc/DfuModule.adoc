@@ -1,0 +1,17 @@
+<<_index.adoc#,Home>>
+
+= DFU Module (ID 4)
+> The DfuModule is not open source at the moment, but can be used by our customers. Don't hesitate to contact us.
+
+== Purpose
+The DfuModule allows all nodes participating in a mesh to be updated over the mesh. Using a MeshGateway makes it possible to update the whole infrastructure from the cloud. It is even possible to update a heterogenous mesh with different devices that need different firmware.
+
+Not only does our DfuModule allow us to replace FruityMesh, the SoftDevice and the Bootloader, it can also be used to update 3rd party controllers connected via UART / SPI / I2C, etc,...
+
+== Functionality
+In order to update FruityMesh, the DfuModule works in conjunction with our proprietary bootloader. The mesh stays fully functional while an update is received and all services on the mesh can still run during update distribution. Once all nodes have received the update, it will be installed by all nodes in less than a few seconds and the infrastructure will reboot.
+
+When updating a 3rd party component, we distribute the update using our standard implementation to all relevant nodes. Afterwards a custom update protocol must be implemented between the FruityMesh controller and the 3rd party controller.
+
+== Usage
+We provide our customers with an implementation of the mesh update using our MeshGateway and also an implementation that runs on mobile operating systems.

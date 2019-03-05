@@ -10,10 +10,9 @@ Total RAM 32KB: 10K for S130, application can use up to 22K (data:fixed size, he
 
 MEMORY
 {
+	/*APPLICATION*/
   FLASH (rx) : ORIGIN = 0x1b000, LENGTH = 0x20000
-  RAM (rwx) :  ORIGIN = 0x20002E80, LENGTH = 0x5180
-
-  BOOTLOADER (rx) : ORIGIN = 0x3c000, LENGTH = 0x4000
+  RAM (rwx) :  ORIGIN = 0x200030F0, LENGTH = 0x4F10
 }
 
 INCLUDE "nrf5x_common.ld"

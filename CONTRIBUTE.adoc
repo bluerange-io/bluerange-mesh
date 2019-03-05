@@ -1,0 +1,4 @@
+== Documentation
+The documentation is done in link:https://asciidoctor.org/docs/asciidoc-syntax-quick-reference/[Asciidoc] and available under the doc/ folder in the repository. A number of conventions should be followed when documenting.
+
+All TerminalCommands should be documented with their expected input and output. The inputParameters that can be changed by the user should be given in square brackets `[param]`. Optional parameters should be given in curly brackes `{opt_param = 0}` with a default value. A Template documentation file is available here: <<DocumentationTemplate.adoc#,DocumentationTemplate>>.

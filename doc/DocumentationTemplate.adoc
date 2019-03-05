@@ -1,0 +1,59 @@
+<<_index.adoc#,Home>>
+
+= ModuleTitle (ID #)
+
+== Purpose
+Some short purpose of this module should be given here and it should be outlined, what the use-cases are that this module can be used for. Paragraphs are writting in a single text line and SoftWrap functionality of an editor is used. This makes it easier to make changes to a document without having to edit line endings.
+
+== Functionality
+Some explanation should be done on the functionality of this module. This can be bigger than the purpose mentioned above.
+
+== Terminal Commands
+
+=== TheCommand Title
+`the_command [param1] [on / off] {opt_param = 1}`
+
+.Examples
+[source,Javascript]
+----
+//Sends the command 1 to all nodes to switch sth. on
+the_command 1 on
+----
+
+The command above is given with commandName and parameters, additionally, some examples can be given so that the reader has a basic understanding of the command. Explanation should follow what the command can be used for and what response is to be expected.
+
+Source Javascript is used to get some syntax highlighting for comments and jsons. The return message should be explained and an example should be given.
+
+[source,Javascript]
+----
+{"type":"the_command_response","code":0}
+----
+
+<<TheCommand Title Binary Message Format,See also: Binary Message Format>>
+
+=== TheCommand2 Title
+
+...
+
+== Messages
+
+=== TheCommand Title Binary Message Format
+==== Request
+A short explanation for the binary message can be added here. Tables should not be indented in the ascii text, as this makes editing quite tedious.
+|===
+|Bytes|Type|Name|Description
+|8|<<connPacketModule>>|header|*messageType:* MESSAGE_TYPE_MODULE_TRIGGER_ACTION(51), *actionType:* THE_COMMAND(1)
+|2|u16|param|Param Description
+|4|u32|optParam|Opt param description
+|===
+==== Response
+A short explanation for the binary message response can be added here.
+|===
+|Bytes|Type|Name|Description
+|8|<<connPacketModule>>|header|*messageType:* MESSAGE_TYPE_MODULE_ACTION_RESPONSE(52), *actionType:* THE_COMMAND_RESPONSE(1)
+|2|u16|param|Param Description
+|===
+
+
+=== TheCommand2 Title Binary Message Format
+...

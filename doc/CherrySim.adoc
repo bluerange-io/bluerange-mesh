@@ -1,0 +1,24 @@
+<<_index.adoc#,Home>>
+
+= CherrySim
+
+____
+CherrySim is not yet open source. We are working on it, stay tuned for
+updates.
+____
+
+CherrySim is our new simulator that is based on our FruityMesh code. It is written entierly in C and C++. You will notice a few `#ifdef` statements in the FruityMesh codebase which check if the simulator is enabled.
+
+image:img/cherrysim.png[cherrysim]
+
+== Functionality and Features
+Our new simulator abstracts the SoftDevice and creates a communication layer between the nodes. It simulates all nodes in short timesteps and can even display a visualization of the mesh.
+
+It supports terminal input and output for all nodes, pipe communication for exchanging data efficiently with other applications, pseudo randomness to deterministically debug a problem, battery usage estimation, google test integration, random configurations or user defined positions, etc,...
+
+We use our simulator a lot for:
+- Unit and System Testing
+- Estimating battery usage
+- Implementing new features
+- Evaluating and improving mesh behaviour
+- Debugging implementation problems

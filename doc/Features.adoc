@@ -1,0 +1,53 @@
+<<_index.adoc#,Home>>
+
+= Features
+This is a non exhaustive list of features of FruityMesh.
+
+* Automatic meshing and self-healing capabilities with
+<<The-FruityMesh-Algorithm.adoc#,The FruityMesh Algorithm>>
+* UART Terminal to execute commands with a list of arguments for either
+manual or automated communication with a MeshGateway (see
+<<Usage.adoc#,Usage>>)
+* Debug Logger with support for filtering log tags (see
+<<Usage.adoc#,Usage>>)
+* Modular structure with persistent module configurations (see
+<<Modules.adoc#,Modules>>)
+* Encrypted mesh and Smartphone connections
+* <<AdvertisingModule.adoc#,AdvertisingModule>> for configuring custom
+broadcast messages such as EddyStone or iBeacon
+* <<StatusReporterModule.adoc#,StatusReporterModule>> for monitoring
+the nodes
+* <<EnrollmentModule.adoc#,EnrollmentModule>> for provisioning nodes
+(locally or over an existing mesh) and giving them access to a mesh
+* <<IoModule.adoc#,IoModule>> for signaling commands using leds or
+other pins
+* <<MeshAccessModule.adoc#,MeshAccessModule>> for handling connections
+from/to Smartphones and other devices
+* Time Synchronisation over the mesh (see <<Usage.adoc#,Usage>>)
+* <<RecordStorage.adoc#,RecordStorage>> A record based filesystem for
+storing data in flash
+* Automatic packet splitting if packets are bigger than the connection
+MTU.
+* Automatic cycling of different advertising messages with the
+AdvertisingController.
+* Watchdog in case of node failure
+* Low <<Battery-Consumption.adoc#,Battery Consumption>>
+
+== Closed Source features
+A number of modules of FruityMesh are not yet
+open source but can be used by our customers. Contact us if you are
+interested.
+
+* <<DfuModule.adoc#,DfuModule>> firmware updates over the mesh, not
+limited to FruityMesh but also available for connected controllers.
+* <<AssetModule.adoc#,AssetModule>> broadcasting of asset telemetry
+messages that can be located indoors by our infrastructure.
+* We have already implemented a number of Custom modules and
+customization of FruityMesh for many of our customers.
+
+== Feature Roadmap
+
+* Coming soon to GitHub: Our CherrySim - written in C++ - simulates the
+mesh using the FruityMesh code and allows us to implement unit and
+system tests. image:img/cherrysim.png[cherrysim]
+* 

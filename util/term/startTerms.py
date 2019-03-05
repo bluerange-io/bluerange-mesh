@@ -9,6 +9,12 @@ import os
 def main():
     # Config
     terminalPath = 'putty.exe'
+	
+    global input
+    try:
+        input = raw_input
+    except NameError:
+        pass
 
     while True:
         # Rest
@@ -16,7 +22,7 @@ def main():
         processes = []
 
         for i in range(len(ports)):
-            command = terminalPath+" -serial "+ports[i]+" -sercfg 38400,8,n,1,R"
+            command = terminalPath+" -load fruitymesh -serial "+ports[i]+" -sercfg 1000000,8,n,1,R"
             p = subprocess.Popen(command, shell=True)
             processes.append(p)
 
@@ -24,11 +30,11 @@ def main():
         print(ports)
 
 
-        wait = raw_input("Press Enter to close all shells")
+        wait = input("Press Enter to close all shells")
 
         subprocess.Popen("TASKKILL /F /IM putty.exe")
 
-        wait = raw_input("Press Enter open them again")
+        wait = input("Press Enter open them again")
 
     print("exiting")
 

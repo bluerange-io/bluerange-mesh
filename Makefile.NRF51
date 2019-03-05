@@ -3,16 +3,31 @@
 # makefile
 #
 
+
+
 CPU := cortex-m0
 LINKER_SCRIPT := linker/gcc_nrf51_s130_32kb.ld
 
-C_SOURCE_FILES   += $(COMPONENTS)/toolchain/system_nrf51.c
+
+
+C_SOURCE_FILES += $(COMPONENTS)/toolchain/system_nrf51.c
+C_SOURCE_FILES += $(COMPONENTS)/softdevice/common/softdevice_handler/softdevice_handler.c
+C_SOURCE_FILES += $(COMPONENTS)/drivers_nrf/adc/nrf_drv_adc.c
+C_SOURCE_FILES += $(COMPONENTS)/drivers_nrf/hal/nrf_adc.c
+C_SOURCE_FILES += $(COMPONENTS)/libraries/hardfault/nrf51/handler/hardfault_handler_gcc.c
+
 ASM_SOURCE_FILES += $(COMPONENTS)/toolchain/gcc/gcc_startup_nrf51.s
 
 INC_PATHS += -I$(COMPONENTS)/softdevice/s130/headers
 INC_PATHS += -I$(COMPONENTS)/softdevice/s130/headers/nrf51
+INC_PATHS += -I$(COMPONENTS)/drivers_nrf/adc
+INC_PATHS += -I$(COMPONENTS)/drivers_nrf/spi_master
+
+CFLAGS += -DSOFTDEVICE_PRESENT -DS130 -DNRF51422
 
 SOFTDEVICE_PATH = $(COMPONENTS)/softdevice/s130/hex/s130_nrf51_2.0.0_softdevice.hex
 
 HEAP_SIZE = 2048
 STACK_SIZE = 2048
+
+MAX_UPDATABLE_APP_SIZE = 71680 # max app size 1024 * 70

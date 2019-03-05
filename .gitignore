@@ -2,9 +2,60 @@
 /Release/
 _build/
 /Makefile.local
-/doc/
 /logs/
 /Debug52/
 /deploy/current.txt
-/.settings/
-/src_mway/
+dist/
+
+/NRF51_BOARD/
+enc_temp_folder
+/config/featureset.h
+
+fruityloader/_debug/
+fruityloader/.settings/
+
+# Visual Studio ignore
+.vs/
+*.suo
+*.userosscache
+*.sln.docstates
+*.user
+*.userprefs
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+## Intellij
+.idea/
+*.iml
+*.iws
+
+# OSX
+.DS_Store
+
+# Fruity-API
+## Maven
+fruity-api/target
+fruity-api/results
+fruity-api/log
+dependency-reduced-pom.xml
+
+## Gradle
+fruity-api/.gradle
+fruity-api/build/
+!gradle-wrapper.jar
+
+## Java
+*.class
+
+## Logs
+fruity-api/testlog.*
+
+# CherrySim Test
+packages/
+
+# cmake
+cmake-build-debug/
+cmake_build/

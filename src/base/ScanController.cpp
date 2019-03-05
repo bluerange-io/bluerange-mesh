@@ -1,6 +1,32 @@
-/**
- OS_LICENSE_PLACEHOLDER
- */
+////////////////////////////////////////////////////////////////////////////////
+// /****************************************************************************
+// **
+// ** Copyright (C) 2015-2019 M-Way Solutions GmbH
+// ** Contact: https://www.blureange.io/licensing
+// **
+// ** This file is part of the Bluerange/FruityMesh implementation
+// **
+// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
+// ** Commercial License Usage
+// ** Licensees holding valid commercial Bluerange licenses may use this file in
+// ** accordance with the commercial license agreement provided with the
+// ** Software or, alternatively, in accordance with the terms contained in
+// ** a written agreement between them and M-Way Solutions GmbH. 
+// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
+// ** information use the contact form at https://www.bluerange.io/contact.
+// **
+// ** GNU General Public License Usage
+// ** Alternatively, this file may be used under the terms of the GNU
+// ** General Public License version 3 as published by the Free Software
+// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+// ** included in the packaging of this file. Please review the following
+// ** information to ensure the GNU General Public License requirements will
+// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// **
+// ** $BR_END_LICENSE$
+// **
+// ****************************************************************************/
+////////////////////////////////////////////////////////////////////////////////
 
 #include <Node.h>
 #include <ScanController.h>
@@ -13,45 +39,42 @@ extern "C"
 #include <app_error.h>
 }
 
+/**
+ * IMPORTANT: The ScanController must be informed if the scan state changes without its
+ * knowledge, e.g. when callind sd_ble_gap_connect. Otherwise scanning will stop and it will
+ * not know it has to restart scanning.
+ */
 
-
-
-scanState ScanController::scanningState = SCAN_STATE_OFF; //The current state of scanning
-
-//The currently used parameters for scanning
-ble_gap_scan_params_t currentScanParams;
-
-void ScanController::Initialize(void)
+ScanController::ScanController()
 {
-
 	//Define scanning Parameters
-	currentScanParams.active = 0;					// Active scanning set.
-	currentScanParams.selective = 0;				// Selective scanning not set.
-	currentScanParams.p_whitelist = NULL;				// White-list not set.
-	currentScanParams.interval = (u16) Config->meshScanIntervalHigh;				// Scan interval.
-	currentScanParams.window = (u16) Config->meshScanWindowHigh;	// Scan window.
+	currentScanParams.interval = 0;				// Scan interval.
+	currentScanParams.window = 0;	// Scan window.
 	currentScanParams.timeout = 0;					// Never stop scanning unless explicit asked to.
 
 	scanningState = SCAN_STATE_OFF;
+	scanStateOk = true;
+}
 
+void ScanController::TimerEventHandler(u16 passedTimeDs)
+{
+	//To be absolutely sure that scanning is in the correct state, we call this function
+	//within the timerHandler
+	TryConfiguringScanState();
 }
 
 
 //Start scanning with the specified scanning parameters
 void ScanController::SetScanState(scanState newState)
 {
+	logt("SC", "SetScanState %u", newState);
+
 	u32 err = 0;
+	//Nothing to do if requested state is same as current state
 	if (newState == scanningState) return;
 
-	//Stop scanning to either leave it stopped or update it
-	if (scanningState != SCAN_STATE_OFF)
-	{
-		err = sd_ble_gap_scan_stop();
-		if(err != NRF_SUCCESS){
-			//We'll just ignore NRF_ERROR_INVALID_STATE and hope that scanning is stopped
-		}
-		logt("C", "Scanning stopped");
-	}
+	scanningState = newState;
+	scanStateOk = false;
 
 	if (newState == SCAN_STATE_HIGH)
 	{
@@ -64,98 +87,74 @@ void ScanController::SetScanState(scanState newState)
 		currentScanParams.window = Config->meshScanWindowLow;
 	}
 
-	//FIXME: Add Saveguard. Because if we are currently in connecting state, we can not scan
-
-	if (newState != SCAN_STATE_OFF)
-	{
-		err = sd_ble_gap_scan_start(&currentScanParams);
-		if(err == NRF_SUCCESS){
-			logt("C", "Scanning started");
-		} else {
-			//Ignore all errors, scanning could not be started
-			newState = SCAN_STATE_OFF;
-		}
-	}
-
-	scanningState = newState;
+	TryConfiguringScanState();
 }
 
-void ScanController::SetScanDutyCycle(u16 interval, u16 window){
+void ScanController::SetScanDutyCycle(u16 interval, u16 window)
+{
+	logt("SC", "SetScanDutyCycle %u %u", interval, window);
 
+	scanningState = SCAN_STATE_CUSTOM;
+	scanStateOk = false;
+
+	currentScanParams.interval = interval;
+	currentScanParams.window = window;
+
+	TryConfiguringScanState();
+}
+
+//This will call the HAL to enable the current scan state
+void ScanController::TryConfiguringScanState()
+{
 	u32 err;
-	if (scanningState != SCAN_STATE_OFF)
-	{
-		err = sd_ble_gap_scan_stop();
-		if(err != NRF_SUCCESS){
-			//We'll just ignore NRF_ERROR_INVALID_STATE and hope that scanning is stopped
+	if(!scanStateOk){
+		//First, try stopping
+		err = FruityHal::BleGapScanStop();
+		if(scanningState == SCAN_STATE_OFF){
+			if(err == NRF_SUCCESS) scanStateOk = true;
 		}
-		logt("C", "Scanning stopped");
-	}
 
-
-	if(interval != 0){
-		currentScanParams.interval = interval;
-		currentScanParams.window = window;
-
-		err = sd_ble_gap_scan_start(&currentScanParams);
-		if(err == NRF_SUCCESS){
-			logt("C", "Scanning started");
-		} else {
-			//Ignore all errors, scanning could not be started
-			scanningState = SCAN_STATE_OFF;
+		//Next, try starting
+		if(scanningState != SCAN_STATE_OFF){
+			err = FruityHal::BleGapScanStart(&currentScanParams);
+			if(err == NRF_SUCCESS) scanStateOk = true;
 		}
 	}
 }
 
-//BLE addresses, 6 Byte (48bit), can be either random, public, etc...
-ble_gap_addr_t blePeripheralAdresses[1] = { BLE_GAP_ADDR_TYPE_RANDOM_STATIC, { 0x25, 0xED, 0xA4, 0x6B, 0xC6, 0xE7 } /*0xD91220800D00*/};
+void ScanController::ScanningHasStopped()
+{
+	scanStateOk = false;
+}
 
 //If a BLE event occurs, this handler will be called to do the work
-bool ScanController::ScanEventHandler(ble_evt_t * bleEvent)
+bool ScanController::ScanEventHandler(ble_evt_t &bleEvent) const
 {
 	//u32 err = 0;
 
 	//Depending on the type of the BLE event, we have to do different stuff
-	switch (bleEvent->header.evt_id)
+	switch (bleEvent.header.evt_id)
 	{
 		//########## Advertisement data coming in
 		case BLE_GAP_EVT_ADV_REPORT:
 		{
 			//Check if packet is a valid mesh advertising packet
-			advPacketHeader* packetHeader = (advPacketHeader*) bleEvent->evt.gap_evt.params.adv_report.data;
+			advPacketHeader* packetHeader = (advPacketHeader*) bleEvent.evt.gap_evt.params.adv_report.data;
 
 			if (
-					bleEvent->evt.gap_evt.params.adv_report.dlen >= SIZEOF_ADV_PACKET_HEADER
+					bleEvent.evt.gap_evt.params.adv_report.dlen >= SIZEOF_ADV_PACKET_HEADER
 					&& packetHeader->manufacturer.companyIdentifier == COMPANY_IDENTIFIER
 					&& packetHeader->meshIdentifier == MESH_IDENTIFIER
-					&& packetHeader->networkId == Node::getInstance()->persistentConfig.networkId
+					&& packetHeader->networkId == GS->node->configuration.networkId
 				)
 			{
 				//Packet is valid and belongs to our network, forward to Node for further processing
-				Node::getInstance()->AdvertisementMessageHandler(bleEvent);
+				GS->node->AdvertisementMessageHandler(bleEvent);
 
 			}
 
 			return true;
 		}
-
-		case BLE_GAP_EVT_CONNECTED:
-		{
-			//In case, a connection comes in, scanning might have been stopped before (valid for outgoing connections)
-			SetScanState(SCAN_STATE_HIGH);
-
-		}
-			break;
-
-			//########## Timout Event (when does this happen?)
-		case BLE_GAP_EVT_TIMEOUT:
-			if (bleEvent->evt.gap_evt.params.timeout.src == BLE_GAP_TIMEOUT_SRC_SCAN)
-			{
-				logt("SCAN", "Scan timed out.");
-			}
-			break;
-		default:
-			break;
 	}
 	return false;
 }

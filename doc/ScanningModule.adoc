@@ -1,0 +1,10 @@
+<<_index.adoc#,Home>>
+
+= ScanningModule (moduleId 2)
+
+== Purpose
+The Scanning module should be configurable with a number of filters that allow it to scan for advertising messages from other devices in the future. These could be Smartphones or other BLE devices. Once such a message is scanned, it is processed and reported according to the filter rules which could be: Count the total number of scanned messages, report any found message, ...
+
+At the moment, the ScanningModule looks for assetTracking messages that are sent out by our Assets. The ScanningModule will be refactored in the future to be more generic.
+
+TIP: The ScanningModule is not intended for receiving custom advertising messages. Implement the BleEventHandler in your custom module to process the messages yourself. See <<Modules.adoc#,Modules>> and <<ScanController.adoc#,ScanController>> documentation.

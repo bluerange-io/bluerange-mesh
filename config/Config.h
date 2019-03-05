@@ -1,24 +1,32 @@
-/**
-
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
-FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
-
-This file is part of FruityMesh
-
-FruityMesh is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-*/
+////////////////////////////////////////////////////////////////////////////////
+// /****************************************************************************
+// **
+// ** Copyright (C) 2015-2019 M-Way Solutions GmbH
+// ** Contact: https://www.blureange.io/licensing
+// **
+// ** This file is part of the Bluerange/FruityMesh implementation
+// **
+// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
+// ** Commercial License Usage
+// ** Licensees holding valid commercial Bluerange licenses may use this file in
+// ** accordance with the commercial license agreement provided with the
+// ** Software or, alternatively, in accordance with the terms contained in
+// ** a written agreement between them and M-Way Solutions GmbH.
+// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
+// ** information use the contact form at https://www.bluerange.io/contact.
+// **
+// ** GNU General Public License Usage
+// ** Alternatively, this file may be used under the terms of the GNU
+// ** General Public License version 3 as published by the Free Software
+// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+// ** included in the packaging of this file. Please review the following
+// ** information to ensure the GNU General Public License requirements will
+// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// **
+// ** $BR_END_LICENSE$
+// **
+// ****************************************************************************/
+////////////////////////////////////////////////////////////////////////////////
 
 /*
  * This file contains the mesh configuration, which is a singleton. Some of the
@@ -28,266 +36,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 #include <types.h>
+
+#ifdef __cplusplus
 #include <LedWrapper.h>
+#include <GlobalState.h>
+#include <FruityHalNrf.h>
+
+class RecordStorageEventListener;
 
 extern "C" {
 #include <ble_gap.h>
 #include <app_util.h>
+#include <nrf_sdm.h>
+#ifndef SIM_ENABLED
 #include <nrf_uart.h>
+#endif
 }
+#endif //__cplusplus
 
 //major (0-400), minor (0-999), patch (0-9999)
 #define FM_VERSION_MAJOR 0
-#define FM_VERSION_MINOR 3
-#define FM_VERSION_PATCH 50
+#define FM_VERSION_MINOR 8
+#define FM_VERSION_PATCH 8
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH);
-
-extern LedWrapper* LedRed;
-extern LedWrapper* LedGreen;
-extern LedWrapper* LedBlue;
 
 #define MESH_IN_CONNECTIONS 1
 #define MESH_OUT_CONNECTIONS 3
+#define MAX_NUM_MESH_CONNECTIONS (MESH_IN_CONNECTIONS+MESH_OUT_CONNECTIONS)
 
+#define APP_IN_CONNECTIONS 2
+#define APP_OUT_CONNECTIONS 0
+#define MAX_NUM_APP_CONNECTIONS (APP_IN_CONNECTIONS+APP_OUT_CONNECTIONS)
 
-extern u32 __application_start_address[]; //Variable is set in the linker script
-extern u32 __application_end_address[]; //Variable is set in the linker script
+#if defined(NRF51) || defined(SIM_ENABLED)
+//NRF51 can not support that many connections, only use meshConnections
+#define MAX_NUM_CONNECTIONS (MESH_IN_CONNECTIONS+MESH_OUT_CONNECTIONS)
+#elif NRF52
+#define MAX_NUM_CONNECTIONS (MESH_IN_CONNECTIONS+MESH_OUT_CONNECTIONS+APP_IN_CONNECTIONS+APP_OUT_CONNECTIONS)
+#endif
 
-extern u32 __application_ram_start_address[]; //Variable is set in the linker script
+extern uint32_t fruityMeshVersion;
 
-typedef enum {
-	PCA_10031	 		= 0x000, //nRF51 Dongle
-	PCA_10028	 		= 0x001, //nRF51-DK
-	ARS_100748_ADAPTER	= 0x002, //ARSv1-with-adapterboard
-	PCA_10036	 		= 0x003, //nRF52-Preview-DK
-	PCA_10040	 		= 0x004, //nRF52-DK
-	ARS_100748_CABLE	= 0x005, //ARSv1-with-cable
-	ARS_100748			= 0x006, //ARSv1-beacon
-	ARS_101693			= 0x007, //ARSv2-beacon
-	ARS_101694			= 0x008, //ARSv2-meshgw-beacon
-} boardTypes;
+#if defined(SIM_ENABLED)
+	extern u32 __application_start_address;
+	extern u32 __application_end_address;
+	extern u32 __application_ram_start_address;
+	extern u32 __start_conn_type_resolvers;
+	extern u32 __stop_conn_type_resolvers;
+#elif defined(__ICCARM__)
+	extern u32 __ICFEDIT_region_ROM_start__; //Variable is set in the linker script
+	extern u32 __ICFEDIT_region_ROM_end__; //Variable is set in the linker script
+	extern u32 __ICFEDIT_region_RAM_start__; //Variable is set in the linker script
+	extern u32 __start_conn_type_resolvers;
+	extern u32 __stop_conn_type_resolvers;
+#else
+	extern u32 __application_start_address[]; //Variable is set in the linker script
+	extern u32 __application_end_address[]; //Variable is set in the linker script
+	extern u32 __application_ram_start_address[]; //Variable is set in the linker script
+	extern u32 __start_conn_type_resolvers[];
+	extern u32 __stop_conn_type_resolvers[];
+#endif
+
+enum deviceConfigOrigins{ RANDOM_CONFIG, UICR_CONFIG, TESTDEVICE_CONFIG };
 
 //Alright, I know this is bad, but it's for readability....
 //And static classes do need a seperate declaration and definition...
 #ifndef Config
-#define Config Conf::getInstance()
+#define Config (&(Conf::getInstance().configuration))
+#define RamConfig (&(Conf::getInstance()))
 #endif
-
-//This class holds the configuration and some bits are changeable at runtime
-class Conf
-{
-	private:
-		Conf(){};
-		static Conf* instance;
-		static void generateRandomSerial();
-		static bool isEmpty(u32* mem, u8 numWords);
-
-	public:
-
-		static Conf* getInstance();
-
-		// ########### DEBUGGING ################################################
-
-		//Do not load the persistent node configuration
-		//Beware: Persistent config must be updated with every connection loss or random shoudl be used....?
-		bool ignorePersistentNodeConfigurationOnBoot = false;
-
-		//Do not use any persistently saved module data
-		bool ignorePersistentModuleConfigurationOnBoot = false;
-
-		//This variable can be toggled via the Terminal "BREAK" and can be used
-		//to toggle conditional breakpoints because the softdevice does not allow
-		//runtime breakpoints while in a connection or stepping
-		bool breakpointToggleActive = false;
-
-		//If in debug mode, the node will run in endless loops when errors occur
-		bool debugMode = false;
-
-		//Instruct the Advertising Module to advertise Debug Packets
-		bool advertiseDebugPackets = false;
-
-		ledMode defaultLedMode = ledMode::LED_MODE_CONNECTIONS;
-
-		//Configures whether the terminal will start in interactive mode or not
-		bool terminalPromptMode = true;
-
-
-		// ########### TIMINGS ################################################
-
-		//Main timer tick interval, must be set to a multiple of 1 decisecond (1/10th o a second)
-		const u16 mainTimerTickDs = 2;
-
-		//Mesh connection parameters (used when a connection is set up)
-		u16 meshMinConnectionInterval = MSEC_TO_UNITS(100, UNIT_1_25_MS);   	//(7.5-4000) Minimum acceptable connection interval
-		u16 meshMaxConnectionInterval = MSEC_TO_UNITS(100, UNIT_1_25_MS);   	//(7.5-4000) Maximum acceptable connection interval
-		u16 meshPeripheralSlaveLatency = 0;                  					//(0-...) Slave latency in number of connection events
-		u16 meshConnectionSupervisionTimeout = MSEC_TO_UNITS(6000, UNIT_10_MS);   	//(100-32000) Connection supervisory timeout
-		u16 meshExtendedConnectionTimeoutSec = 0;	//(0 - 65000) Extended timeout which is used to reconnect a known connection upon connection timeout
-
-		//Mesh discovery parameters
-		//DISCOVERY_HIGH
-		u16 meshAdvertisingIntervalHigh = MSEC_TO_UNITS(100, UNIT_0_625_MS);	//(20-1024) (100-1024 for non connectable advertising!) Determines advertising interval in units of 0.625 millisecond.
-		u16 meshScanIntervalHigh = MSEC_TO_UNITS(20, UNIT_0_625_MS);	//(20-1024) Determines scan interval in units of 0.625 millisecond.
-		u16 meshScanWindowHigh = MSEC_TO_UNITS(3, UNIT_0_625_MS);	//(2.5-1024) Determines scan window in units of 0.625 millisecond.
-
-
-		//DISCOVERY_LOW
-		u16 meshAdvertisingIntervalLow = MSEC_TO_UNITS(5000, UNIT_0_625_MS);	//(20-1024) (100-1024 for non connectable advertising!) Determines advertising interval in units of 0.625 millisecond.
-		u16 meshScanIntervalLow = MSEC_TO_UNITS(1000, UNIT_0_625_MS);	//(20-1024) Determines scan interval in units of 0.625 millisecond.
-		u16 meshScanWindowLow = MSEC_TO_UNITS(50, UNIT_0_625_MS);	//(2.5-1024) Determines scan window in units of 0.625 millisecond.
-
-
-		//INITIATING
-		u16 meshConnectingScanInterval = MSEC_TO_UNITS(20, UNIT_0_625_MS); //(20-1024) in 0.625ms units
-		u16 meshConnectingScanWindow = MSEC_TO_UNITS(4, UNIT_0_625_MS); //(2.5-1024) in 0.625ms units
-		u16 meshConnectingScanTimeout = 1; //(0-...) in seconds
-
-		//HANDSHAKE
-		u16 meshHandshakeTimeoutDs = SEC_TO_DS(4); //If the handshake has not finished after this time, the connection will be disconnected
-
-
-		//STATE timeouts
-		u16 meshStateTimeoutHighDs = SEC_TO_DS(2); //Timeout of the High discovery state before deciding to which partner to connect
-		u16 meshStateTimeoutLowDs = SEC_TO_DS(10); //Timeout of the Low discovery state before deciding to which partner to connect
-		u16 meshStateTimeoutBackOffDs = SEC_TO_DS(0); //Timeout until the back_off state will return to discovery
-		u16 meshStateTimeoutBackOffVarianceDs = SEC_TO_DS(1);  //Up to ... ms will be added randomly to the back off state timeout
-
-		u16 discoveryHighToLowTransitionDuration = 10; // When discovery returns # times without results, the node will switch to low discovery
-
-		/*
-		 * If both conn_sup_timeout and max_conn_interval are specified, then the following constraint applies:
-		 * conn_sup_timeout * 4 > (1 + slave_latency) * max_conn_interval that corresponds to the following
-		 * BT Spec 4.1 Vol 2 Part E, Section 7.8.12 requirement: The Supervision_Timeout in milliseconds shall be
-		 * larger than (1 + Conn_Latency) * Conn_Interval_Max * 2, where Conn_Interval_Max is given in milliseconds.
-		 * https://devzone.nordicsemi.com/question/60/what-is-connection-parameters/
-		 * */
-
-		// ########### ADVERTISING ################################################
-		u8 advertiseOnChannel37 = 1;
-		u8 advertiseOnChannel38 = 1;
-		u8 advertiseOnChannel39 = 1;
-
-		// ########### CONNECTION ################################################
-
-		const u8 meshMaxInConnections = MESH_IN_CONNECTIONS; // Will probably never change and code will not allow this to change without modifications
-		const u8 meshMaxOutConnections = MESH_OUT_CONNECTIONS; //Configurable from 1-7
-		const u8 meshMaxConnections = meshMaxInConnections + meshMaxOutConnections; //for convenience
-
-		const bool enableRadioNotificationHandler = false;
-
-		const bool enableConnectionRSSIMeasurement = true;
-
-
-		// ########### BOARD_SPECIFICS ################################################
-		//Default board is pca10031, modify SET_BOARD if different board is required
-		//Or flash config data to UICR
-		i8 Led1Pin;
-		i8 Led2Pin;
-		i8 Led3Pin;
-		bool LedActiveHigh; //Defines if writing 0 or 1 to an LED turns it on
-
-		i8 Button1Pin;
-		bool ButtonsActiveHigh;
-
-		i8 uartRXPin; //Set RX-Pin to -1 to disable UART
-		i8 uartTXPin;
-		i8 uartCTSPin;
-		i8 uartRTSPin;
-
-		i8 calibratedTX = -63; // This value should be calibrated at 1m distance
-
-		// ########### VALUES from UICR / TEST_DEVICE (initialized in Config.cpp) #############
-		enum deviceConfigOrigins{ RANDOM_CONFIG, UICR_CONFIG, TESTDEVICE_CONFIG };
-		u8 deviceConfigOrigin = RANDOM_CONFIG;
-
-		//Set a default boardId for NRF51 and NRF52 in case no other data is available
-#if defined(NRF51)
-		u32 boardType = PCA_10031;
-#elif defined(NRF52)
-		u32 boardType = PCA_10040;
-#else
-#error "Specify SoC model (NR51 or NRF52)"
-#endif
-
-		char serialNumber[6];
-		u32 serialNumberIndex;
-		u16 manufacturerId = 0; //According to the BLE company identifiers: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
-
-		//When enabling encryption, the mesh handle can only be read through an encrypted connection
-		//And connections will perform an encryption before the handshake
-		const bool encryptionEnabled = false;
-		u8 meshNetworkKey[16] = {1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6}; //16 byte Long term key in little endian format
-		//06050403020100090807060504030201 => How to enter it in the MCP
-		//01:02:03:04:05:06:07:08:09:00:01:02:03:04:05:06 => Format for TI Sniffer
-
-		//Allows a number of mesh networks to coexist in the same physical space without collision
-		//Allowed range is 0x0000 - 0xFF00 (0 - 65280), others are reserved for special purpose
-		networkID meshNetworkIdentifier = 1;
-		nodeID defaultNodeId = 0;
-		deviceTypes deviceType = deviceTypes::DEVICE_TYPE_STATIC;
-
-		ble_gap_addr_t staticAccessAddress = {0xFF, {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}};
-
-
-		// ########### TEST DEVICES ################################################
-		//For our test devices
-		typedef struct{
-			u32 chipID;
-			nodeID id;
-			deviceTypes deviceType;
-			ble_gap_addr_t addr;
-		} testDevice;
-
-		#define NUM_TEST_DEVICES 10
-		static testDevice testDevices[];
-
-		#define NUM_TEST_COLOUR_IDS 12
-		static nodeID testColourIDs[];
-
-		Conf::testDevice* getTestDevice();
-
-
-		// ########### OTHER ################################################
-		u16 firmwareVersionMajor = FM_VERSION_MAJOR; //0-400
-		u16 firmwareVersionMinor = FM_VERSION_MINOR; //0-999
-		u16 firmwareVersionPatch = FM_VERSION_PATCH; //0-9999
-		u32 firmwareVersion = FM_VERSION;
-
-		i8 radioTransmitPower = 4; //The power at which the radio transmits advertisings and data packets
-};
 
 
 // ########### COMPILE TIME SETTINGS ##########################################
 
-//Selecting the board can be done at runtime
-#include <board_pca10031.h>
-#include <board_ars100748.h>
-#include <board_ars100748_adapter.h>
-#include <board_ars100748_cable.h>
-#include <board_pca10036.h>
-#include <board_pca10040.h>
-#include <board_ars101693.h>
-#include <board_ars101694.h>
-
-#define SET_BOARD() do{					\
-		SET_PCA10031_BOARD_IF_FIT(Config->boardType);		\
-		SET_PCA10036_BOARD_IF_FIT(Config->boardType);		\
-		SET_PCA10040_BOARD_IF_FIT(Config->boardType);		\
-		SET_ARS100748_BOARD_IF_FIT(Config->boardType);	\
-		SET_ARS100748_CABLE_BOARD_IF_FIT(Config->boardType);	\
-		SET_ARS100748_ADAPTER_BOARD_IF_FIT(Config->boardType);	\
-		SET_ARS101693_BOARD_IF_FIT(Config->boardType);	\
-		SET_ARS101694_BOARD_IF_FIT(Config->boardType);	\
-}while(0);
+//Used to check if an advertising packet is good enough to be connected to
+#define STABLE_CONNECTION_RSSI_THRESHOLD -85
 
 //Each of the Connections has a buffer for outgoing packets, this is its size in bytes
 #define PACKET_SEND_BUFFER_SIZE 600
+#define PACKET_SEND_BUFFER_HIGH_PRIO_SIZE 100
 
 //Each connection does also have a buffer to assemble packets that were split into 20 byte chunks
 #define PACKET_REASSEMBLY_BUFFER_SIZE 200
-
-//Number of supported Modules
-#define MAX_MODULE_COUNT 10
 
 //Defines the maximum size of the mesh write attribute. This space is required in the ATTR table
 #define MESH_CHARACTERISTIC_MAX_LENGTH 100
@@ -299,16 +129,25 @@ class Conf
 #define COMPANY_IDENTIFIER 0x024D // Company identifier for manufacturer specific data header (M-Way Solutions GmbH) - Should not be changed to ensure compatibility with the mesh protocol
 #define MESH_IDENTIFIER 0xF0 //Identifier that defines this as the fruitymesh protocol
 
+#define SERVICE_DATA_SERVICE_UUID16 0xFE12 //UUID used for custom service
+
 //GAP device name
 #define DEVICE_NAME "FRUITY"
 
 //Serial should be short but unique for the given manufacturer id
 #define MANUFACTURER_ID 0xFFFF //The manufacturer id should match your company identifier that should be registered with the bluetooth sig: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
-#define SERIAL_NUMBER_LENGTH 5 //A serial could use the alphabet "BCDFGHJKLMNPQRSTVWXYZ123456789". This is good for readability (short, no inter-digit resemblance, 25 million possible combinations, no funny words)
+#define NODE_SERIAL_NUMBER_LENGTH 5 //A serial could use the alphabet "BCDFGHJKLMNPQRSTVWXYZ123456789". This is good for readability (short, no inter-digit resemblance, 25 million possible combinations, no funny words)
 
 //Storage
-#define STORAGE_BLOCK_SIZE 128 //Determines the maximum size for a module configuration
-#define STORAGE_BLOCK_NUMBER 8 //Determines the number of blocks that are available
+#define RECORD_STORAGE_NUM_PAGES 2
+
+#define RECORD_STORAGE_RECORD_ID_UPDATE_STATUS 1000 //Stores the done status of an update
+#define RECORD_STORAGE_RECORD_ID_UICR_REPLACEMENT 1001 //Can be used, if UICR can not be flashed, e.g. when updating another beacon with different firmware
+#define RECORD_STORAGE_RECORD_ID_FAKE_NODE_POSITIONS 1002 //Used to store fake positions for nodes to modify the incoming events
+
+//TIMINGS
+//Main timer tick interval, must be set to a multiple of 1 decisecond (1/10th of a second)
+#define MAIN_TIMER_TICK_DS 2
 
 /*############ TERMINAL AND LOGGER ################*/
 
@@ -316,10 +155,12 @@ class Conf
 #define TRACE_BUFFER_SIZE 500
 
 //Define to enable terminal in-/output through UART
-#define USE_UART
+//#define USE_UART
 //Use the SEGGER RTT protocol for in and output
 //In J-Link RTT view, set line ending to CR and send input on enter, echo input to off
 //#define USE_SEGGER_RTT
+//In case stdout should be used, enable this (wont't work on nrf hardware)
+//#define USE_STDIO
 
 #define USE_BUTTONS
 
@@ -328,7 +169,12 @@ class Conf
 
 //If undefined, the final build will have no logging / Terminal functionality built in
 #define ENABLE_LOGGING
-
+//If defined, will log all json output
+#define ENABLE_JSON_LOGGING
+//Define this to automatically set the putty terminal title if in terminal mode
+//#define SET_TERMINAL_TITLE
+//Logs out trace statements
+#define ACTIVATE_TRACE
 
 /*############ SERVICES ################*/
 //Fruity Mesh Service UUID 310bfe40-ed6b-11e3-a1be-0002a5d5c51b
@@ -344,7 +190,7 @@ class Conf
 //Numbers below 150 are standard defined, numbers obove this range are free to use for custom modules
 enum moduleID{
 	//Standard modules
-	NODE=0, // Not a module per se, but why not let it send module messages
+	NODE_ID=0, // Not a module per se, but why not let it send module messages
 	ADVERTISING_MODULE_ID=1,
 	SCANNING_MODULE_ID=2,
 	STATUS_REPORTER_MODULE_ID=3,
@@ -352,26 +198,301 @@ enum moduleID{
 	ENROLLMENT_MODULE_ID=5,
 	IO_MODULE_ID=6,
 	DEBUG_MODULE_ID=7,
+	CONFIG_ID=8,
+	BOARD_CONFIG_ID=9,
+	MESH_ACCESS_MODULE_ID=10,
+	MANAGEMENT_MODULE_ID=11,
+	TESTING_MODULE_ID=12,
 
-	//Custom modules
-	MY_CUSTOM_MODULE_ID=150,
+	//M-way Modules
+	CLC_MODULE_ID=150,
+	VS_MODULE_ID=151,
+	ENOCEAN_MODULE_ID=152,
+	ASSET_MODULE_ID=153,
+	EINK_MODULE_ID=154,
+	WM_MODULE_ID=155,
+
+	//Other Modules
+	MY_CUSTOM_MODULE=200,
 
 	//Invalid Module: 0xFF is the flash memory default and is therefore invalid
 	INVALID_MODULE=255
 };
 
 //Activate and deactivate modules by un-/commenting these defines
+
+//FruityMesh Standard Modules
 #define ACTIVATE_ADVERTISING_MODULE
-#define ACTIVATE_SCANNING_MODULE
 #define ACTIVATE_STATUS_REPORTER_MODULE
-//#define ACTIVATE_DFU_MODULE
+#define ACTIVATE_SCANNING_MODULE
 #define ACTIVATE_ENROLLMENT_MODULE
 #define ACTIVATE_IO_MODULE
 #define ACTIVATE_DEBUG_MODULE
 
-/*############ Stuff for DFU ################*/
-//This is where the bootloader settings are saved
-#define REGION_BOOTLOADER_SETTINGS_START 0x0003FC00
+//FruityMesh non standard modules
+//#define ACTIVATE_DFU_MODULE
+//#define ACTIVATE_MA_MODULE
 
-//Maximum size that a DFU chunk can be
-#define DFU_DATA_BUFFER_SIZE 64
+//Other features
+#define ACTIVATE_BATTERY_MEASUREMENT
+#define ACTIVATE_RADIO_NOTIFICATIONS
+
+//The watchdog will trigger a system reset if it is not feed in time
+//Using the safe boot mode will allow the beacon to reboot with its default configuration
+//each second reboot (it will not read the config from flash)
+//#define ACTIVATE_WATCHDOG
+//#define ACTIVATE_WATCHDOG_SAFE_BOOT_MODE
+//#define FM_WATCHDOG_TIMEOUT (32768UL * 20)
+//#define FM_WATCHDOG_TIMEOUT (32768UL * 60 * 60 * 2)
+
+//Allows us to unwind the stack if an error occured, to save space (5 kb), we can disable this
+//but we must also remove -funwind-tables from the Makefile
+//#define ACTIVATE_STACK_UNWINDING
+
+//Configures the maximum number of firmware group ids that can be compiled into the firmware
+#define MAX_NUM_FW_GROUP_IDS 2
+
+//By enabling this, we can store a record with positions for all beaocns in a mesh, the rssi of incoming events
+//will then be manipulated to reflect these positions
+//#define ENABLE_FAKE_NODE_POSITIONS
+
+/*############ Config class ################*/
+//This class holds the configuration and some bits are changeable at runtime
+
+#ifdef __cplusplus
+class Conf
+{
+	private:
+		Conf();
+		void generateRandomSerialAndNodeId();
+		bool isEmpty(const u8* mem, u16 numBytes) const;
+
+	public:
+		static Conf& getInstance(){
+			if(!GS->config){
+				GS->config = new Conf();
+			}
+			return *(GS->config);
+		}
+
+		static bool loadConfigFromFlash;
+
+		//The Firmware GroupIds are used to check update compatibility if a firmware update is
+		//requested. First id should be reserved for hardware type (e.g. nrf51/nrf52)
+		NodeId fwGroupIds[MAX_NUM_FW_GROUP_IDS];
+
+		//################ The following data is can use defaults from the code but is
+		//################ overwritten if it exists in the UICR
+		//Not loaded from UICR but set to the place id that the config was loaded from
+		u8 deviceConfigOrigin;
+		//Serial Number in ASCII and its index (loaded from UICR if available)
+		char serialNumber[6];
+		u32 serialNumberIndex;
+		//According to the BLE company identifiers: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
+		// (loaded from UICR if 0)
+		u16 manufacturerId;
+		//Allows a number of mesh networks to coexist in the same physical space without collision
+		//Allowed range is 0x0000 - 0xFF00 (0 - 65280), others are reserved for special purpose
+		// (loaded from UICR if 0)
+		NetworkId defaultNetworkId;
+		//Default network key if preenrollment should be used  (loaded from UICR if 0)
+		u8 defaultNetworkKey[16];
+		//Default user base key
+		u8 defaultUserBaseKey[16];
+		//The default nodeId after flashing (loaded from UICR if 0)
+		NodeId defaultNodeId;
+		//Type of device belongs to deviceTypes (loaded from UICR if 0)
+		u8 deviceType : 8;
+		//16 byte Long term node key in little endian format (loaded from UICR if 0)
+		u8 nodeKey[16];
+		//Used to set a static random BLE address (loaded from UICR if type set to 0xFF)
+		fh_ble_gap_addr_t staticAccessAddress;
+		//##################
+
+
+
+		void Initialize(bool loadConfigFromFlash);
+
+
+		void LoadDefaults();
+		void LoadUicr();
+		void LoadTestDevices() const;
+
+
+#pragma pack(push)
+#pragma pack(1)
+	struct ConfigConfiguration : ModuleConfiguration {
+		// ########### DEBUGGING ################################################
+
+		//This variable can be toggled via the Terminal "BREAK" and can be used
+		//to toggle conditional breakpoints because the softdevice does not allow
+		//runtime breakpoints while in a connection or stepping
+		bool breakpointToggleActive : 8;
+
+		//If in debug mode, the node will run in endless loops when errors occur
+		bool debugMode : 8;
+
+		//Instruct the Advertising Module to advertise Debug Packets
+		bool advertiseDebugPackets : 8;
+
+		ledMode defaultLedMode : 8;
+
+		//Configures whether the terminal will start in interactive mode or not
+		TerminalMode terminalMode : 8;
+
+		// ########### TIMINGS ################################################
+
+		u16 mainTimerTickDs_deprecated; //Deprecated, is now set at compile time
+
+		//Mesh connection parameters (used when a connection is set up)
+		//(7.5-4000) Minimum acceptable connection interval
+		u16 meshMinConnectionInterval;
+		//(7.5-4000) Maximum acceptable connection interval
+		u16 meshMaxConnectionInterval;
+		//(0-...) Slave latency in number of connection events
+		u16 meshPeripheralSlaveLatency;
+		//(100-32000) Connection supervisory timeout
+		u16 meshConnectionSupervisionTimeout;
+		//(0 - 65000) Extended timeout which is used to reconnect a known connection upon connection timeout
+		u16 meshExtendedConnectionTimeoutSec;
+
+		//Mesh discovery parameters
+		//DISCOVERY_HIGH
+		//(20-1024) (100-1024 for non connectable advertising!) Determines advertising interval in units of 0.625 millisecond.
+		u16 meshAdvertisingIntervalHigh;
+		//From 4 to 16384 (2.5ms to 10s) in 0.625ms Units
+		u16 meshScanIntervalHigh;
+		//From 4 to 16384 (2.5ms to 10s) in 0.625ms Units
+		u16 meshScanWindowHigh;
+
+
+		//DISCOVERY_LOW
+		//(20-1024) (100-1024 for non connectable advertising!) Determines advertising interval in units of 0.625 millisecond.
+		u16 meshAdvertisingIntervalLow;
+		//(20-1024) Determines scan interval in units of 0.625 millisecond.
+		u16 meshScanIntervalLow;
+		//(2.5-1024) Determines scan window in units of 0.625 millisecond.
+		u16 meshScanWindowLow;
+
+
+		//INITIATING
+		//(20-1024) in 0.625ms units
+		u16 meshConnectingScanInterval;
+		//(2.5-1024) in 0.625ms units
+		u16 meshConnectingScanWindow;
+		//(0-...) in seconds
+		u16 meshConnectingScanTimeout;
+
+		//HANDSHAKE
+		//If the handshake has not finished after this time, the connection will be disconnected
+		u16 meshHandshakeTimeoutDs;
+
+
+		//STATE timeouts
+		//Timeout of the High discovery state before deciding to which partner to connect
+		u16 deprecated_meshStateTimeoutHighDs;
+		//Timeout of the Low discovery state before deciding to which partner to connect
+		u16 deprecated_meshStateTimeoutLowDs;
+		//Timeout until the back_off state will return to discovery
+		u16 deprecated_meshStateTimeoutBackOffDs;
+		//Up to ... ms will be added randomly to the back off state timeout
+		u16 deprecated_meshStateTimeoutBackOffVarianceDs;
+		// When discovery returns # times without results, the node will switch to low discovery
+		u16 deprecated_discoveryHighToLowTransitionDuration;
+
+		/*
+		 * If both conn_sup_timeout and max_conn_interval are specified, then the following constraint applies:
+		 * conn_sup_timeout * 4 > (1 + slave_latency) * max_conn_interval that corresponds to the following
+		 * BT Spec 4.1 Vol 2 Part E, Section 7.8.12 requirement: The Supervision_Timeout in milliseconds shall be
+		 * larger than (1 + Conn_Latency) * Conn_Interval_Max * 2, where Conn_Interval_Max is given in milliseconds.
+		 * https://devzone.nordicsemi.com/question/60/what-is-connection-parameters/
+		 * */
+
+		// ########### ADVERTISING ################################################
+		u8 advertiseOnChannel37;
+		u8 advertiseOnChannel38;
+		u8 advertiseOnChannel39;
+
+		// ########### CONNECTION ################################################
+
+		// Will probably never change and code will not allow this to change without modifications
+		u8 meshMaxInConnections;
+		//Configurable from 1-7
+		u8 meshMaxOutConnections;
+		//for convenience
+		u8 meshMaxConnections;
+
+		bool enableRadioNotificationHandler : 8;
+
+		bool enableConnectionRSSIMeasurement : 8;
+
+		//Transmit Power used as default for this node
+		i8 defaultDBmTX;
+
+		//Total connection count for in and out including mesh connections
+		u8 totalInConnections;
+		u8 totalOutConnections;
+		//Time used for each connectionInterval in 1.25ms steps (Controls throughput)
+		u8 gapEventLength;
+
+		//When enabling encryption, the mesh handle can only be read through an encrypted connection
+		//And connections will perform an encryption before the handshake
+		bool encryptionEnabled : 8;
+
+		//If more than # nodes were found, decide immediately
+		u8 numNodesForDecision;
+		//If not enough nodes were found, decide after this timeout
+		u16 maxTimeUntilDecisionDs;
+		//Switch to low discovery if no other nodes were found for # seconds, set to 0 to disable low discovery state
+		u16 highToLowDiscoveryTimeSec;
+
+	};
+#pragma pack(pop)
+	DECLARE_CONFIG_AND_PACKED_STRUCT(ConfigConfiguration);
+
+	// ########### TEST DEVICES ################################################
+	#ifdef ENABLE_TEST_DEVICES
+	//For our test devices
+	typedef struct{
+		u32 chipID;
+		NodeId id;
+		deviceTypes deviceType;
+		fh_ble_gap_addr_t addr;
+	} testDevice;
+
+	#define NUM_TEST_DEVICES 10
+	static testDevice testDevices[];
+
+	#define NUM_TEST_COLOUR_IDS 12
+	static NodeId testColourIDs[];
+
+	Conf::testDevice* getTestDevice();
+
+	#endif
+};
+#endif // __cplusplus
+
+//Helpers
+u32* getUicrDataPtr();
+
+
+//Includes a header for for a featureset
+#ifdef FEATURESET_NAME
+#include FEATURESET_NAME
+#endif
+
+//If a featureset is included, we 
+#ifdef FEATURESET
+struct ModuleConfiguration;
+#define SET_FEATURESET_CONFIGURATION XCONCAT(setFeaturesetConfiguration_,FEATURESET)
+extern void SET_FEATURESET_CONFIGURATION(ModuleConfiguration* config);
+#elif SIM_ENABLED
+#define SET_FEATURESET_CONFIGURATION(configuration) setFeaturesetConfiguration_CherrySim(configuration);
+#else
+static_assert(false, "Featureset was not defined, which is mandatory!");
+#endif
+
+//We set a define so that the terminal is enabled if one of the following is defined
+#if defined(USE_SEGGER_RTT) || defined(USE_UART) || defined(USE_STDIO)
+#define TERMINAL_ENABLED
+#endif

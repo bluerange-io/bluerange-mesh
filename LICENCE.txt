@@ -1,3 +1,22 @@
+                COMMERCIAL LICENSE FRUITYMESH/BLUERANGE
+                       VERSION 1.0, 01 Jan 2017
+
+FruityMesh Firmware is dual-licensed under commercial and open source 
+licenses. The commercial license of FruityMesh (termed “Bluerange”)  
+gives you the full rights to create and distribute software on your 
+own terms without any open source license obligations. With the 
+commercial license you also have access to the official Bluerange 
+Support and close strategic relationship with M-Way Solutions GmbH 
+to make sure your development goals are met. 
+
+FruityMesh Firmware is also available under GPL v3 open source licenses. 
+FruityMesh tools and some libraries are only available under GPL v3.
+The FruityMesh open source licensing is ideal for use cases such as 
+open source projects with open source distribution, student/academic 
+purposes, hobby projects, internal research projects without external 
+distribution, or other projects where all GPLv3 obligations can be met.
+
+
                     GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 
@@ -5,7 +24,7 @@
  Everyone is permitted to copy and distribute verbatim copies
  of this license document, but changing it is not allowed.
 
-                            Preamble
+                            Preamble 
 
   The GNU General Public License is a free, copyleft license for
 software and other kinds of works.

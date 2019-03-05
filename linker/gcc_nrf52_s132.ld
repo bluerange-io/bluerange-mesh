@@ -5,10 +5,8 @@ GROUP(-lgcc -lc -lnosys)
 
 MEMORY
 {
-  FLASH (rx) : ORIGIN = 0x1c000, LENGTH = 0x60000
-  RAM (rwx) :  ORIGIN = 0x20002e80, LENGTH = 0x5180
-
-  BOOTLOADER (rx) : ORIGIN = 0x3c000, LENGTH = 0x4000
+  FLASH (rx) : ORIGIN = 0x23000, LENGTH = 0x30000 /* Length was chosen arbitrarily */
+  RAM (rwx) :  ORIGIN = 0x200046d0, LENGTH = 0xb930
 }
 
 INCLUDE "nrf5x_common.ld"

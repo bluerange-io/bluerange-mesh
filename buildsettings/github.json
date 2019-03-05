@@ -1,0 +1,15 @@
+{	
+	"additionalArgs":{
+		"settings":"github",
+		"make":"github",
+		"flash":""
+	},
+	"buildSettings":{
+		"environmentVariables":{
+			"FEATURESET":"github"
+		}
+	},
+	"moduleConfigs":[
+		
+	]
+}

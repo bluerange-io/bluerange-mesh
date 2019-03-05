@@ -1,0 +1,37 @@
+<<_index.adoc#,Home>>
+
+= IO Module (moduleId 6)
+
+== Purpose 
+
+Driving and configuring all GPIOs. E.g. toggling an LED, a motor or reading values from a basic sensor.
+
+== Functionality 
+The IO module does only support toggling of LEDs and
+different pins at the moment. It will be extended to include support for
+basic sensors that can be read by e.g. analog/digital conversion.
+
+=== Change led mode 
+Changes the led mode to either on, off (depending on
+configuration either off permanently or connection signaling)
+
+[source,C++]
+----
+//Set led mode
+action [nodeId] io led [mode = on / off / cluster]
+
+//Switch leds on on all nodes
+action 0 io led on
+----
+
+=== Set Pins
+Sets a pin to either high or low output.
+
+[source,C++]
+----
+//Configure pins low or high
+action [nodeId] io pinset [pinNumber] [mode] ...
+
+//Configure Pins 21 and 22
+action 0 io pinset 21 high 22 low
+----

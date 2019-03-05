@@ -13,6 +13,10 @@
 #ifndef NRF_DRV_CONFIG_H
 #define NRF_DRV_CONFIG_H
 
+
+#include <Config.h>
+
+
 /**
  * Provide a non-zero value here in applications that need to use several
  * peripherals with the same ID that are sharing certain resources
@@ -24,7 +28,12 @@
  * This functionality requires a more complicated interrupt handling and driver
  * initialization, hence it is not always desirable to use it.
  */
+
+#if defined(ACTIVATE_EINK_MODULE)
+#define PERIPHERAL_RESOURCE_SHARING_ENABLED  1
+#else
 #define PERIPHERAL_RESOURCE_SHARING_ENABLED  0
+#endif
 
 /* CLOCK */
 #define CLOCK_ENABLED 0
@@ -204,7 +213,11 @@
 #define PWM_COUNT   (PWM0_ENABLED + PWM1_ENABLED + PWM2_ENABLED)
 
 /* SPI */
+#if defined(ACTIVATE_EINK_MODULE)
+#define SPI0_ENABLED 1
+#else
 #define SPI0_ENABLED 0
+#endif
 
 #if (SPI0_ENABLED == 1)
 #define SPI0_USE_EASY_DMA 0
@@ -217,7 +230,11 @@
 #define SPI0_INSTANCE_INDEX 0
 #endif
 
+#if defined(ACTIVATE_EINK_MODULE)
+#define SPI1_ENABLED 1
+#else 
 #define SPI1_ENABLED 0
+#endif
 
 #if (SPI1_ENABLED == 1)
 #define SPI1_USE_EASY_DMA 0
@@ -301,7 +318,12 @@
 #endif //NRF52
 #endif
 
+
+#if defined(ACTIVATE_EINK_MODULE)
+#define TWI0_ENABLED 1
+#else
 #define TWI0_ENABLED 0
+#endif
 
 #if (TWI0_ENABLED == 1)
 #define TWI0_USE_EASY_DMA 0
@@ -376,22 +398,33 @@
 #define QDEC_CONFIG_SAMPLE_INTEN false
 #endif
 
+
 /* ADC */
-#define ADC_ENABLED 0
+#if defined(NRF51)
+#define ADC_ENABLED 1
 
 #if (ADC_ENABLED == 1)
-#define ADC_CONFIG_IRQ_PRIORITY APP_IRQ_PRIORITY_LOW
+//#define ADC_CONFIG_IRQ_PRIORITY APP_IRQ_PRIORITY_LOW
+#define ADC_CONFIG_IRQ_PRIORITY 7
 #endif
+#else
+#define ADC_ENABLED 0
+#endif
+
 
 
 /* SAADC */
-#define SAADC_ENABLED 0
-
+#if defined(NRF52)
+#define SAADC_ENABLED 1
 #if (SAADC_ENABLED == 1)
-#define SAADC_CONFIG_RESOLUTION      NRF_SAADC_RESOLUTION_10BIT
+#define SAADC_CONFIG_RESOLUTION      NRF_SAADC_RESOLUTION_8BIT
 #define SAADC_CONFIG_OVERSAMPLE      NRF_SAADC_OVERSAMPLE_DISABLED
 #define SAADC_CONFIG_IRQ_PRIORITY    APP_IRQ_PRIORITY_LOW
 #endif
+#else
+#define SAADC_ENABLED 0
+#endif
+
 
 /* PDM */
 #define PDM_ENABLED 0

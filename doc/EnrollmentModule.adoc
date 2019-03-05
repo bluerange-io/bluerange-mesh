@@ -1,0 +1,157 @@
+<<_index.adoc#,Home>>
+
+= Enrollment Module (moduleId 5)
+
+== Purpose
+
+New nodes are normally flashed without a networkId assigned (set to 0). This means they will not connect to a mesh as long as they are not enrolled. The term enrolled is used in synonym with provisioned or commisioned. 
+
+In order to assign a node to a mesh, the user has to give a networkId, the networkKey and a unique nodeId for that mesh. This can be done by a MeshGateway or a dedicated enrollment app. The enrollment packet should be sent to the broadcast address 0 and must contain to serial number of the node to be enrolled.
+
+== Functionality
+
+=== Enrolling over the Mesh
+
+The EnrollmentModule supports enrollments over the mesh. A normal enrollment message is sent as a broadcast through the mesh together with the nodeKey of the node that should be enrolled. All the receiving nodes of this message will - at a certain random percentage - try to scan for this node. They will temporarily store the enrollment data and will connect to the node once it was found and enroll it. Also, at a certain random percentage, the node will send an enrollment proposal through the mesh which contains some nearby serial numbers that the MeshGateway might like to enroll.
+
+If the message is sent to a specific nodeId, this node will try to scan for the other node with a 100 percent probability. This is useful, if the nodes position is already known, e.g. by parsing an enrollment proposal.
+
+=== PreEnrollment
+
+The EnrollmentModule support PreEnrollments. A module can register itself using SetPreEnrollmentHandler. The EnrollmentModule will then call this handler once an Unenrollment or Enrollment is received. The Module than has a fixed time to do an enrollment of other components, e.g. an external controller. Once it is done, it must call SaveEnrollment so that the Node enrollment is processed. If this is not called within a defined time, the enrollment will fail with the result code PreEnrollmentFailed.
+
+=== Different Enrollment Scenarios
+
+==== Unenrolled Node
+
+If the defaultNetworkId (flashed into UICR) is set to 0 and no enrollment configuration is present, the node is unenrolled and the node module is inactive. Enrollment can be done by connecting using a MeshAccessConnection with the node key and sending the enrollment data.
+
+==== Node enrolled into a different network
+
+If the node was previously enrolled into a different network, the user might not have access to this network. The node module will be active and will search for other nodes in the same network. It is still possible to connect by using a MeshAccessConnection and send a different enrollment to the node.
+
+==== Node enrolled into the same network or an enrollment network
+If the defaultNetworkId is set to 1 or any other id known by the MeshGateway, we can send a new enrollment through this enrollment network and the node will pick it up and will reboot into the new network.
+
+=== Default Enrollment
+The data stored in the UICR defines the default enrollment of a node. If a node is by default assigned to networkId 0, it will not do meshing until it is enrolled. If a node is assigned another networkId and networkKey as default, it will try to connect to that mesh after it was flashed. Resetting the node will revert back to these defaults.
+
+== Terminal Commands
+
+=== Enrolling a node
+
+[source, C++]
+----
+//Enroll a node
+action [nodeId] enroll basic [serialNumber] [newNodeId] [newNetworkId] {newNetworkKey} {newUserBaseKey} {newOrganizationKey} {nodeKey} {timeoutSec} {enrollOnlyIfUnenrolled} {requestHandle}
+
+//Enroll BBBBB into network 7 that already has nodes 1 and 2
+//Node must be connected to terminal or connected to the node with the terminal (e.g. by using a MeshAccessConnection)
+action 0 enroll basic BBBBB 3 7 78:56:34:12:78:56:34:12:78:56:34:12:78:56:34:12
+
+//Enroll node BBBBB into network 5 over the mesh with new node id 2
+//networkKey will be 11:..., userBaseKey 22:..., orgaKey: 33:...
+//nodeKey is given so that enrollment over mesh can connect securely to the node
+action 0 enroll basic BBBBB 2 5 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22
+33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33
+73:63:92:12:63:94:30:44:63:67:23:11:90:11:42:52 10 0
+----
+
+=== Removing an enrollment
+Removing an enrollment from a node will reset all settings to default (factory reset). The node will return to its default network.
+[source, C++]
+----
+//Remove an enrollment
+action [nodeId] enroll remove [serialNumber] {requestHandle}
+
+//E.g. removing the enrollment of the node with serial number BCBCF
+action 0 enroll remove BCBCF
+----
+== Messages
+=== Message Types
+[source, C++]
+----
+enum EnrollmentModuleTriggerActionMessages{
+	SET_ENROLLMENT_BY_SERIAL=0,
+	REMOVE_ENROLLMENT=1
+};
+enum EnrollmentModuleActionResponseMessages{
+	ENROLLMENT_RESPONSE=0,
+	REMOVE_ENROLLMENT_RESPONSE=1,
+	ENROLLMENT_PROPOSAL=2
+};
+----
+
+=== Enroll the beacon
+==== Request
+actionType: SET_ENROLLMENT
+
+|===
+|Bytes|Type|Description
+|8|**connPacketModule**|	
+|4|serialNumberIndex|Index of the serial number to be enrolled
+|2|newNodeId|The new node id that should be assigned to this node (Set to 0 to leave unchanged)
+|2|newNetworkId|The new network id to be assigned (Set to 0 to leave unchanged)
+|16|newNetworkKey|The network encryption key to be used (Set to 000....000 to leave unchanged)
+|16|newUserBaseKey|The new user base key to derrive all user keys from (Set to 000....000 to leave unchanged)
+|16|newOrganizationKey|A key used for an organization, e.g. used by assets because these must work organization wide.
+|16|nodeKey (optional)|If the enrollment should be done over the mesh, the nodeKey must be given so that another node can connect securely to the to-be-enrolled node
+|7 bit|timeoutSec (optional)|Enrollment over the mesh uses a timeout how long a node will try to look for the to-be-enrolled node. A good default value is 10 seconds which will result in a maximum of 14 seconds time for an enrollment. (Sending 0 will use the default value)
+|1 bit|enrollOnlyIfUnenrolled (optional)|If set to 0, the enrollment will be done even if the other node is already enrolled. If set to 1, the node will generate an error response for the enrollment (ENROLL_RESPONSE with error code .
+|===
+
+==== Response
+This acknowledges a received enrollment.
+[source, C++]
+----
+0x00 = ENROLL_RESPONSE_OK
+0x01 = ENROLL_RESPONSE_FLASH_BUSY //(please retry)
+0x02 = ENROLL_RESPONSE_WRONG_DATA_ALIGNMENT //(fatal error)
+0x03 = ENROLL_RESPONSE_NO_SPACE //(fatal error)
+0x10 = ENROLL_RESPONSE_ALREADY_ENROLLED_WITH_DIFFERENT_DATA //(can use enrollOnlyIfUnenrolled = 0 to force the enrollment)
+0x11 = ENROLL_RESPONSE_PREENROLLMENT_FAILED //Another module that needs to enroll itself first, failed to enroll in the required time
+----
+
+actionType: ENROLLMENT_RESPONSE 
+|===
+|Bytes|Type|Description
+|8|connPacketModule|	
+|4|serialNumberIndex|Index of the serial number that was enrolled
+|1|result|See above for possible result codes
+|===
+==== Response
+Randomly and if available, a node might respond with an enrollment proposal which contains a number of serialNumberIndexes that are nearby. If the MeshGateway wants to enroll one of these nodes, it can send a directed message to this node to enroll the other nearby node. If a serialNumberIndex is 0, there were not enough nodes around or not yet scanned.
+
+actionType: ENROLLMENT_PROPOSAL
+|===
+|Bytes|Type|Description
+|8|connPacketModule	|
+|4|serialNumberIndex[0]|nearby node serial number index
+|4|serialNumberIndex[1]|nearby node serial number index
+|4|serialNumberIndex[2]|nearby node serial number index
+|===
+
+=== Remove an Enrollment
+==== Request
+actionType: REMOVE_ENROLLMENT
+|===
+|Bytes|Type|Description
+|8|connPacketModule	|
+|4|serialNumberIndex|Index of the serial number to be enrolled
+|===
+==== Response
+The result of removing an enrollment
+[source, C++]
+----
+0x00 = ENROLL_RESPONSE_OK
+0x01 = ENROLL_RESPONSE_FLASH_BUSY //(please retry)
+0x02 = ENROLL_RESPONSE_WRONG_DATA_ALIGNMENT //(fatal error)
+0x03 = ENROLL_RESPONSE_NO_SPACE //(fatal error)
+----
+actionType: REMOVE_ENROLLMENT_RESPONSE 
+|===
+|Bytes|Type|Description
+|8|connPacketModule|	
+|4|serialNumberIndex|Index of the serial number that was enrolled
+|1|result|See above for possible result codes
+|===

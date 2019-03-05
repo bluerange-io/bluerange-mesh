@@ -1,32 +1,39 @@
-/**
-
-Copyright (c) 2014-2015 "M-Way Solutions GmbH"
-FruityMesh - Bluetooth Low Energy mesh protocol [http://mwaysolutions.com/]
-
-This file is part of FruityMesh
-
-FruityMesh is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-*/
+////////////////////////////////////////////////////////////////////////////////
+// /****************************************************************************
+// **
+// ** Copyright (C) 2015-2019 M-Way Solutions GmbH
+// ** Contact: https://www.blureange.io/licensing
+// **
+// ** This file is part of the Bluerange/FruityMesh implementation
+// **
+// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
+// ** Commercial License Usage
+// ** Licensees holding valid commercial Bluerange licenses may use this file in
+// ** accordance with the commercial license agreement provided with the
+// ** Software or, alternatively, in accordance with the terms contained in
+// ** a written agreement between them and M-Way Solutions GmbH. 
+// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
+// ** information use the contact form at https://www.bluerange.io/contact.
+// **
+// ** GNU General Public License Usage
+// ** Alternatively, this file may be used under the terms of the GNU
+// ** General Public License version 3 as published by the Free Software
+// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+// ** included in the packaging of this file. Please review the following
+// ** information to ensure the GNU General Public License requirements will
+// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// **
+// ** $BR_END_LICENSE$
+// **
+// ****************************************************************************/
+////////////////////////////////////////////////////////////////////////////////
 
 #include <Logger.h>
 
-#include <vector>
-#include <algorithm>
-#include <iterator>
 #include <Terminal.h>
 #include <Node.h>
+#include <Utility.h>
+#include <mini-printf.h>
 
 extern "C"
 {
@@ -34,24 +41,26 @@ extern "C"
 #include <ble_hci.h>
 #include <nrf_error.h>
 #include <cstring>
-#include <pstorage.h>
 #include <stdarg.h>
 #include <app_timer.h>
 }
 
 using namespace std;
 
-Logger::errorLogEntry Logger::errorLog[NUM_ERROR_LOG_ENTRIES];
-u8 Logger::errorLogPosition = 0;
-
 Logger::Logger()
 {
-	Terminal::AddTerminalCommandListener(this);
+	errorLogPosition = 0;
+	activeLogTags.zeroData();
 }
 
-void Logger::log_f(bool printLine, const char* file, i32 line, const char* message, ...)
+void Logger::Init()
 {
-	memset(mhTraceBuffer, 0, TRACE_BUFFER_SIZE);
+	GS->terminal->AddTerminalCommandListener(this);
+}
+
+void Logger::log_f(bool printLine, const char* file, i32 line, const char* message, ...) const
+{
+	char mhTraceBuffer[TRACE_BUFFER_SIZE] = { 0 };
 
 	//Variable argument list must be passed to vnsprintf
 	va_list aptr;
@@ -73,27 +82,22 @@ void Logger::log_f(bool printLine, const char* file, i32 line, const char* messa
 	}
 }
 
-void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...)
+void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...) const
 {
 #if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	if (
-			//UART communication
-			(!Config->terminalPromptMode && (
-				logType == UART_COMMUNICATION
-				|| tag == "ERROR"
-				|| find(logFilter.begin(), logFilter.end(), tag) != logFilter.end()
-			))
-
-			//User interaction
-			|| (Config->terminalPromptMode && (
-				logEverything
-				|| logType == TRACE
-				|| tag == "ERROR"
-				|| find(logFilter.begin(), logFilter.end(), tag) != logFilter.end() //Logtag is activated
-			))
+			//UART communication (json mode)
+			(
+				Config->terminalMode != TerminalMode::TERMINAL_PROMPT_MODE
+				&& (logEverything || logType == LogType::UART_COMMUNICATION || IsTagEnabled(tag))
+			)
+			//User interaction (prompt mode)
+			|| (Config->terminalMode == TerminalMode::TERMINAL_PROMPT_MODE
+				&& (logEverything || logType == LogType::TRACE || IsTagEnabled(tag))
+			)
 		)
 	{
-		memset(mhTraceBuffer, 0, TRACE_BUFFER_SIZE);
+		char mhTraceBuffer[TRACE_BUFFER_SIZE] = { 0 };
 
 		//Variable argument list must be passed to vsnprintf
 		va_list aptr;
@@ -101,16 +105,20 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
 		vsnprintf(mhTraceBuffer, TRACE_BUFFER_SIZE, message, aptr);
 		va_end(aptr);
 
-		if(Config->terminalPromptMode){
-			if (logType == LOG_LINE)
+		if(Config->terminalMode == TerminalMode::TERMINAL_PROMPT_MODE){
+			if (logType == LogType::LOG_LINE)
 			{
 				char tmp[50];
+#ifndef SIM_ENABLED
 				snprintf(tmp, 50, "[%s@%d %s]: ", file, line, tag);
+#else
+				snprintf(tmp, 50, "%07u:%u:[%s@%d %s]: ", GS->node != nullptr ? GS->appTimerDs : 0, RamConfig->defaultNodeId, file, line, tag);
+#endif
 				log_transport_putstring(tmp);
 				log_transport_putstring(mhTraceBuffer);
 				log_transport_putstring(EOL);
 			}
-			else if (logType == LOG_MESSAGE_ONLY || logType == TRACE)
+			else if (logType == LogType::LOG_MESSAGE_ONLY || logType == LogType::TRACE)
 			{
 				log_transport_putstring(mhTraceBuffer);
 			}
@@ -125,117 +133,179 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
 #endif
 }
 
-void Logger::uart_error_f(UartErrorType type)
+void Logger::uart_error_f(UartErrorType type) const
 {
 	switch (type)
 	{
-		case UartErrorType::NO_ERROR:
-			uart("ERROR", "{\"type\":\"error\",\"code\":0,\"text\":\"OK\"}" SEP);
+		case UartErrorType::SUCCESS:
+			logjson("ERROR", "{\"type\":\"error\",\"code\":0,\"text\":\"OK\"}" SEP);
 			break;
 		case UartErrorType::COMMAND_NOT_FOUND:
-			uart("ERROR", "{\"type\":\"error\",\"code\":1,\"text\":\"Command not found\"}" SEP);
+			logjson("ERROR", "{\"type\":\"error\",\"code\":1,\"text\":\"Command not found\"}" SEP);
 			break;
 		case UartErrorType::ARGUMENTS_WRONG:
-			uart("ERROR", "{\"type\":\"error\",\"code\":2,\"text\":\"Wrong Arguments\"}" SEP);
+			logjson("ERROR", "{\"type\":\"error\",\"code\":2,\"text\":\"Wrong Arguments\"}" SEP);
 			break;
 		default:
-			uart("ERROR", "{\"type\":\"error\",\"code\":99,\"text\":\"Unknown Error\"}" SEP);
+			logjson("ERROR", "{\"type\":\"error\",\"code\":99,\"text\":\"Unknown Error\"}" SEP);
 			break;
 	}
 }
 
-void Logger::enableTag(string tag)
+void Logger::enableTag(const char* tag)
 {
 #if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
-	transform(tag.begin(), tag.end(), tag.begin(), ::toupper);
-	logFilterIterator = find(logFilter.begin(), logFilter.end(), tag);
-	//Only push tag if not found
-	if (logFilterIterator == logFilter.end()){
-		logFilter.push_back(tag);
+
+	if (strlen(tag) + 1 > MAX_LOG_TAG_LENGTH) {
+		logt("ERROR", "Too long");
+		return;
 	}
+
+	char tagUpper[MAX_LOG_TAG_LENGTH];
+	strcpy(tagUpper, tag);
+	Utility::ToUpperCase(tagUpper);
+
+	i32 emptySpot = -1;
+	i32 test = 0;
+	bool found = false;
+
+	for (i32 i = 0; i < MAX_ACTIVATE_LOG_TAG_NUM; i++) {
+		if (activeLogTags[i * MAX_LOG_TAG_LENGTH] == '\0' && emptySpot < 0) emptySpot = i;
+		if (strcmp(&activeLogTags[i * MAX_LOG_TAG_LENGTH], tagUpper) == 0) found = true;
+	}
+
+	if (!found && emptySpot >= 0) {
+		strcpy(&activeLogTags[emptySpot * MAX_LOG_TAG_LENGTH], tagUpper);
+	}
+	else if (!found && emptySpot < 0) logt("ERROR", "Too many tags");
+
+	return;
+
 #endif
 }
 
-void Logger::disableTag(string tag)
+bool Logger::IsTagEnabled(const char* tag) const
 {
 #if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
-	transform(tag.begin(), tag.end(), tag.begin(), ::toupper);
-	logFilterIterator = find(logFilter.begin(), logFilter.end(), tag);
 
-	if (logFilterIterator != logFilter.end())
-	{
-		logFilter.erase(logFilterIterator);
+	if (strcmp(tag, "ERROR") == 0 || strcmp(tag, "WARNING") == 0) {
+		return true;
 	}
+	for (u32 i = 0; i < MAX_ACTIVATE_LOG_TAG_NUM; i++)
+	{
+		if (strcmp(&activeLogTags[i * MAX_LOG_TAG_LENGTH], tag) == 0) return true;
+	}
+	return false;
+
 #endif
 }
 
-void Logger::printEnabledTags()
+void Logger::disableTag(const char* tag)
 {
 #if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
-	if(logEverything) trace("LOG ALL IS ACTIVE" EOL);
-	for (string tag : logFilter)
-	{
-		trace("%s" EOL, tag.c_str());
+
+	char tagUpper[MAX_LOG_TAG_LENGTH];
+	strcpy(tagUpper, tag);
+	Utility::ToUpperCase(tagUpper);
+
+	for (u32 i = 0; i < MAX_ACTIVATE_LOG_TAG_NUM; i++) {
+		if (strcmp(&activeLogTags[i * MAX_LOG_TAG_LENGTH], tagUpper) == 0) {
+			activeLogTags[i * MAX_LOG_TAG_LENGTH] = '\0';
+			return;
+		}
 	}
+
 #endif
 }
 
-void Logger::toggleTag(string tag)
+void Logger::toggleTag(const char* tag)
 {
 #if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
-	transform(tag.begin(), tag.end(), tag.begin(), ::toupper);
-	logFilterIterator = find(logFilter.begin(), logFilter.end(), tag);
+	
+	if (strlen(tag) + 1 > MAX_LOG_TAG_LENGTH) {
+		logt("ERROR", "Too long");
+		return;
+	}
 
-	if (logFilterIterator == logFilter.end())
-	{
-		logFilter.push_back(tag);
+	char tagUpper[MAX_LOG_TAG_LENGTH];
+	strcpy(tagUpper, tag);
+	Utility::ToUpperCase(tagUpper);
+
+	//First, check if it is enabled and disable it after it was found
+	bool found = false;
+	i32 emptySpot = -1;
+	for (u32 i = 0; i < MAX_ACTIVATE_LOG_TAG_NUM; i++) {
+		if (activeLogTags[i * MAX_LOG_TAG_LENGTH] == '\0' && emptySpot < 0) emptySpot = i;
+		if (strcmp(&activeLogTags[i * MAX_LOG_TAG_LENGTH], tagUpper) == 0) {
+			activeLogTags[i * MAX_LOG_TAG_LENGTH] = '\0';
+			found = true;
+			// => Do not return or break as we are still looking for an empty spot
+		}
 	}
-	else
-	{
-		logFilter.erase(logFilterIterator);
+
+	//If we haven't found it, we enable it by using the previously found empty spot
+	if (!found && emptySpot >= 0) {
+		strcpy(&activeLogTags[emptySpot * MAX_LOG_TAG_LENGTH], tagUpper);
 	}
+	else if (!found && emptySpot < 0) logt("ERROR", "Too many tags");
+
 #endif
 }
 
-bool Logger::TerminalCommandHandler(string commandName, vector<string> commandArgs)
+void Logger::printEnabledTags() const
 {
 #if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
-	if (commandName == "debug" && commandArgs.size() == 1)
+	
+	if (logEverything) trace("LOG ALL IS ACTIVE" EOL);
+	for (u32 i = 0; i < MAX_ACTIVATE_LOG_TAG_NUM; i++) {
+		if (activeLogTags[i * MAX_LOG_TAG_LENGTH] != '\0') {
+			trace("%s" EOL, &activeLogTags[i * MAX_LOG_TAG_LENGTH]);
+		}
+	}
+
+#endif
+}
+
+#ifdef TERMINAL_ENABLED
+bool Logger::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
+{
+#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
+	if (TERMARGS(0, "debug") && commandArgsSize >= 2)
 	{
-		if (commandArgs[0] == "all")
+		if (TERMARGS(1, "all"))
 		{
 			logEverything = !logEverything;
 		}
-		else if (commandArgs[0] == "none")
+		else if (TERMARGS(1, "none"))
 		{
 			disableAll();
 		}
 		else
 		{
-			toggleTag(commandArgs[0]);
+			toggleTag(commandArgs[1]);
 		}
 
 		return true;
 	}
-	else if (commandName == "debugtags")
+	else if (TERMARGS(0, "debugtags"))
 	{
 		printEnabledTags();
 
 		return true;
 	}
-	else if (commandName == "debugnone")
+	else if (TERMARGS(0, "debugnone"))
 	{
 
 		return true;
 	}
-	else if (commandName == "errors")
+	else if (TERMARGS(0, "errors"))
 	{
 		for(int i=0; i<errorLogPosition; i++){
-			if(errorLog[i].errorType == errorTypes::HCI_ERROR)
+			if(errorLog[i].errorType == ErrorTypes::HCI_ERROR)
 			{
 				trace("HCI %u %s @%u" EOL, errorLog[i].errorCode, getHciErrorString(errorLog[i].errorCode), errorLog[i].timestamp);
 			}
-			else if(errorLog[i].errorType == errorTypes::SD_CALL_ERROR)
+			else if(errorLog[i].errorType == ErrorTypes::SD_CALL_ERROR)
 			{
 				trace("SD %u %s @%u" EOL, errorLog[i].errorCode, getNrfErrorString(errorLog[i].errorCode), errorLog[i].timestamp);
 			} else {
@@ -249,9 +319,10 @@ bool Logger::TerminalCommandHandler(string commandName, vector<string> commandAr
 #endif
 	return false;
 }
+#endif
 
 /*################### Error codes #########################*/
-const char* Logger::getNrfErrorString(u32 nrfErrorCode)
+const char* Logger::getNrfErrorString(u32 nrfErrorCode) const
 {
 #if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	switch (nrfErrorCode)
@@ -296,23 +367,29 @@ const char* Logger::getNrfErrorString(u32 nrfErrorCode)
 			return "BLE_ERROR_INVALID_CONN_HANDLE";
 		case BLE_ERROR_INVALID_ATTR_HANDLE:
 			return "BLE_ERROR_INVALID_ATTR_HANDLE";
+#if defined(NRF51)
 		case BLE_ERROR_NO_TX_PACKETS:
 			return "BLE_ERROR_NO_TX_PACKETS";
+#endif
 		case 0xDEADBEEF:
 			return "DEADBEEF";
 		default:
 			return "UNKNOWN_ERROR";
 	}
+#else
+	return nullptr;
 #endif
 }
 
-const char* Logger::getBleEventNameString(u16 bleEventId)
+const char* Logger::getBleEventNameString(u16 bleEventId) const
 {
 #if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	switch (bleEventId)
 	{
+#if defined(NRF51)
 		case BLE_EVT_TX_COMPLETE:
 			return "BLE_EVT_TX_COMPLETE";
+#endif
 		case BLE_EVT_USER_MEM_REQUEST:
 			return "BLE_EVT_USER_MEM_REQUEST";
 		case BLE_EVT_USER_MEM_RELEASE:
@@ -377,13 +454,19 @@ const char* Logger::getBleEventNameString(u16 bleEventId)
 			return "BLE_GATTS_EVT_SC_CONFIRM";
 		case BLE_GATTS_EVT_TIMEOUT:
 			return "BLE_GATTS_EVT_TIMEOUT";
+#ifdef NRF52
+		case BLE_GATTS_EVT_HVN_TX_COMPLETE:
+			return "BLE_GATTS_EVT_HVN_TX_COMPLETE";
+#endif
 		default:
-			return "Unknown Error";
+			return "UNKNOWN_EVENT";
 	}
+#else
+	return nullptr;
 #endif
 }
 
-const char* Logger::getHciErrorString(u8 hciErrorCode)
+const char* Logger::getHciErrorString(u8 hciErrorCode) const
 {
 #if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	switch (hciErrorCode)
@@ -469,10 +552,12 @@ const char* Logger::getHciErrorString(u8 hciErrorCode)
 		default:
 			return "Unknown HCI error";
 	}
+#else
+	return nullptr;
 #endif
 }
 
-const char* Logger::getGattStatusErrorString(u16 gattStatusCode)
+const char* Logger::getGattStatusErrorString(u16 gattStatusCode) const
 {
 #if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
 	switch (gattStatusCode)
@@ -542,10 +627,12 @@ const char* Logger::getGattStatusErrorString(u16 gattStatusCode)
 		default:
 			return "Unknown GATT status";
 	}
+#else
+	return nullptr;
 #endif
 }
 
-void Logger::blePrettyPrintAdvData(sizedData advData)
+void Logger::blePrettyPrintAdvData(sizedData advData) const
 {
 
 	trace("Rx Packet len %d: ", advData.length);
@@ -562,34 +649,59 @@ void Logger::blePrettyPrintAdvData(sizedData advData)
 		fieldData.length = fieldSize - 1;
 
 		//Print it
-		convertBufferToHexString(fieldData.data, fieldData.length, hexString, 100);
+		convertBufferToHexString(fieldData.data, fieldData.length, hexString, sizeof(hexString));
 		trace("Type %d, Data %s" EOL, fieldType, hexString);
 
 		i += fieldSize + 1;
 	}
 }
 
-void Logger::logError(errorTypes errorType, u32 errorCode, u16 extraInfo)
+void Logger::logError(ErrorTypes errorType, u32 errorCode, u16 extraInfo)
 {
 	errorLog[errorLogPosition].errorType = errorType;
 	errorLog[errorLogPosition].errorCode = errorCode;
 	errorLog[errorLogPosition].extraInfo = extraInfo;
-	errorLog[errorLogPosition].timestamp = Node::getInstance()->globalTimeSec;
+	errorLog[errorLogPosition].timestamp = (GS->node != nullptr) ? GS->globalTimeSec : 0;
 
 	//Will fill the error log until the last entry (last entry does get overwritten with latest value)
 	if(errorLogPosition < NUM_ERROR_LOG_ENTRIES-1) errorLogPosition++;
+}
+
+//can be called multiple times and will increment the extra each time this happens
+void Logger::logCount(ErrorTypes errorType, u32 errorCode)
+{
+	//Check if the erroLogEntry exists already and increment the extra if yes
+	for (u32 i = 0; i < errorLogPosition; i++) {
+		if (errorLog[i].errorType == errorType && errorLog[i].errorCode == errorCode) {
+			errorLog[i].extraInfo++;
+			return;
+		}
+	}
+
+	//Create the entry
+	errorLog[errorLogPosition].errorType = errorType;
+	errorLog[errorLogPosition].errorCode = errorCode;
+	errorLog[errorLogPosition].extraInfo = 1;
+	errorLog[errorLogPosition].timestamp = GS->globalTimeSec;
+
+	//Will fill the error log until the last entry (last entry does get overwritten with latest value)
+	if (errorLogPosition < NUM_ERROR_LOG_ENTRIES - 1) errorLogPosition++;
 }
 
 //Trivial implementation for converting the timestamp in human readable format
 //This does not pay respect to any leap seconds, gap years, whatever
 void Logger::convertTimestampToString(u32 timestampSec, u16 remainderTicks, char* buffer)
 {
+	u32 gapDays;
+
 	u32 yearDivider = 60 * 60 * 24 * 365;
 	u16 years = timestampSec / yearDivider + 1970;
 	timestampSec = timestampSec % yearDivider;
 
+	gapDays = (years - 1970) / 4 - 1;
 	u32 dayDivider = 60 * 60 * 24;
-	u16 days = timestampSec / dayDivider + 1;
+	u16 days = timestampSec / dayDivider;
+	days -= gapDays;
 	timestampSec = timestampSec % dayDivider;
 
 	u32 hourDivider = 60 * 60;
@@ -602,61 +714,50 @@ void Logger::convertTimestampToString(u32 timestampSec, u16 remainderTicks, char
 
 	u32 seconds = timestampSec;
 
-	sprintf(buffer, "approx. %u years, %u days, %02uh:%02um:%02us,%u ticks", years, days, hours, minutes, seconds, remainderTicks);
+	snprintf(buffer, 80, "approx. %u years, %u days, %02uh:%02um:%02us,%u ticks", years, days, hours, minutes, seconds, remainderTicks);
 }
 
 //FIXME: This method does not know the destination buffer length and could crash the system
 //It also lets developers run into trouble while debugging....
-void Logger::convertBufferToHexString(u8* srcBuffer, u32 srcLength, char* dstBuffer, u16 bufferLength)
+void Logger::convertBufferToHexString(const u8* srcBuffer, u32 srcLength, char* dstBuffer, u16 bufferLength)
 {
 	memset(dstBuffer, 0x00, bufferLength);
 
 	char* dstBufferStart = dstBuffer;
 	for (u32 i = 0; i < srcLength; i++)
 	{
-		dstBuffer += sprintf(dstBuffer, i < srcLength - 1 ? "%02X:" : "%02X\0", srcBuffer[i]);
-		if(dstBuffer - dstBufferStart > bufferLength - 7){
-			dstBuffer[0] = '.';
-			dstBuffer[1] = '.';
-			dstBuffer[2] = '.';
+		//We need to have at least 3 chars to place our .. if the string is too long
+		if(dstBuffer - dstBufferStart + 3 < bufferLength){
+			dstBuffer += snprintf(dstBuffer, bufferLength, i < srcLength - 1 ? "%02X:" : "%02X\0", srcBuffer[i]);
+		} else {
+			SIMEXCEPTION(BufferTooSmallException);
+			dstBuffer[-3] = '.';
+			dstBuffer[-2] = '.';
+			dstBuffer[-1] = '\0';
 			break;
 		}
+
 	};
 }
 
-void Logger::parseHexStringToBuffer(const char* hexString, u8* dstBuffer, u16 dstBufferSize)
+u32 Logger::parseHexStringToBuffer(const char* hexString, u8* dstBuffer, u16 dstBufferSize)
 {
 	u32 length = (strlen(hexString)+1)/3;
-	if(length > dstBufferSize) logt("ERROR", "too long for dstBuffer");
+	if(length > dstBufferSize){
+		logt("ERROR", "too long for dstBuffer");
+		length = dstBufferSize;
+		SIMEXCEPTION(BufferTooSmallException);
+	}
 
 	for(u32 i = 0; i<length; i++){
-		dstBuffer[i] = (u8)strtoul(hexString + (i*3), NULL, 16);
+		dstBuffer[i] = (u8)strtoul(hexString + (i*3), nullptr, 16);
 	}
+
+	return length;
 }
 
 void Logger::disableAll()
 {
-	logFilter.clear();
+	activeLogTags.zeroData();
 	logEverything = false;
-}
-
-const char* Logger::getPstorageStatusErrorString(u16 operationCode)
-{
-#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
-	switch(operationCode){
-		case PSTORAGE_CLEAR_OP_CODE:
-			return "Error when Clear Operation was requested";
-
-		case PSTORAGE_LOAD_OP_CODE:
-			return "Error when Load Operation was requested";
-
-		case PSTORAGE_STORE_OP_CODE:
-			return "Error when Store Operation was requested";
-
-		case PSTORAGE_UPDATE_OP_CODE:
-			return "Update an already touched storage block";
-		default:
-			return "Unknown operation code";
-	}
-#endif
 }

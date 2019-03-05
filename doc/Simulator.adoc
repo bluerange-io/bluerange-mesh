@@ -1,0 +1,44 @@
+<<_index.adoc#,Home>>
+
+= Simulator
+
+____
+The Flash simulator shows a very early stage of our mesh development. It
+is useful for showing the mesh basics, but does not reflect the current
+state of our implementation. Have a look at <<CherrySim.adoc#,CherrySim>>
+for our new simulator.
+____
+
+There is a mesh simulator available in the `fruitymesh/sim/` folder that
+demonstrates the functionality of the algorithm. You can start it by
+either executing the .swf file directly or by opening the html page.
+
+image:img/simulator.png[Simulator]
+
+== Usage The simulator will start with a basic configuration that
+contains a few nodes, the ClusterScore is only calculated by using the
+clusterSize and the free connections that a node has. You start the
+Simulation by clicking on *Start Advertising*. The nodes will then
+advertise to their neighbours and will connect or disconnect based on
+the algorithm. You can see some statistics in the textbox in the lower
+left. You can find info about the individual nodes by hovering over them
+with your mouse cursor.
+
+For more detailed information on the algorithm have a look at
+<<The-FruityMesh-Algorithm.adoc#,The FruityMesh Algorithm>>
+
+==== Modifying the nodes A number of random nodes can be created by
+entering their number and clicking on *Create Random nodes*. Moreover,
+you can add a new node by double-clicking anywhere in the empty space of
+the simulation. Nodes can be moved via drag and drop and their send
+range can be modified by hovering over the node and rotating the mouse
+wheel. Removing a node is supported by `Alt + Mouse click`.
+
+==== Importing or exporting node configurations You can export a json of
+the current node configuration and copy/paste it in your favourite text
+editor so you can import it again later.
+
+==== Sending Data You can send a data packet through the mesh by doing
+`Ctrl + Mouse click` onany node. Data flow is illustrated as
+green-flashing arrows in one direction and blue-flashing arrows in the
+other direction.
