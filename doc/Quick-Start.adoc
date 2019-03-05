@@ -27,13 +27,13 @@ You should add the *bin/* folder of the installation to your operating system PA
 Plug in your nrf51 or nrf52 development board via USB, then open a command prompt in the FruityMesh folder and type in the following command for flashing the nrf51 version:
 
 ----
-C:/<path_to_nrfjprog>/nrfjprog.exe --chiperase --program _build/fruitymesh_nrf51_s130.hex --reset
+C:/<path_to_nrfjprog>/nrfjprog.exe --chiperase --program binary/fruitymesh_nrf51_s130.hex --reset
 ----
 
 or the following for nrf52:
 
 ----
-C:/<path_to_nrfjprog>/nrfjprog.exe --chiperase --program _build/fruitymesh_nrf52_s132.hex --reset
+C:/<path_to_nrfjprog>/nrfjprog.exe --chiperase --program binary/fruitymesh_nrf52_s132.hex --reset
 ----
 
 Your output should look like this:
