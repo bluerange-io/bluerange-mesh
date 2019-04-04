@@ -58,6 +58,5 @@ The implementation has been written in C++ because this makes it easy to impleme
 If you have documentation to add, please post a pull request as well.
 
 = Licence
-FruityMesh is published under the GPLv3 version which is available in the repository. 
-
-TODOm Dual licence ?
+FruityMesh is published under the GPLv3 version which is available in the repository.
+Our commercial license called "BlueRange" is available by sales@mwaysolutions.com
