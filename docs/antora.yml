@@ -1,4 +1,5 @@
 name: fruitymesh
 title: Fruitymesh
-# version:
+# version: master
+# start_page: index or README.adoc
 nav: modules/ROOT/nav.adoc
