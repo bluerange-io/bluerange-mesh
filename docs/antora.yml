@@ -1,4 +1,4 @@
 name: fruitymesh
 title: Fruitymesh
-start_page: ROOT:index.adoc
+# version:
 nav: modules/ROOT/nav.adoc
