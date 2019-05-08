@@ -1,4 +1,4 @@
-image:docs/img/logo.png[fruitymesh]
+image:img/logo.png[fruitymesh]
 
 Version 0.8.8
 
