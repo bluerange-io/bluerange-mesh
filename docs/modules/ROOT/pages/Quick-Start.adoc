@@ -1,6 +1,8 @@
 
 = Quick start
+
 <<README.adoc#,Home>>
+
 image:img/eclipse.png[eclipse-luna]
 image:img/cpp.png[cplusplus]
 
