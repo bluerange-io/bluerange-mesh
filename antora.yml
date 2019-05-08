@@ -1,6 +1,0 @@
-name: fruitymesh
-title: Fruitymesh
-version: master
-start_page: docs/modules/ROOT:Node.adoc
-nav:
-  - docs/modules/ROOT/pages/nav.adoc
