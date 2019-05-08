@@ -1,5 +1,5 @@
 ifndef::imagesdir[:imagesdir: docs/modules/ROOT/assets/images]
-ifndef::sourcedir[sourcedir: docs/modules/ROOT/pages] somehow make this path thing work in the repository
+ifndef::link[:link: docs/modules/ROOT/pages] somehow make this path thing work in the repository
 image:img/logo.png[fruitymesh]
 
 Version 0.8.8
