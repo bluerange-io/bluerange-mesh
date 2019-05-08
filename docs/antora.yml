@@ -3,4 +3,4 @@ title: Fruitymesh
 version: master
 # start_page: ROOT:README.adoc
 nav:
-  - ROOT::README.adoc
+  - modules/ROOT/PAGES/README.adoc
