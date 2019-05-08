@@ -1,6 +1,6 @@
 = Contents
 
-* <<README.adoc#News,Home>>
+// * <<README.adoc#News,Home>> maybe include this only in the Repo version somehow?
 * <<Quick-Start.adoc#,Quick Start>>
 * <<Usage.adoc#,Usage>>
 * <<Features.adoc#,Features>>
