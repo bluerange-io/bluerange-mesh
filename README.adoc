@@ -1,5 +1,5 @@
 ifndef::imagesdir[:imagesdir: docs/modules/ROOT/assets/images]
-ifndef::path[path: docs/modules/ROOT/assets/]
+ifndef::path[path: docs/modules/ROOT/pages]
 image:img/logo.png[fruitymesh]
 
 Version 0.8.8
