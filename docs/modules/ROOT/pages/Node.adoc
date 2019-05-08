@@ -1,4 +1,4 @@
-<<README.adoc#,Home>>
+<<../README.adoc#,Home>>
 
 = Node
 
@@ -182,7 +182,7 @@ As any other message in the mesh, every message in the raw send protocol could b
 
 [cols=",",options="header",]
 |===
-|Dropped message | Reaction 
+|Dropped message | Reaction
 |raw_data_start or raw_data_start_received | The sender must send the raw_data_start again after a timeout of 10 seconds or stop the transmission. The receiver thus has to be able to handle several successive raw_data_start messages with the same content (in case the raw_data_start_received message is dropped) as well as closing a dropped connection after a timeout of 15 seconds (in case the sender does not send another raw_data_start).
 |raw_data_chunk | Missing chunks are reported in raw_data_report once the last chunk is received. These missing chunks must be resent.
 |Last raw_data_chunk or raw_data_report | Using the ChunkID, both sender and receiver are able to identify the last data chunk. If this message or the raw_data_report is dropped, the sender must send the last chunk again. This however means that the receiver is only allowed to save the last chunk id once the first chunk after a raw_data_report is received, not immediately after the raw_data_report is sent.
@@ -328,7 +328,7 @@ This command indicates that some error occurred and the transmission must be clo
 |===
 |Error Code | Name | Meaning
 | 1 | Unexpected end of transmission | Three timeouts happened without receiving a message from the transmission partner.
-| 2 | Not in a transmission | A raw_data_chunk or raw_data_report was received without an open transmission. 
+| 2 | Not in a transmission | A raw_data_chunk or raw_data_report was received without an open transmission.
 | 3 | Malformed Message | A message was received which was malformed and did not fit any other error code.
 | 4 | Unsupported Protocol | The receiver is unable to interpret the given protocol.
 | 5 | Malformed GZIP | The receiver got all chunks but could could not unpack the gzip.
@@ -341,7 +341,7 @@ This command indicates that some error occurred and the transmission must be clo
 |===
 |Destination Code | Name | Meaning
 | 1 | Sender | The error is sent to the sender.
-| 2 | Receiver | The error is sent to the receiver. 
+| 2 | Receiver | The error is sent to the receiver.
 | 3 | Both | The error is sent both to the sender and the receiver.
 |===
 
