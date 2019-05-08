@@ -1,7 +1,7 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
+<<README.adoc#,Home>>
 = Quick start
 
-<<README.adoc#,Home>>
 
 image:img/eclipse.png[eclipse-luna]
 image:img/cpp.png[cplusplus]
