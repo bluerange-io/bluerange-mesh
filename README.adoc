@@ -1,4 +1,5 @@
-image:docs/img/logo.png[fruitymesh]
+ifndef::imagesdir[:imagesdir: docs/modules/ROOT/assets/images]
+image:logo.png[fruitymesh]
 
 Version 0.8.8
 
@@ -13,7 +14,7 @@ https://www.bluerange.io/
 It's been a long time, but we finally released our latest version of FruityMesh with tons of new additions and a lot of refactoring and documentation. Go to the <<doc/Features.adoc#,Features>> page to find out more.
 
 === Documentation
-image:doc/img/documentation.png[]
+image:documentation.png[]
 
 Documentation is the key and therefore, you should have a look at the documentation to get you started. You can find it as part of the repository in the doc folder:
 
@@ -31,7 +32,7 @@ We’re interested in contributions of every kind, otherwise we wouldn’t be he
 Do not hesitate to ask questions, submit issues and comment. Mail us through our website for business enquiries or open an issue and label it as _question_ for developer questions.
 
 == Who are we?
-image:doc/img/mway.png[mway_logo]
+image:mway.png[mway_logo]
 
 This project is under active development at the link:http://www.mwaysolutions.com/[M-Way Solutions GmbH], Germany.
 

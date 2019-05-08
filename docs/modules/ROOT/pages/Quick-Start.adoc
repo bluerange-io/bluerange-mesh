@@ -1,10 +1,10 @@
-ifndef::imagesdir[:imagesdir: ]
+ifndef::imagesdir[:imagesdir: ../assets/images]
 = Quick start
 
 <<README.adoc#,Home>>
 
-image:img/eclipse.png[eclipse-luna]
-image:img/cpp.png[cplusplus]
+image:{imagesdir}eclipse.png[eclipse-luna]
+image:cpp.png[cplusplus]
 
 FruityMesh was built with Eclipse and GCC and is mainly written in C++, with some small C++11 bits. Setting up the development environment has become pretty straightforward.
 
