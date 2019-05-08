@@ -1,7 +1,6 @@
-
+ifndef::imagesdir[:imagesdir: ]
 = Quick start
 
-ifndef::imagesdir[:imagesdir: .]
 <<README.adoc#,Home>>
 
 image:img/eclipse.png[eclipse-luna]
