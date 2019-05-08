@@ -1,5 +1,5 @@
 ifndef::imagesdir[:imagesdir: docs/modules/ROOT/assets/images]
-ifndef::path[path: docs/modules/ROOT/pages]
+ifndef::sourcedir[sourcedir: docs/modules/ROOT/pages] somehow make this path thing work in the repository
 image:img/logo.png[fruitymesh]
 
 Version 0.8.8
@@ -22,7 +22,7 @@ Documentation is the key and therefore, you should have a look at the documentat
 <<doc/README.adoc#,Documentation>>
 
 == Where to begin
-Before you begin, you should have at least two boards with the nRF51/nRF52 chipsets and either an external or an onboard debugger. If not, I suggest that you get two link:https://www.nordicsemi.com/Software-and-Tools/Development-Kits[DevKits from Nordic] to get you started as easily and quickly as possible. Next, have a look at the <<doc/Quick-Start.adoc#,Quick Start>> page to get everything running. Then test some commands from the <<{path}Usage.adoc#,Usage>> page. Afterwards, you could follow one of the <<doc/Tutorials.adoc#,Tutorials>>.
+Before you begin, you should have at least two boards with the nRF51/nRF52 chipsets and either an external or an onboard debugger. If not, I suggest that you get two link:https://www.nordicsemi.com/Software-and-Tools/Development-Kits[DevKits from Nordic] to get you started as easily and quickly as possible. Next, have a look at the <<doc/Quick-Start.adoc#,Quick Start>> page to get everything running. Then test some commands from the <<Usage.adoc#,Usage>> page. Afterwards, you could follow one of the <<doc/Tutorials.adoc#,Tutorials>>.
 
 == What to expect
 Take some nRF devices, flash them with FruityMesh and expect them to connect to each other in an instant. Open the terminal and send them some commands over the mesh, trigger LEDs or watch some data going through. Power consumption is minimal with the right settings. For a list of some of the features, have a look at the <<doc/Features.adoc#,Features>> page.
