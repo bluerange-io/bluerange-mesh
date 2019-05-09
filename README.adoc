@@ -1,5 +1,4 @@
 ifndef::imagesdir[:imagesdir: docs/modules/ROOT/assets/images]
-// ifndef::id[:id: docs/modules/ROOT/pages]
 ifdef::env-github,env-browser[:relfileprefix: docs/modules/ROOT/pages/]
 image:img/logo.png[fruitymesh]
 

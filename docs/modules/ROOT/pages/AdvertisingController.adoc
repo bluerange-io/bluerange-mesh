@@ -1,4 +1,4 @@
-<<README.adoc#,Home>>
+<<../nav.adoc#,Home>>
 
 = AdvertisingController
 
