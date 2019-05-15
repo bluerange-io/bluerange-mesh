@@ -3,4 +3,4 @@ title: Fruitymesh
 version: master
 start_page: ROOT:nav1.adoc
 nav:
-  - modules/ROOT/pages/nav1.adoc
+  - modules/ROOT/pages/nav.adoc
