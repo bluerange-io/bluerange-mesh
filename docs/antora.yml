@@ -1,6 +1,5 @@
 name: fruitymesh
 title: Fruitymesh
 version: master
-start_page: fruitymesh:ROOT:../../README.adoc
 nav:
   - modules/ROOT/pages/nav.adoc
