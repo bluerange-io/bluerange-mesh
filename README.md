@@ -1,1 +1,1 @@
-include:: docs/modules/ROOT/pages/README.adoc[]
+include::./docs/modules/ROOT/pages/README.adoc[]
