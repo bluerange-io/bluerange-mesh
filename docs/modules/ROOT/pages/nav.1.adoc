@@ -8,4 +8,9 @@ ifdef::env-github,env-browser[:relfileprefix: pages/]
 * <<Developers.adoc#,Developers>>
 * <<Specification.adoc#,Specification>>
 
+* <<Modules.adoc#,Modules>>
+** <<AdvertisingModule.adoc#,AdvertisingModule>>
+** <<DebugModule.adoc#,DebugModule>>
+** <<DfuModule.adoc#,DfuModule>>
+
 
