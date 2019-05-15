@@ -4,3 +4,4 @@ version: master
 start_page: ROOT:Quick-Start.adoc
 nav:
   - modules/ROOT/pages/test_nav.adoc
+  - modules/ROOT/pages/nav.adoc
