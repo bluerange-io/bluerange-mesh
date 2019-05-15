@@ -1,3 +1,4 @@
+ifndef::imagesdir[:imagesdir: ../assets/images]
 <<README.adoc#,Home>>
 
 = FruityMesh Algorithm in Detail
@@ -303,7 +304,7 @@ partner, but it has to be evaluated whether directed advertising
 messages provide better results. Using the slave connection procedure
 takes more time because of this challenge and response scheme.
 
-= Implementation 
+= Implementation
 == Packet Structure
 
 Because of the limited number of bytes that can – and should – be

@@ -1,3 +1,5 @@
+ifndef::imagesdir[:imagesdir: ../assets/images]
+
 <<README.adoc#,Home>>
 
 == Implementing a Custom Module
@@ -95,9 +97,9 @@ if(TERMARGS(0, "pingmod")){
     //Get the id of the target node
     nodeID targetNodeId = atoi(commandArgs[0]);
     logt("PINGMOD", "Trying to ping node %u", targetNodeId);
-    
+
     //TODO: Send ping packet to that node
-    
+
     return true;
 }
 ----
@@ -264,11 +266,11 @@ void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConn
 
                 //Inform the user
                 logt("PINGMOD", "Ping request received with data: %d", packet->data[0]);
-                
+
                 u8 data[2];
                 data[0] = packet->data[0];
                 data[1] = 111;
-                
+
                 //Send ping packet to that node
                 SendModuleActionMessage(
                         MESSAGE_TYPE_MODULE_ACTION_RESPONSE,

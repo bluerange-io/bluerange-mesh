@@ -1,3 +1,5 @@
+ifndef::imagesdir[:imagesdir: ../assets/images]
+
 <<README.adoc#,Home>>
 
 = Features
@@ -50,4 +52,4 @@ customization of FruityMesh for many of our customers.
 * Coming soon to GitHub: Our CherrySim - written in C++ - simulates the
 mesh using the FruityMesh code and allows us to implement unit and
 system tests. image:img/cherrysim.png[cherrysim]
-* 
+*

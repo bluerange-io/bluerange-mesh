@@ -1,10 +1,11 @@
+ifndef::imagesdir[:imagesdir: ../assets/images]
 <<README.adoc#,Home>>
 
 = Modules overview
 
 FruityMesh consists of a number of different Modules. There are the core modules which are part of the open source distribution, which deliver standard functionality. Also, there are other modules, some developed by us or by other developers that can provide specific functionality and built on our mesh framework.
 
-== General 
+== General
 All modules share a set of commands for loading and retrieving their configuration, for activating and deactivating them and for triggering actions.
 
 Each Custom Module should extend the Module class to have a set of methods that it can override. Some of these methods are explained below:
@@ -30,7 +31,7 @@ ____
 Commands are given with arguments in brackets *[arg]*. These must be entered by the user. Arguments in curly brackets *\{arg}* are optional.
 ____
 
-==== Configuring a Module 
+==== Configuring a Module
 Sends a new module configuration to any node.
 The resulting binary configuration will be copied to the
 module-configuration of the specified module.
@@ -43,7 +44,7 @@ set_config [nodeID | "this"] [module-name] [hex-string] {requestHandle}
 set_config 0 io 06:01:01:00:00 0
 ----
 
-==== Requesting the Configuration of a Module 
+==== Requesting the Configuration of a Module
 Prints the configuration
 of a specific module
 
@@ -56,7 +57,7 @@ get_config [nodeID  | "this"] [module name]
 get_config this adv
 ----
 
-==== Activating / Deactivating a module at runtime 
+==== Activating / Deactivating a module at runtime
 Activates or
 deactivates a specific module.
 
@@ -70,7 +71,7 @@ set_active 0 scan on //activates the scan module
 set_active 0 adv off //deactivates the advertising module
 ----
 
-== Module Commands 
+== Module Commands
 Most module commands are structured in the same way.
 You have to give the nodeId that should process the command, specify the
 module and a command that should be triggered.
@@ -87,7 +88,7 @@ action 0 status get_device_info //Get the device info of all nodes
 action 123 status get_status //Get the current status from node 123
 ----
 
-== Open Source Modules 
+== Open Source Modules
 The following modules are currently part of the
 open source release:
 
