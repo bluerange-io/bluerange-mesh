@@ -1,6 +1,4 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
-<<README.adoc#,Home>>
-
 = FruityMesh Algorithm in Detail
 
 ____

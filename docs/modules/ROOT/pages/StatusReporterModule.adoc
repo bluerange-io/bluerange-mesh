@@ -1,22 +1,20 @@
-<<README.adoc#,Home>>
-
 = StatusReporterModule (moduleId 3)
 
-== Purpose 
+== Purpose
 This module should report the node's
 status according to a configured interval. Furthermore, it provides
 methods for directly requesting different kinds of device info, status,
 etc,... data.
 
-== Functionality 
+== Functionality
 The StatusReporterModule can periodically send out
 different kinds of information messages. It will also feed the watchdog
 once keep alive messages are received. It is responsible for sending out
 logged error codes and for measuring the necessary data for its messages
 such as the battery power.
 
-== Terminal Commands 
-=== Device Information 
+== Terminal Commands
+=== Device Information
 Generic information about a
 node that does not change or very seldomly - only through enrollment or
 firmware update, can be requested via the get_device_info command.
@@ -27,7 +25,7 @@ firmware update, can be requested via the get_device_info command.
 action [nodeId] status get_device_info
 ----
 
-=== Status Information 
+=== Status Information
 Information that is bound to change from time to
 time can be requested using the get_status command.
 
@@ -37,7 +35,7 @@ time can be requested using the get_status command.
 action [nodeId] status get_status
 ----
 
-=== Connection Information 
+=== Connection Information
 Information about the mesh connections of a
 node can be requested with the following command.
 
@@ -53,7 +51,7 @@ action [nodeId] status get_connections
 action [nodeId] status get_nearby
 ----
 
-=== Livereports 
+=== Livereports
 Livereports are a way to send information about errors,
 connections, disconnecttions and other important events to the user
 through the mesh. Each livereport has a unique id according to its
@@ -86,7 +84,7 @@ actionType: GET_DEVICE_INFO
 |8 |connPacketModule |
 |===
 
-==== Response 
+==== Response
 actionType: DEVICE_INFO
 
 The device info contains information about the device that is not
@@ -113,8 +111,8 @@ firmware update, matching groups are allowed to receive the firmware.
 |2 |bootloaderVersion |version of the bootloader
 |===
 
-=== Device Info 
-==== Request 
+=== Device Info
+==== Request
 actionType: GET_DEVICE_INFO_V2
 
 [cols=",,",options="header",]
@@ -123,7 +121,7 @@ actionType: GET_DEVICE_INFO_V2
 |8 |connPacketModule |
 |===
 
-==== Response 
+==== Response
 actionType: DEVICE_INFO_V2
 
 The device info contains information about the device that is not
@@ -167,8 +165,8 @@ firmware.
 |2 |u16 |bootloaderVersion |version of the bootloader
 |===
 
-=== Status 
-==== Request 
+=== Status
+==== Request
 actionType: GET_STATUS
 
 [cols=",,",options="header",]
@@ -180,11 +178,11 @@ actionType: GET_STATUS
 ==== Response actionType: STATUS
 
 The device status contains information that is changing from time to
-time. 
+time.
 
 [cols=",,",options="header",]
 |===
-|Bytes|Type|Description 
+|Bytes|Type|Description
 |8|connPacketModule|
 |2|clusterSize|Size of the cluster that the node is connected to
 (current mesh size) |2|inConnectionPartner|NodeId of the node that is
@@ -198,12 +196,12 @@ beacon and sent the SET_INITIALIZED command, this bit will be 1 until a
 reboot is encountered |7 bit|reserved|
 |===
 
-=== Connections 
+=== Connections
 Query all nodeIDs that a node is connected to including
 the connection rssi. The first entry is the incoming connection, the
 others are outgoing.
 
-==== Request 
+==== Request
 actionType: GET_ALL_CONNECTIONS
 
 [cols=",,",options="header",]
@@ -212,19 +210,19 @@ actionType: GET_ALL_CONNECTIONS
 |8 |connPacketModule |
 |===
 
-==== Response 
+==== Response
 actionType: ALL_CONNECTIONS
 
 The device status contains information that is changing from time to
-time. 
+time.
 [cols=",,",options="header",]
 |===
-|Bytes|Type|Description 
+|Bytes|Type|Description
 |8|connPacketModule|
 |3*x|connections|Returns an array of all partnerEntries
 |===
 
-===== PartnerEntry 
+===== PartnerEntry
 
 [cols=",,",options="header",]
 |===
@@ -233,11 +231,11 @@ time.
 nodeId of the connected node |1|rssi| the rssi as a signed integer
 |===
 
-=== Nearby Nodes 
+=== Nearby Nodes
 Returns all nodes (limited to some maximum count) that
 are surrounding the node with the same networkid.
 
-==== Request 
+==== Request
 actionType: GET_NEARBY_NODES
 
 [cols=",,",options="header",]
@@ -246,8 +244,8 @@ actionType: GET_NEARBY_NODES
 |8 |connPacketModule |
 |===
 
-==== Response 
-actionType: NEARBY_NODES 
+==== Response
+actionType: NEARBY_NODES
 [cols=",,",options="header",]
 |===
 |Bytes|Type|Description
@@ -255,10 +253,10 @@ actionType: NEARBY_NODES
 NearbyNodeEntries
 |===
 
-===== NearbyNodeEntry 
+===== NearbyNodeEntry
 [cols=",,",options="header",]
 |===
-|Bytes|Type|Description 
+|Bytes|Type|Description
 |2|nodeId|The
 nodeId of the nearby node |1|rssi| the rssi as a signed integer
 |===
@@ -294,8 +292,8 @@ enum LiveReportTypes {
 };
 ----
 
-==== Event 
-actionType: LIVE_REPORT 
+==== Event
+actionType: LIVE_REPORT
 |===
 |Bytes|Type|Description
 

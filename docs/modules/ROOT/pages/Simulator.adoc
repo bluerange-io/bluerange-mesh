@@ -1,6 +1,4 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
-<<README.adoc#,Home>>
-
 = Simulator
 
 ____

@@ -1,8 +1,6 @@
-<<README.adoc#,Home>>
-
 = MeshAccessModule (moduleId 10)
 
-== Purpose 
+== Purpose
 
 The MeshAccessModule provides a simple way of accessing the mesh through a Smartphone, it also provides
 a way to connect to other meshes or access other devices that support
@@ -10,7 +8,7 @@ the functionality. It works over unencrypted GAP connections and uses a
 custom encryption on top to bypass operating system limitations of
 different devices.
 
-== Functionality 
+== Functionality
 The MeshAccessModule works in conjunction with the MeshAccessConnection. The module provides the necessary services while
 the connection handles an individual connection after it was set up.
 
@@ -62,7 +60,7 @@ remote mesh to our mesh.
 send and receive data to/from the node but we cannot send data to the
 remote mesh.
 
-=== Authorization 
+=== Authorization
 Depending on the key type, certain messages are not
 allowed to be sent through a MeshAccessConnection. The key type can be
 any of the <<Specification.adoc#EncryptionKeys,EncryptionKeys>>.
@@ -73,7 +71,7 @@ possible. Blacklisting always has preference over whitelisting. If a
 message got blacklisted by a module, it cannot get whitelisted by
 another module.
 
-=== MeshAccess Broadcast Messages 
+=== MeshAccess Broadcast Messages
 The Mesh Configuration and Access
 Service is broadcasted by active nodes that provide Mesh Access to
 Smartphones or other devices through GATT.
@@ -101,7 +99,7 @@ that is available over the meshaccess connection
 |**7**||**Reserved**|
 |===
 
-=== GATT Service 
+=== GATT Service
 The MeshAccess Service is offered under a different
 UUID (a 128 bit UUID) in order to seperate different services from each
 other.
@@ -114,7 +112,7 @@ After a connection is made, it is necessary to register notifications on
 the TX characteristic in order to receive data from the node. Do not
 send any data before notifications are enabled!
 
-=== Encryption Handshake 
+=== Encryption Handshake
 To establish a connection, the following has to
 be done:
 
@@ -186,8 +184,8 @@ storing the keyId in the first 4 bytes of the message and encrypting the
 cleartext with the userBaseKey. The resulting ciphertext is the derived
 user key.
 
-== Terminal Commands 
-=== Connection Establishment 
+== Terminal Commands
+=== Connection Establishment
 Instructs a node to build a MeshAccessConneciton to another node. The connection state will be notified back to the requester.
 
 [source,C++]
@@ -200,7 +198,7 @@ action [nodeId] ma connect [bleAddress] {keyId} {keyHex} {tunnelType} {requestHa
 action this ma connect 00:11:22:33:44:55 1 11:22:33:44:11:22:33:44:11:22:33:44:11:22:33:44
 ----
 
-=== Connection Disconnection 
+=== Connection Disconnection
 Disconnect from a device if is connected
 using a MeshAccessConnection on that node.
 
@@ -213,7 +211,7 @@ action [nodeId] ma disconnect [bleAddress] {requestHandle}
 action this ma disconnect 00:11:22:33:44:55
 ----
 
-== Messages 
+== Messages
 === Message Types
 
 [source,C++]
@@ -224,7 +222,7 @@ action this ma disconnect 00:11:22:33:44:55
 #define MESSAGE_TYPE_ENCRYPT_CUSTOM_DONE 28
 ----
 
-=== StartHandshake 
+=== StartHandshake
 The central starts the encrypting process by sending
 the following unencrypted packet.
 
@@ -252,7 +250,7 @@ PEER to PEER if it wants.
 |6 bit |u8:6 |reserved |
 |===
 
-=== HandshakeANonce 
+=== HandshakeANonce
 The peripheral will generate a random nonce with a
 length of 8 bytes andanswer with an unencrypted packet. The peripheral
 can also start to generate the session decryption key at this time (see
@@ -269,7 +267,7 @@ peripheral will only acceppt encrypted packets from now on.
 |4 |u32 |anonce[1] |Second part of the anonce.
 |===
 
-=== HandshakeSNonce 
+=== HandshakeSNonce
 The central must now generate a random 8 byte
 nonce as well. It is then able to calculate both session keys, the key
 for encryption and the key for decryption. It will then send the
@@ -287,7 +285,7 @@ to calculate the session decryption key for receiving packets.
 |4 |u32 |snonce[1] |Second part of the snonce.
 |===
 
-=== HandshakeDone 
+=== HandshakeDone
 The peripheral will answer with the final handshake
 packet to state that the handshake was completed successfully. This
 packet is of course transmitted encrypted

@@ -1,7 +1,5 @@
-<<README.adoc#,Home>>
-
 = Usage
-== LED codes 
+== LED codes
 When a node is plugged into power it should blink its red
 LED to signal that it is not connected. Once two nodes are connected to
 each other, they do a handshake which is signaled by a blue LED. Once
@@ -11,7 +9,7 @@ number of active connections to other nodes. If your hardware does not
 have colored LEDs, the LEDs are LED1 for red, LED2 for green and LED3
 for blue.
 
-== Terminal Commands 
+== Terminal Commands
 All classes can implement an interface called
 TerminalCommandListener which allows them to listen for commands entered
 via either the UART or Segger RTT terminal. These commands can either be
@@ -57,7 +55,7 @@ Have a look at the <<Specification.adoc#NodeIDs,NodeIDs section>> for
 some insights on how you can address nodes individually or in groups.
 ____
 
-== More Commands 
+== More Commands
 FruityMesh is structured in Modules. Each module
 provides its own set of commands. A detailed listing of all available
 modules and their commands can be found on the

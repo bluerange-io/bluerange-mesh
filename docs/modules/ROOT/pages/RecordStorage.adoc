@@ -1,5 +1,3 @@
-<<README.adoc#,Home>>
-
 = RecordStorage
 
 ==== Purpose
@@ -15,7 +13,7 @@ Most important features of RecordStorage are:
 * defragmentation
 
 A record is identified by its _recordId_, thus every record need to have unique _recordId_. Records store some metadata like: id, lenght, crc and the record version in addition to the data.
-The crc of the record is checked every time a record is accessed. Records with invalid crc will be ignored and removed during next defragmentation or swap. 
+The crc of the record is checked every time a record is accessed. Records with invalid crc will be ignored and removed during next defragmentation or swap.
 The _versionCounter_ is used determine the version of the record. When a record is updated, it is not deleted, but new record with incremented _versionCounter_ is created. When reading, only the record with newest _versionCounter_ is returned, which means that a record becomes inactive as soon as a newer version of this record is stored. Inactive records are removed during defragmentation.
 
 NOTE: The _versionCounter_ and _pageVersion_ have a maximum of 65535. This is the maximum number of times a record can be updated and the maximum number of times that pages can be swapped.

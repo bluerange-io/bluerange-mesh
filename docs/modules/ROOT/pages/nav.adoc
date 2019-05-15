@@ -1,7 +1,7 @@
 ifdef::env-github,env-browser[:relfileprefix: ./]
 = Contents
 
-// * <<README.adoc#News,Home>> maybe include this only in the Repo version somehow?
+// * <<README.adoc#News  maybe include this only in the Repo version somehow?
 * <<Quick-Start.adoc#,Quick Start>>
 * <<Usage.adoc#,Usage>>
 * <<Features.adoc#,Features>>

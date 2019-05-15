@@ -1,13 +1,11 @@
-<<README.adoc#,Home>>
-
-= Specification 
+= Specification
 
 Most parts of the protocol should not be modified to
 enable interoperability. Some of the protocol decisions are found on
 this page and ongoing discussions will show whether some of these
 specifications should be changed.
 
-== Advertising Packets 
+== Advertising Packets
 FruityMesh uses a number of advertising packets,
 the most important one being the JOIN_ME packet that is used for
 discovery of nearby nodes that also run FruityMesh.
@@ -27,13 +25,13 @@ There are two types of advertising packets used by FruityMesh. One uses the manu
 |1|u8|messageType|Used to identify a number of different advertising messages within the mesh
 |===
 
-==== Manufacturer id 
+==== Manufacturer id
 The company id 0x024D (M-Way Solutions GmbH) is registered with the Bluetooth SIG and may be used by any implementation that conforms to the latest specifications of the FruityMesh protocol.
 
-==== Mesh identifier 
+==== Mesh identifier
 The mesh identifier is 0xF0. No other identifier shall be used. Future versions might change this identifier. The purpose of the mesh identifier is to enable different protocols under the same manufacturer id.
 
-==== Network identifier 
+==== Network identifier
 The network identifier can be changed by the user. In combination with the networkKey, this allows different meshes to co-exist in the same physical area. It is set either during flashing or during enrollment.
 
 ==== Message Type
@@ -77,7 +75,7 @@ Another type of advertising packets used by FruityMesh uses the Service Data Adv
 === Other Advertising Packets
 FruityMesh can be used to distribute all advertising packets that conform to the BLE specification. These can be Eddystone, iBeacon or any other kind of advertising messages. These are however not essential for FruityMesh itself and are therefore not documented here. Have a look at the <<AdvertisingModule.adoc#,AdvertisingModule>> for more information.
 
-== Connection Packets 
+== Connection Packets
 The mesh uses a number of packets that are sent
 over connections. Most packets that are sent over connections must have this header. There are some exceptions to this (e.g. split packets use a two byte message header for less overhead. The messageType is used to identify if the connPacketHeader is used or not.
 
@@ -142,7 +140,7 @@ possible (not yet implemented)
 multiple meshes for the same organization
 * All other nodeIds are currently reserved
 
-== Serial Numbers / SerialNumberIndex 
+== Serial Numbers / SerialNumberIndex
 The serial numbers are assigned
 randomly using the chipId when developing with the open source variant.
 They should however be uniquely assigned using the UICR once devices go
@@ -152,41 +150,41 @@ unsigned integer that can be uniquely mapped from and to a serial number
 using the GenerateBeaconSerialForIndex and GetIndexForSerial methods in
 the Utility class.
 
-== EncryptionKeys 
+== EncryptionKeys
 There are a number of different keys used throughout
 FruityMesh. These are all 128 bit keys that are used for AES encryption
 between the nodes and for communication with Smartphones or other
 devices.
 
-==== No Key (KEY_ID_NONE = 0) 
+==== No Key (KEY_ID_NONE = 0)
 Can only be used if a node is not enrolled
 and uses a key filled with 0x00 for encryption.
 
-==== Node Key (FM_KEY_ID_NODE = 1) 
+==== Node Key (FM_KEY_ID_NODE = 1)
 This key is used for the lifetime of
 a device and is uniquely generated during production. It must be kept
 secure because it allows full configuration access, e.g. enrolling and
 removing the enrollment.
 
-==== Network key (FM_KEY_ID_NETWORK = 2) 
+==== Network key (FM_KEY_ID_NETWORK = 2)
 The network key is shared
 between all nodes that belong to a mesh network. Whoever is in posession
 of this key can configure all nodes in the network and can sent any
 message he likes. It is important to keep this key secret, but it is
 possible to change it if it ever leaks out.
 
-==== UserBase Key (FM_KEY_ID_BASE_USER = 3) 
+==== UserBase Key (FM_KEY_ID_BASE_USER = 3)
 This is a key that cannot be
 used to connect, but only to derive all other user keys from it.
 
-==== Organization Key (FM_KEY_ID_ORGANIZATION = 4) 
+==== Organization Key (FM_KEY_ID_ORGANIZATION = 4)
 The organization key
 is shared between all networks of an organization. It allows access to a
 limited set of functionality, e.g. necessary for tracking assets between
 differen meshes. If the organization key leaks, it is necessary to
 reconfigure all meshes of the organization.
 
-==== User Keys (FM_KEY_ID_USER_DERIVED_START = 10 to UINT32_MAX) 
+==== User Keys (FM_KEY_ID_USER_DERIVED_START = 10 to UINT32_MAX)
 The
 user base key is used to generate a range of many million user keys that
 can be given to users or user groups. A user key allows access to a
@@ -231,10 +229,10 @@ containing the desired UICR data. This can then be merged with the SoftDevice an
 
 FruityMesh will boot with random data (random nodeId / serialNumber /
 ...) if no data is present in the UICR. The data will however be
-persistent across reboots as it is generated according to the internal chip id from the FICR. The layout of UICR memory: 
+persistent across reboots as it is generated according to the internal chip id from the FICR. The layout of UICR memory:
 
 |===
-|Offset|Size(Bytes)|Name|Description 
+|Offset|Size(Bytes)|Name|Description
 
 |0|4|MAGIC_NUMBER|Must be set
 to 0xF07700 when UICR data is available |4|4|BOARD_TYPE|Accepts an
@@ -250,5 +248,5 @@ default enrollment |40|4|DEFAULT_NODE_ID|NodeId to be used if not
 enrolled |44|4|DEVICE_TYPE|Type of device according to
 <<Specification.adoc#DeviceTypes,DeviceTypes>> |48|4|SERIAL_NUMBER_INDEX|Unique index
 that represents the serial number |52|16|NETWORK_KEY|Default network key
-if preenrollment is used 
+if preenrollment is used
 |===

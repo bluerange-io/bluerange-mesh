@@ -1,7 +1,5 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
 
-<<README.adoc#,Home>>
-
 == Implementing a Custom Module
 
 This tutorial should guide anyone through the process of creating a new

@@ -1,7 +1,5 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
 
-<<README.adoc#,Home>>
-
 = Features
 This is a non exhaustive list of features of FruityMesh.
 

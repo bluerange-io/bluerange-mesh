@@ -1,9 +1,7 @@
-<<README.adoc#,Home>>
-
 = Testing Module (moduleId 12)
 
 == Purpose
-The Testing Module is designed to automate tests for battery and throughput measurements. 
+The Testing Module is designed to automate tests for battery and throughput measurements.
 
 == Functionality
 
@@ -16,7 +14,7 @@ The Testing Module has two roles.
 The applications currently being tested are Advertisement, Scanning, LED, Latency and Connection Tests.
 
 === Advertisement Test:
-Advertisement test is performed by using different values of following advertisement parameters. 
+Advertisement test is performed by using different values of following advertisement parameters.
 
 ===== Advertisement Type:
 Advertisement types used by Testing Module are
@@ -53,7 +51,7 @@ Master node generates as many packets as possible, each 20 byte payload and coun
 == Terminal Commands
 
 === starttest
-starttest takes ble address and application number as an input and start test by sending a message to slave 
+starttest takes ble address and application number as an input and start test by sending a message to slave
 [source, C++]
 ----
 //Receiving nodes will switch to slave node and start test

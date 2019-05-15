@@ -1,5 +1,3 @@
-<<README.adoc#,Home>>
-
 = Battery Consumption
 
 Using a mesh atop of Bluetooth Low Energy does only make sense when it can operate on low energy. Simple, isn't it? Well, not too simple. There are tons of settings that affect the performance of FruityMesh and some use-cases will require different settings for some of these parameters. Many of these settings have been benchmarked with the current implementation. Measurements were done with the nRF51 DK with chip version QFACA1. The system consumption for many of these cases are detailed in this document. The same test applications on a nRF52 consume a little less energy.

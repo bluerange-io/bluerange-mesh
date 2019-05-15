@@ -1,10 +1,8 @@
-<<README.adoc#,Home>>
-
 = Enrollment Module (moduleId 5)
 
 == Purpose
 
-New nodes are normally flashed without a networkId assigned (set to 0). This means they will not connect to a mesh as long as they are not enrolled. The term enrolled is used in synonym with provisioned or commisioned. 
+New nodes are normally flashed without a networkId assigned (set to 0). This means they will not connect to a mesh as long as they are not enrolled. The term enrolled is used in synonym with provisioned or commisioned.
 
 In order to assign a node to a mesh, the user has to give a networkId, the networkKey and a unique nodeId for that mesh. This can be done by a MeshGateway or a dedicated enrollment app. The enrollment packet should be sent to the broadcast address 0 and must contain to serial number of the node to be enrolled.
 
@@ -88,7 +86,7 @@ actionType: SET_ENROLLMENT
 
 |===
 |Bytes|Type|Description
-|8|**connPacketModule**|	
+|8|**connPacketModule**|
 |4|serialNumberIndex|Index of the serial number to be enrolled
 |2|newNodeId|The new node id that should be assigned to this node (Set to 0 to leave unchanged)
 |2|newNetworkId|The new network id to be assigned (Set to 0 to leave unchanged)
@@ -112,10 +110,10 @@ This acknowledges a received enrollment.
 0x11 = ENROLL_RESPONSE_PREENROLLMENT_FAILED //Another module that needs to enroll itself first, failed to enroll in the required time
 ----
 
-actionType: ENROLLMENT_RESPONSE 
+actionType: ENROLLMENT_RESPONSE
 |===
 |Bytes|Type|Description
-|8|connPacketModule|	
+|8|connPacketModule|
 |4|serialNumberIndex|Index of the serial number that was enrolled
 |1|result|See above for possible result codes
 |===
@@ -148,10 +146,10 @@ The result of removing an enrollment
 0x02 = ENROLL_RESPONSE_WRONG_DATA_ALIGNMENT //(fatal error)
 0x03 = ENROLL_RESPONSE_NO_SPACE //(fatal error)
 ----
-actionType: REMOVE_ENROLLMENT_RESPONSE 
+actionType: REMOVE_ENROLLMENT_RESPONSE
 |===
 |Bytes|Type|Description
-|8|connPacketModule|	
+|8|connPacketModule|
 |4|serialNumberIndex|Index of the serial number that was enrolled
 |1|result|See above for possible result codes
 |===

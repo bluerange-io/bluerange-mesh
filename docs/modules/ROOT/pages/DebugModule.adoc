@@ -1,5 +1,3 @@
-<<README.adoc#,Home>>
-
 = Debug Module (moduleId 7)
 
 == Purpose

@@ -1,17 +1,15 @@
-<<README.adoc#,Home>>
-
 = IO Module (moduleId 6)
 
-== Purpose 
+== Purpose
 
 Driving and configuring all GPIOs. E.g. toggling an LED, a motor or reading values from a basic sensor.
 
-== Functionality 
+== Functionality
 The IO module does only support toggling of LEDs and
 different pins at the moment. It will be extended to include support for
 basic sensors that can be read by e.g. analog/digital conversion.
 
-=== Change led mode 
+=== Change led mode
 Changes the led mode to either on, off (depending on
 configuration either off permanently or connection signaling)
 

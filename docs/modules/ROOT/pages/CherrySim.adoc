@@ -1,7 +1,5 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
 
-<<README.adoc#,Home>>
-
 = CherrySim
 
 ____

@@ -1,5 +1,3 @@
-<<README.adoc#,Home>>
-
 = ScanningModule (moduleId 2)
 
 == Purpose

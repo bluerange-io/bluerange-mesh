@@ -1,5 +1,3 @@
-<<README.adoc#,Home>>
-
 = Developers
 
 == File structure
@@ -12,8 +10,8 @@ This is a list and description of the most important folders in the repository.
 ├── └── nrf52/          - specific nrf52 includes +
 ├── inc_c/              - include directory for C headers +
 ├── linker/             - linker scripts +
-├── sdk/                - modified nRF SDKs + 
-├── softdevice/         - softdevice hex files + 
+├── sdk/                - modified nRF SDKs +
+├── softdevice/         - softdevice hex files +
 ├── src/  +
 ├── ├── base/           - wrappers for SoftDevice functions +
 ├── ├── c/              - drivers and other c code +
