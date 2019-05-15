@@ -1,1 +1,2 @@
-include:: ../../../../README.adoc[]
+:rootdir: ../../../
+include:: {rootdir}README.adoc[]
