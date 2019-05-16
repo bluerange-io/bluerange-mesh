@@ -1,4 +1,4 @@
-ifdef::env-github,env-browser[:relfileprefix: pages/]
+// ifdef::env-github,env-browser[:relfileprefix: pages/]
 = Contents
 
 * <<Quick-Start.adoc#,Quick Start>>
