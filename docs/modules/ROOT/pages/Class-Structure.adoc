@@ -1,7 +1,5 @@
 = Class Structure
 
-== Some random lvl 1 header
-
 === src/Main.cpp
 This is the entry point of the application. It will just call two functions from FruityMesh.cpp where the first will boot the node and the second will run an endless loop to fetch and process events.
 
