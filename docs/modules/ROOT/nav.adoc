@@ -1,7 +1,7 @@
 // ifdef::env-github,env-browser[:relfileprefix: pages/]
 = Contents
 
-* <<Quick-Start.adoc#,Quick Start>>
+* <<pages/Quick-Start.adoc#,Quick Start>>
 * xref:../../testmodule/pages/Quick-Start.adoc[Quick-Start as xref]
 * <<Usage.adoc#,Usage>>
 * <<Features.adoc#,Features>>
