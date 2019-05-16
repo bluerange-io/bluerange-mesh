@@ -16,7 +16,7 @@ The applications currently being tested are Advertisement, Scanning, LED, Latenc
 === Advertisement Test:
 Advertisement test is performed by using different values of following advertisement parameters.
 
-==== Advertisement Type:
+==== Advertisement Type
 Advertisement types used by Testing Module are
 
 * Connectable Undirected: Advertisement type where any device can send scan response packet and connect request to the advertiser.
@@ -42,10 +42,10 @@ Scanning test is performed by using different values of following scanning param
 === Latency Test:
 Master node sends a packet to slave node. The slave node immediately sends a packet back to the master node. Master node keeps the track of time from start of sending until all packets are received.
 
-=== LED Test
+=== LED Test:
 Slave node switches on red LED for 10 sec and do nothing and then switches on green led and do nothing.
 
-=== Connection Test
+=== Connection Test:
 Master node generates as many packets as possible, each 20 byte payload and count number of packets successfully put in the send queue.
 
 == Terminal Commands
