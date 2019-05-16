@@ -55,6 +55,6 @@ We'd love to develop the FruityMesh protocol as an interoperable protocol that w
 The implementation has been written in C++ because this makes it easy to implement new functionality and seperate it from other parts in a clean way. Refactoring or refinement tips are welcome. If you contribute, please comment your code thorougly and keep the implementation as readable as possible. This will help other contributors understand the code quickly.
 If you have documentation to add, please post a pull request as well.
 
-= Licence
+== Licence
 FruityMesh is published under the GPLv3 version which is available in the repository.
 Our commercial license called "BlueRange" is available by sales@mwaysolutions.com
