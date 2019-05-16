@@ -302,8 +302,8 @@ partner, but it has to be evaluated whether directed advertising
 messages provide better results. Using the slave connection procedure
 takes more time because of this challenge and response scheme.
 
-= Implementation
-== Packet Structure
+== Implementation
+=== Packet Structure
 
 Because of the limited number of bytes that can – and should – be
 transmitted between devices, it is necessary to implement a binary
