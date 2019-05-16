@@ -1,5 +1,6 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
 ifdef::env-github,env-browser[:relfileprefix: ./]
+ifdef::env-github,env-browser[:relfileprefix: ../]
 image:img/logo.png[fruitymesh]
 
 Version 0.8.8
