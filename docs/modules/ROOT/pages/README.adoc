@@ -1,6 +1,5 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
-ifndef::relfileprefix[:relfileprefix: ../]
-// ifdef::env-github,env-browser[:relfileprefix: ./]
+ifdef::env-github,env-browser[:relfileprefix: ./]
 image:img/logo.png[fruitymesh]
 
 Version 0.8.8
@@ -20,7 +19,7 @@ image:img/documentation.png[]
 
 Documentation is the key and therefore, you should have a look at the documentation to get you started. You can find it as part of the repository in the doc folder:
 
-<<nav.adoc#,Documentation>>
+<<../nav.adoc#,Documentation>>
 
 == Where to begin
 Before you begin, you should have at least two boards with the nRF51/nRF52 chipsets and either an external or an onboard debugger. If not, I suggest that you get two link:https://www.nordicsemi.com/Software-and-Tools/Development-Kits[DevKits from Nordic] to get you started as easily and quickly as possible. Next, have a look at the <<Quick-Start.adoc#,Quick Start>> page to get everything running. Then test some commands from the <<Usage.adoc#,Usage>> page. Afterwards, you could follow one of the <<Tutorials.adoc#,Tutorials>>.
