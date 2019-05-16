@@ -29,7 +29,7 @@ ____
 Commands are given with arguments in brackets *[arg]*. These must be entered by the user. Arguments in curly brackets *\{arg}* are optional.
 ____
 
-==== Configuring a Module
+=== Configuring a Module
 Sends a new module configuration to any node.
 The resulting binary configuration will be copied to the
 module-configuration of the specified module.
@@ -42,7 +42,7 @@ set_config [nodeID | "this"] [module-name] [hex-string] {requestHandle}
 set_config 0 io 06:01:01:00:00 0
 ----
 
-==== Requesting the Configuration of a Module
+=== Requesting the Configuration of a Module
 Prints the configuration
 of a specific module
 
@@ -55,7 +55,7 @@ get_config [nodeID  | "this"] [module name]
 get_config this adv
 ----
 
-==== Activating / Deactivating a module at runtime
+=== Activating / Deactivating a module at runtime
 Activates or
 deactivates a specific module.
 

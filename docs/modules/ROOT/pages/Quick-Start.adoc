@@ -12,7 +12,7 @@ You have two possibilities:
 * <<Flashing the precompiled firmware,Flashing the precompiled firmware>> will take you about *5 minutes*.
 * If you want to compile it yourself you need to <<Setup Eclipse and compile FruityMesh yourself,Setup Eclipse and compile FruityMesh yourself>>. This will take you a few more minutes until everything is ready to go.
 
-= Flashing the precompiled firmware
+== Flashing the precompiled firmware
 The precompiled firmware can be flashed in three easy steps.
 
 ===== 1. Download the nRF5 Command Line Tools
@@ -46,7 +46,7 @@ If you have multiple boards attached, you will be prompted for the id of your bo
 ===== 3. Get started
 You're now ready to test FruityMesh. Continue by reading the <<Get started,Get Started>> section.
 
-= Setup Eclipse and compile FruityMesh yourself
+== Setup Eclipse and compile FruityMesh yourself
 FruityMesh is built using the GCC compiler toolchain together with GNU make. The installation process varies a little for each operating system.
 
 ==== 1. Installing the Toolchain
@@ -112,10 +112,10 @@ https://github.com/gnu-mcu-eclipse/org.eclipse.epp.packages/releases
 
 After starting Eclipse, all you have to do is to import the FruityMesh project. You can then develop, flash and debug in a comfortable way.
 
-= Get started
+== Get started
 Now, let's see how we can use FruityMesh. The preconmpiled firmware and the standard project settings are configured so that all devices immediately connect to each other. Start by plugging in your first develoipment kit.
 
-==== Open a Serial Terminal and Connect
+=== Open a Serial Terminal and Connect
 (On Windows,
 http://www.chiark.greenend.org.uk/~sgtatham/putty/download.html[Putty] is the best tool. The screen utility can be used on macOS or Linux.) You have to connect to UART using the following settings:
 
@@ -130,21 +130,21 @@ ____
 Note to OSX users: To find out which serial port to open, you can list all devices under **/dev/cu.*** and pick the one that says usbmodem.
 ____
 
-==== Reset the Development Kit
+=== Reset the Development Kit
 Once your terminal is connected to the serial port, press the reset button on the Development Kit and the Terminal should provide you with some output similar to this:
 
 image:img/terminal.png[Terminal]
 
 If you don't get output immediately it will sometimes help to disconnect the Devkit from USB for a short time or try to write something. This is an issue of the SEGGER Debugger chipset that bridges the UART.
 
-==== Try Some Commands
+=== Try Some Commands
 You may now enter a number of commands to trigger actions. Here are some important ones:
 
 * *status:* will show you the status of the node and its connections
 * *reset:* performs a system reset
 * *data:* sends data through the mesh that other nodes will output to the terminal
 
-==== Connect a Second Development Kit
+=== Connect a Second Development Kit
 Next, flash and connect another node to the network and you should observe that they connect to each other after a short amount of time. You'll see that the LEDs will switch from blinking red to a single green pattern.
 
 * If you enter the command *action 0 io leds on*, both nodes should
@@ -154,7 +154,7 @@ switch their led to white (all LEDs on). After you enter *action 0 io leds off*,
 
 WARNING: Two nodes will only connect to each other once they have been enrolled in the same network. The github configuration will automatically have all nodes enrolled in the same network after flashing. If you do not want this, take a look at the <<Specification.adoc#UICR,UICR configuration>>.
 
-= What's next
+== What's next
 Take a look at the <<Features.adoc#,Features>> page for a detailed overview of the possibilities and check out <<Usage.adoc#,Usage>> for usage instructions. If you're ready to contribute to the development of FruityMesh, see <<Developers.adoc#,Developers>> for a roadmap and for instructions on how to take part.
 
 If you want to start programming with FruityMesh, you should definitely have a look at the <<Tutorials.adoc#,Tutorials>> page for some guided introduction.

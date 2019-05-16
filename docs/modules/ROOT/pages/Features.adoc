@@ -1,5 +1,4 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
-
 = Features
 This is a non exhaustive list of features of FruityMesh.
 
