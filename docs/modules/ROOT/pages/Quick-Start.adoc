@@ -15,7 +15,7 @@ You have two possibilities:
 == Flashing the precompiled firmware
 The precompiled firmware can be flashed in three easy steps.
 
-==== 1. Download the nRF5 Command Line Tools
+=== 1. Download the nRF5 Command Line Tools
 The nRF Command Line Tools are handy for flashing the compiled firmware on a device. You can download them here for the operating system of your choice and install them:
 
 https://www.nordicsemi.com/Software-and-Tools/Development-Tools/nRF5-Command-Line-Tools
@@ -24,7 +24,7 @@ The tools come with a bundled installation of the Segger Utilities, which are ne
 
 You should add the *bin/* folder of the installation to your operating system PATH variable to make development easier.
 
-==== 2. Flash the SoftDevice and the Application
+=== 2. Flash the SoftDevice and the Application
 Plug in your nrf51 or nrf52 development board via USB, then open a command prompt in the FruityMesh folder and type in the following command for flashing the nrf51 version:
 
 ----
@@ -43,14 +43,14 @@ image:img/flashing.png[flashing]
 
 If you have multiple boards attached, you will be prompted for the id of your board that should be flashed.
 
-==== 3. Get started
+=== 3. Get started
 You're now ready to test FruityMesh. Continue by reading the <<Get started,Get Started>> section.
 
 == Setup Eclipse and compile FruityMesh yourself
 FruityMesh is built using the GCC compiler toolchain together with GNU make. The installation process varies a little for each operating system.
 
 === 1. Installing the Toolchain
-===== GNU ARM Embedded Toolchain
+==== GNU ARM Embedded Toolchain
 Download Version 4.9 of the GNU ARM Embedded Toolchain for Windows. This includes the compiler gcc, linker, and multiple utilities like objcopy, addr2line and gdb - the GNU debugger:
 
 https://launchpad.net/gcc-arm-embedded/4.9/4.9-2015-q3-update/
@@ -59,7 +59,7 @@ Unzip the downloaded package into a folder of your choice.
 
 WARNING: Do not choose a newer version, as this might fail to compile.
 
-===== Make Tools Installation (Windows only)
+==== Make Tools Installation (Windows only)
 Next, if you are working on windows, you have to download and install some unix utilities, the GNU ARM Eclipse Build Tools. This includes make, sh, rm and some others. Version 2.4 has been tested successfully and the executable installer can be downloaded from here:
 
 https://github.com/gnu-mcu-eclipse/windows-build-tools/releases/tag/v2.4b
@@ -76,7 +76,7 @@ http://gnuwin32.sourceforge.net/downlinks/coreutils-dep-zip.php
 
 Finally, you should add the bin folders of the gnu buildtools and the bin folder of gcc-arm-embedded to your PATH variable under System Environment. This will make sure that you can access these tools from anywhere.
 
-===== Configure the Project
+==== Configure the Project
 The last step, before you can build the project is to duplicate Makefile.local.template and name it Makefile.local
 
 Open Makefile.local and give the correct path to your gcc installation:
@@ -103,7 +103,7 @@ make flash
 
 to flash the firmware on a device.
 
-===== Using Eclipse for Development
+==== Using Eclipse for Development
 image:img/eclipsescreen.png[eclipsescreenshot]
 
 Eclipse is a good development IDE for FruityMesh. The project settings are already included and all you have to do is download GNU MCU Eclipse, which already contains the necessary plugins for Embedded Development from here:
