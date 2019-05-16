@@ -25,7 +25,7 @@ ifdef::env-github,env-browser[:relfileprefix: ./]
 ** <<RecordStorage.adoc#,RecordStorage>>
 
 * <<The-FruityMesh-Algorithm.adoc#,The FruityMesh Algorithm>>
-** <<The-Algorithm-In-Detail.adoc#,In Detail>>
+** <<The-Algorithm-in-Detail.adoc#,In Detail>>
 ** <<Simulator.adoc#,Simulator>>
 
 
