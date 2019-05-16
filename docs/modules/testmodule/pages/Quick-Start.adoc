@@ -1,5 +1,5 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
-= Quick start
+= Quick start JUST A TEST
 
 
 image:img/eclipse.png[eclipse-luna]
