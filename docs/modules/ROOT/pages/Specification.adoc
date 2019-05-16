@@ -156,35 +156,35 @@ FruityMesh. These are all 128 bit keys that are used for AES encryption
 between the nodes and for communication with Smartphones or other
 devices.
 
-==== No Key (KEY_ID_NONE = 0)
+=== No Key (KEY_ID_NONE = 0)
 Can only be used if a node is not enrolled
 and uses a key filled with 0x00 for encryption.
 
-==== Node Key (FM_KEY_ID_NODE = 1)
+=== Node Key (FM_KEY_ID_NODE = 1)
 This key is used for the lifetime of
 a device and is uniquely generated during production. It must be kept
 secure because it allows full configuration access, e.g. enrolling and
 removing the enrollment.
 
-==== Network key (FM_KEY_ID_NETWORK = 2)
+=== Network key (FM_KEY_ID_NETWORK = 2)
 The network key is shared
 between all nodes that belong to a mesh network. Whoever is in posession
 of this key can configure all nodes in the network and can sent any
 message he likes. It is important to keep this key secret, but it is
 possible to change it if it ever leaks out.
 
-==== UserBase Key (FM_KEY_ID_BASE_USER = 3)
+=== UserBase Key (FM_KEY_ID_BASE_USER = 3)
 This is a key that cannot be
 used to connect, but only to derive all other user keys from it.
 
-==== Organization Key (FM_KEY_ID_ORGANIZATION = 4)
+=== Organization Key (FM_KEY_ID_ORGANIZATION = 4)
 The organization key
 is shared between all networks of an organization. It allows access to a
 limited set of functionality, e.g. necessary for tracking assets between
 differen meshes. If the organization key leaks, it is necessary to
 reconfigure all meshes of the organization.
 
-==== User Keys (FM_KEY_ID_USER_DERIVED_START = 10 to UINT32_MAX)
+=== User Keys (FM_KEY_ID_USER_DERIVED_START = 10 to UINT32_MAX)
 The
 user base key is used to generate a range of many million user keys that
 can be given to users or user groups. A user key allows access to a
