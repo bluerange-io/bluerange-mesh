@@ -16,20 +16,20 @@ The applications currently being tested are Advertisement, Scanning, LED, Latenc
 === Advertisement Test:
 Advertisement test is performed by using different values of following advertisement parameters.
 
-===== Advertisement Type:
+==== Advertisement Type:
 Advertisement types used by Testing Module are
 
 * Connectable Undirected: Advertisement type where any device can send scan response packet and connect request to the advertiser.
 
 * Non Connectable Undirected: Advertisement type where advertiser will not accept any connect request or scan request.
 
-===== Advertisement Interval
+==== Advertisement Interval
 Advertisement Interval specifies the intervening time between advertising messages. The advertisement interval used by Testing Module are 20ms, 100ms, 1000ms and 4000ms
 
-===== Payload Size
+==== Payload Size
 Payload size is the size of the packet to be advertised. Payload of size 10 bytes and 30 bytes are advertised by Testing Module.
 
-===== Transmit Power
+==== Transmit Power
 Testing Module advertise packets with Tx power 0dbm and 4dbm.
 
 
@@ -53,7 +53,7 @@ Master node generates as many packets as possible, each 20 byte payload and coun
 === starttest
 starttest takes ble address and application number as an input and start test by sending a message to slave
 [source, C++]
-----
+---
 //Receiving nodes will switch to slave node and start test
 action [nodeId] testing starttest [bleAddress] {applicationToTest}
 ---
