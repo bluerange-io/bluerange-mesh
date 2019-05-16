@@ -11,6 +11,7 @@ connections as a Central has proven a good configuration for mesh
 connections. With these settings, the following will lead to problems
 where two nodes cannot connect to each other because their one
 connection as a Peripheral is already taken.
+
 image:img/mesh-overview.png[impossible]
 
 There is no way to know the size - or the participating nodes - of our
