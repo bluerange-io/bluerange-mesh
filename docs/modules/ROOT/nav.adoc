@@ -34,3 +34,6 @@ ifdef::env-github,env-browser[:relfileprefix: pages/]
 ** <<Implementing-a-Custom-Module.adoc#,Implementing a Custom Module>>
 
 * <<FAQ.adoc#,FAQ>>
+* API
+** https://dev-mssql.mwaysolutions.com/relution/portal/#/web-api[REST API (Placeholder)]
+** https://dev-mssql.mwaysolutions.com/asyncapi.html[MQTT API (Placeholder)]
