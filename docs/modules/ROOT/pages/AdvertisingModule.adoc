@@ -4,10 +4,10 @@ This module allows the user to configure a number of advertising messages  that 
 
 TIP: The AdvertisingModule is only intended for beaconing messages that can then be configured over the mesh. Take a look at the  <<AdvertisingController.adoc#,AdvertisingController>> documentation for how to schedule advertising messages in your implementation.
 
-==== Functionality
+=== Functionality
 The AdvertisingModule is currently configured by setting its persistent configuration. At the moment, it allows one message to be broadcasted at a time and does not cycle through different messages. Message cycling can however be easily implemented as the mesh framework already supports this.
 
-==== Usage
+=== Usage
 Load a new configuration for *nodeId 45* with the following values:
 
 * *moduleActive:* true
