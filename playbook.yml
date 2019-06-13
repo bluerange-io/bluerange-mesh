@@ -1,7 +1,7 @@
 site:
   title: BlueRange Fruitymesh
   # replace this with site url when available
-  url: http://localhost:5000
+  url: https://panadel.github.io/fruitymesh/
   start_page: fruitymesh::README.adoc
 content:
   sources:
