@@ -1,1 +1,1 @@
-link:./docs/modules/ROOT/pages/partial$README.adoc[README.adoc]
+link:./docs/modules/ROOT/pages/README.adoc[README.adoc]
