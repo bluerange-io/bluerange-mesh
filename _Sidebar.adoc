@@ -1,1 +1,1 @@
-include::./docs/modules/ROOT/nav.adoc
+include::./docs/modules/ROOT/nav.adoc[]
