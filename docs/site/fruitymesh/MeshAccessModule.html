@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeshAccessModule (moduleId 10) :: BlueRange Fruitymesh</title>
+    <link rel="canonical" href="http://localhost:5000/fruitymesh/MeshAccessModule.html">
+    <meta name="generator" content="Antora 2.0.0">
+    <link rel="stylesheet" href="../_/css/site.css">
+  </head>
+  <body class="article">
+<header class="header" role="banner">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="http://localhost:5000">BlueRange Fruitymesh</a>
+      <div class="navbar-item">
+        <img id="navbar-logo" alt="Bluerange Logo">
+      </div>
+      <div class="navbar-item">
+        <input id="search-input" type="text" placeholder="Search docs">
+      </div>
+    </div>
+
+
+  </nav>
+</header>
+<div class="main-wrapper">
+<div class="navigation-container" data-component="fruitymesh" data-version="master">
+  <aside class="navigation" role="navigation">
+    <div class="panels">
+<div class="navigation-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <h3 class="title"><a href="Quick-Start.html">Fruitymesh</a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+<ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Quick-Start.html">Quick Start</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Usage.html">Usage</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Features.html">Features</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Developers.html">Developers</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Specification.html">Specification</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Modules.html">Modules</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="AdvertisingModule.html">AdvertisingModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DebugModule.html">DebugModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DfuModule.html">DfuModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="EnrollmentModule.html">EnrollmentModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="IoModule.html">IoModule</a>
+  </li>
+  <li class="nav-item is-current-page" data-depth="2">
+    <a class="nav-link" href="MeshAccessModule.html">MeshAccessModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Node.html">Node</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="ScanningModule.html">ScanningModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="StatusReporterModule.html">StatusReporterModule</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">Other</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Class-Structure.html">Class Structure</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Debugging.html">Debugging</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Battery-Consumption.html">Battery Consumption</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="RecordStorage.html">RecordStorage</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="The-FruityMesh-Algorithm.html">The FruityMesh Algorithm</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="The-Algorithm-in-Detail.html">In Detail</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Simulator.html">Simulator</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Tutorials.html">Tutorials</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Implementing-a-Custom-Module.html">Implementing a Custom Module</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="FAQ.html">FAQ</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">API</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/relution/portal/#/web-api">REST API (Placeholder)</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/asyncapi.html">MQTT API (Placeholder)</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+<div class="navigation-explore" data-panel="explore">
+  <div class="context">
+    <span class="title">Fruitymesh</span>
+    <span class="version">master</span>
+  </div>
+  <ul class="components">
+    <li class="component is-current">
+      <span class="title">Fruitymesh</span>
+      <ul class="versions">
+        <li class="version is-current is-latest">
+          <a href="Quick-Start.html">master</a>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</div>
+    </div>
+  </aside>
+</div>
+  <main class="main" role="main">
+<div class="toolbar" role="navigation">
+  <button class="navigation-toggle"></button>
+  <a href="README.html" class="home-link"></a>
+<nav class="crumbs" role="navigation" aria-label="breadcrumbs">
+  <ul>
+    <li class="crumb"><a href="Quick-Start.html">Fruitymesh</a></li>
+    <li class="crumb"><a href="Modules.html">Modules</a></li>
+    <li class="crumb"><a href="MeshAccessModule.html">MeshAccessModule</a></li>
+  </ul>
+</nav>
+  <div class="edit-this-page"><a href="https://github.com/PanaDel/fruitymesh/edit/master/docs/modules/ROOT/pages/MeshAccessModule.adoc">Edit this Page</a></div>
+</div>
+<article class="doc">
+<h1>MeshAccessModule (moduleId 10)</h1>
+<div class="sect1">
+<h2 id="_purpose"><a class="anchor" href="#_purpose"></a>Purpose</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The MeshAccessModule provides a simple way of accessing the mesh through a Smartphone, it also provides
+a way to connect to other meshes or access other devices that support
+the functionality. It works over unencrypted GAP connections and uses a
+custom encryption on top to bypass operating system limitations of
+different devices.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_functionality"><a class="anchor" href="#_functionality"></a>Functionality</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The MeshAccessModule works in conjunction with the MeshAccessConnection. The module provides the necessary services while
+the connection handles an individual connection after it was set up.</p>
+</div>
+<div class="paragraph">
+<p>The MeshAccessConnection is able to handle standard mesh packets -
+including packet splitting - and will relay these packets to receivers
+in the mesh if security permits it (if the partner authenticated itself
+with the correct key during the initial encryption procedure).</p>
+</div>
+<div class="paragraph">
+<p>There are different types of connection keys used to authenticate when
+connecting with a node. The keyId is then sent through the mesh
+depending on the packet type to authenticate the user over the mesh.</p>
+</div>
+<div class="paragraph">
+<p>If parts of the documentation are obscure, it is advisable to take a
+look at the thoroughly documented relution/fruitymesh repository at the
+classes MeshAccessConnection.cpp and MeshAccessModule.cpp</p>
+</div>
+<div class="sect2">
+<h3 id="_connection_keys"><a class="anchor" href="#_connection_keys"></a>Connection Keys</h3>
+<div class="paragraph">
+<p>For the different key types used, refer to the
+encryption types in the
+<a href="Specification.html#EncryptionKeys" class="page">Specification</a>.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_virtual_partner"><a class="anchor" href="#_virtual_partner"></a>Virtual Partner</h3>
+<div class="paragraph">
+<p>Ids Because mesh packets need a sender and receiver
+id, it would not be possible to connect to another mesh as the nodeIds
+might clash. When a node connects to another device using a
+MeshAccessConnection, it will assign a virtualPartnerId to the other
+device, which is unique in the mesh. This partnerId is temporary (only
+while the connection lasts) and can be used to address the device during
+its connection.</p>
+</div>
+<div class="paragraph">
+<p>The device does not get to know this virtual id and can operate with its
+own nodeId while using the connection. The node with modify received
+packets and will replace the devices id by the temporary id. It will
+also inspect packets before sending them to the other device and will
+translate the virtual id back into the id of the device before
+transmitting the packet over the MeshAccessConnection.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_tunnel_types"><a class="anchor" href="#_tunnel_types"></a>Tunnel Types</h3>
+<div class="paragraph">
+<p>A node that connects to another mesh will need to
+specify the tunnelType, it can be on of the following:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>MESH_ACCESS_TUNNEL_TYPE_PEER_TO_PEER = 0: The two nodes can
+communicate directly, but broadcast messages will not be relayed to the
+mesh on either side.</p>
+</li>
+<li>
+<p>MESH_ACCESS_TUNNEL_TYPE_REMOTE_MESH = 1: We can address each node in
+the remote mesh from the local node, but cannot relay packets from the
+remote mesh to our mesh.</p>
+</li>
+<li>
+<p>MESH_ACCESS_TUNNEL_TYPE_LOCAL_MESH = 2: All nodes from our mesh can
+send and receive data to/from the node but we cannot send data to the
+remote mesh.</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_authorization"><a class="anchor" href="#_authorization"></a>Authorization</h3>
+<div class="paragraph">
+<p>Depending on the key type, certain messages are not
+allowed to be sent through a MeshAccessConnection. The key type can be
+any of the <a href="Specification.html#EncryptionKeys" class="page">EncryptionKeys</a>.
+The MeshAccessConnection will pass on an incoming message to all modules
+that can then decide if they either want to whitelist or blacklist a
+message. Only allowing the message to be sent to the local node is also
+possible. Blacklisting always has preference over whitelisting. If a
+message got blacklisted by a module, it cannot get whitelisted by
+another module.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_meshaccess_broadcast_messages"><a class="anchor" href="#_meshaccess_broadcast_messages"></a>MeshAccess Broadcast Messages</h3>
+<div class="paragraph">
+<p>The Mesh Configuration and Access
+Service is broadcasted by active nodes that provide Mesh Access to
+Smartphones or other devices through GATT.</p>
+</div>
+<div class="paragraph">
+<p>The enrollment state is broadcasted in the flags. If unenrolled, the
+node service is disabled.</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>11</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">-</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Mandatory data</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Flags</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">(len, type, flags byte)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Service UUID complete</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">(len, type, 2 byte UUID 0xFE12)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Service Data header</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">(len, type, 2 byte UUID 0xFE12)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>10</strong></p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>CustomDataHeader</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">messageType</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0x03 Mesh Configuration and Access Service (with a new
+service version, the messageType can be changed.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">networkId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">mesh network id</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1 bit</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">isEnrolled</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">7 bit</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">reserved</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">serialNumberIndex</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>up to 3</strong></p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>ServiceData</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">moduleId0</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">An id of a module that is
+available over the meshaccess connection</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">moduleId1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">An id of a module
+that is available over the meshaccess connection</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">moduleId2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">An id of a module that is available over the meshaccess connection</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>7</strong></p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Reserved</strong></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_gatt_service"><a class="anchor" href="#_gatt_service"></a>GATT Service</h3>
+<div class="paragraph">
+<p>The MeshAccess Service is offered under a different
+UUID (a 128 bit UUID) in order to seperate different services from each
+other.</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Base Service UUID 00000001-ACCE-423C-93FD-0C07A0051858</p>
+</li>
+<li>
+<p>RX Characteristic Handle: 00000002-ACCE-423C-93FD-0C07A0051858</p>
+</li>
+<li>
+<p>TX Characteristic Handle: 00000003-ACCE-423C-93FD-0C07A0051858</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>After a connection is made, it is necessary to register notifications on
+the TX characteristic in order to receive data from the node. Do not
+send any data before notifications are enabled!</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_encryption_handshake"><a class="anchor" href="#_encryption_handshake"></a>Encryption Handshake</h3>
+<div class="paragraph">
+<p>To establish a connection, the following has to
+be done:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Central connects to peripheral</p>
+</li>
+<li>
+<p>Central discovers the MeshAccessService of the peripheral with its
+rx/tx characteristics and the cccd of the tx characteristic</p>
+</li>
+<li>
+<p>Central enables notifications on cccd of tx characteristic</p>
+<div class="ulist">
+<ul>
+<li>
+<p>The peripheral will notice the enabled notification and will
+instantiate a MeshAccessConnection throught the ResolverConnections</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p>Central starts handshake by requesting a nonce</p>
+</li>
+<li>
+<p>Peripheral anwers with ANonce</p>
+</li>
+<li>
+<p>Central answers with SNonce in an encrypted packet (enables auto
+encrypt/decrypt)</p>
+</li>
+<li>
+<p>Peripheral checks encrypted packet, sends encrypted HandshakeDone
+packet and enables auto encrypt/decrypt</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Encryption and MIC calculation uses three AES encryptions at the moment
+to prevent a discovered packet forgery attack under certain conditions.
+Future versions of the handshake may employ different encryption.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_encryption_once_a_connection_is_set_to_encrypted_state_during_the"><a class="anchor" href="#_encryption_once_a_connection_is_set_to_encrypted_state_during_the"></a>Encryption Once a connection is set to encrypted state - during the</h3>
+<div class="paragraph">
+<p>initial encryption handshake - then all messages must be encrypted with
+a trailing Message Integrity Check (MIC). The data will have the
+following format:</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1&#8230;&#8203;16</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u8[]</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">encryptedData</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Encrypted data that must be decrypted
+first, using the key determined during the handshake together with the
+decryptionNonce.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u32</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">mic</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Message integrity check that protects the message against
+forgery or replay attacks. added at the end of the variable sized
+encryptedData field.</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Because an encrypted packet has only 16 bytes of payload, message
+splitting must account for this. A connection with an MTU of 20 will at
+first split packets into chunks of 20 bytes (2 byte splitting overhead<br>
+18 byte content). After encryption is activated, the chunks have a size
+of 16 bytes.</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Encryption is done by generating a keystream with the
+encryptionNonce. A 16 byte plaintext is created with 0x00 padding and
+the encryptionNonce is copied into the first 8 bytes. This plaintext is
+encrypted using the sessionEncryptionKey to produce a keystream.</p>
+</li>
+<li>
+<p>Next, data to be sent is xored with the keystream. The data can be
+anything from 1 to 16 bytes long.</p>
+</li>
+<li>
+<p>The last 4 byte of the encryptionNonce (encryptionNonce[1]) is used
+as a counter and is now incremented.</p>
+</li>
+<li>
+<p>A new keystream is generated with the increased nonce as explained
+above.</p>
+</li>
+<li>
+<p>This keystream is again xored with the plaintext data to be sent.</p>
+</li>
+<li>
+<p>The resulting ciphertext is encrypted once more. The first 4 bytes can
+now be used as a MIC.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>If the first message were to be encrypted with a nonce of 1, then the
+mic would have been generated with a nonce of 2. The next message to be
+sent must by encrypted with a nonce of 3.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_sessionkey_generation_a_session_key_is_generated_by_creating_a_16"><a class="anchor" href="#_sessionkey_generation_a_session_key_is_generated_by_creating_a_16"></a>SessionKey Generation A session Key is generated by creating a 16</h3>
+<div class="paragraph">
+<p>byte plaintext message padded with 0x00. The first two bytes (1-2) must
+contain the nodeId of the central device. Bytes 3-10 must contain the
+nonce. This plaintext is then encrypted using the chosen key. In case
+the key is a user key, the key must first be derived from the
+userBaseKey. This works by creating a 0x00 padded 16 byte cleartext,
+storing the keyId in the first 4 bytes of the message and encrypting the
+cleartext with the userBaseKey. The resulting ciphertext is the derived
+user key.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_terminal_commands"><a class="anchor" href="#_terminal_commands"></a>Terminal Commands</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_connection_establishment"><a class="anchor" href="#_connection_establishment"></a>Connection Establishment</h3>
+<div class="paragraph">
+<p>Instructs a node to build a MeshAccessConneciton to another node. The connection state will be notified back to the requester.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Establish a connection to another device using a MeshAccessConnection
+//Defaults are keyId=FM_NODE_KEY, keyHex=same as local keys, tunnelType=PEER_TO_PEER, requestHandle=0
+action [nodeId] ma connect [bleAddress] {keyId} {keyHex} {tunnelType} {requestHandle}
+
+//E.g. Connect to device 00:11:.. with node key 11:22:...
+action this ma connect 00:11:22:33:44:55 1 11:22:33:44:11:22:33:44:11:22:33:44:11:22:33:44</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_connection_disconnection"><a class="anchor" href="#_connection_disconnection"></a>Connection Disconnection</h3>
+<div class="paragraph">
+<p>Disconnect from a device if is connected
+using a MeshAccessConnection on that node.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Disconnect a previously connected MeshAccessConnection
+action [nodeId] ma disconnect [bleAddress] {requestHandle}
+
+//E.g. disconnect device 00:11:... if connected to this node
+action this ma disconnect 00:11:22:33:44:55</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_messages"><a class="anchor" href="#_messages"></a>Messages</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_message_types"><a class="anchor" href="#_message_types"></a>Message Types</h3>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">#define MESSAGE_TYPE_ENCRYPT_CUSTOM_START 25
+#define MESSAGE_TYPE_ENCRYPT_CUSTOM_ANONCE 26
+#define MESSAGE_TYPE_ENCRYPT_CUSTOM_SNONCE 27
+#define MESSAGE_TYPE_ENCRYPT_CUSTOM_DONE 28</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_starthandshake"><a class="anchor" href="#_starthandshake"></a>StartHandshake</h3>
+<div class="paragraph">
+<p>The central starts the encrypting process by sending
+the following unencrypted packet.</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">messageType</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">MESSAGE_TYPE_ENCRYPT_CUSTOM_START</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u16</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">senderId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Either a nodeId in the own mesh, or in case of a
+Smartphone, this must be NODE_ID_APP_BASE(32000)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u16</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">receiverId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Set to 0 or if known, the id of the partner</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">version</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Set to 1.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u32</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">keyId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Set to the keyId that should be used for this
+connection.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2 bit</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u8:2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">tunnelType</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Tunnel Type that should be used for this
+connection. See TunnelType. The invalid type must not be sent. E.g. if a
+Smartphone connects to a mesh, it should use REMOTE_MESH, or if it just
+wants to interact with a single node and not with the mesh, it can use
+PEER to PEER if it wants.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">6 bit</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u8:6</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">reserved</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_handshakeanonce"><a class="anchor" href="#_handshakeanonce"></a>HandshakeANonce</h3>
+<div class="paragraph">
+<p>The peripheral will generate a random nonce with a
+length of 8 bytes andanswer with an unencrypted packet. The peripheral
+can also start to generate the session decryption key at this time (see
+SessionKey generation chapter). After sending this packet, the
+peripheral will only acceppt encrypted packets from now on.</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">messageType</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">MESSAGE_TYPE_ENCRYPT_CUSTOM_ANONCE</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u16</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">senderId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The peripherals nodeId in the mesh.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u16</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">receiverId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Replay of the central id.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u32</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">anonce[0]</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The first part of the anonce</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u32</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">anonce[1]</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Second part of the anonce.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_handshakesnonce"><a class="anchor" href="#_handshakesnonce"></a>HandshakeSNonce</h3>
+<div class="paragraph">
+<p>The central must now generate a random 8 byte
+nonce as well. It is then able to calculate both session keys, the key
+for encryption and the key for decryption. It will then send the
+following packet, but in encrypted form. The anonce is used to generate
+the session encryption key for sending packets and the snonce is used
+to calculate the session decryption key for receiving packets.</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">messageType</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">MESSAGE_TYPE_ENCRYPT_CUSTOM_SNONCE</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u16</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">senderId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">senderId</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u16</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">receiverId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">receiverId</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u32</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">snonce[0]</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The first part of the snonce</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u32</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">snonce[1]</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Second part of the snonce.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_handshakedone"><a class="anchor" href="#_handshakedone"></a>HandshakeDone</h3>
+<div class="paragraph">
+<p>The peripheral will answer with the final handshake
+packet to state that the handshake was completed successfully. This
+packet is of course transmitted encrypted</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">messageType</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">MESSAGE_TYPE_ENCRYPT_CUSTOM_DONE</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u16</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">senderId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">senderId</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u16</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">receiverId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">receiverId</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">status</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0 = 0 ok</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</article>
+  </main>
+</div>
+<footer class="footer">
+  <p>This page was built using the Antora default UI.</p>
+  <p>The source code for this UI is licensed under the terms of the MPL-2.0 license.</p>
+</footer>
+<script src="../_/js/site.js"></script>
+<script src="../_/js/vendor/highlight.js"></script>
+<script>hljs.initHighlighting()</script>
+
+  </body>
+</html>

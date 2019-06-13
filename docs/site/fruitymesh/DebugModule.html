@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Module (moduleId 7) :: BlueRange Fruitymesh</title>
+    <link rel="canonical" href="http://localhost:5000/fruitymesh/DebugModule.html">
+    <meta name="generator" content="Antora 2.0.0">
+    <link rel="stylesheet" href="../_/css/site.css">
+  </head>
+  <body class="article">
+<header class="header" role="banner">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="http://localhost:5000">BlueRange Fruitymesh</a>
+      <div class="navbar-item">
+        <img id="navbar-logo" alt="Bluerange Logo">
+      </div>
+      <div class="navbar-item">
+        <input id="search-input" type="text" placeholder="Search docs">
+      </div>
+    </div>
+
+
+  </nav>
+</header>
+<div class="main-wrapper">
+<div class="navigation-container" data-component="fruitymesh" data-version="master">
+  <aside class="navigation" role="navigation">
+    <div class="panels">
+<div class="navigation-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <h3 class="title"><a href="Quick-Start.html">Fruitymesh</a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+<ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Quick-Start.html">Quick Start</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Usage.html">Usage</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Features.html">Features</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Developers.html">Developers</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Specification.html">Specification</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Modules.html">Modules</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="AdvertisingModule.html">AdvertisingModule</a>
+  </li>
+  <li class="nav-item is-current-page" data-depth="2">
+    <a class="nav-link" href="DebugModule.html">DebugModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DfuModule.html">DfuModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="EnrollmentModule.html">EnrollmentModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="IoModule.html">IoModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="MeshAccessModule.html">MeshAccessModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Node.html">Node</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="ScanningModule.html">ScanningModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="StatusReporterModule.html">StatusReporterModule</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">Other</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Class-Structure.html">Class Structure</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Debugging.html">Debugging</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Battery-Consumption.html">Battery Consumption</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="RecordStorage.html">RecordStorage</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="The-FruityMesh-Algorithm.html">The FruityMesh Algorithm</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="The-Algorithm-in-Detail.html">In Detail</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Simulator.html">Simulator</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Tutorials.html">Tutorials</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Implementing-a-Custom-Module.html">Implementing a Custom Module</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="FAQ.html">FAQ</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">API</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/relution/portal/#/web-api">REST API (Placeholder)</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/asyncapi.html">MQTT API (Placeholder)</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+<div class="navigation-explore" data-panel="explore">
+  <div class="context">
+    <span class="title">Fruitymesh</span>
+    <span class="version">master</span>
+  </div>
+  <ul class="components">
+    <li class="component is-current">
+      <span class="title">Fruitymesh</span>
+      <ul class="versions">
+        <li class="version is-current is-latest">
+          <a href="Quick-Start.html">master</a>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</div>
+    </div>
+  </aside>
+</div>
+  <main class="main" role="main">
+<div class="toolbar" role="navigation">
+  <button class="navigation-toggle"></button>
+  <a href="README.html" class="home-link"></a>
+<nav class="crumbs" role="navigation" aria-label="breadcrumbs">
+  <ul>
+    <li class="crumb"><a href="Quick-Start.html">Fruitymesh</a></li>
+    <li class="crumb"><a href="Modules.html">Modules</a></li>
+    <li class="crumb"><a href="DebugModule.html">DebugModule</a></li>
+  </ul>
+</nav>
+  <div class="edit-this-page"><a href="https://github.com/PanaDel/fruitymesh/edit/master/docs/modules/ROOT/pages/DebugModule.adoc">Edit this Page</a></div>
+</div>
+<article class="doc">
+<h1>Debug Module (moduleId 7)</h1>
+<div class="sect1">
+<h2 id="_purpose"><a class="anchor" href="#_purpose"></a>Purpose</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The Debug module contains a collection of commands to debug network problems and test our other functionality.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_functionality"><a class="anchor" href="#_functionality"></a>Functionality</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The debug module does not perform a lot of functionality itself, but will mainly trigger actions from other moduels for debug purpose. It does however have a flooding mode implemented.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_terminal_commands"><a class="anchor" href="#_terminal_commands"></a>Terminal Commands</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_resetting_nodes"><a class="anchor" href="#_resetting_nodes"></a>Resetting Nodes</h3>
+<div class="paragraph">
+<p>Sometimes it is necessary to reset all nodes connected to a mesh at once. This is where the reset command comes in handy. After receiving the command, each node will wait a predefined time (about 10 seconds) that can be optionally modified. This ensures that the packet is sent to other nodes as well before resetting.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Receiving nodes will reset within a few seconds
+action [nodeId] debug reset {waitSeconds}</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_request_discover_buffer"><a class="anchor" href="#_request_discover_buffer"></a>Request Discover Buffer</h3>
+<div class="paragraph">
+<p>To debug problems with discovery, we might want to get the <a href="Specification.html" class="page">JOIN_ME</a> buffer from all nodes in a mesh.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Receiving nodes will send back their buffer contents
+action [nodeId] debug getbuf</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_ping"><a class="anchor" href="#_ping"></a>Ping</h3>
+<div class="paragraph">
+<p>To find out the latency, we might want to ping some nodes. This command will only give usable results if one node is pinged at a time. It will not keep track of timings when pinging multiple nodes at once. Mode can be unreliable (write_cmd) or reliable (write_req).</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Sends a ping to a node and logs the time
+action [nodeId] debug ping [count] [mode = r / u]
+
+//Sends one ping message to nodeId 2 using write_cmd (unreliable)
+action 2 debug ping 1 u</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_pingpong"><a class="anchor" href="#_pingpong"></a>PingPong</h3>
+<div class="paragraph">
+<p>We can have a ping packet bounce multiple times between two nodes to get a better average of the ping.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Bounces a ping back and forth multiple times
+action [nodeId] debug pingpong [count] [mode]
+
+//Bounces a packet back and forth 10 times between the current node and node 45
+action 45 debug pingpong 10 u</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_leaf_ping"><a class="anchor" href="#_leaf_ping"></a>Leaf Ping</h3>
+<div class="paragraph">
+<p>The leaf ping will send a ping command through the mesh starting from the current node. All leaf nodes will respond and the ping times will be logged on the terminal.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Start the leaf ping
+lping [count] [mode = r / u]</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_flooding"><a class="anchor" href="#_flooding"></a>Flooding</h3>
+<div class="paragraph">
+<p>The DebugModule has a flooding mode where it will generate messages every once in a while. This is helpful for generating load on the network. Supported modes are:
+- <strong>Off (0):</strong> No flooding and no listening
+- <strong>Unreliable (2):</strong> Floods with WRITE_CMD packets
+- <strong>Listen (3):</strong> Listens for floods from given node and counts them
+-  <strong>SplitData (4):</strong> Sends big messages that are split into multiple packets</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Activates a flooding mode to generate packets
+action [nodeID] debug flood [destinationNodeId] [mode] [packetsPer100Sec]
+
+//E.g. Tells node 1 to flood node 2 with 1 packet each second
+action 1 debug flood 2 2 100
+
+//E.g. instructs node 2 to count packets from node 1
+action 2 debug flood 1 3 0</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_saving_and_retrieving_records"><a class="anchor" href="#_saving_and_retrieving_records"></a>Saving and Retrieving Records</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>It is possible to store, retrieve or delete a record by using the terminal on the local node. This will invoke the [RecordStorage](RecordStorage.adoc) class.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Save record with given id and data
+saverec [recordId] [hexString]
+
+//E.g. saves or updates a record with id 1234 and data AA:BB:CC
+saverec 1234 AA:BB:CC
+
+//Get record with given id
+getrec [recordId]
+
+//Delete record with given id
+delrec [recordId]</code></pre>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_print_active_advertising_jobs"><a class="anchor" href="#_print_active_advertising_jobs"></a>Print Active Advertising Jobs</h3>
+<div class="paragraph">
+<p>Prints the registered advertising jobs of the advertising controller.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">advjobs</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_heap"><a class="anchor" href="#_heap"></a>Heap</h3>
+<div class="paragraph">
+<p>Prints statistics about the current heap usage.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">heap</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_flash_memory_map"><a class="anchor" href="#_flash_memory_map"></a>Flash Memory Map</h3>
+<div class="paragraph">
+<p>Prints a map of used flash memory blocks (1024 kb) where 0 is empty and 1 does contain data.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">memorymap</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_reading_the_memory"><a class="anchor" href="#_reading_the_memory"></a>Reading the memory</h3>
+<div class="paragraph">
+<p>Sometimes it is useful to read back some of the memory contents of a node while being connected.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">readblock [number | "uicr" | "ficr" | "ram"] [numBlocks]
+
+//Read the first block of memory of the flash
+readblock 0 1</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_more"><a class="anchor" href="#_more"></a>More</h3>
+<div class="paragraph">
+<p>There are more commands that are not documented, you can find them by looking at the TerminalCommandHandler in the source code. These commands may however be removed or change at any time.</p>
+</div>
+</div>
+</div>
+</div>
+</article>
+  </main>
+</div>
+<footer class="footer">
+  <p>This page was built using the Antora default UI.</p>
+  <p>The source code for this UI is licensed under the terms of the MPL-2.0 license.</p>
+</footer>
+<script src="../_/js/site.js"></script>
+<script src="../_/js/vendor/highlight.js"></script>
+<script>hljs.initHighlighting()</script>
+
+  </body>
+</html>

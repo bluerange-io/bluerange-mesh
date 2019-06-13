@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debugging :: BlueRange Fruitymesh</title>
+    <link rel="canonical" href="http://localhost:5000/fruitymesh/Debugging.html">
+    <meta name="generator" content="Antora 2.0.0">
+    <link rel="stylesheet" href="../_/css/site.css">
+  </head>
+  <body class="article">
+<header class="header" role="banner">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="http://localhost:5000">BlueRange Fruitymesh</a>
+      <div class="navbar-item">
+        <img id="navbar-logo" alt="Bluerange Logo">
+      </div>
+      <div class="navbar-item">
+        <input id="search-input" type="text" placeholder="Search docs">
+      </div>
+    </div>
+
+
+  </nav>
+</header>
+<div class="main-wrapper">
+<div class="navigation-container" data-component="fruitymesh" data-version="master">
+  <aside class="navigation" role="navigation">
+    <div class="panels">
+<div class="navigation-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <h3 class="title"><a href="Quick-Start.html">Fruitymesh</a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+<ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Quick-Start.html">Quick Start</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Usage.html">Usage</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Features.html">Features</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Developers.html">Developers</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Specification.html">Specification</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Modules.html">Modules</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="AdvertisingModule.html">AdvertisingModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DebugModule.html">DebugModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DfuModule.html">DfuModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="EnrollmentModule.html">EnrollmentModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="IoModule.html">IoModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="MeshAccessModule.html">MeshAccessModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Node.html">Node</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="ScanningModule.html">ScanningModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="StatusReporterModule.html">StatusReporterModule</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">Other</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Class-Structure.html">Class Structure</a>
+  </li>
+  <li class="nav-item is-current-page" data-depth="2">
+    <a class="nav-link" href="Debugging.html">Debugging</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Battery-Consumption.html">Battery Consumption</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="RecordStorage.html">RecordStorage</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="The-FruityMesh-Algorithm.html">The FruityMesh Algorithm</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="The-Algorithm-in-Detail.html">In Detail</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Simulator.html">Simulator</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Tutorials.html">Tutorials</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Implementing-a-Custom-Module.html">Implementing a Custom Module</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="FAQ.html">FAQ</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">API</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/relution/portal/#/web-api">REST API (Placeholder)</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/asyncapi.html">MQTT API (Placeholder)</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+<div class="navigation-explore" data-panel="explore">
+  <div class="context">
+    <span class="title">Fruitymesh</span>
+    <span class="version">master</span>
+  </div>
+  <ul class="components">
+    <li class="component is-current">
+      <span class="title">Fruitymesh</span>
+      <ul class="versions">
+        <li class="version is-current is-latest">
+          <a href="Quick-Start.html">master</a>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</div>
+    </div>
+  </aside>
+</div>
+  <main class="main" role="main">
+<div class="toolbar" role="navigation">
+  <button class="navigation-toggle"></button>
+  <a href="README.html" class="home-link"></a>
+<nav class="crumbs" role="navigation" aria-label="breadcrumbs">
+  <ul>
+    <li class="crumb"><a href="Quick-Start.html">Fruitymesh</a></li>
+    <li class="crumb">Other</li>
+    <li class="crumb"><a href="Debugging.html">Debugging</a></li>
+  </ul>
+</nav>
+  <div class="edit-this-page"><a href="https://github.com/PanaDel/fruitymesh/edit/master/docs/modules/ROOT/pages/Debugging.adoc">Edit this Page</a></div>
+</div>
+<article class="doc">
+<h1>Debugging</h1>
+<div class="sect1">
+<h2 id="_debugging_stacktraces"><a class="anchor" href="#_debugging_stacktraces"></a>Debugging Stacktraces</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>When Fruitymesh reboots, it will try to save the reason in the ramRetainStruct. The Stacked Program Counter (PC before e.g. the hardfaultHandler was called) will be saved in stacktrace[0].
+Using this information we should be able to get the source code line where the error happened. Use the following:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>C:\nrf\sdk\gcc_arm_embedded_4_9\bin\arm-none-eabi-addr2line -e C:\mway\projects\fruitymesh\_build\debug\NRF51_BOARD\FruityMesh.out 0x35BA5</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The address must be given as a hex value, otherwise, addr2line will print no valid result!! FruityMesh must have been compiled with debug information using -g</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_reading_the_flash_of_a_broken_fruitymesh_node"><a class="anchor" href="#_reading_the_flash_of_a_broken_fruitymesh_node"></a>Reading the flash of a broken FruityMesh Node</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>In order to analyze a broken node, the flash and UICR can be read back in order to analyze the problem. A good idea is to read back UICR and flash and afterwards compare the .hex with either the last .hex flashed onto this beacon (from the fruitydeploy beacon directory) or flash the beacon again and read it back.</p>
+</div>
+<div class="paragraph">
+<p>Read back code and UICR to a .hex file:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>nrfjprog --readuicr --readcode E:\dump.hex</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Convert both .hex files to a hex dump so we can view them with a standard txt editor:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>srec_cat C:\test\dump.hex -intel -o C:\test\dump.txt -hex_dump</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Afterwards, use The TortoiseDiff Tool to see the differences:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Page 0 is the master boot record that should not have been altered</p>
+</li>
+<li>
+<p>The first ~120kb are the softdevice that should not have been altered</p>
+</li>
+<li>
+<p>Afterwards comes the application that should not have changes</p>
+</li>
+<li>
+<p>The free space after the application can be whatever it wants</p>
+</li>
+<li>
+<p>The settings are located 2 pages before the bootloader:</p>
+<div class="ulist">
+<ul>
+<li>
+<p>0x3E400 (NRF51)</p>
+</li>
+<li>
+<p>0x76000 (NRF52)</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p>The bootloader is at:</p>
+<div class="ulist">
+<ul>
+<li>
+<p>#define FRUITYLOAD_ADDRESS 0x3EC00 (NRF51)</p>
+</li>
+<li>
+<p>#define FRUITYLOAD_ADDRESS 0x78000 (NRF52)</p>
+</li>
+</ul>
+</div>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>In order to check the correctness of the settings, we could convert the hex dump of the settings pages to a c array using sublime and load it into the flash of a node in the simulator. Then we can properly debug the startup behaviour. But debugging a real node should also be possible if only the settings are broken.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_debug_running_node"><a class="anchor" href="#_debug_running_node"></a>Debug Running node</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>When the nodes are somewhere in the building and one of them is stuck in a hardfault, or another endless loop, debugging is complicated. Here&#8217;s how to do it:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>If the node is connected with its USB cable, put a battery in the node, then unplug the USB cable</p>
+</li>
+<li>
+<p>Take the node to the workstation, while it is running on battery</p>
+</li>
+<li>
+<p>Use two USB cables that are both plugged into the docking station (do not plug one into the laptop and the other in the docking station because they might have a different ground!!!)</p>
+</li>
+<li>
+<p>One of the cables is plugged into the DevKit / Debugger</p>
+</li>
+<li>
+<p>The other cable is plugged into the node &#8658; Debugger and Node are now powered from the same ground level, this is important</p>
+</li>
+<li>
+<p>Next, connect the Debug cable to the node</p>
+</li>
+<li>
+<p>In Eclipse, select the Debug Configuration "Running Target". (Connect to running target must be selected and no reset, etc&#8230;&#8203; shall be performed)</p>
+</li>
+<li>
+<p>The node should not have restarted during this procedure, &#8230;&#8203; hopefully.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_nrf_sniffer"><a class="anchor" href="#_nrf_sniffer"></a>nRF Sniffer</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The nRF sniffer is used with wireshark. A custom dissector for fruitymesh JOIN_ME packets has been written and is saved in the util/wireshark folder. Integration into wireshark is easy and documented at the beginning of the lua file.</p>
+</div>
+<div class="paragraph">
+<p>The nRF Sniffer does not work with an updated SEGGER Firmware, it is necessary to put the SEGGER Firmeware JLink_V498c on the beacon by using JLinkConfig.exe and replacing selecting replace firmware. Afterwards, the sniffer should work together with the fixed sniffer application received by nordic.</p>
+</div>
+<div class="paragraph">
+<p>If the fixed sniffer application does not find the beacon, open the buggy official version first until the beacon is found, then close and reopen the fixed version.</p>
+</div>
+</div>
+</div>
+</article>
+  </main>
+</div>
+<footer class="footer">
+  <p>This page was built using the Antora default UI.</p>
+  <p>The source code for this UI is licensed under the terms of the MPL-2.0 license.</p>
+</footer>
+<script src="../_/js/site.js"></script>
+<script src="../_/js/vendor/highlight.js"></script>
+<script>hljs.initHighlighting()</script>
+
+  </body>
+</html>

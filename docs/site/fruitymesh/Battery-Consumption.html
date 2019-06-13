@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battery Consumption :: BlueRange Fruitymesh</title>
+    <link rel="canonical" href="http://localhost:5000/fruitymesh/Battery-Consumption.html">
+    <meta name="generator" content="Antora 2.0.0">
+    <link rel="stylesheet" href="../_/css/site.css">
+  </head>
+  <body class="article">
+<header class="header" role="banner">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="http://localhost:5000">BlueRange Fruitymesh</a>
+      <div class="navbar-item">
+        <img id="navbar-logo" alt="Bluerange Logo">
+      </div>
+      <div class="navbar-item">
+        <input id="search-input" type="text" placeholder="Search docs">
+      </div>
+    </div>
+
+
+  </nav>
+</header>
+<div class="main-wrapper">
+<div class="navigation-container" data-component="fruitymesh" data-version="master">
+  <aside class="navigation" role="navigation">
+    <div class="panels">
+<div class="navigation-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <h3 class="title"><a href="Quick-Start.html">Fruitymesh</a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+<ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Quick-Start.html">Quick Start</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Usage.html">Usage</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Features.html">Features</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Developers.html">Developers</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Specification.html">Specification</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Modules.html">Modules</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="AdvertisingModule.html">AdvertisingModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DebugModule.html">DebugModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DfuModule.html">DfuModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="EnrollmentModule.html">EnrollmentModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="IoModule.html">IoModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="MeshAccessModule.html">MeshAccessModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Node.html">Node</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="ScanningModule.html">ScanningModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="StatusReporterModule.html">StatusReporterModule</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">Other</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Class-Structure.html">Class Structure</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Debugging.html">Debugging</a>
+  </li>
+  <li class="nav-item is-current-page" data-depth="2">
+    <a class="nav-link" href="Battery-Consumption.html">Battery Consumption</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="RecordStorage.html">RecordStorage</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="The-FruityMesh-Algorithm.html">The FruityMesh Algorithm</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="The-Algorithm-in-Detail.html">In Detail</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Simulator.html">Simulator</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Tutorials.html">Tutorials</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Implementing-a-Custom-Module.html">Implementing a Custom Module</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="FAQ.html">FAQ</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">API</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/relution/portal/#/web-api">REST API (Placeholder)</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/asyncapi.html">MQTT API (Placeholder)</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+<div class="navigation-explore" data-panel="explore">
+  <div class="context">
+    <span class="title">Fruitymesh</span>
+    <span class="version">master</span>
+  </div>
+  <ul class="components">
+    <li class="component is-current">
+      <span class="title">Fruitymesh</span>
+      <ul class="versions">
+        <li class="version is-current is-latest">
+          <a href="Quick-Start.html">master</a>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</div>
+    </div>
+  </aside>
+</div>
+  <main class="main" role="main">
+<div class="toolbar" role="navigation">
+  <button class="navigation-toggle"></button>
+  <a href="README.html" class="home-link"></a>
+<nav class="crumbs" role="navigation" aria-label="breadcrumbs">
+  <ul>
+    <li class="crumb"><a href="Quick-Start.html">Fruitymesh</a></li>
+    <li class="crumb">Other</li>
+    <li class="crumb"><a href="Battery-Consumption.html">Battery Consumption</a></li>
+  </ul>
+</nav>
+  <div class="edit-this-page"><a href="https://github.com/PanaDel/fruitymesh/edit/master/docs/modules/ROOT/pages/Battery-Consumption.adoc">Edit this Page</a></div>
+</div>
+<article class="doc">
+<h1>Battery Consumption</h1>
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>Using a mesh atop of Bluetooth Low Energy does only make sense when it can operate on low energy. Simple, isn&#8217;t it? Well, not too simple. There are tons of settings that affect the performance of FruityMesh and some use-cases will require different settings for some of these parameters. Many of these settings have been benchmarked with the current implementation. Measurements were done with the nRF51 DK with chip version QFACA1. The system consumption for many of these cases are detailed in this document. The same test applications on a nRF52 consume a little less energy.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_sleeping"><a class="anchor" href="#_sleeping"></a>Sleeping</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Doing nothing will still cost some energy because the RAM and the low frequency clock must be running at all times. This costs about 5.6µA on average. But because the mesh implementation needs some timers, different timer intervals have been tested:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Every 1000ms: 6.3µA</p>
+</li>
+<li>
+<p>Every 500ms: 7µA</p>
+</li>
+<li>
+<p>Every 100ms: 11.5µA</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>The Sleep Power mode should be set to NRF_POWER_MODE_LOWPWR which is the default because constant latency will consume 1mA on average.</p>
+</div>
+<div class="paragraph">
+<p>The DC/DC converter should be enabled to save 10-20% during radio activity.</p>
+</div>
+<div class="paragraph">
+<p>All further measurements have been made with a 500ms timer enabled.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_advertising"><a class="anchor" href="#_advertising"></a>Advertising</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Different Advertising intervals will result in a very different power consumption. These values have been measured with DC/DC enabled and advertising on all three channels:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Advertising every 25ms will consume 770µA</p>
+</li>
+<li>
+<p>Advertising every 100ms will reduce the system consumption to 222µA</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>This does mostly scale linearly.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_scanning"><a class="anchor" href="#_scanning"></a>Scanning</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>There&#8217;s nothing like scanning when it comes to draining the battery as quickly as possible, even with DC/DC on:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Scanning at 50% duty cycle: 5.4mA</p>
+</li>
+<li>
+<p>Scanning at 100% duty cycle: 10.8mA</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Again, we can see that this scales nicely.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_connections"><a class="anchor" href="#_connections"></a>Connections</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Next up, we tested the BLE connections with the DC/DC on, both as a Master and as a Slave:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>1 Connection with an interval of 100ms: 77µA (empty PDUs), 134µA (20 byte each connection event)</p>
+</li>
+<li>
+<p>2 Connections with 100ms each: 142µA (empty PDUs)</p>
+</li>
+<li>
+<p>3 Connections: 211µA</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>The differences between a Slave and a Master connection were not directly measurable because of the good sleep clocks but the Slave will probably use a bit more energy because it has to synchronize on the Master at each connection event.</p>
+</div>
+<div class="paragraph">
+<p>A connection at 30ms used 230µA with empty data packets and 270µA with 20 byte payloads. This suggests that each connection adds a rather constant amount of energy consumption and having three connections at 100ms instead of only one will consume a little less than three times the amount of a single connections.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_mesh_discovery"><a class="anchor" href="#_mesh_discovery"></a>Mesh Discovery</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Measuring mesh discovery consumption is a little tricky because of the SoftDevice scheduling. Sometimes discovery will use less energy while the device has a connection in contrast to a device without connections because the different tasks (scanning/advertising/connection events/&#8230;&#8203;) will collide.</p>
+</div>
+<div class="paragraph">
+<p>Ultra High Discovery with:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>100ms advertising on all channels</p>
+</li>
+<li>
+<p>40ms scan interval</p>
+</li>
+<li>
+<p>20ms scan window</p>
+</li>
+<li>
+<p>3s in DISCOVERY state</p>
+</li>
+<li>
+<p>1s + 1 random second in BACK_OFF state</p>
+</li>
+<li>
+<p>&#8658; 2.2mA with one connection and 2.6 mA without a connection</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Medium Discovery with:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>200ms advertising on all channels</p>
+</li>
+<li>
+<p>1000ms scan interval</p>
+</li>
+<li>
+<p>20ms scan window</p>
+</li>
+<li>
+<p>3s in DISCOVERY state</p>
+</li>
+<li>
+<p>1s + 1 random second in BACK_OFF state</p>
+</li>
+<li>
+<p>&#8658; 240µA with one connection and 200µA without a connection</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Low Discovery with:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>1000ms advertising on all channels</p>
+</li>
+<li>
+<p>2000ms scan interval</p>
+</li>
+<li>
+<p>10ms scan window</p>
+</li>
+<li>
+<p>8s in DISCOVERY state</p>
+</li>
+<li>
+<p>5s + 5 random second in BACK_OFF state</p>
+</li>
+<li>
+<p>&#8658; 110µA with one connection and 60µA without a connection</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>By selecting the appropriate parameters for discovery, we can balance speed vs. energy consumption.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_what_does_that_mean"><a class="anchor" href="#_what_does_that_mean"></a>What does that mean?</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>In general, discovery should be switched off after all devices have joined the network. Once a device loses a connection, discovery should be switched on again.</p>
+</div>
+<div class="paragraph">
+<p>There are different possibilities to achieve this. The best possibility is having a MeshGateway that monitors the mesh and switches discovery on or off. But if the clusterSize of the mesh is known, it is possible to switch discovery off or to a very low setting once the target cluster size is reached. Additionally, a timeout has to be implemented to switch discovery to a low setting after some time in case a node is defective and the target cluster size is never reached.</p>
+</div>
+<div class="paragraph">
+<p>Under good conditions, connections should not break up often which means that discovery can be off at most times. While everything is connected, every node will need about 150-250µA at a connection interval of 100ms. If you do not need low latency, you can easily set the connection interval to a very low 4000ms. This should give you a power consumption as low as 20µA once discovery is switched off.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_measuring_the_power_consumption"><a class="anchor" href="#_measuring_the_power_consumption"></a>Measuring the Power Consumption</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>We have not yet done many tests which intervals provide the best balance between power consumption and performance. Be aware that tweaking some parameters might result in the mesh not connecting properly. We are still working on optimizing the power consumption for most general use-cases.</p>
+</div>
+<div class="paragraph">
+<p>The current consumption can be measured with the <a href="https://www.nordicsemi.com/Software-and-Tools/Development-Kits/Power-Profiler-Kit">Nordic nRF Power Profiler Kit</a></p>
+</div>
+</div>
+</div>
+</article>
+  </main>
+</div>
+<footer class="footer">
+  <p>This page was built using the Antora default UI.</p>
+  <p>The source code for this UI is licensed under the terms of the MPL-2.0 license.</p>
+</footer>
+<script src="../_/js/site.js"></script>
+<script src="../_/js/vendor/highlight.js"></script>
+<script>hljs.initHighlighting()</script>
+
+  </body>
+</html>

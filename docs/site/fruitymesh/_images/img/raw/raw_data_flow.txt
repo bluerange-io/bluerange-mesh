@@ -1,0 +1,14 @@
+entryspacing 1
+Sender->Receiver:raw_data_start
+Receiver->Sender:raw_data_start_received
+
+loop Until all chunks transmitted
+Sender->Receiver:raw_data_chunk
+entryspacing 0
+Sender->Receiver:
+Sender->Receiver:
+entryspacing 1
+box over Sender,Receiver:++...++
+Sender->Receiver:(last) raw_data_chunk
+Receiver->Sender:raw_data_report
+end

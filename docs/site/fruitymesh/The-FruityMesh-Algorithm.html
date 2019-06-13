@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FruityMesh Algorithm :: BlueRange Fruitymesh</title>
+    <link rel="canonical" href="http://localhost:5000/fruitymesh/The-FruityMesh-Algorithm.html">
+    <meta name="generator" content="Antora 2.0.0">
+    <link rel="stylesheet" href="../_/css/site.css">
+  </head>
+  <body class="article">
+<header class="header" role="banner">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="http://localhost:5000">BlueRange Fruitymesh</a>
+      <div class="navbar-item">
+        <img id="navbar-logo" alt="Bluerange Logo">
+      </div>
+      <div class="navbar-item">
+        <input id="search-input" type="text" placeholder="Search docs">
+      </div>
+    </div>
+
+
+  </nav>
+</header>
+<div class="main-wrapper">
+<div class="navigation-container" data-component="fruitymesh" data-version="master">
+  <aside class="navigation" role="navigation">
+    <div class="panels">
+<div class="navigation-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <h3 class="title"><a href="Quick-Start.html">Fruitymesh</a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+<ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Quick-Start.html">Quick Start</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Usage.html">Usage</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Features.html">Features</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Developers.html">Developers</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Specification.html">Specification</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Modules.html">Modules</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="AdvertisingModule.html">AdvertisingModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DebugModule.html">DebugModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DfuModule.html">DfuModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="EnrollmentModule.html">EnrollmentModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="IoModule.html">IoModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="MeshAccessModule.html">MeshAccessModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Node.html">Node</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="ScanningModule.html">ScanningModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="StatusReporterModule.html">StatusReporterModule</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">Other</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Class-Structure.html">Class Structure</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Debugging.html">Debugging</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Battery-Consumption.html">Battery Consumption</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="RecordStorage.html">RecordStorage</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item is-current-page" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="The-FruityMesh-Algorithm.html">The FruityMesh Algorithm</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="The-Algorithm-in-Detail.html">In Detail</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Simulator.html">Simulator</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Tutorials.html">Tutorials</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Implementing-a-Custom-Module.html">Implementing a Custom Module</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="FAQ.html">FAQ</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">API</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/relution/portal/#/web-api">REST API (Placeholder)</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/asyncapi.html">MQTT API (Placeholder)</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+<div class="navigation-explore" data-panel="explore">
+  <div class="context">
+    <span class="title">Fruitymesh</span>
+    <span class="version">master</span>
+  </div>
+  <ul class="components">
+    <li class="component is-current">
+      <span class="title">Fruitymesh</span>
+      <ul class="versions">
+        <li class="version is-current is-latest">
+          <a href="Quick-Start.html">master</a>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</div>
+    </div>
+  </aside>
+</div>
+  <main class="main" role="main">
+<div class="toolbar" role="navigation">
+  <button class="navigation-toggle"></button>
+  <a href="README.html" class="home-link"></a>
+<nav class="crumbs" role="navigation" aria-label="breadcrumbs">
+  <ul>
+    <li class="crumb"><a href="Quick-Start.html">Fruitymesh</a></li>
+    <li class="crumb"><a href="The-FruityMesh-Algorithm.html">The FruityMesh Algorithm</a></li>
+  </ul>
+</nav>
+  <div class="edit-this-page"><a href="https://github.com/PanaDel/fruitymesh/edit/master/docs/modules/ROOT/pages/The-FruityMesh-Algorithm.adoc">Edit this Page</a></div>
+</div>
+<article class="doc">
+<h1>FruityMesh Algorithm</h1>
+<div class="sect1">
+<h2 id="_intro"><a class="anchor" href="#_intro"></a>Intro</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>A mesh should be able to build and
+manage all connections without user interaction. There is one big
+restriction when it comes to BLE connections. Having more than one
+connection as a Peripheral can degrade mesh performance and lead to
+connection losses. Using one connection as a Peripheral and up to three
+connections as a Central has proven a good configuration for mesh
+connections. With these settings, the following will lead to problems
+where two nodes cannot connect to each other because their one
+connection as a Peripheral is already taken.</p>
+</div>
+<div class="paragraph">
+<p><span class="image"><img src="_images/img/mesh-overview.png" alt="impossible"></span></p>
+</div>
+<div class="paragraph">
+<p>There is no way to know the size - or the participating nodes - of our
+mesh in advance. Distributing the presence of a node over long distances
+would be a bad idea because of the time it takes and the energy it
+costs. This means that every node can only see its surroundig nodes.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_simulator"><a class="anchor" href="#_simulator"></a>Simulator</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>There is a <a href="Simulator.html##" class="page">Simulator</a> available that
+will show you how the algorithm works. It allows you to play around with
+different configurations and see how the mesh reacts.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_node"><a class="anchor" href="#_node"></a>Node</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Each node saves a few variables like network id, cluster id,
+cluster size and its own id. Additionally it keeps some information for
+each of its connections. <span class="image"><img src="_images/img/node-data.png" alt="saved values"></span> During
+discovery, it broadcasts its nodeId, clusterSize and clusterId along
+with a few other measures in special advertising packets (<a href="Specification.html##" class="page">JOIN_ME</a>
+packets). It will also scan for some time to receive
+discovery packets of surrounding nodes. From these packets, it selects
+the best connection partner and connects to him.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_clustering"><a class="anchor" href="#_clustering"></a>Clustering</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Now, the real trick here is the clustering. Because every
+node knows the size of the cluster that it&#8217;s part of, it uses this as a
+criteria when connecting to others. Big clusters can always decide to
+which nodes they want to connect and smaller clusters will have to obey.
+Any change in cluster size due to connection or disconnection is
+broadcasted through the exisiting connections.
+<span class="image"><img src="_images/img/clustering.png" alt="cluster forming"></span> After a few <a href="Specification.html##" class="page">JOIN_ME</a> packets
+have been collected, these are processed in the ClusterScore function to
+determine the best connection partner. A node will never try to connect
+to a node with the same clusterId which does effectively prevent loops.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_handshake"><a class="anchor" href="#_handshake"></a>Handshake</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>After receiving the <a href="Specification.html##" class="page">JOIN_ME</a> packets, some time has passed
+and the other node might already be in another cluster or in a different
+state than before. This is why the two nodes will first do a handshake
+after connecting where they pass each other the latest information. Only
+one Handshake must happen at a time to prevent race conditions. Once
+they are satisfied with their partner, the connection can be used,
+otherwise it will be disconnected.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_states"><a class="anchor" href="#_states"></a>States</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The algorithm uses a state machine that switches between
+different DISCOVERY and HANDSHAKE states. This helps the node to reduce
+its energy usage.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_self_healing"><a class="anchor" href="#_self_healing"></a>Self-Healing</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Once a connection in the cluster breaks up, the smaller
+cluster distributes a new cluster id among its nodes. This will
+ultimately repair the missing connection through a similar way.
+<span class="image"><img src="_images/img/self-healing.png" alt="self healing"></span></p>
+</div>
+<div class="paragraph">
+<p>After each connection loss, a node will increment its
+connection-loss-counter. This counter is used together with the nodeId
+to generate a clusterID, this is necessary because there might be cases
+where the founding node of a cluster can not join the cluster anymore if
+it generates the same clusterID again.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_connection"><a class="anchor" href="#_connection"></a>Connection</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Master Bit Because a node cannot know for certain at any
+time if it is part of the bigger cluster, there might be times where two
+connected nodes both think they are part of the bigger cluster, which
+would pose a threat to our mesh once the connection drops. Therefore,
+each connection is assigned a masterBit that is passed to the node that
+is part of the bigger cluster. Now, it is only possible that the
+masterBit is in transition during a disconnect and both cluster must
+dissolve, but they cannot form islands anymore.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_more"><a class="anchor" href="#_more"></a>More</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Anybody interested in a much more detailed explanation of the
+Algorithm is welcome to take a look at
+<a href="The-Algorithm-in-Detail.html" class="page">The Algorithm in Detail</a> page.</p>
+</div>
+</div>
+</div>
+</article>
+  </main>
+</div>
+<footer class="footer">
+  <p>This page was built using the Antora default UI.</p>
+  <p>The source code for this UI is licensed under the terms of the MPL-2.0 license.</p>
+</footer>
+<script src="../_/js/site.js"></script>
+<script src="../_/js/vendor/highlight.js"></script>
+<script>hljs.initHighlighting()</script>
+
+  </body>
+</html>

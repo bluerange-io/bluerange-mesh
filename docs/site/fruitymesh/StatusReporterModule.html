@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StatusReporterModule (moduleId 3) :: BlueRange Fruitymesh</title>
+    <link rel="canonical" href="http://localhost:5000/fruitymesh/StatusReporterModule.html">
+    <meta name="generator" content="Antora 2.0.0">
+    <link rel="stylesheet" href="../_/css/site.css">
+  </head>
+  <body class="article">
+<header class="header" role="banner">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="http://localhost:5000">BlueRange Fruitymesh</a>
+      <div class="navbar-item">
+        <img id="navbar-logo" alt="Bluerange Logo">
+      </div>
+      <div class="navbar-item">
+        <input id="search-input" type="text" placeholder="Search docs">
+      </div>
+    </div>
+
+
+  </nav>
+</header>
+<div class="main-wrapper">
+<div class="navigation-container" data-component="fruitymesh" data-version="master">
+  <aside class="navigation" role="navigation">
+    <div class="panels">
+<div class="navigation-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <h3 class="title"><a href="Quick-Start.html">Fruitymesh</a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+<ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Quick-Start.html">Quick Start</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Usage.html">Usage</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Features.html">Features</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Developers.html">Developers</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Specification.html">Specification</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Modules.html">Modules</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="AdvertisingModule.html">AdvertisingModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DebugModule.html">DebugModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DfuModule.html">DfuModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="EnrollmentModule.html">EnrollmentModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="IoModule.html">IoModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="MeshAccessModule.html">MeshAccessModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Node.html">Node</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="ScanningModule.html">ScanningModule</a>
+  </li>
+  <li class="nav-item is-current-page" data-depth="2">
+    <a class="nav-link" href="StatusReporterModule.html">StatusReporterModule</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">Other</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Class-Structure.html">Class Structure</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Debugging.html">Debugging</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Battery-Consumption.html">Battery Consumption</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="RecordStorage.html">RecordStorage</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="The-FruityMesh-Algorithm.html">The FruityMesh Algorithm</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="The-Algorithm-in-Detail.html">In Detail</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Simulator.html">Simulator</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Tutorials.html">Tutorials</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Implementing-a-Custom-Module.html">Implementing a Custom Module</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="FAQ.html">FAQ</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">API</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/relution/portal/#/web-api">REST API (Placeholder)</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/asyncapi.html">MQTT API (Placeholder)</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+<div class="navigation-explore" data-panel="explore">
+  <div class="context">
+    <span class="title">Fruitymesh</span>
+    <span class="version">master</span>
+  </div>
+  <ul class="components">
+    <li class="component is-current">
+      <span class="title">Fruitymesh</span>
+      <ul class="versions">
+        <li class="version is-current is-latest">
+          <a href="Quick-Start.html">master</a>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</div>
+    </div>
+  </aside>
+</div>
+  <main class="main" role="main">
+<div class="toolbar" role="navigation">
+  <button class="navigation-toggle"></button>
+  <a href="README.html" class="home-link"></a>
+<nav class="crumbs" role="navigation" aria-label="breadcrumbs">
+  <ul>
+    <li class="crumb"><a href="Quick-Start.html">Fruitymesh</a></li>
+    <li class="crumb"><a href="Modules.html">Modules</a></li>
+    <li class="crumb"><a href="StatusReporterModule.html">StatusReporterModule</a></li>
+  </ul>
+</nav>
+  <div class="edit-this-page"><a href="https://github.com/PanaDel/fruitymesh/edit/master/docs/modules/ROOT/pages/StatusReporterModule.adoc">Edit this Page</a></div>
+</div>
+<article class="doc">
+<h1>StatusReporterModule (moduleId 3)</h1>
+<div class="sect1">
+<h2 id="_purpose"><a class="anchor" href="#_purpose"></a>Purpose</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>This module should report the node&#8217;s
+status according to a configured interval. Furthermore, it provides
+methods for directly requesting different kinds of device info, status,
+etc,&#8230;&#8203; data.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_functionality"><a class="anchor" href="#_functionality"></a>Functionality</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The StatusReporterModule can periodically send out
+different kinds of information messages. It will also feed the watchdog
+once keep alive messages are received. It is responsible for sending out
+logged error codes and for measuring the necessary data for its messages
+such as the battery power.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_terminal_commands"><a class="anchor" href="#_terminal_commands"></a>Terminal Commands</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_device_information"><a class="anchor" href="#_device_information"></a>Device Information</h3>
+<div class="paragraph">
+<p>Generic information about a
+node that does not change or very seldomly - only through enrollment or
+firmware update, can be requested via the get_device_info command.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Request the full device info from some nodes
+action [nodeId] status get_device_info</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_status_information"><a class="anchor" href="#_status_information"></a>Status Information</h3>
+<div class="paragraph">
+<p>Information that is bound to change from time to
+time can be requested using the get_status command.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Request the status
+action [nodeId] status get_status</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_connection_information"><a class="anchor" href="#_connection_information"></a>Connection Information</h3>
+<div class="paragraph">
+<p>Information about the mesh connections of a
+node can be requested with the following command.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Retrieve the connections from all nodes in the network
+action [nodeId] status get_connections</code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Return nearby nodes from the JOIN_ME buffer
+action [nodeId] status get_nearby</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_livereports"><a class="anchor" href="#_livereports"></a>Livereports</h3>
+<div class="paragraph">
+<p>Livereports are a way to send information about errors,
+connections, disconnecttions and other important events to the user
+through the mesh. Each livereport has a unique id according to its
+importance. Setting the livereport level to a level greater than 0 will
+activate the reporting. The different levels are:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Off (0)</p>
+</li>
+<li>
+<p>Error (50)</p>
+</li>
+<li>
+<p>Warn (100)</p>
+</li>
+<li>
+<p>Info (150)</p>
+</li>
+<li>
+<p>Debug (200)</p>
+</li>
+</ul>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Set the livereport level
+action [nodeId] status livereports [liveReportLevel]
+
+//Activate livereports for all errors on all nodes
+action 0 status livereports 50</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_messages"><a class="anchor" href="#_messages"></a>Messages</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_device_info"><a class="anchor" href="#_device_info"></a>Device Info</h3>
+<div class="sect3">
+<h4 id="_request"><a class="anchor" href="#_request"></a>Request</h4>
+<div class="paragraph">
+<p>actionType: GET_DEVICE_INFO</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">connPacketModule</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_response"><a class="anchor" href="#_response"></a>Response</h4>
+<div class="paragraph">
+<p>actionType: DEVICE_INFO</p>
+</div>
+<div class="paragraph">
+<p>The device info contains information about the device that is not
+changing often, e.g. only after a firmware update or an enrollment.</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">connPacketModule</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">manufacturerId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Id according to Bluetooth SIG Assigned numbers
+company identifiers</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">5</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">serialNumber</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Serial number as ASCII without terminating 0 character</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">chipId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A unique ID of the nrf chip</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">7</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">gapAddress</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1 byte address type, 6 byte ble address</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">networkid</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The network id</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">nodeVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Version of the node (10000000 * MAJOR + 10000 * MINOR + PATCH)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">dbmRx</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Receive dbm signed</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">dbmTx</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Transmit dbm signed</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">deviceType</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Refer to DeviceTypes</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">calibratedTx</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">calibrated tx power at 1m distance, signed</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">chipGroupId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">groupid for the chip (e.g. NRF51 or NRF52)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">featuresetGroupId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">groupid for the firmware featureset (used for
+firmware update, matching groups are allowed to receive the firmware.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">bootloaderVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">version of the bootloader</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_device_info_2"><a class="anchor" href="#_device_info_2"></a>Device Info</h3>
+<div class="sect3">
+<h4 id="_request_2"><a class="anchor" href="#_request_2"></a>Request</h4>
+<div class="paragraph">
+<p>actionType: GET_DEVICE_INFO_V2</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">connPacketModule</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_response_2"><a class="anchor" href="#_response_2"></a>Response</h4>
+<div class="paragraph">
+<p>actionType: DEVICE_INFO_V2</p>
+</div>
+<div class="paragraph">
+<p>The device info contains information about the device that is not
+changing often, e.g. only after a firmware update or an enrollment.</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">connPacketModule</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u16</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">manufacturerId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Id according to Bluetooth SIG Assigned numbers
+company identifiers</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u32</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">serialNumberIndex</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Index of the serial number, can be converted
+with alphabet</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u64</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">chipId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A unique ID of the nrf chip</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">7</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">gapAddress</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">byte address type, 6 byte ble address</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u16</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">networkid</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The network id</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u32</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">nodeVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Version of the node (10000000 * MAJOR + 10000 *
+MINOR + PATCH)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">i8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">dbmRx</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Receive dbm signed</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">i8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">dbmTx</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Transmit dbm signed</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">deviceType</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Refer to
+<a href="Specification.html#DeviceTypes" class="page">DeviceTypes</a></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">i8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">calibratedTx</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">calibrated tx power at 1m distance, signed</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u16</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">chipGroupId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">groupid for the chip (e.g. NRF51 or NRF52)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u16</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">featuresetGroupId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">groupid for the firmware featureset (used
+for firmware update, matching groups are allowed to receive the
+firmware.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">u16</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">bootloaderVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">version of the bootloader</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_status"><a class="anchor" href="#_status"></a>Status</h3>
+<div class="sect3">
+<h4 id="_request_3"><a class="anchor" href="#_request_3"></a>Request</h4>
+<div class="paragraph">
+<p>actionType: GET_STATUS</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">connPacketModule</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_response_actiontype_status"><a class="anchor" href="#_response_actiontype_status"></a>Response actionType: STATUS</h4>
+<div class="paragraph">
+<p>The device status contains information that is changing from time to
+time.</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">connPacketModule</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">clusterSize</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Size of the cluster that the node is connected to
+(current mesh size)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">inConnectionPartner</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">NodeId of the node that is
+connected to the one and only peripheral connection with this node.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">inConnectionRssi</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RSSI of the incoming connection</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2 bit</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">freeIn</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Number
+of free mesh connections as peripheral</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">6 bit</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">freeOut</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Number of free
+mesh connections as central</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">batteryInfo</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Voltage of the battery</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">connectionLossCounter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Counter on how many mesh connections were
+dropped</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1 bit</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">initializedByGateway</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If the gateway has initialized this
+beacon and sent the SET_INITIALIZED command, this bit will be 1 until a
+reboot is encountered</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">7 bit</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">reserved</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_connections"><a class="anchor" href="#_connections"></a>Connections</h3>
+<div class="paragraph">
+<p>Query all nodeIDs that a node is connected to including
+the connection rssi. The first entry is the incoming connection, the
+others are outgoing.</p>
+</div>
+<div class="sect3">
+<h4 id="_request_4"><a class="anchor" href="#_request_4"></a>Request</h4>
+<div class="paragraph">
+<p>actionType: GET_ALL_CONNECTIONS</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">connPacketModule</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_response_3"><a class="anchor" href="#_response_3"></a>Response</h4>
+<div class="paragraph">
+<p>actionType: ALL_CONNECTIONS</p>
+</div>
+<div class="paragraph">
+<p>The device status contains information that is changing from time to
+time.</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">connPacketModule</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3*x</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">connections</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Returns an array of all partnerEntries</p></td>
+</tr>
+</tbody>
+</table>
+<div class="sect4">
+<h5 id="_partnerentry"><a class="anchor" href="#_partnerentry"></a>PartnerEntry</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">partnerId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The
+nodeId of the connected node</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">rssi</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">the rssi as a signed integer</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_nearby_nodes"><a class="anchor" href="#_nearby_nodes"></a>Nearby Nodes</h3>
+<div class="paragraph">
+<p>Returns all nodes (limited to some maximum count) that
+are surrounding the node with the same networkid.</p>
+</div>
+<div class="sect3">
+<h4 id="_request_5"><a class="anchor" href="#_request_5"></a>Request</h4>
+<div class="paragraph">
+<p>actionType: GET_NEARBY_NODES</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">connPacketModule</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_response_4"><a class="anchor" href="#_response_4"></a>Response</h4>
+<div class="paragraph">
+<p>actionType: NEARBY_NODES</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">connPacketModule</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3*x</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">nearbyNodes</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Returns an array of
+NearbyNodeEntries</p></td>
+</tr>
+</tbody>
+</table>
+<div class="sect4">
+<h5 id="_nearbynodeentry"><a class="anchor" href="#_nearbynodeentry"></a>NearbyNodeEntry</h5>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">nodeId</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The
+nodeId of the nearby node</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">rssi</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">the rssi as a signed integer</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_live_reports"><a class="anchor" href="#_live_reports"></a>Live Reports</h3>
+<div class="paragraph">
+<p>The statusReporterModule can send live reports that
+notify the user over various state changes and error conditions. A live
+Report is generated on a node and is then broadcasted over the mesh.
+This allows us to do live debugging of mesh errors, e.g. if two nodes
+are not connecting to each other. Live Reports are also received over
+MeshAccessConnections which means we can find an error after we connect
+to the disconnected part of the mesh using a MeshAccessConnection.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">enum LiveReportTypes {
+    LIVE_REPORT_TYPES_ERROR = 0,
+    LIVE_REPORT_TYPES_WARN = 50,
+    //========
+    LIVE_REPORT_TYPES_INFO = 100,
+    LIVE_REPORT_TYPE_GAP_CONNECTED_INCOMING, //extra is connHandle, extra2 is 4 bytes of gap addr
+    LIVE_REPORT_TYPE_GAP_TRYING_AS_MASTER, //extra is partnerId, extra2 is 4 bytes of gap addr
+    LIVE_REPORT_TYPE_GAP_CONNECTED_OUTGOING, //extra is connHandle, extra2 is 4 byte of gap addr
+    LIVE_REPORT_TYPE_GAP_DISCONNECTED, //extra is partnerid, extra2 is hci code
+
+    LIVE_REPORT_TYPE_HANDSHAKE_FAIL,
+    LIVE_REPORT_TYPE_MESH_CONNECTED, //extra is partnerid, extra2 is asWinner
+    LIVE_REPORT_TYPE_MESH_DISCONNECTED, //extra is partnerid, extra2 is appDisconnectReason
+
+    //========
+    LIVE_REPORT_TYPES_DEBUG = 150,
+    LIVE_REPORT_TYPE_DECISION_RESULT //extra is decision type, extra2 is preferedPartner
+};</code></pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_event"><a class="anchor" href="#_event"></a>Event</h4>
+<div class="paragraph">
+<p>actionType: LIVE_REPORT</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Bytes</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">connPacketModule</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">MESSAGE_TYPE_MODULE_GENERAL</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">reportType</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Is of type LiveReportType</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">extra</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Additional data regarding the event, depending on the reportType</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">extra2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Additional data regarding the event, depending on the reportType</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</article>
+  </main>
+</div>
+<footer class="footer">
+  <p>This page was built using the Antora default UI.</p>
+  <p>The source code for this UI is licensed under the terms of the MPL-2.0 license.</p>
+</footer>
+<script src="../_/js/site.js"></script>
+<script src="../_/js/vendor/highlight.js"></script>
+<script>hljs.initHighlighting()</script>
+
+  </body>
+</html>

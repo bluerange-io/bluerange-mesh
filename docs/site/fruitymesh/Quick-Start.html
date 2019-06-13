@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick start :: BlueRange Fruitymesh</title>
+    <link rel="canonical" href="http://localhost:5000/fruitymesh/Quick-Start.html">
+    <meta name="generator" content="Antora 2.0.0">
+    <link rel="stylesheet" href="../_/css/site.css">
+  </head>
+  <body class="article">
+<header class="header" role="banner">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="http://localhost:5000">BlueRange Fruitymesh</a>
+      <div class="navbar-item">
+        <img id="navbar-logo" alt="Bluerange Logo">
+      </div>
+      <div class="navbar-item">
+        <input id="search-input" type="text" placeholder="Search docs">
+      </div>
+    </div>
+
+
+  </nav>
+</header>
+<div class="main-wrapper">
+<div class="navigation-container" data-component="fruitymesh" data-version="master">
+  <aside class="navigation" role="navigation">
+    <div class="panels">
+<div class="navigation-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <h3 class="title"><a href="Quick-Start.html">Fruitymesh</a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+<ul class="nav-list">
+  <li class="nav-item is-current-page" data-depth="1">
+    <a class="nav-link" href="Quick-Start.html">Quick Start</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Usage.html">Usage</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Features.html">Features</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Developers.html">Developers</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Specification.html">Specification</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Modules.html">Modules</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="AdvertisingModule.html">AdvertisingModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DebugModule.html">DebugModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DfuModule.html">DfuModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="EnrollmentModule.html">EnrollmentModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="IoModule.html">IoModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="MeshAccessModule.html">MeshAccessModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Node.html">Node</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="ScanningModule.html">ScanningModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="StatusReporterModule.html">StatusReporterModule</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">Other</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Class-Structure.html">Class Structure</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Debugging.html">Debugging</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Battery-Consumption.html">Battery Consumption</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="RecordStorage.html">RecordStorage</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="The-FruityMesh-Algorithm.html">The FruityMesh Algorithm</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="The-Algorithm-in-Detail.html">In Detail</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Simulator.html">Simulator</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Tutorials.html">Tutorials</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Implementing-a-Custom-Module.html">Implementing a Custom Module</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="FAQ.html">FAQ</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">API</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/relution/portal/#/web-api">REST API (Placeholder)</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/asyncapi.html">MQTT API (Placeholder)</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+<div class="navigation-explore" data-panel="explore">
+  <div class="context">
+    <span class="title">Fruitymesh</span>
+    <span class="version">master</span>
+  </div>
+  <ul class="components">
+    <li class="component is-current">
+      <span class="title">Fruitymesh</span>
+      <ul class="versions">
+        <li class="version is-current is-latest">
+          <a href="Quick-Start.html">master</a>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</div>
+    </div>
+  </aside>
+</div>
+  <main class="main" role="main">
+<div class="toolbar" role="navigation">
+  <button class="navigation-toggle"></button>
+  <a href="README.html" class="home-link"></a>
+<nav class="crumbs" role="navigation" aria-label="breadcrumbs">
+  <ul>
+    <li class="crumb"><a href="Quick-Start.html">Fruitymesh</a></li>
+    <li class="crumb"><a href="Quick-Start.html">Quick Start</a></li>
+  </ul>
+</nav>
+  <div class="edit-this-page"><a href="https://github.com/PanaDel/fruitymesh/edit/master/docs/modules/ROOT/pages/Quick-Start.adoc">Edit this Page</a></div>
+</div>
+<article class="doc">
+<h1>Quick start</h1>
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p><span class="image"><img src="_images/img/eclipse.png" alt="eclipse-luna"></span>
+<span class="image"><img src="_images/img/cpp.png" alt="cplusplus"></span></p>
+</div>
+<div class="paragraph">
+<p>FruityMesh was built with Eclipse and GCC and is mainly written in C, with some small C11 bits. Setting up the development environment has become pretty straightforward.</p>
+</div>
+<div class="paragraph">
+<p>You have two possibilities:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><a href="#_flashing_the_precompiled_firmware">Flashing the precompiled firmware</a> will take you about <strong>5 minutes</strong>.</p>
+</li>
+<li>
+<p>If you want to compile it yourself you need to <a href="#_setup_eclipse_and_compile_fruitymesh_yourself">Setup Eclipse and compile FruityMesh yourself</a>. This will take you a few more minutes until everything is ready to go.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_flashing_the_precompiled_firmware"><a class="anchor" href="#_flashing_the_precompiled_firmware"></a>Flashing the precompiled firmware</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The precompiled firmware can be flashed in three easy steps.</p>
+</div>
+<div class="sect2">
+<h3 id="_1_download_the_nrf5_command_line_tools"><a class="anchor" href="#_1_download_the_nrf5_command_line_tools"></a>1. Download the nRF5 Command Line Tools</h3>
+<div class="paragraph">
+<p>The nRF Command Line Tools are handy for flashing the compiled firmware on a device. You can download them here for the operating system of your choice and install them:</p>
+</div>
+<div class="paragraph">
+<p><a href="https://www.nordicsemi.com/Software-and-Tools/Development-Tools/nRF5-Command-Line-Tools" class="bare">https://www.nordicsemi.com/Software-and-Tools/Development-Tools/nRF5-Command-Line-Tools</a></p>
+</div>
+<div class="paragraph">
+<p>The tools come with a bundled installation of the Segger Utilities, which are necessary for flashing and debugging nRF Hardware.</p>
+</div>
+<div class="paragraph">
+<p>You should add the <strong>bin/</strong> folder of the installation to your operating system PATH variable to make development easier.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_2_flash_the_softdevice_and_the_application"><a class="anchor" href="#_2_flash_the_softdevice_and_the_application"></a>2. Flash the SoftDevice and the Application</h3>
+<div class="paragraph">
+<p>Plug in your nrf51 or nrf52 development board via USB, then open a command prompt in the FruityMesh folder and type in the following command for flashing the nrf51 version:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>C:/&lt;path_to_nrfjprog&gt;/nrfjprog.exe --chiperase --program binary/fruitymesh_nrf51_s130.hex --reset</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>or the following for nrf52:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>C:/&lt;path_to_nrfjprog&gt;/nrfjprog.exe --chiperase --program binary/fruitymesh_nrf52_s132.hex --reset</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Your output should look like this:</p>
+</div>
+<div class="paragraph">
+<p><span class="image"><img src="_images/img/flashing.png" alt="flashing"></span></p>
+</div>
+<div class="paragraph">
+<p>If you have multiple boards attached, you will be prompted for the id of your board that should be flashed.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_3_get_started"><a class="anchor" href="#_3_get_started"></a>3. Get started</h3>
+<div class="paragraph">
+<p>You&#8217;re now ready to test FruityMesh. Continue by reading the <a href="#_get_started">Get Started</a> section.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_setup_eclipse_and_compile_fruitymesh_yourself"><a class="anchor" href="#_setup_eclipse_and_compile_fruitymesh_yourself"></a>Setup Eclipse and compile FruityMesh yourself</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>FruityMesh is built using the GCC compiler toolchain together with GNU make. The installation process varies a little for each operating system.</p>
+</div>
+<div class="sect2">
+<h3 id="_1_installing_the_toolchain"><a class="anchor" href="#_1_installing_the_toolchain"></a>1. Installing the Toolchain</h3>
+<div class="sect3">
+<h4 id="_gnu_arm_embedded_toolchain"><a class="anchor" href="#_gnu_arm_embedded_toolchain"></a>GNU ARM Embedded Toolchain</h4>
+<div class="paragraph">
+<p>Download Version 4.9 of the GNU ARM Embedded Toolchain for Windows. This includes the compiler gcc, linker, and multiple utilities like objcopy, addr2line and gdb - the GNU debugger:</p>
+</div>
+<div class="paragraph">
+<p><a href="https://launchpad.net/gcc-arm-embedded/4.9/4.9-2015-q3-update/" class="bare">https://launchpad.net/gcc-arm-embedded/4.9/4.9-2015-q3-update/</a></p>
+</div>
+<div class="paragraph">
+<p>Unzip the downloaded package into a folder of your choice.</p>
+</div>
+<div class="admonitionblock warning">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-warning" title="Warning"></i>
+</td>
+<td class="content">
+Do not choose a newer version, as this might fail to compile.
+</td>
+</tr>
+</table>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_make_tools_installation_windows_only"><a class="anchor" href="#_make_tools_installation_windows_only"></a>Make Tools Installation (Windows only)</h4>
+<div class="paragraph">
+<p>Next, if you are working on windows, you have to download and install some unix utilities, the GNU ARM Eclipse Build Tools. This includes make, sh, rm and some others. Version 2.4 has been tested successfully and the executable installer can be downloaded from here:</p>
+</div>
+<div class="paragraph">
+<p><a href="https://github.com/gnu-mcu-eclipse/windows-build-tools/releases/tag/v2.4b" class="bare">https://github.com/gnu-mcu-eclipse/windows-build-tools/releases/tag/v2.4b</a></p>
+</div>
+<div class="paragraph">
+<p>Because most makefiles will also use the mkdir command and maybe some others, you should also download the GNU Coreutils that provide a set of UNIX commands in binary for Windows. Copy at least the mkdir.exe and md5.exe to the bin/ folder of your GNU ARM Build Tools installation. You must also download the dependencies and copy these to the same folder (Two .dll files).</p>
+</div>
+<div class="paragraph">
+<p>Binaries:</p>
+</div>
+<div class="paragraph">
+<p><a href="http://gnuwin32.sourceforge.net/downlinks/coreutils-bin-zip.php" class="bare">http://gnuwin32.sourceforge.net/downlinks/coreutils-bin-zip.php</a></p>
+</div>
+<div class="paragraph">
+<p>Dependencies:</p>
+</div>
+<div class="paragraph">
+<p><a href="http://gnuwin32.sourceforge.net/downlinks/coreutils-dep-zip.php" class="bare">http://gnuwin32.sourceforge.net/downlinks/coreutils-dep-zip.php</a></p>
+</div>
+<div class="paragraph">
+<p>Finally, you should add the bin folders of the gnu buildtools and the bin folder of gcc-arm-embedded to your PATH variable under System Environment. This will make sure that you can access these tools from anywhere.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_configure_the_project"><a class="anchor" href="#_configure_the_project"></a>Configure the Project</h4>
+<div class="paragraph">
+<p>The last step, before you can build the project is to duplicate Makefile.local.template and name it Makefile.local</p>
+</div>
+<div class="paragraph">
+<p>Open Makefile.local and give the correct path to your gcc installation:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>FRUITYMESH_GNU_INSTALL_ROOT := C:/&lt;path_to_gcc-arm-embedded-4.9&gt;</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can also specify the PLATFORM (NRF51 or NRF52) and give a different <a href="#Featuresets.adoc">Featureset</a> for the build.</p>
+</div>
+<div class="paragraph">
+<p>Next, open a command prompt in the fruitymesh folder and type:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>make</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If everything was set up correctly and the location of make was correctly entered in the PATH variable of your operating system, everything should build.</p>
+</div>
+<div class="paragraph">
+<p>If you installed the nRF Command Line Tools and properly configured the PATH, you can now type:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>make flash</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>to flash the firmware on a device.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_using_eclipse_for_development"><a class="anchor" href="#_using_eclipse_for_development"></a>Using Eclipse for Development</h4>
+<div class="paragraph">
+<p><span class="image"><img src="_images/img/eclipsescreen.png" alt="eclipsescreenshot"></span></p>
+</div>
+<div class="paragraph">
+<p>Eclipse is a good development IDE for FruityMesh. The project settings are already included and all you have to do is download GNU MCU Eclipse, which already contains the necessary plugins for Embedded Development from here:</p>
+</div>
+<div class="paragraph">
+<p><a href="https://github.com/gnu-mcu-eclipse/org.eclipse.epp.packages/releases" class="bare">https://github.com/gnu-mcu-eclipse/org.eclipse.epp.packages/releases</a></p>
+</div>
+<div class="paragraph">
+<p>After starting Eclipse, all you have to do is to import the FruityMesh project. You can then develop, flash and debug in a comfortable way.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_get_started"><a class="anchor" href="#_get_started"></a>Get started</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Now, let&#8217;s see how we can use FruityMesh. The preconmpiled firmware and the standard project settings are configured so that all devices immediately connect to each other. Start by plugging in your first develoipment kit.</p>
+</div>
+<div class="sect2">
+<h3 id="_open_a_serial_terminal_and_connect"><a class="anchor" href="#_open_a_serial_terminal_and_connect"></a>Open a Serial Terminal and Connect</h3>
+<div class="paragraph">
+<p>(On Windows,
+<a href="http://www.chiark.greenend.org.uk/~sgtatham/putty/download.html">Putty</a> is the best tool. The screen utility can be used on macOS or Linux.) You have to connect to UART using the following settings:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Connection Type:</strong> Serial</p>
+</li>
+<li>
+<p><strong>Speed:</strong> 1000000</p>
+</li>
+<li>
+<p><strong>Data bits:</strong> 8</p>
+</li>
+<li>
+<p><strong>Stop Bits:</strong> 1</p>
+</li>
+<li>
+<p><strong>Parity:</strong> None</p>
+</li>
+<li>
+<p><strong>Flow control:</strong> RTS/CTS (Hardware)</p>
+</li>
+</ul>
+</div>
+<div class="quoteblock">
+<blockquote>
+<div class="paragraph">
+<p>Note to OSX users: To find out which serial port to open, you can list all devices under <strong>/dev/cu.</strong>* and pick the one that says usbmodem.</p>
+</div>
+</blockquote>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_reset_the_development_kit"><a class="anchor" href="#_reset_the_development_kit"></a>Reset the Development Kit</h3>
+<div class="paragraph">
+<p>Once your terminal is connected to the serial port, press the reset button on the Development Kit and the Terminal should provide you with some output similar to this:</p>
+</div>
+<div class="paragraph">
+<p><span class="image"><img src="_images/img/terminal.png" alt="Terminal"></span></p>
+</div>
+<div class="paragraph">
+<p>If you don&#8217;t get output immediately it will sometimes help to disconnect the Devkit from USB for a short time or try to write something. This is an issue of the SEGGER Debugger chipset that bridges the UART.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_try_some_commands"><a class="anchor" href="#_try_some_commands"></a>Try Some Commands</h3>
+<div class="paragraph">
+<p>You may now enter a number of commands to trigger actions. Here are some important ones:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>status:</strong> will show you the status of the node and its connections</p>
+</li>
+<li>
+<p><strong>reset:</strong> performs a system reset</p>
+</li>
+<li>
+<p><strong>data:</strong> sends data through the mesh that other nodes will output to the terminal</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_connect_a_second_development_kit"><a class="anchor" href="#_connect_a_second_development_kit"></a>Connect a Second Development Kit</h3>
+<div class="paragraph">
+<p>Next, flash and connect another node to the network and you should observe that they connect to each other after a short amount of time. You&#8217;ll see that the LEDs will switch from blinking red to a single green pattern.</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>If you enter the command <strong>action 0 io leds on</strong>, both nodes should
+switch their led to white (all LEDs on). After you enter <strong>action 0 io leds off</strong>, it will go back to connection signaling mode.</p>
+</li>
+<li>
+<p>Now, connect with another Terminal to the second Node and enter <strong>data</strong> in the command prompt and observe how the data is sent to the other node and outputted on the other terminal.</p>
+</li>
+<li>
+<p>You can add as many nodes as you like to the network and see how it reacts. If you remove a node, the network will try to repair this connection. You can observe the size change of the cluster by entering <strong>status</strong> from time to time.</p>
+</li>
+</ul>
+</div>
+<div class="admonitionblock warning">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-warning" title="Warning"></i>
+</td>
+<td class="content">
+Two nodes will only connect to each other once they have been enrolled in the same network. The github configuration will automatically have all nodes enrolled in the same network after flashing. If you do not want this, take a look at the <a href="Specification.html#UICR" class="page">UICR configuration</a>.
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_whats_next"><a class="anchor" href="#_whats_next"></a>What&#8217;s next</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Take a look at the <a href="Features.html" class="page">Features</a> page for a detailed overview of the possibilities and check out <a href="Usage.html" class="page">Usage</a> for usage instructions. If you&#8217;re ready to contribute to the development of FruityMesh, see <a href="Developers.html" class="page">Developers</a> for a roadmap and for instructions on how to take part.</p>
+</div>
+<div class="paragraph">
+<p>If you want to start programming with FruityMesh, you should definitely have a look at the <a href="Tutorials.html" class="page">Tutorials</a> page for some guided introduction.</p>
+</div>
+</div>
+</div>
+</article>
+  </main>
+</div>
+<footer class="footer">
+  <p>This page was built using the Antora default UI.</p>
+  <p>The source code for this UI is licensed under the terms of the MPL-2.0 license.</p>
+</footer>
+<script src="../_/js/site.js"></script>
+<script src="../_/js/vendor/highlight.js"></script>
+<script>hljs.initHighlighting()</script>
+
+  </body>
+</html>

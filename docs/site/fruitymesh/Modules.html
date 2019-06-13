@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modules overview :: BlueRange Fruitymesh</title>
+    <link rel="canonical" href="http://localhost:5000/fruitymesh/Modules.html">
+    <meta name="generator" content="Antora 2.0.0">
+    <link rel="stylesheet" href="../_/css/site.css">
+  </head>
+  <body class="article">
+<header class="header" role="banner">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="http://localhost:5000">BlueRange Fruitymesh</a>
+      <div class="navbar-item">
+        <img id="navbar-logo" alt="Bluerange Logo">
+      </div>
+      <div class="navbar-item">
+        <input id="search-input" type="text" placeholder="Search docs">
+      </div>
+    </div>
+
+
+  </nav>
+</header>
+<div class="main-wrapper">
+<div class="navigation-container" data-component="fruitymesh" data-version="master">
+  <aside class="navigation" role="navigation">
+    <div class="panels">
+<div class="navigation-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <h3 class="title"><a href="Quick-Start.html">Fruitymesh</a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+<ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Quick-Start.html">Quick Start</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Usage.html">Usage</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Features.html">Features</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Developers.html">Developers</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Specification.html">Specification</a>
+  </li>
+  <li class="nav-item is-current-page" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Modules.html">Modules</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="AdvertisingModule.html">AdvertisingModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DebugModule.html">DebugModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DfuModule.html">DfuModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="EnrollmentModule.html">EnrollmentModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="IoModule.html">IoModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="MeshAccessModule.html">MeshAccessModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Node.html">Node</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="ScanningModule.html">ScanningModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="StatusReporterModule.html">StatusReporterModule</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">Other</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Class-Structure.html">Class Structure</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Debugging.html">Debugging</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Battery-Consumption.html">Battery Consumption</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="RecordStorage.html">RecordStorage</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="The-FruityMesh-Algorithm.html">The FruityMesh Algorithm</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="The-Algorithm-in-Detail.html">In Detail</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Simulator.html">Simulator</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Tutorials.html">Tutorials</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Implementing-a-Custom-Module.html">Implementing a Custom Module</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="FAQ.html">FAQ</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">API</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/relution/portal/#/web-api">REST API (Placeholder)</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/asyncapi.html">MQTT API (Placeholder)</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+<div class="navigation-explore" data-panel="explore">
+  <div class="context">
+    <span class="title">Fruitymesh</span>
+    <span class="version">master</span>
+  </div>
+  <ul class="components">
+    <li class="component is-current">
+      <span class="title">Fruitymesh</span>
+      <ul class="versions">
+        <li class="version is-current is-latest">
+          <a href="Quick-Start.html">master</a>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</div>
+    </div>
+  </aside>
+</div>
+  <main class="main" role="main">
+<div class="toolbar" role="navigation">
+  <button class="navigation-toggle"></button>
+  <a href="README.html" class="home-link"></a>
+<nav class="crumbs" role="navigation" aria-label="breadcrumbs">
+  <ul>
+    <li class="crumb"><a href="Quick-Start.html">Fruitymesh</a></li>
+    <li class="crumb"><a href="Modules.html">Modules</a></li>
+  </ul>
+</nav>
+  <div class="edit-this-page"><a href="https://github.com/PanaDel/fruitymesh/edit/master/docs/modules/ROOT/pages/Modules.adoc">Edit this Page</a></div>
+</div>
+<article class="doc">
+<h1>Modules overview</h1>
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>FruityMesh consists of a number of different Modules. There are the core modules which are part of the open source distribution, which deliver standard functionality. Also, there are other modules, some developed by us or by other developers that can provide specific functionality and built on our mesh framework.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_general"><a class="anchor" href="#_general"></a>General</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>All modules share a set of commands for loading and retrieving their configuration, for activating and deactivating them and for triggering actions.</p>
+</div>
+<div class="paragraph">
+<p>Each Custom Module should extend the Module class to have a set of methods that it can override. Some of these methods are explained below:</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Method</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Module Constructor</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The constructor must only define variables and should not start any functionality.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ConfigurationLoadedHandler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">This handler is called once the module should be initialized. A pointer to the configuration will be given and all initialization should happen in this method. If the module configuration says that the module is inactive, the module should not initialize any functionality.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TimerEventHandler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Will be called at a fixed interval for all Modules. If functionality should only be executed e.g. each 5 seconds, use the SHOULD_IV_TRIGGER macro in the handler.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TerminalCommandHandler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Will receive all terminal input that can then be checked against a list of commands to execute.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ButtonHandler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Called once a button has been pressed and released.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">MeshMessageReceivedHandler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Will be called once a full message has been received over the mesh (e.g. after all message parts were reassembled)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BleEventHandler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Implement this to receive all other ble events that have not been preprocessed, such as received advertising packets, new connections, e.g.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PreEnrollmentHandler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Allows a module to e.g. enroll an attached controller before accepting the enrollment. Check the <a href="EnrollmentModule.html" class="page">EnrollmentModule</a> for more info.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RecordStorageEventHandler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">When saving a record, this handler is called once the flash access was done. Check the <a href="RecordStorage.html" class="page">RecordStorage</a> documentation.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">CheckMeshAccessPacketAuthorization</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">See <a href="MeshAccessModule.html" class="page">MeshAccessModule</a></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">CheckComponentUpdateRequest</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Implement to ask a 3rd party controller about compatibility with the Dfu.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">StartComponentUpdate</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Called once the Dfu image is ready and can be sent to a 3rd party controller.</p></td>
+</tr>
+</tbody>
+</table>
+<div class="quoteblock">
+<blockquote>
+<div class="paragraph">
+<p>Commands are given with arguments in brackets <strong>[arg]</strong>. These must be entered by the user. Arguments in curly brackets <strong>{arg}</strong> are optional.</p>
+</div>
+</blockquote>
+</div>
+<div class="sect2">
+<h3 id="_configuring_a_module"><a class="anchor" href="#_configuring_a_module"></a>Configuring a Module</h3>
+<div class="paragraph">
+<p>Sends a new module configuration to any node.
+The resulting binary configuration will be copied to the
+module-configuration of the specified module.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">set_config [nodeID | "this"] [module-name] [hex-string] {requestHandle}
+
+//Set binary configuration for io module
+set_config 0 io 06:01:01:00:00 0</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_requesting_the_configuration_of_a_module"><a class="anchor" href="#_requesting_the_configuration_of_a_module"></a>Requesting the Configuration of a Module</h3>
+<div class="paragraph">
+<p>Prints the configuration
+of a specific module</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Display the current module configuration, shorthand notation is: getconf
+get_config [nodeID  | "this"] [module name]
+
+//Print the configuration from the current node's advertising module
+get_config this adv</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_activating_deactivating_a_module_at_runtime"><a class="anchor" href="#_activating_deactivating_a_module_at_runtime"></a>Activating / Deactivating a module at runtime</h3>
+<div class="paragraph">
+<p>Activates or
+deactivates a specific module.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Activate or deactivate a module, shorthand notation is: setactive
+set_active [nodeID | "this"] [module name] [on | off]
+
+//Examples
+set_active 0 scan on //activates the scan module
+set_active 0 adv off //deactivates the advertising module</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_module_commands"><a class="anchor" href="#_module_commands"></a>Module Commands</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Most module commands are structured in the same way.
+You have to give the nodeId that should process the command, specify the
+module and a command that should be triggered.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">//Trigger some module action, shorthand notation is: action
+action [nodeID  | "this"] [module name] [command]
+
+//Examples
+action 0 io led on //Switch on the LED for all connected nodes
+action this io led off //Switch off LEDs for the current node
+action 0 status get_device_info //Get the device info of all nodes
+action 123 status get_status //Get the current status from node 123</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_open_source_modules"><a class="anchor" href="#_open_source_modules"></a>Open Source Modules</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The following modules are currently part of the
+open source release:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><a href="AdvertisingModule.html" class="page">AdvertisingModule (moduleID 1)</a></p>
+</li>
+<li>
+<p><a href="ScanningModule.html" class="page">ScanningModule (moduleID 2)</a></p>
+</li>
+<li>
+<p><a href="StatusReporterModule.html" class="page">StatusReporterModule (moduleID 3)</a></p>
+</li>
+<li>
+<p><a href="EnrollmentModule.html" class="page">EnrollmentModule (moduleID 5)</a></p>
+</li>
+<li>
+<p><a href="IoModule.html" class="page">IoModule (moduleID 6)</a></p>
+</li>
+<li>
+<p><a href="DebugModule.html" class="page">DebugModule (moduleID 7)</a></p>
+</li>
+<li>
+<p>Config (moduleID 8)</p>
+</li>
+<li>
+<p>BoardConfig (moduleID 9)</p>
+</li>
+<li>
+<p><a href="MeshAccessModule.html" class="page">MeshAccessModule (moduleID 10)</a></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_proprietary_modules"><a class="anchor" href="#_proprietary_modules"></a>Proprietary Modules</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p><a href="DfuModule.html" class="page">DfuModule (moduleID 4)</a></p>
+</li>
+<li>
+<p>We also have EnOcean, Eink, Asset and other prorietory modules upon
+request.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</article>
+  </main>
+</div>
+<footer class="footer">
+  <p>This page was built using the Antora default UI.</p>
+  <p>The source code for this UI is licensed under the terms of the MPL-2.0 license.</p>
+</footer>
+<script src="../_/js/site.js"></script>
+<script src="../_/js/vendor/highlight.js"></script>
+<script>hljs.initHighlighting()</script>
+
+  </body>
+</html>

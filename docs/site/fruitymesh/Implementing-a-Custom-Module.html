@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Untitled :: BlueRange Fruitymesh</title>
+    <link rel="canonical" href="http://localhost:5000/fruitymesh/Implementing-a-Custom-Module.html">
+    <meta name="generator" content="Antora 2.0.0">
+    <link rel="stylesheet" href="../_/css/site.css">
+  </head>
+  <body class="article">
+<header class="header" role="banner">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="http://localhost:5000">BlueRange Fruitymesh</a>
+      <div class="navbar-item">
+        <img id="navbar-logo" alt="Bluerange Logo">
+      </div>
+      <div class="navbar-item">
+        <input id="search-input" type="text" placeholder="Search docs">
+      </div>
+    </div>
+
+
+  </nav>
+</header>
+<div class="main-wrapper">
+<div class="navigation-container" data-component="fruitymesh" data-version="master">
+  <aside class="navigation" role="navigation">
+    <div class="panels">
+<div class="navigation-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <h3 class="title"><a href="Quick-Start.html">Fruitymesh</a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+<ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Quick-Start.html">Quick Start</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Usage.html">Usage</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Features.html">Features</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Developers.html">Developers</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="Specification.html">Specification</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Modules.html">Modules</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="AdvertisingModule.html">AdvertisingModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DebugModule.html">DebugModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="DfuModule.html">DfuModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="EnrollmentModule.html">EnrollmentModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="IoModule.html">IoModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="MeshAccessModule.html">MeshAccessModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Node.html">Node</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="ScanningModule.html">ScanningModule</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="StatusReporterModule.html">StatusReporterModule</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">Other</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Class-Structure.html">Class Structure</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Debugging.html">Debugging</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Battery-Consumption.html">Battery Consumption</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="RecordStorage.html">RecordStorage</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="The-FruityMesh-Algorithm.html">The FruityMesh Algorithm</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="The-Algorithm-in-Detail.html">In Detail</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="Simulator.html">Simulator</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <a class="nav-link" href="Tutorials.html">Tutorials</a>
+<ul class="nav-list">
+  <li class="nav-item is-current-page" data-depth="2">
+    <a class="nav-link" href="Implementing-a-Custom-Module.html">Implementing a Custom Module</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="FAQ.html">FAQ</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-toggle"></button>
+    <span class="nav-text">API</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/relution/portal/#/web-api">REST API (Placeholder)</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="https://dev-mssql.mwaysolutions.com/asyncapi.html">MQTT API (Placeholder)</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+<div class="navigation-explore" data-panel="explore">
+  <div class="context">
+    <span class="title">Fruitymesh</span>
+    <span class="version">master</span>
+  </div>
+  <ul class="components">
+    <li class="component is-current">
+      <span class="title">Fruitymesh</span>
+      <ul class="versions">
+        <li class="version is-current is-latest">
+          <a href="Quick-Start.html">master</a>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</div>
+    </div>
+  </aside>
+</div>
+  <main class="main" role="main">
+<div class="toolbar" role="navigation">
+  <button class="navigation-toggle"></button>
+  <a href="README.html" class="home-link"></a>
+<nav class="crumbs" role="navigation" aria-label="breadcrumbs">
+  <ul>
+    <li class="crumb"><a href="Quick-Start.html">Fruitymesh</a></li>
+    <li class="crumb"><a href="Tutorials.html">Tutorials</a></li>
+    <li class="crumb"><a href="Implementing-a-Custom-Module.html">Implementing a Custom Module</a></li>
+  </ul>
+</nav>
+  <div class="edit-this-page"><a href="https://github.com/PanaDel/fruitymesh/edit/master/docs/modules/ROOT/pages/Implementing-a-Custom-Module.adoc">Edit this Page</a></div>
+</div>
+<article class="doc">
+<div class="sect1">
+<h2 id="_implementing_a_custom_module"><a class="anchor" href="#_implementing_a_custom_module"></a>Implementing a Custom Module</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>This tutorial should guide anyone through the process of creating a new
+FruityMesh module. We&#8217;ll implement a PingModule that allows us to ping a
+node and get its response. You&#8217;d normally implement ping functionality
+into the StatusReporter oder DebugModule, which is where it belongs, but
+the use-case acts as a good and easy example for building your own
+module. You can find the finished files in the folder <code>src/examples</code> or
+you can just follow the tutorial.</p>
+</div>
+<div class="sect2">
+<h3 id="_what_is_a_module"><a class="anchor" href="#_what_is_a_module"></a>What is a Module</h3>
+<div class="paragraph">
+<p>Modules are used to structure functionality that does not directly
+interfer with the mesh-logic. Modules extend the <code>Module</code> class. Each
+module has the possibility to save a <strong>persistent configuration</strong>. It can
+be loaded or unloaded and it is possible to decide which modules are
+part of the firmware during compile time. A module can choose to
+register an <strong>UART listener</strong> and react on commands, it can also <strong>output
+to UART</strong> for logging or communication purposes. It can also <strong>send data
+packets</strong> through the mesh and <strong>receive data</strong>.</p>
+</div>
+<div class="paragraph">
+<p>Here is an overview over some of the handlers that it can use:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>ConfigurationLoadedHandler</strong>: Is called when a new Module
+configuration is loaded</p>
+</li>
+<li>
+<p><strong>TimerEventHandler</strong>: Is called at a fixed interval to do periodic
+tasks</p>
+</li>
+<li>
+<p><strong>BleEventHandler</strong>: Routes all Bluetooth Low Energy events to the
+module</p>
+</li>
+<li>
+<p><strong>MeshMessageReceivedEventHandler</strong>: Delivers data that has been sent
+over the mesh</p>
+</li>
+<li>
+<p><strong>TerminalCommandHandler</strong>: Gets called when data is received over UART</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_creating_a_ping_module"><a class="anchor" href="#_creating_a_ping_module"></a>Creating a Ping module</h3>
+<div class="paragraph">
+<p>I will now guide you through the steps to implement a simple module that
+can ping another node over the network and parse the response.</p>
+</div>
+<div class="sect3">
+<h4 id="_step_1"><a class="anchor" href="#_step_1"></a>Step 1</h4>
+<div class="paragraph">
+<p>First, clone the <code>TemplateModule.cpp</code> file from the <code>src/examples</code>
+folder into <code>src/modules/PingModule.cpp</code>, afterwards, do the same with
+<code>TemplateModule.h</code> but put it in the <code>inc/</code> folder. You must of course
+refactor the Method names and some more variales, just use the search
+function and look out for the string "template" anywhere in those two
+files and rename them accordingly.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_step_2"><a class="anchor" href="#_step_2"></a>Step 2</h4>
+<div class="paragraph">
+<p>Activate your module by instantiating it in the constructor of
+<code>src/FruityMesh.cpp</code> right where all the other modules are instantiated.
+You might have to increase the MAX_MODULE_COUNT in <code>config/Config.h</code>.
+Your PingModule Constructor needs a moduleID for instantiation. All
+module Ids are specified in the Config.h (enum moduleID) as well. You
+should add a new enum entry under the section "Custom modules", e.g.
+<code>PING_MODULE_ID=200</code>.</p>
+</div>
+<div class="paragraph">
+<p>For example initialization can look like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">activeModules[15] = new PingModule();</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You should also include the new <code>&lt;PingModule.h&gt;</code>.</p>
+</div>
+<div class="paragraph">
+<p>Once the modules .cpp file is in the modules folder, it will
+automatically be included in the compilation.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_step_3"><a class="anchor" href="#_step_3"></a>Step 3</h4>
+<div class="paragraph">
+<p>Now go ahead and try to compile the binary and flash it to a device.
+Connect via terminal and input <strong>get_modules this</strong>. You should now see a
+list of modules and your new Ping modules id should be part of it.</p>
+</div>
+<div class="paragraph">
+<p>It does not do much yet, but we&#8217;ll now start to add more functionality.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_step_4"><a class="anchor" href="#_step_4"></a>Step 4</h4>
+<div class="paragraph">
+<p>Your PingModule does already overwrite a few of the methods in its
+base-class. One of these is the TerminalCommandHandler. We&#8217;ll keep it
+simple for this tutorial and we&#8217;ll only implement the ping command so
+that it can be triggered via a locally connected terminal. (It would
+also be possible to trigger a remote node to send a ping and communicate
+the result back to another node).</p>
+</div>
+<div class="paragraph">
+<p>In the TerminalCommandHandler, add the following lines to the beginning
+of the function:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">if(TERMARGS(0, "pingmod")){
+    //Get the id of the target node
+    nodeID targetNodeId = atoi(commandArgs[0]);
+    logt("PINGMOD", "Trying to ping node %u", targetNodeId);
+
+    //TODO: Send ping packet to that node
+
+    return true;
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The command name and command arguments should be in lowercase letters to
+be consistent with other commands. You must include <code>&lt;stdlib.h&gt;</code> so that
+the atoi method works.</p>
+</div>
+<div class="paragraph">
+<p>Next, flash it to your device again and watch if it reacts on your
+pingmod command. If it does not, make sure you are using the logtag
+"PINGMOD" and you either enable it by writing <strong>debug pingmod</strong> in the
+terminal first, or you enable the logtag by default in FruityMesh.cpp.</p>
+</div>
+<div class="paragraph">
+<p><span class="image"><img src="_images/img/tutorial-pingmod.png" alt="pingmod_1"></span></p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_step_5"><a class="anchor" href="#_step_5"></a>Step 5</h4>
+<div class="paragraph">
+<p>Now that the module is reacting to our command, we want to send our ping
+packet. Because this is going to be a very simple message, we will use a
+predefined message format called <code>connPacketModule</code>. This packet is
+intended to be used for triggering actions and for responding to these
+triggers. It has a special message header that contains the moduleId and
+an actionType. This will ensure that they do not interfere with mesh
+messages or messages from other modules.</p>
+</div>
+<div class="paragraph">
+<p>To keep our module messages organized, we&#8217;ll add an enum that contains
+all of our messages in the <code>private:</code> section of our <code>PingModule.h</code>
+file:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">enum PingModuleTriggerActionMessages{
+    TRIGGER_PING=0
+};</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Next, we add the code that is responsible for sending this packet to the
+other node. The previously written code now looks like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">if(TERMARGS(0, "pingmod")){
+    //Get the id of the target node
+    nodeID targetNodeId = atoi(commandArgs[0]);
+    logt("PINGMOD", "Trying to ping node %u", targetNodeId);
+
+    //Some data
+    u8 data[1];
+    data[0] = 123;
+
+    //Send ping packet to that node
+    SendModuleActionMessage(
+            MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+            targetNodeId,
+            PingModuleTriggerActionMessages::TRIGGER_PING,
+            0,
+            data,
+            1,
+            false
+    );
+
+    return true;
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This code creates a buffer of 1 byte and fills in some data (123). This
+data is not necessary for a ping and was only added for illustration
+purpose. The message is sent as a ModuleMessage with the moduleId
+automatically added by the <code>SendModuleActionMessage</code> method. The
+actionType is TRIGGER_PING. The message type
+`MESSAGE_TYPE_MODULE_TRIGGER_ACTION``is used for sending messages that
+await a response.</p>
+</div>
+<div class="paragraph">
+<p>The ConnectionManager (cm) will handle the transmission of this packet,
+it will copy the packet to its buffer and queue the packet transmission.
+It is important to pass the size of payload (1). The last parameter is
+used to specify that this packet should be transmitted by using
+BLE-unacknowledged packet transmission (WRITE_CMD).</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_step_6"><a class="anchor" href="#_step_6"></a>Step 6</h4>
+<div class="paragraph">
+<p>Next, we want to see if the packet arrived at its destination, we&#8217;ll
+need to implement the MeshMessageReceivedEventHandler in our PingModule
+which looks like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
+{
+    //Must call superclass for handling
+    Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
+
+    //Filter trigger_action messages
+    if(packetHeader-&gt;messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
+        connPacketModule* packet = (connPacketModule*)packetHeader;
+
+        //Check if our module is meant and we should trigger an action
+        if(packet-&gt;moduleId == moduleId){
+            //It's a ping message
+            if(packet-&gt;actionType == PingModuleTriggerActionMessages::TRIGGER_PING){
+
+                //Inform the user
+                logt("PINGMOD", "Ping request received with data: %d", packet-&gt;data[0]);
+
+                //TODO: Send ping response
+            }
+        }
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In the <code>PingModule.h</code>, you must now also add the definition for this
+handler or uncomment it.</p>
+</div>
+<div class="paragraph">
+<p>We can now perform a simple test by flashing this new firmware on our
+development board again. There is a simple trick that allows us to test
+the functionality with a single node by pinging the node itself:</p>
+</div>
+<div class="paragraph">
+<p><span class="image"><img src="_images/img/tutorial-pingmod2.png" alt="pingmod_2"></span></p>
+</div>
+<div class="paragraph">
+<p>The ConnectionManager will parse the packet and will route it back to
+the MeshMessageReceived without broadcasting it because the nodeId is
+the same as its own. As you can see, the packet triggered the
+appropriate action in the node.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_step_7"><a class="anchor" href="#_step_7"></a>Step 7</h4>
+<div class="paragraph">
+<p>With this working, you should now perform a test with two different
+nodes. Flash both of them, connect with two terminals and watch how the
+packet is delivered:</p>
+</div>
+<div class="paragraph">
+<p><span class="image"><img src="_images/img/tutorial-pingmod3.png" alt="pingmod_3"></span></p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_step_8"><a class="anchor" href="#_step_8"></a>Step 8</h4>
+<div class="paragraph">
+<p>Now, a proper ping message should, well, &#8230;&#8203;. pong. That&#8217;s why we need a
+return packet. Go to <code>PingModule.h</code> and add another enum that contains
+action responses:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">enum PingModuleActionResponseMessages{
+    PING_RESPONSE=0
+};</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Then, go back to your .cpp file and insert this updated code:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-C++ hljs" data-lang="C++">void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
+{
+    //Must call superclass for handling
+    Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
+
+    //Filter trigger_action messages
+    if(packetHeader-&gt;messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
+        connPacketModule* packet = (connPacketModule*)packetHeader;
+
+        //Check if our module is meant and we should trigger an action
+        if(packet-&gt;moduleId == moduleId){
+            //It's a ping message
+            if(packet-&gt;actionType == PingModuleTriggerActionMessages::TRIGGER_PING){
+
+                //Inform the user
+                logt("PINGMOD", "Ping request received with data: %d", packet-&gt;data[0]);
+
+                u8 data[2];
+                data[0] = packet-&gt;data[0];
+                data[1] = 111;
+
+                //Send ping packet to that node
+                SendModuleActionMessage(
+                        MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+                        packetHeader-&gt;sender,
+                        PingModuleActionResponseMessages::PING_RESPONSE,
+                        0,
+                        data,
+                        2,
+                        false
+                );
+            }
+        }
+    }
+
+    //Parse Module action_response messages
+    if(packetHeader-&gt;messageType == MESSAGE_TYPE_MODULE_ACTION_RESPONSE){
+
+        connPacketModule* packet = (connPacketModule*)packetHeader;
+
+        //Check if our module is meant and we should trigger an action
+        if(packet-&gt;moduleId == moduleId)
+        {
+            //Somebody reported its connections back
+            if(packet-&gt;actionType == PingModuleActionResponseMessages::PING_RESPONSE){
+                logt("PINGMOD", "Ping came back from %u with data %d, %d", packet-&gt;header.sender, packet-&gt;data[0], packet-&gt;data[1]);
+            }
+        }
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This code sends a response to the ping request, includes the data that
+came with the initial request and adds some more data. Also, it adds
+another condition that checks for the reply to the ping request and
+prints it out on the terminal.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_step_9"><a class="anchor" href="#_step_9"></a>Step 9</h4>
+<div class="paragraph">
+<p>That&#8217;s it, you should now be able to ping any node in the mesh network
+and see its response. The intermediate nodes will automatically route
+all traffic without having to know what kind of message it is.</p>
+</div>
+<div class="paragraph">
+<p><span class="image"><img src="_images/img/tutorial-pingmod4.png" alt="pingmod_4"></span></p>
+</div>
+<div class="paragraph">
+<p>You would probably want to use a counter with the ping message to
+generate a handle for a ping. Then, you&#8217;d be able to calculate the time
+that it took for the packet to come back through the mesh. And as I&#8217;ve
+said initially, you would not necessarily want to create new module for
+pinging other nodes but you&#8217;d have that functionality in a core module.</p>
+</div>
+<div class="paragraph">
+<p>I hope you&#8217;ve been successful by following this tutorial and I&#8217;ll wait
+for the modules you&#8217;re going to implement on top of FruityMesh :-)</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</article>
+  </main>
+</div>
+<footer class="footer">
+  <p>This page was built using the Antora default UI.</p>
+  <p>The source code for this UI is licensed under the terms of the MPL-2.0 license.</p>
+</footer>
+<script src="../_/js/site.js"></script>
+<script src="../_/js/vendor/highlight.js"></script>
+<script>hljs.initHighlighting()</script>
+
+  </body>
+</html>
