@@ -1,5 +1,3 @@
-include::./docs/modules/ROOT/nav.adoc[]
-
 ifdef::env-github,env-browser[:relfileprefix: pages/]
 = Contents
 
