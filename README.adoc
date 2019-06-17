@@ -1,1 +1,1 @@
-link:./docs/modules/ROOT/pages/README.adoc[README.adoc]
+include:./docs/modules/ROOT/pages/README.adoc[README.adoc]
