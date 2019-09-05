@@ -163,6 +163,9 @@ typedef enum
     NRF_DRV_UART_EVT_TX_DONE, ///< Requested TX transfer completed.
     NRF_DRV_UART_EVT_RX_DONE, ///< Requested RX transfer completed.
     NRF_DRV_UART_EVT_ERROR,   ///< Error reported by UART peripheral.
+#if UARTE_RXDRDY_ENABLE_PATCH == 1
+    NRF_DRV_UART_EVT_RXDRDY,  ///< Byte avaialable to read.
+#endif
 } nrf_drv_uart_evt_type_t;
 
 /**@brief Structure for UART configuration. */

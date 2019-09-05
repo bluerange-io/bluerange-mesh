@@ -33,13 +33,12 @@
 #include <types.h>
 #include <AppConnection.h>
 
-#ifdef ACTIVATE_MA_MODULE
 
 class MeshAccessModule;
 struct MeshAccessServiceStruct;
 
-#define MESH_ACCESS_MIC_LENGTH 4
-#define MESH_ACCESS_HANDSHAKE_NONCE_LENGTH 8
+constexpr int MESH_ACCESS_MIC_LENGTH = 4;
+constexpr int MESH_ACCESS_HANDSHAKE_NONCE_LENGTH = 8;
 
 enum class MeshAccessTunnelType: u8
 {
@@ -71,7 +70,7 @@ private:
 	u32 decryptionNonce[2];
 
 
-	u8 lastProcessedMessageType;
+	MessageType lastProcessedMessageType;
 
 
 	bool GenerateSessionKey(u8* nonce, NodeId centralNodeId, u32 fmKeyId, u8* keyOut);
@@ -116,6 +115,7 @@ public:
 	void HandshakeSNonce(connPacketEncryptCustomANonce* inPacket);
 	void HandshakeDone(connPacketEncryptCustomSNonce* inPacket);
 
+	void SendClusterState();
 	void NotifyConnectionStateSubscriber(ConnectionState state) const;
 
 	/*############### Encryption ##################*/
@@ -128,24 +128,21 @@ public:
 
 
 	/*############### Sending ##################*/
-	sizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer) override;
+	SizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer) override;
 	bool SendData(BaseConnectionSendData* sendData, u8* data);
-	bool SendData(u8* data, u8 dataLength, DeliveryPriority priority, bool reliable) override;
-	void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, sizedData* sentData) override;
+	bool SendData(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable) override;
+	void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData) override;
 
 	/*############### Receiving ##################*/
 	void ReceiveDataHandler(BaseConnectionSendData* sendData, u8* data) override;
 	void ReceiveMeshAccessMessageHandler(BaseConnectionSendData* sendData, u8* data);
 
 	/*############### Handler ##################*/
-	void ConnectionSuccessfulHandler(u16 connectionHandle, u16 connInterval) override;
+	void ConnectionSuccessfulHandler(u16 connectionHandle) override;
 	bool GapDisconnectionHandler(u8 hciDisconnectReason) override;
 	void GATTServiceDiscoveredHandler(ble_db_discovery_evt_t &evt) override;
-
-	void BleEventHandler(ble_evt_t &bleEvent) override;
 
 	void PrintStatus() override;
 
 };
 
-#endif

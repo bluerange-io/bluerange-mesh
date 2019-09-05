@@ -132,6 +132,13 @@ static void uart_event_handler(nrf_drv_uart_event_t * p_event, void * p_context)
 
     switch (p_event->type)
     {
+#if UARTE_RXDRDY_ENABLE_PATCH == 1
+        case NRF_DRV_UART_EVT_RXDRDY:
+        {
+            event_handler(p_serial, NRF_SERIAL_EVENT_RXDRDY);
+            break;
+        }
+#endif 
         case NRF_DRV_UART_EVT_RX_DONE:
         {
             nrf_queue_t const * p_rxq =

@@ -29,12 +29,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <FlashStorage.h>
+#include <GlobalState.h>
 #include <Logger.h>
-
-extern "C"
-{
-#include <app_error.h>
-}
+#include "Utility.h"
 
 //TODO: NRF_BUSY and other errors of sd_flash_write should be handled
 //TODO: callback should use task pointe rinsted of struct
@@ -44,20 +41,22 @@ extern "C"
 //TODO: WriteData is only able to write multiples of words
 
 FlashStorage::FlashStorage()
+	:taskQueue(taskBuffer, FLASH_STORAGE_QUEUE_SIZE)
 {
-	taskQueue = nullptr;
 	currentTask = nullptr;
 	emptyHandler = nullptr;
 	transactionCounter = 0;
 	currentTransactionId = 0;
 	retryCallingSoftdevice = false;
-
-	//Initialize queue for queueing store and load tasks
-	taskQueue = new PacketQueue(taskBuffer, FLASH_STORAGE_QUEUE_SIZE);
 	
 	retryCount = FLASH_STORAGE_RETRY_COUNT;
 }
 
+
+FlashStorage & FlashStorage::getInstance()
+{
+	return GS->flashStorage;
+}
 
 void FlashStorage::TimerEventHandler(u16 passedTimeDs)
 {
@@ -75,8 +74,8 @@ FlashStorageError FlashStorage::ErasePage(u16 page, FlashStorageEventListener* c
 	      
 
 	if(page == 0){
-		logt("FATAL", "WRONG PAGE ERASE");
-		return FlashStorageError::WRONG_PARAM;
+		logt("FATAL", "WRONG PAGE ERASE");     // LCOV_EXCL_LINE assertion
+		return FlashStorageError::WRONG_PARAM; // LCOV_EXCL_LINE assertion
 	}
 
 	FlashStorageTaskItem task;
@@ -86,7 +85,7 @@ FlashStorageError FlashStorage::ErasePage(u16 page, FlashStorageEventListener* c
 	task.header.userType = userType;
 	task.params.erasePage.page = page;
 
-	if (!taskQueue->Put((u8*)&task, SIZEOF_FLASH_STORAGE_TASK_ITEM_ERASE_PAGE))
+	if (!taskQueue.Put((u8*)&task, SIZEOF_FLASH_STORAGE_TASK_ITEM_ERASE_PAGE))
 	{
 		AbortLastInsertedTransaction();
 		return FlashStorageError::QUEUE_FULL;
@@ -103,8 +102,8 @@ FlashStorageError FlashStorage::ErasePages(u16 startPage, u16 numPages, FlashSto
 	logt("FLASH", "Queue Erase Pages %u (%u)", startPage, numPages);
 
 	if(startPage == 0){
-		logt("FATAL", "WRONG PAGE ERASE");
-		return FlashStorageError::WRONG_PARAM;
+		logt("FATAL", "WRONG PAGE ERASE");	   // LCOV_EXCL_LINE assertion
+		return FlashStorageError::WRONG_PARAM; // LCOV_EXCL_LINE assertion
 	}
 
 	FlashStorageTaskItem task;
@@ -115,7 +114,7 @@ FlashStorageError FlashStorage::ErasePages(u16 startPage, u16 numPages, FlashSto
 	task.params.erasePages.startPage = startPage;
 	task.params.erasePages.numPages = numPages;
 
-	if (!taskQueue->Put((u8*)&task, SIZEOF_FLASH_STORAGE_TASK_ITEM_ERASE_PAGES))
+	if (!taskQueue.Put((u8*)&task, SIZEOF_FLASH_STORAGE_TASK_ITEM_ERASE_PAGES))
 	{
 		AbortLastInsertedTransaction();
 		return FlashStorageError::QUEUE_FULL;
@@ -129,7 +128,7 @@ FlashStorageError FlashStorage::ErasePages(u16 startPage, u16 numPages, FlashSto
 
 FlashStorageError FlashStorage::WriteData(u32* source, u32* destination, u16 length, FlashStorageEventListener* callback, u32 userType)
 {
-	logt("FLASH", "Queue Write %u to %u (%u)", source, destination, length);
+	logt("FLASH", "Queue Write %u to %u (%u)", (u32)source, (u32)destination, length);
 
 	FlashStorageTaskItem task;
 	task.header.command = FlashStorageCommand::WRITE_DATA;
@@ -140,7 +139,7 @@ FlashStorageError FlashStorage::WriteData(u32* source, u32* destination, u16 len
 	task.params.writeData.dataDestination = destination;
 	task.params.writeData.dataLength = length;
 
-	if (!taskQueue->Put((u8*)&task, SIZEOF_FLASH_STORAGE_TASK_ITEM_WRITE_DATA))
+	if (!taskQueue.Put((u8*)&task, SIZEOF_FLASH_STORAGE_TASK_ITEM_WRITE_DATA))
 	{
 		AbortLastInsertedTransaction();
 		return FlashStorageError::QUEUE_FULL;
@@ -154,7 +153,7 @@ FlashStorageError FlashStorage::WriteData(u32* source, u32* destination, u16 len
 
 FlashStorageError FlashStorage::CacheAndWriteData(u32* source, u32* destination, u16 length, FlashStorageEventListener* callback, u32 userType)
 {
-	logt("FLASH", "Queue CachedWrite %u to %u (%u)", source, destination, length);
+	logt("FLASH", "Queue CachedWrite %u to %u (%u)", (u32)source, (u32)destination, length);
 
 	if(length + SIZEOF_FLASH_STORAGE_TASK_ITEM_WRITE_CACHED_DATA > 250){
 		return FlashStorageError::QUEUE_FULL;
@@ -163,9 +162,9 @@ FlashStorageError FlashStorage::CacheAndWriteData(u32* source, u32* destination,
 	//First, reserve space in the queue if possible
 	u8 padding = (4-length%4)%4;
 
-	u8* buffer = taskQueue->Reserve(SIZEOF_FLASH_STORAGE_TASK_ITEM_WRITE_CACHED_DATA + length + padding);
+	u8* buffer = taskQueue.Reserve(SIZEOF_FLASH_STORAGE_TASK_ITEM_WRITE_CACHED_DATA + length + padding);
 
-	logt("WARNING", "buffer %u", buffer);
+	logt("WARNING", "buffer %u", (u32)buffer);
 
 	if (buffer != nullptr)
 	{
@@ -178,82 +177,14 @@ FlashStorageError FlashStorage::CacheAndWriteData(u32* source, u32* destination,
 		task->params.writeCachedData.dataDestination = destination;
 		task->params.writeCachedData.dataLength = length;
 		memcpy(task->params.writeCachedData.data, source, length);
-		memset(task->params.writeCachedData.data + length, 0xFF, padding);
+		CheckedMemset(task->params.writeCachedData.data + length, 0xFF, padding);
 	}
 	else 
 	{
 		AbortLastInsertedTransaction();
 		logt("ERROR", "aborted transaction");
-		return FlashStorageError::QUEUE_FULL;
-	}
+		GS->logger.logCustomError(CustomErrorTypes::FATAL_ABORTED_FLASH_TRANSACTION, 0);
 
-	//Do not start processing until a transaction has been inserted fully
-	if (currentTransactionId == 0) ProcessQueue(false);
-
-	return FlashStorageError::SUCCESS;
-}
-
-
-FlashStorageError FlashStorage::StartTransaction()
-{
-	if (currentTransactionId != 0) return FlashStorageError::TRANSACTION_IN_PROGRESS;
-
-	currentTransactionId = ++transactionCounter;
-	if (currentTransactionId == 0) currentTransactionId = 1;
-
-	return FlashStorageError::SUCCESS;
-}
-
-FlashStorageError FlashStorage::EndTransaction(FlashStorageEventListener* callback, u32 userType)
-{
-	if (currentTransactionId == 0) return FlashStorageError::TRANSACTION_IN_PROGRESS;
-
-	logt("FLASH", "Queue EndTransaction");
-
-	//Insert an end transaction taskitem so that we can register a callback at the end of our transaction
-	FlashStorageTaskItemHeader task;
-	task.command = FlashStorageCommand::END_TRANSACTION;
-	task.transactionId = currentTransactionId;
-	task.callback = callback;
-	task.userType = userType;
-
-	//Clear the currently used transactionid
-	currentTransactionId = 0;
-
-	if (!taskQueue->Put((u8*)&task, SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER))
-	{
-		AbortLastInsertedTransaction();
-		return FlashStorageError::QUEUE_FULL;
-	}
-
-	//Process queue after the transaction end has been inserted
-	ProcessQueue(false);
-
-	return FlashStorageError::SUCCESS;
-}
-
-FlashStorageError FlashStorage::CacheDataInTask(u8* data, u16 dataLength, FlashStorageEventListener* callback, u32 userType)
-{
-	logt("FLASH", "Queue cache data");
-
-	//First, reserve space in the queue if possible
-	u16 taskLength = SIZEOF_FLASH_STORAGE_TASK_ITEM_DATA_CACHE + dataLength;
-	u8* buffer = taskQueue->Reserve((u8)taskLength);
-
-	if (buffer != nullptr)
-	{
-		//Write data into reserved space
-		FlashStorageTaskItem* task = (FlashStorageTaskItem*)buffer;
-		task->header.command = FlashStorageCommand::CACHE_DATA;
-		task->header.transactionId = currentTransactionId;
-		task->header.callback = callback;
-		task->header.userType = userType;
-		task->params.dataCache.dataLength = dataLength;
-		memcpy(task->params.dataCache.data, data, dataLength);
-	}
-	else
-	{
-		AbortLastInsertedTransaction();
 		return FlashStorageError::QUEUE_FULL;
 	}
 
@@ -287,9 +218,9 @@ void FlashStorage::AbortTransactionInProgress(u16 transactionId, bool removeNext
 	if (transactionId != 0) {
 		//Go through the next queue items and drop all those that belong to the same transaction
 		while (true) {
-			sizedData data;
-			if (removeNext) data = taskQueue->PeekNext();
-			else data = taskQueue->PeekLast();
+			SizedData data;
+			if (removeNext) data = taskQueue.PeekNext();
+			else data = taskQueue.PeekLast();
 			if (data.length != 0) {
 				FlashStorageTaskItem* task = (FlashStorageTaskItem*)data.data;
 				if (task->header.transactionId == transactionId) {
@@ -297,10 +228,10 @@ void FlashStorage::AbortTransactionInProgress(u16 transactionId, bool removeNext
 					if (task->header.command == FlashStorageCommand::END_TRANSACTION && task->header.callback != nullptr) {
 						task->header.callback->FlashStorageItemExecuted(task, FlashStorageError::FLASH_OPERATION_TIMED_OUT);
 					}
-					if (removeNext) taskQueue->DiscardNext();
-					else taskQueue->DiscardLast();
+					if (removeNext) taskQueue.DiscardNext();
+					else taskQueue.DiscardLast();
 
-					if (taskQueue->_numElements == 0 && emptyHandler != nullptr) emptyHandler->FlashStorageQueueEmptyHandler();
+					if (taskQueue._numElements == 0 && emptyHandler != nullptr) emptyHandler->FlashStorageQueueEmptyHandler();
 				}
 				else {
 					break;
@@ -321,19 +252,19 @@ void FlashStorage::ProcessQueue(bool continueCurrentTask)
 	u32 err = 0xFFFFFFFFUL;
 
 	//Do not execute next task if there is a task running or if there are no more tasks
-	if((currentTask != nullptr && !continueCurrentTask) || taskQueue->_numElements < 1) return;
+	if((currentTask != nullptr && !continueCurrentTask) || taskQueue._numElements < 1) return;
 
 	//Get one item from the queue and execute it
-	sizedData data = taskQueue->PeekNext();
+	SizedData data = taskQueue.PeekNext();
 	currentTask = (FlashStorageTaskItem*)data.data;
 
-	logt("FLASH", "processing command %u", currentTask->header.command);
+	logt("FLASH", "processing command %u", (u32)currentTask->header.command);
 
 	if(currentTask->header.command == FlashStorageCommand::ERASE_PAGE)
 	{
 		if(currentTask->params.erasePage.page == 0){
-			err = NRF_ERROR_FORBIDDEN;
-			GS->logger->logError(ErrorTypes::CUSTOM, (u32)CustomErrorTypes::FATAL_PROTECTED_PAGE_ERASE, 0);
+			err = NRF_ERROR_FORBIDDEN;													 //LCOV_EXCL_LINE assertion
+			GS->logger.logCustomError(CustomErrorTypes::FATAL_PROTECTED_PAGE_ERASE, 0); //LCOV_EXCL_LINE assertion
 		} else {
 			err = sd_flash_page_erase(currentTask->params.erasePage.page);
 		}
@@ -366,7 +297,7 @@ void FlashStorage::ProcessQueue(bool continueCurrentTask)
 				logt("FLASH", "erasing page %u", pageNum);
 				if(pageNum == 0){
 					err = NRF_ERROR_FORBIDDEN;
-					GS->logger->logError(ErrorTypes::CUSTOM, (u32)CustomErrorTypes::FATAL_PROTECTED_PAGE_ERASE, 1);
+					GS->logger.logCustomError(CustomErrorTypes::FATAL_PROTECTED_PAGE_ERASE, 1);
 				} else {
 					err = sd_flash_page_erase(pageNum);
 					break;
@@ -377,18 +308,18 @@ void FlashStorage::ProcessQueue(bool continueCurrentTask)
 	else if(currentTask->header.command == FlashStorageCommand::WRITE_DATA){
 		FlashStorageTaskItemWriteData* params = &currentTask->params.writeData;
 
-		logt("FLASH", "copy from %u to %u, length %u", params->dataSource, params->dataDestination, params->dataLength/4);
+		logt("FLASH", "copy from %u to %u, length %u", (u32)params->dataSource, (u32)params->dataDestination, params->dataLength/4);
 
-		err = sd_flash_write(params->dataDestination, params->dataSource, params->dataLength / 4); //FIXME: NRF_ERROR_BUSY and others not handeled
+		err = (u32)sd_flash_write((uint32_t*)params->dataDestination, (uint32_t*)params->dataSource, params->dataLength / 4); //FIXME: NRF_ERROR_BUSY and others not handeled
 	}
 	else if (currentTask->header.command == FlashStorageCommand::WRITE_AND_CACHE_DATA) {
 		FlashStorageTaskItemWriteCachedData* params = &currentTask->params.writeCachedData;
 
 		u8 padding = (4-params->dataLength%4)%4;
 
-		logt("FLASH", "copy cached data to %u, length %u", params->dataDestination, params->dataLength);
+		logt("FLASH", "copy cached data to %u, length %u", (u32)params->dataDestination, params->dataLength);
 
-		err = sd_flash_write(params->dataDestination, (u32*)params->data, (params->dataLength+padding) / 4); //FIXME: NRF_ERROR_BUSY and others not handeled
+		err = (u32)sd_flash_write((uint32_t*)params->dataDestination, (uint32_t*)params->data, (params->dataLength+padding) / 4); //FIXME: NRF_ERROR_BUSY and others not handeled
 	}
 	else if (currentTask->header.command == FlashStorageCommand::END_TRANSACTION) {
 
@@ -396,13 +327,13 @@ void FlashStorage::ProcessQueue(bool continueCurrentTask)
 
 		//We have to make a copy of the task and discard it before calling the callback to avoid problems in the simulator
 		FlashStorageTaskItem taskCopy = *currentTask;
-		taskQueue->DiscardNext();
+		taskQueue.DiscardNext();
 		currentTask = nullptr;
 
 		if (taskCopy.header.callback != nullptr) {
 			taskCopy.header.callback->FlashStorageItemExecuted(&taskCopy, FlashStorageError::SUCCESS);
 		}
-		if (taskQueue->_numElements == 0 && emptyHandler != nullptr) emptyHandler->FlashStorageQueueEmptyHandler();
+		if (taskQueue._numElements == 0 && emptyHandler != nullptr) emptyHandler->FlashStorageQueueEmptyHandler();
 	}
 	else if (currentTask->header.command == FlashStorageCommand::CACHE_DATA) {
 
@@ -412,22 +343,24 @@ void FlashStorage::ProcessQueue(bool continueCurrentTask)
 		memcpy(buffer, data.data, data.length);
 		FlashStorageTaskItem* taskCopy = (FlashStorageTaskItem*)buffer;
 
-		taskQueue->DiscardNext();
+		taskQueue.DiscardNext();
 		currentTask = nullptr;
 
 		if (taskCopy->header.callback != nullptr) {
 			taskCopy->header.callback->FlashStorageItemExecuted(taskCopy, FlashStorageError::SUCCESS);
 		}
-		if (taskQueue->_numElements == 0 && emptyHandler != nullptr) emptyHandler->FlashStorageQueueEmptyHandler();
+		if (taskQueue._numElements == 0 && emptyHandler != nullptr) emptyHandler->FlashStorageQueueEmptyHandler();
 	}
 	else {
-		logt("ERROR", "Wrong command %u", currentTask->header.command);
-		taskQueue->DiscardNext();
-		if (taskQueue->_numElements == 0 && emptyHandler != nullptr) emptyHandler->FlashStorageQueueEmptyHandler();
+		logt("ERROR", "Wrong command %u", (u32)currentTask->header.command);
+		GS->logger.logCustomError(CustomErrorTypes::FATAL_WRONG_FLASH_STORAGE_COMMAND, (u16)currentTask->header.command);
+
+		taskQueue.DiscardNext();
+		if (taskQueue._numElements == 0 && emptyHandler != nullptr) emptyHandler->FlashStorageQueueEmptyHandler();
 	}
 
 	//SoftDevice either responded with SUCCESS or we did not query the SoftDevice at all
-	if(err == NRF_SUCCESS || err == 0xFFFFFFFFUL){
+	if(err == FruityHal::SUCCESS || err == 0xFFFFFFFFUL){
 		//do nothing
 	}
 	//If the call did not return success, we have to retry later (from the timer handler)
@@ -448,7 +381,7 @@ void FlashStorage::SystemEventHandler(u32 systemEvent)
 	if(currentTask == nullptr) return;
 
 	//Make a copy so we can clear it from our queue before calling a listener
-	sizedData data = taskQueue->PeekNext();
+	SizedData data = taskQueue.PeekNext();
 	DYNAMIC_ARRAY(buffer, data.length);
 	memcpy(buffer, data.data, data.length);
 	FlashStorageTaskItem* oldTaskReference = (FlashStorageTaskItem*)data.data;
@@ -457,6 +390,8 @@ void FlashStorage::SystemEventHandler(u32 systemEvent)
 	if(systemEvent == NRF_EVT_FLASH_OPERATION_ERROR)
 	{
 		logt("ERROR", "Flash operation error");
+		GS->logger.logCustomCount(CustomErrorTypes::COUNT_FLASH_OPERATION_ERROR);
+
 		if(retryCount > 0)
 		{
 			//Decrement retry counter
@@ -467,7 +402,7 @@ void FlashStorage::SystemEventHandler(u32 systemEvent)
 		}
 		else {
 			//Discard task
-			taskQueue->DiscardNext();
+			taskQueue.DiscardNext();
 
 			//Reset currentTask and retryCount after the task was canceled
 			currentTask = nullptr;
@@ -476,7 +411,7 @@ void FlashStorage::SystemEventHandler(u32 systemEvent)
 			//Abort transaction will now discard further tasks if the task belonged to a transaction
 			AbortTransactionInProgress(taskReference, FlashStorageError::FLASH_OPERATION_TIMED_OUT);
 
-			if (taskQueue->_numElements == 0 && emptyHandler != nullptr) emptyHandler->FlashStorageQueueEmptyHandler();
+			if (taskQueue._numElements == 0 && emptyHandler != nullptr) emptyHandler->FlashStorageQueueEmptyHandler();
 		}
 	}
 	else if(systemEvent == NRF_EVT_FLASH_OPERATION_SUCCESS)
@@ -491,10 +426,10 @@ void FlashStorage::SystemEventHandler(u32 systemEvent)
 				|| currentTask->header.command == FlashStorageCommand::WRITE_AND_CACHE_DATA
 		){
 			//Erase page command successful
-			taskQueue->DiscardNext();
+			taskQueue.DiscardNext();
 			currentTask = nullptr;
 			if(taskReference->header.callback != nullptr) taskReference->header.callback->FlashStorageItemExecuted(taskReference, FlashStorageError::SUCCESS);
-			if (taskQueue->_numElements == 0 && emptyHandler != nullptr) emptyHandler->FlashStorageQueueEmptyHandler();
+			if (taskQueue._numElements == 0 && emptyHandler != nullptr) emptyHandler->FlashStorageQueueEmptyHandler();
 		}
 		else if(taskReference->header.command == FlashStorageCommand::ERASE_PAGES){
 
@@ -508,10 +443,10 @@ void FlashStorage::SystemEventHandler(u32 systemEvent)
 			else
 			{
 				logt("FLASH", "done");
-				taskQueue->DiscardNext();
+				taskQueue.DiscardNext();
 				currentTask = nullptr;
 				if(taskReference->header.callback != nullptr) taskReference->header.callback->FlashStorageItemExecuted(taskReference, FlashStorageError::SUCCESS);
-				if (taskQueue->_numElements == 0 && emptyHandler != nullptr) emptyHandler->FlashStorageQueueEmptyHandler();
+				if (taskQueue._numElements == 0 && emptyHandler != nullptr) emptyHandler->FlashStorageQueueEmptyHandler();
 			}
 		}
 	}
@@ -522,5 +457,5 @@ void FlashStorage::SystemEventHandler(u32 systemEvent)
 
 u16 FlashStorage::GetNumberOfActiveTasks() const
 {
-	return taskQueue->_numElements;
+	return taskQueue._numElements;
 }

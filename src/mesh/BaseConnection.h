@@ -54,7 +54,7 @@ enum class DeliveryOption : u8 {
 	NOTIFICATION
 };
 enum class DeliveryPriority : u8{
-	HIGH=0, //Must only be used for mesh relevant data
+	MESH_INTERNAL_HIGH=0, //Must only be used for mesh relevant data
 	MEDIUM=1,
 	LOW=2,
 	LOWEST=3,
@@ -67,10 +67,10 @@ typedef struct BaseConnectionSendData {
 	DeliveryOption deliveryOption;
 	DeliveryPriority priority;
 	u8 sendHandle;
-	u8 dataLength;
+	u16 dataLength;
 } BaseConnectionSendData;
 
-#define SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED 5
+#define SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED 6
 #pragma pack(push)
 #pragma pack(1)
 typedef struct BaseConnectionSendDataPacked {
@@ -78,10 +78,10 @@ typedef struct BaseConnectionSendDataPacked {
 	u8 deliveryOption : 4;
 	u8 priority : 4;
 	u8 sendHandle;
-	u8 dataLength;
+	u16 dataLength;
 } BaseConnectionSendDataPacked;
 #pragma pack(pop)
-STATIC_ASSERT_SIZE(BaseConnectionSendDataPacked, 5);
+STATIC_ASSERT_SIZE(BaseConnectionSendDataPacked, 6);
 
 class Node;
 class ConnectionManager;
@@ -107,7 +107,19 @@ enum class AppDisconnectReason : u8 {
 	PENDING_TIMEOUT = 16,
 	ENROLLMENT_TIMEOUT = 17,
 	ENROLLMENT_TIMEOUT2 = 18,
-	NETWORK_ID_MISMATCH = 19
+	NETWORK_ID_MISMATCH = 19,
+	RECONNECT_BLE_ERROR = 20,
+	UNPREFERRED_CONNECTION = 21,
+	EMERGENCY_DISCONNECT = 22,
+	GAP_ERROR = 23,
+	WRONG_PARTNERID = 24,
+	ILLEGAL_TUNNELTYPE = 25,
+	INVALID_KEY = 26,
+	INVALID_PACKET = 27,
+	ENROLLMENT_RESPONSE_RECEIVED = 28,
+	NEEDED_FOR_ENROLLMENT = 29,
+	WRONG_DIRECTION = 30,
+	GATTC_TIMEOUT = 31,
 };
 
 
@@ -117,8 +129,14 @@ enum class ConnectionDirection : u8{
 	DIRECTION_OUT, 
 	INVALID 
 };
+
+enum class DataDirection : u8 {
+	DIRECTION_IN,	//Can't make it shorter like "IN", because thats a predefined Microsoft macro.
+	DIRECTION_OUT
+};
+
 //Possible states for a connection
-enum class ConnectionState{ //jstodo: this cant be u8 because else some tests fail. Check! Reproduce in commit a36ceefd75890b39c93e25ad7a44381444782aca
+enum class ConnectionState : u8{
 	DISCONNECTED=0, 
 	CONNECTING=1, 
 	CONNECTED=2, 
@@ -141,19 +159,19 @@ class BaseConnection
 		bool QueueData(const BaseConnectionSendData& sendData, u8* data);
 		bool QueueData(const BaseConnectionSendData& sendData, u8* data, bool fillTxBuffers); // Can be used to avoid infinite recursion in queue and fillTxBuffers
 
-		bool PrepareBaseConnection(fh_ble_gap_addr_t* address, ConnectionTypes connectionType) const;
+		bool PrepareBaseConnection(fh_ble_gap_addr_t* address, ConnectionType connectionType) const;
 
-		u16 connectionMtu;
+		static constexpr u16 connectionMtu = MAX_DATA_SIZE_PER_WRITE;
 		u16 connectionPayloadSize;
 
 	public:
 
-		ConnectionTypes connectionType;
+		ConnectionType connectionType;
 		ConnectionState connectionState;
 		EncryptionState encryptionState;
 		//Backup for the last conneciton state before it was disconnected
 		ConnectionState connectionStateBeforeDisconnection;
-		u8 disconnectionReason;
+		FruityHal::HciErrorCode disconnectionReason;
 		AppDisconnectReason appDisconnectionReason;
 
 
@@ -163,52 +181,46 @@ class BaseConnection
 		BaseConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress);
 		virtual ~BaseConnection();
 
-		//GATT Handshake
-		virtual void DiscoverCharacteristicHandles(){};
-		virtual void GATTHandleDiscoveredHandler(u16 characteristicHandle){};
-
 		//Custom handshake
 		virtual void StartHandshake(){};
 
 
-		virtual void DisconnectAndRemove();
+		virtual void DisconnectAndRemove(AppDisconnectReason reason);
 
 		//################### Sending ######################
 		//Must be implemented in super class
-		virtual bool SendData(u8* data, u8 dataLength, DeliveryPriority priority, bool reliable) = 0;
+		virtual bool SendData(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable) = 0;
 		//Allow a subclass to transmit data before the writeQueue is processed
 		virtual bool TransmitHighPrioData() { return false; };
 		//Allows a subclass to process data closely before sending it
-		virtual sizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer);
+		virtual SizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer);
 		//Called after data has been queued in the softdevice, pay attention that data points to the full packet in the queue
 		//whereas sentData is the data that was really sent (e.g. the packet was split or preprocessed in some way before sending)
-		virtual void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, sizedData* sentData);
+		virtual void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData);
 		//Fills the tx buffers of the softdevice with the packets from the packet queue
 		virtual void FillTransmitBuffers();
+		virtual void DataSentHandler(const u8* data, u16 length) {};
 
 		//Handler
-		virtual void ConnectionSuccessfulHandler(u16 connectionHandle, u16 connInterval);
-		virtual void ReconnectionSuccessfulHandler(ble_evt_t& bleEvent);
+		virtual void ConnectionSuccessfulHandler(u16 connectionHandle);
+		virtual void GapReconnectionSuccessfulHandler(const GapConnectedEvent& connectedEvent);
 		virtual bool GapDisconnectionHandler(u8 hciDisconnectReason);
 		virtual void GATTServiceDiscoveredHandler(ble_db_discovery_evt_t& evt);
 		//Called when data from a connection is received
-		virtual void ReceiveDataHandler(BaseConnectionSendData* sendData, u8* data){};
+		virtual void ReceiveDataHandler(BaseConnectionSendData* sendData, u8* data) = 0;
 		//Can be called by subclasses to use the connPacketHeader reassembly
 		u8* ReassembleData(BaseConnectionSendData* sendData, u8* data);
-		sizedData GetSplitData(const BaseConnectionSendData &sendData, u8* data, u8* packetBuffer) const;
-
-
-		virtual void BleEventHandler(ble_evt_t& bleEvent);
+		SizedData GetSplitData(const BaseConnectionSendData &sendData, u8* data, u8* packetBuffer) const;
 
 		//Helpers
-		virtual void PrintStatus(){};
+		virtual void PrintStatus() = 0;
 
 		i8 GetAverageRSSI() const;
 		//Must return the number of packets that are queued. (Not just in the Packetqueues, also HighPrioData!)
 		virtual bool GetPendingPackets() { return packetSendQueue._numElements + packetSendQueueHighPrio._numElements; };
 
 
-		sizedData GetNextPacketToSend(const PacketQueue& queue) const;
+		SizedData GetNextPacketToSend(const PacketQueue& queue) const;
 
 		void HandlePacketQueued(PacketQueue* activeQueue, BaseConnectionSendDataPacked* sendDataPacked);
 		void HandlePacketQueuingFail(PacketQueue& activeQueue, BaseConnectionSendDataPacked* sendDataPacked, u32 err);
@@ -258,20 +270,20 @@ class BaseConnection
 		NodeId partnerId;
 		u16 connectionHandle; //The handle that is given from the BLE stack to identify a connection
 		fh_ble_gap_addr_t partnerAddress;
-		u16 currentConnectionIntervalMs;
-
-		bool forceReestablish;
 
 		//Times
 		u32 creationTimeDs;
 		u32 handshakeStartedDs;
 		u32 connectionHandshakedTimestampDs;
-		u16 reestablishTimeSec;
 		u32 disconnectedTimestampDs;
 
 		//Debug info
 		u16 droppedPackets;
 		u16 sentReliable;
 		u16 sentUnreliable;
+
+#ifdef SIM_ENABLED
+		void PrintQueueInfo();
+#endif
 
 };

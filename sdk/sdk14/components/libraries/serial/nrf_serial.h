@@ -183,6 +183,9 @@ typedef enum {
     NRF_SERIAL_EVENT_RX_DATA,   //!< New chunk of data has been received.
     NRF_SERIAL_EVENT_DRV_ERR,   //!< Internal driver error.
     NRF_SERIAL_EVENT_FIFO_ERR,  //!< RX FIFO overrun.
+#if UARTE_RXDRDY_ENABLE_PATCH == 1
+    NRF_SERIAL_EVENT_RXDRDY,    //!< Custom event.
+#endif
 } nrf_serial_event_t;
 
 /**

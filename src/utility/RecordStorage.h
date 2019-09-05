@@ -30,21 +30,16 @@
 #pragma once
 
 #include <types.h>
-#include <GlobalState.h>
 #include <FlashStorage.h>
-
-extern "C"{
-
-}
 
 /**
  * The RecordStorage is able to manage multiple records in the flash. It is possible to create new
  * records, update records and delete records
  */
 
-#define RECORD_STORAGE_ACTIVE_PAGE_MAGIC_NUMBER 0xAC71
+constexpr int RECORD_STORAGE_ACTIVE_PAGE_MAGIC_NUMBER = 0xAC71;
 
-#define RECORD_STORAGE_INVALIDATION_MASK 0xFFFF0000
+constexpr int RECORD_STORAGE_INVALIDATION_MASK = 0xFFFF0000;
 
 class RecordStorageEventListener;
 
@@ -57,7 +52,7 @@ enum class RecordStorageOperationType : u8
 
 #pragma pack(push)
 #pragma pack(1)
-#define SIZEOF_RECORD_STORAGE_RECORD_HEADER 8
+constexpr int SIZEOF_RECORD_STORAGE_RECORD_HEADER = 8;
 typedef struct
 {
 		u8 crc;
@@ -72,7 +67,7 @@ typedef struct
 } RecordStorageRecord;
 STATIC_ASSERT_SIZE(RecordStorageRecord, 9);
 
-#define SIZEOF_RECORD_STORAGE_PAGE_HEADER 4
+constexpr int SIZEOF_RECORD_STORAGE_PAGE_HEADER = 4;
 typedef struct
 {
 		u16 magicNumber;
@@ -91,7 +86,7 @@ typedef union
 
 } RecordStorageUT;
 
-#define SIZEOF_RECORD_STORAGE_OPERATION 16
+constexpr int SIZEOF_RECORD_STORAGE_OPERATION = 16;
 typedef struct
 {
 	RecordStorageEventListener* callback;
@@ -103,7 +98,7 @@ typedef struct
 
 }RecordStorageOperation;
 STATIC_ASSERT_SIZE(RecordStorageOperation, 16);
-#define SIZEOF_RECORD_STORAGE_SAVE_RECORD_OP (SIZEOF_RECORD_STORAGE_OPERATION + 4)
+constexpr int SIZEOF_RECORD_STORAGE_SAVE_RECORD_OP = (SIZEOF_RECORD_STORAGE_OPERATION + 4);
 typedef struct
 {
 	RecordStorageOperation op;
@@ -114,7 +109,7 @@ typedef struct
 }SaveRecordOperation;
 STATIC_ASSERT_SIZE(SaveRecordOperation, 21);
 
-#define SIZEOF_RECORD_STORAGE_DEACTIVATE_RECORD_OP (SIZEOF_RECORD_STORAGE_OPERATION + 4)
+constexpr int SIZEOF_RECORD_STORAGE_DEACTIVATE_RECORD_OP = (SIZEOF_RECORD_STORAGE_OPERATION + 4);
 typedef struct
 {
 	RecordStorageOperation op;
@@ -142,7 +137,7 @@ enum class RecordStoragePageState : u8
 
 class RecordStorageEventListener;
 
-#define RECORD_STORAGE_QUEUE_SIZE 256
+constexpr int RECORD_STORAGE_QUEUE_SIZE = 256;
 
 
 class RecordStorage : public FlashStorageEventListener
@@ -150,7 +145,6 @@ class RecordStorage : public FlashStorageEventListener
 	friend class TestRecordStorage;
 
 	private:
-		RecordStorage();
 		u8* startPage;
 		u8 numPages;
 
@@ -195,16 +189,15 @@ class RecordStorage : public FlashStorageEventListener
 		//Looks through all pages and returns the page with the most space after defragmentation
 		RecordStoragePage * FindPageToDefragment() const;
 
+		bool isInit = false;
 		
 	public:
+		RecordStorage();
+		void Init();
+		bool IsInit();
 
 		//Initialize Storage class
-		static RecordStorage& getInstance(){
-			if(!GS->recordStorage){
-				GS->recordStorage = new RecordStorage();
-			}
-			return *(GS->recordStorage);
-		}
+		static RecordStorage& getInstance();
 
 		//Must only be called upon start
 		void InitialRepair();
@@ -218,12 +211,9 @@ class RecordStorage : public FlashStorageEventListener
 		//Retrieves a record
 		RecordStorageRecord* GetRecord(u16 recordId) const;
 		//Retrieves the data of a record
-		sizedData GetRecordData(u16 recordId) const;
+		SizedData GetRecordData(u16 recordId) const;
 		//Resets all settings
 		void ClearAllSettings();
-
-		//Stuff
-		void PrintPages() const;
 		
 		//Listener
 		void FlashStorageItemExecuted(FlashStorageTaskItem* task, FlashStorageError errorCode) override;

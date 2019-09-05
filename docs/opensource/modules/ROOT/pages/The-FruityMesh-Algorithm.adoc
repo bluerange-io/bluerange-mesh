@@ -1,0 +1,95 @@
+ifndef::imagesdir[:imagesdir: ../assets/images]
+= FruityMesh Algorithm
+
+== Introduction
+A mesh should be able to build and
+manage all connections without user interaction. There is one big
+restriction when it comes to BLE connections. Having more than one
+connection as a peripheral can degrade mesh performance and lead to
+connection losses. Using one connection as a peripheral and up to three
+connections as a central has proven a good configuration for mesh
+connections. With these settings, the following will lead to problems
+where two nodes are not able to connect to each other because their one
+connection as a peripheral is already taken.
+
+image:mesh-overview.png[impossible]
+
+There is no way to know the size - or the participating nodes - of a
+mesh in advance. Distributing the presence of a node over long distances
+would be a bad idea because of the time it takes and the energy it
+costs. This means that every node can only see its surroundig nodes.
+
+== Simulator
+There is a xref:Simulator.adoc[Simulator] available that
+illustrates how the algorithm works. It allows to apply
+different configurations and see how the mesh reacts.
+
+== Node
+Each node saves a few variables like network ID, cluster ID,
+cluster size and its own ID. Additionally, it keeps some information for
+each of its connections.
+
+image:node-data.png[saved values]
+
+During discovery, it broadcasts its _nodeId_, _clusterSize_ and _clusterId_
+along with a few other measures in special advertising packets (xref:Specification.adoc[JOIN_ME]>> packets).
+It also scans for some time to receive
+discovery packets of surrounding nodes. From these packets, it selects
+the best connection partner and establishes a connection to it.
+
+== Clustering
+The real trick here is the clustering. Because every
+node knows the size of the cluster that it's part of, it uses this information
+as a criteria when connecting to others. Big clusters can always decide to
+which nodes they want to connect and smaller clusters will have to obey.
+Any change in cluster size due to connection or disconnection is
+broadcast through the exisiting connections.
+
+image:clustering.png[cluster forming]
+
+After a few xref:Specification.adoc#_JOIN_ME_Packet_(MessageType_1)[JOIN_ME] packets
+have been collected, they are processed in the ClusterScore function to
+determine the best connection partner. A node never tries to connect
+to a node with the same _clusterId_ to prevent loops.
+
+== Handshake
+After receiving the xref:Specification.adoc#_JOIN_ME_Packet_(MessageType_1)[JOIN ME] packets, some time has passed
+and the other node might already be in another cluster or in a different
+state than before. This is why the two nodes will first do a handshake
+after connecting to pass the latest information to each other. Only
+one Handshake must happen at a time to prevent race conditions. Once
+they are satisfied with their partner, the connection is used,
+otherwise it is disconnected.
+
+== States
+The algorithm uses a state machine that switches between
+different DISCOVERY and HANDSHAKE states. This helps the node to reduce
+its energy usage.
+
+== Self-Healing
+Once a connection in the cluster breaks up, the smaller
+cluster distributes a new cluster ID among its nodes. This
+repairs the missing connection using a similar path.
+
+image:self-healing.png[Self healing]
+
+After each connection loss, a node will increment its
+connection-loss-counter. This counter is used together with the _nodeId_
+to generate a _clusterId_. This is necessary because there might be cases
+where the original node of a cluster can't join the cluster anymore if
+it generates the same _clusterId_ again.
+
+== Connection
+Master Bit:  Because a node can't always know for certain if it is
+part of the bigger cluster, there may be times when two
+connected nodes both think they are part of the bigger cluster. This
+would pose a threat to the mesh once the connection drops. Therefore,
+each connection is assigned a _masterBit_ that is passed to the node that
+is part of the bigger cluster. With this, it is only possible that the
+_masterBit_ is in transition during a disconnect and both cluster must
+dissolve, but they can no longer form any islands.
+
+== More
+Anybody interested in a much more detailed explanation of the
+algorithm is welcome to take a look at
+xref:The-Algorithm-in-Detail.adoc[The Algorithm in Detail] page.

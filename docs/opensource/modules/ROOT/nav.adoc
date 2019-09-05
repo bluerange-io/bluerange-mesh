@@ -1,0 +1,11 @@
+// The nav file can be found in docs/opensource/modules/ROOT/pages/_partials/...
+// this has been done to be able to reference the nav.adoc as a partial include in this and other components(commercial version)
+
+// commercial attr. is defined in playbook.yml
+include::fruitymesh:ROOT:partial$nav-start.adoc[]
+
+ifdef::commercial[]
+include::bluerange-firmware:ROOT:partial$nav-commercial.adoc[]
+endif::[]
+
+include::fruitymesh:ROOT:partial$nav-end.adoc[]

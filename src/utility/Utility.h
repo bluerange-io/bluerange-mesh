@@ -47,14 +47,12 @@ class RecordStorageEventListener;
 
 namespace Utility
 {
-
 	const char serialAlphabet[] = "BCDFGHJKLMNPQRSTVWXYZ123456789";
 
 	//General methods for loading settings
 	u32 GetSettingsPageBaseAddress();
-	bool LoadSettingsFromFlash(Module* module, moduleID moduleId, ModuleConfiguration* configurationPointer, u16 configurationLength);
-	bool LoadSettingsFromFlashWithId(moduleID moduleId, ModuleConfiguration* configurationPointer, u16 configurationLength);
 	RecordStorageResultCode SaveModuleSettingsToFlash(const Module* module, ModuleConfiguration* configurationPointer, const u16 configurationLength, RecordStorageEventListener* listener, u32 userType, u8* userData, u16 userDataLength);
+	RecordStorageResultCode SaveModuleSettingsToFlashWithId(ModuleId moduleId, ModuleConfiguration* configurationPointer, const u16 configurationLength, RecordStorageEventListener* listener, u32 userType, u8* userData, u16 userDataLength);
 
 	//Serial number and version utilities
 	u32 GetIndexForSerial(const char* serialNumber);
@@ -76,14 +74,19 @@ namespace Utility
 
 	//Memory modification
 	void swapBytes(u8 *data, const size_t length);//Reverses the direction of bytes according to the length
+	u16 swap_u16( u16 val );
+	u32 swap_u32( u32 val );
 	bool CompareMem(const u8 byte, const u8* data, const u16 dataLength);
 
 	//String manipulation
 	void ToUpperCase(char* str);
 
 	//Other
-	void CheckFreeHeap(void);
+	u16 ByteToAsciiHex(u8 b);
+	u32 ByteFromAsciiHex(char* asciiHex, u8 numChars);
 
+	bool Contains(const u8* data, const u32 length, const u8 searchValue);
 
+	bool IsPowerOfTwo(u32 val);
 }
 

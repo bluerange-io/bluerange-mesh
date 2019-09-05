@@ -173,6 +173,12 @@ __STATIC_INLINE void interrupts_enable(const nrf_drv_uart_t * p_instance, uint8_
                                          NRF_UARTE_INT_ERROR_MASK |
                                          NRF_UARTE_INT_RXTO_MASK);
         nrf_drv_common_irq_enable(nrf_drv_get_IRQn((void *)p_instance->reg.p_uarte), interrupt_priority);
+
+#if UARTE_RXDRDY_ENABLE_PATCH == 1
+        nrf_uart_event_clear((NRF_UART_Type *)p_instance->reg.p_uarte, NRF_UART_EVENT_RXDRDY);
+        nrf_uart_int_enable((NRF_UART_Type *)p_instance->reg.p_uarte, NRF_UART_INT_MASK_RXDRDY);
+#endif
+
     )
     CODE_FOR_UART
     (
@@ -756,6 +762,19 @@ __STATIC_INLINE void tx_done_event(uart_control_block_t * p_cb, uint8_t bytes)
     p_cb->handler(&event, p_cb->p_context);
 }
 
+#if UARTE_RXDRDY_ENABLE_PATCH == 1
+__STATIC_INLINE void rx_ready_event(uart_control_block_t * p_cb, uint8_t bytes, uint8_t * p_data)
+{
+    nrf_drv_uart_event_t event;
+
+    event.type             = NRF_DRV_UART_EVT_RXDRDY;
+    event.data.rxtx.bytes  = 0;
+    event.data.rxtx.p_data = NULL;
+
+    p_cb->handler(&event, p_cb->p_context);
+}
+#endif
+
 void nrf_drv_uart_tx_abort(const nrf_drv_uart_t * p_instance)
 {
     uart_control_block_t * p_cb = &m_cb[p_instance->drv_inst_idx];
@@ -951,6 +970,16 @@ __STATIC_INLINE void uarte_irq_handler(NRF_UARTE_Type * p_uarte, uart_control_bl
             tx_done_event(p_cb, nrf_uarte_tx_amount_get(p_uarte));
         }
     }
+
+#if UARTE_RXDRDY_ENABLE_PATCH == 1
+    if (nrf_uart_int_enable_check((NRF_UART_Type *)p_uarte, NRF_UART_INT_MASK_RXDRDY) &&
+             nrf_uart_event_check((NRF_UART_Type *)p_uarte, NRF_UART_EVENT_RXDRDY))
+    {
+        nrf_uart_event_clear((NRF_UART_Type *)p_uarte, NRF_UART_EVENT_RXDRDY);
+        rx_ready_event(p_cb, nrf_uarte_rx_amount_get(p_uarte), p_cb->p_rx_buffer);
+    }
+#endif
+
 }
 #endif
 

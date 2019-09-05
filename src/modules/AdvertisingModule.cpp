@@ -28,30 +28,23 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-#define ADVERTISING_MODULE_CONFIG_VERSION 1
 
 #include <AdvertisingController.h>
 #include <AdvertisingModule.h>
-
-#ifdef ACTIVATE_ADVERTISING_MODULE
 
 #include <Node.h>
 #include <IoModule.h>
 #include <Logger.h>
 #include <Utility.h>
-
-extern "C"{
-#include <app_error.h>
-}
+#include <GlobalState.h>
+constexpr u8 ADVERTISING_MODULE_CONFIG_VERSION = 1;
 
 //This module allows a number of advertising messages to be configured.
 //These will be broadcasted periodically
 
 AdvertisingModule::AdvertisingModule()
-	: Module(moduleID::ADVERTISING_MODULE_ID, "adv")
+	: Module(ModuleId::ADVERTISING_MODULE, "adv")
 {
-	moduleVersion = ADVERTISING_MODULE_CONFIG_VERSION;
-
 	//Register callbacks n' stuff
 
 	//Save configuration to base class variables
@@ -76,17 +69,18 @@ void AdvertisingModule::ResetToDefaultConfiguration()
 	configuration.messageCount = 0;
 	configuration.txPower = (i8)0xFF; //Set to invalid value
 
-	SET_FEATURESET_CONFIGURATION(&configuration);
+	SET_FEATURESET_CONFIGURATION(&configuration, this);
 }
 
 void AdvertisingModule::ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength)
 {
+#if IS_INACTIVE(GW_SAVE_SPACE)
 	u32 err = 0;
 
 	//Start the Module...
 	//Delete previous jobs if they exist
 	for(u32 i=0; i<advJobHandles.length; i++){
-		if(advJobHandles[i] != nullptr) GS->advertisingController->RemoveJob(advJobHandles[i]);
+		if(advJobHandles[i] != nullptr) GS->advertisingController.RemoveJob(advJobHandles[i]);
 	}
 
 	//Configure Advertising Jobs for all advertising messages
@@ -99,7 +93,7 @@ void AdvertisingModule::ConfigurationLoadedHandler(ModuleConfiguration* migratab
 			0, //AdvChannel
 			0, //CurrentSlots
 			0, //CurrentDelay
-			BLE_GAP_ADV_TYPE_ADV_IND, //Advertising Mode
+			GapAdvType::ADV_IND, //Advertising Mode
 			{0}, //AdvData
 			0, //AdvDataLength
 			{0}, //ScanData
@@ -109,13 +103,9 @@ void AdvertisingModule::ConfigurationLoadedHandler(ModuleConfiguration* migratab
 		memcpy(&job.advData, configuration.messageData[i].messageData.getRaw(), configuration.messageData[i].messageLength);
 		job.advDataLength = configuration.messageData[i].messageLength;
 
-		advJobHandles[i] = GS->advertisingController->AddJob(job);
+		advJobHandles[i] = GS->advertisingController.AddJob(job);
 	}
-}
-
-void AdvertisingModule::ButtonHandler(u8 buttonId, u32 holdTimeDs)
-{
-
+#endif
 }
 
 
@@ -125,7 +115,5 @@ bool AdvertisingModule::TerminalCommandHandler(char* commandArgs[], u8 commandAr
 	//Must be called to allow the module to get and set the config
 	return Module::TerminalCommandHandler(commandArgs, commandArgsSize);
 }
-#endif
-
 #endif
 

@@ -37,39 +37,51 @@
 
 
 #include <types.h>
+#include <FruityHalNrf.h>
 
-extern "C"{
-#include <ble.h>
-#include <ble_gap.h>
-}
+#define SCAN_CONTROLLER_JOBS_MAX	4
 
+enum class ScanJobState : u8{
+	INACTIVE,
+	ACTIVE,
+};
+
+typedef struct ScanJob
+{
+	i32				timeout;
+	i32				leftTimeoutDs;
+	u16				interval;
+	u16				window;
+	ScanJobState	state;
+	ScanState		type;
+}ScanJob;
 
 class ScanController
 {
 private:
 	fh_ble_gap_scan_params_t currentScanParams;
-	scanState scanningState; //The current state of scanning
 	bool scanStateOk;
+	SimpleArray<ScanJob, SCAN_CONTROLLER_JOBS_MAX> jobs;
+	ScanJob* currentActiveJob;
 
-	ScanController();
 
 	void TryConfiguringScanState();
 
 public:
-	static ScanController& getInstance(){
-		if(!GS->scanController){
-			GS->scanController = new ScanController();
-		}
-		return *(GS->scanController);
-	}
+	ScanController();
+#if SDK == 15
+	u8 scanBuffer[31];	// 31 = BLE_GAP_SCAN_BUFFER_MAX
+#endif
+	static ScanController& getInstance();
+
+	//Job Scheduling
+	ScanJob* AddJob(ScanJob& job);
+	void RefreshJobs();
+	void RemoveJob(ScanJob * p_jobHandle);
 
 	void TimerEventHandler(u16 passedTimeDs);
 
-	void SetScanState(scanState newState);
-
-	void SetScanDutyCycle(u16 interval, u16 window);
-
-	bool ScanEventHandler(ble_evt_t &p_ble_evt) const;
+	bool ScanEventHandler(const GapAdvertisementReportEvent& advertisementReportEvent) const;
 
 	//Must be called if scanning was stopped by any external procedure
 	void ScanningHasStopped();

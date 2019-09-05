@@ -1,3 +1,0 @@
-= Customer Specific code
-
-This is the place where you should put your own modules and source code.

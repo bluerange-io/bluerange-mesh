@@ -27,17 +27,15 @@
 // **
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
-#pragma once
+
 
 //The following can be undefined to drastically change the size of the firmware
-#define ENABLE_LOGGING //Undefine to remove most human readable logs
-#define ENABLE_JSON_LOGGING //Undefine to remove json communication over uart
-#define USE_UART //Undefine to remove the UART terminal
-#define USE_SEGGER_RTT //Undefine to disable debugging over Segger Rtt
+#define ACTIVATE_LOGGING 1 //Undefine to remove most human readable logs
+#define ACTIVATE_JSON_LOGGING 1 //Undefine to remove json communication over uart
+#define ACTIVATE_UART 1 //Undefine to remove the UART terminal
+#define ACTIVATE_SEGGER_RTT 1 //Undefine to disable debugging over Segger Rtt
 
 //The following shouldn't be modified
-#define ACTIVATE_MA_MODULE
-
 #ifdef NRF51
 #define SET_FW_GROUPID_CHIPSET GROUP_ID_NRF51
 #define SET_FW_GROUPID_FEATURESET GROUP_ID_NRF51_MESH

@@ -28,11 +28,9 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-#define DEBUG_MODULE_CONFIG_VERSION 1
 
 #include <DebugModule.h>
 
-#ifdef ACTIVATE_DEBUG_MODULE
 
 #include <Utility.h>
 #include <Node.h>
@@ -41,38 +39,28 @@
 #include <AdvertisingController.h>
 #include <ScanController.h>
 #include <FlashStorage.h>
+#include "GlobalState.h"
+constexpr u8 DEBUG_MODULE_CONFIG_VERSION = 2;
 
-#ifdef ACTIVATE_EINK_MODULE
+#if IS_ACTIVE(EINK_MODULE)
 #include "EinkModule.h"
 #endif
 
-#ifdef ACTIVATE_ASSET_MODULE
+#if IS_ACTIVE(ASSET_MODULE)
 #include <AssetModule.h>
 #endif
 
-extern "C"{
-#include <ble_hci.h>
-#include <limits.h>
-#include <stdlib.h>
-#include <app_timer.h>
-#ifndef SIM_ENABLED
-#include <nrf_nvic.h>
-#endif
-}
+#include <climits>
+#include <cstdlib>
+
 
 DebugModule::DebugModule()
-	: Module(moduleID::DEBUG_MODULE_ID, "debug")
+	: Module(ModuleId::DEBUG_MODULE, "debug")
 {
-	moduleVersion = DEBUG_MODULE_CONFIG_VERSION;
-
-	//Register callbacks n' stuff
-
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
 	configurationPointer = &configuration;
 	configurationLength = sizeof(DebugModuleConfiguration);
-
-	rebootTimeDs = 0;
 
 	floodMode = FloodMode::OFF;
 	packetsOut = 0;
@@ -82,6 +70,7 @@ DebugModule::DebugModule()
 	pingHandle = 0;
 	pingCount = 0;
 	pingCountResponses = 0;
+	syncTest = false;
 
 	//Set defaults
 	ResetToDefaultConfiguration();
@@ -93,10 +82,8 @@ void DebugModule::ResetToDefaultConfiguration()
 	configuration.moduleId = moduleId;
 	configuration.moduleActive = true;
 	configuration.moduleVersion = DEBUG_MODULE_CONFIG_VERSION;
-	configuration.deprecated_debugButtonRemoveEnrollmentDs = 0;
-	configuration.debugButtonEnableUartDs = 0;
 
-	SET_FEATURESET_CONFIGURATION(&configuration);
+	SET_FEATURESET_CONFIGURATION(&configuration, this);
 }
 
 void DebugModule::ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength)
@@ -108,14 +95,15 @@ void DebugModule::ConfigurationLoadedHandler(ModuleConfiguration* migratableConf
 void DebugModule::SendStatistics(NodeId receiver) const
 {
 	DebugModuleInfoMessage infoMessage;
-	memset(&infoMessage, 0x00, sizeof(infoMessage));
+	CheckedMemset(&infoMessage, 0x00, sizeof(infoMessage));
 
-	infoMessage.sentPackets = GS->cm->sentMeshPackets;
-	infoMessage.droppedPackets = GS->cm->droppedMeshPackets;
-	infoMessage.connectionLossCounter = GS->node->connectionLossCounter;
+	infoMessage.sentPacketsUnreliable = GS->cm.sentMeshPacketsUnreliable;
+	infoMessage.sentPacketsReliable = GS->cm.sentMeshPacketsReliable;
+	infoMessage.droppedPackets = GS->cm.droppedMeshPackets;
+	infoMessage.connectionLossCounter = GS->node.connectionLossCounter;
 
 	SendModuleActionMessage(
-		MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+		MessageType::MODULE_ACTION_RESPONSE,
 		receiver,
 		(u8)DebugModuleActionResponseMessages::STATS_MESSAGE,
 		0,
@@ -129,10 +117,39 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
 
 	if(!configuration.moduleActive) return;
 
+#if IS_ACTIVE(TIME_SYNC_TEST_CODE) && !defined(SIM_ENABLED)
 
+	/*When time is synced, this will switch on green led after every 10 sec for 2 sec from the start of the minute*/
+	u32 seconds = GS->timeManager.GetTime();
+	char timestring[80];
+	if (seconds % 60 == 0 && !syncTest && GS->timeManager.IsTimeSynced()) {
+		//Enable LED
+		IoModule* ioMod = (IoModule*)GS->node.GetModuleById(ModuleId::IO_MODULE);
+		if(ioMod != nullptr){
+			ioMod->currentLedMode = LedMode::OFF;
+		}
+
+		syncTest = true;
+	}
+
+	if (syncTest)
+	{
+		if (seconds % 10 == 0) {
+			GS->timeManager.convertTimestampToString(timestring);
+
+			trace("Time is currently %s" EOL, timestring);
+
+			GS->ledGreen.On();
+			FruityHal::DelayMs(2000);
+		}
+	}
+#endif
+
+
+#if IS_INACTIVE(GW_SAVE_SPACE)
 	if(floodMode != FloodMode::OFF){
 		u8 numPacketsToSend = 0;
-		u32 timerEventsPer100Sec = 1000 / MAIN_TIMER_TICK_DS;
+		u32 timerEventsPer100Sec = 1000 * ticksPerSecond / MAIN_TIMER_TICK / 10;
 
 		//Distribute the packets evenly over 100 seconds
 		if (floodMessagesPer100Sec == 0) {
@@ -147,7 +164,7 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
 		}
 
 		if (numPacketsToSend > 0) {
-			logt("ERROR", "Queuing %u packets at time %u", numPacketsToSend, GS->appTimerDs);
+			logt("DEBUGMOD", "Queuing %u packets at time %u", numPacketsToSend, GS->appTimerDs);
 		}
 
 		for (int i = 0; i < numPacketsToSend; i++)
@@ -157,9 +174,10 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
 			DebugModuleFloodMessage data;
 			data.packetsIn = packetsIn;
 			data.packetsOut = packetsOut;
+			CheckedMemset(data.chunkData, 0, 21);
 
 			SendModuleActionMessage(
-				MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+				MessageType::MODULE_TRIGGER_ACTION,
 				floodDestinationId,
 				(u8)DebugModuleTriggerActionMessages::FLOOD_MESSAGE,
 				0,
@@ -168,31 +186,27 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
 				floodMode == FloodMode::RELIABLE ? true : false);
 		}
 	}
-
-	//Reset if a reset time is set
-	if(rebootTimeDs != 0 && rebootTimeDs < GS->appTimerDs){
-		logt("DEBUGMOD", "Resetting!");
-		FruityHal::SystemReset();
-	}
+#endif
 }
 
 u8 modeCounter = 0;
 
+#if IS_ACTIVE(BUTTONS)
 void DebugModule::ButtonHandler(u8 buttonId, u32 holdTimeDs)
 {
 //	//Advertise each 100ms
 //	if(modeCounter == 0){
 //		GS->terminal->UartDisable();
-//		IoModule* iomod = (IoModule*)GS->node->GetModuleById(moduleID::IO_MODULE_ID);
-//		iomod->currentLedMode = ledMode::LED_MODE_OFF;
+//		IoModule* iomod = (IoModule*)GS->node.GetModuleById(moduleID::IO_MODULE_ID);
+//		iomod->currentLedMode = LedMode::OFF;
 //
 //		//FruityHal::BleGapAdvStop();
 //		FruityHal::BleGapScanStop();
 //
 ////		fh_ble_gap_adv_params_t advparams;
-////		memset(&advparams, 0x00, sizeof(fh_ble_gap_adv_params_t));
+////		CheckedMemset(&advparams, 0x00, sizeof(fh_ble_gap_adv_params_t));
 ////		advparams.interval = MSEC_TO_UNITS(100, UNIT_0_625_MS);
-////		advparams.type = BLE_GAP_ADV_TYPE_ADV_IND;
+////		advparams.type = GapAdvType::ADV_IND;
 ////		FruityHal::BleGapAdvStart(&advparams);
 //
 //
@@ -200,9 +214,9 @@ void DebugModule::ButtonHandler(u8 buttonId, u32 holdTimeDs)
 //
 //		FruityHal::DelayMs(1000);
 //
-//		GS->ledRed->Off();
-//		GS->ledGreen->Off();
-//		GS->ledBlue->Off();
+//		GS->ledRed.Off();
+//		GS->ledGreen.Off();
+//		GS->ledBlue.Off();
 //
 //		modeCounter++;
 //	}
@@ -217,8 +231,8 @@ void DebugModule::ButtonHandler(u8 buttonId, u32 holdTimeDs)
 //			GS->ledGreen->Off();
 //			GS->ledBlue->Off();
 //
-//#ifdef ACTIVATE_ASSET_MODULE
-//			AssetModule* asMod = (AssetModule*)GS->node->GetModuleById(moduleID::ASSET_MODULE_ID);
+//#if IS_ACTIVE(ASSET_MODULE)
+//			AssetModule* asMod = (AssetModule*)GS->node.GetModuleById(moduleID::ASSET_MODULE_ID);
 //			asMod->configuration.enableBarometer = false;
 //#endif
 //
@@ -226,19 +240,20 @@ void DebugModule::ButtonHandler(u8 buttonId, u32 holdTimeDs)
 //		}
 
 
-	if(SHOULD_BUTTON_EVT_EXEC(configuration.debugButtonEnableUartDs)){
+	if(SHOULD_BUTTON_EVT_EXEC(debugButtonEnableUartDs)){
 		//Enable UART
-#ifdef USE_UART
-		GS->terminal->UartEnable(false);
+#if IS_ACTIVE(UART)
+		GS->terminal.UartEnable(false);
 #endif
 
 		//Enable LED
-		IoModule* ioMod = (IoModule*)GS->node->GetModuleById(moduleID::IO_MODULE_ID);
+		IoModule* ioMod = (IoModule*)GS->node.GetModuleById(ModuleId::IO_MODULE);
 		if(ioMod != nullptr){
-			ioMod->currentLedMode = ledMode::LED_MODE_CONNECTIONS;
+			ioMod->currentLedMode = LedMode::CONNECTIONS;
 		}
 	}
 }
+#endif
 
 #ifdef TERMINAL_ENABLED
 bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
@@ -246,49 +261,15 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 	//React on commands, return true if handled, false otherwise
 	if(commandArgsSize >= 3 && (TERMARGS(2 ,moduleName) || TERMARGS(2 ,"eink")))
 	{
-		NodeId destinationNode = (TERMARGS(1 ,"this")) ? GS->node->configuration.nodeId : atoi(commandArgs[1]);
+		NodeId destinationNode = (TERMARGS(1 ,"this")) ? GS->node.configuration.nodeId : atoi(commandArgs[1]);
 
 
 		if(commandArgsSize >= 4 && TERMARGS(0 ,"action"))
 		{
-			/*Deprecated and ported to Node module*/
-			if(commandArgsSize > 3 && TERMARGS(3 ,"reset"))
-			{
-				DebugModuleResetMessage data;
-				data.resetSeconds = commandArgsSize > 4 ? atoi(commandArgs[4]) : 10;
-
+#if IS_INACTIVE(CLC_GW_SAVE_SPACE)
+			if(commandArgsSize >= 4 && TERMARGS(3 ,"get_buffer")){
 				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
-					destinationNode,
-					(u8)DebugModuleTriggerActionMessages::RESET_NODE,
-					0,
-					(u8*)&data,
-					SIZEOF_DEBUG_MODULE_RESET_MESSAGE,
-					false
-				);
-				return true;
-			}
-#ifndef SAVE_SPACE_GW_1
-			else if(commandArgsSize >= 5 && TERMARGS(3 ,"livereports")){
-				//Enables or disables live reporting of connection establishments
-				u8 liveReportingState = atoi(commandArgs[4]);
-
-				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
-					destinationNode,
-					(u8)DebugModuleTriggerActionMessages::SET_LIVEREPORTING_DEPRECATED,
-					0,
-					&liveReportingState,
-					1,
-					false
-				);
-
-				return true;
-			}
-#endif
-			else if(commandArgsSize >= 4 && TERMARGS(3 ,"getbuf")){	//jstodo this sends all joinmepakets without distinction. Intended?
-				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					MessageType::MODULE_TRIGGER_ACTION,
 					destinationNode,
 					(u8)DebugModuleTriggerActionMessages::GET_JOIN_ME_BUFFER,
 					0,
@@ -299,12 +280,13 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 
 				return true;
 			}
-#ifndef SAVE_SPACE_1
+#endif
+#if IS_INACTIVE(SAVE_SPACE)
 			//Reset the connection loss counter of any node
 			else if(TERMARGS(3, "reset_connection_loss_counter"))
 			{
 				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					MessageType::MODULE_TRIGGER_ACTION,
 					destinationNode,
 					(u8)DebugModuleTriggerActionMessages::RESET_CONNECTION_LOSS_COUNTER,
 					0,
@@ -315,11 +297,24 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 
 				return true;
 			}
+			else if (TERMARGS(3, "send_max_message"))
+			{
+				SendModuleActionMessage(
+					MessageType::MODULE_TRIGGER_ACTION,
+					destinationNode,
+					(u8)DebugModuleTriggerActionMessages::SEND_MAX_MESSAGE,
+					0,
+					nullptr,
+					0,
+					false
+				);
+				return true;
+			}
 			//Query for statistics
 			else if(TERMARGS(3, "get_stats"))
 			{
 				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					MessageType::MODULE_TRIGGER_ACTION,
 					destinationNode,
 					(u8)DebugModuleTriggerActionMessages::GET_STATS_MESSAGE,
 					0,
@@ -335,7 +330,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 			{
 				logt("DEBUGMOD", "send hardfault");
 				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					MessageType::MODULE_TRIGGER_ACTION,
 					destinationNode,
 					(u8)DebugModuleTriggerActionMessages::CAUSE_HARDFAULT_MESSAGE,
 					0,
@@ -356,7 +351,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 				data.packetsPer100Sec = atoi(commandArgs[6]);
 
 				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					MessageType::MODULE_TRIGGER_ACTION,
 					destinationNode,
 					(u8)DebugModuleTriggerActionMessages::SET_FLOOD_MODE,
 					0,
@@ -380,14 +375,14 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 
 				for(int i=0; i<pingCount; i++){
 					SendModuleActionMessage(
-							MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
-							destinationNode,
-							(u8)DebugModuleTriggerActionMessages::PING,
-							0,
-							nullptr,
-							0,
-							pingModeReliable
-						);
+						MessageType::MODULE_TRIGGER_ACTION,
+						destinationNode,
+						(u8)DebugModuleTriggerActionMessages::PING,
+						0,
+						nullptr,
+						0,
+						pingModeReliable
+					);
 				}
 				return true;
 			}
@@ -405,34 +400,13 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 				data.ttl = pingCount * 2 - 1;
 
 				SendModuleActionMessage(
-						MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
-						destinationNode,
-						(u8)DebugModuleTriggerActionMessages::PINGPONG,
-						0,
-						(u8*)&data,
-						SIZEOF_DEBUG_MODULE_PINGPONG_MESSAGE,
-						pingModeReliable
-					);
-
-				return true;
-			}
-			//Sets the reestablishing time, in the debug module until ready
-			else if(TERMARGS(3, "rees") && commandArgsSize >= 5)
-			{
-				u16 partnerId = atoi(commandArgs[4]);
-
-				DebugModuleForceReestablishMessage data;
-
-				data.partnerId = partnerId;
-
-				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					MessageType::MODULE_TRIGGER_ACTION,
 					destinationNode,
-					(u8)DebugModuleTriggerActionMessages::REQUEST_FORCE_REESTABLISH,
+					(u8)DebugModuleTriggerActionMessages::PINGPONG,
 					0,
 					(u8*)&data,
-					SIZEOF_DEBUG_MODULE_FORCE_REESTABLISH_MESSAGE,
-					true
+					SIZEOF_DEBUG_MODULE_PINGPONG_MESSAGE,
+					pingModeReliable
 				);
 
 				return true;
@@ -442,7 +416,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 
 	}
 
-#ifndef SAVE_SPACE_1
+#if IS_INACTIVE(SAVE_SPACE)
 	else if (TERMARGS(0, "data"))
 	{
 		NodeId receiverId = 0;
@@ -453,10 +427,10 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 		}
 
 		connPacketData1 data;
-		memset(&data, 0x00, sizeof(connPacketData1));
+		CheckedMemset(&data, 0x00, sizeof(connPacketData1));
 
-		data.header.messageType = MESSAGE_TYPE_DATA_1;
-		data.header.sender = GS->node->configuration.nodeId;
+		data.header.messageType = MessageType::DATA_1;
+		data.header.sender = GS->node.configuration.nodeId;
 		data.header.receiver = receiverId;
 
 		data.payload.length = 7;
@@ -464,16 +438,14 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 		data.payload.data[1] = 3;
 		data.payload.data[2] = 3;
 
-		bool reliable = false;
-
-		GS->cm->SendMeshMessage((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, DeliveryPriority::LOW, reliable);
+		GS->cm.SendMeshMessage((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, DeliveryPriority::LOW);
 
 		return true;
 	}
 	//Flood the network with messages and count them
 	else if (TERMARGS(0, "floodstat"))
 	{
-		logt("ERROR", "Flooding has %u packetsIn and %u packetsOut", packetsIn, packetsOut);
+		logt("DEBUGMOD", "Flooding has %u packetsIn and %u packetsOut", packetsIn, packetsOut);
 
 		return true;
 	}
@@ -481,9 +453,8 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 	else if (TERMARGS(0, "heap"))
 	{
 		u8 checkvar = 1;
-		logjson("NODE", "{\"stack\":%u}" SEP, &checkvar - 0x20000000);
-
-		Utility::CheckFreeHeap();
+		logjson("NODE", "{\"stack\":%u}" SEP, (u32)(&checkvar - 0x20000000));
+		logjson("NODE", "Module usage: %u" SEP, GS->moduleAllocator.getMemorySize());
 
 		return true;
 
@@ -515,7 +486,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 			for(u32 i=0; i<blockSize/bufferSize; i++)
 			{
 				memcpy(buffer, (u8*)(block*blockSize+i*bufferSize + offset), bufferSize);
-				GS->logger->convertBufferToHexString(buffer, bufferSize, (char*)charBuffer, bufferSize*3+1);
+				Logger::convertBufferToHexString(buffer, bufferSize, (char*)charBuffer, bufferSize*3+1);
 				trace("0x%08X: %s" EOL,(block*blockSize)+i*bufferSize + offset, charBuffer);
 			}
 		}
@@ -549,7 +520,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 		u32 errorCode = atoi(commandArgs[1]);
 		u16 extra = atoi(commandArgs[2]);
 
-		GS->logger->logError(ErrorTypes::CUSTOM, errorCode, extra);
+		GS->logger.logError(ErrorTypes::CUSTOM, errorCode, extra);
 
 		return true;
 	}
@@ -560,9 +531,9 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 		u32 recordId = atoi(commandArgs[1]);
 
 		u8 buffer[50];
-		u16 len = GS->logger->parseHexStringToBuffer(commandArgs[2], buffer, 50);
+		u16 len = Logger::parseEncodedStringToBuffer(commandArgs[2], buffer, 50);
 
-		GS->recordStorage->SaveRecord(recordId, buffer, len, nullptr, 0);
+		GS->recordStorage.SaveRecord(recordId, buffer, len, nullptr, 0);
 
 		return true;
 	}
@@ -572,7 +543,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 
 		u32 recordId = atoi(commandArgs[1]);
 
-		GS->recordStorage->DeactivateRecord(recordId, nullptr, 0);
+		GS->recordStorage.DeactivateRecord(recordId, nullptr, 0);
 
 		return true;
 	}
@@ -582,7 +553,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 
 		u32 recordId = atoi(commandArgs[1]);
 
-		sizedData data = GS->recordStorage->GetRecordData(recordId);
+		SizedData data = GS->recordStorage.GetRecordData(recordId);
 
 		if(data.length > 0){
 			for(int i=0; i<data.length; i++){
@@ -604,8 +575,8 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 		//parameter 2: count
 
 		connPacketData1 data;
-		data.header.messageType = MESSAGE_TYPE_DATA_1;
-		data.header.sender = GS->node->configuration.nodeId;
+		data.header.messageType = MessageType::DATA_1;
+		data.header.sender = GS->node.configuration.nodeId;
 		data.header.receiver = 0;
 
 		data.payload.length = 7;
@@ -622,13 +593,13 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 			if(reliable == 0 || reliable == 2){
 				data.payload.data[0] = i*2;
 				data.payload.data[1] = 0;
-				GS->cm->SendMeshMessage((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, DeliveryPriority::LOW, false);
+				GS->cm.SendMeshMessageInternal((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, DeliveryPriority::LOW, false, true, true);
 			}
 
 			if(reliable == 1 || reliable == 2){
 				data.payload.data[0] = i*2+1;
 				data.payload.data[1] = 1;
-				GS->cm->SendMeshMessage((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, DeliveryPriority::LOW, true);
+				GS->cm.SendMeshMessageInternal((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, DeliveryPriority::LOW, true, true, true);
 			}
 		}
 		return true;
@@ -648,18 +619,18 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 			0, //AdvChannel
 			0,
 			0,
-			BLE_GAP_ADV_TYPE_ADV_IND,
+			GapAdvType::ADV_IND,
 			{0x02, 0x01, 0x06, 0x05, 0xFF, 0x4D, 0x02, 0xAA, advDataByte},
 			9,
 			{0},
-			0
+			0 //ScanDataLength
 		};
 
-		GS->advertisingController->AddJob(job);
+		GS->advertisingController.AddJob(job);
 
 		return true;
 	}
-	else if (TERMARGS(0, "advrem"))	//jstodo unused? advadd seems to be unused.
+	else if (TERMARGS(0, "advrem"))
 	{
 		if(commandArgsSize <= 1) return false;
 
@@ -667,23 +638,23 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 
 		if (jobNum >= ADVERTISING_CONTROLLER_MAX_NUM_JOBS) return false;
 
-		GS->advertisingController->RemoveJob(&(GS->advertisingController->jobs[jobNum]));
+		GS->advertisingController.RemoveJob(&(GS->advertisingController.jobs[jobNum]));
 
 		return true;
 	}
-	else if (TERMARGS(0, "advjobs"))	//jstodo unused? advadd seems to be unused.
+	else if (TERMARGS(0, "advjobs"))
 	{
-		AdvertisingController* advCtrl = GS->advertisingController;
+		AdvertisingController* advCtrl = &(GS->advertisingController);
 		char buffer[150];
 
 		for(u32 i=0; i<advCtrl->currentNumJobs; i++){
-			GS->logger->convertBufferToHexString(advCtrl->jobs[i].advData, advCtrl->jobs[i].advDataLength, buffer, sizeof(buffer));
-			trace("Job type:%u, slots:%u, iv:%u, advData:%s" EOL, advCtrl->jobs[i].type, advCtrl->jobs[i].slots, advCtrl->jobs[i].advertisingInterval, buffer);
+			Logger::convertBufferToHexString(advCtrl->jobs[i].advData, advCtrl->jobs[i].advDataLength, buffer, sizeof(buffer));
+			trace("Job type:%u, slots:%u, iv:%u, advData:%s" EOL, (u32)advCtrl->jobs[i].type, advCtrl->jobs[i].slots, advCtrl->jobs[i].advertisingInterval, buffer);
 		}
 
 		return true;
 	}
-	else if (TERMARGS(0, "feed")) //jstodo seems to be an important feature. Shouldn't this be relocated to the node?
+	else if (TERMARGS(0, "feed"))
 	{
 		FruityHal::FeedWatchdog();
 		logt("WATCHDOG", "Watchdogs fed.");
@@ -705,14 +676,14 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 
 		for(int i=0; i<pingCount; i++){
 			SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
-					NODE_ID_HOPS_BASE + 500,
+				MessageType::MODULE_TRIGGER_ACTION,
+				NODE_ID_HOPS_BASE + 500,
 				(u8)DebugModuleTriggerActionMessages::LPING,
-					0,
-					(u8*)&lpingData,
-					SIZEOF_DEBUG_MODULE_LPING_MESSAGE,
-					pingModeReliable
-				);
+				0,
+				(u8*)&lpingData,
+				SIZEOF_DEBUG_MODULE_LPING_MESSAGE,
+				pingModeReliable
+			);
 		}
 		return true;
 	}
@@ -720,48 +691,47 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 	{
 		u32 addr = strtoul(commandArgs[1], nullptr, 10) + FLASH_REGION_START_ADDRESS;
 		u8 buffer[200];
-		GS->logger->parseHexStringToBuffer(commandArgs[2], buffer, 200);
-		u16 dataLength = (u16)(strlen(commandArgs[2]) + 1)/3;	//jstodo investigate: why dont we use the return value of parseHexStringToBuffer?
+		u16 dataLength = Logger::parseEncodedStringToBuffer(commandArgs[2], buffer, 200);
 
 
-		GS->flashStorage->WriteData((u32*)buffer, (u32*)addr, dataLength, nullptr, 0);
+		GS->flashStorage.WriteData((u32*)buffer, (u32*)addr, dataLength, nullptr, 0);
 
 		return true;
 	}
-	if (TERMARGS(0, "erasepage") )	//jstodo unused? We already have that command!
+	if (TERMARGS(0, "erasepage"))
 	{
 		if(commandArgsSize <= 1) return false;
 
 		u16 pageNum = atoi(commandArgs[1]);
 
-		GS->flashStorage->ErasePage(pageNum, nullptr, 0);
+		GS->flashStorage.ErasePage(pageNum, nullptr, 0);
 
 		return true;
 	}
-	if (TERMARGS(0, "erasepages") && commandArgsSize >= 3)	//jstodo unused?
+	if (TERMARGS(0, "erasepages") && commandArgsSize >= 3)
 	{
 
 		u16 page = atoi(commandArgs[1]);
 		u16 numPages = atoi(commandArgs[2]);
 
-		GS->flashStorage->ErasePages(page, numPages, nullptr, 0);
+		GS->flashStorage.ErasePages(page, numPages, nullptr, 0);
 
 		return true;
 	}
 	if (TERMARGS(0, "filltx"))
 	{
-		GS->cm->fillTransmitBuffers();
+		GS->cm.fillTransmitBuffers();
 
 		return true;
 	}
 	if (TERMARGS(0, "getpending"))
 	{
-		logt("ERROR", "cm pending %u", GS->cm->GetPendingPackets());
+		logt("DEBUGMOD", "cm pending %u", GS->cm.GetPendingPackets());
 
-		BaseConnections conns = GS->cm->GetBaseConnections(ConnectionDirection::INVALID);
+		BaseConnections conns = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
 		for (u32 i = 0; i < conns.count; i++) {
-			BaseConnection* conn = GS->cm->allConnections[conns.connectionIndizes[i]];
-			logt("ERROR", "conn %u pend %u", conn->connectionId, conn->GetPendingPackets());
+			BaseConnection* conn = GS->cm.allConnections[conns.connectionIndizes[i]];
+			logt("DEBUGMOD", "conn %u pend %u", conn->connectionId, conn->GetPendingPackets());
 		}
 
 		return true;
@@ -774,9 +744,9 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 		u32 destAddr = atoi(commandArgs[1]) + FLASH_REGION_START_ADDRESS;
 
 		u32 buffer[16];
-		u16 len = GS->logger->parseHexStringToBuffer(commandArgs[2], (u8*)buffer, 64);
+		u16 len = Logger::parseEncodedStringToBuffer(commandArgs[2], (u8*)buffer, 64);
 
-		GS->flashStorage->CacheAndWriteData(buffer, (u32*)destAddr, len, nullptr, 0);
+		GS->flashStorage.CacheAndWriteData(buffer, (u32*)destAddr, len, nullptr, 0);
 
 
 		return true;
@@ -787,7 +757,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 		if(commandArgsSize <= 1) return false;
 
 		u16 hnd = atoi(commandArgs[1]);
-		BaseConnection* conn = GS->cm->GetConnectionFromHandle(hnd);
+		BaseConnection* conn = GS->cm.GetConnectionFromHandle(hnd);
 		if (conn != nullptr) {
 			conn->packetSendQueue.Clean();
 		}
@@ -800,7 +770,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 		if(commandArgsSize <= 1) return false;
 
 		u16 hnd = atoi(commandArgs[1]);
-		BaseConnection* conn = GS->cm->GetConnectionFromHandle(hnd);
+		BaseConnection* conn = GS->cm.GetConnectionFromHandle(hnd);
 
 		if (conn != nullptr) {
 			conn->packetSendQueue.Print();
@@ -821,7 +791,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
 	//Check if this request is meant for modules in general
-	if (packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION) {
+	if (packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION) {
 		connPacketModule* packet = (connPacketModule*)packetHeader;
 		DebugModuleTriggerActionMessages actionType = (DebugModuleTriggerActionMessages)packet->actionType;
 
@@ -830,7 +800,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 
 			if (actionType == DebugModuleTriggerActionMessages::SET_FLOOD_MODE)
 			{
-#ifndef SAVE_SPACE_1
+#if IS_INACTIVE(SAVE_SPACE)
 				DebugModuleSetFloodModeMessage* data = (DebugModuleSetFloodModeMessage*)packet->data;
 				floodMode = (FloodMode)data->floodMode;
 				floodDestinationId = data->floodDestinationId;
@@ -841,7 +811,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 					packetsOut = 0;
 				}
 				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					MessageType::MODULE_TRIGGER_ACTION,
 					packet->header.sender,
 					(u8)DebugModuleTriggerActionMessages::RESET_FLOOD_COUNTER,
 					packet->requestHandle,
@@ -859,7 +829,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 					if (packet->header.sender == floodDestinationId) {
 						packetsIn++;
 						if (packetsIn != data->packetsOut) {
-							logt("ERROR", "Lost messages, got %u should have %u", packetsIn, data->packetsOut);
+							logt("DEBUGMOD", "Lost messages, got %u should have %u", packetsIn, data->packetsOut);
 						}
 					}
 				}
@@ -870,46 +840,32 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 				}
 #endif
 			}
+#if IS_INACTIVE(CLC_GW_SAVE_SPACE)
 			else if (packet->actionType == (u8)DebugModuleTriggerActionMessages::RESET_FLOOD_COUNTER)
 			{
 				logt("DEBUGMOD", "Resetting flood counter.");
 				packetsOut = 0;
 				packetsIn = 0;
 			}
-			else if (actionType == DebugModuleTriggerActionMessages::RESET_NODE)
-			{
-				DebugModuleResetMessage* message = (DebugModuleResetMessage*)packet->data;
-				logt("DEBUGMOD", "Scheduled reboot in %u seconds", message->resetSeconds);
-
-				GS->node->Reboot(message->resetSeconds * 10);
-			}
-			else if (actionType == DebugModuleTriggerActionMessages::SET_LIVEREPORTING_DEPRECATED)
-			{
-				LiveReportTypes liveReportingState = (LiveReportTypes)packet->data[0];
-				logt("DEBUGMOD", "LiveReporting is now %u", liveReportingState);
-
-				StatusReporterModule* mod = (StatusReporterModule*)GS->node->GetModuleById(moduleID::STATUS_REPORTER_MODULE_ID);
-				if (mod != nullptr) {
-					mod->configuration.liveReportingState = liveReportingState;
-				}
-			}
+#endif
+#if IS_INACTIVE(CLC_GW_SAVE_SPACE)
 			else if (actionType == DebugModuleTriggerActionMessages::GET_JOIN_ME_BUFFER)
 			{
 				//Send a special packet that contains my own information
 				joinMeBufferPacket p;
-				memset(&p, 0x00, sizeof(joinMeBufferPacket));
+				CheckedMemset(&p, 0x00, sizeof(joinMeBufferPacket));
 				p.receivedTimeDs = GS->appTimerDs;
-				p.connectable = GS->advertisingController->currentAdvertisingParams.type;
-				p.payload.ackField = GS->node->currentAckId;
-				p.payload.clusterId = GS->node->clusterId;
-				p.payload.clusterSize = GS->node->clusterSize;
-				p.payload.deviceType = GS->node->configuration.deviceType;
-				p.payload.freeMeshInConnections = GS->cm->freeMeshInConnections;
-				p.payload.freeMeshOutConnections = GS->cm->freeMeshOutConnections;
-				p.payload.sender = GS->node->configuration.nodeId;
+				p.advType = GS->advertisingController.currentAdvertisingParams.type;
+				p.payload.ackField = GS->node.currentAckId;
+				p.payload.clusterId = GS->node.clusterId;
+				p.payload.clusterSize = GS->node.clusterSize;
+				p.payload.deviceType = GET_DEVICE_TYPE();
+				p.payload.freeMeshInConnections = GS->cm.freeMeshInConnections;
+				p.payload.freeMeshOutConnections = GS->cm.freeMeshOutConnections;
+				p.payload.sender = GS->node.configuration.nodeId;
 
 				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+					MessageType::MODULE_ACTION_RESPONSE,
 					packet->header.sender,
 					(u8)DebugModuleActionResponseMessages::JOIN_ME_BUFFER_ITEM,
 					packet->requestHandle,
@@ -919,28 +875,44 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 				);
 
 				//Send the join_me buffer items
-				for (int i = 0; i < GS->node->joinMePackets.length; i++)	//jstodo probably only send the non zeros?
+				for (int i = 0; i < GS->node.joinMePackets.length; i++)
 				{
 					SendModuleActionMessage(
-						MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+						MessageType::MODULE_ACTION_RESPONSE,
 						packet->header.sender,
 						(u8)DebugModuleActionResponseMessages::JOIN_ME_BUFFER_ITEM,
 						packet->requestHandle,
-						(u8*)&(GS->node->joinMePackets[i]),
+						(u8*)&(GS->node.joinMePackets[i]),
 						sizeof(joinMeBufferPacket),
 						false
 					);
 				}
 
 			}
-#ifndef SAVE_SPACE_1
+#endif
+#if IS_INACTIVE(SAVE_SPACE)
 			else if (actionType == DebugModuleTriggerActionMessages::RESET_CONNECTION_LOSS_COUNTER) {
 
 				logt("DEBUGMOD", "Resetting connection loss counter");
 
-				GS->node->connectionLossCounter = 0;
-				GS->logger->errorLogPosition = 0;
+				GS->node.connectionLossCounter = 0;
+				GS->logger.errorLogPosition = 0;
 
+			}
+			else if (actionType == DebugModuleTriggerActionMessages::SEND_MAX_MESSAGE) {
+				DebugModuleSendMaxMessageResponse message;
+				for (u32 i = 0; i < sizeof(message.data); i++) {
+					message.data[i] = (i % 50) + 100;
+				}
+				SendModuleActionMessage(
+					MessageType::MODULE_ACTION_RESPONSE,
+					packet->header.sender,
+					(u8)DebugModuleActionResponseMessages::SEND_MAX_MESSAGE_RESPONSE,
+					packet->requestHandle,
+					(u8*)&message,
+					sizeof(message),
+					false
+				);
 			}
 			else if (actionType == DebugModuleTriggerActionMessages::GET_STATS_MESSAGE) {
 
@@ -954,7 +926,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 			else if (actionType == DebugModuleTriggerActionMessages::PING) {
 				//We respond to the ping
 				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+					MessageType::MODULE_ACTION_RESPONSE,
 					packet->header.sender,
 					(u8)DebugModuleActionResponseMessages::PING_RESPONSE,
 					packet->requestHandle,
@@ -966,18 +938,18 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 			}
 			else if (actionType == DebugModuleTriggerActionMessages::LPING) {
 				//Only respond to the leaf ping if we are a leaf
-				if (GS->cm->GetMeshConnections(ConnectionDirection::INVALID).count != 1) {
+				if (GS->cm.GetMeshConnections(ConnectionDirection::INVALID).count != 1) {
 					return;
 				}
 
 				//Insert our nodeId into the packet
 				DebugModuleLpingMessage* lpingData = (DebugModuleLpingMessage*)packet->data;
 				lpingData->hops = 500 - (packetHeader->receiver - NODE_ID_HOPS_BASE);
-				lpingData->leafNodeId = GS->node->configuration.nodeId;
+				lpingData->leafNodeId = GS->node.configuration.nodeId;
 
 				//We respond to the ping
 				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+					MessageType::MODULE_ACTION_RESPONSE,
 					packet->header.sender,
 					(u8)DebugModuleActionResponseMessages::LPING_RESPONSE,
 					packet->requestHandle,
@@ -996,7 +968,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 					data->ttl--;
 
 					SendModuleActionMessage(
-						MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+						MessageType::MODULE_TRIGGER_ACTION,
 						packet->header.sender,
 						(u8)DebugModuleTriggerActionMessages::PINGPONG,
 						packet->requestHandle,
@@ -1019,66 +991,30 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 				}
 			}
 #endif
-			else if (actionType == DebugModuleTriggerActionMessages::REQUEST_FORCE_REESTABLISH) {
-
-				DebugModuleForceReestablishMessage* data = (DebugModuleForceReestablishMessage*)packet->data;
-
-				//Save flag so that we reestablish on next disconnect
-				BaseConnections conns = GS->cm->GetBaseConnections(ConnectionDirection::INVALID);
-				for (u32 i = 0; i < conns.count; i++) {
-					BaseConnection *conn = GS->cm->allConnections[conns.connectionIndizes[i]];
-					if (conn->partnerId == data->partnerId) {
-						conn->forceReestablish = true;
-					}
-				}
-
-				//Send a request to our partner to kill the connection and reestablish it
-				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
-					data->partnerId,
-					(u8)DebugModuleTriggerActionMessages::FORCE_REESTABLISH,
-					packet->requestHandle,
-					nullptr,
-					0,
-					true
-				);
-			}
-			else if (actionType == DebugModuleTriggerActionMessages::FORCE_REESTABLISH)
-			{
-				//Save flag in connection and disconnect connection to our partner
-				BaseConnections conns = GS->cm->GetBaseConnections(ConnectionDirection::INVALID);
-				for (u32 i = 0; i < conns.count; i++) {
-					BaseConnection *conn = GS->cm->allConnections[conns.connectionIndizes[i]];
-					if (conn != nullptr && conn->partnerId == packet->header.sender) {
-						conn->forceReestablish = true;
-						FruityHal::Disconnect(conn->connectionHandle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-					}
-				}
-			};
 		}
 	}
-	else if (packetHeader->messageType == MESSAGE_TYPE_DATA_1) {
-		if (sendData->dataLength >= SIZEOF_CONN_PACKET_DATA_1)
+	else if (packetHeader->messageType == MessageType::DATA_1) {
+		if (sendData->dataLength >= SIZEOF_CONN_PACKET_HEADER + 3) //We do not need the full data paket, just the bytes that we read
 		{
 			connPacketData1* packet = (connPacketData1*)packetHeader;
 			NodeId partnerId = connection == nullptr ? 0 : connection->partnerId;
 
-			logt("DATA", "IN <= %d ################## Got Data packet %d:%d:%d (len:%d) ##################", partnerId, packet->payload.data[0], packet->payload.data[1], packet->payload.data[2], sendData->dataLength);
+			logt("DATA", "IN <= %d ################## Got Data packet %d:%d:%d (len:%d,%s) ##################", partnerId, packet->payload.data[0], packet->payload.data[1], packet->payload.data[2], sendData->dataLength, sendData->deliveryOption == DeliveryOption::WRITE_REQ ? "r" : "u");
 		}
 	}
-	else if (packetHeader->messageType == MESSAGE_TYPE_MODULE_ACTION_RESPONSE) {
+	else if (packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE) {
 		connPacketModule* packet = (connPacketModule*)packetHeader;
 		DebugModuleActionResponseMessages actionType = (DebugModuleActionResponseMessages)packet->actionType;
 
 		//Check if our module is meant
 		if(packet->moduleId == moduleId){
-#ifndef SAVE_SPACE_1
+#if IS_INACTIVE(SAVE_SPACE)
 			if (actionType == DebugModuleActionResponseMessages::STATS_MESSAGE){
 				DebugModuleInfoMessage* infoMessage = (DebugModuleInfoMessage*) packet->data;
 
 				logjson("DEBUGMOD", "{\"nodeId\":%u,\"type\":\"debug_stats\", \"conLoss\":%u,", packet->header.sender, infoMessage->connectionLossCounter);
 				logjson("DEBUGMOD", "\"dropped\":%u,", infoMessage->droppedPackets);
-				logjson("DEBUGMOD", "\"sent\":%u}" SEP, infoMessage->sentPackets);
+				logjson("DEBUGMOD", "\"sentRel\":%u,\"sentUnr\":%u}" SEP, infoMessage->sentPacketsReliable, infoMessage->sentPacketsUnreliable);
 			}
 			else if(actionType == DebugModuleActionResponseMessages::PING_RESPONSE){
 				//Calculate the time it took to ping the other node
@@ -1092,6 +1028,18 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 
 				trace("p %u ms" EOL, timePassedMs);
 				//logjson("DEBUGMOD", "{\"type\":\"ping_response\",\"passedTime\":%u}" SEP, timePassedMs);
+			}
+			else if (actionType == DebugModuleActionResponseMessages::SEND_MAX_MESSAGE_RESPONSE) {
+				DebugModuleSendMaxMessageResponse* message = (DebugModuleSendMaxMessageResponse*)packet->data;
+				u32 i;
+				for (i = 0; i < sizeof(message->data); i++){
+					u8 expectedValue = (i % 50) + 100;
+					if (message->data[i] != expectedValue)
+					{
+						break;
+					}
+				}
+				logjson("DEBUGMOD", "{\"nodeId\":%u,\"type\":\"send_max_message_response\", \"correctValues\":%u, \"expectedCorrectValues\":%u}" SEP, packet->header.sender, i, sizeof(message->data));
 			}
 			else if(actionType == DebugModuleActionResponseMessages::LPING_RESPONSE){
 				//Calculate the time it took to ping the other node
@@ -1109,18 +1057,20 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 			}
 
 #endif
+#if IS_INACTIVE(CLC_GW_SAVE_SPACE)
 			if(actionType == DebugModuleActionResponseMessages::JOIN_ME_BUFFER_ITEM){
 				//Must copy the data to not produce a hardfault because of unaligned access
 				joinMeBufferPacket data;
 				memcpy(&data, packet->data, sizeof(joinMeBufferPacket));
 
 				logjson("DEBUG", "{\"buf\":\"advT %u,rssi %d,time %u,last %u,node %u,cid %u,csiz %d, in %u, out %u, devT %u, ack %x\"}" SEP,
-						data.connectable,                   data.rssi,                          data.receivedTimeDs, data.lastConnectAttemptDs,
+						(u32)data.advType,                  data.rssi,                          data.receivedTimeDs, data.lastConnectAttemptDs,
 						data.payload.sender,                data.payload.clusterId,             data.payload.clusterSize,
 						data.payload.freeMeshInConnections, data.payload.freeMeshOutConnections,
-						data.payload.deviceType, data.payload.ackField
+						(u32)data.payload.deviceType, data.payload.ackField
 				);
 			}
+#endif
 		}
 	}
 }
@@ -1145,4 +1095,3 @@ void DebugModule::CauseHardfault() const
 #endif
 }
 
-#endif

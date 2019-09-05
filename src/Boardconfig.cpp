@@ -41,14 +41,9 @@ extern void setBoard_19(BoardConfiguration* c);
 
 void* fmBoardConfigPtr;
 
-Boardconf::Boardconf()
-{
-
-}
-
 void Boardconf::ResetToDefaultConfiguration()
 {
-	configuration.moduleId = moduleID::BOARD_CONFIG_ID;
+	configuration.moduleId = ModuleId::BOARD_CONFIG;
 	configuration.moduleVersion = 1;
 	configuration.moduleActive = true;
 
@@ -67,7 +62,7 @@ configuration.boardType = 19;
 #endif
 
 	//If there is data in the UICR, we use the boardType from there
-	u32* uicrData = getUicrDataPtr();
+	u32* uicrData = FruityHal::getUicrDataPtr();
 	if (uicrData != nullptr) {
 		if (uicrData[1] != EMPTY_WORD) configuration.boardType = uicrData[1];
 	}
@@ -87,14 +82,18 @@ configuration.boardType = 19;
 	configuration.dBmRX = -90;
 	configuration.calibratedTX = -60;
 	configuration.lfClockSource = NRF_CLOCK_LF_SRC_RC;
-	configuration.batteryAdcAin = -1;
-	configuration.batteryCheckDIO = -1;
+	configuration.batteryAdcInputPin = -1;
+	configuration.batteryMeasurementEnablePin = -1;
 	configuration.spiM0SckPin = -1;
 	configuration.spiM0MosiPin = -1;
 	configuration.spiM0MisoPin = -1;
 	configuration.spiM0SSAccPin = -1;
 	configuration.spiM0SSBmePin = -1;
+	configuration.twiM1SCLPin = -1;
+	configuration.twiM1SDAPin = -1;
 	configuration.lis2dh12Interrupt1Pin = -1;
+	configuration.voltageDividerR1 = 0;
+	configuration.voltageDividerR2 = 0;
 	configuration.dcDcEnabled = false;
 
 	//Now, we load all Default boards (nRf Development kits)
@@ -109,10 +108,15 @@ configuration.boardType = 19;
 
 	//We call our featureset to check if additional boards are available and if they should be set
 	//Each featureset can include a number of boards that it can run on
-	SET_FEATURESET_CONFIGURATION(&configuration);
+	SET_FEATURESET_CONFIGURATION(&configuration, this);
 }
 
-void Boardconf::Initialize(bool loadConfigFromFlash)
+Boardconf & Boardconf::getInstance()
+{
+	return GS->boardconf;
+}
+
+void Boardconf::Initialize()
 {
 	ResetToDefaultConfiguration();
 

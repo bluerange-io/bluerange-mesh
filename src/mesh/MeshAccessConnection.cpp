@@ -33,14 +33,8 @@
 #include <Node.h>
 #include <Logger.h>
 #include <Utility.h>
-
-extern "C"
-{
-#include <ble_db_discovery.h>
-}
-
-
-#ifdef ACTIVATE_MA_MODULE
+#include <GlobalState.h>
+#include "ConnectionAllocator.h"
 
 /**
  * The MeshAccessConnection provides access to a node through a connection that is manually encrypted using
@@ -80,9 +74,9 @@ MeshAccessConnection::MeshAccessConnection(u8 id, ConnectionDirection direction,
 	logt("MACONN", "New MeshAccessConnection");
 
 	//Save correct connectionType
-	this->connectionType = ConnectionTypes::CONNECTION_TYPE_MESH_ACCESS;
+	this->connectionType = ConnectionType::MESH_ACCESS;
 	this->fmKeyId = fmKeyId;
-	memset(this->key, 0x00, 16);
+	CheckedMemset(this->key, 0x00, 16);
 	this->useCustomKey = false;
 
 	this->partnerRxCharacteristicHandle = 0;
@@ -93,7 +87,7 @@ MeshAccessConnection::MeshAccessConnection(u8 id, ConnectionDirection direction,
 		this->handshakeStartedDs = GS->appTimerDs;
 	}
 
-	this->lastProcessedMessageType = 0;
+	this->lastProcessedMessageType = MessageType::INVALID;
 
 	this->tunnelType = tunnelType;
 
@@ -102,10 +96,10 @@ MeshAccessConnection::MeshAccessConnection(u8 id, ConnectionDirection direction,
 	//The partner is assigned a unique nodeId in our mesh network that is not already taken
 	//This is only possible if less than NODE_ID_VIRTUAL_BASE nodes are in the network and if
 	//the enrollment ensures that successive nodeIds are used
-	this->virtualPartnerId = GS->node->configuration.nodeId + (this->connectionId+1) * NODE_ID_VIRTUAL_BASE;
+	this->virtualPartnerId = GS->node.configuration.nodeId + (this->connectionId+1) * NODE_ID_VIRTUAL_BASE;
 
 	//Fetch the MeshAccessModule reference
-	this->meshAccessMod = (MeshAccessModule*)GS->node->GetModuleById(moduleID::MESH_ACCESS_MODULE_ID);
+	this->meshAccessMod = (MeshAccessModule*)GS->node.GetModuleById(ModuleId::MESH_ACCESS_MODULE);
 	if(meshAccessMod != nullptr){
 		this->meshAccessService = &meshAccessMod->meshAccessService;
 	} else {
@@ -129,13 +123,13 @@ MeshAccessConnection::~MeshAccessConnection(){
 BaseConnection* MeshAccessConnection::ConnTypeResolver(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8* data)
 {
 	//Check if data was written to our service rx characteristic
-	MeshAccessModule* meshAccessMod = (MeshAccessModule*)GS->node->GetModuleById(moduleID::MESH_ACCESS_MODULE_ID);
+	MeshAccessModule* meshAccessMod = (MeshAccessModule*)GS->node.GetModuleById(ModuleId::MESH_ACCESS_MODULE);
 	if(meshAccessMod != nullptr){
 		if(
 			sendData->characteristicHandle == meshAccessMod->meshAccessService.rxCharacteristicHandle.value_handle
 			|| sendData->characteristicHandle == meshAccessMod->meshAccessService.txCharacteristicHandle.cccd_handle
 		){
-			return new MeshAccessConnection(
+			return ConnectionAllocator::getInstance().allocateMeshAccessConnection(
 					oldConnection->connectionId,
 					oldConnection->direction,
 					&oldConnection->partnerAddress,
@@ -153,13 +147,13 @@ BaseConnection* MeshAccessConnection::ConnTypeResolver(BaseConnection* oldConnec
 u16 MeshAccessConnection::ConnectAsMaster(fh_ble_gap_addr_t* address, u16 connIntervalMs, u16 connectionTimeoutSec, u32 fmKeyId, u8* customKey, MeshAccessTunnelType tunnelType)
 {
 	//Only connect when not currently in another connection or when there are no more free connections
-	if (GS->cm->pendingConnection != nullptr) return 0;
+	if (GS->cm.pendingConnection != nullptr) return 0;
 
 	//Check if we already have a MeshAccessConnection to this address and do not allow a second
-	BaseConnections conns = GS->cm->GetConnectionsOfType(ConnectionTypes::CONNECTION_TYPE_MESH_ACCESS, ConnectionDirection::INVALID);
+	BaseConnections conns = GS->cm.GetConnectionsOfType(ConnectionType::MESH_ACCESS, ConnectionDirection::INVALID);
 	for(u32 i=0; i<conns.count; i++)
 	{
-		BaseConnection* conn = GS->cm->allConnections[conns.connectionIndizes[i]];
+		BaseConnection* conn = GS->cm.allConnections[conns.connectionIndizes[i]];
 		if (conn != nullptr) {
 			u32 result = memcmp(&(conn->partnerAddress), address, FH_BLE_SIZEOF_GAP_ADDR);
 			if (result == 0) {
@@ -169,36 +163,36 @@ u16 MeshAccessConnection::ConnectAsMaster(fh_ble_gap_addr_t* address, u16 connIn
 	}
 
 	//Create the connection and set it as pending, this is done before starting the GAP connect to avoid race conditions
-	for (u32 i = 0; i < MAX_NUM_CONNECTIONS; i++){
-		if (GS->cm->allConnections[i] == nullptr){
-			MeshAccessConnection* conn = new MeshAccessConnection(i, ConnectionDirection::DIRECTION_OUT, address, fmKeyId, tunnelType);
-			GS->cm->pendingConnection = GS->cm->allConnections[i] = conn;
+	for (u32 i = 0; i < TOTAL_NUM_CONNECTIONS; i++){
+		if (GS->cm.allConnections[i] == nullptr){
+			MeshAccessConnection* conn = ConnectionAllocator::getInstance().allocateMeshAccessConnection(i, ConnectionDirection::DIRECTION_OUT, address, fmKeyId, tunnelType);
+			GS->cm.pendingConnection = GS->cm.allConnections[i] = conn;
 
 			//Set the timeout big enough so that it is not killed by the ConnectionManager
 			conn->handshakeStartedDs = GS->appTimerDs + SEC_TO_DS(connectionTimeoutSec + 2);
 
 			//If customKey is not nullptr and not set to FF:FF...., we use it
 			if(customKey != nullptr && !Utility::CompareMem(0xFF, customKey, 16)){
-				((MeshAccessConnection*)GS->cm->pendingConnection)->SetCustomKey(customKey);
+				((MeshAccessConnection*)GS->cm.pendingConnection)->SetCustomKey(customKey);
 			}
 			break;
 		}
 	}
-	if(GS->cm->pendingConnection == nullptr){
+	if(GS->cm.pendingConnection == nullptr){
 		logt("ERROR", "No free connection");
 		return 0;
 	}
 
 	//Tell the GAP Layer to connect, it will return if it is trying or if there was an error
-	u32 err = GS->gapController->connectToPeripheral(*address, MSEC_TO_UNITS(connIntervalMs, UNIT_1_25_MS), connectionTimeoutSec);
+	u32 err = GS->gapController.connectToPeripheral(*address, MSEC_TO_UNITS(connIntervalMs, UNIT_1_25_MS), connectionTimeoutSec);
 
-	if (err == NRF_SUCCESS)
+	if (err == FruityHal::SUCCESS)
 	{
 		logt("MACONN", "Trying to connect");
-		return GS->cm->pendingConnection->uniqueConnectionId;
+		return GS->cm.pendingConnection->uniqueConnectionId;
 	} else {
 		//Clean the connection that has just been created
-		GS->cm->DeleteConnection(GS->cm->pendingConnection);
+		GS->cm.DeleteConnection(GS->cm.pendingConnection, AppDisconnectReason::GAP_ERROR);
 	}
 
 	return 0;
@@ -216,7 +210,7 @@ void MeshAccessConnection::RegisterForNotifications()
 
     u16 data = 0x0001; //Bit to enable the notifications
 
-    u32 err = GS->gattController->bleWriteCharacteristic(connectionHandle, partnerTxCharacteristicCccdHandle, (u8*)&data, 2, true);
+    u32 err = GS->gattController.bleWriteCharacteristic(connectionHandle, partnerTxCharacteristicCccdHandle, (u8*)&data, 2, true);
     if(err == 0){
     	manualPacketsSent++;
     	reliableBuffersFree--;
@@ -241,9 +235,9 @@ void MeshAccessConnection::StartHandshake(u16 fmKeyId)
 	//C=>P: Type=RequestANuonce, fmKeyId=#,Authorize(true/false), Authenticate(true/false)
 
 	connPacketEncryptCustomStart packet;
-	memset(&packet, 0x00, sizeof(connPacketEncryptCustomStart));
-	packet.header.messageType = MESSAGE_TYPE_ENCRYPT_CUSTOM_START;
-	packet.header.sender = GS->node->configuration.nodeId;
+	CheckedMemset(&packet, 0x00, sizeof(connPacketEncryptCustomStart));
+	packet.header.messageType = MessageType::ENCRYPT_CUSTOM_START;
+	packet.header.sender = GS->node.configuration.nodeId;
 	packet.header.receiver = virtualPartnerId;
 	packet.version = 1;
 	packet.fmKeyId = fmKeyId;
@@ -252,7 +246,7 @@ void MeshAccessConnection::StartHandshake(u16 fmKeyId)
 	SendData(
 		(u8*)&packet,
 		SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_START,
-		DeliveryPriority::HIGH,
+		DeliveryPriority::MESH_INTERNAL_HIGH,
 		false);
 }
 
@@ -273,7 +267,7 @@ void MeshAccessConnection::HandshakeANonce(connPacketEncryptCustomStart* inPacke
 
 	if (partnerId == NODE_ID_BROADCAST){
 		logt("ERROR", "Wrong partnerId");
-		DisconnectAndRemove();
+		DisconnectAndRemove(AppDisconnectReason::WRONG_PARTNERID);
 		return;
 	}
 
@@ -285,13 +279,15 @@ void MeshAccessConnection::HandshakeANonce(connPacketEncryptCustomStart* inPacke
 	} else if(inPacket->tunnelType == (u8)MeshAccessTunnelType::REMOTE_MESH){
 		tunnelType = MeshAccessTunnelType::LOCAL_MESH;
 	} else {
-		DisconnectAndRemove();
+		logt("ERROR", "Illegal TunnelType %u", (u32)inPacket->tunnelType);
+		DisconnectAndRemove(AppDisconnectReason::ILLEGAL_TUNNELTYPE);
+		return;
 	}
 
 	connPacketEncryptCustomANonce packet;
-	memset(&packet, 0x00, sizeof(connPacketEncryptCustomANonce));
-	packet.header.messageType = MESSAGE_TYPE_ENCRYPT_CUSTOM_ANONCE;
-	packet.header.sender = GS->node->configuration.nodeId;
+	CheckedMemset(&packet, 0x00, sizeof(connPacketEncryptCustomANonce));
+	packet.header.messageType = MessageType::ENCRYPT_CUSTOM_ANONCE;
+	packet.header.sender = GS->node.configuration.nodeId;
 	packet.header.receiver = virtualPartnerId;
 
 	decryptionNonce[0] = packet.anonce[0] = Utility::GetRandomInteger();
@@ -301,14 +297,15 @@ void MeshAccessConnection::HandshakeANonce(connPacketEncryptCustomStart* inPacke
 	bool keyValid = GenerateSessionKey((u8*)decryptionNonce, partnerId, fmKeyId, sessionDecryptionKey);
 
 	if(!keyValid){
-		DisconnectAndRemove();
+		logt("ERROR", "Invalid Key");
+		DisconnectAndRemove(AppDisconnectReason::INVALID_KEY);
 		return;
 	}
 
 	SendData(
 		(u8*)&packet,
 		SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_ANONCE,
-		DeliveryPriority::HIGH,
+		DeliveryPriority::MESH_INTERNAL_HIGH,
 		false);
 
 	//Set encryption state to encrypted because we await the next packet to be encrypted
@@ -332,10 +329,10 @@ void MeshAccessConnection::HandshakeSNonce(connPacketEncryptCustomANonce* inPack
 	//Send an encrypted packet containing the sNonce
 	const u8 len = SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE + MESH_ACCESS_MIC_LENGTH;
 	u8 buffer[len];
-	memset(buffer, 0x00, len);
+	CheckedMemset(buffer, 0x00, len);
 	connPacketEncryptCustomSNonce* packet = (connPacketEncryptCustomSNonce*)buffer;
-	packet->header.messageType = MESSAGE_TYPE_ENCRYPT_CUSTOM_SNONCE;
-	packet->header.sender = GS->node->configuration.nodeId;
+	packet->header.messageType = MessageType::ENCRYPT_CUSTOM_SNONCE;
+	packet->header.sender = GS->node.configuration.nodeId;
 	packet->header.receiver = virtualPartnerId;
 
 	//Save self-generated nonce to decrypt packets
@@ -343,11 +340,12 @@ void MeshAccessConnection::HandshakeSNonce(connPacketEncryptCustomANonce* inPack
 	decryptionNonce[1] = packet->snonce[1] = Utility::GetRandomInteger();
 
 	//Generate the session keys for encryption and decryption
-	bool keyValidA = GenerateSessionKey((u8*)encryptionNonce, GS->node->configuration.nodeId, fmKeyId, sessionEncryptionKey);
-	bool keyValidB = GenerateSessionKey((u8*)decryptionNonce, GS->node->configuration.nodeId, fmKeyId, sessionDecryptionKey);
+	bool keyValidA = GenerateSessionKey((u8*)encryptionNonce, GS->node.configuration.nodeId, fmKeyId, sessionEncryptionKey);
+	bool keyValidB = GenerateSessionKey((u8*)decryptionNonce, GS->node.configuration.nodeId, fmKeyId, sessionDecryptionKey);
 
 	if(!keyValidA || !keyValidB){
-		DisconnectAndRemove();
+		logt("ERROR", "Invalid Key %u %u", (u32)keyValidA, (u32)keyValidB);
+		DisconnectAndRemove(AppDisconnectReason::INVALID_KEY);
 		return;
 	}
 
@@ -367,13 +365,16 @@ void MeshAccessConnection::HandshakeSNonce(connPacketEncryptCustomANonce* inPack
 	SendData(
 		(u8*)packet,
 		SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE,
-		DeliveryPriority::HIGH,
+		DeliveryPriority::MESH_INTERNAL_HIGH,
 		false);
 
 	connectionState = ConnectionState::HANDSHAKE_DONE;
 
 	//Needed by our packet splitting methods, payload is now less than before because of MIC
 	connectionPayloadSize = connectionMtu - MESH_ACCESS_MIC_LENGTH;
+
+	//Send the current mesh state to our partner
+	SendClusterState();
 
 	NotifyConnectionStateSubscriber(ConnectionState::HANDSHAKE_DONE);
 }
@@ -395,7 +396,8 @@ void MeshAccessConnection::HandshakeDone(connPacketEncryptCustomSNonce* inPacket
 	bool keyValid = GenerateSessionKey((u8*)encryptionNonce, partnerId, fmKeyId, sessionEncryptionKey);
 
 	if(!keyValid){
-		DisconnectAndRemove();
+		logt("ERROR", "Invalid Key in HD");
+		DisconnectAndRemove(AppDisconnectReason::INVALID_KEY);
 		return;
 	}
 
@@ -407,17 +409,17 @@ void MeshAccessConnection::HandshakeDone(connPacketEncryptCustomSNonce* inPacket
 
 	//Send an encrypted packet to say that we are done
 	connPacketEncryptCustomDone packet;
-	memset(&packet, 0x00, sizeof(connPacketEncryptCustomDone));
-	packet.header.messageType = MESSAGE_TYPE_ENCRYPT_CUSTOM_DONE;
-	packet.header.sender = GS->node->configuration.nodeId;
+	CheckedMemset(&packet, 0x00, sizeof(connPacketEncryptCustomDone));
+	packet.header.messageType = MessageType::ENCRYPT_CUSTOM_DONE;
+	packet.header.sender = GS->node.configuration.nodeId;
 	packet.header.receiver = virtualPartnerId;
-	packet.status = NRF_SUCCESS;
+	packet.status = FruityHal::SUCCESS;
 
 	//From now on, we can just send data the normal way and the encryption is done automatically
 	SendData(
 		(u8*)&packet,
 		SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_DONE,
-		DeliveryPriority::HIGH,
+		DeliveryPriority::MESH_INTERNAL_HIGH,
 		false);
 
 	connectionState = ConnectionState::HANDSHAKE_DONE;
@@ -425,7 +427,25 @@ void MeshAccessConnection::HandshakeDone(connPacketEncryptCustomSNonce* inPacket
 	//Needed by our packet splitting methods, payload is now less than before because of MIC
 	connectionPayloadSize = connectionMtu - MESH_ACCESS_MIC_LENGTH;
 
+	//Send the current mesh state to our partner
+	SendClusterState();
+
 	NotifyConnectionStateSubscriber(ConnectionState::HANDSHAKE_DONE);
+}
+
+void MeshAccessConnection::SendClusterState()
+{
+	connPacketClusterInfoUpdate packet;
+	CheckedMemset(&packet, 0, sizeof(connPacketClusterInfoUpdate));
+	packet.header.messageType = MessageType::CLUSTER_INFO_UPDATE;
+	packet.header.sender = GS->node.configuration.nodeId;
+	packet.header.receiver = NODE_ID_BROADCAST;
+
+	packet.payload.clusterSizeChange = GS->node.clusterSize;
+	packet.payload.connectionMasterBitHandover = GS->node.HasAllMasterBits();
+	packet.payload.hopsToSink = GS->cm.GetMeshHopsToShortestSink(nullptr);
+
+	SendData((u8*)&packet, sizeof(connPacketClusterInfoUpdate), DeliveryPriority::LOW, false);
 }
 
 void MeshAccessConnection::NotifyConnectionStateSubscriber(ConnectionState state) const
@@ -436,9 +456,9 @@ void MeshAccessConnection::NotifyConnectionStateSubscriber(ConnectionState state
 		data.vPartnerId = virtualPartnerId;
 		data.state = (u8)state;
 
-		GS->cm->SendModuleActionMessage(
-			MESSAGE_TYPE_MODULE_GENERAL,
-			moduleID::MESH_ACCESS_MODULE_ID,
+		GS->cm.SendModuleActionMessage(
+			MessageType::MODULE_GENERAL,
+			ModuleId::MESH_ACCESS_MODULE,
 			connectionStateSubscriberId,
 			(u8)MeshAccessModuleGeneralMessages::MA_CONNECTION_STATE,
 			0, //TODO: maybe store the request handle and send it back here?
@@ -461,39 +481,45 @@ bool MeshAccessConnection::GenerateSessionKey(u8* nonce, NodeId centralNodeId, u
 	if(useCustomKey){
 		logt("MACONN", "Using custom key");
 		memcpy(ltKey, key, 16);
-	} else if(fmKeyId == FM_KEY_ID_NONE && GS->node->configuration.enrollmentState == EnrollmentState::NOT_ENROLLED){
-		//FM_KEY_ID_NONE can be used as long as the node is not enrolled
+	} else if(fmKeyId == FM_KEY_ID_ZERO
+			&& meshAccessMod->IsZeroKeyConnectable(direction)) {
+		//If the fmKeyId is FM_KEY_ID_ZERO and we allow unsecure connections, we use
+		//the zero encryption key (basically no encryption) if we are not enrolled or 
+		//we are the one opening the connection.
 		logt("MACONN", "Using key none");
-		memset(ltKey, 0x00, 16);
-	} else if(fmKeyId == FM_KEY_ID_NODE){
+		CheckedMemset(ltKey, 0x00, 16);
+	} else if(fmKeyId == FM_KEY_ID_NODE) {
 		logt("MACONN", "Using node key");
-		memcpy(ltKey, RamConfig->nodeKey, 16);
-	} else if(fmKeyId == FM_KEY_ID_NETWORK){
+		memcpy(ltKey, RamConfig->GetNodeKey(), 16);
+	} else if(fmKeyId == FM_KEY_ID_NETWORK) {
 		logt("MACONN", "Using network key");
-		memcpy(ltKey, GS->node->configuration.networkKey, 16);
-	} else if(fmKeyId == FM_KEY_ID_ORGANIZATION){
+		memcpy(ltKey, GS->node.configuration.networkKey, 16);
+	} else if(fmKeyId == FM_KEY_ID_ORGANIZATION) {
 		logt("MACONN", "Using orga key");
-		memcpy(ltKey, GS->node->configuration.organizationKey, 16);
+		memcpy(ltKey, GS->node.configuration.organizationKey, 16);
+	} else if (fmKeyId == FM_KEY_ID_RESTRAINED) {
+		logt("MACONN", "Using restrained key");
+		RamConfig->GetRestrainedKey(ltKey);
 	}
 	else if(fmKeyId >= FM_KEY_ID_USER_DERIVED_START && fmKeyId <= FM_KEY_ID_USER_DERIVED_END)
 	{
 		logt("MACONN", "Using derived user key %u", fmKeyId);
 		//Construct some cleartext with the user id to construct the user key
 		u8 cleartext[16];
-		memset(cleartext, 0x00, 16);
+		CheckedMemset(cleartext, 0x00, 16);
 		memcpy(cleartext, &fmKeyId, 4);
 
 
 		Utility::Aes128BlockEncrypt(
 				(Aes128Block*)cleartext,
-				(Aes128Block*)GS->node->configuration.userBaseKey,
+				(Aes128Block*)GS->node.configuration.userBaseKey,
 				(Aes128Block*)ltKey);
 
 	}
 	else {
 		logt("MACONN", "Invalid key generated");
 		//No key
-		memset(keyOut, 0x00, 16);
+		CheckedMemset(keyOut, 0x00, 16);
 		return false;
 	}
 
@@ -508,7 +534,7 @@ bool MeshAccessConnection::GenerateSessionKey(u8* nonce, NodeId centralNodeId, u
 
 	//Generate cleartext with NodeId and ANonce
 	u8 cleartext[16];
-	memset(cleartext, 0x00, 16);
+	CheckedMemset(cleartext, 0x00, 16);
 	memcpy(cleartext, (u8*)&centralNodeId, 2);
 	memcpy(((u8*)cleartext) + 2, nonce, MESH_ACCESS_HANDSHAKE_NONCE_LENGTH);
 
@@ -545,7 +571,7 @@ void MeshAccessConnection::EncryptPacket(u8* data, u16 dataLength)
 	u8 ciphertext[16];
 
 	//Generate keystream with nonce
-	memset(cleartext, 0x00, 16);
+	CheckedMemset(cleartext, 0x00, 16);
 	memcpy(cleartext, encryptionNonce, MESH_ACCESS_HANDSHAKE_NONCE_LENGTH);
 	Utility::Aes128BlockEncrypt(
 			(Aes128Block*)cleartext,
@@ -564,7 +590,7 @@ void MeshAccessConnection::EncryptPacket(u8* data, u16 dataLength)
 	encryptionNonce[1]++;
 
 	//Generate a new Keystream with an updated counter for MIC calculateion
-	memset(cleartext, 0x00, 16);
+	CheckedMemset(cleartext, 0x00, 16);
 	memcpy(cleartext, encryptionNonce, MESH_ACCESS_HANDSHAKE_NONCE_LENGTH);
 	Utility::Aes128BlockEncrypt( //encrypts nonce
 				(Aes128Block*)cleartext,
@@ -573,7 +599,7 @@ void MeshAccessConnection::EncryptPacket(u8* data, u16 dataLength)
 
 	//To generate the MIC, we xor the new keystream with our cleartext and encrypt it again
 	//we therefore create a pair that cannot be reproduced by an attacker (hopefully :-))
-	memset(cleartext, 0x00, 16);
+	CheckedMemset(cleartext, 0x00, 16);
 	memcpy(cleartext, data, dataLength);
 	Utility::XorBytes(keystream, cleartext, 16, cleartext);
 	Utility::Aes128BlockEncrypt(
@@ -616,7 +642,7 @@ bool MeshAccessConnection::DecryptPacket(u8* data, u16 dataLength)
 	decryptionNonce[1]++;
 
 	//Generate a keystream from the nonce
-	memset(cleartext, 0x00, 16);
+	CheckedMemset(cleartext, 0x00, 16);
 	memcpy(cleartext, decryptionNonce, MESH_ACCESS_HANDSHAKE_NONCE_LENGTH);
 	Utility::Aes128BlockEncrypt( //encrypts nonce
 				(Aes128Block*)cleartext,
@@ -624,7 +650,7 @@ bool MeshAccessConnection::DecryptPacket(u8* data, u16 dataLength)
 				(Aes128Block*)keystream);
 
 	//Xor the keystream with the ciphertext
-	memset(ciphertext, 0x00, 16);
+	CheckedMemset(ciphertext, 0x00, 16);
 	memcpy(ciphertext, data, dataLength - MESH_ACCESS_MIC_LENGTH);
 	Utility::XorBytes(ciphertext, keystream, 16, cleartext);
 	//Encrypt the resulting cleartext
@@ -641,7 +667,7 @@ bool MeshAccessConnection::DecryptPacket(u8* data, u16 dataLength)
 	decryptionNonce[1]--;
 
 	//Generate keystream with nonce
-	memset(cleartext, 0x00, 16);
+	CheckedMemset(cleartext, 0x00, 16);
 	memcpy(cleartext, decryptionNonce, MESH_ACCESS_HANDSHAKE_NONCE_LENGTH);
 	Utility::Aes128BlockEncrypt(
 			(Aes128Block*)cleartext,
@@ -663,7 +689,7 @@ bool MeshAccessConnection::DecryptPacket(u8* data, u16 dataLength)
 //	logt("ERROR", "MIC nonce %u, Keystream %s", decryptionNonce[1], keystream2Hex);
 
 
-	TO_HEX2(data, dataLength - MESH_ACCESS_MIC_LENGTH);
+	TO_HEX_2(data, dataLength - MESH_ACCESS_MIC_LENGTH);
 	logt("MACONN", "Decrypted as %s (%u) micValid %u", dataHex, dataLength - MESH_ACCESS_MIC_LENGTH, micCheck == 0);
 
 	return micCheck == 0;
@@ -673,10 +699,10 @@ bool MeshAccessConnection::DecryptPacket(u8* data, u16 dataLength)
 #define ________________________SEND________________________
 
 //This function might modify the packet, can also split bigger packets
-sizedData MeshAccessConnection::ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer)
+SizedData MeshAccessConnection::ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer)
 {
 	//Use the split packet from the BaseConnection to process all packets
-	sizedData splitData = GetSplitData(*sendData, data, packetBuffer);
+	SizedData splitData = GetSplitData(*sendData, data, packetBuffer);
 
 	//We must save the message type before encrypting because we need to know if the
 	//packet was queued in the softdevice for packet splitting
@@ -695,8 +721,14 @@ sizedData MeshAccessConnection::ProcessDataBeforeTransmission(BaseConnectionSend
 	return splitData;
 }
 
-bool MeshAccessConnection::SendData(u8* data, u8 dataLength, DeliveryPriority priority, bool reliable)
+bool MeshAccessConnection::SendData(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable)
 {
+	if (dataLength > MAX_MESH_PACKET_SIZE) {
+		SIMEXCEPTION(PaketTooBigException);
+		logt("ERROR", "Packet too big for sending!");
+		return false;
+	}
+
 	if(meshAccessService == nullptr) return false;
 
 	BaseConnectionSendData sendData;
@@ -705,7 +737,7 @@ bool MeshAccessConnection::SendData(u8* data, u8 dataLength, DeliveryPriority pr
 	{
 		//The central can write the data to the rx characteristic of the peripheral
 		sendData.characteristicHandle = partnerRxCharacteristicHandle;
-		sendData.dataLength = dataLength;
+		sendData.dataLength = (u8)dataLength;
 		sendData.deliveryOption = reliable ? DeliveryOption::WRITE_REQ : DeliveryOption::WRITE_CMD;
 		sendData.priority = priority;
 	}
@@ -713,7 +745,7 @@ bool MeshAccessConnection::SendData(u8* data, u8 dataLength, DeliveryPriority pr
 	{
 		//The peripheral must send data as notifications from its tx characteristic
 		sendData.characteristicHandle = meshAccessService->txCharacteristicHandle.value_handle;
-		sendData.dataLength = dataLength;
+		sendData.dataLength = (u8)dataLength;
 		sendData.deliveryOption = DeliveryOption::NOTIFICATION;
 		sendData.priority = priority;
 	}
@@ -729,13 +761,13 @@ bool MeshAccessConnection::SendData(BaseConnectionSendData* sendData, u8* data)
 
 	logt("MACONN", "MA SendData from %u to %u", packetHeader->sender, packetHeader->receiver);
 
-	MeshAccessAuthorization auth = meshAccessMod->CheckAuthorizationForAll(sendData, data, fmKeyId);
+	MeshAccessAuthorization auth = meshAccessMod->CheckAuthorizationForAll(sendData, data, fmKeyId, DataDirection::DIRECTION_OUT);
 
 	//Block other packets as long as handshake is not done
 	if(
 		connectionState < ConnectionState::HANDSHAKE_DONE
-		&& (packetHeader->messageType < MESSAGE_TYPE_ENCRYPT_CUSTOM_START
-		|| packetHeader->messageType > MESSAGE_TYPE_ENCRYPT_CUSTOM_DONE)
+		&& (packetHeader->messageType < MessageType::ENCRYPT_CUSTOM_START
+		|| packetHeader->messageType > MessageType::ENCRYPT_CUSTOM_DONE)
 	){
 		return false;
 	}
@@ -766,7 +798,7 @@ bool MeshAccessConnection::SendData(BaseConnectionSendData* sendData, u8* data)
 		}
 
 		//Put packet in the queue for sending
-		if(auth != MA_AUTH_UNDETERMINED && auth != MA_AUTH_BLACKLIST){
+		if(auth != MeshAccessAuthorization::UNDETERMINED && auth != MeshAccessAuthorization::BLACKLIST){
 			return QueueData(*sendData, data);
 		} else {
 			return false;
@@ -779,16 +811,16 @@ bool MeshAccessConnection::SendData(BaseConnectionSendData* sendData, u8* data)
 		}
 
 		//Put packet in the queue for sending
-		if(auth != MA_AUTH_UNDETERMINED && auth != MA_AUTH_BLACKLIST){
+		if(auth != MeshAccessAuthorization::UNDETERMINED && auth != MeshAccessAuthorization::BLACKLIST){
 			return QueueData(*sendData, data);
 		} else {
 			return false;
 		}
 	//We must allow handshake packets
-	} else if (packetHeader->messageType >= MESSAGE_TYPE_ENCRYPT_CUSTOM_START && packetHeader->messageType <= MESSAGE_TYPE_ENCRYPT_CUSTOM_DONE)
+	} else if (packetHeader->messageType >= MessageType::ENCRYPT_CUSTOM_START && packetHeader->messageType <= MessageType::ENCRYPT_CUSTOM_DONE)
 	{
 		//Put packet in the queue for sending
-		if(auth != MA_AUTH_UNDETERMINED && auth != MA_AUTH_BLACKLIST){
+		if(auth != MeshAccessAuthorization::UNDETERMINED && auth != MeshAccessAuthorization::BLACKLIST){
 			return QueueData(*sendData, data);
 		} else {
 			return false;
@@ -799,7 +831,7 @@ bool MeshAccessConnection::SendData(BaseConnectionSendData* sendData, u8* data)
 }
 
 //Because we are using packet splitting, we must handle packetSendPosition and Discarding here
-void MeshAccessConnection::PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, sizedData* sentData)
+void MeshAccessConnection::PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData)
 {
 	//The queued packet might be encrypted, so we must rely on the saved messageType that is saved
 	//by the ProcessDataBeforeTransmission method
@@ -809,12 +841,20 @@ void MeshAccessConnection::PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* q
 	}
 
 	//If this was an intermediate split packet
-	if(lastProcessedMessageType == MESSAGE_TYPE_SPLIT_WRITE_CMD){
+	if (lastProcessedMessageType == MessageType::SPLIT_WRITE_CMD) {
 		queue->packetSendPosition++;
 		packetSendQueue.packetSentRemaining++;
+	}
+	//The end of a split packet
+	else if (lastProcessedMessageType == MessageType::SPLIT_WRITE_CMD_END) {
+		queue->packetSendPosition = 0;
+		packetSendQueue.packetSentRemaining++;
 
-	//If this was a normal packet or the end of a split packet
-	} else {
+		//Save a queue handle for that packet
+		HandlePacketQueued(queue, sendDataPacked);
+	}
+	//If this was a normal packet
+	else {
 		queue->packetSendPosition = 0;
 
 		//Discard the last packet because it was now successfully sent
@@ -824,7 +864,8 @@ void MeshAccessConnection::PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* q
 
 #define ________________________RECEIVE________________________
 
-
+//Check if encryption was started, and if yes, decrypt all packets before passing them to
+//other functions, deal with the handshake packets as well
 void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8* data)
 {
 	if(
@@ -843,7 +884,8 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
 
 		if(!valid){
 			//Disconnect connection if a packet was received that is not valid
-			DisconnectAndRemove();
+			logt("ERROR", "Invalid packet");
+			DisconnectAndRemove(AppDisconnectReason::INVALID_PACKET);
 			return;
 		}
 	}
@@ -852,23 +894,23 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
 
 	if(connectionState == ConnectionState::CONNECTED)
 	{
-		if(sendData->dataLength == SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_START && packetHeader->messageType == MESSAGE_TYPE_ENCRYPT_CUSTOM_START){
+		if(sendData->dataLength == SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_START && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_START){
 			HandshakeANonce((connPacketEncryptCustomStart*) data);
 		} else {
 			logt("ERROR", "Wrong handshake packet");
-			DisconnectAndRemove();
+			DisconnectAndRemove(AppDisconnectReason::INVALID_PACKET);
 		}
 	}
 	else if(connectionState == ConnectionState::HANDSHAKING)
 	{
-		if(sendData->dataLength == SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_ANONCE && packetHeader->messageType == MESSAGE_TYPE_ENCRYPT_CUSTOM_ANONCE){
+		if(sendData->dataLength == SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_ANONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_ANONCE){
 			HandshakeSNonce((connPacketEncryptCustomANonce*) data);
 		}
-		else if(sendData->dataLength == SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE && packetHeader->messageType == MESSAGE_TYPE_ENCRYPT_CUSTOM_SNONCE){
+		else if(sendData->dataLength == SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_SNONCE){
 			HandshakeDone((connPacketEncryptCustomSNonce*) data);
 		} else {
 			logt("ERROR", "Wrong handshake packet");
-			DisconnectAndRemove();
+			DisconnectAndRemove(AppDisconnectReason::INVALID_PACKET);
 		}
 	}
 	else if(connectionState == ConnectionState::HANDSHAKE_DONE){
@@ -885,19 +927,22 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
 
 void MeshAccessConnection::ReceiveMeshAccessMessageHandler(BaseConnectionSendData* sendData, u8* data)
 {
-
 	//We must change the sender because our partner might have a nodeId clash within our network
 	connPacketHeader* packetHeader = (connPacketHeader*)data;
 
 	//Some special handling for timestamp updates
-	if(packetHeader->messageType == MESSAGE_TYPE_UPDATE_TIMESTAMP)
+	if(packetHeader->messageType == MessageType::UPDATE_TIMESTAMP)
 	{
 		//Set our time to the received timestamp
-		GS->globalTimeSec = ((connPacketUpdateTimestamp*)data)->timestampSec;
-		GS->globalTimeRemainderTicks = ((connPacketUpdateTimestamp*)data)->remainderTicks;
-		GS->timeWasSet = true;
-
-		logt("NODE", "time updated with timestamp:%u", (u32)GS->globalTimeSec);
+		connPacketUpdateTimestamp* packet = (connPacketUpdateTimestamp*)data;
+		if (sendData->dataLength >= offsetof(connPacketUpdateTimestamp, offset) + sizeof(packet->offset))
+		{
+			GS->timeManager.SetTime(packet->timestampSec, 0, packet->offset);
+		}
+		else
+		{
+			GS->timeManager.SetTime(packet->timestampSec, 0, 0);
+		}
 	}
 
 	//Replace the sender id with our virtual partner id
@@ -905,12 +950,12 @@ void MeshAccessConnection::ReceiveMeshAccessMessageHandler(BaseConnectionSendDat
 		packetHeader->sender = virtualPartnerId;
 	}
 
-	MeshAccessAuthorization auth = meshAccessMod->CheckAuthorizationForAll(sendData, data, fmKeyId);
+	MeshAccessAuthorization auth = meshAccessMod->CheckAuthorizationForAll(sendData, data, fmKeyId, DataDirection::DIRECTION_IN);
 
 	//Block unauthorized packets
 	if(
-		auth == MeshAccessAuthorization::MA_AUTH_UNDETERMINED
-		|| auth == MeshAccessAuthorization::MA_AUTH_BLACKLIST
+		auth == MeshAccessAuthorization::UNDETERMINED 
+		|| auth == MeshAccessAuthorization::BLACKLIST
 	){
 		logt("ERROR", "Packet unauthorized");
 		return;
@@ -924,7 +969,7 @@ void MeshAccessConnection::ReceiveMeshAccessMessageHandler(BaseConnectionSendDat
 		logt("MACONN", "Received remote mesh data %s (%u) from %u", dataHex, sendData->dataLength, packetHeader->sender);
 
 		//Only dispatch to the local node, virtualPartnerId and remote nodeIds are kept in tact
-		if(auth <=  MA_AUTH_LOCAL_ONLY) GS->cm->DispatchMeshMessage(this, sendData, packetHeader, true);
+		if(auth <= MeshAccessAuthorization::LOCAL_ONLY) GS->cm.DispatchMeshMessage(this, sendData, packetHeader, true);
 	}
 	else if(tunnelType == MeshAccessTunnelType::LOCAL_MESH)
 	{
@@ -932,31 +977,42 @@ void MeshAccessConnection::ReceiveMeshAccessMessageHandler(BaseConnectionSendDat
 		logt("MACONN", "Received data for local mesh %s (%u) from %u aka %u", dataHex, sendData->dataLength, packetHeader->sender, virtualPartnerId);
 
 		//Send to other Mesh-like Connections
-		if(auth <=  MA_AUTH_WHITELIST) GS->cm->RouteMeshData(this, sendData, data);
+		if(auth <= MeshAccessAuthorization::WHITELIST) GS->cm.RouteMeshData(this, sendData, data);
 
 		//Dispatch Message throughout the implementation to all modules
-		if(auth <=  MA_AUTH_LOCAL_ONLY) GS->cm->DispatchMeshMessage(this, sendData, packetHeader, true);
+		if(auth <= MeshAccessAuthorization::LOCAL_ONLY) GS->cm.DispatchMeshMessage(this, sendData, packetHeader, true);
 
 	//We must allow handshake packets
-	} else if (packetHeader->messageType >= MESSAGE_TYPE_ENCRYPT_CUSTOM_START && packetHeader->messageType <= MESSAGE_TYPE_ENCRYPT_CUSTOM_DONE)
+	} else if (packetHeader->messageType >= MessageType::ENCRYPT_CUSTOM_START && packetHeader->messageType <= MessageType::ENCRYPT_CUSTOM_DONE)
 	{
-		if(auth <=  MA_AUTH_LOCAL_ONLY) GS->cm->DispatchMeshMessage(this, sendData, packetHeader, true);
+		if(auth <= MeshAccessAuthorization::LOCAL_ONLY) GS->cm.DispatchMeshMessage(this, sendData, packetHeader, true);
 	}
+
+#ifdef SIM_ENABLED
+	if (packetHeader->messageType == MessageType::CLUSTER_INFO_UPDATE
+		&& sendData->dataLength >= sizeof(connPacketClusterInfoUpdate)
+	) {
+		connPacketClusterInfoUpdate* data = (connPacketClusterInfoUpdate*)packetHeader;
+		logt("MACONN", "Received ClusterInfoUpdate over MACONN with size:%u and hops:%d", data->payload.clusterSizeChange, data->payload.hopsToSink);
+	}
+#endif
 }
 
 
 #define ________________________HANDLER________________________
 
-
-void MeshAccessConnection::ConnectionSuccessfulHandler(u16 connectionHandle, u16 connInterval)
+//After connection, both sides must do a service and characteristic discovery for the other rx and tx handle
+//Then, they must activate notifications on the tx handle
+//After the partner has activated notifications on ones own tx handle, it is possible to transmit data
+void MeshAccessConnection::ConnectionSuccessfulHandler(u16 connectionHandle)
 {
 	//Call super method
-	BaseConnection::ConnectionSuccessfulHandler(connectionHandle, connInterval);
+	BaseConnection::ConnectionSuccessfulHandler(connectionHandle);
 
 	if(direction == ConnectionDirection::DIRECTION_OUT)
 	{
 		//First, we need to discover the remote service
-		GS->gattController->DiscoverService(connectionHandle, meshAccessService->serviceUuid);
+		GS->gattController.DiscoverService(connectionHandle, meshAccessService->serviceUuid);
 	}
 }
 
@@ -971,7 +1027,7 @@ bool MeshAccessConnection::GapDisconnectionHandler(u8 hciDisconnectReason)
 
 void MeshAccessConnection::GATTServiceDiscoveredHandler(ble_db_discovery_evt_t& evt)
 {
-	logt("MACONN", "Service discovered %x", evt.params.discovered_db.srv_uuid);
+	logt("MACONN", "Service discovered %x", evt.params.discovered_db.srv_uuid.uuid);
 
 
 	//Once the remote service was discovered, we must register for notifications
@@ -1002,25 +1058,22 @@ void MeshAccessConnection::GATTServiceDiscoveredHandler(ble_db_discovery_evt_t& 
 }
 
 
-//Check if encryption was started, and if yes, decrypt all packets before passing them to
-//other functions, deal with the handshake packets as well
-
-//After connection, both sides must do a service and characteristic discovery for the other rx and tx handle
-//Then, they must activate notifications on the tx handle
-//After the partner has activated notifications on ones own tx handle, it is possible to transmit data
-
-void MeshAccessConnection::BleEventHandler(ble_evt_t& bleEvent)
-{
-
-}
-
 #define ________________________OTHER________________________
 
 void MeshAccessConnection::PrintStatus()
 {
 	const char* directionString = (direction == ConnectionDirection::DIRECTION_IN) ? "IN " : "OUT";
 
-	trace("%s MA state:%u, Queue:%u-%u(%u), Buf%u/%u, hnd:%u, partnerId/virtual:%u/%u, tunnel %u" EOL, directionString, this->connectionState, (packetSendQueue.readPointer - packetSendQueue.bufferStart), (packetSendQueue.writePointer - packetSendQueue.bufferStart), packetSendQueue._numElements, reliableBuffersFree, unreliableBuffersFree, connectionHandle, partnerId, virtualPartnerId, tunnelType);
+	trace("%s MA state:%u, Queue:%u-%u(%u), Buf%u/%u, hnd:%u, partnerId/virtual:%u/%u, tunnel %u" EOL, 
+		directionString, 
+		(u32)this->connectionState, 
+		(packetSendQueue.readPointer - packetSendQueue.bufferStart), 
+		(packetSendQueue.writePointer - packetSendQueue.bufferStart), 
+		packetSendQueue._numElements, 
+		reliableBuffersFree, 
+		unreliableBuffersFree, 
+		connectionHandle, 
+		partnerId, 
+		virtualPartnerId, 
+		(u32)tunnelType);
 }
-
-#endif

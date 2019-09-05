@@ -39,6 +39,11 @@
  */
 
 
+//Includes a header file for the used featureset
+//This allows us to enable certain modules in the featureset directly
+#ifdef FEATURESET_NAME
+#include FEATURESET_NAME
+#endif
 
 #ifndef SDK_CONFIG_H
 #define SDK_CONFIG_H

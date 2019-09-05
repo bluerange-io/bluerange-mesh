@@ -1,0 +1,44 @@
+ifdef::env-github,env-browser[:relfileprefix: pages/]
+:relfileprefix: pages/
+
+ifdef::commercial[]
+* xref:bluerange-firmware:ROOT:index.adoc[Home]
+endif::[]
+
+ifdef::open-source[]
+* xref:fruitymesh:ROOT:index.adoc[Home]
+endif::[]
+
+* xref:fruitymesh::Quick-Start.adoc[Quick Start]
+* xref:fruitymesh::Usage.adoc[Usage]
+* xref:fruitymesh::Features.adoc[Features]
+* xref:fruitymesh::Developers.adoc[Developers]
+* xref:fruitymesh::Specification.adoc[Specification]
+
+* xref:fruitymesh::Modules.adoc[Modules]
+** xref:fruitymesh::AdvertisingModule.adoc[Advertising Module]
+** xref:fruitymesh::DebugModule.adoc[Debug Module]
+** xref:fruitymesh::DfuModule.adoc[DFU Module]
+** xref:fruitymesh::EnrollmentModule.adoc[Enrollment Module]
+** xref:fruitymesh::IoModule.adoc[IO Module]
+** xref:fruitymesh::MeshAccessModule.adoc[Mesh Access Module]
+** xref:fruitymesh::Node.adoc[Node]
+** xref:fruitymesh::ScanningModule.adoc[Scanning Module]
+** xref:fruitymesh::StatusReporterModule.adoc[Status Report Module]
+
+* Other Classes
+** xref:fruitymesh::Logger.adoc[Logger]
+** xref:fruitymesh::RecordStorage.adoc[Record Storage]
+
+* Other
+** xref:fruitymesh::Class-Structure.adoc[Class Structure]
+** xref:fruitymesh::Debugging.adoc[Debugging]
+** xref:fruitymesh::Battery-Consumption.adoc[Battery Consumption]
+** xref:fruitymesh::RecordStorage.adoc[Record Storage]
+
+* xref:fruitymesh::The-FruityMesh-Algorithm.adoc[The Fruitymesh Algorithm]
+** xref:fruitymesh::The-Algorithm-in-Detail.adoc[The Algorithm in Detail]
+** xref:fruitymesh::Simulator.adoc[Simulator]
+
+* xref:fruitymesh::Tutorials.adoc[Tutorials]
+** xref:fruitymesh::Implementing-a-Custom-Module.adoc[Implementing a Custom Module]

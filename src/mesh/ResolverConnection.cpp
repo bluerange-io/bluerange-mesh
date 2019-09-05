@@ -31,6 +31,7 @@
 #include <ResolverConnection.h>
 #include <Logger.h>
 #include <ConnectionManager.h>
+#include <GlobalState.h>
 
 /**
  * The ResolverConnection must first determine the correct connection type from a small handshake
@@ -45,12 +46,12 @@ ResolverConnection::ResolverConnection(u8 id, ConnectionDirection direction, fh_
 {
 	logt("RCONN", "New Resolver Connection");
 
-	connectionType = ConnectionTypes::CONNECTION_TYPE_RESOLVER;
+	connectionType = ConnectionType::RESOLVER;
 }
 
-void ResolverConnection::ConnectionSuccessfulHandler(u16 connectionHandle, u16 connInterval)
+void ResolverConnection::ConnectionSuccessfulHandler(u16 connectionHandle)
 {
-	BaseConnection::ConnectionSuccessfulHandler(connectionHandle, connInterval);
+	BaseConnection::ConnectionSuccessfulHandler(connectionHandle);
 
 	connectionState = ConnectionState::HANDSHAKING;
 }
@@ -60,10 +61,10 @@ void ResolverConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8
 	logt("RCONN", "Resolving Connection with received data");
 
 	//If we receive any data, we use it to resolve the connection type
-	GS->cm->ResolveConnection(this, sendData, data);
+	GS->cm.ResolveConnection(this, sendData, data);
 }
 
-bool ResolverConnection::SendData(u8* data, u8 dataLength, DeliveryPriority priority, bool reliable)
+bool ResolverConnection::SendData(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable)
 {
 	return false;
 };
@@ -72,5 +73,5 @@ void ResolverConnection::PrintStatus()
 {
 	const char* directionString = (direction == ConnectionDirection::DIRECTION_IN) ? "IN " : "OUT";
 
-	trace("%s RSV state:%u, Queue:%u-%u(%u), Buf%u/%u, hnd:%u" EOL, directionString, this->connectionState, (packetSendQueue.readPointer - packetSendQueue.bufferStart), (packetSendQueue.writePointer - packetSendQueue.bufferStart), packetSendQueue._numElements, reliableBuffersFree, unreliableBuffersFree, connectionHandle);
+	trace("%s RSV state:%u, Queue:%u-%u(%u), Buf%u/%u, hnd:%u" EOL, directionString, (u32)this->connectionState, (packetSendQueue.readPointer - packetSendQueue.bufferStart), (packetSendQueue.writePointer - packetSendQueue.bufferStart), packetSendQueue._numElements, reliableBuffersFree, unreliableBuffersFree, connectionHandle);
 }

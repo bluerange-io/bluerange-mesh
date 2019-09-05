@@ -32,7 +32,7 @@ Purpose : Implementation of SEGGER real-time terminal which allows
 
 #define SEGGER_RTT_PRINTF_BUFFER_SIZE             (0)    // Size of buffer for RTT printf to bulk-send chars via RTT     (Default: 64)
 
-#define SEGGER_RTT_USE_ROLLING_LOG 				1
+#define SEGGER_RTT_USE_ROLLING_LOG                1
 
 //
 // Target is not allowed to perform other RTT operations while string still has not been stored completely.

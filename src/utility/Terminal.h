@@ -44,15 +44,15 @@
 
 //UART does not work with the SIM
 #ifdef SIM_ENABLED
-#undef USE_UART
+#define ACTIVATE_UART 0
 #endif
 
 #define TERMARGS(commandArgsIndex, compareTo)     (strcmp(commandArgs[commandArgsIndex], compareTo)==0)
 
 
-#define MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS 20
-#define READ_BUFFER_LENGTH 250
-#define MAX_NUM_TERM_ARGS      12
+constexpr int MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS = 20;
+constexpr int READ_BUFFER_LENGTH = 250;
+constexpr int MAX_NUM_TERM_ARGS = 15;
 
 class TerminalCommandListener
 {
@@ -75,7 +75,6 @@ class Terminal
 
 private:
 	char* commandArgsPtr[MAX_NUM_TERM_ARGS];
-	u8 commandArgsSize;
 	
 	//CommandListeners
 	u8 registeredCallbacksNum;
@@ -84,21 +83,15 @@ private:
 	u8 readBufferOffset;
 	char readBuffer[READ_BUFFER_LENGTH];
 
+	void WriteStdioLineToReadBuffer();
+
 
 	//Will be false after a timeout and true after input is received
 	bool uartActive;
 
 
 public:
-	static Terminal& getInstance(){
-		if(!GS->terminal){
-			GS->terminal = new Terminal();
-		}
-		return *(GS->terminal);
-	}
-	~Terminal() {
-		GS->terminal = nullptr;
-	}
+	static Terminal& getInstance();
 
 	//After the terminal has been initialized (all transports), this is true
 	bool terminalIsInitialized;
@@ -109,7 +102,7 @@ public:
 	//Checks if a line is available or reads a line if input is detected
 	void CheckAndProcessLine();
 	void ProcessLine(char* line);
-	bool TokenizeLine(char* line, u16 lineLength);
+	i32 TokenizeLine(char* line, u16 lineLength);
 
 	//Register a class that will be notified when the activation string is entered
 	void AddTerminalCommandListener(TerminalCommandListener* callback);
@@ -129,7 +122,7 @@ public:
 
 
 	//##### UART ######
-#ifdef USE_UART
+#if IS_ACTIVE(UART)
 private:
 	void UartEnable(bool promptAndEchoMode);
 	void UartDisable();
@@ -152,7 +145,7 @@ private:
 
 
 	//###### Segger RTT ######
-#ifdef USE_SEGGER_RTT
+#if IS_ACTIVE(SEGGER_RTT)
 private:
 	void SeggerRttInit();
 	void SeggerRttCheckAndProcessLine();
@@ -164,14 +157,13 @@ public:
 #endif
 
 	//###### Stdio ######
-#ifdef USE_STDIO
+#if IS_ACTIVE(STDIO)
 private:
 	void StdioInit();
 	void StdioCheckAndProcessLine();
 public:
 	bool PutIntoReadBuffer(const char* message);
 	void StdioPutString(const char* message);
-	void StdioPutChar(const char character);
 
 #endif
 };

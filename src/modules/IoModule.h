@@ -32,18 +32,13 @@
 
 #include <Module.h>
 
-extern "C"{
-#ifndef SIM_ENABLED
-#include <nrf_gpio.h>
-#endif
-}
-
 #pragma pack(push, 1)
 //Module configuration that is saved persistently
 struct IoModuleConfiguration : ModuleConfiguration {
-	u8 ledMode;
+	LedMode ledMode;
 	//Insert more persistent config values here
 };
+STATIC_ASSERT_SIZE(IoModuleConfiguration, 5);
 #pragma pack(pop)
 
 class IoModule: public Module
@@ -64,7 +59,7 @@ class IoModule: public Module
 		};
 
 		//Combines a pin and its config
-		#define SIZEOF_GPIO_PIN_CONFIG 2
+		static constexpr int SIZEOF_GPIO_PIN_CONFIG = 2;
 		struct gpioPinConfig{
 			u8 pinNumber : 5;
 			u8 direction : 1; //configure pin as either input or output (nrf_gpio_pin_dir_t)
@@ -81,10 +76,10 @@ class IoModule: public Module
 		#pragma pack(push)
 		#pragma pack(1)
 
-			#define SIZEOF_IO_MODULE_SET_LED_MESSAGE 1
+			static constexpr int SIZEOF_IO_MODULE_SET_LED_MESSAGE = 1;
 			typedef struct
 			{
-				u8 ledMode;
+				LedMode ledMode;
 
 			}IoModuleSetLedMessage;
 			STATIC_ASSERT_SIZE(IoModuleSetLedMessage, 1);
@@ -98,7 +93,7 @@ class IoModule: public Module
 
 		DECLARE_CONFIG_AND_PACKED_STRUCT(IoModuleConfiguration);
 
-		ledMode currentLedMode;
+		LedMode currentLedMode;
 
 		IoModule();
 
@@ -107,8 +102,6 @@ class IoModule: public Module
 		void ResetToDefaultConfiguration() override;
 
 		void TimerEventHandler(u16 passedTimeDs) override;
-
-		//void BleEventHandler(ble_evt_t& bleEvent) override;
 
 		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) override;
 

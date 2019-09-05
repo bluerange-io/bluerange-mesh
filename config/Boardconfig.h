@@ -38,7 +38,6 @@
 
 #ifdef __cplusplus
 	#include <types.h>
-	#include <GlobalState.h>
 
 	#ifndef Boardconfig
 	#define Boardconfig (&(Boardconf::getInstance().configuration))
@@ -49,18 +48,10 @@
 #ifdef __cplusplus
 	class Boardconf
 	{
-		private:
-			Boardconf();
-
 		public:
-			static Boardconf& getInstance(){
-				if(!GS->boardconf){
-					GS->boardconf = new Boardconf();
-				}
-				return *(GS->boardconf);
-			}
+			static Boardconf& getInstance();
 
-			void Initialize(bool loadConfigFromFlash);
+			void Initialize();
 			void ResetToDefaultConfiguration();
 
 		DECLARE_CONFIG_AND_PACKED_STRUCT(BoardConfiguration);

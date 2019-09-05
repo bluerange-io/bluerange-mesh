@@ -28,28 +28,20 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-#define IO_MODULE_CONFIG_VERSION 1
 
 #include <IoModule.h>
 
-#ifdef ACTIVATE_IO_MODULE
 
 #include <Logger.h>
 #include <Utility.h>
 #include <GlobalState.h>
 #include <Node.h>
-
-extern "C"{
-#include <stdlib.h>
-}
+constexpr u8 IO_MODULE_CONFIG_VERSION = 1;
+#include <cstdlib>
 
 IoModule::IoModule()
-	: Module(moduleID::IO_MODULE_ID, "io")
+	: Module(ModuleId::IO_MODULE, "io")
 {
-	moduleVersion = IO_MODULE_CONFIG_VERSION;
-
-	//Register callbacks n' stuff
-
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
 	configurationPointer = &configuration;
@@ -67,15 +59,15 @@ void IoModule::ResetToDefaultConfiguration()
 	configuration.moduleVersion = IO_MODULE_CONFIG_VERSION;
 
 	//Set additional config values...
-	configuration.ledMode = Config->defaultLedMode;
+	configuration.ledMode = Conf::getInstance().defaultLedMode;
 
-	SET_FEATURESET_CONFIGURATION(&configuration);
+	SET_FEATURESET_CONFIGURATION(&configuration, this);
 }
 
 void IoModule::ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength)
 {
 	//Do additional initialization upon loading the config
-	currentLedMode = (ledMode)configuration.ledMode;
+	currentLedMode = configuration.ledMode;
 
 	//Start the Module...
 
@@ -87,99 +79,67 @@ void IoModule::TimerEventHandler(u16 passedTimeDs)
 
 
 	//If the Beacon is in the enrollment network
-	if(currentLedMode == ledMode::LED_MODE_CONNECTIONS && GS->node->configuration.networkId == 1){
+	if(currentLedMode == LedMode::CONNECTIONS && GS->node.configuration.networkId == 1){
 
-		GS->ledRed->On();
-		GS->ledGreen->Off();
-		GS->ledBlue->Off();
+		GS->ledRed.On();
+		GS->ledGreen.Off();
+		GS->ledBlue.Off();
 
 	}
-	else if (currentLedMode == ledMode::LED_MODE_CONNECTIONS)
+	else if (currentLedMode == LedMode::CONNECTIONS)
 	{
 		//Calculate the current blink step
-		ledBlinkPosition = (ledBlinkPosition + 1) % ((Config->meshMaxConnections + 2) * 2);
+		ledBlinkPosition = (ledBlinkPosition + 1) % (((Conf::meshMaxInConnections + Conf::meshMaxOutConnections) + 2) * 2);
 
 		//No Connections: Red blinking, Connected: Green blinking for connection count
 
-		BaseConnections conns = GS->cm->GetBaseConnections(ConnectionDirection::INVALID);
+		BaseConnections conns = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
 		u8 countHandshakeDone = 0;
 		for(u32 i=0; i< conns.count; i++){
-			BaseConnection *conn = GS->cm->allConnections[conns.connectionIndizes[i]];
+			BaseConnection *conn = GS->cm.allConnections[conns.connectionIndizes[i]];
 			if(conn != nullptr && conn->handshakeDone()) countHandshakeDone++;
 		}
 		u8 countConnected = conns.count - countHandshakeDone;
 
 		u8 i = ledBlinkPosition / 2;
 
-		if(i < MAX_NUM_MESH_CONNECTIONS){
+		if(i < (Conf::meshMaxInConnections + Conf::meshMaxOutConnections)){
 			if(ledBlinkPosition % 2 == 0){
 				//No connections
-				if (conns.count == 0){ GS->ledRed->On(); }
+				if (conns.count == 0){ GS->ledRed.On(); }
 				//Connected and handshake done
-				else if(i < countHandshakeDone) { GS->ledGreen->On(); }
+				else if(i < countHandshakeDone) { GS->ledGreen.On(); }
 				//Connected and handshake not done
-				else if(i < conns.count) { GS->ledBlue->On(); }
+				else if(i < conns.count) { GS->ledBlue.On(); }
 				//A free connection
-				else if(i < MAX_NUM_MESH_CONNECTIONS) {  }
+				else if(i < (Conf::meshMaxInConnections + Conf::meshMaxOutConnections)) {  }
 			} else {
-				GS->ledRed->Off();
-				GS->ledGreen->Off();
-				GS->ledBlue->Off();
+				GS->ledRed.Off();
+				GS->ledGreen.Off();
+				GS->ledBlue.Off();
 			}
 		}
 	}
-#ifdef ENABLE_TEST_DEVICES
-	else if(currentLedMode == ledMode::LED_MODE_CLUSTERING)
-	{
-		//A different color for each cluster
-
-		ledBlinkPosition++;
-
-		int c = 0;
-		for(int i=0; i<NUM_TEST_COLOUR_IDS; i++){
-			NodeId nodeIdFromClusterId = node->clusterId & 0xffff;
-
-			if(Config->testColourIDs[i] == nodeIdFromClusterId){
-				c = (i+1) % 8;
-
-				if(c & (1 << 0)) GS->ledRed->On();
-				else GS->ledRed->Off();
-
-				if(c & (1 << 1)) GS->ledGreen->On();
-				else GS->ledGreen->Off();
-
-				if(c & (1 << 2)) GS->ledBlue->On();
-				else GS->ledBlue->Off();
-
-				if(i >= 8 && ledBlinkPosition %2 == 0){
-					GS->ledRed->Off();
-					GS->ledGreen->Off();
-					GS->ledBlue->Off();
-				}
-			}
-		}
-	}
-#endif
-	else if(currentLedMode == ledMode::LED_MODE_ON)
+	else if(currentLedMode == LedMode::ON)
 	{
 		//All LEDs on (orange when only green and red available)
-		GS->ledRed->On();
-		GS->ledGreen->On();
-		GS->ledBlue->On();
+		GS->ledRed.On();
+		GS->ledGreen.On();
+		GS->ledBlue.On();
 	}
-	else if(currentLedMode == ledMode::LED_MODE_OFF)
+	else if(currentLedMode == LedMode::OFF)
 	{
-		GS->ledRed->Off();
-		GS->ledGreen->Off();
-		GS->ledBlue->Off();
+		GS->ledRed.Off();
+		GS->ledGreen.Off();
+		GS->ledBlue.Off();
 	}
-	else if(currentLedMode == ledMode::LED_MODE_ASSET)
+	else if(currentLedMode == LedMode::ASSET)
 	{
 		//Constant red
 
-		GS->ledRed->On();
-		GS->ledGreen->Off();
-		GS->ledBlue->Off();
+		GS->ledRed.On();
+		GS->ledGreen.Off();
+		GS->ledBlue.Off();
 	}
 }
 
@@ -193,10 +153,10 @@ bool IoModule::TerminalCommandHandler(char* commandArgs[],u8 commandArgsSize)
 		{
 			if(!TERMARGS(2, moduleName)) return false;
 
-			NodeId destinationNode = (TERMARGS(1, "this")) ? GS->node->configuration.nodeId : atoi(commandArgs[1]);
+			NodeId destinationNode = (TERMARGS(1, "this")) ? GS->node.configuration.nodeId : atoi(commandArgs[1]);
 
 			//Example:
-#ifndef SAVE_SPACE_GW_1
+#if IS_INACTIVE(GW_SAVE_SPACE)
 			if(commandArgsSize >= 6 && TERMARGS(3,"pinset"))
 			{
 				//Check how many GPIO ports we want to set
@@ -219,7 +179,7 @@ bool IoModule::TerminalCommandHandler(char* commandArgs[],u8 commandArgsSize)
 				}
 
 				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					MessageType::MODULE_TRIGGER_ACTION,
 					destinationNode,
 					(u8)IoModuleTriggerActionMessages::SET_PIN_CONFIG,
 					requestHandle,
@@ -236,14 +196,14 @@ bool IoModule::TerminalCommandHandler(char* commandArgs[],u8 commandArgsSize)
 			{
 				IoModuleSetLedMessage data;
 
-				if(TERMARGS(4, "on")) data.ledMode= ledMode::LED_MODE_ON;
-				else if(TERMARGS(4, "cluster")) data.ledMode = ledMode::LED_MODE_CLUSTERING;
-				else data.ledMode = Config->defaultLedMode == ledMode::LED_MODE_OFF ? ledMode::LED_MODE_OFF : ledMode::LED_MODE_CONNECTIONS;
+				if(TERMARGS(4, "on")) data.ledMode= LedMode::ON;
+				else if(TERMARGS(4, "cluster")) data.ledMode = LedMode::CLUSTERING;
+				else data.ledMode = Conf::getInstance().defaultLedMode == LedMode::OFF ? LedMode::OFF : LedMode::CONNECTIONS;
 
 				u8 requestHandle = commandArgsSize >= 6 ? atoi(commandArgs[5]) : 0;
 
 				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+					MessageType::MODULE_TRIGGER_ACTION,
 					destinationNode,
 					(u8)IoModuleTriggerActionMessages::SET_LED,
 					requestHandle,
@@ -273,7 +233,7 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
 	//Must call superclass for handling
 	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
-	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
+	if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
 		connPacketModule* packet = (connPacketModule*)packetHeader;
 		u16 dataFieldLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE;
 
@@ -282,8 +242,8 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
 			IoModuleTriggerActionMessages actionType = (IoModuleTriggerActionMessages)packet->actionType;
 			if(actionType == IoModuleTriggerActionMessages::SET_PIN_CONFIG){
 
-				configuration.ledMode = ledMode::LED_MODE_OFF;
-				currentLedMode = ledMode::LED_MODE_OFF;
+				configuration.ledMode = LedMode::OFF;
+				currentLedMode = LedMode::OFF;
 
 				//Parse the data and set the gpio ports to the requested
 				for(int i=0; i<dataFieldLength; i+=SIZEOF_GPIO_PIN_CONFIG)
@@ -303,7 +263,7 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
 
 				//Confirmation
 				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+					MessageType::MODULE_ACTION_RESPONSE,
 					packet->header.sender,
 					(u8)IoModuleActionResponseMessages::SET_PIN_CONFIG_RESULT,
 					packet->requestHandle,
@@ -317,22 +277,22 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
 
 				IoModuleSetLedMessage* data = (IoModuleSetLedMessage*)packet->data;
 
-				configuration.ledMode = (ledMode)data->ledMode;
-				currentLedMode = (ledMode)data->ledMode;
+				configuration.ledMode = data->ledMode;
+				currentLedMode = data->ledMode;
 
-				if(currentLedMode == ledMode::LED_MODE_ON){
-					GS->ledRed->On();
-					GS->ledGreen->On();
-					GS->ledBlue->On();
+				if(currentLedMode == LedMode::ON){
+					GS->ledRed.On();
+					GS->ledGreen.On();
+					GS->ledBlue.On();
 				} else {
-					GS->ledRed->Off();
-					GS->ledGreen->Off();
-					GS->ledBlue->Off();
+					GS->ledRed.Off();
+					GS->ledGreen.Off();
+					GS->ledBlue.Off();
 				}
 
 				//send confirmation
 				SendModuleActionMessage(
-					MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+					MessageType::MODULE_ACTION_RESPONSE,
 					packet->header.sender,
 					(u8)IoModuleActionResponseMessages::SET_LED_RESPONSE,
 					packet->requestHandle,
@@ -345,7 +305,7 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
 	}
 
 	//Parse Module responses
-	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_ACTION_RESPONSE){
+	if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
 		connPacketModule* packet = (connPacketModule*)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
@@ -354,16 +314,14 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
 			IoModuleActionResponseMessages actionType = (IoModuleActionResponseMessages)packet->actionType;
 			if(actionType == IoModuleActionResponseMessages::SET_PIN_CONFIG_RESULT)
 			{
-				logjson("MODULE", "{\"nodeId\":%u,\"type\":\"set_pin_config_result\",\"module\":%u,", packet->header.sender, packet->moduleId);
+				logjson("MODULE", "{\"nodeId\":%u,\"type\":\"set_pin_config_result\",\"module\":%u,", packet->header.sender, (u32)packet->moduleId);
 				logjson("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, 0);
 			}
 			else if(actionType == IoModuleActionResponseMessages::SET_LED_RESPONSE)
 			{
-				logjson("MODULE", "{\"nodeId\":%u,\"type\":\"set_led_result\",\"module\":%u,", packet->header.sender, packet->moduleId);
+				logjson("MODULE", "{\"nodeId\":%u,\"type\":\"set_led_result\",\"module\":%u,", packet->header.sender, (u32)packet->moduleId);
 				logjson("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, 0);
 			}
 		}
 	}
 }
-
-#endif

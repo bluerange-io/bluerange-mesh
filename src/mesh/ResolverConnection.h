@@ -42,13 +42,13 @@ private:
 public:
 	ResolverConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress);
 
-	void ConnectionSuccessfulHandler(u16 connectionHandle, u16 connInterval) override;
+	void ConnectionSuccessfulHandler(u16 connectionHandle) override;
 
 	void ReceiveDataHandler(BaseConnectionSendData* sendData, u8* data) override;
 
 	void PrintStatus() override;
 
-	bool SendData(u8* data, u8 dataLength, DeliveryPriority priority, bool reliable) override;
+	bool SendData(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable) override;
 
 };
 

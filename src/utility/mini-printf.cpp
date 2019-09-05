@@ -162,16 +162,14 @@ mini_vsnprintf(char *buffer, unsigned int buffer_len, const char *fmt, va_list v
 			switch (ch) {
 				case 0:
 					goto end;
-
 				case 'u':
 				case 'd':
-					len = mini_itoa(va_arg(va, unsigned int), 10, 0, (ch=='u'), bf, zero_pad);
+					len = mini_itoa(va_arg(va, long unsigned int), 10, 0, (ch=='u'), bf, zero_pad);
 					_puts(bf, len, &b);
 					break;
-
 				case 'x':
 				case 'X':
-					len = mini_itoa(va_arg(va, unsigned int), 16, (ch=='X'), 1, bf, zero_pad);
+					len = mini_itoa(va_arg(va, long unsigned int), 16, (ch=='X'), 1, bf, zero_pad);
 					_puts(bf, len, &b);
 					break;
 

@@ -38,9 +38,16 @@
  * 
  */
 
+/*
+ * Had to be copied + modified from SDK 14.0 because it does not allow changing the clock source at runtime
+ */
+
 #include "sdk_common.h"
 #if NRF_MODULE_ENABLED(NRF_SDH)
 
+#ifdef FEATURESET
+#include <Boardconfig.h>
+#endif
 #include "nrf_sdh.h"
 
 #include <stdint.h>
@@ -166,17 +173,33 @@ ret_code_t nrf_sdh_enable_request(void)
     // Notify observers about starting SoftDevice enable process.
     sdh_state_observer_notify(NRF_SDH_EVT_STATE_ENABLE_PREPARE);
 
-    nrf_clock_lf_cfg_t const clock_lf_cfg =
-    {
-        .source        = NRF_SDH_CLOCK_LF_SRC,
-        .rc_ctiv       = NRF_SDH_CLOCK_LF_RC_CTIV,
-        .rc_temp_ctiv  = NRF_SDH_CLOCK_LF_RC_TEMP_CTIV,
-    #ifdef S132
-        .accuracy      = NRF_SDH_CLOCK_LF_XTAL_ACCURACY
-    #else
-        .xtal_accuracy = NRF_SDH_CLOCK_LF_XTAL_ACCURACY
-    #endif
-    };
+// ########################### Modification
+#ifndef FEATURESET
+   nrf_clock_lf_cfg_t const clock_lf_cfg =
+   {
+       .source        = NRF_SDH_CLOCK_LF_SRC,
+       .rc_ctiv       = NRF_SDH_CLOCK_LF_RC_CTIV,
+       .rc_temp_ctiv  = NRF_SDH_CLOCK_LF_RC_TEMP_CTIV,
+   #ifdef S132
+       .accuracy      = NRF_SDH_CLOCK_LF_XTAL_ACCURACY
+   #else
+       .xtal_accuracy = NRF_SDH_CLOCK_LF_XTAL_ACCURACY
+   #endif
+   };
+#else
+    nrf_clock_lf_cfg_t clock_lf_cfg;
+    if(fmBoardConfigPtr->lfClockSource == NRF_CLOCK_LF_SRC_XTAL){
+        clock_lf_cfg.source = NRF_CLOCK_LF_SRC_XTAL;
+    clock_lf_cfg.accuracy = NRF_CLOCK_LF_ACCURACY_100_PPM;
+        clock_lf_cfg.rc_ctiv = 0;
+    } else {
+        clock_lf_cfg.source = NRF_CLOCK_LF_SRC_RC;
+    clock_lf_cfg.accuracy = NRF_CLOCK_LF_ACCURACY_500_PPM;
+        clock_lf_cfg.rc_ctiv = 1;
+    }
+    clock_lf_cfg.rc_temp_ctiv = 0;
+#endif
+// ########################### Modification end
 
     #ifdef ANT_LICENSE_KEY
         ret_code = sd_softdevice_enable(&clock_lf_cfg, app_error_fault_handler, ANT_LICENSE_KEY);

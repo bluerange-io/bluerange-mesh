@@ -1,0 +1,26 @@
+== Advertising Module (moduleId 1)
+=== Purpose
+This module allows the user to configure a number of advertising messages to be sent periodically. It is possible to send iBeacon messages, EddyStone messages and other custom advertising messages without the need to update the firmware. Using FruityMesh in conjunction with a MeshGateway, a fully managed beacon infrastructure can be established.
+
+TIP: The _AdvertisingModule_ is only intended for beaconing messages that can subsequently be configured over the mesh. Take a look at the xref:AdvertisingController.adoc[AdvertisingController] documentation for how to schedule advertising messages in your implementation.
+
+=== Functionality
+The _AdvertisingModule_ is currently configured by setting its persistent configuration. At the moment, it allows one message to be broadcast at a time and doesn't cycle through different messages. Message cycling can however be easily implemented since the mesh framework already supports this.
+
+=== Usage
+Load a new configuration for *nodeId 45* with the following values:
+
+* *moduleActive:* true
+* *advertisingInterval:* 100 ms
+* *advertising message type:* iBeacon
+* *UUID:* AABBCCDD-EEFF-0011-2233-445566778899
+* *major:* 1
+* *minor:* 2
+* *calibratedRSSI:* -60
+
+[source, C++]
+----
+//Sets a configuration for the advertising module with the values above
+set_config 45 adv 01:01:01:00:64:00:01:04:01:F0:02:01:06:1A:FF:4C:00:02:15:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:00:01:00:02:C4:00 0
+----
+This configuration message is built according to the `AdvertisingModuleConfiguration` that is specified in `AdvertisingModule.h`.

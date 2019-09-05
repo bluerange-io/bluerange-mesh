@@ -1,0 +1,30 @@
+= Class Structure
+
+== src/Main.cpp
+This is the entry point of the application. It just calls two functions in `FruityMesh.cpp`. The first one boots up the node and the second one runs an endless loop to fetch and process events.
+
+== src/FruityMesh.cpp
+During bootup, classes such as the _SoftDevice_, _Terminal_, _Logger_, _Storage_, and others are initialized. After everything has been started, the event handling routine takes over. All event dispatching routines, as well as interrupt and error handlers are implemented here.
+
+== src/base/
+The base folder contains a few classes that are meant as wrappers for the S130 API. The most central one is the _FruityHal_, which wraps all nRF functionality (not yet complete).
+
+== src/mesh/Node.cpp
+The _Node_ class is responsible for building mesh connections and works hand in hand with the _MeshConnection_ and _ConnectionManager_ classes to accomplish these tasks.
+
+== src/mesh/ConnectionManager.cpp
+The _ConnectionManager_ is responsible for handling and scheduling all BLE connections. It is the central point to handle connects, disconnects and reestablishing connections.
+
+== src/mesh/MeshConnection.cpp
+All connections between nodes are using the _MeshConnection_ class. This, together with the _ConnectionManager_ and the _Node_ handles clustering and meshing in general.
+
+== src/mesh/
+Other classes, all derived from _BaseConnection_ are also in this folder and they enable e.g. smart phones to connect to the mesh and send and receive data. The most important one is the _MeshAccessConnection_, which implements a custom encryption protocol for communicating with external devices independent of their operating system.
+
+== src/modules/
+This folder contains a number of modules that provide specific functionality apart from the meshing protocol. To implement a new module, use a template in the `fruitymesh/src_examples/` folder to get started and have a look at the xref:StatusReporterModule.adoc[StatusReporterModule] to get an idea of how to implement additional functionality.
+
+If you want to learn more about modules, either read the xref:Modules.adoc[Modules] chapter or have at look at this tutorial about xref:Implementing-a-Custom-Module.adoc[Implementing a Custom Module].
+
+== src/utility/
+A basic circular queue implementation, a file system, utility classes, implementation of the terminal, logger, etc.

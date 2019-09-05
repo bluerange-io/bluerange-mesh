@@ -1,0 +1,49 @@
+= Connections
+
+There are a number of different connection types, each used for a different purpose.
+
+== BaseConnection
+A base connection is the base class of all connections. It provides some general concepts such as a _PacketQueue_ for sending and some methods for splitting and reassembling messages according to the connection MTU.
+
+=== Connection States
+[source,C++]
+----
+enum class ConnectionState{
+	DISCONNECTED=0,
+	CONNECTING=1,
+	CONNECTED=2,
+	HANDSHAKING=3,
+	HANDSHAKE_DONE=4,
+	REESTABLISHING = 5,
+	REESTABLISHING_HANDSHAKE = 6
+};
+----
+
+=== Packet Splitting
+For connections that use the basic packet format with the _connPacketHeader_ (cf. xref:Specification.adoc[Specification]), packet splitting can be used. The _MeshConnection_ and _MeshAccessConnection_ use this.
+
+==== connPacketSplitHeader
+With packet splitting, a wrapper is placed around messages to allow for messages that are longer than the maximum number of bytes that can be placed into a characteristic. Usually, this limit is 20 bytes per write, but may be different if a connection supports a different payload. Cf. the documentation of the connection.
+
+A split packet will have the _messageType_ set to one of these:
+[source,C++]
+----
+#define MESSAGE_TYPE_SPLIT_WRITE_CMD 16 //Used if a WRITE_CMD message is split
+#define MESSAGE_TYPE_SPLIT_WRITE_CMD_END 17 //Used if a WRITE_CMD message is split
+---- 
+|===
+|Bytes|Type|Name|Description
+
+|1|u8|messageType|Set to SPLIT_WRITE_CMD if this is the first or an intermediate part. Set to SPLIT_WRITE_CMD_END if this is the last part of the message.
+|1|u8|splitCounter|Index of the split message, starting with 0 for the first part.
+|===
+
+== ResolverConnection
+This connection is instantiated as soon as another device connects to the node, in which case the node is the peripherial. Initially, it is not known whether the other device is a mesh node, a smartphone or something else. The resolver connection will wait until the partner transmits a packet from which it can determine the type of connection that needs to be instantiated. The correct connection is then created and the _ResolverConnection_ is deleted.
+
+== MeshConnection
+MeshConnections are initiated by the node and are used to connect between two mesh nodes. They store important information for clustering such as the _clusterId_ and _clusterSize_ of their partner.
+It also implements the handshake for two partners to be connected to the same cluster. It works closely together with the xref:Node.adoc[Node].
+
+== MeshAccessConnection
+The MeshAccessConnection is documented to a large extent in the documentation of the xref:MeshAccessModule.adoc[MeshAccessModule].

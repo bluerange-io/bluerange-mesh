@@ -29,13 +29,10 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <PacketQueue.h>
+#include "GlobalState.h"
 #include <Logger.h>
-
-extern "C"
-{
-#include <nrf_error.h>
 #include <cstring>
-}
+#include "Utility.h"
 
 //Data will be 4-byte aligned if all inputs are 4 byte aligned
 PacketQueue::PacketQueue(u32* buffer, u16 bufferLength)
@@ -51,7 +48,7 @@ PacketQueue::PacketQueue(u32* buffer, u16 bufferLength)
 
 	((u16*)writePointer)[0] = 0;
 
-	memset(buffer, 0, bufferLength);
+	CheckedMemset(buffer, 0, bufferLength);
 
 	packetSendPosition = 0;
 	packetSentRemaining = 0;
@@ -77,8 +74,10 @@ u8* PacketQueue::Reserve(u16 dataLength)
 	if (dataLength == 0) return nullptr;
 
 	if(dataLength + 10 > bufferLength){
-		logt("ERROR", "Too big");
-		return nullptr;
+		logt("ERROR", "Too big");																	//LCOV_EXCL_LINE assertion
+		GS->logger.logCustomError(CustomErrorTypes::FATAL_PACKETQUEUE_PACKET_TOO_BIG, dataLength);	//LCOV_EXCL_LINE assertion
+		SIMEXCEPTION(IllegalArgumentException);														//LCOV_EXCL_LINE assertion
+		return nullptr;																				//LCOV_EXCL_LINE assertion
 	}
 
 	//Padding makes sure that we only save 4-byte aligned data
@@ -125,14 +124,14 @@ u8* PacketQueue::Reserve(u16 dataLength)
 	return dataPointer;
 }
 
-sizedData PacketQueue::PeekNext() const
+SizedData PacketQueue::PeekNext() const
 {
 	return PeekNext(0);
 }
 
-sizedData PacketQueue::PeekNext(u8 pos) const
+SizedData PacketQueue::PeekNext(u8 pos) const
 {
-	sizedData data;
+	SizedData data;
 	//If queue has been fully read, return empty data
 	if (pos >= _numElements){
 		data.length = 0;
@@ -194,9 +193,9 @@ void PacketQueue::DiscardNext()
 }
 
 //Iterates over all items in order to find the last element
-sizedData PacketQueue::PeekLast()
+SizedData PacketQueue::PeekLast()
 {
-	sizedData data = { nullptr, 0 };
+	SizedData data = { nullptr, 0 };
 
 	//Return 0 length data in case we have no elements
 	if (_numElements == 0){
@@ -235,7 +234,7 @@ void PacketQueue::DiscardLast()
 	}
 
 	//Look for the last element
-	sizedData lastElement = PeekLast();
+	SizedData lastElement = PeekLast();
 
 	//Discard this element (No wrapping necessary because writePointer is always at the end of an element if it exists)
 	u8 padding = (4-lastElement.length%4)%4;
@@ -281,7 +280,7 @@ void PacketQueue::Print() const
 		if (((u16*)tmpReadPointer)[0] == 0 && writePointer < tmpReadPointer)
 			tmpReadPointer = bufferStart;
 
-		sizedData data;
+		SizedData data;
 		data.length = ((u16*)tmpReadPointer)[0];
 		data.data = tmpReadPointer + 4; // 4 byte added for length field
 

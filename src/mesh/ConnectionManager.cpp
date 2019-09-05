@@ -38,16 +38,13 @@
 #include <StatusReporterModule.h>
 #include <Utility.h>
 #include <Logger.h>
-
-#ifdef ACTIVATE_MA_MODULE
+#include <GlobalState.h>
+#include "ConnectionAllocator.h"
 #include <MeshAccessModule.h>
-#endif
 
-extern "C"
-{
-#include <app_error.h>
-#include <ble_hci.h>
-}
+#ifdef SIM_ENABLED
+#include <CherrySim.h>
+#endif
 
 //When data is received, it is first processed until packets are available, once these have undergone some basic
 //checks, they are considered Messages that are then dispatched to the node and modules
@@ -56,26 +53,19 @@ extern "C"
 // Connected => Encrypted => Mesh handle discovered => Handshake done
 //encryption can be disabled and handle discovery can be skipped (handle from JOIN_ME packet will be used)
 
-ConnectionManager::ConnectionManager() :
-		GAPControllerHandler(), GATTControllerHandler()
+ConnectionManager::ConnectionManager()
 {
 	//init vars
-	freeMeshOutConnections = Config->meshMaxOutConnections;
-	freeMeshInConnections = Config->meshMaxInConnections;
+	freeMeshOutConnections = Conf::meshMaxOutConnections;
+	freeMeshInConnections = Conf::meshMaxInConnections;
 
 	pendingConnection = nullptr;
 	uniqueConnectionIdCounter = 0;
 	droppedMeshPackets = 0;
-	sentMeshPackets = 0;
+	sentMeshPacketsReliable = 0;
+	sentMeshPacketsUnreliable = 0;
 
-	memset(allConnections, 0x00, sizeof(allConnections));
-
-	//Register GAPController callbacks
-	GS->gapController->setGAPControllerHandler(this);
-
-	//Set GATTController callbacks
-	GS->gattController->setGATTControllerHandler(this);
-
+	CheckedMemset(allConnections, 0x00, sizeof(allConnections));
 }
 
 #define _______________CONNECTIVITY______________
@@ -94,11 +84,14 @@ void ConnectionManager::ConnectAsMaster(NodeId partnerId, fh_ble_gap_addr_t* add
 	//Only connect when not currently in another connection or when there are no more free connections
 	if (freeMeshOutConnections < 1 || pendingConnection != nullptr) return;
 
+	//Don't connect if the partner is not a preferred connection while we are in preferred connection mode ignore.
+	if (!GS->node.IsPreferredConnection(partnerId) && GS->config.configuration.preferredConnectionMode == PreferredConnectionMode::IGNORED)
+	{
+		return;
+	}
 	//Tell the GAP Layer to connect, it will return if it is trying or if there was an error
-	u32 err = GS->gapController->connectToPeripheral(*address, connectionIv, Config->meshConnectingScanTimeout);
+	u32 err = GS->gapController.connectToPeripheral(*address, connectionIv, Conf::meshConnectingScanTimeout);
 
-	char addrString[20];
-	GS->logger->convertBufferToHexString(address->addr, 6, addrString, sizeof(addrString));
 	logt("CONN", "Connecting as Master to %d (%02X:%02X:%02X:%02X:%02X:%02X) %s",
 		partnerId,
 		address->addr[5],
@@ -107,11 +100,11 @@ void ConnectionManager::ConnectAsMaster(NodeId partnerId, fh_ble_gap_addr_t* add
 		address->addr[2],
 		address->addr[1],
 		address->addr[0],
-		err == NRF_SUCCESS ? "true" : "false");
+		err == FruityHal::SUCCESS ? "true" : "false");
 
-	if (err == NRF_SUCCESS)
+	if (err == FruityHal::SUCCESS)
 	{
-		StatusReporterModule* statusMod = (StatusReporterModule*)GS->node->GetModuleById(moduleID::STATUS_REPORTER_MODULE_ID);
+		StatusReporterModule* statusMod = (StatusReporterModule*)GS->node.GetModuleById(ModuleId::STATUS_REPORTER_MODULE);
 		if(statusMod != nullptr){
 			u32 addrPart;
 			memcpy(&addrPart, address->addr, 4);
@@ -119,27 +112,27 @@ void ConnectionManager::ConnectAsMaster(NodeId partnerId, fh_ble_gap_addr_t* add
 		}
 
 		//Create the connection and set it as pending
-		for (u32 i = 0; i < MAX_NUM_CONNECTIONS; i++){
+		for (u32 i = 0; i < TOTAL_NUM_CONNECTIONS; i++){
 			if (allConnections[i] == nullptr){
-				pendingConnection = allConnections[i] = new MeshConnection(i, ConnectionDirection::DIRECTION_OUT, address, writeCharacteristicHandle);
+				pendingConnection = allConnections[i] = ConnectionAllocator::getInstance().allocateMeshConnection(i, ConnectionDirection::DIRECTION_OUT, address, writeCharacteristicHandle);
 				break;
 			}
 		}
 
 	} else {
-		GS->logger->logError(ErrorTypes::CUSTOM, (u32)CustomErrorTypes::CONNECT_AS_MASTER_NOT_POSSIBLE, err);
+		GS->logger.logCustomError(CustomErrorTypes::WARN_CONNECT_AS_MASTER_NOT_POSSIBLE, err);
 	}
 }
 
-void ConnectionManager::DeleteConnection(BaseConnection* connection){
+void ConnectionManager::DeleteConnection(BaseConnection* connection, AppDisconnectReason reason){
 	if(connection == nullptr) return;
 
 	logt("CM", "Cleaning up conn %u", connection->connectionId);
 
-	for(u32 i=0; i<MAX_NUM_CONNECTIONS; i++){
+	for(u32 i=0; i<TOTAL_NUM_CONNECTIONS; i++){
 		if(connection == allConnections[i]){
-			delete connection;
 			allConnections[i] = nullptr;
+			ConnectionAllocator::getInstance().deallocate(connection);
 		}
 	}
 	if(pendingConnection == connection){
@@ -147,7 +140,7 @@ void ConnectionManager::DeleteConnection(BaseConnection* connection){
 	}
 
 	//Update Join me packet after connection was deleted so we have another free one
-	GS->node->UpdateJoinMePacket();
+	GS->node.UpdateJoinMePacket();
 }
 
 //TODO: Mesh specific
@@ -156,11 +149,21 @@ void ConnectionManager::DeleteConnection(BaseConnection* connection){
 void ConnectionManager::ForceDisconnectOtherMeshConnections(const MeshConnection* ignoreConnection, AppDisconnectReason appDisconnectReason) const
 {
 	//We can not use GetConnections here as a disconnection of a connection might trigger another force disconnect method.
-	for (int i = 0; i < MAX_NUM_CONNECTIONS; i++) {
+	for (int i = 0; i < TOTAL_NUM_CONNECTIONS; i++) {
 		BaseConnection* conn = allConnections[i];
-		if (conn != nullptr && conn != ignoreConnection && conn->connectionType == ConnectionTypes::CONNECTION_TYPE_FRUITYMESH) {
-			conn->appDisconnectionReason = appDisconnectReason;
-			conn->DisconnectAndRemove();
+		if (conn != nullptr && conn != ignoreConnection && conn->connectionType == ConnectionType::FRUITYMESH) {
+			conn->DisconnectAndRemove(appDisconnectReason);
+		}
+	}
+}
+
+void ConnectionManager::ForceDisconnectOtherHandshakedMeshConnections(const MeshConnection* ignoreConnection, AppDisconnectReason appDisconnectReason) const
+{
+	//We can not use GetConnections here as a disconnection of a connection might trigger another force disconnect method.
+	for (int i = 0; i < TOTAL_NUM_CONNECTIONS; i++) {
+		BaseConnection* conn = allConnections[i];
+		if (conn != nullptr && conn != ignoreConnection && conn->connectionType == ConnectionType::FRUITYMESH && conn->handshakeDone()) {
+			conn->DisconnectAndRemove(appDisconnectReason);
 		}
 	}
 }
@@ -168,11 +171,10 @@ void ConnectionManager::ForceDisconnectOtherMeshConnections(const MeshConnection
 void ConnectionManager::ForceDisconnectAllConnections(AppDisconnectReason appDisconnectReason) const
 {
 	//We can not use GetConnections here as a disconnection of a connection might trigger another force disconnect method.
-	for (int i = 0; i < MAX_NUM_CONNECTIONS; i++) {
+	for (int i = 0; i < TOTAL_NUM_CONNECTIONS; i++) {
 		BaseConnection* conn = allConnections[i];
 		if (conn != nullptr) {
-			conn->appDisconnectionReason = appDisconnectReason;
-			conn->DisconnectAndRemove();
+			conn->DisconnectAndRemove(appDisconnectReason);
 		}
 	}
 }
@@ -184,7 +186,7 @@ void ConnectionManager::SetMeshConnectionInterval(u16 connectionInterval) const
 	MeshConnections conn = GetMeshConnections(ConnectionDirection::DIRECTION_OUT);
 	for(u32 i=0; i< conn.count; i++){
 		if (conn.connections[i]->handshakeDone()){
-			GS->gapController->RequestConnectionParameterUpdate(conn.connections[i]->connectionHandle, connectionInterval, connectionInterval, 0, Config->meshConnectionSupervisionTimeout);
+			GS->gapController.RequestConnectionParameterUpdate(conn.connections[i]->connectionHandle, connectionInterval, connectionInterval, 0, Conf::meshConnectionSupervisionTimeout);
 		}
 	}
 }
@@ -221,14 +223,16 @@ void ConnectionManager::ResolveConnection(BaseConnection* oldConnection, BaseCon
 		//If the resolver found a suitable connection upgrade, find the connection reference and replace
 		//it with a new instance of our upgraded connection
 		if(newConnection != nullptr){
-			for(int i=0; i<MAX_NUM_CONNECTIONS; i++){
+			for(int i=0; i<TOTAL_NUM_CONNECTIONS; i++){
 				if(allConnections[i] == oldConnection){
-					newConnection->ConnectionSuccessfulHandler(oldConnection->connectionHandle, oldConnection->currentConnectionIntervalMs);
+					//First, we must update the pointer because the new connection might look for itself in the array
+					allConnections[i] = newConnection;
+
+					newConnection->ConnectionSuccessfulHandler(oldConnection->connectionHandle);
 					newConnection->ReceiveDataHandler(sendData, data);
 
 					//Delete old connection and replace pointer with new connection
-					delete oldConnection;
-					allConnections[i] = newConnection;
+					ConnectionAllocator::getInstance().deallocate(oldConnection);
 					return;
 				}
 			}
@@ -240,20 +244,21 @@ void ConnectionManager::ResolveConnection(BaseConnection* oldConnection, BaseCon
 
 #define _________________SENDING____________
 
-void ConnectionManager::SendMeshMessage(u8* data, u8 dataLength, DeliveryPriority priority, bool reliable) const
+void ConnectionManager::SendMeshMessage(u8* data, u16 dataLength, DeliveryPriority priority) const
 {
-	SendMeshMessage(data, dataLength, priority, reliable, true);
+	SendMeshMessageInternal(data, dataLength, priority, false, true, true);
 }
 
-void ConnectionManager::SendMeshMessage(u8* data, u8 dataLength, DeliveryPriority priority, bool reliable, bool loopback) const
+void ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable, bool loopback, bool toMeshAccess) const
 {
-	connPacketHeader* packetHeader = (connPacketHeader*) data;
-#ifdef SIM_ENABLED
-	if (packetHeader->sender != GS->node->configuration.nodeId && packetHeader->sender != NODE_ID_SHORTEST_SINK)
-	{
-		SIMEXCEPTION(IllegalSenderException);
+	if (dataLength > MAX_MESH_PACKET_SIZE) {
+		SIMEXCEPTION(PaketTooBigException);
+		logt("ERROR", "Packet too big for sending!");
+		return;
 	}
-#endif
+
+	connPacketHeader* packetHeader = (connPacketHeader*) data;
+
 	// ########################## Local Loopback
 	if(loopback){
 		//Build fake data for our loopback packet
@@ -268,34 +273,33 @@ void ConnectionManager::SendMeshMessage(u8* data, u8 dataLength, DeliveryPriorit
 	}
 
 	// ########################## Routing to MeshAccess Connections
-
-#ifdef ACTIVATE_MA_MODULE
 	//We send the packet to all MeshAccessConnections because any receiverId could be on the other side
-	BaseConnections maConn = GetConnectionsOfType(ConnectionTypes::CONNECTION_TYPE_MESH_ACCESS, ConnectionDirection::INVALID);
-	for(u32 i=0; i< maConn.count; i++){
-		MeshAccessConnection* c = (MeshAccessConnection*)allConnections[maConn.connectionIndizes[i]];
-		if (c == nullptr) {
-			continue;
+	if (toMeshAccess) {
+		BaseConnections maConn = GetConnectionsOfType(ConnectionType::MESH_ACCESS, ConnectionDirection::INVALID);
+		for (u32 i = 0; i < maConn.count; i++) {
+			MeshAccessConnection* c = (MeshAccessConnection*)allConnections[maConn.connectionIndizes[i]];
+			if (c == nullptr) {
+				continue;
+			}
+			c->SendData(data, dataLength, priority, reliable);
 		}
-		c->SendData(data, dataLength, priority, reliable);
 	}
-#endif
-
 
 	// ########################## Sink Routing
 	//Packets to the shortest sink, can only be sent to mesh partners
 	if (packetHeader->receiver == NODE_ID_SHORTEST_SINK)
 	{
-		BroadcastMeshPacket(data, dataLength, priority, reliable);
+		MeshConnection* dest = GetMeshConnectionToShortestSink(nullptr);
 
-		//TODO: Implement sink routing
-//		MeshConnection* dest = GetMeshConnectionToShortestSink(nullptr);
-//
-//		//FIXME: Packets are currently only delivered if a sink is known
-//		if (dest)
-//		{
-//			dest->SendData(data, dataLength, priority, reliable);
-//		}
+		if (GS->config.enableSinkRouting && dest)
+		{
+			dest->SendData(data, dataLength, priority, reliable);
+		}
+		// If message was adressed to sink but there is no route to sink broadcast message
+		else
+		{
+			BroadcastMeshPacket(data, dataLength, priority, reliable);
+		}
 	}
 	else if(packetHeader->receiver == NODE_ID_LOCAL_LOOPBACK)
 	{
@@ -309,7 +313,7 @@ void ConnectionManager::SendMeshMessage(u8* data, u8 dataLength, DeliveryPriorit
 	}
 	// ########################## Generic broadcast packets
 	//All other packets will be broadcasted, but we check if the receiver is connected to us
-	else if (packetHeader->receiver != GS->node->configuration.nodeId)
+	else if (packetHeader->receiver != GS->node.configuration.nodeId)
 	{
 		//Check if the receiver has a handshaked connection with us
 		MeshConnection* receiverConn = nullptr;
@@ -335,23 +339,23 @@ void ConnectionManager::DispatchMeshMessage(BaseConnection* connection, BaseConn
 	//Check if we are part of the firmware group that should receive this image
 	bool fwGroupIdMatches = false;
 	for(u32 i=0; i<MAX_NUM_FW_GROUP_IDS; i++){
-		if(GS->config->fwGroupIds != 0 && GS->config->fwGroupIds[i] == packet->receiver) fwGroupIdMatches = true;
+		if(GS->config.fwGroupIds != 0 && GS->config.fwGroupIds[i] == packet->receiver) fwGroupIdMatches = true;
 	}
 
 	if(
 		!checkReceiver
-		|| packet->receiver == GS->node->configuration.nodeId //Directly addressed at us
+		|| packet->receiver == GS->node.configuration.nodeId //Directly addressed at us
 		|| packet->receiver == NODE_ID_BROADCAST //broadcast packet for all nodes
 		|| (packet->receiver >= NODE_ID_HOPS_BASE && packet->receiver < NODE_ID_HOPS_BASE + 1000) //Broadcasted for a number of hops
-		|| (packet->receiver == NODE_ID_SHORTEST_SINK && GS->node->configuration.deviceType == deviceTypes::DEVICE_TYPE_SINK)
+		|| (packet->receiver == NODE_ID_SHORTEST_SINK && GET_DEVICE_TYPE() == DeviceType::SINK)
 		|| fwGroupIdMatches
 	){
 		//Fix local loopback id and replace with out nodeId
-		if(packet->receiver == NODE_ID_LOCAL_LOOPBACK) packet->receiver = GS->node->configuration.nodeId;
+		if(packet->receiver == NODE_ID_LOCAL_LOOPBACK) packet->receiver = GS->node.configuration.nodeId;
 
 		//Now we must pass the message to all of our modules for further processing
-		for(int i=0; i<MAX_MODULE_COUNT; i++){
-			if(GS->activeModules[i] != nullptr && GS->activeModules[i]->configurationPointer->moduleActive){
+		for(u32 i=0; i<GS->amountOfModules; i++){
+			if(GS->activeModules[i]->configurationPointer->moduleActive){
 				GS->activeModules[i]->MeshMessageReceivedHandler(connection, sendData, packet);
 			}
 		}
@@ -359,13 +363,13 @@ void ConnectionManager::DispatchMeshMessage(BaseConnection* connection, BaseConn
 }
 
 //A helper method for sending moduleAction messages
-void ConnectionManager::SendModuleActionMessage(u8 messageType, u8 moduleId, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable) const
+void ConnectionManager::SendModuleActionMessage(MessageType messageType, ModuleId moduleId, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable) const
 {
 	DYNAMIC_ARRAY(buffer, SIZEOF_CONN_PACKET_MODULE + additionalDataSize);
 
 	connPacketModule* outPacket = (connPacketModule*)buffer;
 	outPacket->header.messageType = messageType;
-	outPacket->header.sender = GS->node->configuration.nodeId;
+	outPacket->header.sender = GS->node.configuration.nodeId;
 	outPacket->header.receiver = toNode;
 
 	outPacket->moduleId = moduleId;
@@ -377,15 +381,20 @@ void ConnectionManager::SendModuleActionMessage(u8 messageType, u8 moduleId, Nod
 		memcpy(&outPacket->data, additionalData, additionalDataSize);
 	}
 
-	GS->cm->SendMeshMessage(buffer, SIZEOF_CONN_PACKET_MODULE + additionalDataSize, DeliveryPriority::LOW, reliable);
+	GS->cm.SendMeshMessage(buffer, SIZEOF_CONN_PACKET_MODULE + additionalDataSize, DeliveryPriority::LOW);
 }
 
-void ConnectionManager::BroadcastMeshPacket(u8* data, u8 dataLength, DeliveryPriority priority, bool reliable) const
+void ConnectionManager::BroadcastMeshPacket(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable) const
 {
 	MeshConnections conn = GetMeshConnections(ConnectionDirection::INVALID);
 	for(u32 i=0; i< conn.count; i++){
 		conn.connections[i]->SendData(data, dataLength, priority, reliable);
 	}
+}
+
+ConnectionManager & ConnectionManager::getInstance()
+{
+	return GS->cm;
 }
 
 void ConnectionManager::fillTransmitBuffers() const
@@ -399,136 +408,110 @@ void ConnectionManager::fillTransmitBuffers() const
 	}
 }
 
-//FIXME: Some rewrite of this method necessary
-void ConnectionManager::GATTDataTransmittedHandler(ble_evt_t &bleEvent)
+void ConnectionManager::GattDataTransmittedEventHandler(const GattDataTransmittedEvent& gattDataTransmitted)
 {
-	ConnectionManager* cm = GS->cm;
 	//There are two types of events that trigger a dataTransmittedCallback
 	//A TX complete event frees a number of transmit buffers
 	//These are used for all connections
 
-
-	u16 txCompleteConnectionHandle = BLE_CONN_HANDLE_INVALID;
-	u8 txCompleteCount = 0;
-
-#if defined(NRF51) || defined(SIM_ENABLED)
-	if(bleEvent.header.evt_id == BLE_EVT_TX_COMPLETE){
-		txCompleteConnectionHandle = bleEvent.evt.common_evt.conn_handle;
-		txCompleteCount = bleEvent.evt.common_evt.params.tx_complete.count;
-	}
-#elif defined(NRF52)
-	if(bleEvent.header.evt_id == BLE_GATTC_EVT_WRITE_CMD_TX_COMPLETE){
-		txCompleteConnectionHandle = bleEvent.evt.gattc_evt.conn_handle;
-		txCompleteCount = bleEvent.evt.gattc_evt.params.write_cmd_tx_complete.count;
-	} else if (bleEvent.header.evt_id == BLE_GATTS_EVT_HVN_TX_COMPLETE){
-		txCompleteConnectionHandle = bleEvent.evt.gatts_evt.conn_handle;
-		txCompleteCount = bleEvent.evt.gatts_evt.params.hvn_tx_complete.count;
-	}
-#endif
-
-
-	if (txCompleteConnectionHandle != BLE_CONN_HANDLE_INVALID)
+	if (gattDataTransmitted.isConnectionHandleValid()/*txCompleteConnectionHandle != BLE_CONN_HANDLE_INVALID*/)
 	{
-		logt("CONN_DATA", "write_CMD complete (n=%d)", txCompleteCount);
+		logt("CONN_DATA", "write_CMD complete (n=%d)", gattDataTransmitted.getCompleteCount());
 
 		//This connection has just been given back some transmit buffers
-		BaseConnection* connection = cm->GetConnectionFromHandle(txCompleteConnectionHandle);
+		BaseConnection* connection = ConnectionManager::getInstance().GetConnectionFromHandle(gattDataTransmitted.getConnectionHandle());
 		if (connection == nullptr) return;
 
-		connection->HandlePacketSent(txCompleteCount, 0);
+		connection->HandlePacketSent(gattDataTransmitted.getCompleteCount(), 0);
 
-		sentMeshPackets += txCompleteCount;
+		sentMeshPacketsUnreliable += gattDataTransmitted.getCompleteCount();
 
-		for (u32 i = 0; i < txCompleteCount; i++) {
-			GS->logger->logCount(ErrorTypes::CUSTOM, (u32)CustomErrorTypes::COUNT_SENT_PACKETS_UNRELIABLE);
+		for (u32 i = 0; i < gattDataTransmitted.getCompleteCount(); i++) {
+			GS->logger.logCustomCount(CustomErrorTypes::COUNT_SENT_PACKETS_UNRELIABLE);
 		}
 
 		//Next, we should continue sending packets if there are any
-		if (cm->GetPendingPackets())
-			cm->fillTransmitBuffers();
+		if (ConnectionManager::getInstance().GetPendingPackets())
+			ConnectionManager::getInstance().fillTransmitBuffers();
 
 	}
+}
+
+void ConnectionManager::GattcWriteResponseEventHandler(const GattcWriteResponseEvent & writeResponseEvent)
+{
 	//The EVT_WRITE_RSP comes after a WRITE_REQ and notifies that a buffer
 	//for one specific connection has been cleared
-	else if (bleEvent.header.evt_id == BLE_GATTC_EVT_WRITE_RSP)
+
+	if (writeResponseEvent.getGattStatus() != FruityHal::SUCCESS)
 	{
-		if (bleEvent.evt.gattc_evt.gatt_status != BLE_GATT_STATUS_SUCCESS)
-		{
-			logt("ERROR", "GATT status problem %d %s", bleEvent.evt.gattc_evt.gatt_status, GS->logger->getGattStatusErrorString(bleEvent.evt.gattc_evt.gatt_status));
+		logt("ERROR", "GATT status problem %d %s", writeResponseEvent.getGattStatus(), FruityHal::getGattStatusErrorString(writeResponseEvent.getGattStatus()));
 
+		GS->logger.logCount(ErrorTypes::GATT_STATUS, writeResponseEvent.getGattStatus());
 
-			GS->logger->logCount(ErrorTypes::GATT_STATUS, bleEvent.evt.gattc_evt.gatt_status);
+		//TODO: Error handling, but there really shouldn't be an error....;-)
+		//FIXME: Handle possible gatt status codes
 
-			//TODO: Error handling, but there really shouldn't be an error....;-)
-			//FIXME: Handle possible gatt status codes
+	}
+	else
+	{
+		logt("CONN_DATA", "write_REQ complete");
+		BaseConnection* connection = ConnectionManager::getInstance().GetConnectionFromHandle(writeResponseEvent.getConnectionHandle());
 
-		}
-		else
-		{
-			logt("CONN_DATA", "write_REQ complete");
-			BaseConnection* connection = cm->GetConnectionFromHandle(bleEvent.evt.gattc_evt.conn_handle);
+		//Connection could have been disconneced
+		if (connection == nullptr) return;
 
-			//Connection could have been disconneced
-			if (connection == nullptr) return;
+		connection->HandlePacketSent(0, 1);
 
-			connection->HandlePacketSent(0, 1);
+		sentMeshPacketsReliable++;
 
-			sentMeshPackets++;
+		GS->logger.logCustomCount(CustomErrorTypes::COUNT_SENT_PACKETS_RELIABLE);
 
-			GS->logger->logCount(ErrorTypes::CUSTOM, (u32)CustomErrorTypes::COUNT_SENT_PACKETS_RELIABLE);
-
-			//Now we continue sending packets
-			if (cm->GetPendingPackets())
-				cm->fillTransmitBuffers();
-		}
+		//Now we continue sending packets
+		if (ConnectionManager::getInstance().GetPendingPackets())
+			ConnectionManager::getInstance().fillTransmitBuffers();
 	}
 }
 
 #define _________________RECEIVING____________
 
-void ConnectionManager::GattDataReceivedHandler(ble_evt_t &bleEvent)
+void ConnectionManager::ForwardReceivedDataToConnection(u16 connectionHandle, BaseConnectionSendData & sendData, u8 * data)
 {
-	BaseConnectionSendData sendData;
-	u8* data;
-
-	if(bleEvent.header.evt_id == BLE_GATTS_EVT_WRITE){
-		ble_gatts_evt_write_t* writeEvent = (ble_gatts_evt_write_t*) &bleEvent.evt.gatts_evt.params.write;
-		connPacketHeader* packetHeader = (connPacketHeader*)writeEvent->data;
-
-		sendData.characteristicHandle = writeEvent->handle;
-		sendData.deliveryOption = (writeEvent->op == BLE_GATTS_OP_WRITE_REQ) ? DeliveryOption::WRITE_REQ : DeliveryOption::WRITE_CMD;
-		sendData.priority = DeliveryPriority::LOW; //TODO: Prio is unknown, should we send it in the packet?
-		sendData.dataLength = (u8)writeEvent->len;
-		data = writeEvent->data;
-
-	} else if(bleEvent.header.evt_id == BLE_GATTC_EVT_HVX){
-		ble_gattc_evt_hvx_t* hvxEvent = (ble_gattc_evt_hvx_t*) &bleEvent.evt.gattc_evt.params.hvx;
-		connPacketHeader* packetHeader = (connPacketHeader*)hvxEvent->data;
-
-		sendData.characteristicHandle = hvxEvent->handle;
-		sendData.deliveryOption = DeliveryOption::NOTIFICATION;
-		sendData.priority = DeliveryPriority::LOW; //TODO: Prio is unknown, should we send it in the packet?
-		sendData.dataLength = (u8)hvxEvent->len;
-		data = hvxEvent->data;
-	} else {
-		return;
-	}
-
-	logt("CM", "RX Data size is: %d, handles(%d, %d), delivery %d", sendData.dataLength, bleEvent.evt.gatts_evt.conn_handle, sendData.characteristicHandle, sendData.deliveryOption);
+	logt("CM", "RX Data size is: %d, handles(%d, %d), delivery %d", sendData.dataLength, connectionHandle, sendData.characteristicHandle, (u32)sendData.deliveryOption);
 
 	char stringBuffer[100];
-	GS->logger->convertBufferToHexString(data, sendData.dataLength, stringBuffer, sizeof(stringBuffer));
+	Logger::convertBufferToHexString(data, sendData.dataLength, stringBuffer, sizeof(stringBuffer));
 	logt("CM", "%s", stringBuffer);
-
 	//Get the handling connection for this write
-	u16 connectionHandle = bleEvent.evt.gatts_evt.conn_handle;
-	BaseConnection* connection = GS->cm->GetConnectionFromHandle(connectionHandle);
+	BaseConnection* connection = GS->cm.GetConnectionFromHandle(connectionHandle);
 
 	//Notify our connection instance that data has been received
-	if (connection != nullptr){
+	if (connection != nullptr) {
 		connection->ReceiveDataHandler(&sendData, data);
 	}
+}
 
+void ConnectionManager::GattsWriteEventHandler(const GattsWriteEvent& gattsWriteEvent)
+{
+	BaseConnectionSendData sendData;
+	sendData.characteristicHandle = gattsWriteEvent.getAttributeHandle();
+	sendData.deliveryOption = (gattsWriteEvent.isWriteRequest()) ? DeliveryOption::WRITE_REQ : DeliveryOption::WRITE_CMD;
+	sendData.priority = DeliveryPriority::LOW; //TODO: Prio is unknown, should we send it in the packet?
+	sendData.dataLength = gattsWriteEvent.getLength();
+
+	ForwardReceivedDataToConnection(gattsWriteEvent.getConnectionHandle(), sendData, gattsWriteEvent.getData() /*bleEvent.evt.gatts_evt.params.write->data*/);
+}
+
+void ConnectionManager::GattcHandleValueEventHandler(const GattcHandleValueEvent & handleValueEvent)
+{
+	BaseConnectionSendData sendData;
+
+	sendData.characteristicHandle = handleValueEvent.getHandle();
+	sendData.deliveryOption = DeliveryOption::NOTIFICATION;
+	sendData.priority = DeliveryPriority::LOW; //TODO: Prio is unknown, should we send it in the packet?
+	sendData.dataLength = handleValueEvent.getLength();
+
+
+	ForwardReceivedDataToConnection(handleValueEvent.getConnectionHandle(), sendData, handleValueEvent.getData());
 }
 
 //This method accepts connPackets and distributes it to all other mesh connections
@@ -538,14 +521,20 @@ void ConnectionManager::RouteMeshData(BaseConnection* connection, BaseConnection
 
 
 	/*#################### Modification ############################*/
-
+	//We ask all our modules to decide if this packet should be routed, the modules could also modify the packet content
+	RoutingDecision routingDecision = 0;
+	for (u32 i = 0; i < GS->amountOfModules; i++) {
+		if (GS->activeModules[i]->configurationPointer->moduleActive) {
+			routingDecision |= GS->activeModules[i]->MessageRoutingInterceptor(connection, sendData, packetHeader);
+		}
+	}
 
 	/*#################### ROUTING ############################*/
 
 	//We are the last receiver for this packet
-	if (packetHeader->receiver == GS->node->configuration.nodeId //We are the receiver
+	if (packetHeader->receiver == GS->node.configuration.nodeId //We are the receiver
 	|| packetHeader->receiver == NODE_ID_HOPS_BASE + 1//The packet was meant to travel only one hop
-	|| (packetHeader->receiver == NODE_ID_SHORTEST_SINK && GS->node->configuration.deviceType == deviceTypes::DEVICE_TYPE_SINK)//Packet was meant for the shortest sink and we are a sink
+	|| (packetHeader->receiver == NODE_ID_SHORTEST_SINK && GET_DEVICE_TYPE() == DeviceType::SINK)//Packet was meant for the shortest sink and we are a sink
 	)
 	{
 		//No packet forwarding needed here.
@@ -553,22 +542,18 @@ void ConnectionManager::RouteMeshData(BaseConnection* connection, BaseConnection
 	//The packet should continue to the shortest sink
 	else if(packetHeader->receiver == NODE_ID_SHORTEST_SINK)
 	{
-		//Send to all other connections (as long as sink routing is not implemented)
-		BroadcastMeshData(connection, sendData, data);
+		MeshConnection* connectionSink = GS->cm.GetMeshConnectionToShortestSink(connection);
 
-		//TODO: implement sink routing
-
-//		MeshConnection* connection = GS->cm->GetMeshConnectionToShortestSink(nullptr);
-//
-//		if(connection)
-//		{
-//			connection->SendData(sendData, data);
-//		}
-//		//We could send it as a broadcast or we just drop it if we do not know any sink
-//		else
-//		{
-//
-//		}
+		if(GS->config.enableSinkRouting && connectionSink && !(routingDecision & ROUTING_DECISION_BLOCK_TO_MESH))
+		{
+			connectionSink->SendData(sendData, data);
+		}
+		// If message was adressed to sink but there is no route to sink broadcast message
+		else
+		{
+			connPacketHeader* packetHeader = (connPacketHeader*)data;
+			BroadcastMeshData(connection, sendData, data, routingDecision);
+		}
 	}
 	//This could be either a packet to a specific node, group, with some hops left or a broadcast packet
 	else
@@ -579,71 +564,83 @@ void ConnectionManager::RouteMeshData(BaseConnection* connection, BaseConnection
 			packetHeader->receiver--;
 		}
 
-		//Do not forward cluster info update packets, these are handeled by the node
-		if(packetHeader->messageType != MESSAGE_TYPE_CLUSTER_INFO_UPDATE)
+		//TODO: We can refactor this to use the new MessageRoutingInterceptor
+		//Do not forward ...
+		//		... cluster info update packets, these are handeled by the node
+		//		... timestamps, these are only directly sent to one node and propagate through the mesh by other means
+		if(packetHeader->messageType != MessageType::CLUSTER_INFO_UPDATE
+			&& packetHeader->messageType != MessageType::UPDATE_TIMESTAMP)
 		{
 			//Send to all other connections
-			BroadcastMeshData(connection, sendData, data);
+			BroadcastMeshData(connection, sendData, data, routingDecision);
 		}
 	}
 }
 
-void ConnectionManager::BroadcastMeshData(const BaseConnection* ignoreConnection, BaseConnectionSendData* sendData, u8* data) const
+void ConnectionManager::BroadcastMeshData(const BaseConnection* ignoreConnection, BaseConnectionSendData* sendData, u8* data, RoutingDecision routingDecision) const
 {
 	//Iterate through all mesh connections except the ignored one and send the packet
-	MeshConnections conn = GetMeshConnections(ConnectionDirection::INVALID);
-	for(u32 i=0; i< conn.count; i++){
-		if (conn.connections[i] != ignoreConnection){
-			sendData->characteristicHandle = conn.connections[i]->partnerWriteCharacteristicHandle;
-			conn.connections[i]->SendData(sendData, data);
+	if (!(routingDecision & ROUTING_DECISION_BLOCK_TO_MESH)) {
+		MeshConnections conn = GetMeshConnections(ConnectionDirection::INVALID);
+		for (u32 i = 0; i < conn.count; i++) {
+			if (conn.connections[i] != ignoreConnection) {
+				sendData->characteristicHandle = conn.connections[i]->partnerWriteCharacteristicHandle;
+				conn.connections[i]->SendData(sendData, data);
+			}
 		}
 	}
 
 	//Route to all MeshAccess Connections
-#ifdef ACTIVATE_MA_MODULE
 	//Iterate through all mesh access connetions except the ignored one and send the packet
-	BaseConnections conn2 = GetConnectionsOfType(ConnectionTypes::CONNECTION_TYPE_MESH_ACCESS, ConnectionDirection::INVALID);
-	for(u32 i=0; i< conn2.count; i++){
-		MeshAccessConnection* maconn = (MeshAccessConnection*)allConnections[conn2.connectionIndizes[i]];
-		if (maconn != nullptr && maconn != ignoreConnection){
-			maconn->SendData(data, sendData->dataLength, sendData->priority, false);
+	if (!(routingDecision & ROUTING_DECISION_BLOCK_TO_MESH_ACCESS)) {
+		BaseConnections conn2 = GetConnectionsOfType(ConnectionType::MESH_ACCESS, ConnectionDirection::INVALID);
+		for (u32 i = 0; i < conn2.count; i++) {
+			MeshAccessConnection* maconn = (MeshAccessConnection*)allConnections[conn2.connectionIndizes[i]];
+			if (maconn != nullptr && maconn != ignoreConnection) {
+				maconn->SendData(data, sendData->dataLength, sendData->priority, false);
+			}
 		}
 	}
-#endif
 }
 
 #define _________________CONNECTIONS____________
 
 //Called as soon as a new connection is made, either as central or peripheral
-void ConnectionManager::GapConnectionConnectedHandler(ble_evt_t& bleEvent)
+void ConnectionManager::GapConnectionConnectedHandler(const GapConnectedEvent & connectedEvent)
 {
 	u32 err;
 
-	ble_gap_evt_connected_t* connectedEvent = &bleEvent.evt.gap_evt.params.connected;
-
-	StatusReporterModule* statusMod = (StatusReporterModule*)GS->node->GetModuleById(moduleID::STATUS_REPORTER_MODULE_ID);
+	StatusReporterModule* statusMod = (StatusReporterModule*)GS->node.GetModuleById(ModuleId::STATUS_REPORTER_MODULE);
 	if(statusMod != nullptr){
 		u32 addrPart;
-		memcpy(&addrPart, connectedEvent->peer_addr.addr, 4);
+		memcpy(&addrPart, connectedEvent.getPeerAddr(), 4);
 
-		if(connectedEvent->role == BLE_GAP_ROLE_PERIPH){
-			statusMod->SendLiveReport(LiveReportTypes::GAP_CONNECTED_INCOMING, bleEvent.evt.gap_evt.conn_handle, addrPart);
-		} else if(connectedEvent->role == BLE_GAP_ROLE_CENTRAL){
-			statusMod->SendLiveReport(LiveReportTypes::GAP_CONNECTED_OUTGOING, bleEvent.evt.gap_evt.conn_handle, addrPart);
+		if(connectedEvent.getRole() == GapRole::PERIPHERAL){
+			statusMod->SendLiveReport(LiveReportTypes::GAP_CONNECTED_INCOMING, connectedEvent.getConnectionHandle(), addrPart);
+		} else if(connectedEvent.getRole() == GapRole::CENTRAL){
+			statusMod->SendLiveReport(LiveReportTypes::GAP_CONNECTED_OUTGOING, connectedEvent.getConnectionHandle(), addrPart);
 		}
 	}
 
 
-	logt("CM", "Connection handle %u success as %s, partner:%02x:%02x:%02x:%02x:%02x:%02x", bleEvent.evt.gap_evt.conn_handle, bleEvent.evt.gap_evt.params.connected.role == BLE_GAP_ROLE_CENTRAL ? "Central" : "Peripheral", bleEvent.evt.gap_evt.params.connected.peer_addr.addr[5], bleEvent.evt.gap_evt.params.connected.peer_addr.addr[4], bleEvent.evt.gap_evt.params.connected.peer_addr.addr[3], bleEvent.evt.gap_evt.params.connected.peer_addr.addr[2], bleEvent.evt.gap_evt.params.connected.peer_addr.addr[1], bleEvent.evt.gap_evt.params.connected.peer_addr.addr[0]);
+	logt("CM", "Connection handle %u success as %s, partner:%02x:%02x:%02x:%02x:%02x:%02x", 
+		connectedEvent.getConnectionHandle(), 
+		connectedEvent.getRole() == GapRole::CENTRAL ? "Central" : "Peripheral", 
+		connectedEvent.getPeerAddr()[5], 
+		connectedEvent.getPeerAddr()[4],
+		connectedEvent.getPeerAddr()[3], 
+		connectedEvent.getPeerAddr()[2], 
+		connectedEvent.getPeerAddr()[1], 
+		connectedEvent.getPeerAddr()[0]);
 
-	GS->logger->logCount(ErrorTypes::CUSTOM, (u32)CustomErrorTypes::COUNT_CONNECTION_SUCCESS);
+	GS->logger.logCustomCount(CustomErrorTypes::COUNT_CONNECTION_SUCCESS);
 
-	BaseConnection* reestablishedConnection = IsConnectionReestablishment(bleEvent);
+	BaseConnection* reestablishedConnection = IsConnectionReestablishment(connectedEvent);
 
 	/* TODO: Part A: We have a connection reestablishment */
 	if (reestablishedConnection != nullptr)
 	{
-		reestablishedConnection->ReconnectionSuccessfulHandler(bleEvent);
+		reestablishedConnection->GapReconnectionSuccessfulHandler(connectedEvent);
 
 		//Check if there is another connection in reestablishing state that we can try to reconnect
 		MeshConnections conns = GetMeshConnections(ConnectionDirection::DIRECTION_OUT);
@@ -653,16 +650,16 @@ void ConnectionManager::GapConnectionConnectedHandler(ble_evt_t& bleEvent)
 			}
 		}
 
-		if (bleEvent.evt.gap_evt.params.connected.role == BLE_GAP_ROLE_PERIPH)
+		if (connectedEvent.getRole() == GapRole::PERIPHERAL)
 		{
 			//The Peripheral should wait until the encryption request was made
 			reestablishedConnection->encryptionState = EncryptionState::NOT_ENCRYPTED;
 		}
-		else if (bleEvent.evt.gap_evt.params.connected.role == BLE_GAP_ROLE_CENTRAL)
+		else if (connectedEvent.getRole() == GapRole::CENTRAL)
 		{
 			//If encryption is enabled, the central starts to encrypt the connection
 			reestablishedConnection->encryptionState = EncryptionState::ENCRYPTING;
-			GS->gapController->startEncryptingConnection(bleEvent.evt.gap_evt.conn_handle);
+			GS->gapController.startEncryptingConnection(connectedEvent.getConnectionHandle());
 		}
 
 		return;
@@ -674,13 +671,12 @@ void ConnectionManager::GapConnectionConnectedHandler(ble_evt_t& bleEvent)
 		logt("CM", "Currently in handshake, disconnect");
 
 		//If we have a pendingConnection for this, we must clean it
-		if(bleEvent.evt.gap_evt.params.connected.role == BLE_GAP_ROLE_CENTRAL){
+		if(connectedEvent.getRole() == GapRole::CENTRAL){
 			if(pendingConnection != nullptr){
-				pendingConnection->appDisconnectionReason = AppDisconnectReason::CURRENTLY_IN_HANDSHAKE;
-				DeleteConnection(pendingConnection);
+				DeleteConnection(pendingConnection, AppDisconnectReason::CURRENTLY_IN_HANDSHAKE);
 			}
 		}
-		err = FruityHal::Disconnect(bleEvent.evt.gap_evt.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+		err = FruityHal::Disconnect(connectedEvent.getConnectionHandle(), FruityHal::HciErrorCode::REMOTE_USER_TERMINATED_CONNECTION);
 
 		return;
 	}
@@ -688,39 +684,44 @@ void ConnectionManager::GapConnectionConnectedHandler(ble_evt_t& bleEvent)
 	BaseConnection* c = nullptr;
 
 	//We are slave (peripheral)
-	if (bleEvent.evt.gap_evt.params.connected.role == BLE_GAP_ROLE_PERIPH)
+	if (connectedEvent.getRole() == GapRole::PERIPHERAL)
 	{
 		logt("CM", "Incoming Connection connected");
 
 		//Check if we have a free entry in our connections array
+		//It might happen that we have not, because we have not yet received a disconnect event but a connection was already disconnected
 		i8 id = getFreeConnectionSpot();
 		if(id < 0){
-			SIMERROR();
-			logt("ERROR", "Fail: No spot");
+			logt("ERROR", "No spot available");
 			
-			//Critical error, drop all connections
-			GS->logger->logCount(ErrorTypes::CUSTOM, (u32)CustomErrorTypes::COUNT_CM_FAIL_NO_SPOT);
-			ForceDisconnectAllConnections(AppDisconnectReason::CM_FAIL_NO_SPOT);
+			//We must drop the connection
+			GS->logger.logCustomError(CustomErrorTypes::WARN_CM_FAIL_NO_SPOT, 0);
+			FruityHal::Disconnect(connectedEvent.getConnectionHandle(), FruityHal::HciErrorCode::REMOTE_USER_TERMINATED_CONNECTION);
+
+			return;
 		}
 
 
 
-		fh_ble_gap_addr_t peerAddress = FruityHal::Convert(&connectedEvent->peer_addr);
+		fh_ble_gap_addr_t peerAddress;
+		CheckedMemset(&peerAddress, 0, sizeof(peerAddress));
+		peerAddress.addr_type = connectedEvent.getPeerAddrType();
+		memcpy(peerAddress.addr, connectedEvent.getPeerAddr(), sizeof(peerAddress.addr));
 
-		c = allConnections[id] = new ResolverConnection(id, ConnectionDirection::DIRECTION_IN, &peerAddress);
-		c->ConnectionSuccessfulHandler(bleEvent.evt.gap_evt.conn_handle, bleEvent.evt.gap_evt.params.connected.conn_params.min_conn_interval);
+		c = allConnections[id] = ConnectionAllocator::getInstance().allocateResolverConnection(id, ConnectionDirection::DIRECTION_IN, &peerAddress);
+		c->ConnectionSuccessfulHandler(connectedEvent.getConnectionHandle());
 
 
 		//The central may now start encrypting or start the handshake, we just have to wait
 	}
 	//We are master (central)
-	else if (bleEvent.evt.gap_evt.params.connected.role == BLE_GAP_ROLE_CENTRAL)
+	else if (connectedEvent.getRole() == GapRole::CENTRAL)
 	{
 		//This can happen if the connection has been cleaned up already e.g. by disconnecting all connections but the connection was accepted in the meantime
 		if(pendingConnection == nullptr){
 			logt("ERROR", "No pending Connection");
-			GS->logger->logCount(ErrorTypes::CUSTOM, (u32)CustomErrorTypes::COUNT_NO_PENDING_CONNECTION);
-			err = FruityHal::Disconnect(bleEvent.evt.gap_evt.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+			GS->logger.logCustomCount(CustomErrorTypes::COUNT_NO_PENDING_CONNECTION);
+			err = FruityHal::Disconnect(connectedEvent.getConnectionHandle(), FruityHal::HciErrorCode::REMOTE_USER_TERMINATED_CONNECTION);
 			return;
 		}
 
@@ -728,12 +729,12 @@ void ConnectionManager::GapConnectionConnectedHandler(ble_evt_t& bleEvent)
 		pendingConnection = nullptr;
 
 		//Call Prepare again so that the clusterID and size backup are created with up to date values
-		c->ConnectionSuccessfulHandler(bleEvent.evt.gap_evt.conn_handle, bleEvent.evt.gap_evt.params.connected.conn_params.min_conn_interval);
+		c->ConnectionSuccessfulHandler(connectedEvent.getConnectionHandle());
 
 		//If encryption is enabled, the central starts to encrypt the connection
-		if (Config->encryptionEnabled && c->connectionType == ConnectionTypes::CONNECTION_TYPE_FRUITYMESH){
+		if (Conf::encryptionEnabled && c->connectionType == ConnectionType::FRUITYMESH){
 			c->encryptionState = EncryptionState::ENCRYPTING;
-			GS->gapController->startEncryptingConnection(bleEvent.evt.gap_evt.conn_handle);
+			GS->gapController.startEncryptingConnection(connectedEvent.getConnectionHandle());
 		}
 		//Without encryption we immediately start the handshake
 		else {
@@ -743,35 +744,25 @@ void ConnectionManager::GapConnectionConnectedHandler(ble_evt_t& bleEvent)
 }
 
 //If we wanted to connect but our connection timed out (only outgoing connections)
-void ConnectionManager::GapConnectingTimeoutHandler(ble_evt_t& bleEvent)
+void ConnectionManager::GapConnectingTimeoutHandler(const GapTimeoutEvent &gapTimeoutEvent)
 {
 	if (pendingConnection == nullptr)
 		return;
 
 	//Save connection type, but clear pending connection, because the handlers might try to
 	//create a new connection immediately
-	ConnectionTypes connectionType = pendingConnection->connectionType;
+	ConnectionType connectionType = pendingConnection->connectionType;
 
-	pendingConnection->appDisconnectionReason = AppDisconnectReason::GAP_CONNECTING_TIMEOUT;
-	DeleteConnection(pendingConnection);
-
-	//Inform modules about all kinds of connection timeouts
-	for (int i = 0; i < MAX_MODULE_COUNT; i++)
-	{
-		if (GS->activeModules[i] != nullptr && GS->activeModules[i]->configurationPointer->moduleActive)
-		{
-			GS->activeModules[i]->ConnectionTimeoutHandler(connectionType, &bleEvent);
-		}
-	}
+	DeleteConnection(pendingConnection, AppDisconnectReason::GAP_CONNECTING_TIMEOUT);
 }
 
 //FIXME: Still needs rewriting
 //When a connection changes to encrypted
-void ConnectionManager::GapConnectionEncryptedHandler(ble_evt_t& bleEvent)
+void ConnectionManager::GapConnectionEncryptedHandler(const GapConnectionSecurityUpdateEvent &connectionSecurityUpdateEvent)
 {
-	BaseConnection* c = GetConnectionFromHandle(bleEvent.evt.gap_evt.conn_handle);
+	BaseConnection* c = GetConnectionFromHandle(connectionSecurityUpdateEvent.getConnectionHandle());
 
-	if (c == nullptr) return; //Connection might have been disconnected alread
+	if (c == nullptr) return; //Connection might have been disconnected already
 
 	logt("CM", "Connection id %u is now encrypted", c->connectionId);
 	c->encryptionState = EncryptionState::ENCRYPTED;
@@ -790,28 +781,29 @@ void ConnectionManager::GapConnectionEncryptedHandler(ble_evt_t& bleEvent)
 //due to a timeout, deliberate disconnection by the localhost, remote, etc,...
 //We might however decide to sustain it. it will only be lost after
 //the finalDisconnectionHander is called
-void ConnectionManager::GapConnectionDisconnectedHandler(ble_evt_t& bleEvent)
+void ConnectionManager::GapConnectionDisconnectedHandler(const GapDisconnectedEvent& disconnectedEvent)
 {
-	StatusReporterModule* statusMod = (StatusReporterModule*)GS->node->GetModuleById(moduleID::STATUS_REPORTER_MODULE_ID);
-	if(statusMod != nullptr){
-		statusMod->SendLiveReport(LiveReportTypes::GAP_DISCONNECTED, bleEvent.evt.gap_evt.conn_handle, bleEvent.evt.gap_evt.params.disconnected.reason);
+	BaseConnection* connection = GetConnectionFromHandle(disconnectedEvent.getConnectionHandle());
+
+	StatusReporterModule* statusMod = (StatusReporterModule*)GS->node.GetModuleById(ModuleId::STATUS_REPORTER_MODULE);
+	if (statusMod != nullptr) {
+		statusMod->SendLiveReport(LiveReportTypes::WARN_GAP_DISCONNECTED, connection == nullptr ? 0 : connection->partnerId, disconnectedEvent.getReason());
 	}
-	BaseConnection* connection = GetConnectionFromHandle(bleEvent.evt.gap_evt.conn_handle);
 
 	if(connection == nullptr) return;
 
-	logt("CM", "Gap Connection handle %u disconnected", bleEvent.evt.gap_evt.conn_handle);
 
-	GS->logger->logCount(ErrorTypes::HCI_ERROR, bleEvent.evt.gap_evt.params.disconnected.reason);
+	logt("CM", "Gap Connection handle %u disconnected", disconnectedEvent.getConnectionHandle());
+
+	GS->logger.logCount(ErrorTypes::HCI_ERROR, disconnectedEvent.getReason());
 
 	//Notify the connection itself
-	bool result = connection->GapDisconnectionHandler(bleEvent.evt.gap_evt.params.disconnected.reason);
+	bool result = connection->GapDisconnectionHandler(disconnectedEvent.getReason());
 
 	//The connection can be disconnected
 	if(result){
 		logt("WARNING", "Final Disconnect");
-		connection->appDisconnectionReason = AppDisconnectReason::GAP_DISCONNECT_NO_REESTABLISH_REQUESTED;
-		connection->DisconnectAndRemove();
+		connection->DisconnectAndRemove(AppDisconnectReason::GAP_DISCONNECT_NO_REESTABLISH_REQUESTED);
 	}
 	// The connection will try to reconnect
 	else
@@ -820,11 +812,24 @@ void ConnectionManager::GapConnectionDisconnectedHandler(ble_evt_t& bleEvent)
 	}
 }
 
+void ConnectionManager::GattcTimeoutEventHandler(const GattcTimeoutEvent & gattcTimeoutEvent)
+{
+	//A GATTC Timeout occurs if a WRITE_RSP is not received within 30s
+	//This essentially marks the end of a connection, we'll have to disconnect
+	logt("ERROR", "BLE_GATTC_EVT_TIMEOUT");
+
+	BaseConnection* connection = GetConnectionFromHandle(gattcTimeoutEvent.getConnectionHandle());
+
+	connection->DisconnectAndRemove(AppDisconnectReason::GATTC_TIMEOUT);
+
+	GS->logger.logCustomError(CustomErrorTypes::FATAL_BLE_GATTC_EVT_TIMEOUT_FORCED_US, 0);
+}
+
 #define _________________HELPERS____________
 
 i8 ConnectionManager::getFreeConnectionSpot() const
 {
-	for (int i = 0; i < MAX_NUM_CONNECTIONS; i++){
+	for (int i = 0; i < TOTAL_NUM_CONNECTIONS; i++){
 		if (allConnections[i] == nullptr)
 			return i;
 	}
@@ -835,7 +840,7 @@ i8 ConnectionManager::getFreeConnectionSpot() const
 //Looks through all connections for the right handle and returns the right one
 BaseConnection* ConnectionManager::GetConnectionFromHandle(u16 connectionHandle) const
 {
-	for(u32 i=0; i<MAX_NUM_CONNECTIONS; i++){
+	for(u32 i=0; i<TOTAL_NUM_CONNECTIONS; i++){
 		if(allConnections[i] != nullptr && allConnections[i]->connectionHandle == connectionHandle){
 			return allConnections[i];
 		}
@@ -846,7 +851,7 @@ BaseConnection* ConnectionManager::GetConnectionFromHandle(u16 connectionHandle)
 //Looks through all connections for the right handle and returns the right one
 BaseConnection* ConnectionManager::GetConnectionByUniqueId(u16 uniqueConnectionId) const
 {
-	for(u32 i=0; i<MAX_NUM_CONNECTIONS; i++){
+	for(u32 i=0; i<TOTAL_NUM_CONNECTIONS; i++){
 		if(allConnections[i] != nullptr && allConnections[i]->uniqueConnectionId == uniqueConnectionId){
 			return allConnections[i];
 		}
@@ -856,8 +861,8 @@ BaseConnection* ConnectionManager::GetConnectionByUniqueId(u16 uniqueConnectionI
 
 BaseConnections ConnectionManager::GetBaseConnections(ConnectionDirection direction) const{
 	BaseConnections fc;
-	memset(&fc, 0x00, sizeof(BaseConnections));
-	for(u32 i=0; i<MAX_NUM_CONNECTIONS; i++){
+	CheckedMemset(&fc, 0x00, sizeof(BaseConnections));
+	for(u32 i=0; i<TOTAL_NUM_CONNECTIONS; i++){
 		if(allConnections[i] != nullptr){
 			if(allConnections[i]->direction == direction || direction == ConnectionDirection::INVALID){
 				fc.connectionIndizes[fc.count] = i;
@@ -870,10 +875,10 @@ BaseConnections ConnectionManager::GetBaseConnections(ConnectionDirection direct
 
 MeshConnections ConnectionManager::GetMeshConnections(ConnectionDirection direction) const{
 	MeshConnections fc;
-	memset(&fc, 0x00, sizeof(MeshConnections));
-	for(u32 i=0; i<MAX_NUM_CONNECTIONS; i++){
+	CheckedMemset(&fc, 0x00, sizeof(MeshConnections));
+	for(u32 i=0; i<TOTAL_NUM_CONNECTIONS; i++){
 		if(allConnections[i] != nullptr){
-			if(allConnections[i]->connectionType == ConnectionTypes::CONNECTION_TYPE_FRUITYMESH){
+			if(allConnections[i]->connectionType == ConnectionType::FRUITYMESH){
 				if(allConnections[i]->direction == direction || direction == ConnectionDirection::INVALID){
 					fc.connections[fc.count] = (MeshConnection*)allConnections[i];
 					fc.count++;
@@ -887,8 +892,8 @@ MeshConnections ConnectionManager::GetMeshConnections(ConnectionDirection direct
 MeshConnection* ConnectionManager::GetConnectionInHandshakeState() const
 {
 
-	for(u32 i=0; i<MAX_NUM_CONNECTIONS; i++){
-		if(allConnections[i] != nullptr && allConnections[i]->connectionType == ConnectionTypes::CONNECTION_TYPE_FRUITYMESH){
+	for(u32 i=0; i<TOTAL_NUM_CONNECTIONS; i++){
+		if(allConnections[i] != nullptr && allConnections[i]->connectionType == ConnectionType::FRUITYMESH){
 			if(allConnections[i]->connectionState == ConnectionState::HANDSHAKING){
 				return (MeshConnection*)allConnections[i];
 			}
@@ -897,12 +902,12 @@ MeshConnection* ConnectionManager::GetConnectionInHandshakeState() const
 	return nullptr;
 }
 
-BaseConnections ConnectionManager::GetConnectionsOfType(ConnectionTypes connectionType, ConnectionDirection direction) const{
+BaseConnections ConnectionManager::GetConnectionsOfType(ConnectionType connectionType, ConnectionDirection direction) const{
 	BaseConnections fc;
-	memset(&fc, 0x00, sizeof(BaseConnections));
-	for(u32 i=0; i<MAX_NUM_CONNECTIONS; i++){
+	CheckedMemset(&fc, 0x00, sizeof(BaseConnections));
+	for(u32 i=0; i<TOTAL_NUM_CONNECTIONS; i++){
 		if(allConnections[i] != nullptr){
-			if(allConnections[i]->connectionType == connectionType || connectionType == ConnectionTypes::CONNECTION_TYPE_INVALID){
+			if(allConnections[i]->connectionType == connectionType || connectionType == ConnectionType::INVALID){
 				if(allConnections[i]->direction == direction || direction == ConnectionDirection::INVALID){
 					fc.connectionIndizes[fc.count] = i;
 					fc.count++;
@@ -913,11 +918,26 @@ BaseConnections ConnectionManager::GetConnectionsOfType(ConnectionTypes connecti
 	return fc;
 }
 
+//Looks through all connections for the right handle and returns the right one
+MeshConnection* ConnectionManager::GetMeshConnectionToPartner(NodeId partnerId) const
+{
+	for (u32 i = 0; i < TOTAL_NUM_CONNECTIONS; i++) {
+		if (
+			allConnections[i] != nullptr
+			&& allConnections[i]->connectionType == ConnectionType::FRUITYMESH
+			&& allConnections[i]->partnerId == partnerId
+		) {
+			return (MeshConnection*)allConnections[i];
+		}
+	}
+	return nullptr;
+}
+
 //Returns the pending packets of all connection types
 u16 ConnectionManager::GetPendingPackets() const
 {
 	u16 pendingPackets = 0;
-	for (u32 i = 0; i < MAX_NUM_CONNECTIONS; i++){
+	for (u32 i = 0; i < TOTAL_NUM_CONNECTIONS; i++){
 		if(allConnections[i] != nullptr){
 			pendingPackets += allConnections[i]->GetPendingPackets();
 		}
@@ -925,15 +945,15 @@ u16 ConnectionManager::GetPendingPackets() const
 	return pendingPackets;
 }
 
-BaseConnection* ConnectionManager::IsConnectionReestablishment(const ble_evt_t& bleEvent) const
+BaseConnection* ConnectionManager::IsConnectionReestablishment(const GapConnectedEvent& connectedEvent) const
 {
 	//Check if we already have a connection for this peer, identified by its address
-	fh_ble_gap_addr_t peerAddress = FruityHal::Convert(&bleEvent.evt.gap_evt.params.connected.peer_addr);
-	for (int i = 0; i < Config->meshMaxConnections; i++)
+	for (int i = 0; i < (Conf::meshMaxInConnections + Conf::meshMaxOutConnections); i++)
 	{
 		if (allConnections[i] != nullptr && allConnections[i]->connectionState == ConnectionState::REESTABLISHING)
 		{
-			if (memcmp(&allConnections[i]->partnerAddress, &peerAddress, sizeof(fh_ble_gap_addr_t)) == 0)
+			if (memcmp(connectedEvent.getPeerAddr(), allConnections[i]->partnerAddress.addr, 6) == 0
+				&& connectedEvent.getPeerAddrType() == allConnections[i]->partnerAddress.addr_type)
 			{
 				logt("CM", "Found existing connection id %u", allConnections[i]->connectionId);
 				return allConnections[i];
@@ -944,7 +964,7 @@ BaseConnection* ConnectionManager::IsConnectionReestablishment(const ble_evt_t& 
 }
 
 //TODO: Only return mesh connections, check
-MeshConnection* ConnectionManager::GetMeshConnectionToShortestSink(const MeshConnection* excludeConnection) const
+MeshConnection* ConnectionManager::GetMeshConnectionToShortestSink(const BaseConnection* excludeConnection) const
 {
 	ClusterSize min = INT16_MAX;
 	MeshConnection* c = nullptr;
@@ -962,11 +982,11 @@ MeshConnection* ConnectionManager::GetMeshConnectionToShortestSink(const MeshCon
 	return c;
 }
 
-ClusterSize ConnectionManager::GetMeshHopsToShortestSink(const MeshConnection* excludeConnection) const
+ClusterSize ConnectionManager::GetMeshHopsToShortestSink(const BaseConnection* excludeConnection) const
 {
-	if (GS->node->configuration.deviceType == deviceTypes::DEVICE_TYPE_SINK)
+	if (GET_DEVICE_TYPE() == DeviceType::SINK)
 	{
-		logt("SINK", "HOPS 0, clID:%x, clSize:%d", GS->node->clusterId, GS->node->clusterSize);
+		logt("SINK", "HOPS 0, clID:%x, clSize:%d", GS->node.clusterId, GS->node.clusterSize);
 		return 0;
 	}
 	else
@@ -976,7 +996,7 @@ ClusterSize ConnectionManager::GetMeshHopsToShortestSink(const MeshConnection* e
 		MeshConnections conn = GetMeshConnections(ConnectionDirection::INVALID);
 		for(int i=0; i<conn.count; i++)
 		{
-			if(conn.connections[i] == excludeConnection || !conn.connections[i]->isConnected()) continue;
+			if(conn.connections[i] == excludeConnection || !conn.connections[i]->handshakeDone()) continue;
 			if(conn.connections[i]->hopsToSink > -1 && conn.connections[i]->hopsToSink < min)
 			{
 				min = conn.connections[i]->hopsToSink;
@@ -984,32 +1004,23 @@ ClusterSize ConnectionManager::GetMeshHopsToShortestSink(const MeshConnection* e
 			}
 		}
 
-		logt("SINK", "HOPS %d, clID:%x, clSize:%d", (c == nullptr) ? -1 : c->hopsToSink, GS->node->clusterId, GS->node->clusterSize);
+		logt("SINK", "HOPS %d, clID:%x, clSize:%d", (c == nullptr) ? -1 : c->hopsToSink, GS->node.clusterId, GS->node.clusterSize);
 		return (c == nullptr) ? -1 : c->hopsToSink;
 	}
 }
 
 #define _________________EVENTS____________
 
-//Forward ble events to connections
-void ConnectionManager::BleEventHandler(ble_evt_t &bleEvent) const
+void ConnectionManager::GapRssiChangedEventHandler(const GapRssiChangedEvent & rssiChangedEvent) const
 {
-	for (int i = 0; i < MAX_NUM_CONNECTIONS; i++) {
-		if(allConnections[i] != nullptr) GS->cm->allConnections[i]->BleEventHandler(bleEvent);
-	}
+	BaseConnection* connection = GetConnectionFromHandle(rssiChangedEvent.getConnectionHandle());
+	if (connection != nullptr) {
+		i8 rssi = rssiChangedEvent.getRssi();
+		connection->lastReportedRssi = rssi;
 
-	//New RSSI measurement for connection received
-	if(bleEvent.header.evt_id == BLE_GAP_EVT_RSSI_CHANGED)
-	{
-		BaseConnection* connection = GetConnectionFromHandle(bleEvent.evt.gap_evt.conn_handle);
-		if (connection != nullptr) {
-			i8 rssi = bleEvent.evt.gap_evt.params.rssi_changed.rssi;
-			connection->lastReportedRssi = rssi;
+		if (connection->rssiAverageTimes1000 == 0) connection->rssiAverageTimes1000 = (i32)rssi * 1000;
 
-			if(connection->rssiAverageTimes1000 == 0) connection->rssiAverageTimes1000 = (i32)rssi * 1000;
-
-			//=> The averaging is done in the timerEventHandler
-		}
+		//=> The averaging is done in the timerEventHandler
 	}
 }
 
@@ -1020,52 +1031,226 @@ void ConnectionManager::TimerEventHandler(u16 passedTimeDs)
 		fillTransmitBuffers();
 	}
 
-	//Disconnect Connections that have exceeded their handshake timeout
-	BaseConnections conns = GetConnectionsOfType(ConnectionTypes::CONNECTION_TYPE_INVALID, ConnectionDirection::INVALID);
+	{
+		//Disconnect Connections that have exceeded their handshake timeout
+		BaseConnections conns = GetConnectionsOfType(ConnectionType::INVALID, ConnectionDirection::INVALID);
 
-	for(u32 i=0; i< conns.count; i++){
-		BaseConnection* conn = allConnections[conns.connectionIndizes[i]];
-		if (conn == nullptr) {
-			continue; //The connection was already removed in a previous iteration.
+		for (u32 i = 0; i < conns.count; i++) {
+			BaseConnection* conn = allConnections[conns.connectionIndizes[i]];
+			if (conn == nullptr) {
+				continue; //The connection was already removed in a previous iteration.
+			}
+
+			//The average rssi is caluclated using a moving average with 5% influece per time step
+			conn->rssiAverageTimes1000 = (95 * (i32)conn->rssiAverageTimes1000 + 5000 * (i32)conn->lastReportedRssi) / 100;
+
+			//Check if an implementation failure did not clear the pending connection
+			//FIXME: Should use a timeout stored in the connection as we do not know what connectingTimout this connection has
+			if (pendingConnection != nullptr)
+			{
+				const u32 timeoutTimeDs = (
+					pendingConnection->handshakeStartedDs > 0 ?
+						//If the handshake has started, we calculate the timeout based on the handshake...
+						Conf::meshHandshakeTimeoutDs + pendingConnection->handshakeStartedDs
+						//...else we calculate the timeout based on the creation.
+						: pendingConnection->creationTimeDs
+					);
+				if (GS->appTimerDs > timeoutTimeDs + SEC_TO_DS(10))
+				{
+					logt("ERROR", "Fatal: Pending timeout");
+					u32 error = (((u8)pendingConnection->appDisconnectionReason))
+						+ (((u8)pendingConnection->connectionType) << 8)
+						+ (((u8)pendingConnection->direction) << 16)
+						+ (((u8)pendingConnection->connectionState) << 24);
+					GS->logger.logCustomError(CustomErrorTypes::FATAL_PENDING_NOT_CLEARED, error);
+
+					SIMEXCEPTION(IllegalStateException);
+
+					DeleteConnection(pendingConnection, AppDisconnectReason::PENDING_TIMEOUT);
+				}
+			}
+			//Check if a handshake should time out
+			else if (
+				conn->connectionState >= ConnectionState::CONNECTED
+				&& conn->connectionState < ConnectionState::HANDSHAKE_DONE
+				&& conn->handshakeStartedDs + Conf::meshHandshakeTimeoutDs <= GS->appTimerDs
+				) {
+				logt("CM", "Handshake timeout");
+
+				GS->logger.logCustomError(CustomErrorTypes::WARN_HANDSHAKE_TIMEOUT, conn->partnerId);
+
+				conn->DisconnectAndRemove(AppDisconnectReason::HANDSHAKE_TIMEOUT);
+			}
+			//Check if a connection reestablishment should time out
+			else if (
+				(conn->connectionState == ConnectionState::REESTABLISHING || conn->connectionState == ConnectionState::REESTABLISHING_HANDSHAKE)
+				&& conn->disconnectedTimestampDs + SEC_TO_DS(Conf::meshExtendedConnectionTimeoutSec) <= GS->appTimerDs
+				) {
+				logt("CM", "Reconnection timeout");
+
+				GS->logger.logCustomError(CustomErrorTypes::WARN_CONNECTION_SUSTAIN_FAILED_TO_ESTABLISH, conn->partnerId);
+
+				conn->DisconnectAndRemove(AppDisconnectReason::RECONNECT_TIMEOUT);
+			}
 		}
+	}
 
-		//The average rssi is caluclated using a moving average with 5% influece per time step
-		conn->rssiAverageTimes1000 = (95 * (i32)conn->rssiAverageTimes1000 + 5000 * (i32)conn->lastReportedRssi) / 100;
+	// Time Syncing
+	timeSinceLastTimeSyncIntervalDs += passedTimeDs;
+	if(GS->timeManager.IsTimeCorrected() && timeSinceLastTimeSyncIntervalDs >= TIME_BETWEEN_TIME_SYNC_INTERVALS_DS)
+	{
+		timeSinceLastTimeSyncIntervalDs = 0;
+		BaseConnections conns = GetConnectionsOfType(ConnectionType::FRUITYMESH, ConnectionDirection::INVALID);
 
-		//Check if an implementation failure did not clear the pending connection
-		//FIXME: Should use a timeout stored in the connection as we do not know what connectingTimout this connection has
-		if(pendingConnection != nullptr && GS->appTimerDs > pendingConnection->creationTimeDs + Config->meshConnectingScanTimeout + SEC_TO_DS(10))
+		for (u32 i = 0; i < conns.count; i++)
 		{
-			logt("CM", "Pending timeout");
+			MeshConnection* conn = static_cast<MeshConnection*>(allConnections[conns.connectionIndizes[i]]);
+			if (conn == nullptr)
+			{
+				// The Connection was already removed
+				SIMEXCEPTION(IllegalStateException);
+				GS->logger.logCustomError(CustomErrorTypes::FATAL_CONNECTION_REMOVED_WHILE_TIME_SYNC, 1000);
+				continue;
+			}
 
-			GS->logger->logError(ErrorTypes::CUSTOM, (u32)CustomErrorTypes::FATAL_PENDING_NOT_CLEARED, 0);
-			pendingConnection->appDisconnectionReason = AppDisconnectReason::PENDING_TIMEOUT;
-			DeleteConnection(pendingConnection);
+			if (conn->handshakeDone() == false) continue;
+
+			if (conn->timeSyncState == MeshConnection::TimeSyncState::UNSYNCED)
+			{
+				alignas(u32) TimeSyncInitial dataToSend = GS->timeManager.GetTimeSyncIntialMessage(conn->partnerId);
+
+				conn->syncSendingOrdered = GS->timeManager.GetTimePoint();
+
+				logt("TSYNC", "Sending out TimeSyncInitial, NodeId: %u, partner: %u", (u32)GS->node.configuration.nodeId, (u32)conn->partnerId);
+
+				GS->cm.SendMeshMessage(
+					(u8*)&dataToSend,
+					sizeof(TimeSyncInitial),
+					DeliveryPriority::LOW);
+			}
+			else if (conn->timeSyncState == MeshConnection::TimeSyncState::INITIAL_SENT)
+			{
+				alignas(u32) TimeSyncCorrection dataToSend;
+				CheckedMemset(&dataToSend, 0, sizeof(dataToSend));
+				dataToSend.header.header.messageType = MessageType::TIME_SYNC;
+				dataToSend.header.header.receiver = conn->partnerId;
+				dataToSend.header.header.sender = GS->node.configuration.nodeId;
+				dataToSend.header.type = TimeSyncType::CORRECTION;
+				dataToSend.correctionTicks = conn->correctionTicks;
+
+				logt("TSYNC", "Sending out TimeSyncCorrection, NodeId: %u, partner: %u", (u32)GS->node.configuration.nodeId, (u32)conn->partnerId);
+
+				GS->cm.SendMeshMessage(
+					(u8*)&dataToSend,
+					sizeof(TimeSyncCorrection),
+					DeliveryPriority::LOW
+					);
+			}
 		}
-		//Check if a handshake should time out
-		else if(
-			conn->connectionState >= ConnectionState::CONNECTED
-			&& conn->connectionState < ConnectionState::HANDSHAKE_DONE
-			&& conn->handshakeStartedDs + Config->meshHandshakeTimeoutDs <= GS->appTimerDs
-		){
-			logt("CM", "Handshake timeout");
+	}
+}
 
-			GS->logger->logCount(ErrorTypes::CUSTOM, (u32)CustomErrorTypes::COUNT_HANDSHAKE_TIMEOUT);
+void ConnectionManager::ResetTimeSync()
+{
+	BaseConnections conns = GetConnectionsOfType(ConnectionType::FRUITYMESH, ConnectionDirection::INVALID);
 
-			conn->appDisconnectionReason = AppDisconnectReason::HANDSHAKE_TIMEOUT;
-			conn->DisconnectAndRemove();
+	for (u32 i = 0; i < conns.count; i++)
+	{
+		MeshConnection* conn = static_cast<MeshConnection*>(allConnections[conns.connectionIndizes[i]]);
+		if (conn == nullptr)
+		{
+			// The Connection was already removed
+			SIMEXCEPTION(IllegalStateException);
+			GS->logger.logCustomError(CustomErrorTypes::FATAL_CONNECTION_REMOVED_WHILE_TIME_SYNC, 2000);
+			continue;
 		}
-		//Check if a connection reestablishment should time out
-		else if(
-			(conn->connectionState == ConnectionState::REESTABLISHING || conn->connectionState == ConnectionState::REESTABLISHING_HANDSHAKE)
-			&& conn->disconnectedTimestampDs + SEC_TO_DS(Config->meshExtendedConnectionTimeoutSec) <= GS->appTimerDs
-		){
-			logt("CM", "Reconnection timeout");
 
-			GS->logger->logError(ErrorTypes::CUSTOM, (u32)CustomErrorTypes::COUNT_CONNECTION_SUSTAIN_FAILED_TO_ESTABLISH, conn->partnerId);
+		conn->timeSyncState = MeshConnection::TimeSyncState::UNSYNCED;
+	}
+}
 
-			conn->appDisconnectionReason = AppDisconnectReason::RECONNECT_TIMEOUT;
-			conn->DisconnectAndRemove();
+bool ConnectionManager::IsAnyConnectionCurrentlySyncing()
+{
+	BaseConnections conns = GetConnectionsOfType(ConnectionType::FRUITYMESH, ConnectionDirection::INVALID);
+
+	for (u32 i = 0; i < conns.count; i++)
+	{
+		const MeshConnection* conn = static_cast<MeshConnection*>(allConnections[conns.connectionIndizes[i]]);
+		if (conn == nullptr)
+		{
+			// The Connection was already removed, should not happen
+			SIMEXCEPTION(IllegalStateException);
+			GS->logger.logCustomError(CustomErrorTypes::FATAL_CONNECTION_REMOVED_WHILE_TIME_SYNC, 5000);
+			continue;
+		}
+		if (conn->timeSyncState == MeshConnection::TimeSyncState::INITIAL_SENT)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void ConnectionManager::TimeSyncInitialReplyReceivedHandler(const TimeSyncInitialReply & reply)
+{
+	BaseConnections conns = GetConnectionsOfType(ConnectionType::FRUITYMESH, ConnectionDirection::INVALID);
+
+	for (u32 i = 0; i < conns.count; i++)
+	{
+		MeshConnection* conn = static_cast<MeshConnection*>(allConnections[conns.connectionIndizes[i]]);
+		if (conn == nullptr)
+		{
+			// The Connection was already removed
+			SIMEXCEPTION(IllegalStateException);
+			GS->logger.logCustomError(CustomErrorTypes::FATAL_CONNECTION_REMOVED_WHILE_TIME_SYNC, 3000);
+			continue;
+		}
+
+		if (conn->partnerId == reply.header.header.sender)
+		{
+			if (conn->timeSyncState != MeshConnection::TimeSyncState::UNSYNCED)
+			{
+				// Our time Syncing was interrupted by a third node. This can happen e.g. when two nodes in the mesh were synced roughly at the same time
+				// and their time syncs now propagate through the mesh simultaneously. In such a case we just resync the connection.
+				conn->timeSyncState = MeshConnection::TimeSyncState::UNSYNCED;
+			}
+			else
+			{
+				conn->timeSyncState = MeshConnection::TimeSyncState::INITIAL_SENT;
+			}
+		}
+	}
+}
+
+void ConnectionManager::TimeSyncCorrectionReplyReceivedHandler(const TimeSyncCorrectionReply & reply)
+{
+	BaseConnections conns = GetConnectionsOfType(ConnectionType::FRUITYMESH, ConnectionDirection::INVALID);
+
+	for (u32 i = 0; i < conns.count; i++)
+	{
+		MeshConnection* conn = static_cast<MeshConnection*>(allConnections[conns.connectionIndizes[i]]);
+		if (conn == nullptr)
+		{
+			// The Connection was already removed
+			SIMEXCEPTION(IllegalStateException);
+			GS->logger.logCustomError(CustomErrorTypes::FATAL_CONNECTION_REMOVED_WHILE_TIME_SYNC, 4000);
+			continue;
+		}
+
+		if (conn->partnerId == reply.header.header.sender)
+		{
+			logt("TSYNC", "Setting CORRECTION_SENT for node %u with partner %u", (u32)GS->node.configuration.nodeId, conn->partnerId);
+			if (conn->timeSyncState != MeshConnection::TimeSyncState::INITIAL_SENT)
+			{
+				// Our time Syncing was interrupted by a third node. This can happen e.g. when two nodes in the mesh were synced roughly at the same time
+				// and their time syncs now propagate through the mesh simultaneously. In such a case we just resync the connection.
+				conn->timeSyncState = MeshConnection::TimeSyncState::UNSYNCED;
+			}
+			else
+			{
+				conn->timeSyncState = MeshConnection::TimeSyncState::CORRECTION_SENT;
+			}
 		}
 	}
 }

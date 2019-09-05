@@ -30,7 +30,7 @@ end
 -- Create a new dissector
 Proto_Fruitymesh = Proto("fruitymesh", "FruityMesh Protocol")
 Proto_Fruitymesh_Debug = Proto("fruitymesh_debug", "FruityMesh Debug")
-Proto_Fruitymesh_MeshAccess = Proto("fruitymesh_mesh_access", "FruityMesh MeshAccess")
+Proto_Fruitymesh_MeshAccess = Proto("fruitymesh_ma", "FruityMesh MeshAccess")
 Proto_Fruitymesh_Asset = Proto("fruitymesh_asset", "FruityMesh Asset")
 
 -- ######################################################################################################################
@@ -128,7 +128,12 @@ function Proto_Fruitymesh.dissector (buffer, pinfo, tree)
       -- Add values
       t:add(ma_message_type, ma_data(0, 2):le_uint())
       t:add(ma_network_id, ma_data(2,2):le_uint())
-      t:add(ma_flags, ma_data(4,1):le_uint())
+
+      t:add(ma_is_enrolled, ma_data(4,1):bitfield(7,1))
+      t:add(ma_is_sink, ma_data(4,1):bitfield(6,1))
+      t:add(ma_is_zero_key_connectable, ma_data(4,1):bitfield(5,1))
+      t:add(ma_other_flags, ma_data(4,1):bitfield(0,5))
+
       t:add(ma_serial_index, ma_data(5,4):le_uint())
       t:add(ma_module_id1, ma_data(9,1):le_uint())
       t:add(ma_module_id2, ma_data(10,1):le_uint())
@@ -164,7 +169,7 @@ end
 -- Create the protocol fields for the JOIN_ME message
 packet_identifier = ProtoField.uint8("fruitymesh.packet_identifier","Mesh Identifier",base.HEX)
 network_id = ProtoField.uint16("fruitymesh.network_id","Network Id",base.DEC)
-message_type = ProtoField.uint8("fruitymesh.message_type","Message Type",base.DEC)
+message_type = ProtoField.uint8("fruitymesh.message_type","Message Type (3)",base.DEC)
 sender_id = ProtoField.uint16("fruitymesh.sender_id","Sender Id",base.DEC)
 cluster_id = ProtoField.uint32("fruitymesh.cluster_id","Cluster Id",base.HEX)
 cluster_id_node_id_part = ProtoField.uint16("fruitymesh.cluster_id_node_id_part","Node Id",base.DEC)
@@ -236,9 +241,12 @@ Proto_Fruitymesh_Debug.fields = {
 -- ######################################################################################################################
 
 -- Create the protocol fields for the Mesh Access message
-ma_message_type = ProtoField.uint16("fruitymesh_ma.message_type","Message Type",base.HEX)
+ma_message_type = ProtoField.uint16("fruitymesh_ma.message_type","Message Type",base.DEC)
 ma_network_id = ProtoField.uint16("fruitymesh_ma.network_id","Network Id",base.DEC)
-ma_flags = ProtoField.uint8("fruitymesh_ma.flags","Flags",base.HEX)
+ma_is_enrolled = ProtoField.uint8("fruitymesh_ma.is_enrolled","isEnrolled",base.DEC)
+ma_is_sink = ProtoField.uint8("fruitymesh_ma.is_sink","isSink",base.DEC)
+ma_is_zero_key_connectable = ProtoField.uint8("fruitymesh_ma.is_zero_key_connectable","isZeroKeyConnectable",base.DEC)
+ma_other_flags = ProtoField.uint8("fruitymesh_ma.other_flags","otherFlags",base.DEC)
 ma_serial_index = ProtoField.uint32("fruitymesh_ma.serialindex","Serial index",base.DEC)
 ma_module_id1 = ProtoField.uint8("fruitymesh_ma.ma_module_id1","Module Id1",base.DEC)
 ma_module_id2 = ProtoField.uint8("fruitymesh_ma.ma_module_id2","Module Id2",base.DEC)
@@ -248,7 +256,10 @@ ma_module_id3 = ProtoField.uint8("fruitymesh_ma.ma_module_id3","Module Id3",base
 Proto_Fruitymesh_MeshAccess.fields = {
   ma_message_type,
   ma_network_id,
-  ma_flags,
+  ma_is_enrolled,
+  ma_is_sink,
+  ma_is_zero_key_connectable,
+  ma_other_flags,
   ma_serial_index,
   ma_module_id1,
   ma_module_id2,

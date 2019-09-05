@@ -37,7 +37,7 @@
 #pragma once
 
 #include <BaseConnection.h>
-
+#include <TimeManager.h>
 
 class MeshConnection
 	: public BaseConnection
@@ -45,11 +45,18 @@ class MeshConnection
 #ifdef SIM_ENABLED
 	friend class CherrySim;
 	friend class FruitySimServer;
+	friend class MultiStackFixture_TestSinkDetectionWithSingleSink_Test;
 #endif
 	friend class ConnectionManager;
 	friend class Node;
 
 	private:
+
+		enum class TimeSyncState : u8 {
+			UNSYNCED             = 0,
+			INITIAL_SENT         = 1,
+			CORRECTION_SENT      = 2,
+		};
 
 		u16 partnerWriteCharacteristicHandle;
 
@@ -57,11 +64,11 @@ class MeshConnection
 		u8 connectionMasterBit;
 		ClusterId connectedClusterId;
 		ClusterSize connectedClusterSize;
-		ClusterSize hopsToSink;
 
 		ClusterId clusterIDBackup;
 		ClusterSize clusterSizeBackup;
 		ClusterSize hopsToSinkBackup;
+		ClusterSize hopsToSink;
 
 		//Timestamp and Clustering messages must be sent immediately and are not queued
 		//Multiple updates can accumulate in this variable
@@ -72,6 +79,17 @@ class MeshConnection
 		connPacketClusterAck1 clusterAck1Packet;
 		connPacketClusterAck2 clusterAck2Packet;
 
+		//Timing
+		TimeSyncState timeSyncState = TimeSyncState::UNSYNCED;
+		u32 correctionTicks = 0;
+		TimePoint syncSendingOrdered;
+
+#ifdef SIM_ENABLED
+		//Cluster validity checking in the Simulator
+		i16 validityClusterUpdatesToSend;
+		i16 validityClusterUpdatesReceived;
+#endif
+
 	public:
 		//Init + Destroy
 		MeshConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress, u16 partnerWriteCharacteristicHandle);
@@ -80,11 +98,7 @@ class MeshConnection
 		static BaseConnection* ConnTypeResolver(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8* data);
 
 		void SaveClusteringSnapshot();
-		void DisconnectAndRemove() override;
-//
-//		//GATT Handshake
-//		void DiscoverCharacteristicHandles() override;
-//		void GATTHandleDiscoveredHandler(u16 characteristicHandle);
+		void DisconnectAndRemove(AppDisconnectReason reason) override;
 
 		//Mesh Handshake
 		void StartHandshake() override;
@@ -92,18 +106,19 @@ class MeshConnection
 		void SendReconnectionHandshakePacket();
 		void ReceiveReconnectionHandshakePacket(connPacketReconnect* packet);
 
-		bool SendHandshakeMessage(u8* data, u8 dataLength, bool reliable);
+		bool SendHandshakeMessage(u8* data, u16 dataLength, bool reliable);
 
 		void TryReestablishing();
 
 		//Sending Data
 		bool TransmitHighPrioData() override;
-		sizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer) override;
-		void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, sizedData* sentData) override;
-
+		void ClearCurrentClusterInfoUpdatePacket();
+		SizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer) override;
+		void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData) override;
+		void DataSentHandler(const u8* data, u16 length) override;
 
 		bool SendData(BaseConnectionSendData* sendData, u8* data);
-		bool SendData(u8* data, u8 dataLength, DeliveryPriority priority, bool reliable) override;
+		bool SendData(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable) override;
 
 		//Receiving Data
 		void ReceiveDataHandler(BaseConnectionSendData* sendData, u8* data) override;
@@ -112,9 +127,13 @@ class MeshConnection
 
 		//Handler
 		bool GapDisconnectionHandler(u8 hciDisconnectReason) override;
-		void ReconnectionSuccessfulHandler(ble_evt_t& bleEvent) override;
+		void GapReconnectionSuccessfulHandler(const GapConnectedEvent& connectedEvent) override;
 
 		//Helpers
 		void PrintStatus() override;
 		bool GetPendingPackets() override;
+		bool IsValidMessageType(MessageType type);
+
+		//Setter
+		void setHopsToSink(ClusterSize hops);
 };

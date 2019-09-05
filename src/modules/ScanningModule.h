@@ -40,19 +40,18 @@
 
 #include <Module.h>
 
-#ifdef ACTIVATE_SCANNING_MODULE
-
-#ifdef ACTIVATE_ASSET_MODULE
+#if IS_ACTIVE(ASSET_MODULE)
 #include <AssetModule.h>
 #endif
+#include <ScanController.h>
 
-#define SCAN_FILTER_NUMBER 1 //Number of filters that can be set
-#define NUM_ADDRESSES_TRACKED 50
+constexpr int SCAN_FILTER_NUMBER = 2;//Number of filters that can be set
+constexpr int NUM_ADDRESSES_TRACKED = 50;
 
-#define ASSET_PACKET_BUFFER_SIZE 30
-#define ASSET_PACKET_RSSI_SEND_THRESHOLD -88
+constexpr int ASSET_PACKET_BUFFER_SIZE = 30;
+constexpr int ASSET_PACKET_RSSI_SEND_THRESHOLD = -88;
 
-#define SCAN_BUFFERS_SIZE 10 //Max number of packets that are buffered
+constexpr int SCAN_BUFFERS_SIZE = 10; //Max number of packets that are buffered
 
 		enum class GroupingType : u8 {
 			GROUP_BY_ADDRESS=1, 
@@ -75,9 +74,6 @@
 #pragma pack(push, 1)
 //Module configuration that is saved persistently
 struct ScanningModuleConfiguration : ModuleConfiguration{
-	u16 groupedReportingIntervalDs;
-	u16 assetReportingIntervalDs;
-	i8 groupedPacketRssiThreshold;
 	//Insert more persistent config values here
 };
 #pragma pack(pop)
@@ -85,7 +81,7 @@ struct ScanningModuleConfiguration : ModuleConfiguration{
 class ScanningModule: public Module
 {
 	private:
-
+		static constexpr u16 groupedReportingIntervalDs = 0;
 		/*
 		 * Filters coud be:
 		 * 	- group all filtered packets by address and sum their RSSI and count
@@ -137,7 +133,7 @@ class ScanningModule: public Module
 
 
 		enum class ScanModuleMessages : u8{
-			TOTAL_SCANNED_PACKETS=0,
+			//TOTAL_SCANNED_PACKETS=0,  //Removed as of 21.05.2019
 			ASSET_TRACKING_PACKET=1
 		};
 
@@ -145,24 +141,8 @@ class ScanningModule: public Module
 		#pragma pack(push)
 		#pragma pack(1)
 
-		typedef struct
-		{
-			u16 assetId;
-			i8 rssiAvg;
-			u8 packetCount;
-		} trackedAsset;
-
-		#define SIZEOF_SCAN_MODULE_TRACKED_ASSETS_MESSAGE 12
-		typedef struct
-		{
-				SimpleArray<trackedAsset, 3> trackedAssets;
-
-		} ScanModuleTrackedAssetsMessage;
-		STATIC_ASSERT_SIZE(ScanModuleTrackedAssetsMessage, 12);
-
 		//Asset Message V2
-
-		#define SIZEOF_SCAN_MODULE_TRACKED_ASSET_V2 8
+		static constexpr int SIZEOF_SCAN_MODULE_TRACKED_ASSET_V2 = 8;
 		typedef struct
 		{
 			u32 assetId : 24;
@@ -187,9 +167,8 @@ class ScanningModule: public Module
 
 
 		//Asset packet handling
-		void HandleAssetV1Packets(const ble_evt_t& bleEvent);
-		void HandleAssetV2Packets(const ble_evt_t& bleEvent);
-		bool addTrackedAsset(advPacketAssetServiceData* packet, i8 rssi);
+		void HandleAssetV2Packets(const GapAdvertisementReportEvent& advertisementReportEvent);
+		bool addTrackedAsset(const advPacketAssetServiceData* packet, i8 rssi);
 		void ReceiveTrackedAssets(BaseConnectionSendData* sendData, ScanModuleTrackedAssetsV2Message* packet) const;
 
 
@@ -221,6 +200,10 @@ class ScanningModule: public Module
 
 
 	public:
+		u16 assetReportingIntervalDs = 0;
+
+		ScanJob * p_scanJob;
+
 		DECLARE_CONFIG_AND_PACKED_STRUCT(ScanningModuleConfiguration);
 
 		ScanningModule();
@@ -231,7 +214,7 @@ class ScanningModule: public Module
 
 		void TimerEventHandler(u16 passedTimeDs) override;
 
-		void BleEventHandler(const ble_evt_t& bleEvent) override;
+		virtual void GapAdvertisementReportEventHandler(const GapAdvertisementReportEvent& advertisementReportEvent) override;
 
 		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) override;
 
@@ -240,4 +223,3 @@ class ScanningModule: public Module
 		#endif
 };
 
-#endif

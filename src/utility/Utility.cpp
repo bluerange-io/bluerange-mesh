@@ -34,16 +34,7 @@
 #include <RecordStorage.h>
 #include <Module.h>
 #include <cctype>
-
-extern "C"{
-#include <nrf_soc.h>
-#include <nrf_error.h>
-#include <stdlib.h>
-#ifndef __ICCARM__
-#include <malloc.h>
-#endif
-}
-
+#include "GlobalState.h"
 
 u32 Utility::GetSettingsPageBaseAddress()
 {
@@ -54,45 +45,14 @@ u32 Utility::GetSettingsPageBaseAddress()
 	return (appSettingsAddress);
 }
 
-bool Utility::LoadSettingsFromFlashWithId(moduleID moduleId, ModuleConfiguration* configurationPointer, u16 configurationLength)
-{
-	return Utility::LoadSettingsFromFlash(nullptr, moduleId, configurationPointer, configurationLength);
-}
-
-bool Utility::LoadSettingsFromFlash(Module* module, moduleID moduleId, ModuleConfiguration* configurationPointer, u16 configurationLength)
-{
-	if (Conf::loadConfigFromFlash) {
-		sizedData configData = GS->recordStorage->GetRecordData(moduleId);
-
-		//Check if configuration exists and has the correct version, if yes, copy to module configuration struct
-		if (configData.length > SIZEOF_MODULE_CONFIGURATION_HEADER && ((ModuleConfiguration*)configData.data)->moduleVersion == configurationPointer->moduleVersion) {
-			memcpy((u8*)configurationPointer, configData.data, configData.length);
-
-			logt("CONFIG", "Config for module %u loaded", moduleId, configurationPointer->moduleVersion, configData.length);
-
-			if(module != nullptr) module->ConfigurationLoadedHandler(nullptr, 0);
-
-			return true;
-		}
-		//If the configuration has a different version, we call the migration if it exists
-		else if(configData.length > SIZEOF_MODULE_CONFIGURATION_HEADER){
-			logt("CONFIG", "Flash config for module %u has mismatching version", moduleId);
-
-			if(module != nullptr) module->ConfigurationLoadedHandler((ModuleConfiguration*)configData.data, configData.length);
-		}
-		else {
-			logt("CONFIG", "No flash config for module %u found, using defaults", moduleId);
-
-			if(module != nullptr) module->ConfigurationLoadedHandler(nullptr, 0);
-		}
-	}
-
-	return false;
-}
-
 RecordStorageResultCode Utility::SaveModuleSettingsToFlash(const Module* module, ModuleConfiguration* configurationPointer, const u16 configurationLength, RecordStorageEventListener* listener, u32 userType, u8* userData, u16 userDataLength)
 {
-	RecordStorageResultCode err = GS->recordStorage->SaveRecord(module->moduleId, (u8*)configurationPointer, configurationLength, listener, userType, userData, userDataLength);
+	return  Utility::SaveModuleSettingsToFlashWithId(module->moduleId, configurationPointer, configurationLength, listener, userType, userData, userDataLength);
+}
+
+RecordStorageResultCode Utility::SaveModuleSettingsToFlashWithId(ModuleId moduleId, ModuleConfiguration * configurationPointer, const u16 configurationLength, RecordStorageEventListener * listener, u32 userType, u8 * userData, u16 userDataLength)
+{
+	RecordStorageResultCode err = GS->recordStorage.SaveRecord((u16)moduleId, (u8*)configurationPointer, configurationLength, listener, userType, userData, userDataLength);
 
 	return err;
 }
@@ -103,22 +63,12 @@ u32 Utility::GetRandomInteger(void)
 	u32 err = NRF_ERROR_BUSY;
 	u32 randomNumber;
 
-	while(err != NRF_SUCCESS){
+	while(err != FruityHal::SUCCESS){
 		//A busy loop is fine here because the nordic spec guarantees us, that we will, at some point, get a random number. If not, the node itself is broken.
 		err = sd_rand_application_vector_get((u8*) &randomNumber, 4);
 	}
 
 	return randomNumber;
-}
-
-void Utility::CheckFreeHeap(void)
-{
-#ifdef __GNUC__
-	struct mallinfo used = mallinfo();
-	u32 size = used.uordblks + used.hblkhd;
-
-	logjson("NODE", "{\"heap\":%u}" SEP, size);
-#endif
 }
 
 //buffer should have a length of 15 bytes
@@ -154,7 +104,7 @@ bool Utility::CompareMem(const u8 byte, const u8* data, const u16 dataLength){
 
 void Utility::ToUpperCase(char * str)
 {
-	while (*str = toupper(*str)) str++;
+	while ((*str = toupper(*str))) str++;
 }
 
 u32 Utility::GetIndexForSerial(const char* serialNumber){
@@ -163,7 +113,11 @@ u32 Utility::GetIndexForSerial(const char* serialNumber){
 		if(i == NODE_SERIAL_NUMBER_LENGTH-1 && serialNumber[0] == 'A') continue;
 		char currentChar = serialNumber[NODE_SERIAL_NUMBER_LENGTH-i-1];
 		const char* charPos = strchr(serialAlphabet, currentChar);
-		if(charPos == nullptr) return 0;
+		if (charPos == nullptr)
+		{
+			SIMEXCEPTION(IllegalArgumentException);
+			return INVALID_SERIAL_NUMBER;
+		}
 		u32 charValue = (u32)charPos - (u32)serialAlphabet;
 		index += ipow(sizeof(serialAlphabet)-1, i) * charValue;
 	}
@@ -172,13 +126,59 @@ u32 Utility::GetIndexForSerial(const char* serialNumber){
 
 void Utility::GenerateBeaconSerialForIndex(u32 index, char* serialBuffer)
 {
-	memset(serialBuffer, 0x00, NODE_SERIAL_NUMBER_LENGTH+1);
+	CheckedMemset(serialBuffer, 0x00, NODE_SERIAL_NUMBER_LENGTH+1);
 	for(u32 i=0; i<NODE_SERIAL_NUMBER_LENGTH; i++){
 		int rest = (int)(index % strlen(serialAlphabet));
 		serialBuffer[NODE_SERIAL_NUMBER_LENGTH-i-1] = serialAlphabet[rest];
 		index /= strlen(serialAlphabet);
 	}
 
+}
+
+u16 Utility::ByteToAsciiHex(u8 b) {
+	u8 asciiHex[2];
+	static const char* digits = "0123456789ABCDEF";
+	asciiHex[0] = digits[(b & 0xF0) >> 4];
+	asciiHex[1] = digits[b & 0xF];
+
+	return *((u16*)asciiHex);
+}
+
+//Converts a series of 2,4,6 or 8 hex-chars to an unsigned int
+u32 Utility::ByteFromAsciiHex(char* asciiHex, u8 numChars){
+	char* h = asciiHex;
+	//convert x tuples
+	u32 result = 0;
+	for(int i=0; i<numChars; i+=2){
+		u8 byte = 0;
+		//Convert first char
+		if(h[i] >= 48 && h[i] <= 57){
+			byte += (h[i] - 48) << 4;
+		} else if(h[i] >= 65 && h[i] <= 90){
+			byte += (h[i] - 55) << 4;
+		}
+		//Convert and add second char
+		if(h[i+1] >= 48 && h[i+1] <= 57){
+			byte += (h[i+1] - 48);
+		} else if(h[i+1] >= 65 && h[i+1] <= 90){
+			byte += (h[i+1] - 55);
+		}
+
+		result |= byte << i*4;
+	}
+
+	return result;
+}
+
+bool Utility::Contains(const u8 * data, const u32 length, const u8 searchValue)
+{
+	return memchr(data, searchValue, length) != nullptr;
+}
+
+bool Utility::IsPowerOfTwo(u32 val)
+{
+	if (val == 0) return false; //Edge case
+	else return ((val & (val - 1ul)) == 0ul);
 }
 
 /*
@@ -242,8 +242,6 @@ uint16_t Utility::CalculateCrc16(const uint8_t * p_data, const uint32_t size, co
 
 //Taken from http://www.hackersdelight.org/hdcodetxt/crc.c.txt
 u32 Utility::CalculateCrc32(const u8* message, const i32 messageLength) {
-#pragma warning( push )
-#pragma warning( disable : 4146)
    i32 i, j;
    unsigned int byte, crc, mask;
 
@@ -259,7 +257,6 @@ u32 Utility::CalculateCrc32(const u8* message, const i32 messageLength) {
 	  i = i + 1;
    }
    return ~crc;
-#pragma warning( pop ) 
 }
 
 //Encrypts a message
@@ -291,6 +288,17 @@ void Utility::swapBytes(u8 *data, const size_t length)
         p[lo] = p[hi];
         p[hi] = tmp;
     }
+}
+
+u16 Utility::swap_u16( u16 val )
+{
+    return (val << 8) | (val >> 8 );
+}
+
+u32 Utility::swap_u32( u32 val )
+{
+    val = ((val << 8) & 0xFF00FF00 ) | ((val >> 8) & 0xFF00FF );
+    return (val << 16) | (val >> 16);
 }
 
 void Utility::XorWords(const u32* src1, const u32* src2, const u8 numWords, u32* out) {

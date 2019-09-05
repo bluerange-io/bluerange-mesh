@@ -13,9 +13,9 @@
 #ifndef NRF_DRV_CONFIG_H
 #define NRF_DRV_CONFIG_H
 
-
-#include <Config.h>
-
+#ifdef FEATURESET_NAME
+#include FEATURESET_NAME
+#endif
 
 /**
  * Provide a non-zero value here in applications that need to use several
@@ -29,9 +29,7 @@
  * initialization, hence it is not always desirable to use it.
  */
 
-#if defined(ACTIVATE_EINK_MODULE)
-#define PERIPHERAL_RESOURCE_SHARING_ENABLED  1
-#else
+#ifndef PERIPHERAL_RESOURCE_SHARING_ENABLED
 #define PERIPHERAL_RESOURCE_SHARING_ENABLED  0
 #endif
 
@@ -213,9 +211,7 @@
 #define PWM_COUNT   (PWM0_ENABLED + PWM1_ENABLED + PWM2_ENABLED)
 
 /* SPI */
-#if defined(ACTIVATE_EINK_MODULE)
-#define SPI0_ENABLED 1
-#else
+#ifndef SPI0_ENABLED
 #define SPI0_ENABLED 0
 #endif
 
@@ -230,9 +226,7 @@
 #define SPI0_INSTANCE_INDEX 0
 #endif
 
-#if defined(ACTIVATE_EINK_MODULE)
-#define SPI1_ENABLED 1
-#else 
+#ifndef SPI1_ENABLED
 #define SPI1_ENABLED 0
 #endif
 
@@ -319,9 +313,7 @@
 #endif
 
 
-#if defined(ACTIVATE_EINK_MODULE)
-#define TWI0_ENABLED 1
-#else
+#ifndef TWI0_ENABLED
 #define TWI0_ENABLED 0
 #endif
 

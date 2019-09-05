@@ -36,14 +36,8 @@
 #pragma once
 
 #include <types.h>
-#include <GlobalState.h>
 #include <FruityHal.h>
 #include "SimpleArray.h"
-
-extern "C"{
-#include <ble.h>
-#include <ble_gap.h>
-}
 
 enum class AdvJobTypes : u8{
 	INVALID,
@@ -52,7 +46,7 @@ enum class AdvJobTypes : u8{
 
 };
 
-typedef struct AdvJob {
+struct AdvJob {
 	AdvJobTypes type;
 	//For Scheduler
 	u8 slots; //Number of slots this advertising message will get (1-10), 0 = Invalid
@@ -65,32 +59,48 @@ typedef struct AdvJob {
 	u8 currentDelay;
 
 	//Advertising Data
-	i8 advertisingType; //BLE_GAP_ADV_TYPES
+	GapAdvType advertisingType; //BLE_GAP_ADV_TYPES
 	u8 advData[31];
 	u8 advDataLength;
 	u8 scanData[31];
 	u8 scanDataLength;
+	
+};
 
-} AdvJob;
+struct AdvData {
+	bool inUse;
+	u8 advData[31];
+	u8 advDataLength;
+	u8 scanData[31];
+	u8 scanDataLength;
+};
 
 
-#define ADVERTISING_CONTROLLER_MAX_NUM_JOBS 4
+constexpr int ADVERTISING_CONTROLLER_MAX_NUM_JOBS = 4;
 
 class AdvertisingController
 {
 private:
-	AdvertisingController();
-
 	u32 sumSlots;
 	u16 currentAdvertisingInterval;
+#if SDK == 15
+	u8 handle;
+#endif
 
 	//The address that should be used for advertising, the Least Significant Byte
 	//May be changed by the advertiser to account for different advertising services
 	fh_ble_gap_addr_t baseGapAddress;
 
+	bool isActive = true;
+
 public:
+	AdvertisingController();
 
 	SimpleArray<AdvJob, ADVERTISING_CONTROLLER_MAX_NUM_JOBS> jobs;
+#if SDK == 15
+	SimpleArray<AdvData, 2> advData;
+	u8 currentSlotUsed;
+#endif
 
 	enum class AdvertisingState : u8{
 		DISABLED,
@@ -113,12 +123,7 @@ public:
 	AdvJob* currentActiveJob;
 	AdvJob* jobToSet;
 
-	static AdvertisingController& getInstance(){
-		if(!GS->advertisingController){
-			GS->advertisingController = new AdvertisingController();
-		}
-		return *(GS->advertisingController);
-	}
+	static AdvertisingController& getInstance();
 
 
 	void Initialize();
@@ -140,12 +145,13 @@ public:
 	u16 GetLowestAdvertisingInterval();
 	void RestartAdvertising();
 
-	void DeleteAllJobs();
+	void Deactivate();
 
 
 	void TimerEventHandler(u16 passedTimeDs);
 
-	bool AdvertiseEventHandler(const ble_evt_t &bleEvent);
+	void GapConnectedEventHandler(const GapConnectedEvent& connectedEvent);
+	void GapDisconnectedEventHandler(const GapDisconnectedEvent& disconnectedEvent);
 
 
 };

@@ -1,0 +1,37 @@
+= Logger
+
+== Purpose
+
+The logger is used to output data on the terminal. It allows filtering for log tags to make development easy and also offers some functionality to log error codes into RAM.
+
+== Functionality
+
+The logger can be used for printing log outputs to the terminal using the `logt` macro. With the `logjson` macro, it is possible to log a json for machine to machine communication. This logging can be removed from the compiled firmware by undefining the `ENABLE_LOGGING` macro or the `ENABLE_JSON_LOGGING` macro. Another function called `trace` will log a string without adding additional information such as the time or the place where the log statement was used.
+
+The logger also has functionality for logging events to the RAM, e.g. `logError` or `logCustomError`. These commands will record the time and the error code into RAM. `logCustomCount` allows you to increase the value each time the method is called. These error codes can be queried using the `get_errors` command of the xref:StatusReporterModule.adoc[StatusReporterModule]. Once the error codes have been requested, the error log is cleared.
+
+== Terminal Commands
+
+=== Toggling Log Tags
+
+Output of specific logTags can be toggled with the following command. A few log tags such as ERROR or WARNING are always logged to the terminal.
+
+[source,C++]
+----
+debug [tagName]
+
+//E.g. toggle logging for the node
+debug node
+
+//E.g. toggle logging for all logs
+debug all
+----
+
+=== Viewing All Active Log Tags
+
+The following command provides a list of all enabled log tags:
+
+[source,C++]
+----
+debugtags
+----

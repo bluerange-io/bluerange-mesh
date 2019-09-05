@@ -1,0 +1,7 @@
+= ScanController
+
+== Purpose
+The _ScanController_ ensures that scanning is restarted after connections are made. It should allow a better seperation between modules in the future.
+
+== Functionality
+At the moment, the _ScanController_ doesn't allow to register _ScanJobs_ similar to the advertising controller. This functionality will be implemented in the future. At the moment, there is no good abstraction between modules for scanning. All _BleEvents_ are reported in the _BleEventHandler_ of the modules if one of the modules has started scanning. If a module stops scanning, other modules might malfunction.

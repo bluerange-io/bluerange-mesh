@@ -69,12 +69,23 @@ OUTPUT_FILENAME = $(PROJECT_NAME)
 # The sdks are part of the project because bugs had to be fixed
 ifeq ($(PLATFORM),NRF51)
 NRF5_SDK_PATH = sdk/sdk11
-else
+SDK           = 11
+else ifeq ($(PLATFORM),NRF52)
 NRF5_SDK_PATH = sdk/sdk14
+SDK           = 14
+else
+NRF5_SDK_PATH = sdk/sdk15
+SDK           = 15
 endif
 
 COMPONENTS     = $(NRF5_SDK_PATH)/components
 TEMPLATE_PATH  = $(COMPONENTS)/toolchain/gcc
+ifeq ($(SDK),15)
+MODULES        = $(NRF5_SDK_PATH)/modules
+INTEGRATION    = $(NRF5_SDK_PATH)/integration
+DRIVERS        = $(MODULES)/nrfx/drivers
+HAL            = $(MODULES)/nrfx/hal
+endif
 
 ifeq ($(OS),Windows_NT)
 include $(TEMPLATE_PATH)/Makefile.windows
@@ -115,8 +126,13 @@ GDB             := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-gdb'
 remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-out $(firstword $1),$1))))
 
 #source common to all targets
+ifeq ($(SDK),15)
+C_SOURCE_FILES += $(DRIVERS)/src/nrfx_gpiote.c
+else
 C_SOURCE_FILES += $(COMPONENTS)/drivers_nrf/common/nrf_drv_common.c
 C_SOURCE_FILES += $(COMPONENTS)/drivers_nrf/gpiote/nrf_drv_gpiote.c
+endif
+
 C_SOURCE_FILES += $(COMPONENTS)/libraries/timer/app_timer.c
 C_SOURCE_FILES += $(COMPONENTS)/ble/ble_db_discovery/ble_db_discovery.c
 C_SOURCE_FILES += $(COMPONENTS)/ble/ble_radio_notification/ble_radio_notification.c
@@ -168,15 +184,37 @@ else ifeq ($(BUILD_TYPE),debug)
   DEBUG_FLAGS += -D DEBUG -Og -g
 endif
 
-# Check if Featureset exists
-ifneq ("$(wildcard config/featureset.h)","")
-CFLAGS += -DUSE_FEATURESET_H
-endif
-
 # Platform specific flags
 include Makefile.$(PLATFORM)
 
 # Includes common to all targets
+ifeq ($(SDK),15)
+INC_PATHS += -isystem $(INTEGRATION)/nrfx
+INC_PATHS += -isystem $(INTEGRATION)/nrfx/legacy
+INC_PATHS += -isystem $(DRIVERS)/include
+INC_PATHS += -isystem $(HAL)
+INC_PATHS += -isystem $(MODULES)/nrfx
+INC_PATHS += -isystem $(MODULES)/nrfx/mdk
+INC_PATHS += -isystem $(COMPONENTS)/libraries/delay
+else
+INC_PATHS += -isystem $(COMPONENTS)/drivers_nrf/common
+INC_PATHS += -isystem $(COMPONENTS)/drivers_nrf/delay
+INC_PATHS += -isystem $(COMPONENTS)/drivers_nrf/gpiote
+INC_PATHS += -isystem $(COMPONENTS)/drivers_nrf/hal
+endif
+INC_PATHS += -isystem $(COMPONENTS)/ble/common
+INC_PATHS += -isystem $(COMPONENTS)/ble/ble_db_discovery
+INC_PATHS += -isystem $(COMPONENTS)/ble/ble_radio_notification
+INC_PATHS += -isystem $(COMPONENTS)/ble/ble_services/ble_dfu
+INC_PATHS += -isystem $(COMPONENTS)/device
+INC_PATHS += -isystem $(COMPONENTS)/libraries/button
+INC_PATHS += -isystem $(COMPONENTS)/libraries/timer
+INC_PATHS += -isystem $(COMPONENTS)/libraries/util
+INC_PATHS += -isystem $(COMPONENTS)/softdevice/common
+INC_PATHS += -isystem $(COMPONENTS)/softdevice/common/softdevice_handler
+INC_PATHS += -isystem $(COMPONENTS)/toolchain
+INC_PATHS += -isystem $(COMPONENTS)/toolchain/gcc
+INC_PATHS += -isystem $(COMPONENTS)/toolchain/cmsis/include
 INC_PATHS += -Isrc/c/segger_rtt
 INC_PATHS += -Isrc
 INC_PATHS += -Isrc/base
@@ -188,52 +226,44 @@ INC_PATHS += -Iconfig
 INC_PATHS += -Iconfig/boards
 INC_PATHS += -Iconfig/featuresets
 INC_PATHS += -Isrc/vendor
-INC_PATHS += -I$(COMPONENTS)/ble/common
-INC_PATHS += -I$(COMPONENTS)/ble/ble_db_discovery
-INC_PATHS += -I$(COMPONENTS)/ble/ble_radio_notification
-INC_PATHS += -I$(COMPONENTS)/ble/ble_services/ble_dfu
-INC_PATHS += -I$(COMPONENTS)/device
-INC_PATHS += -I$(COMPONENTS)/drivers_nrf/common
-INC_PATHS += -I$(COMPONENTS)/drivers_nrf/delay
-INC_PATHS += -I$(COMPONENTS)/drivers_nrf/gpiote
-INC_PATHS += -I$(COMPONENTS)/drivers_nrf/hal
-INC_PATHS += -I$(COMPONENTS)/libraries/button
-INC_PATHS += -I$(COMPONENTS)/libraries/timer
-INC_PATHS += -I$(COMPONENTS)/libraries/util
-INC_PATHS += -I$(COMPONENTS)/softdevice/common
-INC_PATHS += -I$(COMPONENTS)/softdevice/common/softdevice_handler
-INC_PATHS += -I$(COMPONENTS)/toolchain
-INC_PATHS += -I$(COMPONENTS)/toolchain/gcc
-INC_PATHS += -I$(COMPONENTS)/toolchain/cmsis/include
 
 #Conditionally disable stack unwinding
 ifneq ("$(DISABLE_STACK_UNWINDING)","1")
   CFLAGS += -funwind-tables
 endif
 
+CFLAGS += -DSDK=$(SDK)
+
 # Flags common to all targets
 CFLAGS += -mcpu=$(CPU) -mthumb -fmessage-length=0 -fsigned-char
 CFLAGS += -ffunction-sections -fdata-sections -flto -fno-move-loop-invariants -fno-math-errno -fno-unroll-loops
-CFLAGS += -Wextra -DBLE_STACK_SUPPORT_REQD $(DEBUG_FLAGS) -D$(BOARD) -DFEATURESET=$(FEATURESET)
-CFLAGS += -D$(PLATFORM) -D__need___va_list
+CFLAGS += -Wextra -Werror -DBLE_STACK_SUPPORT_REQD $(DEBUG_FLAGS) -D$(BOARD) -DFEATURESET=$(FEATURESET)
+CFLAGS += -D$(PLATFORM) -D__need___va_list -fno-strict-aliasing
 
 # C++ compiler flags
 CXXFLAGS += $(CFLAGS)
-CXXFLAGS += -fabi-version=0 -fno-exceptions -fno-rtti -fno-use-cxa-atexit
+CXXFLAGS += -Wall -Wlogical-op -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-variable -Wno-vla -Wno-unused-parameter -fabi-version=0 -fno-exceptions -fno-rtti -fno-use-cxa-atexit
 CXXFLAGS += -fno-threadsafe-statics
 
 # Linker flags
 LDFLAGS += $(CFLAGS)
 LDFLAGS += -Llinker/ -T$(LINKER_SCRIPT) -Xlinker --gc-sections
 LDFLAGS += -Wl,-Map,"$(LISTING_DIRECTORY)/$(OUTPUT_FILENAME).map" --specs=nano.specs
+LDFLAGS += -Xlinker --wrap=malloc
 
 # Assembler flags
 ASMFLAGS += $(CFLAGS) -x assembler-with-cpp -D__HEAP_SIZE=$(HEAP_SIZE) -D__STACK_SIZE=$(STACK_SIZE)
 
 LIBS += -lgcc -lc -lnosys
 
-## Building all targets
-all: $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex echosize
+ifeq ("$(USE_CMAKE)","1")
+  TARGET_CMD += $(addsuffix _release,$(FEATURESET))
+else
+  TARGET_CMD += $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex echosize
+endif
+
+ ## Building all targets
+all: $(TARGET_CMD)
 
 ## Target for printing all targets (ayyyyyyy)
 help:
@@ -268,21 +298,21 @@ DEPEND = $(patsubst %.c, $(DEPEND_DIRECTORY)/%.d, $(C_SOURCE_FILE_NAMES)) $(pats
 ## Create objects from C source files
 $(OBJECT_DIRECTORY)/%.o: %.c
 	$(NO_ECHO)$(MK) $(@D)
-	@echo Compiling file: $(notdir $<)
+	@echo "Compiling C   file: $(notdir $<)"
 	$(NO_ECHO)$(CC) --std=gnu99 $(CFLAGS) $(INC_PATHS) -c -o $@ $<
 	$(NO_ECHO)$(CC) --std=gnu99 $(CFLAGS) $(INC_PATHS) -MM -MT $(OBJECT_DIRECTORY)/$*.o $< -o $(DEPEND_DIRECTORY)/$*.d
 
 ## Create objects from C++ source files
 $(OBJECT_DIRECTORY)/%.o: %.cpp
 	$(NO_ECHO)$(MK) $(@D)
-	@echo Compiling file: $(notdir $<)
+	@echo "Compiling CPP file: $(notdir $<)"
 	$(NO_ECHO)$(CXX) --std=c++11 $(CXXFLAGS) $(INC_PATHS) -c -o $@ $<
 	$(NO_ECHO)$(CXX) --std=c++11 $(CXXFLAGS) $(INC_PATHS) -MM -MT $(OBJECT_DIRECTORY)/$*.o $< -o $(DEPEND_DIRECTORY)/$*.d
 
 ## Assemble files
 $(OBJECT_DIRECTORY)/%.o: %.s
 	$(NO_ECHO)$(MK) $(@D)
-	@echo Compiling file: $(notdir $<)
+	@echo "Compiling ASM file: $(notdir $<)"
 	$(NO_ECHO)$(CC) $(ASMFLAGS) $(INC_PATHS) -c -o $@ $<
 
 ## Link
@@ -308,10 +338,11 @@ echosize: $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out
 	-@echo ' --------------------------------------------------------------'
 ## We now want to evaluate if the size is too big for updates
 	$(eval SIZEINFO = $(shell $(SIZE) $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out))
-# Take the 10th word from the size command which corresponds to the total decimal file size
-	$(eval TOTAL_SIZE = $(word 10, $(SIZEINFO)))
-	@if [ ${TOTAL_SIZE} -gt $(MAX_UPDATABLE_APP_SIZE) ]; then\
-		echo Total size is $(TOTAL_SIZE), maximum updatable size is $(MAX_UPDATABLE_APP_SIZE);\
+	$(eval TEXT_SIZE = $(word 7, $(SIZEINFO)))
+	$(eval DATA_SIZE = $(word 8, $(SIZEINFO)))
+	@TOTAL_SIZE=$$(($(TEXT_SIZE)+$(DATA_SIZE)));\
+	if [ $$TOTAL_SIZE -gt $(MAX_UPDATABLE_APP_SIZE) ]; then\
+		echo Total size is $$TOTAL_SIZE, maximum updatable size is $(MAX_UPDATABLE_APP_SIZE);\
 		if [ $(FAIL_ON_SIZE_TOO_BIG) -gt 0 ]; then\
 			echo "!FATAL ERROR! Firmware size is too big for updating over the mesh. !FATAL ERROR!";\
 			exit 1;\
@@ -320,7 +351,7 @@ echosize: $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out
 			echo "!WARNING! To solve this, undef some things in your featureset.";\
 		fi;\
 	else\
-		echo Total size is $(TOTAL_SIZE) of max $(MAX_UPDATABLE_APP_SIZE);\
+		echo Total size is $$TOTAL_SIZE of max $(MAX_UPDATABLE_APP_SIZE);\
 	fi
 	-@echo ' --------------------------------------------------------------'
 
@@ -349,6 +380,61 @@ flash_softdevice:
 	@echo Flashing: $(SOFTDEVICE_PATH)
 	$(NO_ECHO)$(NRFJPROG) --program $(SOFTDEVICE_PATH) -f $(PLATFORM) --chiperase $(PROGFLAGS)
 	$(NO_ECHO)$(NRFJPROG) --reset -f $(PLATFORM) $(PROGFLAGS)
+
+BUILD_DIR     		= ../cmake_build
+FEATURESETS 	 		= prod_mesh_nrf51 prod_sink_nrf51 prod_sink_nrf52 prod_mesh_nrf52 github prod_eink_nrf51 prod_asset_nrf52 dev_asset_nrf52 prod_asset_nrf51 prod_clc_mesh_nrf52 prod_vs_nrf52 dev_wm_nrf52840 dev_automated_tests_master_nrf52 dev_automated_tests_slave_nrf52 prod_clc_sink_nrf51 dev_all_nrf52
+RELEASE_TARGETS     = $(foreach FEATURESET,$(FEATURESETS), $(FEATURESET)_release) 
+DEBUG_TARGETS       = $(foreach FEATURESET,$(FEATURESETS), $(FEATURESET)_debug)
+
+cmake-clean:
+	$(RM) $(BUILD_DIR)
+
+cmake-clean-win:
+	$(RM) $(BUILD_DIR)_win
+
+$(RELEASE_TARGETS): %:
+	mkdir -p $(BUILD_DIR)/$* && cd $(BUILD_DIR)/$* && cmake -G "Eclipse CDT4 - Unix Makefiles" -DFEATURESET=$(subst _release,,$*) -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_TOOLCHAIN_FILE=CMake/arm_none_eabi_toolchain.cmake ../../fruitymesh && make -j
+
+$(DEBUG_TARGETS): %:
+	mkdir -p $(BUILD_DIR)/$* && cd $(BUILD_DIR)/$* && cmake -G "Eclipse CDT4 - Unix Makefiles" -DFEATURESET=$(subst _debug,,$*) -DCMAKE_BUILD_TYPE=DEBUG -DCMAKE_TOOLCHAIN_FILE=CMake/arm_none_eabi_toolchain.cmake ../../fruitymesh && make -j
+
+cherrysim_runner:
+	mkdir -p $(BUILD_DIR)/cherrysim_runner && cd $(BUILD_DIR)/cherrysim_runner && cmake -G "Eclipse CDT4 - Unix Makefiles"  -DCHERRYSIM_ENABLED=CHERRYSIM_RUNNER_ENABLED -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_TOOLCHAIN_FILE=CMake/pc_toolchain.cmake ../../fruitymesh && make -j
+
+cherrysim_runner_run:
+	$(BUILD_DIR)/cherrysim_runner/cherrysim/cherrySim_runner
+
+cherrysim_runner_win:
+	mkdir -p $(BUILD_DIR)_win/cherrysim_runner && cd $(BUILD_DIR)_win/cherrysim_runner && cmake -G "Eclipse CDT4 - Unix Makefiles"  -DCHERRYSIM_ENABLED=CHERRYSIM_RUNNER_ENABLED -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_TOOLCHAIN_FILE=CMake/pc_toolchain.cmake ../../fruitymesh && make -j
+
+cherrysim_runner_win_run:
+	$(BUILD_DIR)_win/cherrysim_runner/cherrysim/cherrySim_runner
+
+cherrysim_tester:
+	mkdir -p $(BUILD_DIR)/cherrysim_tester && cd $(BUILD_DIR)/cherrysim_tester && cmake -G "Eclipse CDT4 - Unix Makefiles" -DENABLE_GT=1 -DCHERRYSIM_ENABLED=CHERRYSIM_TESTER_ENABLED -DCMAKE_BUILD_TYPE=DEBUG -DCMAKE_TOOLCHAIN_FILE=CMake/pc_toolchain.cmake ../../fruitymesh && make -j
+
+cherrysim_tester_win:
+	mkdir -p $(BUILD_DIR)_win/cherrysim_tester && cd $(BUILD_DIR)_win/cherrysim_tester && cmake -G "Eclipse CDT4 - Unix Makefiles" -DENABLE_GT=1 -DCHERRYSIM_ENABLED=CHERRYSIM_TESTER_ENABLED -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_TOOLCHAIN_FILE=CMake/pc_toolchain.cmake ../../fruitymesh && make -j
+
+cherrysim_tester_run:
+	$(BUILD_DIR)/cherrysim_tester/cherrysim/cherrySim_tester GitLab
+
+cherrysim_tester_win_run:
+	$(BUILD_DIR)_win/cherrysim_tester/cherrysim/cherrySim_tester
+
+cmake-help:
+	@echo "***********************************"
+	@echo "Available cmake FruityMesh targets:"
+	@for FEATURESET in ${RELEASE_TARGETS}; do \
+		echo " * $$FEATURESET"; \
+		done \
+
+	@echo "***********************************"
+	@echo "Available cmake CherrySim targets:"
+	@echo " * cherrysim_runner"
+	@echo " * cherrysim_runner_run"
+	@echo " * cherrysim_tester"
+	@echo " * cherrysim_tester_run"
 
 #.NOTPARALLEL: clean (Does not work because http://stackoverflow.com/questions/16829933/how-to-use-makefile-with-notparallel-label)
 .PHONY: flash flash_softdevice clean serial debug

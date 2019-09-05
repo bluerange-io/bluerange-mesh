@@ -37,12 +37,11 @@
 #pragma once
 
 #include <Module.h>
-
-#ifdef ACTIVATE_ADVERTISING_MODULE
+#include "AdvertisingController.h"
 
 // Be sure to check the advertising controller for the maximum number of supported jobs before increasing this
-#define ADVERTISING_MODULE_MAX_MESSAGES 1
-#define ADVERTISING_MODULE_MAX_MESSAGE_LENGTH 31
+constexpr int ADVERTISING_MODULE_MAX_MESSAGES = 1;
+constexpr int ADVERTISING_MODULE_MAX_MESSAGE_LENGTH = 31;
 
 class AdvertisingModule: public Module
 {
@@ -106,12 +105,7 @@ class AdvertisingModule: public Module
 
 		void ResetToDefaultConfiguration() override;
 
-		void ButtonHandler(u8 buttonId, u32 holdTime) USE_BUTTONS_OVERRIDE;
-
 		#ifdef TERMINAL_ENABLED
 		bool TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize) override;
 		#endif
 };
-
-#endif
-
