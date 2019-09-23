@@ -36,53 +36,17 @@
 #pragma once
 
 #include "types.h"
-#include "GlobalState.h"
 #include "FruityHal.h"
-
-extern "C"{
-	#include <ble.h>
-}
-
-class GAPControllerHandler
-{
-public:
-		GAPControllerHandler(){};
-	virtual ~GAPControllerHandler(){};
-
-	virtual void  GapConnectingTimeoutHandler(ble_evt_t& bleEvent) = 0;
-	virtual void  GapConnectionConnectedHandler(ble_evt_t& bleEvent) = 0;
-	virtual void  GapConnectionEncryptedHandler(ble_evt_t& bleEvent) = 0;
-	virtual void  GapConnectionDisconnectedHandler(ble_evt_t& bleEvent) = 0;
-
-};
 
 class GAPController
 {
-
-private:
-	GAPController();
-
-	//Set to true if a connection procedure is ongoing
-	GAPControllerHandler* gapControllerHandler;
-
-
 public:
-	static GAPController& getInstance(){
-		if(!GS->gapController){
-			GS->gapController = new GAPController();
-		}
-		return *(GS->gapController);
-	}
+	static GAPController& getInstance();
 	//Initialize the GAP module
 	void bleConfigureGAP() const;
 
-	//Configure the callbacks
-	void setGAPControllerHandler(GAPControllerHandler* handler);
-
 	//Connects to a peripheral with the specified address and calls the corresponding callbacks
 	u32 connectToPeripheral(const fh_ble_gap_addr_t &address, u16 connectionInterval, u16 timeout) const;
-	//Disconnects from a peripheral when given a connection handle
-	void disconnectFromPartner(u16 connectionHandle) const;
 
 	//Encryption
 	void startEncryptingConnection(u16 connectionHandle) const;
@@ -93,6 +57,10 @@ public:
 
 
 	//This handler is called with bleEvents from the softdevice
-	bool bleConnectionEventHandler(ble_evt_t& bleEvent) const;
+	void GapDisconnectedEventHandler(const GapDisconnectedEvent& disconnectEvent);
+	void GapConnectedEventHandler(const GapConnectedEvent& connvectedEvent);
+	void GapTimeoutEventHandler(const GapTimeoutEvent& gapTimeoutEvent);
+	void GapSecurityInfoRequestEvenetHandler(const GapSecurityInfoRequestEvent& securityInfoRequestEvent);
+	void GapConnectionSecurityUpdateEventHandler(const GapConnectionSecurityUpdateEvent& connectionSecurityUpdateEvent);
 };
 

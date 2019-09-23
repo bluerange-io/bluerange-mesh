@@ -38,6 +38,16 @@ extern "C"{
 
 LedWrapper::LedWrapper(i8 io_num, bool active_high)
 {
+	Init(io_num, active_high);
+}
+
+LedWrapper::LedWrapper()
+{
+	//Leave uninit
+}
+
+void LedWrapper::Init(i8 io_num, bool active_high)
+{
 	if(io_num == -1){
 		active = false;
 		return;

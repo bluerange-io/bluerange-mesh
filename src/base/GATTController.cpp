@@ -31,30 +31,21 @@
 
 #include <GATTController.h>
 #include <GAPController.h>
+#include <GlobalState.h>
 #include <Logger.h>
 #include <Node.h>
 #include <cstring>
-
-extern "C"
-{
-#include <app_error.h>
-#include <ble_gatt.h>
-#include <ble_gattc.h>
-#include <ble_gatts.h>
-#include <ble_types.h>
-#include <nrf_error.h>
-#include <ble_db_discovery.h>
-}
+#include "Utility.h"
 
 GATTController::GATTController()
 {
-	memset(&discoveredServices, 0x00, sizeof(ble_db_discovery_t));
+	CheckedMemset(&discoveredServices, 0x00, sizeof(ble_db_discovery_t));
+}
+
+void GATTController::Init()
+{
 	//Initialize the nordic service discovery module (we could write that ourselves,...)
 	FruityHal::DiscovereServiceInit(GATTController::ServiceDiscoveryDoneDispatcher);
-}
-void GATTController::setGATTControllerHandler(GATTControllerHandler* handler)
-{
-	gattControllerHandler = handler;
 }
 
 u32 GATTController::DiscoverService(u16 connHandle, const ble_uuid_t &p_uuid)
@@ -77,20 +68,8 @@ void GATTController::ServiceDiscoveryDoneDispatcher(ble_db_discovery_evt_t *p_ev
 	logt("GATTCTRL", "DB Discovery Event");
 
 	if(p_evt->evt_type == BLE_DB_DISCOVERY_COMPLETE){
-		if(GS->gattController->gattControllerHandler != nullptr){
-			GS->gattController->gattControllerHandler->GATTServiceDiscoveredHandler(p_evt->conn_handle, *p_evt);
-		}
+		ConnectionManager::getInstance().GATTServiceDiscoveredHandler(p_evt->conn_handle, *p_evt);
 	}
-}
-
-
-
-void GATTController::attributeMissingHandler(const ble_evt_t &bleEvent) const
-{
-	u32 err = 0;
-	//Handles missing Attributes, don't know why it is needed
-	err = sd_ble_gatts_sys_attr_set(bleEvent.evt.gatts_evt.conn_handle, nullptr, 0, 0);
-	logt("ERROR", "SysAttr %u", err);
 }
 
 //Throws different errors that must be handeled
@@ -101,13 +80,13 @@ u32 GATTController::bleWriteCharacteristic(u16 connectionHandle, u16 characteris
 	logt("CONN_DATA", "Data size is: %d, handles(%d, %d), reliable %d", dataLength, connectionHandle, characteristicHandle, reliable);
 
 	char stringBuffer[100];
-	GS->logger->convertBufferToHexString(data, dataLength, stringBuffer, sizeof(stringBuffer));
+	Logger::convertBufferToHexString(data, dataLength, stringBuffer, sizeof(stringBuffer));
 	logt("CONN_DATA", "%s", stringBuffer);
 
 
 	//Configure the write parameters with reliable/unreliable, writehandle, etc...
 	ble_gattc_write_params_t writeParameters;
-	memset(&writeParameters, 0, sizeof(ble_gattc_write_params_t));
+	CheckedMemset(&writeParameters, 0, sizeof(ble_gattc_write_params_t));
 	writeParameters.handle = characteristicHandle;
 	writeParameters.offset = 0;
 	writeParameters.len = dataLength;
@@ -140,7 +119,7 @@ u32 GATTController::bleSendNotification(u16 connectionHandle, u16 characteristic
 	logt("CONN_DATA", "hvx Data size is: %d, handles(%d, %d)", dataLength, connectionHandle, characteristicHandle);
 
 	char stringBuffer[100];
-	GS->logger->convertBufferToHexString(data, dataLength, stringBuffer, sizeof(stringBuffer));
+	Logger::convertBufferToHexString(data, dataLength, stringBuffer, sizeof(stringBuffer));
 	logt("CONN_DATA", "%s", stringBuffer);
 
 
@@ -151,99 +130,13 @@ u32 GATTController::bleSendNotification(u16 connectionHandle, u16 characteristic
 	notificationParams.p_len = &dataLength;
 	notificationParams.type = BLE_GATT_HVX_NOTIFICATION;
 
-//	NRF_SUCCESS
-//	BLE_ERROR_INVALID_CONN_HANDLE
-//	NRF_ERROR_INVALID_STATE
-//	NRF_ERROR_INVALID_ADDR
-//	NRF_ERROR_INVALID_PARAM
-//	BLE_ERROR_INVALID_ATTR_HANDLE
-//	BLE_ERROR_GATTS_INVALID_ATTR_TYPE
-//	NRF_ERROR_NOT_FOUND
-//	NRF_ERROR_DATA_SIZE
-//	NRF_ERROR_BUSY
-//	BLE_ERROR_GATTS_SYS_ATTR_MISSING
-//	BLE_ERROR_NO_TX_PACKETS
-
 	err = sd_ble_gatts_hvx(connectionHandle, &notificationParams);
 
 	return err;
 }
 
-bool GATTController::bleMeshServiceEventHandler(ble_evt_t &bleEvent)
+GATTController & GATTController::getInstance()
 {
-	//Calls the Db Discovery modules event handler
-#ifdef NRF51
-	ble_db_discovery_on_ble_evt(&discoveredServices, &bleEvent);
-#elif defined(NRF52)
-	ble_db_discovery_on_ble_evt(&bleEvent, &discoveredServices);
-#endif
-
-
-	u32 err = 0;
-
-	switch (bleEvent.header.evt_id)
-	{
-
-			//Is called when a client has written to our characteristic
-		case BLE_GATTS_EVT_WRITE:
-		case BLE_GATTC_EVT_HVX:
-		{
-			if(gattControllerHandler != nullptr){
-				gattControllerHandler->GattDataReceivedHandler(bleEvent);
-			}
-			break;
-		}
-
-		case BLE_GATTS_EVT_SYS_ATTR_MISSING:
-			GATTController::attributeMissingHandler(bleEvent);
-			break;
-
-			//Fired as a result of an unreliable write command
-#if defined(NRF51) || defined(SIM_ENABLED)
-		case BLE_EVT_TX_COMPLETE:
-#elif defined(NRF52)
-		case BLE_GATTS_EVT_HVN_TX_COMPLETE:
-		case BLE_GATTC_EVT_WRITE_CMD_TX_COMPLETE:
-#endif
-		{
-			if(gattControllerHandler != nullptr){
-				gattControllerHandler->GATTDataTransmittedHandler(bleEvent);
-			}
-			return true;
-		}
-#ifdef NRF52
-		case BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST:
-		{
-			//Use default MTU if requested
-			err = sd_ble_gatts_exchange_mtu_reply(bleEvent.evt.gatts_evt.conn_handle, BLE_GATT_ATT_MTU_DEFAULT);
-
-			break;
-		}
-#endif
-
-			//Is called when a write has completed
-		case BLE_GATTC_EVT_WRITE_RSP:
-			//Send next packet after first has been received
-			if(gattControllerHandler != nullptr){
-				gattControllerHandler->GATTDataTransmittedHandler(bleEvent);
-			}
-
-			return true;
-
-		case BLE_GATTC_EVT_TIMEOUT:
-			//A GATTC Timeout occurs if a WRITE_RSP is not received within 30s
-			//This essentially marks the end of a connection, we'll have to disconnect
-			logt("ERROR", "BLE_GATTC_EVT_TIMEOUT");
-			GS->logger->logError(ErrorTypes::CUSTOM, (u32)CustomErrorTypes::BLE_GATTC_EVT_TIMEOUT_FORCED_US, 0);
-
-			GS->gapController->disconnectFromPartner(bleEvent.evt.gattc_evt.conn_handle);
-
-
-			return true;
-
-		default:
-			break;
-	}
-
-	return false;
+	return GS->gattController;
 }
+

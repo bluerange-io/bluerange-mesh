@@ -1,0 +1,84 @@
+= Developers
+
+== File Structure
+This is a list and description of the most important folders in the repository.
+
+[cols="2m,3",width="100%",grid="none"]
+|===
+|├── config/ +
+├── └── featuresets/ + 
+├── inc/ +
+├── ├── c/ +
+├── └── nrf52/ +
+├── inc_c/ +
+├── linker/ +
+├── sdk/ +
+├── softdevice/ +
+├── src/ +
+├── ├── base/ +
+├── ├── c/ +
+├── ├── mesh/ +
+├── ├── modules/ +
+├── ├── utility/ +
+├── ├── Boardconfig.cpp +
+├── ├── Config.cpp +
+├── ├── FruityMesh.cpp +
+├── ├── GlobalState.cpp +
+├── └── Main.cpp +
+├── util/ +
+└── src_examples/
+| configuration header files +
+different build configurations +
+main include directory for C++ headers +
+includes for c code +
+specific nrf52 includes +
+include directory for C headers +
+linker scripts +
+modified nRF SDKs +
+softdevice hex files +
+ + 
+wrappers for SoftDevice functions +
+drivers and other c code +
+mesh functionality +
+functionality wrapped in modules +
+helper classes +
+runtime pin and board configuration +
+configuration +
+bootup and main functionality +
+holds references to basic classes +
+Startup Code +
+tools and utilities +
+code templates and examples
+|===
+
+Functionality that is not part of the meshing algorithm should be placed in the `fruitymesh/modules/` folder and the module class extended. A module receives all events that it is interested in and can save and load its configuration from flash memory.
+
+Have a look at xref:Class-Structure.adoc[Class Structure] for some more detailed explanations on how the code is structured. Also keep in mind xref:CherrySim.adoc[Instances] when implementing new functionalities.
+
+There are some utilities in the `/util` folder, for example a python script that opens a putty terminal for all connected serial devices and a Wireshark dissector that can be used together with the nRF Sniffer to inspect the advertising packets.
+
+== Configuring FruityMesh
+Most settings are found in the `fruitymesh/config/` folder in `Config.h`. Module specific settings are kept within the module's header and cpp file.
+
+== Feature Sets
+FruityMesh uses so called featuresets for creating different distributions for different use-cases. A featureset defines the compile time and run time configuration for a node. The make process can be configured differently for a featureset, a number of different defines or macros can be used during compile time and different code is used during runtime. This also allows FruityMesh to run on a number of different boards (different pin settings or configuration) with the same binary. You can specify the featureset by e.g. calling make with `make FEATURESET=featureset_name` or by creating a `Makefile.local`.
+
+== Memory Requirements
+FruityMesh doesn't run on devices with only 16kb of RAM. It may be possible to optimize the build and resize some buffers, but this is currently not supported. The binary of FruityMesh is around 50kb depending on the configuration and will easily fit on devices with 256kb flash together with the softdevice and still be updatable using dual bank updates.
+
+== Want To Contribute?
+All kinds of contributions are welcome. Before you start coding, please contact us to align the development process.
+
+== About Questions
+If you have a general question, the best way is to open a new issue and label it with "question". This way, a knowledge base of questions and answers is maintained for easy access in the future. If it is a commit-specific comment or question, you can just comment under the commit.
+
+== About Forking
+We'd love to develop the FruityMesh protocol as an interoperable protocol that works across devices from different developers. If you want to make any changes to the protocol itself, please contact us first so that we can work out a mutual agreement. Every implementation that is compatible with the current official release of FruityMesh is welcome to use the M-Way Solutions Company identifier (0x024D) in the manufacturer specific data along with the current mesh identifier. Be sure to read the xref:Specification.adoc[Specification] for some basics. This is only very basic documentation, we try to continually improve the specification and add more details. In the meantime, do not hesitate to contact us or have a look in the implementation.
+
+
+== About Contributions
+The implementation is written in C++. This makes it easy to implement new functionality and separate it from other parts in a clean way. Refactoring or refinement tips are welcome. If you contribute, please comment your code thorougly and keep the implementation as readable as possible. This will help other contributors understand the code quickly.
+If you have documentation to add, please post a pull request as well.
+
+== Licence
+FruityMesh is published under the GPLv3 version, which is available in the repository.

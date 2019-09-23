@@ -1,0 +1,26 @@
+ifndef::imagesdir[:imagesdir: ../assets/images]
+= CherrySim
+
+____
+CherrySim is not yet open source. It is being worked on, stay tuned for updates.
+____
+
+CherrySim is the new simulator that is based on our FruityMesh code. It is written entirely in C and C++. You will notice a few `#ifdef` statements in the FruityMesh codebase that perform a check whether the simulator is enabled.
+
+image:cherrysim.png[cherrysim]
+
+== Functionality & Features
+The new simulator abstracts the SoftDevice and creates a communication layer between the nodes. It simulates all nodes in a short period of time and can even visualize the mesh.
+
+It supports terminal input and output for all nodes, pipe communication for exchanging data efficiently with other applications, pseudo-randomness to deterministically debug a problem, battery usage estimation, Google test integration, random configurations or user defined positions, etc.
+
+Use cases for the simulator are:
+
+- Unit and system testing
+- Estimate battery usage
+- Implement new features
+- Evaluate and improve mesh behavior
+- Debug implementation problems
+
+=== Instances
+CherrySim works with only one instance and is able to simulate many instances of FruityMesh. Hence FruityMesh must be written in a way that the code itself has no state variables. No global or functional static variables are allowed. Every variable that needs to be saved from function call to another needs to be a part of class since CherrySim creates instances of classes for every node.

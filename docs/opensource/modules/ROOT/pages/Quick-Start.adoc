@@ -1,0 +1,157 @@
+ifndef::imagesdir[:imagesdir: ../assets/images]
+= Quick Start
+:page-partial:
+image:eclipse.png[eclipse-luna]
+image:cpp.png[cplusplus]
+
+FruityMesh was built with Eclipse and GCC and is mainly written in C++, with some small C++11 bits. Setting up the development environment has become pretty straightforward.
+
+You have two possibilities:
+
+* <<Flashing the precompiled firmware,Flashing the precompiled firmware>> will take you about *5 minutes*.
+* If you want to compile it yourself you need to <<Setup Eclipse & Compile FruityMesh>>. This will take you a few more minutes until everything is ready to go.
+
+== Flashing Precompiled Firmware
+The precompiled firmware can be flashed in three easy steps.
+
+=== Download nRF5 Command Line Tools
+The nRF Command Line Tools are handy for flashing the compiled firmware on a device. You can download them here for the operating system of your choice and install them:
+
+https://www.nordicsemi.com/Software-and-Tools/Development-Tools/nRF5-Command-Line-Tools
+
+The tools come with a bundled installation of the Segger Utilities, which are necessary for flashing and debugging nRF Hardware.
+
+You should add the *bin/* folder of the installation to your operating system PATH variable to make development easier.
+
+=== Flash SoftDevice & Application
+Plug in your nrf51 or nrf52 development board via USB, then open a command prompt in the FruityMesh folder and type in the following command for flashing the nrf51 version:
+
+----
+C:/<path_to_nrfjprog>/nrfjprog.exe --chiperase --program binary/fruitymesh_nrf51_s130.hex --reset
+----
+
+or the following for nrf52:
+
+----
+C:/<path_to_nrfjprog>/nrfjprog.exe --chiperase --program binary/fruitymesh_nrf52_s132.hex --reset
+----
+
+Your output should look like this:
+
+image:flashing.png[flashing]
+
+If you have multiple boards attached, you will be prompted for the id of your board that should be flashed.
+
+=== Next Steps
+You're now ready to test FruityMesh. Continue by reading the <<Get Started,Get Started>> section.
+
+== Setup Eclipse & Compile FruityMesh
+FruityMesh is built using the GCC compiler toolchain together with GNU make. The installation process varies a little for each operating system.
+
+=== Installing the Toolchain
+==== GNU ARM Embedded Toolchain
+Download Version 4.9 of the GNU ARM Embedded Toolchain for Windows. This includes the compiler gcc, linker, and multiple utilities like objcopy, addr2line and gdb - the GNU debugger:
+
+https://launchpad.net/gcc-arm-embedded/4.9/4.9-2015-q3-update/
+
+Unzip the downloaded package into a folder of your choice.
+
+WARNING: Do not choose a newer version, as this might fail to compile.
+
+==== Tools Installation (Windows Only)
+Next, if you are working on windows, you have to download and install some unix utilities, the GNU ARM Eclipse Build Tools. This includes _make_, _sh_, _rm_ and some others. Version 2.4 has been tested successfully and the executable installer can be downloaded from here:
+
+https://github.com/gnu-mcu-eclipse/windows-build-tools/releases/tag/v2.4b
+
+Because most makefiles will also use the _mkdir_ command and maybe some others, you should also download the GNU Coreutils that provide a set of UNIX commands in binary for Windows. Copy at least the `mkdir.exe` and `md5.exe` to the `bin/` folder of your GNU ARM Build Tools installation. You must also download the dependencies and copy these to the same folder (Two `.dll` files).
+
+Binaries:
+
+http://gnuwin32.sourceforge.net/downlinks/coreutils-bin-zip.php
+
+Dependencies:
+
+http://gnuwin32.sourceforge.net/downlinks/coreutils-dep-zip.php
+
+Finally, you should add the bin folders of the gnu buildtools and the `bin` folder of `gcc-arm-embedded` to your PATH variable under System Environment. This will make sure that you can access these tools from anywhere.
+
+==== Project Configuration
+The last step, before you can build the project is to duplicate `Makefile.local.template` and name it `Makefile.local`.
+
+Open Makefile.local and give the correct path to your _gcc_ installation:
+
+----
+FRUITYMESH_GNU_INSTALL_ROOT := C:/<path_to_gcc-arm-embedded-4.9>
+----
+
+You can also specify the PLATFORM (NRF51 or NRF52) and give a different xref:Features.adoc[Featureset] for the build.
+
+Next, open a command prompt in the FruityMesh folder and type:
+
+----
+make
+----
+
+If everything was set up correctly and the location of make was correctly entered in the `PATH` variable of your operating system, everything should build.
+
+If you installed the nRF Command Line Tools and properly configured the `PATH`, you can now type:
+
+----
+make flash
+----
+
+to flash the firmware on a device.
+
+==== Using Eclipse For Development
+image:eclipsescreen.png[eclipsescreenshot]
+
+Eclipse is a good development IDE for FruityMesh. The project settings are already included and all you have to do is download GNU MCU Eclipse, which already contains the necessary plugins for Embedded Development from here:
+
+https://github.com/gnu-mcu-eclipse/org.eclipse.epp.packages/releases
+
+After starting Eclipse, all you have to do is to import the FruityMesh project. You can then develop, flash and debug in a comfortable way.
+
+== Get Started
+Now, let's see how we can use FruityMesh. The preconmpiled firmware and the standard project settings are configured so that all devices immediately connect to each other. Start by plugging in your first develoipment kit.
+
+=== Open Serial Terminal & Connect
+(On Windows,
+http://www.chiark.greenend.org.uk/~sgtatham/putty/download.html[Putty] is the best tool. The screen utility can be used on macOS or Linux.) You have to connect to UART using the following settings:
+
+* *Connection Type:* Serial
+* *Speed:* 1000000
+* *Data bits:* 8
+* *Stop Bits:* 1
+* *Parity:* None
+* *Flow control:* RTS/CTS (Hardware)
+
+TIP: OSX users: To find out which serial port to open, you can list all devices under `/dev/cu.` and pick the one that says usbmodem.
+
+=== Reset Development Kit
+Once your terminal is connected to the serial port, press the reset button on the Development Kit and the Terminal should provide you with some output similar to this:
+
+image:terminal.png[Terminal]
+
+If you don't get output immediately it will sometimes help to disconnect the Devkit from USB for a short time or try to write something. This is an issue of the Segger Debugger chipset that bridges the UART.
+
+=== Try Some Commands
+You may now enter a number of commands to trigger actions. Here are some important ones:
+
+* *status:* displays the status of the node and its connections
+* *reset:* performs a system reset
+* *data:* sends data through the mesh that other nodes then output to the terminal
+
+=== Connect Second Development Kit
+Next, flash and connect another node to the network and you should observe that they connect to each other after a short amount of time. You'll see that the LEDs will switch from blinking red to a single green pattern.
+
+* If you enter the command *action 0 io leds on*, both nodes should
+switch their led to white (all LEDs on). After you enter *action 0 io leds off*, it will go back to connection signaling mode.
+* Now, connect with another terminal to the second node and enter *data* in the command prompt and observe how the data is sent to the other node and outputted on the other terminal.
+* You can add as many nodes as you like to the network and see how it reacts. If you remove a node, the network will try to repair this connection. You can observe the size change of the cluster by entering *status* from time to time.
+
+WARNING: Two nodes will only connect to each other once they have been enrolled in the same network. The Github configuration will automatically have all nodes enrolled in the same network after flashing. If you do not want this, take a look at the xref:Specification.adoc#_UICR[UICR configuration].
+
+== What's Next
+Take a look at the xref:Features.adoc[Features] page for a detailed overview of the possibilities and check out xref:Usage.adoc[Usage] for usage instructions. If you're ready to contribute to the development of FruityMesh, cf. xref:Developers.adoc[Developers] for a roadmap and for instructions on how to participate.
+
+If you want to start programming with FruityMesh, you should have a look at the xref:Tutorials.adoc[Tutorials] page for a guided introduction.

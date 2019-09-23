@@ -127,7 +127,6 @@ STATIC_ASSERT_SIZE(advPacketServiceAndDataHeader, 13);
 //Message types: Protocol defined, up to 19 because we want to have a unified
 //type across advertising and connection packets if we need to unify these.
 #define MESSAGE_TYPE_JOIN_ME_V0 1
-#define MESSAGE_TYPE_ASSET_V1 2
 
 
 //####### Advertising packets => Structs #################################################
@@ -141,15 +140,6 @@ typedef struct
 	u8 messageType;
 }advPacketHeaderManufacturer;
 STATIC_ASSERT_SIZE(advPacketHeaderManufacturer, 8);
-
-
-#define SIZEOF_ADV_PACKET_ASSET_V1 (SIZEOF_ADV_PACKET_HEADER_MANUFACTURER + 2)
-typedef struct
-{
-	advPacketHeaderManufacturer header;
-	u16 assetId;
-}advPacketAssetV1;
-STATIC_ASSERT_SIZE(advPacketAssetV1, 10);
 
 //Header that is common to all mesh advertising messages
 #define SIZEOF_ADV_PACKET_STUFF_AFTER_MANUFACTURER 4 //1byte mesh identifier + 2 byte networkid + 1 byte message type
@@ -185,7 +175,7 @@ typedef struct
 
 	u8 batteryRuntime; //batteryRuntime. Contains the expected runtime of the device (1-59=minutes, 60-83=1-23hours, 84-113=1-29days, 114-233=1-119months, 234-254=10-29year, 255=infinite)
 	i8 txPower; //txPower. Send power in two's complement dbm
-	u8 deviceType; //Type of device => enum deviceTypes
+	DeviceType deviceType; //Type of device
 	u16 hopsToSink; //Number of hops to the shortest sink
 	u16 meshWriteHandle; //The GATT handle for the mesh communication characteristic
 	ClusterId ackField;//Contains the acknowledgement from another node for the slave connection procedure

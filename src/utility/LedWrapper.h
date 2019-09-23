@@ -47,6 +47,8 @@ private:
 
 public:
     LedWrapper(i8 io_num, bool active_high);
+	LedWrapper();
+	void Init(i8 io_num, bool active_high);
     void On(void);
     void Off(void);
     void Toggle(void);

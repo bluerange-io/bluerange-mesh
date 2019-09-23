@@ -1,38 +1,22 @@
-image:doc/img/logo.png[fruitymesh]
+ifndef::imagesdir[:imagesdir: docs/opensource/modules/ROOT/assets/images]
 
-Version 0.8.8
+image:logo.png[fruitymesh]
 
-FruityMesh is the reference implementation of the **BlueRange** initiative. It was the first open source implementation of a mesh network that is based on standard *Bluetooth Low Energy 4.1 connections*. In contrast to meshes that use advertising and scanning, this allows for a network run with *battery powered* devices. FruityMesh works with the Nordic nRF51 or nRF52 chipset in combination with the *S130/S132 SoftDevices* and enables tons of devices to connect to each other with its auto-meshing capabilities. It is *always connected* with configurable connection intervals of *7.5 ms to 4 seconds* while still being able to run on batteries.
+Version 0.8.540
 
-=== BlueRange
-BlueRange is our commercial product that includes our Mesh, MeshGateway, Platform, Asset Tracking and much more. Have a look at our website:
+FruityMesh is the reference implementation of the **BlueRange** initiative. It was the first open source implementation of a mesh network that is based on standard *Bluetooth Low Energy connections*. In contrast to meshes that use advertising and scanning, this allows for a network run with *battery powered* devices. FruityMesh works with the Nordic nRF51 or nRF52 chipset in combination with the *S130/S132 SoftDevices* and enables tons of devices to connect to each other with its auto-meshing capabilities. It is *always connected* with configurable connection intervals of *7.5 ms to 4 seconds* while still being able to run on batteries.
 
-https://www.bluerange.io/
+== News
+This release should bring a lot of stability improvements and can now be compiled for the *nRF52840* using *SDK15*. Our new Simulator did not make it in this release, though, as it needs some cleanup until we can make it available to everybody. We are planning to provide a changelog in the future, but for now, take a look at the documentation to find out more.
 
-=== News
-It's been a long time, but we finally released our latest version of FruityMesh with tons of new additions and a lot of refactoring and documentation. Go to the <<doc/Features.adoc#,Features>> page to find out more.
+* Many bugfixes and stability improvements
+* Improved clustering
+* Better automatic TimeSync between nodes
+* Adds Nearby Enrollment
+* nRF SDK 15.2 integrated
+* Generic Sensor & Actuator messages
 
-=== Documentation
-image:doc/img/documentation.png[]
+== Documentation
+image:documentation.png[]
 
-Documentation is the key and therefore, you should have a look at the documentation to get you started.
-
-link:https://mwaylabs.github.io/fruitymesh/fruitymesh/index.html[Documentation]
-
-== Where to begin
-Before you begin, you should have at least two boards with the nRF51/nRF52 chipsets and either an external or an onboard debugger. If not, I suggest that you get two link:https://www.nordicsemi.com/Software-and-Tools/Development-Kits[DevKits from Nordic] to get you started as easily and quickly as possible. Next, have a look at the <<doc/Quick-Start.adoc#,Quick Start>> page to get everything running. Then test some commands from the <<doc/Usage.adoc#,Usage>> page. Afterwards, you could follow one of the <<doc/Tutorials.adoc#,Tutorials>>.
-
-== What to expect
-Take some nRF devices, flash them with FruityMesh and expect them to connect to each other in an instant. Open the terminal and send them some commands over the mesh, trigger LEDs or watch some data going through. Power consumption is minimal with the right settings. For a list of some of the features, have a look at the <<doc/Features.adoc#,Features>> page.
-
-== Talk to us
-We’re interested in contributions of every kind, otherwise we wouldn’t be here on GitHub. If you have questions on how to help and bring the technology forward, do not hesitate to contact us. Make sure to read the <<doc/Developers.adoc#,Developers>> page to find out how to help.
-
-Do not hesitate to ask questions, submit issues and comment. Mail us through our website for business enquiries or open an issue and label it as _question_ for developer questions.
-
-== Who are we?
-image:doc/img/mway.png[mway_logo]
-
-This project is under active development at the link:http://www.mwaysolutions.com/[M-Way Solutions GmbH], Germany.
-
-We use FruityMesh ourselves in conjunction with our custom MeshGateway to build services such as connected lights, asset tracking and much more for our customers.
+https://mwaylabs.github.io/fruitymesh/fruitymesh/index.html

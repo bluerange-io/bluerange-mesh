@@ -1,0 +1,298 @@
+= StatusReporterModule (moduleId 3)
+
+== Purpose
+The _StatusReporterModule_ reports the node status in a configured interval. It provides methods for directly requesting different kinds of device info and status data.
+
+== Functionality
+The _StatusReporterModule_ can periodically send out
+different kinds of informational messages. It also feeds the watchdog
+when keep alive messages are received. It is responsible for sending out
+logged error codes and measuring the necessary data for its messages
+such as the battery power.
+
+== Terminal Commands
+=== Device Information
+Generic information about a node that never changes or only changes through enrollment or firmware updates can be requested via the _get_device_info_ command.
+
+[source,C++]
+----
+//Request the full device info from some nodes
+action [nodeId] status get_device_info
+----
+
+=== Status Information
+Information that is bound to change from time to time can be requested using the _get_status_ command.
+
+[source,C++]
+----
+//Request the status
+action [nodeId] status get_status
+----
+
+=== Connection Information
+Information about the mesh connections of a node can be requested with the _get_connections_ or _get_nearby_ commands.
+
+[source,C++]
+----
+//Retrieve the connections from all nodes in the network
+action [nodeId] status get_connections
+----
+
+[source,C++]
+----
+//Return nearby nodes from the JOIN_ME buffer
+action [nodeId] status get_nearby
+----
+
+=== Live Reports
+Live reports are a way to send information about errors, connections, disconnections and other important events to the user through the mesh. Each live report has a unique ID according to its importance. Liver reports are activated by setting the _livereports_ level to a value greater than 0. The different levels are:
+
+* Off (0)
+* Error (50)
+* Warn (100)
+* Info (150)
+* Debug (200)
+
+Live reports can be generated in the firmware using the _SendLiveReport_ method. Two extra parameters can be given that can contain additional information for the specific report/error.
+
+[source,C++]
+----
+//Set the livereport level
+action [nodeId] status livereports [liveReportLevel]
+
+//Activate livereports for all errors on all nodes
+action 0 status livereports 50
+----
+
+Live reports are printed on the terminal of a sink node and can be used to debug a problem in a running system:
+
+[source,Javascript]
+----
+{"type":"live_report","nodeId":123,"module":3,"code":1,"extra":2,"extra2":3}
+----
+
+== Messages
+=== Device Info
+==== Request
+actionType: `GET_DEVICE_INFO`
+
+|===
+|Bytes |Type |Description
+
+|8 |connPacketModule |
+|===
+
+==== Response
+actionType: `DEVICE_INFO`
+
+The device info contains device information that is not changing often, e.g. only after a firmware update or an enrollment.
+
+[cols="1,2,5"]
+|===
+|Bytes |Type |Description
+
+|8 |connPacketModule |
+|2 |manufacturerId |ID according to Bluetooth SIG Assigned numbers
+company identifiers
+|5 |serialNumber |Serial number as ASCII without terminating 0 character
+|8 |chipId |A unique ID of the nRF chip
+|7 |gapAddress |1 byte address type, 6 byte BLE address
+|2 |networkid |The network ID
+|4 |nodeVersion |Version of the node +
+(10000000 * MAJOR + 10000 * MINOR + PATCH)
+|1 |dbmRx |Receive power in dBm (signed)
+|1 |dbmTx |Transmit power in dBm (signed)
+|1 |deviceType |cf. xref:Specification.adoc#_Device_Types[Device Types]
+|1 |calibratedTx |Calibrated TX power at 1m distance (signed)
+|2 |chipGroupId |Group ID for the chip (e.g. NRF51 or NRF52)
+|2 |featuresetGroupId |Group ID for the firmware feature set (used for
+firmware update). Matching groups are allowed to receive the firmware.
+|2 |bootloaderVersion |Version of the bootloader
+|===
+
+=== Device Info
+==== Request
+actionType: GET_DEVICE_INFO_V2
+
+[cols="1,2,5"]
+|===
+|Bytes |Type |Description
+
+|8 |connPacketModule |
+|===
+
+==== Response
+actionType: `DEVICE_INFO_V2`
+
+The device info contains information about the device that is not
+changing often, e.g. only after a firmware update or an enrollment.
+
+[cols="1,2,2,5"]
+|===
+|Bytes |Type |Name |Description
+
+|8 |connPacketModule | |
+|2 |u16 |manufacturerId |ID according to Bluetooth SIG Assigned numbers
+company identifiers
+|4 |u32 |serialNumberIndex |Index of the serial number, can be converted
+with alphabet
+|8 |u64 |chipId |A unique ID of the nRF chip
+|7 ||gapAddress |1 byte address type, 6 byte BLE address
+|2 |u16 |networkid |The network id
+|4 |u32 |nodeVersion |Version of the node (10000000 * MAJOR + 10000 *
+MINOR + PATCH)
+|1 |i8 |dbmRx |Receive power in dBm (signed)
+|1 |i8 |dbmTx |Transmit power in dBm (signed)
+|1 |u8 |deviceType |cf. xref:Specification.adoc#_Device_Types[Device Types]
+|1 |i8 |calibratedTx |Calibrated TX power at 1m distance (signed)
+|2 |u16 |chipGroupId |Group ID for the chip (e.g. NRF51 or NRF52)
+|2 |u16 |featuresetGroupId |Group ID for the firmware featureset (used
+for firmware update). Matching groups are allowed to receive the firmware.
+|2 |u16 |bootloaderVersion |Version of the bootloader
+|===
+
+=== Status
+==== Request
+actionType: `GET_STATUS`
+
+|===
+|Bytes |Type |Description
+
+|8 |connPacketModule |
+|===
+
+==== Response actionType: STATUS
+
+The device status contains information that is changing from time to
+time.
+
+[cols="1,2,4"]
+|===
+|Bytes|Type|Description
+
+|8|connPacketModule|
+|2|clusterSize|Size of the cluster that the node is connected to (current mesh size)
+|2|inConnectionPartner|NodeId of the node that is connected to the one and only peripheral connection with this node.
+|1|inConnectionRssi|RSSI of the incoming connection
+|2 bit|freeIn|Number of free mesh connections as peripheral
+|6 bit|freeOut|Number of free mesh connections as central
+|1|batteryInfo|Battery voltage
+|1|connectionLossCounter|Counter of how many mesh connections were dropped
+|1 bit|initializedByGateway|If the gateway has initialized this beacon and sent the _SET_INITIALIZED_ command, this bit will be 1 until a reboot is encountered
+|7 bit|reserved|
+|===
+
+=== Connections
+Query all nodeIDs that a node is connected to including
+the connection rssi. The first entry is the incoming connection, the
+others are outgoing.
+
+==== Request
+actionType: `GET_ALL_CONNECTIONS`
+
+[cols="1,2,4"]
+|===
+|Bytes |Type |Description
+
+|8 |connPacketModule |
+|===
+
+==== Response
+actionType: `ALL_CONNECTIONS`
+
+The device status contains information that is changing from time to
+time.
+[cols="1,2,4"]
+|===
+|Bytes|Type|Description
+
+|8|connPacketModule|
+|3*x|connections|Array of all _partnerEntries_
+|===
+
+===== PartnerEntry
+
+[cols="1,2,4"]
+|===
+|Bytes|Type|Description
+
+|2|partnerId|_nodeId_ of the connected node 
+|1|rssi|RSSI as a signed integer
+|===
+
+=== Nearby Nodes
+Returns all nodes (limited to some maximum count) that
+are surrounding the node with the same networkid.
+
+==== Request
+actionType: `GET_NEARBY_NODES`
+
+[cols="1,2,4"]
+|===
+|Bytes |Type |Description
+
+|8 |connPacketModule |
+|===
+
+==== Response
+actionType: `NEARBY_NODES`
+[cols="1,2,4"]
+|===
+|Bytes|Type|Description
+
+|8|connPacketModule|
+|3*x|nearbyNodes|Array of _NearbyNodeEntries_
+|===
+
+===== NearbyNodeEntry
+[cols="1,2,4"]
+|===
+|Bytes|Type|Description
+
+|2|nodeId|The
+nodeId of the nearby node |1|rssi| The RSSI as a signed integer
+|===
+
+=== Live Reports
+The _statusReporterModule_ can send live reports that
+notify the user over various state changes and error conditions. A live
+report is generated for a node and then broadcast over the mesh.
+This allows live debugging of mesh errors, e.g. if two nodes
+are not connecting to each other. Live reports are also received over
+_MeshAccessConnection_, which means an error can be detected after connecting
+to the disconnected part of the mesh using a _MeshAccessConnection_.
+
+[source,C++]
+----
+enum LiveReportTypes {
+    LIVE_REPORT_TYPES_ERROR = 0,
+    LIVE_REPORT_TYPES_WARN = 50,
+    //========
+    LIVE_REPORT_TYPES_INFO = 100,
+    LIVE_REPORT_TYPE_GAP_CONNECTED_INCOMING, //extra is connHandle, extra2 is 4 bytes of gap addr
+    LIVE_REPORT_TYPE_GAP_TRYING_AS_MASTER, //extra is partnerId, extra2 is 4 bytes of gap addr
+    LIVE_REPORT_TYPE_GAP_CONNECTED_OUTGOING, //extra is connHandle, extra2 is 4 byte of gap addr
+    LIVE_REPORT_TYPE_GAP_DISCONNECTED, //extra is partnerid, extra2 is hci code
+
+    LIVE_REPORT_TYPE_HANDSHAKE_FAIL,
+    LIVE_REPORT_TYPE_MESH_CONNECTED, //extra is partnerid, extra2 is asWinner
+    LIVE_REPORT_TYPE_MESH_DISCONNECTED, //extra is partnerid, extra2 is appDisconnectReason
+
+    //========
+    LIVE_REPORT_TYPES_DEBUG = 150,
+    LIVE_REPORT_TYPE_DECISION_RESULT //extra is decision type, extra2 is preferedPartner
+};
+----
+
+==== Event
+actionType: `LIVE_REPORT`
+
+[cols="1,2,4"]
+|===
+|Bytes|Type|Description
+
+|8|connPacketModule|MESSAGE_TYPE_MODULE_GENERAL
+|1|reportType|Of type _LiveReportType_
+|4|extra|Additional data regarding the event, depending on _reportType_
+|4|extra2|Additional data regarding the event, depending on _reportType_
+|===

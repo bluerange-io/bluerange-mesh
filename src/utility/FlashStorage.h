@@ -34,12 +34,7 @@
 
 #pragma once
 
-#include <GlobalState.h>
 #include <PacketQueue.h>
-
-extern "C"{
-#include <ble.h>
-}
 
 class FlashStorageEventListener;
 
@@ -65,7 +60,7 @@ enum class FlashStorageCommand : u8 {
 #pragma pack(push)
 #pragma pack(1)
 
-#define SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER 12
+constexpr int SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER = 12;
 struct FlashStorageTaskItemHeader
 {
 	FlashStorageCommand command;
@@ -76,7 +71,7 @@ struct FlashStorageTaskItemHeader
 };
 STATIC_ASSERT_SIZE(FlashStorageTaskItemHeader, 12);
 
-#define SIZEOF_FLASH_STORAGE_TASK_ITEM_WRITE_DATA (SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER + 10)
+constexpr int SIZEOF_FLASH_STORAGE_TASK_ITEM_WRITE_DATA = (SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER + 10);
 struct FlashStorageTaskItemWriteData
 {
 		u32* dataSource;
@@ -87,7 +82,7 @@ struct FlashStorageTaskItemWriteData
 STATIC_ASSERT_SIZE(FlashStorageTaskItemWriteData, 10);
 
 //We should pay attention that the data pointer is saved at a word aligned address so we can directly write to flash from this pointer
-#define SIZEOF_FLASH_STORAGE_TASK_ITEM_WRITE_CACHED_DATA (SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER + 8)
+constexpr int SIZEOF_FLASH_STORAGE_TASK_ITEM_WRITE_CACHED_DATA = (SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER + 8);
 struct FlashStorageTaskItemWriteCachedData
 {
 	u32* dataDestination;
@@ -98,7 +93,7 @@ struct FlashStorageTaskItemWriteCachedData
 };
 STATIC_ASSERT_SIZE(FlashStorageTaskItemWriteCachedData, 9);
 
-#define SIZEOF_FLASH_STORAGE_TASK_ITEM_ERASE_PAGE (SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER + 2)
+constexpr int SIZEOF_FLASH_STORAGE_TASK_ITEM_ERASE_PAGE = (SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER + 2);
 struct FlashStorageTaskItemErasePage
 {
 		u16 page;
@@ -106,17 +101,17 @@ struct FlashStorageTaskItemErasePage
 };
 STATIC_ASSERT_SIZE(FlashStorageTaskItemErasePage, 2);
 
-#define SIZEOF_FLASH_STORAGE_TASK_ITEM_ERASE_PAGES (SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER + 4)
+constexpr int SIZEOF_FLASH_STORAGE_TASK_ITEM_ERASE_PAGES = (SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER + 4);
 struct FlashStorageTaskItemErasePages
 {
 	u16 startPage;
 	u16 numPages;
 
 };
-STATIC_ASSERT_SIZE(FlashStorageTaskItemErasePages, 4)
+STATIC_ASSERT_SIZE(FlashStorageTaskItemErasePages, 4);
 
 //The data cache is useful in a multi-task transaction where data has to be cached for later and other tasks have to execute first
-#define SIZEOF_FLASH_STORAGE_TASK_ITEM_DATA_CACHE (SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER + 4)
+constexpr int SIZEOF_FLASH_STORAGE_TASK_ITEM_DATA_CACHE = (SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER + 4);
 struct FlashStorageTaskItemDataCache
 {
 	u16 dataLength;
@@ -146,16 +141,15 @@ struct FlashStorageTaskItem
 
 
 
-#define FLASH_STORAGE_RETRY_COUNT 3
-#define FLASH_STORAGE_QUEUE_SIZE 256
+constexpr int FLASH_STORAGE_RETRY_COUNT = 3;
+constexpr int FLASH_STORAGE_QUEUE_SIZE = 256;
 
 class FlashStorage
 {
 	private:
-		FlashStorage();
 				
 		u32 taskBuffer[FLASH_STORAGE_QUEUE_SIZE/sizeof(u32)];
-		PacketQueue* taskQueue;
+		mutable PacketQueue taskQueue;
 
 		FlashStorageTaskItem* currentTask;
 		i8 retryCount;
@@ -176,14 +170,10 @@ class FlashStorage
 		void AbortTransactionInProgress(u16 transactionId, bool removeNext) const;
 
 	public:
+		FlashStorage();
 
 		//Initialize Storage class
-		static FlashStorage& getInstance(){
-			if(!GS->flashStorage){
-				GS->flashStorage = new FlashStorage();
-			}
-			return *(GS->flashStorage);
-		}
+		static FlashStorage& getInstance();
 
 		void TimerEventHandler(u16 passedTimeDs);
 
@@ -199,15 +189,6 @@ class FlashStorage
 		//Caches the data in an internal buffer before saving (destination page must be empty)
 		FlashStorageError CacheAndWriteData(u32* source, u32* destination, u16 length, FlashStorageEventListener* callback, u32 userType);
 
-		//Starts a transaction (multiple task items that must only execute together or fail at one point)
-		FlashStorageError StartTransaction();
-
-		//Ends a set of task items that belong together
-		FlashStorageError EndTransaction(FlashStorageEventListener* callback, u32 userType);
-
-		//Allows us to cache some data in the queue until we need it later
-		FlashStorageError CacheDataInTask(u8 * data, u16 dataLength, FlashStorageEventListener * callback, u32 userType);
-
 		//Return the number of tasks
 		u16 GetNumberOfActiveTasks() const;
 
@@ -220,10 +201,10 @@ class FlashStorage
 
 class FlashStorageEventListener
 {
-	public:
-		FlashStorageEventListener(){};
+public:
+	FlashStorageEventListener() {};
 
-	virtual ~FlashStorageEventListener(){};
+	virtual ~FlashStorageEventListener() {};
 
 	//Struct is passed by value so that it can be dequeued before calling this handler
 	//If we passed a reference, this handler would have to clear the item from the TaskQueue

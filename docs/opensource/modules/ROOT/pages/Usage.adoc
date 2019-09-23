@@ -1,0 +1,52 @@
+= Usage
+== LED Codes
+When a node is powered up, the red LED is flashing to signal that it is not connected. Once two nodes are connected to
+each other, they perform a handshake, which is signaled by a blue LED. Once they are connected and the handshake has taken place, they signal their connection with a single short green flash. The number of green flashes corresponds to the number of active connections to other nodes. If your hardware doesn't have colored LEDs, the LEDs are LED1 for red, LED2 for green and LED3 for blue.
+
+== Terminal Commands
+All classes can implement An interface called
+`TerminalCommandListener` can be implemented for all classes. It allows each class to listen for commands entered via either the UART or Segger RTT terminal. These commands can be entered by the user or by a program such as a MeshGateway that connects a mesh to the internet.
+
+Use a terminal or similar application to use one of the following commands as
+detailed in xref:Quick-Start.adoc[Quick Start].
+
+Some basic commands for testing the mesh are listed below. Content in
+[brackets] has to be replaced by the user.
+
+* *reset*: Reboots the system.
+* *status*: Displays the node status, including its connections.
+* *data*: Sends a test packet to all connected nodes and prints a response
+once the output was received.
+* *datal*: Sends a big test packet that is automatically split into
+multiple writes over the mesh and prints a response when it was received.
+* *action 0 io led [on/off]*: Broadcasts a packet to all nodes to switch
+on/off their leds permanently.
+* *action 0 status get_device_info*: Asks all nodes for their device
+information.
+* *debugtags*: Displays all log tags that are currently enabled.
+* *debug [tagname]*: Toggle log output of the given tag. (ERROR and
+WARNING are always printed.)
+* *debug all* : Toggles logging of all messages, no matter what their
+tag is (these are a lot of messages).
+* *settime [unix timestamp]*: Sets the time for the current node.
+* *sendtime*: Broadcasts the current time over the mesh.
+* *gettime*: Displays the current time.
+* *startterm*: Displays a prompt and echos back the user's input
+(default). Backspace is supported.
+* *stopterm*: Uses an interrupt based input mode. Used for
+communication with a control application. There is no echo of the
+user input.
+* *bufferstat*: Displays the contents of the JOIN_ME buffer, filled with discovery packets from surrounding nodes.
+* *get_modules [nodeId]*: Displays a list of modules from the node and
+whether they are active or not.
+
+____
+Have a look at the xref:Specification.adoc#_NodeIDs[NodeIDs section] for
+some insights on how to address nodes individually or in groups.
+____
+
+== More Commands
+FruityMesh is structured in Modules. Each module
+provides its own set of commands. A detailed listing of all available
+modules and their commands can be found on the
+xref:Modules.adoc[Modules] page.

@@ -58,7 +58,7 @@ public:
 #ifdef SIM_ENABLED
 		if (index >= length || index < 0)
 		{
-			SIMEXCEPTION(IndexOutOfBoundsException);
+			SIMEXCEPTION(IndexOutOfBoundsException); //LCOV_EXCL_LINE assertion
 		}
 #endif
 		return data[index];
@@ -68,7 +68,7 @@ public:
 #ifdef SIM_ENABLED
 		if (index >= length || index < 0)
 		{
-			SIMEXCEPTION(IndexOutOfBoundsException);
+			SIMEXCEPTION(IndexOutOfBoundsException); //LCOV_EXCL_LINE assertion
 		}
 #endif
 		return data[index];
@@ -85,6 +85,6 @@ public:
 			SIMEXCEPTION(ZeroOnNonPodTypeException);
 		}
 #endif
-		memset(data, value, sizeof(T) * length);
+		memset(data, value, sizeof(T) * length);	//CODE_ANALYZER_IGNORE Must be possible to compile for non pod types (cause it's a template), but wont be executed.
 	}
 };

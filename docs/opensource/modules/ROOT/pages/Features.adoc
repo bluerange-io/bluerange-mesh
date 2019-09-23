@@ -1,0 +1,72 @@
+ifndef::imagesdir[:imagesdir: ../assets/images]
+= Features
+This is a non-exhaustive list of features of FruityMesh.
+
+* Automatic meshing and self-healing capabilities with
+xref:The-FruityMesh-Algorithm.adoc[The FruityMesh Algorithm]
+* UART Terminal to execute commands with a list of arguments for
+manual or automated communication with a MeshGateway (cf.
+xref:Usage.adoc[Usage])
+* Debug Logger with support for filtering log tags (cf.
+xref:Usage.adoc[Usage])
+* Modular structure with persistent module configurations (cf.
+xref:Modules.adoc[Modules])
+* Encrypted mesh and smartphone connections
+* xref:AdvertisingModule.adoc[AdvertisingModule] for configuring custom
+broadcast messages such as EddyStone or iBeacon
+* xref:StatusReporterModule.adoc[StatusReporterModule] for monitoring
+the nodes
+* xref:EnrollmentModule.adoc[EnrollmentModule] for provisioning nodes
+(locally or over an existing mesh) and giving them access to a mesh
+* xref:IoModule.adoc[IoModule] for signalling commands using LEDs or
+other pins
+* xref:MeshAccessModule.adoc[MeshAccessModule] for handling connections
+from/to smartphones and other devices
+* Time synchronisation over the mesh (cf. xref:Usage.adoc[Usage])
+* xref:RecordStorage.adoc[RecordStorage], a record based file system for
+storing data in flash
+* Automatic packet splitting if packets are bigger than the connection
+MTU
+* Automatic cycling of different advertising messages with the
+AdvertisingController
+* <<Watchdog With Safe Boot Mode>>
+* Low xref:Battery-Consumption.adoc[Battery Consumption]
+* <<Sink Determination>>
+* <<Error Log & Live Error Reporting>>
+
+== Closed Source Features
+A number of modules of FruityMesh are not yet
+open source but can be used by customers. Contact us if you are
+interested.
+
+* xref:DfuModule.adoc[DfuModule] firmware updates over the mesh, not
+limited to FruityMesh, but also available for connected controllers
+* xref:AssetModule.adoc[AssetModule]: Broadcasting of asset telemetry
+messages that can be located indoors by our infrastructure
+* A number of custom modules and customization of FruityMesh have
+already been implemented for many customers. 
+
+== Feature Roadmap
+
+Coming soon to GitHub:
+
+CherrySim, written in C++, simulates the mesh using the FruityMesh code and allows to implement unit and system tests.
+
+image:cherrysim.png[cherrysim]
+
+== Feature Details
+
+=== Sink Determination
+During clustering, a new node performs a handshake with its partner node and exchanges information about the network structure. This includes the cluster size and also the master bit that is used to determine which cluster must dissolve if a connection is lost. This handshake also includes the number of hops to the sink (MeshGateway). This information is also included in the clusterInfoUpdate packets that notify all nodes about changes in the network.
+
+If a sink is available through a connection, the number of hops to this sink will be sent with these packets. The sink itself has 0 hops to the sink. If there is no sink available, it is denoted with -1.
+
+=== Watchdog With Safe Boot Mode
+The hardware watchdog is configured to restart a node after a certain time if it doesn't receive a keep alive packet from the gateway in the meantime. This is the last fallback to recover a node if there is some critical unknown issue. This issue will then be reported as a watchdog reboot using the error log of a node.
+
+It is possible to configure the watchdog to use safe boot. In safe boot mode, the node will boot up without loading any persistant configuration. This also means that the node will not be enrolled in this mode, but it will reboot in normal mode after the watchdog triggers again. This makes it possible to rescue a node that received a faulty persistent configuration.
+
+== Error Log & Live Error Reporting
+Each node can store a number of errors in RAM. The timestamp, error code and some extra information can be stored. This log can be queried every few minutes or hours. The errors have different significance and some information is logged using a counter that always increments. This statistical information can be used to determine the health of a live mesh and to monitor it. Storing the errors is necessary as they might be generated while a node is disconnected from the mesh. The error log will be cleared once the errors have been queried.
+
+Additionally, live error logging can be used to send information about errors through the mesh instantly. This will only work if the node is part of the mesh.

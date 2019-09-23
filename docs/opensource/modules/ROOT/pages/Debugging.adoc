@@ -1,0 +1,62 @@
+= Debugging
+
+== Debugging Stack Traces
+
+When Fruitymesh reboots, it tries to save the reason in the ramRetainStruct. The Stacked Program Counter (PC before e.g. the _hardfaultHandler_ was called) will be saved in `stacktrace[0]`.
+Using this information it is possible to get the source code line where the error happened. Use the following:
+
+ <gccDir>\bin\arm-none-eabi-addr2line -e <fruitymeshDir>\_build\debug\NRF51_BOARD\FruityMesh.out 0x35BA5
+
+TIP: The address must be given as a hex value, otherwise _addr2line_ doesn't print a valid result. FruityMesh must have been compiled with debug information using `-g`.
+
+== Reading Flash Of A Broken FruityMesh Node
+
+In order to analyze a broken node, the flash and UICR can be read back. A good idea is to first read back UICR and flash and then compare the .hex with either the last .hex flashed onto this beacon (from the _fruitydeploy_ beacon directory) or flash the beacon again and read it back.
+
+Read back code and UICR to a .hex file:
+
+ nrfjprog --readuicr --readcode E:\dump.hex
+
+Convert both .hex files to a hex dump to view them with a standard text editor:
+
+ srec_cat C:\test\dump.hex -intel -o C:\test\dump.txt -hex_dump
+
+Then, use _The TortoiseDiff Tool_ to see the differences:
+
+* Page 0 is the master boot record and should not have been altered
+* The first ~120kb are the softdevice and should not have been altered
+* Afterwards comes the application that should not have any changes
+* The free space after the application can be any code or data
+* The settings are located 2 pages before the bootloader:
+** 0x3E400 (NRF51)
+** 0x76000 (NRF52)
+* The bootloader is located at:
+** `#define FRUITYLOAD_ADDRESS 0x3EC00` (NRF51)
+** `#define FRUITYLOAD_ADDRESS 0x78000` (NRF52)
+
+In order to check the correctness of the settings, convert the hex dump of the settings pages to a C array using Sublime and load it into the flash of a node in the simulator. This permits to debug the startup behaviour. If only the settings are broken, debugging a real node is also an option.
+
+== Debug Running Node
+
+When the nodes are somewhere in the building and one of them is stuck in a hard fault or another endless loop, debugging is complicated. Follow these steps:
+
+* If the node is connected with its USB cable, put a battery in the node, then unplug the USB cable.
+* Take the node to the workstation while it is running on battery
+* Use two USB cables that are both plugged into the docking station (do not plug one into the laptop and the other in the docking station because they might have a different ground).
+* One of the cables is plugged into the DevKit/debugger.
+* The other cable is plugged into the node. Debugger and node are now powered from the same ground level. This is important.
+* Next, connect the debug cable to the node.
+* In Eclipse, select the debug configuration "Running Target". Connect to running target must be selected and no reset must be performed.
+* The node should not have restarted during this procedure.
+
+== Finding Problems In A Live System
+
+Often, an error only occurs sporadically and in a system that is only accessible remotely. FruityMesh has some built-in functionality to find errors in these cases. First, live reports can be used (cf. xref:StatusReporterModule.adoc[StatusReporterModule]). A number of live report statements may be added to the code and they will be reported through the mesh as soon as they get triggered. A drawback with live reports is that they may not be available if the trigger occurs while the mesh connection is lost. In this case, the error logging facility of the xref:Logger.adoc[Logger] class can be used. This way, the error is logged to RAM and can be requested once the node is available in the mesh again.
+
+== nRF Sniffer
+
+The nRF sniffer is used with Wireshark. A custom dissector for FruityMesh _JOIN_ME_ packets has been written and is saved in the `util/wireshark` folder. Integration into Wireshark described at the beginning of file `fruitymesh.lua`.
+
+The nRF Sniffer doesn't work with an updated Segger firmware. It is necessary to flash the Segger firmeware JLink_V498c onto the beacon with `JLinkConfig.exe`, option: replace firmware. Afterwards, the sniffer should work together with the fixed sniffer application received by Nordic Semiconductor.
+
+If the fixed sniffer application does not find the beacon, open the buggy official version until the beacon is found, then close it and reopen the fixed version.

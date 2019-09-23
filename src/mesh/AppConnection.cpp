@@ -51,8 +51,8 @@ AppConnection::AppConnection(u8 id, ConnectionDirection direction, fh_ble_gap_ad
 bool AppConnection::SendData(const BaseConnectionSendData &sendData, u8* data)
 {
 	//Print packet as hex
-	char stringBuffer[400];
-	GS->logger->convertBufferToHexString(data, sendData.dataLength, stringBuffer, sizeof(stringBuffer));
+	char stringBuffer[100];
+	Logger::convertBufferToHexString(data, sendData.dataLength, stringBuffer, sizeof(stringBuffer));
 
 	logt("APP_CONN", "PUT_PACKET:%s", stringBuffer);
 
@@ -64,6 +64,6 @@ void AppConnection::PrintStatus()
 {
 	const char* directionString = (direction == ConnectionDirection::DIRECTION_IN) ? "IN " : "OUT";
 
-	trace("%s APP state:%u, Queue:%u-%u(%u), Buf%u/%u, hnd:%u" EOL, directionString, this->connectionState, (packetSendQueue.readPointer - packetSendQueue.bufferStart), (packetSendQueue.writePointer - packetSendQueue.bufferStart), packetSendQueue._numElements, reliableBuffersFree, unreliableBuffersFree, connectionHandle);
+	trace("%s APP state:%u, Queue:%u-%u(%u), Buf%u/%u, hnd:%u" EOL, directionString, (u32)this->connectionState, (packetSendQueue.readPointer - packetSendQueue.bufferStart), (packetSendQueue.writePointer - packetSendQueue.bufferStart), packetSendQueue._numElements, reliableBuffersFree, unreliableBuffersFree, connectionHandle);
 }
 

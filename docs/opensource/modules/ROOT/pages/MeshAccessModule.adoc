@@ -1,0 +1,237 @@
+= MeshAccessModule (moduleId 10)
+
+== Purpose
+
+The _MeshAccessModule_ provides a simple way of accessing the mesh through a smartphone, it also provides a way to connect to other meshes or access other devices that support the functionality. It works over unencrypted GAP connections and uses a custom encryption on top to bypass operating system limitations of different devices.
+
+== Functionality
+The _MeshAccessModule_ works in conjunction with the _MeshAccessConnection_. The module provides the necessary services while the connection handles an individual connection after it was set up.
+
+The _MeshAccessConnection_ is able to handle standard mesh packets - including packet splitting - and will relay these packets to receivers in the mesh if security permits it (if the partner authenticated itself with the correct key during the initial encryption procedure). A _MeshAccessConnection_ performs first a security handshake before data can be transmitted. After the handshake passes, a node may transmit information about its cluster and update this information once the cluster changes. Cf. xref:Node.adoc#_ClusterInfoUpdate[ClusterInfoUpdate] packet for more information.
+
+There are different types of connection keys used to authenticate when connecting with a node. The _keyId_ is then sent through the mesh depending on the packet type to authenticate the user over the mesh.
+
+If parts of the documentation are obscure, it is advisable to take a look at the thoroughly documented _relution/fruitymesh_ repository at the classes MeshAccessConnection.cpp and MeshAccessModule.cpp.
+
+=== Connection Keys
+For the different key types used, refer to the
+encryption types in the
+xref:Specification.adoc#_EncryptionKeys[Specification].
+
+=== Virtual Partner
+Ids Because mesh packets need a sender and receiver
+id, it would not be possible to connect to another mesh as the nodeIds
+might clash. When a node connects to another device using a
+MeshAccessConnection, it will assign a virtualPartnerId to the other
+device, which is unique in the mesh. This partnerId is temporary (only
+while the connection lasts) and can be used to address the device during
+its connection.
+
+The device does not get to know this virtual id and can operate with its
+own nodeId while using the connection. The node with modify received
+packets and will replace the devices id by the temporary id. It will
+also inspect packets before sending them to the other device and will
+translate the virtual id back into the id of the device before
+transmitting the packet over the MeshAccessConnection.
+
+=== Tunnel Types
+A node that connects to another mesh will need to
+specify the tunnelType, it can be on of the following:
+
+* `MESH_ACCESS_TUNNEL_TYPE_PEER_TO_PEER = 0`: The two nodes can
+communicate directly, but broadcast messages will not be relayed to the
+mesh on either side.
+* `MESH_ACCESS_TUNNEL_TYPE_REMOTE_MESH = 1`: Each node can be accessed in
+the remote mesh from the local node, but cannot relay packets from the
+remote mesh to the local mesh.
+* `MESH_ACCESS_TUNNEL_TYPE_LOCAL_MESH = 2`: All nodes from the local mesh can
+send and receive data to/from the node but can't send data to the
+remote mesh.
+
+=== Authorization
+Depending on the key type, certain messages are not
+allowed to be sent through a MeshAccessConnection. The key type can be
+any of the xref:Specification.adoc#EncryptionKeys[EncryptionKeys].
+The MeshAccessConnection passes on an incoming message to all modules. The modules can then decide if they want to whitelist or blacklist a
+message. It is also possible to restrict the message to be sent to the local node only. Blacklisting always has preference over whitelisting. If a
+message got blacklisted by a module, it cannot get whitelisted by
+another module.
+
+=== MeshAccess Broadcast Messages
+The Mesh Configuration and Access
+Service is broadcast by active nodes that provide mesh access to
+smartphones or other devices through GATT.
+
+The enrollment state is broadcast in the flags. If unenrolled, the node service is disabled.
+
+[cols="1,2,4"]
+|===
+|Bytes|Type|Description
+
+|**11**|-|**Mandatory data**
+|3|Flags|(len, type, flags byte) |4|Service UUID complete|(len, type, 2 byte UUID 0xFE12)
+|4|Service Data header|(len, type, 2 byte UUID 0xFE12)
+|**10**||**CustomDataHeader**
+|2|messageType|0x03 Mesh Configuration and Access Service (with a new
+service version, the messageType can be changed.
+|2|networkId|Mesh network ID
+|1 bit|isEnrolled|1 if the node is enrolled, 0 otherwise
+|1 bit|isSink|1 if the node is communicating with a MeshGateway, 0 otherwise
+|1 bit|isZeroKeyConnectable|1 if the node is connectable using the zero key, 0 0 otherwise
+|5 bit|reserved|Must be 0
+|4|serialNumberIndex|cf. xref:Specification.adoc[Specification]
+|**3**||**ServiceData**
+|1|moduleId0|ID of a module that is available over the mesh access connection (0 for invalid module)
+|1|moduleId1|ID of a module that is available over the mesh access connection (0 for invalid module)
+|1|moduleId2|ID of a module that is available over the mesh access connection (0 for invalid module)
+|**7**||**Reserved**|
+|===
+
+=== GATT Service
+The Mesh Access Service is offered under a different UUID (a 128-bit UUID) in order to seperate different services from each other.
+
+* Base Service UUID 00000001-ACCE-423C-93FD-0C07A0051858
+* RX Characteristic Handle: 00000002-ACCE-423C-93FD-0C07A0051858
+* TX Characteristic Handle: 00000003-ACCE-423C-93FD-0C07A0051858
+
+After a connection is made, it is necessary to register notifications on the TX characteristic in order to receive data from the node. Do not send any data before notifications are enabled!
+
+=== Encryption Handshake
+To establish a connection, the following steps need to be performed:
+
+* Central connects to peripheral
+* Central discovers the _MeshAccessService_ of the peripheral with its rx/tx characteristics and the cccd of the tx characteristic
+* Central enables notifications on cccd of tx characteristic
+** The peripheral will notice the enabled notification and will instantiate a _MeshAccessConnection_ throught the _ResolverConnections_
+* Central starts handshake by requesting a nonce
+* Peripheral anwers with _ANonce_
+* Central answers with _SNonce_ in an encrypted packet (enables auto encrypt/decrypt)
+* Peripheral checks encrypted packet, sends encrypted _HandshakeDone_ packet and enables auto encrypt/decrypt
+
+Encryption and MIC calculation uses three AES encryptions at the moment to prevent a discovered packet forgery attack under certain conditions. Future versions of the handshake may employ different encryption.
+
+=== Encryption
+Once a connection is set to encrypted state - during the initial encryption handshake - all messages must be encrypted with a trailing Message Integrity Check (MIC). The data has the following format:
+
+[cols="1,1,2,4"]
+|===
+|Bytes |Type |Name |Description
+
+|1...16 |u8[] |encryptedData |Encrypted data that must be decrypted first, using the key determined during the handshake together with the _decryptionNonce_.
+|4 |u32 |mic |Message integrity check that protects the message against forgery or replay attacks, added at the end of the variable sized _encryptedData_ field.
+|===
+
+Because an encrypted packet has only 16 bytes of payload, message splitting must account for this. A connection with an MTU of 20 will first split packets into chunks of 20 bytes (2 byte splitting overhead, 18 byte content). After encryption is activated, the chunks have a size of 16 bytes.
+
+* Encryption is done by generating a key stream with the _encryptionNonce_. A 16-byte plaintext is created with 0x00 padding and the _encryptionNonce_ is copied into the first 8 bytes. This plaintext is encrypted using the _sessionEncryptionKey_ to produce a key stream.
+* Next, data to be sent is XOR-ed with the key stream. The data can be from 1 to 16 bytes long.
+* The last 4 bytes of the _encryptionNonce_ (_encryptionNonce[1]_) are used as a counter and are now incremented.
+* A new key stream is generated with the increased nonce as explained above.
+* This key stream is again XOR-ed with the plaintext data to be sent.
+* The resulting cipher text is encrypted once more. The first 4 bytes can now be used as a MIC.
+
+If the first message were to be encrypted with a nonce of 1, then the mic would have been generated with a nonce of 2. The next message to be sent must by encrypted with a nonce of 3.
+
+=== Session Key Generation
+A session key (_sessionKey_) is generated by creating a 16-byte plaintext message padded with 0x00. The first two bytes (1-2) must contain the _nodeId_ of the central device. Bytes 3-10 must contain the nonce. This plaintext is then encrypted using the chosen key. In case the key is a user key, the key must first be derived from the _userBaseKey_. This works by creating a 0x00 padded 16-byte cleartext, storing the _keyId_ in the first 4 bytes of the message and encrypting the cleartext with the _userBaseKey_. The resulting ciphertext is the derived user key.
+
+== Terminal Commands
+=== Connection Establishment
+Instructs a node to build a _MeshAccessConneciton_ to another node. The connection state will be notified back to the requester. Refer to xref:Specification.adoc[Specification] for the key types.
+
+[source,C++]
+----
+//Establish a connection to another device using a MeshAccessConnection
+action [nodeId] ma connect [bleAddress] {keyId=FM_NODE_KEY} {keyHex=<same as Local Key>} {tunnelType=PEER_TO_PEER} {requestHandle=0}
+
+//E.g. Connect to device 00:11:.. with node key 11:22:...
+action this ma connect 00:11:22:33:44:55 1 11:22:33:44:11:22:33:44:11:22:33:44:11:22:33:44
+----
+
+The node responds with information about the xref:Connections.adoc[connection state changes]. In this message, the node provides the virtual partner ID that was assigned to the node connected over the _MeshAccessConnection_.
+
+[source,Javascript]
+----
+//Example response where nodeId 1 is now connected and handshaked with another node
+{"nodeId":1,"type":"ma_conn_state","module":10,"requestHandle":0,"vPartnerId":2001,"state":4}
+----
+
+=== Disconnection
+Disconnect from a device if it is connected via a _MeshAccessConnection_ to that node.
+
+[source,C++]
+----
+//Disconnect a previously connected MeshAccessConnection
+action [nodeId] ma disconnect [bleAddress] {requestHandle}
+
+//E.g. disconnect device 00:11:... if connected to this node
+action this ma disconnect 00:11:22:33:44:55
+----
+
+== Messages
+=== Message Types
+
+[source,C++]
+----
+#define MESSAGE_TYPE_ENCRYPT_CUSTOM_START 25
+#define MESSAGE_TYPE_ENCRYPT_CUSTOM_ANONCE 26
+#define MESSAGE_TYPE_ENCRYPT_CUSTOM_SNONCE 27
+#define MESSAGE_TYPE_ENCRYPT_CUSTOM_DONE 28
+----
+
+=== Start Handshake
+The central starts the encryption process by sending
+the following unencrypted packet:
+
+|===
+|Bytes |Type |Name |Description
+
+|1 |u8 |messageType |`MESSAGE_TYPE_ENCRYPT_CUSTOM_START`
+|2 |u16 |senderId |Either a _nodeId_ in the own mesh, or in case of a
+smartphone, this must be `NODE_ID_APP_BASE` (32000)
+|2 |u16 |receiverId |Set to 0 or if known, the ID of the partner
+|1 |u8 |version |Set to 1
+|4 |u32 |keyId |Set to the _keyId_ that should be used for this connection
+|2 bit |u8:2 |tunnelType |Tunnel type that should be used for this connection, cf. _TunnelType_. The invalid type must not be sent. E.g., if a Smartphone connects to a mesh, it should use `REMOTE_MESH`. If it just wants to interact with a single node and not with the mesh, it can use PEER to PEER.
+|6 bit |u8:6 |reserved |
+|===
+
+=== Handshake ANonce
+The peripheral will generate a random nonce with a length of 8 bytes and answer with an unencrypted packet. The peripheral can also start to generate the session decryption key at this time (cf. <<Session Key Generation>> generation chapter). After sending this packet, the peripheral only accepts encrypted packets.
+
+|===
+|Bytes |Type |Name |Description
+
+|1 |u8 |messageType |`MESSAGE_TYPE_ENCRYPT_CUSTOM_ANONCE`
+|2 |u16 |senderId |_nodeId_ of the peripheral in the mesh
+|2 |u16 |receiverId |Replay of the central id.
+|4 |u32 |anonce[0] |First part of the _ANonce_
+|4 |u32 |anonce[1] |Second part of the _Anonce_
+|===
+
+=== Handshake SNonce
+The central must now generate a random 8 byte nonce as well. It is then able to calculate both session keys, the key for encryption and the key for decryption. It will then send the following packet, but in encrypted form. The _ANonce_ is used to generate the session encryption key for sending packets and the _SNonce_ is used to calculate the session decryption key for receiving packets.
+
+|===
+|Bytes |Type |Name |Description
+
+|1 |u8 |messageType |`MESSAGE_TYPE_ENCRYPT_CUSTOM_SNONCE`
+|2 |u16 |senderId |Sender ID
+|2 |u16 |receiverId |Receiver ID
+|4 |u32 |snonce[0] |First part of the _SNonce_
+|4 |u32 |snonce[1] |Second part of the _SNonce_
+|===
+
+=== Handshake Done
+The peripheral answers with the final handshake
+packet to confirm that the handshake was completed successfully. This
+packet is encrypted before transmission.
+
+|===
+|Bytes |Type |Name |Description
+
+|1 |u8 |messageType |`MESSAGE_TYPE_ENCRYPT_CUSTOM_DONE`
+|2 |u16 |senderId |Sender ID
+|2 |u16 |receiverId |Receiver ID
+|1 |u8 |status |0: OK
+|===

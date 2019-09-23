@@ -33,30 +33,40 @@
 #include <Config.h>
 #include <Utility.h>
 #include <mini-printf.h>
+#include <GlobalState.h>
 
 #ifdef SIM_ENABLED
 #include <CherrySim.h>
 #include <mutex>
+#include <condition_variable>
+#include <chrono>
 static std::mutex terminalMutex;
+static std::condition_variable bufferFree;
+#endif
+
+#if defined(__unix)
+#include <stdio.h>
+#include <unistd.h>
 #endif
 
 
 extern "C"
 {
-#include "nrf.h"
-
-#ifdef USE_UART
+#if IS_ACTIVE(UART)
 #include "app_util_platform.h"
 #include "nrf_uart.h"
-#include "nrf_gpio.h"
-#include "nrf_nvic.h"
 #endif
-#ifdef USE_SEGGER_RTT
+#if IS_ACTIVE(SEGGER_RTT)
 #include "SEGGER_RTT.h"
-#include <stdarg.h>
 #endif
-#ifdef USE_STDIO
+#if IS_ACTIVE(STDIO)
+#ifdef _WIN32
 #include <conio.h>
+#else
+#undef trace
+#include <ncurses.h>
+#define trace(message, ...) 
+#endif
 #endif
 }
 
@@ -72,35 +82,43 @@ Terminal::Terminal(){
 void Terminal::Init()
 {
 #ifdef TERMINAL_ENABLED
+#if defined(__unix) && !defined(SIM_ENABLED)
+    initscr();
+    cbreak();
+    noecho();
+    scrollok(stdscr, TRUE);
+    nodelay(stdscr, TRUE);
+#endif //defined(__unix) && !defined(SIM_ENABLED)
 	//UART
 	uartActive = false;
 	lineToReadAvailable = false;
 	readBufferOffset = 0;
 
 	registeredCallbacksNum = 0;
-	memset(&registeredCallbacks, 0x00, sizeof(registeredCallbacks));
+	CheckedMemset(&registeredCallbacks, 0x00, sizeof(registeredCallbacks));
 
-#ifdef USE_UART
-	if(Config->terminalMode != TerminalMode::TERMINAL_DISABLED){
-		UartEnable(Config->terminalMode == TerminalMode::TERMINAL_PROMPT_MODE);
+#if IS_ACTIVE(UART)
+	if(Conf::getInstance().terminalMode != TerminalMode::DISABLED){
+		UartEnable(Conf::getInstance().terminalMode == TerminalMode::PROMPT);
 	}
-	FruityHal::SetUartHandler([]()->void {
+	GS->SetUartHandler([]()->void {
 		Terminal::getInstance().UartInterruptHandler();
 	});
 #endif
-#ifdef USE_SEGGER_RTT
+#if IS_ACTIVE(SEGGER_RTT)
 	SeggerRttInit();
 #endif
-#ifdef USE_STDIO
+#if IS_ACTIVE(STDIO)
 	StdioInit();
 #endif
 
 	terminalIsInitialized = true;
 
+#if IS_INACTIVE(GW_SAVE_SPACE)
 	char versionString[15];
-	Utility::GetVersionStringFromInt(fruityMeshVersion, versionString);
+	Utility::GetVersionStringFromInt(GS->config.getFruityMeshVersion(), versionString);
 
-	if (Config->terminalMode == TerminalMode::TERMINAL_PROMPT_MODE)
+	if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
 	{
 		//Send Escape sequence
 		log_transport_put(27); //ESC
@@ -123,11 +141,11 @@ void Terminal::Init()
 		log_transport_putstring(", nRF51");
 #endif
 
-		if(RamConfig->deviceConfigOrigin == deviceConfigOrigins::RANDOM_CONFIG){
+		if(RamConfig->deviceConfigOrigin == DeviceConfigOrigins::RANDOM_CONFIG){
 			log_transport_putstring(", RANDOM Config");
-		} else if(RamConfig->deviceConfigOrigin == deviceConfigOrigins::UICR_CONFIG){
+		} else if(RamConfig->deviceConfigOrigin == DeviceConfigOrigins::UICR_CONFIG){
 			log_transport_putstring(", UICR Config");
-		} else if(RamConfig->deviceConfigOrigin == deviceConfigOrigins::TESTDEVICE_CONFIG){
+		} else if(RamConfig->deviceConfigOrigin == DeviceConfigOrigins::TESTDEVICE_CONFIG){
 			log_transport_putstring(", TESTDEVICE Config");
 		}
 
@@ -137,6 +155,12 @@ void Terminal::Init()
 		
 	}
 #endif
+#endif //IS_ACTIVE(UART)
+}
+
+Terminal & Terminal::getInstance()
+{
+	return GS->terminal;
 }
 
 //Register a string that will call the callback function with the rest of the string
@@ -144,7 +168,7 @@ void Terminal::AddTerminalCommandListener(TerminalCommandListener* callback)
 {
 #ifdef TERMINAL_ENABLED
 	if (registeredCallbacksNum >= MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS) {
-		SIMEXCEPTION(TooManyTerminalCommandListenersException);
+		SIMEXCEPTION(TooManyTerminalCommandListenersException); //LCOV_EXCL_LINE assertion
 	}
 	registeredCallbacks[registeredCallbacksNum] = callback;
 	registeredCallbacksNum++;
@@ -155,13 +179,13 @@ void Terminal::PutString(const char* buffer)
 {
 	if(!terminalIsInitialized) return;
 
-#ifdef USE_UART
+#if IS_ACTIVE(UART)
 	UartPutStringBlockingWithTimeout(buffer);
 #endif
-#ifdef USE_SEGGER_RTT
+#if IS_ACTIVE(SEGGER_RTT)
 	Terminal::SeggerRttPutString(buffer);
 #endif
-#ifdef USE_STDIO
+#if IS_ACTIVE(STDIO)
 	Terminal::StdioPutString(buffer);
 #endif
 }
@@ -170,14 +194,11 @@ void Terminal::PutChar(const char character)
 {
 	if(!terminalIsInitialized) return;
 
-#ifdef USE_UART
+#if IS_ACTIVE(UART)
 	UartPutCharBlockingWithTimeout(character);
 #endif
-#ifdef USE_SEGGER_RTT
+#if IS_ACTIVE(SEGGER_RTT)
 	SeggerRttPutChar(character);
-#endif
-#ifdef USE_STDIO
-	Terminal::StdioPutChar(character);
 #endif
 }
 
@@ -212,13 +233,13 @@ void Terminal::CheckAndProcessLine()
 {
 	if(!terminalIsInitialized) return;
 
-#ifdef USE_UART
+#if IS_ACTIVE(UART)
 	UartCheckAndProcessLine();
 #endif
-#ifdef USE_SEGGER_RTT
+#if IS_ACTIVE(SEGGER_RTT)
 	SeggerRttCheckAndProcessLine();
 #endif
-#ifdef USE_STDIO
+#if IS_ACTIVE(STDIO)
 	StdioCheckAndProcessLine();
 #endif
 }
@@ -234,8 +255,9 @@ void Terminal::ProcessLine(char* line)
 	//Tokenize input string into vector
 
 	u16 size = (u16)strlen(line);
-	if (!TokenizeLine(line, size)) {
-		if (Config->terminalMode == TerminalMode::TERMINAL_PROMPT_MODE) {
+	i32 commandArgsSize = TokenizeLine(line, size);
+	if (commandArgsSize < 0) {
+		if (Conf::getInstance().terminalMode == TerminalMode::PROMPT) {
 			log_transport_putstring("Too many arguments!" EOL);
 		}
 		else {
@@ -249,13 +271,13 @@ void Terminal::ProcessLine(char* line)
 
 	for(u32 i=0; i<MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS; i++){
 		if(registeredCallbacks[i]){
-			handled += (registeredCallbacks[i])->TerminalCommandHandler(commandArgsPtr, commandArgsSize);
+			handled += (registeredCallbacks[i])->TerminalCommandHandler(commandArgsPtr, (u8)commandArgsSize);
 		}
 	}
 
 	//Output result
 	if (handled == 0){
-		if(Config->terminalMode == TerminalMode::TERMINAL_PROMPT_MODE){
+		if(Conf::getInstance().terminalMode == TerminalMode::PROMPT){
 			log_transport_putstring("Command not found" EOL);
 		} else {
 			logjson_error(Logger::UartErrorType::COMMAND_NOT_FOUND);
@@ -263,24 +285,24 @@ void Terminal::ProcessLine(char* line)
 #ifdef CHERRYSIM_TESTER_ENABLED
 		SIMEXCEPTION(CommandNotFoundException);
 #endif
-	} else if(Config->terminalMode == TerminalMode::TERMINAL_JSON_MODE){
+	} else if(Conf::getInstance().terminalMode == TerminalMode::JSON){
 		logjson_error(Logger::UartErrorType::SUCCESS);
 	}
 #endif
 }
 
-bool Terminal::TokenizeLine(char* line, u16 lineLength)
+i32 Terminal::TokenizeLine(char* line, u16 lineLength)
 {
-	memset(commandArgsPtr, 0, MAX_NUM_TERM_ARGS * sizeof(char*));
+	CheckedMemset(commandArgsPtr, 0, MAX_NUM_TERM_ARGS * sizeof(char*));
 
 	commandArgsPtr[0] = &(line[0]);
-	commandArgsSize = 1;
+	i32 commandArgsSize = 1;
 
 	for(u32 i=0; i<lineLength; i++){
 		if (line[i] == ' ' && line[i+1] > '!' && line[i+1] < '~') {
 			if (commandArgsSize >= MAX_NUM_TERM_ARGS) {
-				SIMEXCEPTION(TooManyArgumentsException);
-				return false;
+				SIMEXCEPTION(TooManyArgumentsException); //LCOV_EXCL_LINE assertion
+				return -1;								 //LCOV_EXCL_LINE assertion
 			}
 			commandArgsPtr[commandArgsSize] = &line[i+1];
 			line[i] = '\0';
@@ -288,7 +310,7 @@ bool Terminal::TokenizeLine(char* line, u16 lineLength)
 		}
 	}
 
-	return true;
+	return commandArgsSize;
 }
 
 // ############################### UART
@@ -296,7 +318,7 @@ bool Terminal::TokenizeLine(char* line, u16 lineLength)
 // Results such as JSON objects are delimtied by \r\n
 
 #define ________________UART___________________
-#ifdef USE_UART
+#if IS_ACTIVE(UART)
 
 
 void Terminal::UartDisable()
@@ -398,7 +420,7 @@ void Terminal::UartEnable(bool promptAndEchoMode)
 //Checks whether a character is waiting on the input line
 void Terminal::UartCheckAndProcessLine(){
 	//Check if a line is available
-	if(Config->terminalMode == TerminalMode::TERMINAL_PROMPT_MODE && UartCheckInputAvailable()){
+	if(Conf::getInstance().terminalMode == TerminalMode::PROMPT && UartCheckInputAvailable()){
 		UartReadLineBlocking();
 	}
 
@@ -417,13 +439,15 @@ void Terminal::UartCheckAndProcessLine(){
 		UartPutCharBlockingWithTimeout(27); //ESC
 		UartPutStringBlockingWithTimeout("[H"); //Cursor to Home
 	}
+#if IS_INACTIVE(GW_SAVE_SPACE)
 	else if(strcmp(readBuffer, "startterm") == 0){
-		Config->terminalMode = TerminalMode::TERMINAL_PROMPT_MODE;
+		Conf::getInstance().terminalMode = TerminalMode::PROMPT;
 		UartEnable(true);
 		return;
 	}
+#endif
 	else if(strcmp(readBuffer, "stopterm") == 0){
-		Config->terminalMode = TerminalMode::TERMINAL_JSON_MODE;
+		Conf::getInstance().terminalMode = TerminalMode::JSON;
 		UartEnable(false);
 		return;
 	}
@@ -437,7 +461,7 @@ void Terminal::UartCheckAndProcessLine(){
 	lineToReadAvailable = false;
 
 	//Re-enable Read interrupt after line was processed
-	if(Config->terminalMode != TerminalMode::TERMINAL_PROMPT_MODE){
+	if(Conf::getInstance().terminalMode != TerminalMode::PROMPT){
 		UartEnableReadInterrupt();
 	}
 }
@@ -458,6 +482,7 @@ void Terminal::UartHandleError(u32 error)
 //############################ UART_BLOCKING_READ
 #define ___________UART_BLOCKING_READ______________
 
+
 bool Terminal::UartCheckInputAvailable()
 {
 	if(NRF_UART0->EVENTS_RXDRDY == 1) uartActive = true;
@@ -471,6 +496,7 @@ bool Terminal::UartCheckInputAvailable()
 // a non-interrupt driven UART will not generate an event
 void Terminal::UartReadLineBlocking()
 {
+#if IS_INACTIVE(GW_SAVE_SPACE)
 	if (!uartActive)
 		return;
 
@@ -517,10 +543,12 @@ void Terminal::UartReadLineBlocking()
 			readBufferOffset++;
 		}
 	}
+#endif
 }
 
 char Terminal::UartReadCharBlocking()
 {
+#if IS_INACTIVE(GW_SAVE_SPACE)
 	int i=0;
 	while (NRF_UART0->EVENTS_RXDRDY != 1){
 		if(NRF_UART0->EVENTS_ERROR){
@@ -530,8 +558,11 @@ char Terminal::UartReadCharBlocking()
 	}
 	NRF_UART0->EVENTS_RXDRDY = 0;
 	return NRF_UART0->RXD;
-}
 
+#else
+	return 0;
+#endif
+}
 
 //############################ UART_BLOCKING_WRITE
 #define ___________UART_BLOCKING_WRITE______________
@@ -650,7 +681,7 @@ void Terminal::UartEnableReadInterrupt()
 //############################ SEGGER RTT
 #define ________________SEGGER_RTT___________________
 
-#ifdef USE_SEGGER_RTT
+#if IS_ACTIVE(SEGGER_RTT)
 void Terminal::SeggerRttInit()
 {
 
@@ -659,11 +690,11 @@ void Terminal::SeggerRttInit()
 void Terminal::SeggerRttCheckAndProcessLine()
 {
 	if(SEGGER_RTT_HasKey()){
-		char byte = 0;
-		while(byte != '\r' && byte != '\n' && byte != '#' && readBufferOffset < READ_BUFFER_LENGTH - 1){
-			byte = SEGGER_RTT_GetKey();
-			if(byte < 0) continue;
-			readBuffer[readBufferOffset] = byte;
+		int seggerKey = 0;
+		while(seggerKey != '\r' && seggerKey != '\n' && seggerKey != '#' && readBufferOffset < READ_BUFFER_LENGTH - 1){
+			seggerKey = SEGGER_RTT_GetKey();
+			if(seggerKey < 0) continue;
+			readBuffer[readBufferOffset] = (char)seggerKey;
 			readBufferOffset++;
 		}
 		readBuffer[readBufferOffset-1] = '\0';
@@ -680,7 +711,7 @@ void Terminal::SeggerRttCheckAndProcessLine()
 void Terminal::SeggerRttPrintf(const char* message, ...)
 {
 	char tmp[250];
-	memset(tmp, 0, 250);
+	CheckedMemset(tmp, 0, 250);
 
 	//Variable argument list must be passed to vnsprintf
 	va_list aptr;
@@ -707,53 +738,74 @@ void Terminal::SeggerRttPutChar(char character)
 
 //############################ STDIO
 #define ________________STDIO___________________
-#if defined(USE_STDIO)
+#if IS_ACTIVE(STDIO)
+#ifndef _WIN32
+static int _kbhit(void)
+{
+    int ch = getch();
+
+    if (ch != ERR) {
+        ungetch(ch);
+        return 1;
+    } else {
+        return 0;
+    }
+}
+#endif
+
 void Terminal::StdioInit()
 {
 	setbuf(stdout, nullptr);
 }
 
-char * getline(void) {
-	char * line = new char[100];
-    char * linep = line;
-    size_t lenmax = 100, len = lenmax;
+void Terminal::WriteStdioLineToReadBuffer() {
+	size_t i;
+#ifdef __unix
+	nodelay(stdscr, FALSE);
+#endif
+	for (i = 0; i < READ_BUFFER_LENGTH - 1; i++) {
+		int c = fgetc(stdin);
+		if(c == EOF) break;
 
-    if(line == nullptr)
-        return nullptr;
+		readBuffer[i] = (char)c;
 
-    for(;;) {
-        int c = fgetc(stdin);
-        if(c == EOF)
-            break;
-
-        if(--len == 0) {
-            len = lenmax;
-            char * linen = (char*)realloc(linep, lenmax *= 2);
-
-            if(linen == nullptr) {
-				delete[] line;
-                return nullptr;
-            }
-            line = linen + (line - linep);
-            linep = linen;
-        }
-
-        if((*line++ = c) == '\n')
-            break;
-    }
-    *line = '\0';
-    return linep;
+		if(c == '\n') break;
+	}
+#ifdef __unix
+	nodelay(stdscr, TRUE);
+#endif
+	readBuffer[i] = '\0';
 }
+
+extern bool meshGwCommunication;
 
 //Used to inject a message into the readBuffer directly
 bool Terminal::PutIntoReadBuffer(const char* message)
 {
 #ifdef SIM_ENABLED
-	std::lock_guard<std::mutex> guard(terminalMutex);
+	std::unique_lock<std::mutex> guard(terminalMutex);
 #endif
 	u16 len = (u16)(strlen(message) + 1);
 
-	if (readBufferOffset != 0 || len > READ_BUFFER_LENGTH) return false;
+	if (meshGwCommunication)
+	{
+		//Loop to catch spurious wakeups as well as timeouts.
+		while (readBufferOffset != 0)
+		{
+			bufferFree.wait_for(guard, std::chrono::seconds(1));
+		}
+	}
+	else if (readBufferOffset != 0)
+	{
+		// You need to simulate before sending another command!
+		SIMEXCEPTION(CommandbufferAlreadyInUseException);
+		return false;
+	}
+	if (len >= READ_BUFFER_LENGTH)
+	{
+		SIMEXCEPTION(CommandTooLongException);
+		return false;
+	}
 
 	memcpy(readBuffer, message, len);
 	readBufferOffset = (u8)len;
@@ -768,31 +820,27 @@ void Terminal::StdioCheckAndProcessLine()
 #endif
 	if (cherrySimInstance->simConfig.terminalId != cherrySimInstance->currentNode->id && cherrySimInstance->simConfig.terminalId != 0) return;
 
-	if(_kbhit() != 0){ //FIXME: Not supported by eclipse console
+#if (defined(__unix) && !defined(CHERRYSIM_TESTER_ENABLED)) || defined(_WIN32)
+	if(!meshGwCommunication && _kbhit() != 0){ //FIXME: Not supported by eclipse console
 		printf("mhTerm: ");
-		char* input = getline();
-		input[strlen(input)-1] = '\0';
-		//printf("!%s!, len %d", input, strlen(input));
+		WriteStdioLineToReadBuffer();
 
-		Terminal::ProcessLine(input);
-		delete[] input;
+		Terminal::ProcessLine(readBuffer);
 	}
 	//Also process data that was written in the readBuffer
-	else if (readBufferOffset != 0) {
-		//printf("mhTerm: %s" EOL, readBuffer);
+	else 
+#endif
+	if (readBufferOffset != 0) {
+		if(cherrySimInstance->simConfig.verboseCommands) printf("mhTerm: %s" EOL, readBuffer);
 		Terminal::ProcessLine(readBuffer);
 		readBufferOffset = 0;
+		bufferFree.notify_one();
 	}
 }
 
 void Terminal::StdioPutString(const char*message)
 {
 	cherrySimInstance->TerminalPrintHandler(message);
-}
-
-void Terminal::StdioPutChar(char character)
-{
-
 }
 
 #endif

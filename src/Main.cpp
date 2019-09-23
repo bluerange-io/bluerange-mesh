@@ -28,9 +28,16 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include <FruityMesh.h>
+#include <GlobalState.h>
 
 int main(void)
 {
 	BootFruityMesh();
+	
+	const u32 moduleMemoryBlockSize = INITIALIZE_MODULES(false);
+	DYNAMIC_ARRAY(moduleMemoryBlock, moduleMemoryBlockSize);
+	GS->moduleAllocator.setMemory(moduleMemoryBlock, moduleMemoryBlockSize);
+	BootModules();
+	
 	StartFruityMesh();
 }

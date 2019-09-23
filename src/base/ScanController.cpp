@@ -30,14 +30,11 @@
 
 #include <Node.h>
 #include <ScanController.h>
-#include <ConnectionManager.h>
 #include <Logger.h>
 #include <Config.h>
+#include <GlobalState.h>
+#include "Utility.h"
 
-extern "C"
-{
-#include <app_error.h>
-}
 
 /**
  * IMPORTANT: The ScanController must be informed if the scan state changes without its
@@ -52,73 +49,149 @@ ScanController::ScanController()
 	currentScanParams.window = 0;	// Scan window.
 	currentScanParams.timeout = 0;					// Never stop scanning unless explicit asked to.
 
-	scanningState = SCAN_STATE_OFF;
 	scanStateOk = true;
+	jobs.zeroData();
+#if SDK == 15
+	CheckedMemset(scanBuffer, 0, sizeof(scanBuffer));
+#endif
 }
 
 void ScanController::TimerEventHandler(u16 passedTimeDs)
 {
+	for (u8 i = 0; i < jobs.length; i++)
+	{
+		if ((jobs[i].state == ScanJobState::ACTIVE) &&
+			(jobs[i].timeout != 0))
+		{
+			//logt("SC", "Active scan job: %d", jobs[i].leftTimeoutDs);
+			jobs[i].leftTimeoutDs -= passedTimeDs;
+			if (jobs[i].leftTimeoutDs <= 0) RemoveJob(&jobs[i]);
+		}
+	}
 	//To be absolutely sure that scanning is in the correct state, we call this function
 	//within the timerHandler
 	TryConfiguringScanState();
 }
 
-
-//Start scanning with the specified scanning parameters
-void ScanController::SetScanState(scanState newState)
+ScanController & ScanController::getInstance()
 {
-	logt("SC", "SetScanState %u", newState);
-
-	u32 err = 0;
-	//Nothing to do if requested state is same as current state
-	if (newState == scanningState) return;
-
-	scanningState = newState;
-	scanStateOk = false;
-
-	if (newState == SCAN_STATE_HIGH)
-	{
-		currentScanParams.interval = Config->meshScanIntervalHigh;
-		currentScanParams.window = Config->meshScanWindowHigh;
-	}
-	else if (newState == SCAN_STATE_LOW)
-	{
-		currentScanParams.interval = Config->meshScanIntervalLow;
-		currentScanParams.window = Config->meshScanWindowLow;
-	}
-
-	TryConfiguringScanState();
+	return GS->scanController;
 }
 
-void ScanController::SetScanDutyCycle(u16 interval, u16 window)
+// Add new scanner job
+// If the new job has higher duty cycle than current job it will be set as current.
+ScanJob* ScanController::AddJob(ScanJob& job)
 {
-	logt("SC", "SetScanDutyCycle %u %u", interval, window);
+	if (job.state == ScanJobState::INACTIVE) return nullptr;
+	if (job.type == ScanState::HIGH)
+	{
+		job.interval = Conf::getInstance().meshScanIntervalHigh;
+		job.window = Conf::getInstance().meshScanWindowHigh;
+		job.timeout = 0;
+	}
+	else if (job.type == ScanState::LOW)
+	{
+		job.interval = Conf::getInstance().meshScanIntervalLow;
+		job.window = Conf::getInstance().meshScanWindowLow;
+		job.timeout = 0;
+	}
+	else if (job.type == ScanState::CUSTOM)
+	{
+		// left empty on purpose
+	}
+	else
+	{
+		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
+		return nullptr;
+	}
 
-	scanningState = SCAN_STATE_CUSTOM;
-	scanStateOk = false;
+	for (u8 i = 0; i < jobs.length; i++)
+	{
+		if (jobs[i].state == ScanJobState::ACTIVE) continue;
+		job.leftTimeoutDs = job.timeout * 10;
+		jobs[i] = job;
+		RefreshJobs();
+		return &jobs[i];
+	}
 
-	currentScanParams.interval = interval;
-	currentScanParams.window = window;
+	SIMEXCEPTION(OutOfMemoryException); //LCOV_EXCL_LINE assertion
+	return nullptr;
+}
 
-	TryConfiguringScanState();
+// Checks duty cycle of given job and compares to current. If new one has higher duty cycle
+// scannit will be restarted with new params.
+void ScanController::RefreshJobs()
+{
+	u8 currentDutyCycle = currentScanParams.interval != 0 ? (currentScanParams.window * 100) / currentScanParams.interval : 0;
+	u8 newDutyCycle = 0;
+	ScanJob * p_job = nullptr;
+	for (u8 i = 0; i < jobs.length; i++)
+	{
+		if (jobs[i].state == ScanJobState::ACTIVE)
+		{
+			u8 tempDutyCycle = (jobs[i].window * 100) / jobs[i].interval;
+			if (tempDutyCycle > newDutyCycle)
+			{
+				newDutyCycle = tempDutyCycle;
+				p_job = &jobs[i];
+			}
+		}
+	}
+	
+	// no active jobs
+	if ((newDutyCycle != currentDutyCycle) && (newDutyCycle == 0))
+	{
+		scanStateOk = false;
+		CheckedMemset(&currentScanParams, 0, sizeof(currentScanParams));
+		TryConfiguringScanState();
+	}
+
+	// new highest duty cycle
+	if ((newDutyCycle != currentDutyCycle) && (p_job != nullptr))
+	{
+		scanStateOk = false;
+		currentScanParams.window = p_job->window;
+		currentScanParams.interval = p_job->interval;
+		currentScanParams.timeout = 0;
+		TryConfiguringScanState();
+	}
+}
+
+void ScanController::RemoveJob(ScanJob * p_jobHandle)
+{
+	for (int i = 0; i < jobs.length; i++) {
+		if (&(jobs[i]) == p_jobHandle && jobs[i].state != ScanJobState::INACTIVE)
+		{
+			p_jobHandle->state = ScanJobState::INACTIVE;
+		}
+	}
+	RefreshJobs();
 }
 
 //This will call the HAL to enable the current scan state
 void ScanController::TryConfiguringScanState()
 {
 	u32 err;
-	if(!scanStateOk){
+		if(!scanStateOk){
 		//First, try stopping
 		err = FruityHal::BleGapScanStop();
-		if(scanningState == SCAN_STATE_OFF){
-			if(err == NRF_SUCCESS) scanStateOk = true;
+		if ((err == NRF_SUCCESS) || (err == NRF_ERROR_INVALID_STATE)) {
+			if (currentScanParams.window == 0) {
+				scanStateOk = true;
+				return;
+			}
 		}
-
+		else 
+		{
+			return;
+		}
 		//Next, try starting
-		if(scanningState != SCAN_STATE_OFF){
-			err = FruityHal::BleGapScanStart(&currentScanParams);
-			if(err == NRF_SUCCESS) scanStateOk = true;
-		}
+#if SDK == 15
+		err = FruityHal::BleGapScanStart(&currentScanParams, scanBuffer);
+#else
+		err = FruityHal::BleGapScanStart(&currentScanParams);
+#endif
+		if (err == NRF_SUCCESS) scanStateOk = true;
 	}
 }
 
@@ -128,35 +201,24 @@ void ScanController::ScanningHasStopped()
 }
 
 //If a BLE event occurs, this handler will be called to do the work
-bool ScanController::ScanEventHandler(ble_evt_t &bleEvent) const
+bool ScanController::ScanEventHandler(const GapAdvertisementReportEvent& advertisementReportEvent) const
 {
-	//u32 err = 0;
+	//Check if packet is a valid mesh advertising packet
+	const advPacketHeader* packetHeader = (const advPacketHeader*)advertisementReportEvent.getData();
 
-	//Depending on the type of the BLE event, we have to do different stuff
-	switch (bleEvent.header.evt_id)
+	if (
+			advertisementReportEvent.getDataLength() >= SIZEOF_ADV_PACKET_HEADER
+			&& packetHeader->manufacturer.companyIdentifier == COMPANY_IDENTIFIER
+			&& packetHeader->meshIdentifier == MESH_IDENTIFIER
+			&& packetHeader->networkId == GS->node.configuration.networkId
+		)
 	{
-		//########## Advertisement data coming in
-		case BLE_GAP_EVT_ADV_REPORT:
-		{
-			//Check if packet is a valid mesh advertising packet
-			advPacketHeader* packetHeader = (advPacketHeader*) bleEvent.evt.gap_evt.params.adv_report.data;
+		//Packet is valid and belongs to our network, forward to Node for further processing
+		GS->node.GapAdvertisementMessageHandler(advertisementReportEvent);
 
-			if (
-					bleEvent.evt.gap_evt.params.adv_report.dlen >= SIZEOF_ADV_PACKET_HEADER
-					&& packetHeader->manufacturer.companyIdentifier == COMPANY_IDENTIFIER
-					&& packetHeader->meshIdentifier == MESH_IDENTIFIER
-					&& packetHeader->networkId == GS->node->configuration.networkId
-				)
-			{
-				//Packet is valid and belongs to our network, forward to Node for further processing
-				GS->node->AdvertisementMessageHandler(bleEvent);
-
-			}
-
-			return true;
-		}
 	}
-	return false;
+
+	return true;
 }
 
 

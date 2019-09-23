@@ -29,23 +29,14 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <Logger.h>
+#include "GlobalState.h"
 
 #include <Terminal.h>
-#include <Node.h>
 #include <Utility.h>
 #include <mini-printf.h>
 
-extern "C"
-{
-#include <ble.h>
-#include <ble_hci.h>
-#include <nrf_error.h>
-#include <cstring>
-#include <stdarg.h>
-#include <app_timer.h>
-}
-
-using namespace std;
+// Size for tracing messages to the log transport, if it is too short, messages will get truncated
+#define TRACE_BUFFER_SIZE 500
 
 Logger::Logger()
 {
@@ -53,9 +44,14 @@ Logger::Logger()
 	activeLogTags.zeroData();
 }
 
+Logger & Logger::getInstance()
+{
+	return GS->logger;
+}
+
 void Logger::Init()
 {
-	GS->terminal->AddTerminalCommandListener(this);
+	GS->terminal.AddTerminalCommandListener(this);
 }
 
 void Logger::log_f(bool printLine, const char* file, i32 line, const char* message, ...) const
@@ -84,15 +80,15 @@ void Logger::log_f(bool printLine, const char* file, i32 line, const char* messa
 
 void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...) const
 {
-#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
+#if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
 	if (
 			//UART communication (json mode)
 			(
-				Config->terminalMode != TerminalMode::TERMINAL_PROMPT_MODE
+				Conf::getInstance().terminalMode != TerminalMode::PROMPT
 				&& (logEverything || logType == LogType::UART_COMMUNICATION || IsTagEnabled(tag))
 			)
 			//User interaction (prompt mode)
-			|| (Config->terminalMode == TerminalMode::TERMINAL_PROMPT_MODE
+			|| (Conf::getInstance().terminalMode == TerminalMode::PROMPT
 				&& (logEverything || logType == LogType::TRACE || IsTagEnabled(tag))
 			)
 		)
@@ -105,14 +101,14 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
 		vsnprintf(mhTraceBuffer, TRACE_BUFFER_SIZE, message, aptr);
 		va_end(aptr);
 
-		if(Config->terminalMode == TerminalMode::TERMINAL_PROMPT_MODE){
+		if(Conf::getInstance().terminalMode == TerminalMode::PROMPT){
 			if (logType == LogType::LOG_LINE)
 			{
 				char tmp[50];
 #ifndef SIM_ENABLED
 				snprintf(tmp, 50, "[%s@%d %s]: ", file, line, tag);
 #else
-				snprintf(tmp, 50, "%07u:%u:[%s@%d %s]: ", GS->node != nullptr ? GS->appTimerDs : 0, RamConfig->defaultNodeId, file, line, tag);
+				snprintf(tmp, 50, "%07u:%u:[%s@%d %s]: ", GS->node.IsInit() ? GS->appTimerDs : 0, RamConfig->defaultNodeId, file, line, tag);
 #endif
 				log_transport_putstring(tmp);
 				log_transport_putstring(mhTraceBuffer);
@@ -146,19 +142,23 @@ void Logger::uart_error_f(UartErrorType type) const
 		case UartErrorType::ARGUMENTS_WRONG:
 			logjson("ERROR", "{\"type\":\"error\",\"code\":2,\"text\":\"Wrong Arguments\"}" SEP);
 			break;
+		case UartErrorType::TOO_MANY_ARGUMENTS:
+			logjson("ERROR", "{\"type\":\"error\",\"code\":3,\"text\":\"Too many arguments\"}" SEP);
+			break;
 		default:
-			logjson("ERROR", "{\"type\":\"error\",\"code\":99,\"text\":\"Unknown Error\"}" SEP);
+			logjson("ERROR", "{\"type\":\"error\",\"code\":%u,\"text\":\"Unknown Error\"}" SEP, (u32)type);
 			break;
 	}
 }
 
 void Logger::enableTag(const char* tag)
 {
-#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
+#if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
 
 	if (strlen(tag) + 1 > MAX_LOG_TAG_LENGTH) {
-		logt("ERROR", "Too long");
-		return;
+		logt("ERROR", "Too long");				//LCOV_EXCL_LINE assertion
+		SIMEXCEPTION(IllegalArgumentException);	//LCOV_EXCL_LINE assertion
+		return;									//LCOV_EXCL_LINE assertion
 	}
 
 	char tagUpper[MAX_LOG_TAG_LENGTH];
@@ -186,7 +186,7 @@ void Logger::enableTag(const char* tag)
 
 bool Logger::IsTagEnabled(const char* tag) const
 {
-#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
+#if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
 
 	if (strcmp(tag, "ERROR") == 0 || strcmp(tag, "WARNING") == 0) {
 		return true;
@@ -195,14 +195,14 @@ bool Logger::IsTagEnabled(const char* tag) const
 	{
 		if (strcmp(&activeLogTags[i * MAX_LOG_TAG_LENGTH], tag) == 0) return true;
 	}
-	return false;
-
 #endif
+
+	return false;
 }
 
 void Logger::disableTag(const char* tag)
 {
-#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
+#if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
 
 	char tagUpper[MAX_LOG_TAG_LENGTH];
 	strcpy(tagUpper, tag);
@@ -220,11 +220,12 @@ void Logger::disableTag(const char* tag)
 
 void Logger::toggleTag(const char* tag)
 {
-#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
+#if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
 	
 	if (strlen(tag) + 1 > MAX_LOG_TAG_LENGTH) {
-		logt("ERROR", "Too long");
-		return;
+		logt("ERROR", "Too long");				//LCOV_EXCL_LINE assertion
+		SIMEXCEPTION(IllegalArgumentException);	//LCOV_EXCL_LINE assertion
+		return;									//LCOV_EXCL_LINE assertion
 	}
 
 	char tagUpper[MAX_LOG_TAG_LENGTH];
@@ -254,7 +255,7 @@ void Logger::toggleTag(const char* tag)
 
 void Logger::printEnabledTags() const
 {
-#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
+#if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
 	
 	if (logEverything) trace("LOG ALL IS ACTIVE" EOL);
 	for (u32 i = 0; i < MAX_ACTIVATE_LOG_TAG_NUM; i++) {
@@ -269,7 +270,7 @@ void Logger::printEnabledTags() const
 #ifdef TERMINAL_ENABLED
 bool Logger::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
 {
-#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
+#if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
 	if (TERMARGS(0, "debug") && commandArgsSize >= 2)
 	{
 		if (TERMARGS(1, "all"))
@@ -293,23 +294,18 @@ bool Logger::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
 
 		return true;
 	}
-	else if (TERMARGS(0, "debugnone"))
-	{
-
-		return true;
-	}
 	else if (TERMARGS(0, "errors"))
 	{
 		for(int i=0; i<errorLogPosition; i++){
 			if(errorLog[i].errorType == ErrorTypes::HCI_ERROR)
 			{
-				trace("HCI %u %s @%u" EOL, errorLog[i].errorCode, getHciErrorString(errorLog[i].errorCode), errorLog[i].timestamp);
+				trace("HCI %u %s @%u" EOL, errorLog[i].errorCode, FruityHal::getHciErrorString((FruityHal::HciErrorCode)errorLog[i].errorCode), errorLog[i].timestamp);
 			}
 			else if(errorLog[i].errorType == ErrorTypes::SD_CALL_ERROR)
 			{
-				trace("SD %u %s @%u" EOL, errorLog[i].errorCode, getNrfErrorString(errorLog[i].errorCode), errorLog[i].timestamp);
+				trace("SD %u %s @%u" EOL, errorLog[i].errorCode, FruityHal::getGeneralErrorString((FruityHal::GeneralHardwareError)errorLog[i].errorCode), errorLog[i].timestamp);
 			} else {
-				trace("CUSTOM %u %u @%u" EOL, errorLog[i].errorType, errorLog[i].errorCode, errorLog[i].timestamp);
+				trace("CUSTOM %u %u @%u" EOL, (u32)errorLog[i].errorType, errorLog[i].errorCode, errorLog[i].timestamp);
 			}
 		}
 
@@ -321,324 +317,13 @@ bool Logger::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
 }
 #endif
 
-/*################### Error codes #########################*/
-const char* Logger::getNrfErrorString(u32 nrfErrorCode) const
-{
-#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
-	switch (nrfErrorCode)
-	{
-		case NRF_SUCCESS:
-			return "NRF_SUCCESS";
-		case NRF_ERROR_SVC_HANDLER_MISSING:
-			return "NRF_ERROR_SVC_HANDLER_MISSING";
-		case NRF_ERROR_SOFTDEVICE_NOT_ENABLED:
-			return "NRF_ERROR_SOFTDEVICE_NOT_ENABLED";
-		case NRF_ERROR_INTERNAL:
-			return "NRF_ERROR_INTERNAL";
-		case NRF_ERROR_NO_MEM:
-			return "NRF_ERROR_NO_MEM";
-		case NRF_ERROR_NOT_FOUND:
-			return "NRF_ERROR_NOT_FOUND";
-		case NRF_ERROR_NOT_SUPPORTED:
-			return "NRF_ERROR_NOT_SUPPORTED";
-		case NRF_ERROR_INVALID_PARAM:
-			return "NRF_ERROR_INVALID_PARAM";
-		case NRF_ERROR_INVALID_STATE:
-			return "NRF_ERROR_INVALID_STATE";
-		case NRF_ERROR_INVALID_LENGTH:
-			return "NRF_ERROR_INVALID_LENGTH";
-		case NRF_ERROR_INVALID_FLAGS:
-			return "NRF_ERROR_INVALID_FLAGS";
-		case NRF_ERROR_INVALID_DATA:
-			return "NRF_ERROR_INVALID_DATA";
-		case NRF_ERROR_DATA_SIZE:
-			return "NRF_ERROR_DATA_SIZE";
-		case NRF_ERROR_TIMEOUT:
-			return "NRF_ERROR_TIMEOUT";
-		case NRF_ERROR_NULL:
-			return "NRF_ERROR_NULL";
-		case NRF_ERROR_FORBIDDEN:
-			return "NRF_ERROR_FORBIDDEN";
-		case NRF_ERROR_INVALID_ADDR:
-			return "NRF_ERROR_INVALID_ADDR";
-		case NRF_ERROR_BUSY:
-			return "NRF_ERROR_BUSY";
-		case BLE_ERROR_INVALID_CONN_HANDLE:
-			return "BLE_ERROR_INVALID_CONN_HANDLE";
-		case BLE_ERROR_INVALID_ATTR_HANDLE:
-			return "BLE_ERROR_INVALID_ATTR_HANDLE";
-#if defined(NRF51)
-		case BLE_ERROR_NO_TX_PACKETS:
-			return "BLE_ERROR_NO_TX_PACKETS";
-#endif
-		case 0xDEADBEEF:
-			return "DEADBEEF";
-		default:
-			return "UNKNOWN_ERROR";
-	}
-#else
-	return nullptr;
-#endif
-}
-
-const char* Logger::getBleEventNameString(u16 bleEventId) const
-{
-#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
-	switch (bleEventId)
-	{
-#if defined(NRF51)
-		case BLE_EVT_TX_COMPLETE:
-			return "BLE_EVT_TX_COMPLETE";
-#endif
-		case BLE_EVT_USER_MEM_REQUEST:
-			return "BLE_EVT_USER_MEM_REQUEST";
-		case BLE_EVT_USER_MEM_RELEASE:
-			return "BLE_EVT_USER_MEM_RELEASE";
-		case BLE_GAP_EVT_CONNECTED:
-			return "BLE_GAP_EVT_CONNECTED";
-		case BLE_GAP_EVT_DISCONNECTED:
-			return "BLE_GAP_EVT_DISCONNECTED";
-		case BLE_GAP_EVT_CONN_PARAM_UPDATE:
-			return "BLE_GAP_EVT_CONN_PARAM_UPDATE";
-		case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
-			return "BLE_GAP_EVT_SEC_PARAMS_REQUEST";
-		case BLE_GAP_EVT_SEC_INFO_REQUEST:
-			return "BLE_GAP_EVT_SEC_INFO_REQUEST";
-		case BLE_GAP_EVT_PASSKEY_DISPLAY:
-			return "BLE_GAP_EVT_PASSKEY_DISPLAY";
-		case BLE_GAP_EVT_AUTH_KEY_REQUEST:
-			return "BLE_GAP_EVT_AUTH_KEY_REQUEST";
-		case BLE_GAP_EVT_AUTH_STATUS:
-			return "BLE_GAP_EVT_AUTH_STATUS";
-		case BLE_GAP_EVT_CONN_SEC_UPDATE:
-			return "BLE_GAP_EVT_CONN_SEC_UPDATE";
-		case BLE_GAP_EVT_TIMEOUT:
-			return "BLE_GAP_EVT_TIMEOUT";
-		case BLE_GAP_EVT_RSSI_CHANGED:
-			return "BLE_GAP_EVT_RSSI_CHANGED";
-		case BLE_GAP_EVT_ADV_REPORT:
-			return "BLE_GAP_EVT_ADV_REPORT";
-		case BLE_GAP_EVT_SEC_REQUEST:
-			return "BLE_GAP_EVT_SEC_REQUEST";
-		case BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST:
-			return "BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST";
-		case BLE_GATTC_EVT_PRIM_SRVC_DISC_RSP:
-			return "BLE_GATTC_EVT_PRIM_SRVC_DISC_RSP";
-		case BLE_GATTC_EVT_REL_DISC_RSP:
-			return "BLE_GATTC_EVT_REL_DISC_RSP";
-		case BLE_GATTC_EVT_CHAR_DISC_RSP:
-			return "BLE_GATTC_EVT_CHAR_DISC_RSP";
-		case BLE_GATTC_EVT_DESC_DISC_RSP:
-			return "BLE_GATTC_EVT_DESC_DISC_RSP";
-		case BLE_GATTC_EVT_CHAR_VAL_BY_UUID_READ_RSP:
-			return "BLE_GATTC_EVT_CHAR_VAL_BY_UUID_READ_RSP";
-		case BLE_GATTC_EVT_READ_RSP:
-			return "BLE_GATTC_EVT_READ_RSP";
-		case BLE_GATTC_EVT_CHAR_VALS_READ_RSP:
-			return "BLE_GATTC_EVT_CHAR_VALS_READ_RSP";
-		case BLE_GATTC_EVT_WRITE_RSP:
-			return "BLE_GATTC_EVT_WRITE_RSP";
-		case BLE_GATTC_EVT_HVX:
-			return "BLE_GATTC_EVT_HVX";
-		case BLE_GATTC_EVT_TIMEOUT:
-			return "BLE_GATTC_EVT_TIMEOUT";
-		case BLE_GATTS_EVT_WRITE:
-			return "BLE_GATTS_EVT_WRITE";
-		case BLE_GATTS_EVT_RW_AUTHORIZE_REQUEST:
-			return "BLE_GATTS_EVT_RW_AUTHORIZE_REQUEST";
-		case BLE_GATTS_EVT_SYS_ATTR_MISSING:
-			return "BLE_GATTS_EVT_SYS_ATTR_MISSING";
-		case BLE_GATTS_EVT_HVC:
-			return "BLE_GATTS_EVT_HVC";
-		case BLE_GATTS_EVT_SC_CONFIRM:
-			return "BLE_GATTS_EVT_SC_CONFIRM";
-		case BLE_GATTS_EVT_TIMEOUT:
-			return "BLE_GATTS_EVT_TIMEOUT";
-#ifdef NRF52
-		case BLE_GATTS_EVT_HVN_TX_COMPLETE:
-			return "BLE_GATTS_EVT_HVN_TX_COMPLETE";
-#endif
-		default:
-			return "UNKNOWN_EVENT";
-	}
-#else
-	return nullptr;
-#endif
-}
-
-const char* Logger::getHciErrorString(u8 hciErrorCode) const
-{
-#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
-	switch (hciErrorCode)
-	{
-
-		case BLE_HCI_STATUS_CODE_SUCCESS:
-			return "Success";
-
-		case BLE_HCI_STATUS_CODE_UNKNOWN_BTLE_COMMAND:
-			return "Unknown BLE Command";
-
-		case BLE_HCI_STATUS_CODE_UNKNOWN_CONNECTION_IDENTIFIER:
-			return "Unknown Connection Identifier";
-
-		case BLE_HCI_AUTHENTICATION_FAILURE:
-			return "Authentication Failure";
-
-		case BLE_HCI_CONN_FAILED_TO_BE_ESTABLISHED:
-			return "Connection Failed to be Established";
-
-		case BLE_HCI_CONN_INTERVAL_UNACCEPTABLE:
-			return "Connection Interval Unacceptable";
-
-		case BLE_HCI_CONN_TERMINATED_DUE_TO_MIC_FAILURE:
-			return "Connection Terminated due to MIC Failure";
-
-		case BLE_HCI_CONNECTION_TIMEOUT:
-			return "Connection Timeout";
-
-		case BLE_HCI_CONTROLLER_BUSY:
-			return "Controller Busy";
-
-		case BLE_HCI_DIFFERENT_TRANSACTION_COLLISION:
-			return "Different Transaction Collision";
-
-		case BLE_HCI_DIRECTED_ADVERTISER_TIMEOUT:
-			return "Directed Adverisement Timeout";
-
-		case BLE_HCI_INSTANT_PASSED:
-			return "Instant Passed";
-
-		case BLE_HCI_LOCAL_HOST_TERMINATED_CONNECTION:
-			return "Local Host Terminated Connection";
-
-		case BLE_HCI_MEMORY_CAPACITY_EXCEEDED:
-			return "Memory Capacity Exceeded";
-
-		case BLE_HCI_PAIRING_WITH_UNIT_KEY_UNSUPPORTED:
-			return "Pairing with Unit Key Unsupported";
-
-		case BLE_HCI_REMOTE_DEV_TERMINATION_DUE_TO_LOW_RESOURCES:
-			return "Remote Device Terminated Connection due to low resources";
-
-		case BLE_HCI_REMOTE_DEV_TERMINATION_DUE_TO_POWER_OFF:
-			return "Remote Device Terminated Connection due to power off";
-
-		case BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION:
-			return "Remote User Terminated Connection";
-
-		case BLE_HCI_STATUS_CODE_COMMAND_DISALLOWED:
-			return "Command Disallowed";
-
-		case BLE_HCI_STATUS_CODE_INVALID_BTLE_COMMAND_PARAMETERS:
-			return "Invalid BLE Command Parameters";
-
-		case BLE_HCI_STATUS_CODE_INVALID_LMP_PARAMETERS:
-			return "Invalid LMP Parameters";
-
-		case BLE_HCI_STATUS_CODE_LMP_PDU_NOT_ALLOWED:
-			return "LMP PDU Not Allowed";
-
-		case BLE_HCI_STATUS_CODE_LMP_RESPONSE_TIMEOUT:
-			return "LMP Response Timeout";
-
-		case BLE_HCI_STATUS_CODE_PIN_OR_KEY_MISSING:
-			return "Pin or Key missing";
-
-		case BLE_HCI_STATUS_CODE_UNSPECIFIED_ERROR:
-			return "Unspecified Error";
-
-		case BLE_HCI_UNSUPPORTED_REMOTE_FEATURE:
-			return "Unsupported Remote Feature";
-		default:
-			return "Unknown HCI error";
-	}
-#else
-	return nullptr;
-#endif
-}
-
-const char* Logger::getGattStatusErrorString(u16 gattStatusCode) const
-{
-#if defined(ENABLE_LOGGING) && defined(TERMINAL_ENABLED)
-	switch (gattStatusCode)
-	{
-		case BLE_GATT_STATUS_SUCCESS:
-			return "Success";
-		case BLE_GATT_STATUS_UNKNOWN:
-			return "Unknown or not applicable status";
-		case BLE_GATT_STATUS_ATTERR_INVALID:
-			return "ATT Error: Invalid Error Code";
-		case BLE_GATT_STATUS_ATTERR_INVALID_HANDLE:
-			return "ATT Error: Invalid Attribute Handle";
-		case BLE_GATT_STATUS_ATTERR_READ_NOT_PERMITTED:
-			return "ATT Error: Read not permitted";
-		case BLE_GATT_STATUS_ATTERR_WRITE_NOT_PERMITTED:
-			return "ATT Error: Write not permitted";
-		case BLE_GATT_STATUS_ATTERR_INVALID_PDU:
-			return "ATT Error: Used in ATT as Invalid PDU";
-		case BLE_GATT_STATUS_ATTERR_INSUF_AUTHENTICATION:
-			return "ATT Error: Authenticated link required";
-		case BLE_GATT_STATUS_ATTERR_REQUEST_NOT_SUPPORTED:
-			return "ATT Error: Used in ATT as Request Not Supported";
-		case BLE_GATT_STATUS_ATTERR_INVALID_OFFSET:
-			return "ATT Error: Offset specified was past the end of the attribute";
-		case BLE_GATT_STATUS_ATTERR_INSUF_AUTHORIZATION:
-			return "ATT Error: Used in ATT as Insufficient Authorisation";
-		case BLE_GATT_STATUS_ATTERR_PREPARE_QUEUE_FULL:
-			return "ATT Error: Used in ATT as Prepare Queue Full";
-		case BLE_GATT_STATUS_ATTERR_ATTRIBUTE_NOT_FOUND:
-			return "ATT Error: Used in ATT as Attribute not found";
-		case BLE_GATT_STATUS_ATTERR_ATTRIBUTE_NOT_LONG:
-			return "ATT Error: Attribute cannot be read or written using read/write blob requests";
-		case BLE_GATT_STATUS_ATTERR_INSUF_ENC_KEY_SIZE:
-			return "ATT Error: Encryption key size used is insufficient";
-		case BLE_GATT_STATUS_ATTERR_INVALID_ATT_VAL_LENGTH:
-			return "ATT Error: Invalid value size";
-		case BLE_GATT_STATUS_ATTERR_UNLIKELY_ERROR:
-			return "ATT Error: Very unlikely error";
-		case BLE_GATT_STATUS_ATTERR_INSUF_ENCRYPTION:
-			return "ATT Error: Encrypted link required";
-		case BLE_GATT_STATUS_ATTERR_UNSUPPORTED_GROUP_TYPE:
-			return "ATT Error: Attribute type is not a supported grouping attribute";
-		case BLE_GATT_STATUS_ATTERR_INSUF_RESOURCES:
-			return "ATT Error: Encrypted link required";
-		case BLE_GATT_STATUS_ATTERR_RFU_RANGE1_BEGIN:
-			return "ATT Error: Reserved for Future Use range #1 begin";
-		case BLE_GATT_STATUS_ATTERR_RFU_RANGE1_END:
-			return "ATT Error: Reserved for Future Use range #1 end";
-		case BLE_GATT_STATUS_ATTERR_APP_BEGIN:
-			return "ATT Error: Application range begin";
-		case BLE_GATT_STATUS_ATTERR_APP_END:
-			return "ATT Error: Application range end";
-		case BLE_GATT_STATUS_ATTERR_RFU_RANGE2_BEGIN:
-			return "ATT Error: Reserved for Future Use range #2 begin";
-		case BLE_GATT_STATUS_ATTERR_RFU_RANGE2_END:
-			return "ATT Error: Reserved for Future Use range #2 end";
-		case BLE_GATT_STATUS_ATTERR_RFU_RANGE3_BEGIN:
-			return "ATT Error: Reserved for Future Use range #3 begin";
-		case BLE_GATT_STATUS_ATTERR_RFU_RANGE3_END:
-			return "ATT Error: Reserved for Future Use range #3 end";
-		case BLE_GATT_STATUS_ATTERR_CPS_CCCD_CONFIG_ERROR:
-			return "ATT Common Profile and Service Error: Client Characteristic Configuration Descriptor improperly configured";
-		case BLE_GATT_STATUS_ATTERR_CPS_PROC_ALR_IN_PROG:
-			return "ATT Common Profile and Service Error: Procedure Already in Progress";
-		case BLE_GATT_STATUS_ATTERR_CPS_OUT_OF_RANGE:
-			return "ATT Common Profile and Service Error: Out Of Range";
-		default:
-			return "Unknown GATT status";
-	}
-#else
-	return nullptr;
-#endif
-}
-
-void Logger::blePrettyPrintAdvData(sizedData advData) const
+void Logger::blePrettyPrintAdvData(SizedData advData) const
 {
 
 	trace("Rx Packet len %d: ", advData.length);
 
 	u32 i = 0;
-	sizedData fieldData;
+	SizedData fieldData;
 	char hexString[100];
 	//Loop through advertising data and parse it
 	while (i < advData.length)
@@ -649,22 +334,27 @@ void Logger::blePrettyPrintAdvData(sizedData advData) const
 		fieldData.length = fieldSize - 1;
 
 		//Print it
-		convertBufferToHexString(fieldData.data, fieldData.length, hexString, sizeof(hexString));
+		Logger::convertBufferToHexString(fieldData.data, fieldData.length, hexString, sizeof(hexString));
 		trace("Type %d, Data %s" EOL, fieldType, hexString);
 
 		i += fieldSize + 1;
 	}
 }
 
-void Logger::logError(ErrorTypes errorType, u32 errorCode, u16 extraInfo)
+void Logger::logError(ErrorTypes errorType, u32 errorCode, u32 extraInfo)
 {
 	errorLog[errorLogPosition].errorType = errorType;
 	errorLog[errorLogPosition].errorCode = errorCode;
 	errorLog[errorLogPosition].extraInfo = extraInfo;
-	errorLog[errorLogPosition].timestamp = (GS->node != nullptr) ? GS->globalTimeSec : 0;
+	errorLog[errorLogPosition].timestamp = GS->node.IsInit() ? GS->timeManager.GetTime() : 0;
 
 	//Will fill the error log until the last entry (last entry does get overwritten with latest value)
 	if(errorLogPosition < NUM_ERROR_LOG_ENTRIES-1) errorLogPosition++;
+}
+
+void Logger::logCustomError(CustomErrorTypes customErrorType, u32 extraInfo)
+{
+	logError(ErrorTypes::CUSTOM, (u32)customErrorType, extraInfo);
 }
 
 //can be called multiple times and will increment the extra each time this happens
@@ -682,55 +372,66 @@ void Logger::logCount(ErrorTypes errorType, u32 errorCode)
 	errorLog[errorLogPosition].errorType = errorType;
 	errorLog[errorLogPosition].errorCode = errorCode;
 	errorLog[errorLogPosition].extraInfo = 1;
-	errorLog[errorLogPosition].timestamp = GS->globalTimeSec;
+	errorLog[errorLogPosition].timestamp = GS->timeManager.GetTime();
 
 	//Will fill the error log until the last entry (last entry does get overwritten with latest value)
 	if (errorLogPosition < NUM_ERROR_LOG_ENTRIES - 1) errorLogPosition++;
 }
 
-//Trivial implementation for converting the timestamp in human readable format
-//This does not pay respect to any leap seconds, gap years, whatever
-void Logger::convertTimestampToString(u32 timestampSec, u16 remainderTicks, char* buffer)
+void Logger::logCustomCount(CustomErrorTypes customErrorType)
 {
-	u32 gapDays;
-
-	u32 yearDivider = 60 * 60 * 24 * 365;
-	u16 years = timestampSec / yearDivider + 1970;
-	timestampSec = timestampSec % yearDivider;
-
-	gapDays = (years - 1970) / 4 - 1;
-	u32 dayDivider = 60 * 60 * 24;
-	u16 days = timestampSec / dayDivider;
-	days -= gapDays;
-	timestampSec = timestampSec % dayDivider;
-
-	u32 hourDivider = 60 * 60;
-	u16 hours = timestampSec / hourDivider;
-	timestampSec = timestampSec % hourDivider;
-
-	u32 minuteDivider = 60;
-	u16 minutes = timestampSec / minuteDivider;
-	timestampSec = timestampSec % minuteDivider;
-
-	u32 seconds = timestampSec;
-
-	snprintf(buffer, 80, "approx. %u years, %u days, %02uh:%02um:%02us,%u ticks", years, days, hours, minutes, seconds, remainderTicks);
+	logCount(ErrorTypes::CUSTOM, (u32)customErrorType);
 }
 
-//FIXME: This method does not know the destination buffer length and could crash the system
-//It also lets developers run into trouble while debugging....
-void Logger::convertBufferToHexString(const u8* srcBuffer, u32 srcLength, char* dstBuffer, u16 bufferLength)
+const char* base64Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+void convertBase64Block(const u8 * srcBuffer, u32 blockLength, char* dstBuffer)
 {
-	memset(dstBuffer, 0x00, bufferLength);
+	if (blockLength == 0 || blockLength > 3) {
+		//blockLength must be 1, 2 or 3
+		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
+	}
+
+	                    dstBuffer[0] = base64Alphabet[((srcBuffer[0] & 0b11111100) >> 2)                                                             ];
+	                    dstBuffer[1] = base64Alphabet[((srcBuffer[0] & 0b00000011) << 4) + (((blockLength > 1 ? srcBuffer[1] : 0) & 0b11110000) >> 4)];
+	if(blockLength > 1) dstBuffer[2] = base64Alphabet[((srcBuffer[1] & 0b00001111) << 2) + (((blockLength > 2 ? srcBuffer[2] : 0) & 0b11000000) >> 6)];
+	else                dstBuffer[2] = '=';
+	if(blockLength > 2) dstBuffer[3] = base64Alphabet[ (srcBuffer[2] & 0b00111111)                                                                   ];
+	else                dstBuffer[3] = '=';
+}
+
+void Logger::convertBufferToBase64String(const u8 * srcBuffer, u32 srcLength, char * dstBuffer, u16 bufferLength)
+{
+	if (bufferLength == 0) {
+		SIMEXCEPTION(BufferTooSmallException); //LCOV_EXCL_LINE assertion
+		return;
+	}
+	bufferLength--; //Reserve one byte for zero termination
+	u32 requiredDstBufferLength = ((srcLength + 2) / 3) * 4;
+	if (bufferLength < requiredDstBufferLength) {
+		SIMEXCEPTION(BufferTooSmallException);
+		srcLength = bufferLength / 4 * 3;
+	}
+
+	for (u32 i = 0; i < srcLength; i += 3) {
+		u32 srcLengthLeft = srcLength - i;
+		convertBase64Block(srcBuffer + i, srcLengthLeft > 3 ? 3 : srcLengthLeft, dstBuffer + i / 3 * 4);
+	}
+
+	dstBuffer[((srcLength + 2) / 3) * 4] = 0;
+}
+
+void Logger::convertBufferToHexString(const u8 * srcBuffer, u32 srcLength, char * dstBuffer, u16 bufferLength)
+{
+	CheckedMemset(dstBuffer, 0x00, bufferLength);
 
 	char* dstBufferStart = dstBuffer;
 	for (u32 i = 0; i < srcLength; i++)
 	{
 		//We need to have at least 3 chars to place our .. if the string is too long
-		if(dstBuffer - dstBufferStart + 3 < bufferLength){
+		if (dstBuffer - dstBufferStart + 3 < bufferLength) {
 			dstBuffer += snprintf(dstBuffer, bufferLength, i < srcLength - 1 ? "%02X:" : "%02X\0", srcBuffer[i]);
-		} else {
-			SIMEXCEPTION(BufferTooSmallException);
+		}
+		else {
 			dstBuffer[-3] = '.';
 			dstBuffer[-2] = '.';
 			dstBuffer[-1] = '\0';
@@ -740,13 +441,24 @@ void Logger::convertBufferToHexString(const u8* srcBuffer, u32 srcLength, char* 
 	};
 }
 
-u32 Logger::parseHexStringToBuffer(const char* hexString, u8* dstBuffer, u16 dstBufferSize)
+u32 Logger::parseEncodedStringToBuffer(const char * encodedString, u8 * dstBuffer, u16 dstBufferSize)
 {
-	u32 length = (strlen(hexString)+1)/3;
+	auto len = strlen(encodedString);
+	if (len >= 4 && encodedString[2] != ':') {
+		return parseBase64StringToBuffer(encodedString, len, dstBuffer, dstBufferSize);
+	}
+	else {
+		return parseHexStringToBuffer(encodedString, len, dstBuffer, dstBufferSize);
+	}
+}
+
+u32 Logger::parseHexStringToBuffer(const char* hexString, u32 hexStringLength, u8* dstBuffer, u16 dstBufferSize)
+{
+	u32 length = (hexStringLength + 1) / 3;
 	if(length > dstBufferSize){
-		logt("ERROR", "too long for dstBuffer");
-		length = dstBufferSize;
-		SIMEXCEPTION(BufferTooSmallException);
+		logt("ERROR", "too long for dstBuffer"); //LCOV_EXCL_LINE assertion
+		length = dstBufferSize;					 //LCOV_EXCL_LINE assertion
+		SIMEXCEPTION(BufferTooSmallException);	 //LCOV_EXCL_LINE assertion
 	}
 
 	for(u32 i = 0; i<length; i++){
@@ -756,8 +468,67 @@ u32 Logger::parseHexStringToBuffer(const char* hexString, u8* dstBuffer, u16 dst
 	return length;
 }
 
+u32 parseBase64Block(const char* base64Block, u8 * dstBuffer, u16 dstBufferSize)
+{
+	const char* base64Ptr[4];
+	u32 base64Index[4];
+	for (int i = 0; i < 4; i++) 
+	{
+		base64Ptr[i] = strchr(base64Alphabet, base64Block[i]);
+		base64Index[i] = (u32)(base64Ptr[i] - base64Alphabet);
+	}
+
+	u32 length = 3;
+	//Strictly speaking we accept any none base64 char as padding.
+	if (base64Ptr[3] == nullptr)
+		length--;
+	if (base64Ptr[2] == nullptr)
+		length--;
+	if (base64Ptr[1] == nullptr || base64Ptr[0] == nullptr)
+	{
+		SIMEXCEPTION(IllegalArgumentException);	 //LCOV_EXCL_LINE assertion
+		return 0;								 //LCOV_EXCL_LINE assertion
+	}
+
+	if(               dstBufferSize >= 1) dstBuffer[0] = ((base64Index[0] & 0b111111) << 2) + ((base64Index[1] & 0b110000) >> 4);
+	if(length >= 2 && dstBufferSize >= 2) dstBuffer[1] = ((base64Index[1] & 0b001111) << 4) + ((base64Index[2] & 0b111100) >> 2);
+	if(length >= 3 && dstBufferSize >= 3) dstBuffer[2] = ((base64Index[2] & 0b000011) << 6) + ((base64Index[3] & 0b111111));
+
+	if (length > dstBufferSize) 
+	{
+		SIMEXCEPTION(BufferTooSmallException);
+	}
+
+	return length;
+}
+
+u32 Logger::parseBase64StringToBuffer(const char * base64String, const u32 base64StringLength, u8 * dstBuffer, u16 dstBufferSize)
+{
+	if (base64StringLength % 4 != 0)
+	{
+		SIMEXCEPTION(IllegalArgumentException); //The base64 string was not padded correctly.
+		return 0;
+	}
+
+	const u32 amountOfBlocks = base64StringLength / 4;
+
+	u32 amountOfBytes = 0;
+	for (u32 i = 0; i < amountOfBlocks; i++)
+	{
+		amountOfBytes += parseBase64Block(base64String, dstBuffer, (i32)dstBufferSize - (i32)amountOfBytes);
+		base64String += 4;
+		dstBuffer += 3;
+	}
+	return amountOfBytes;
+}
+
 void Logger::disableAll()
 {
 	activeLogTags.zeroData();
 	logEverything = false;
+}
+
+void Logger::enableAll()
+{
+	logEverything = true;
 }

@@ -1,0 +1,122 @@
+= Battery Consumption
+
+Using a mesh on top of Bluetooth Low Energy does only make sense when it can operate at low energy. Simple, right? Well, not quite. There are many settings that affect the performance of FruityMesh and some use cases require different settings for some of these parameters. Many of these settings have been benchmarked with the current implementation. Measurements were made using the nRF51 DK chip, version QFACA1. The system consumption for many of these cases is detailed in this document. The same test applications on a nRF52 consume a little less energy.
+
+== Sleeping
+Doing nothing still costs some energy since RAM and low frequency clock have to run at all times. This costs about 5.6µA on average. As the mesh implementation is based on timers, different timer intervals have been tested:
+
+* Every 1000ms: 6.3µA
+* Every 500ms: 7µA
+* Every 100ms: 11.5µA
+
+The Sleep Power mode should be set to NRF_POWER_MODE_LOWPWR, which is the default and constant latency will consume 1mA on average.
+
+The DC/DC converter should be enabled to save 10-20% when the radio is active.
+
+All further measurements have been made with a 500ms timer.
+
+== Advertising
+Different Advertising intervals result in different power consumption. These values have been measured with DC/DC enabled and advertising on all three channels:
+
+* Advertising every 25ms consumes 770µA
+* Advertising every 100ms reduces the system consumption to 222µA
+
+This scales mostly linearly.
+
+== Scanning
+There's nothing like scanning when it comes to draining the battery as quickly as possible, even with the DC/DC turned on:
+
+* Scanning at 50% duty cycle: 5.4mA
+* Scanning at 100% duty cycle: 10.8mA
+
+This also scales linearly.
+
+== Connections
+The next test examines the BLE connections with the DC/DC on, both as a Master and as a Slave:
+
+*  1 Connection with an interval of 100ms: 77µA (empty PDUs), 134µA (20 byte each connection event)
+*  2 Connections with 100ms each: 142µA (empty PDUs)
+*  3 Connections: 211µA
+
+The difference between a Slave and a Master connection is not readily measurable because of the efficient sleep clocks. The Slave probably uses a bit more energy because it has to synchronize to the Master with each connection event.
+
+A connection at 30ms uses 230µA with empty data packets and 270µA with 20 byte payloads. This suggests that each connection adds an almost constant amount of energy consumption. Three connections at 100ms instead of only one consumes a little less than three times the amount of a single connection.
+
+== Bulk Mode
+Some results of battery measurements for bulk factory mode are available. The node used for the measurements is flashed with feature set `prod_mesh_nrf52` while skipping uicr settings. Results are in the range of 34-36µA.
+
+== Mesh Discovery
+Measuring mesh discovery consumption is a little tricky because of the SoftDevice scheduling. Sometimes discovery will use less energy while the device has a connection in contrast to a device without connections because the different tasks (scanning/advertising/connection events/...) will collide. Some important measurements are carried out to evaluate the tradeoff between fast connection and low power measurement of mesh.
+
+=== NRF51
+==== Ultra High Discovery with:
+
+* 100ms advertising on all channels
+* 40ms scan interval
+* 20ms scan window
+* 3s in DISCOVERY state
+* 1s + 1 random second in BACK_OFF state
+
+=> 2.2mA with one connection and 2.6mA without a connection
+
+==== Medium Discovery with:
+
+* 200ms advertising on all channels
+* 1000ms scan interval
+* 20ms scan window
+* 3s in DISCOVERY state
+* 1s + 1 random second in BACK_OFF state
+
+=> 240µA with one connection and 200µA without a connection
+
+==== Low Discovery with:
+
+* 1000ms advertising on all channels
+* 2000ms scan interval
+* 10ms scan window
+* 8s in DISCOVERY state
+* 5s + 5 random second in BACK_OFF state
+
+=> 110µA with one connection and 60µA without a connection
+
+=== NRF52
+
+Battery measurements are calculated for feature set `prod_mesh_nrf52`. Measurement for both High and Low discovery are as follows:
+
+==== High Discovery
+
+* Consumes on average 890µA when in mesh.
+
+* Consumes on average 760µA when not in mesh.
+
+* Captures 50-55 packets of all the nearby nodes during a scan interval of 30 seconds.
+
+* Captures 10-12 _JOIN_ME_ packets during a scan interval of 30 seconds from a single device advertising at an interval of 100ms. 
+
+* time to connect to another node = 100...400ms.
+
+==== Low Discovery
+
+* Consumes on average 460µA when in a mesh.
+
+* Consumes on average 220µA when not in a mesh.
+
+* Captures 15-20 packets from all the nearby nodes during a scan interval of 30 seconds.
+
+* Captures 1-2 _JOIN_ME_ packets during a scan interval of 30 seconds from a single device advertising at interval 200ms.
+
+* time to connect to another node = 700ms - 30s.
+
+By selecting the appropriate parameters for discovery, a balance can be found between fast connection vs. energy consumption.
+
+== What Does This Mean?
+In general, discovery should be switched off after all devices have joined the network. Once a device loses a connection, discovery should be switched on again.
+
+There are different possibilities to achieve this. The best possibility is having a MeshGateway that monitors the mesh and switches discovery on or off. If the clusterSize of the mesh is known, it is possible to switch discovery off or to a very low setting once the target cluster size is reached. Additionally, a timeout has to be implemented to switch discovery to a low setting in case a node is defective and the target cluster size is never reached.
+
+Under good conditions, connections should not break up often, which means that discovery can be switched off most of the time. While everything is connected, every node consumes about 150-250µA at a connection interval of 100ms. If low latency is not a requirement, the connection interval can be set to a very low 4000ms. This results in a power consumption of as low as 20µA once discovery is switched off.
+
+== Measuring Power Consumption
+Limited testing has been done in regards to which intervals provide the best balance between power consumption and performance. Be aware that tweaking some parameters may result in the mesh not connecting properly. Work is on-going to optimize the power consumption for a number of generic use cases.
+
+The current consumption can be measured with the https://www.nordicsemi.com/Software-and-Tools/Development-Kits/Power-Profiler-Kit[Nordic nRF Power Profiler Kit]

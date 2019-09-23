@@ -27,31 +27,57 @@
 // **
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
-#include <Config.h>
-#include <Node.h>
+#include "Config.h"
+#include "Node.h"
+#include "Utility.h"
+#include "DebugModule.h"
+#include "StatusReporterModule.h"
+#include "AdvertisingModule.h"
+#include "ScanningModule.h"
+#include "EnrollmentModule.h"
+#include "IoModule.h"
+#include "MeshAccessModule.h"
+#include "GlobalState.h"
 
-void setFeaturesetConfiguration_github(ModuleConfiguration* config)
+void setFeaturesetConfiguration_github(ModuleConfiguration* config, void* module)
 {
-	if(config->moduleId == moduleID::BOARD_CONFIG_ID)
+	if(config->moduleId == ModuleId::BOARD_CONFIG)
 	{
 		BoardConfiguration* c = (BoardConfiguration*) config;
 
 		//Additional boards can be put in here to be selected at runtime
 		//e.g. setBoard_123(c);
 	}
-	else if (config->moduleId == moduleID::CONFIG_ID)
+	else if (config->moduleId == ModuleId::CONFIG)
 	{
-		Conf::ConfigConfiguration* c = (Conf::ConfigConfiguration*) config;
-		c->defaultLedMode = LED_MODE_CONNECTIONS;
-		c->terminalMode = TERMINAL_PROMPT_MODE;
+		Conf::getInstance().defaultLedMode = LedMode::CONNECTIONS;
+		Conf::getInstance().terminalMode = TerminalMode::PROMPT;
 	}
-	else if (config->moduleId == moduleID::NODE_ID)
+	else if (config->moduleId == ModuleId::NODE)
 	{
 		//Specifies a default enrollment for the github configuration
 		//This enrollment will be overwritten as soon as the node is either enrolled or the enrollment removed
 		NodeConfiguration* c = (NodeConfiguration*) config;
 		c->enrollmentState = EnrollmentState::ENROLLED;
 		c->networkId = 11;
-		memset(c->networkKey, 0x00, 16);
+		CheckedMemset(c->networkKey, 0x00, 16);
 	}
+}
+
+u32 initializeModules_github(bool createModule)
+{
+	u32 size = 0;
+	size += GS->InitializeModule<DebugModule>(createModule);
+	size += GS->InitializeModule<StatusReporterModule>(createModule);
+	size += GS->InitializeModule<AdvertisingModule>(createModule);
+	size += GS->InitializeModule<ScanningModule>(createModule);
+	size += GS->InitializeModule<EnrollmentModule>(createModule);
+	size += GS->InitializeModule<IoModule>(createModule);
+	size += GS->InitializeModule<MeshAccessModule>(createModule);
+	return size;
+}
+
+DeviceType getDeviceType_github()
+{
+	return DeviceType::STATIC;
 }

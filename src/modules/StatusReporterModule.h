@@ -38,31 +38,37 @@
 #include <Module.h>
 #include <Logger.h>
 
-#ifdef ACTIVATE_STATUS_REPORTER_MODULE
-
 #include <Terminal.h>
 
 #if defined(NRF51)
 extern "C"{
 #include <nrf_drv_adc.h>
-#include <nrf_adc.h>
 }
 #endif
 #if defined(NRF52)
 #include <nrf_drv_saadc.h>
-#include <nrf_saadc.h>
 #endif
 
 #define BATTERY_SAMPLES_IN_BUFFER 					1//Number of SAADC samples in RAM before returning a SAADC event. For low power SAADC set this constant to 1. Otherwise the EasyDMA will be enabled for an extended time which consumes high current.
 
 #if defined(NRF51) || defined(SIM_ENABLED)
-#define REF_VOLTAGE_IN_MILLIVOLTS           		1200
+constexpr int REF_VOLTAGE_IN_MILLIVOLTS            = 1200;
 #define RESULT_IN_DECI_VOLTS(ADC_VALUE)    			((((ADC_VALUE) * REF_VOLTAGE_IN_MILLIVOLTS) / 1024))
 #endif
+
+
 #if defined(NRF52)
-#define REF_VOLTAGE_IN_MILLIVOLTS           		600// Maximum Internal Reference Voltage
-#define ADC_OFFSET 									28.5
-#define RESULT_IN_DECI_VOLTS(ADC_VALUE)     		((ADC_VALUE + (ADC_OFFSET*ADC_VALUE)/100) / 10)
+constexpr double REF_VOLTAGE_INTERNAL_IN_MILLI_VOLTS			= 600; // Maximum Internal Reference Voltage
+constexpr double VOLTAGE_DIVIDER_INTERNAL_IN_MILLI_VOLTS		= 166; //Internal voltage divider
+constexpr double ADC_RESOLUTION_8BIT							= 256;
+
+#define RESULT_IN_DECI_VOLTS(ADC_VALUE)     		((ADC_VALUE*REF_VOLTAGE_INTERNAL_IN_MILLI_VOLTS)/(VOLTAGE_DIVIDER_INTERNAL_IN_MILLI_VOLTS*ADC_RESOLUTION_8BIT))*10
+
+constexpr double REF_VOLTAGE_EXTERNAL_IN_MILLI_VOLTS		= 825; // Maximum Internal Reference Voltage
+constexpr double VOLTAGE_GAIN_IN_MILLI_VOLTS				= 200; //Internal voltage divider
+constexpr double ADC_RESOLUTION_10BIT						= 1023;
+
+#define RESULT_IN_DECI_VOLTS_VOLTAGE_DIV(ADC_VALUE, VOLTAGE_DIV)   ( (ADC_VALUE)* (REF_VOLTAGE_EXTERNAL_IN_MILLI_VOLTS/VOLTAGE_GAIN_IN_MILLI_VOLTS) * (1/ADC_RESOLUTION_10BIT) * (VOLTAGE_DIV))
 #endif
 
 enum class RSSISamplingModes : u8 {
@@ -72,57 +78,48 @@ enum class RSSISamplingModes : u8 {
 	HIGH = 3
 };
 
-enum class LiveReportTypes : u8{
-	LEVEL_ERROR = 0,
-	LEVEL_WARN = 50,
-	//########
-	LEVEL_INFO = 100,
-	GAP_CONNECTED_INCOMING, //extra is connHandle, extra2 is 4 bytes of gap addr
-	GAP_TRYING_AS_MASTER, //extra is partnerId, extra2 is 4 bytes of gap addr
-	GAP_CONNECTED_OUTGOING, //extra is connHandle, extra2 is 4 byte of gap addr
-	GAP_DISCONNECTED, //extra is partnerid, extra2 is hci code (TODO: can we detect wrong encryption keys?)
-
-	HANDSHAKE_FAIL, //TODO: use more of this type
-	MESH_CONNECTED, //extra is partnerid, extra2 is asWinner
-	MESH_DISCONNECTED, //extra is partnerid, extra2 is appDisconnectReason
-
-	//########
-	LEVEL_DEBUG = 150,
-	DECISION_RESULT //extra is decision type, extra2 is preferedPartner
-};
-
-enum class LiveReportHandshakeFailCode : u8
-{
-	SUCCESS,
-	SAME_CLUSTERID,
-	NETWORK_ID_MISMATCH,
-};
-
 #pragma pack(push, 1)
 //Module configuration that is saved persistently
 struct StatusReporterModuleConfiguration: ModuleConfiguration
 {
 		u16 connectionReportingIntervalDs;
 		u16 statusReportingIntervalDs;
-		RSSISamplingModes connectionRSSISamplingMode;
-		RSSISamplingModes advertisingRSSISamplingMode;
 		u16 nearbyReportingIntervalDs;
 		u16 deviceInfoReportingIntervalDs;
-		u16 batteryMeasurementIntervalDs;
 		LiveReportTypes liveReportingState;
 		//Insert more persistent config values here
 };
 #pragma pack(pop)
 
+#pragma pack(push)
+#pragma pack(1)
+typedef struct
+{
+	NodeId partner1;
+	i8 rssi1;
+	NodeId partner2;
+	i8 rssi2;
+	NodeId partner3;
+	i8 rssi3;
+	NodeId partner4;
+	i8 rssi4;
+
+} StatusReporterModuleConnectionsMessage;
+STATIC_ASSERT_SIZE(StatusReporterModuleConnectionsMessage, 12);
+#pragma pack(pop)
+
 class StatusReporterModule: public Module
 {
-private:
+public:
+		
+		static constexpr RSSISamplingModes connectionRSSISamplingMode = RSSISamplingModes::HIGH;
+		static constexpr u32 batteryMeasurementIntervalDs = SEC_TO_DS(6*60*60);
 
 		enum class StatusModuleTriggerActionMessages : u8
 		{
 			SET_LED = 0,
 			GET_STATUS = 1,
-			GET_DEVICE_INFO = 2,
+			//GET_DEVICE_INFO = 2, removed as of 17.05.2019
 			GET_ALL_CONNECTIONS = 3,
 			GET_NEARBY_NODES = 4,
 			SET_INITIALIZED = 5,
@@ -137,12 +134,12 @@ private:
 		{
 			SET_LED_RESULT = 0,
 			STATUS = 1,
-			DEVICE_INFO = 2,
+			//DEVICE_INFO = 2, removed as of 17.05.2019
 			ALL_CONNECTIONS = 3,
 			NEARBY_NODES = 4,
 			SET_INITIALIZED_RESULT = 5,
 			ERROR_LOG_ENTRY = 6,
-			DISCONNECT_REASON = 7,
+			//DISCONNECT_REASON = 7, removed as of 21.05.2019
 			REBOOT_REASON = 8,
 			DEVICE_INFO_V2 = 10,
 		};
@@ -151,6 +148,8 @@ private:
 		{
 			LIVE_REPORT = 1
 		};
+
+private:
 
 		//####### Module specific message structs (these need to be packed)
 		#pragma pack(push)
@@ -163,44 +162,8 @@ private:
 				u16 packetCount;
 			} nodeMeasurement;
 
-			#define SIZEOF_STATUS_REPORTER_MODULE_CONNECTIONS_MESSAGE 12
-			typedef struct
-			{
-				NodeId partner1;
-				i8 rssi1;
-				NodeId partner2;
-				i8 rssi2;
-				NodeId partner3;
-				i8 rssi3;
-				NodeId partner4;
-				i8 rssi4;
-
-			} StatusReporterModuleConnectionsMessage;
-			STATIC_ASSERT_SIZE(StatusReporterModuleConnectionsMessage, 12);
-
 			//This message delivers non- (or not often)changing information
-			#define SIZEOF_STATUS_REPORTER_MODULE_DEVICE_INFO_MESSAGE (33 + NODE_SERIAL_NUMBER_LENGTH)
-			typedef struct
-			{
-				u16 manufacturerId;
-				u8 serialNumber[NODE_SERIAL_NUMBER_LENGTH];
-				u8 chipId[8];
-				fh_ble_gap_addr_t accessAddress;
-				NetworkId networkId;
-				u32 nodeVersion;
-				i8 dBmRX;
-				i8 dBmTX;
-				u8 deviceType;
-				i8 calibratedTX;
-				NodeId chipGroupId;
-				NodeId featuresetGroupId;
-				u16 bootloaderVersion;
-
-			} StatusReporterModuleDeviceInfoMessage;
-			STATIC_ASSERT_SIZE(StatusReporterModuleDeviceInfoMessage, 38);
-
-			//This message delivers non- (or not often)changing information
-			#define SIZEOF_STATUS_REPORTER_MODULE_DEVICE_INFO_V2_MESSAGE (37)
+			static constexpr int SIZEOF_STATUS_REPORTER_MODULE_DEVICE_INFO_V2_MESSAGE = (37);
 			typedef struct
 			{
 				u16 manufacturerId;
@@ -211,7 +174,7 @@ private:
 				u32 nodeVersion;
 				i8 dBmRX;
 				i8 dBmTX;
-				u8 deviceType;
+				DeviceType deviceType;
 				i8 calibratedTX;
 				NodeId chipGroupId;
 				NodeId featuresetGroupId;
@@ -221,7 +184,7 @@ private:
 			STATIC_ASSERT_SIZE(StatusReporterModuleDeviceInfoV2Message, 37);
 
 			//This message delivers often changing information and info about the incoming connection
-			#define SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE 9
+			static constexpr int SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE = 9;
 			typedef struct
 			{
 				ClusterSize clusterSize;
@@ -236,18 +199,19 @@ private:
 			} StatusReporterModuleStatusMessage;
 			STATIC_ASSERT_SIZE(StatusReporterModuleStatusMessage, 9);
 
-			//This message delivers often changing information and info about the incoming connection
-			#define SIZEOF_STATUS_REPORTER_MODULE_ERROR_LOG_ENTRY_MESSAGE 11
+			//Used for sending error logs through the mesh
+			static constexpr int SIZEOF_STATUS_REPORTER_MODULE_ERROR_LOG_ENTRY_MESSAGE = 12;
 			typedef struct
 			{
-				ErrorTypes errorType;
-				u16 extraInfo;
+				u32 errorType : 8; //Workaround necessary for packing, should be of type ErrorTypes
+				u32 timestamp : 24; //This should be u32, but not enough space in that message, so it will wrap after 20 days
+				u32 extraInfo;
 				u32 errorCode;
-				u32 timestamp;
-			} StatusReporterModuleErrorLogEntryMessage;
-			STATIC_ASSERT_SIZE(StatusReporterModuleErrorLogEntryMessage, 11);
 
-			#define SIZEOF_STATUS_REPORTER_MODULE_LIVE_REPORT_MESSAGE 9
+			} StatusReporterModuleErrorLogEntryMessage;
+			STATIC_ASSERT_SIZE(StatusReporterModuleErrorLogEntryMessage, 12);
+
+			static constexpr int SIZEOF_STATUS_REPORTER_MODULE_LIVE_REPORT_MESSAGE = 9;
 			typedef struct
 			{
 				u8 reportType;
@@ -260,7 +224,7 @@ private:
 
 		//####### Module messages end
 
-#define NUM_NODE_MEASUREMENTS 20
+		static constexpr int NUM_NODE_MEASUREMENTS = 20;
 		nodeMeasurement nodeMeasurements[NUM_NODE_MEASUREMENTS];
 
 		u8 batteryVoltageDv; //in decivolts
@@ -276,11 +240,10 @@ private:
 		nrf_saadc_value_t m_buffer[BATTERY_SAMPLES_IN_BUFFER];
 #endif
 
-		void SendStatus(NodeId toNode, u8 messageType) const;
-		void SendDeviceInfo(NodeId toNode, u8 requestHandle, u8 messageType) const;
-		void SendDeviceInfoV2(NodeId toNode, u8 requestHandle, u8 messageType) const;
-		void SendNearbyNodes(NodeId toNode, u8 messageType);
-		void SendAllConnections(NodeId toNode, u8 messageType) const;
+		void SendStatus(NodeId toNode, MessageType messageType) const;
+		void SendDeviceInfoV2(NodeId toNode, u8 requestHandle, MessageType messageType) const;
+		void SendNearbyNodes(NodeId toNode, MessageType messageType);
+		void SendAllConnections(NodeId toNode, MessageType messageType) const;
 		void SendErrors(NodeId toNode) const;
 		void SendRebootReason(NodeId toNode) const;
 
@@ -293,6 +256,10 @@ private:
 		void convertADCtoVoltage(i16 * buffer, u16 size);
 
 	public:
+
+		static constexpr int SIZEOF_STATUS_REPORTER_MODULE_CONNECTIONS_MESSAGE = 12;
+
+
 		DECLARE_CONFIG_AND_PACKED_STRUCT(StatusReporterModuleConfiguration);
 
 		StatusReporterModule();
@@ -309,16 +276,14 @@ private:
 
 		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) override;
 
-		void BleEventHandler(const ble_evt_t& bleEvent) override;
-
-		void ButtonHandler(u8 buttonId, u32 holdTime) USE_BUTTONS_OVERRIDE;
+		void GapAdvertisementReportEventHandler(const GapAdvertisementReportEvent& advertisementReportEvent) override;
 
 		void MeshConnectionChangedHandler(MeshConnection& connection) override;
 
 		void SendLiveReport(LiveReportTypes type, u32 extra, u32 extra2) const;
 
 		u8 GetBatteryVoltage() const;
-};
 
-#endif
+		u16 ExternalVoltageDividerDv(u32 Resistor1, u32 Resistor2);
+};
 

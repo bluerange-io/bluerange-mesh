@@ -57,5 +57,4 @@ fruity-api/testlog.*
 packages/
 
 # cmake
-cmake-build-debug/
-cmake_build/
+cmake_build*

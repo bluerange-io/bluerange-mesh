@@ -36,8 +36,6 @@
 
 #include <Module.h>
 
-#ifdef ACTIVATE_DEBUG_MODULE
-
 enum class FloodMode : u8{
 	OFF = 0,
 	RELIABLE = 1,
@@ -51,16 +49,14 @@ class DebugModule: public Module
 {
 	private:
 
+		static constexpr u8 debugButtonEnableUartDs = 0;
+
 		#pragma pack(push, 1)
 		//Module configuration that is saved persistently
 		struct DebugModuleConfiguration : ModuleConfiguration{
-			u8 deprecated_debugButtonRemoveEnrollmentDs;
-			u8 debugButtonEnableUartDs;
 			//Insert more persistent config values here
 		};
 		#pragma pack(pop)
-
-		u32 rebootTimeDs; //Time until reboot
 
 		//Counters for flood messages
 		FloodMode floodMode;
@@ -75,28 +71,22 @@ class DebugModule: public Module
 		u8 pingHandle;
 		u16 pingCount;
 		u16 pingCountResponses;
+		bool syncTest;
 
 		#pragma pack(push)
 		#pragma pack(1)
 
-		#define SIZEOF_DEBUG_MODULE_INFO_MESSAGE 6
+		static constexpr int SIZEOF_DEBUG_MODULE_INFO_MESSAGE = 8;
 		typedef struct
 		{
 			u16 connectionLossCounter;
 			u16 droppedPackets;
-			u16 sentPackets;
+			u16 sentPacketsReliable;
+			u16 sentPacketsUnreliable;
 		} DebugModuleInfoMessage;
-		STATIC_ASSERT_SIZE(DebugModuleInfoMessage, 6);
+		STATIC_ASSERT_SIZE(DebugModuleInfoMessage, 8);
 
-		#define SIZEOF_DEBUG_MODULE_FORCE_REESTABLISH_MESSAGE 2
-		typedef struct
-		{
-			u16 partnerId;
-
-		} DebugModuleForceReestablishMessage;
-		STATIC_ASSERT_SIZE(DebugModuleForceReestablishMessage, 2);
-
-		#define SIZEOF_DEBUG_MODULE_PINGPONG_MESSAGE 1
+		static constexpr int SIZEOF_DEBUG_MODULE_PINGPONG_MESSAGE = 1;
 		typedef struct
 		{
 			u8 ttl;
@@ -104,7 +94,7 @@ class DebugModule: public Module
 		} DebugModulePingpongMessage;
 		STATIC_ASSERT_SIZE(DebugModulePingpongMessage, 1);
 
-		#define SIZEOF_DEBUG_MODULE_LPING_MESSAGE 4
+		static constexpr int SIZEOF_DEBUG_MODULE_LPING_MESSAGE = 4;
 		typedef struct
 		{
 			NodeId leafNodeId;
@@ -114,7 +104,7 @@ class DebugModule: public Module
 		STATIC_ASSERT_SIZE(DebugModuleLpingMessage, 4);
 
 
-		#define SIZEOF_DEBUG_MODULE_SET_DISCOVERY_MESSAGE 1
+		static constexpr int SIZEOF_DEBUG_MODULE_SET_DISCOVERY_MESSAGE = 1;
 		typedef struct
 		{
 			u8 discoveryMode;
@@ -123,7 +113,7 @@ class DebugModule: public Module
 		STATIC_ASSERT_SIZE(DebugModuleSetDiscoveryMessage, 1);
 
 
-		#define SIZEOF_DEBUG_MODULE_RESET_MESSAGE 1
+		static constexpr int SIZEOF_DEBUG_MODULE_RESET_MESSAGE = 1;
 		typedef struct
 		{
 			u8 resetSeconds;
@@ -132,17 +122,18 @@ class DebugModule: public Module
 		STATIC_ASSERT_SIZE(DebugModuleResetMessage, 1);
 
 
-		#define SIZEOF_DEBUG_MODULE_FLOOD_MESSAGE 4
+		static constexpr int SIZEOF_DEBUG_MODULE_FLOOD_MESSAGE = 4;
 		typedef struct
 		{
 			u16 packetsIn;
 			u16 packetsOut;
 
+			u8 chunkData[21]; // This chunk is only there to bloat the message to such a size, that it has to be split.
 		} DebugModuleFloodMessage;
-		STATIC_ASSERT_SIZE(DebugModuleFloodMessage, 4);
+		STATIC_ASSERT_SIZE(DebugModuleFloodMessage, 25);
 
 
-#define SIZEOF_DEBUG_MODULE_SET_FLOOD_MODE_MESSAGE 5
+		static constexpr int SIZEOF_DEBUG_MODULE_SET_FLOOD_MODE_MESSAGE = 5;
 		typedef struct
 		{
 			NodeId floodDestinationId;
@@ -151,6 +142,11 @@ class DebugModule: public Module
 
 		} DebugModuleSetFloodModeMessage;
 		STATIC_ASSERT_SIZE(DebugModuleSetFloodModeMessage, 5);
+
+		typedef struct
+		{
+			u8 data[MAX_MESH_PACKET_SIZE - SIZEOF_CONN_PACKET_MODULE];
+		} DebugModuleSendMaxMessageResponse;
 
 		#pragma pack(pop)
 
@@ -161,22 +157,23 @@ class DebugModule: public Module
 		DECLARE_CONFIG_AND_PACKED_STRUCT(DebugModuleConfiguration);
 
 		enum class DebugModuleTriggerActionMessages : u8{
-			RESET_NODE = 0,
+			//RESET_NODE = 0, Removed as of 21.05.2019
 			RESET_CONNECTION_LOSS_COUNTER = 1,
 			FLOOD_MESSAGE = 2,
 			GET_STATS_MESSAGE = 3,
 			CAUSE_HARDFAULT_MESSAGE = 4,
-			REQUEST_FORCE_REESTABLISH = 5,
+			//REQUEST_FORCE_REESTABLISH = 5, deprecated
 			PING = 6,
 			PINGPONG = 7,
 			//SET_DISCOVERY = 8, deprecated
 			LPING = 9,
 			SET_FLOOD_MODE = 10,
-			FORCE_REESTABLISH = 11, //Must be sent to a node that is connected to us to force a reestablishment
-			SET_LIVEREPORTING_DEPRECATED = 12,
+			//FORCE_REESTABLISH = 11, deprecated //Must be sent to a node that is connected to us to force a reestablishment
+			//SET_LIVEREPORTING_DEPRECATED = 12, Removed as of 21.05.2019
 			EINK_SETANDDRAW_DEPRECATED = 13,
 			GET_JOIN_ME_BUFFER = 14,
-			RESET_FLOOD_COUNTER = 15
+			RESET_FLOOD_COUNTER = 15,
+			SEND_MAX_MESSAGE = 16,
 
 		};
 
@@ -186,7 +183,8 @@ class DebugModule: public Module
 			//SET_DISCOVERY_RESPONSE = 8, deprecated
 			LPING_RESPONSE = 9,
 			JOIN_ME_BUFFER_ITEM = 10,
-			EINK_SETANDDRAW_RESPONSE_DEPRECATED = 11
+			EINK_SETANDDRAW_RESPONSE_DEPRECATED = 11,
+			SEND_MAX_MESSAGE_RESPONSE = 16,
 		};
 
 		DebugModule();
@@ -199,7 +197,9 @@ class DebugModule: public Module
 
 		void SendStatistics(NodeId receiver) const;
 
-		void ButtonHandler(u8 buttonId, u32 holdTimeDs) USE_BUTTONS_OVERRIDE;
+#if IS_ACTIVE(BUTTONS)
+		void ButtonHandler(u8 buttonId, u32 holdTimeDs) override;
+#endif
 
 		#ifdef TERMINAL_ENABLED
 		bool TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize) override;
@@ -210,5 +210,3 @@ class DebugModule: public Module
 		u32 getPacketsOut();
 		
 };
-
-#endif

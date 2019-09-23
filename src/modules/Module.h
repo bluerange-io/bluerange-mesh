@@ -48,25 +48,37 @@
 
 #pragma once
 
-#define INVALID_U8_CONFIG 0xFF
-#define INVALID_U16_CONFIG 0xFFFF
-#define INVALID_U32_CONFIG 0xFFFFFFFF
+constexpr int INVALID_U8_CONFIG  = 0xFF;
+constexpr int INVALID_U16_CONFIG = 0xFFFF;
+constexpr int INVALID_U32_CONFIG = 0xFFFFFFFF;
 
 #include <Config.h>
 #include <Boardconfig.h>
 #include <Logger.h>
-#include <ConnectionManager.h>
 #include <Terminal.h>
 #include <RecordStorage.h>
+#include <MeshConnection.h>
+#include <BaseConnection.h>
 
-extern "C"{
-#include <ble.h>
-}
+enum class CapabilityEntryType : u8
+{
+	INVALID = 0,
+	HARDWARE = 1,
+	SOFTWARE = 2,
 
+	NOT_READY = 100,	//The module is currently not ready to report the capability with the provided index but will be in the near future.
+};
+
+struct CapabilityEntry
+{
+	CapabilityEntryType type;
+	//WARNING: The following values are not guaranteed to have a terminating zero!
+	char manufacturer[32];
+	char modelName[53];
+	char revision[32];
+};
 
 class Node;
-
-#define MODULE_NAME_MAX_SIZE 10
 
 class Module:
 		public RecordStorageEventListener,
@@ -76,21 +88,22 @@ class Module:
 
 protected:
 		struct ModuleInformation {
-			u8 moduleId;
+			ModuleId moduleId;
 			u8 moduleVersion;
 		};
+		STATIC_ASSERT_SIZE(ModuleInformation, 2);
 
-		//Called when the load failed
-		virtual void ResetToDefaultConfiguration(){};
+		//This must be called in the constructor to reset all values to default
+		virtual void ResetToDefaultConfiguration() = 0;
 
 
 	public:
-		u8 moduleId;
-		u8 moduleVersion;
-		char moduleName[MODULE_NAME_MAX_SIZE];
+		const ModuleId moduleId;
+		const char* moduleName;
 
-		//Constructor is passed
-		Module(u8 moduleId, const char* name);
+
+		//The constructor is used to initialize all members and must call ResetToDefaultConfiguration in all subclasses
+		Module(ModuleId moduleId, const char* name);
 		virtual ~Module();
 
 		//These two variables must be set by the submodule in the constructor before loading the configuration
@@ -116,16 +129,16 @@ protected:
 
 		struct SaveModuleConfigAction {
 			NodeId sender;
-			moduleID moduleId;
+			ModuleId moduleId;
 			u8 requestHandle;
 		};
 
-		//This function is called on the module to load its saved configuration and start
+		//This function is called on the module to load its saved configuration from flash and start
 		void LoadModuleConfigurationAndStart();
 
 		//Constructs a simple TriggerAction message and sends it
-		void SendModuleActionMessage(u8 messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool loopback) const;
-		void SendModuleActionMessage(u8 messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable) const;
+		void SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool loopback) const;
+		void SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable) const;
 
 
 		//##### Handlers that can be implemented by any module, but are implemented empty here
@@ -143,48 +156,52 @@ protected:
 		 */
 		virtual void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength){};
 
-		//Called when the module should update configuration parameters
-		virtual void SetConfigurationHandler(u8* configuration, u8 length){};
-
-		//Called when the module should send back its data
-		virtual void GetDataHandler(u8* request, u8 length){};
-
-		//Handle system events
-		virtual void SystemEventHandler(u32 systemEvent){};
-
 		//This handler receives all timer events
 		virtual void TimerEventHandler(u16 passedTimeDs){};
 
 		//This handler receives all ble events and can act on them
-		virtual void BleEventHandler(const ble_evt_t &bleEvent){};
+		virtual void GapAdvertisementReportEventHandler(const GapAdvertisementReportEvent& advertisementReportEvent) {};
+		virtual void GapConnectedEventHandler(const GapConnectedEvent& connectedEvent) {};
+		virtual void GapDisconnectedEventHandler(const GapDisconnectedEvent& disconnectedEvent) {};
+		virtual void GattDataTransmittedEventHandler(const GattDataTransmittedEvent& gattDataTransmittedEvent) {};
 
 		//When a mesh connection is connected with handshake and everything or if it is disconnected, the ConnectionManager will call this handler
 		virtual void MeshConnectionChangedHandler(MeshConnection& connection){};
 
-		//This handler receives all connection packets
+		//This can be used to get access to all routed messages and modify their content, block them or re-route them
+		//A routing decision must be returned and all the routing decisions are ORed together so that a block from one module
+		//will definitely block the message
+		virtual RoutingDecision MessageRoutingInterceptor(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) { return 0; };
+
+		//This handler receives all connection packets addressed to this node
 		virtual void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader);
 
 		//This handler is called before the node is enrolled, it can return PRE_ENROLLMENT_ codes
 		virtual PreEnrollmentReturnCode PreEnrollmentHandler(connPacketModule* packet, u16 packetLength);
 
-		//Changing the node state will affect some module's behaviour
-		virtual void NodeStateChangedHandler(discoveryState newState){};
-
-		virtual void ConnectionDisconnectedHandler(BaseConnection* connection){};
-
-		virtual void ConnectionTimeoutHandler(ConnectionTypes connectionType, ble_evt_t* bleEvent){};
-
 		virtual void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
+
+#if defined(NRF52) || defined(SIM_ENABLED)
+		//Queries a single capability of a module. If no capability with the given index is available the type INVALID must be returned.
+		//After the first invalid index, no valid indices must follow. To limit the amount of virtual methods, this method is called once
+		//for every capability per capability in the module, thus leading to a time complexity of O(n²). This means that this method
+		//should not do complex tasks!
+		virtual CapabilityEntry GetCapability(u32 index) {
+			CapabilityEntry retVal;
+			retVal.type = CapabilityEntryType::INVALID;
+			return retVal;
+		};
+#endif
 
 		//MeshAccessConnections should only allow authorized packets to be sent into the mesh
 		//This function is called once a packet was received through a meshAccessConnection to
 		//query if the packet can be sent through. It can also be modified by this handler
-		virtual MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, u32 fmKeyId){ return MeshAccessAuthorization::MA_AUTH_UNDETERMINED; };
+		virtual MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, u32 fmKeyId, DataDirection direction){ return MeshAccessAuthorization::UNDETERMINED; };
 
 		//This method must be implemented by modules that support component updates
 		//The module must answer weather it wants to accept the update (0) or not (negative result)
 		//If the request is handled asynchronously, the module must return dfu start response QUERY_WAITING and must then manually call ContinueDfuStart
-		virtual i32 CheckComponentUpdateRequest(connPacketModule* inPacket, u32 version, u8 imageType, u8 componentId){ return -1; };
+		virtual i32 CheckComponentUpdateRequest(connPacketModule* inPacket, u32 version, ImageType imageType, u8 componentId){ return -1; };
 
 		//This method allows a module to update its component
 		//The module must ensure that subsequent calls to this method do not interfere with the update process
@@ -195,12 +212,8 @@ protected:
 		virtual bool TerminalCommandHandler(char* commandArgs[],u8 commandArgsSize);
 #endif
 
-#ifdef USE_BUTTONS
+#if IS_ACTIVE(BUTTONS)
 		virtual void ButtonHandler(u8 buttonId, u32 holdTime) {};
-#define USE_BUTTONS_OVERRIDE override
-#else
-		void ButtonHandler(u8 buttonId, u32 holdTime) {};
-#define USE_BUTTONS_OVERRIDE 
 #endif
 
 

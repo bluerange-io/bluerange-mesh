@@ -37,10 +37,6 @@
 
 #include <types.h>
 
-extern "C" {
-#include <nrf_soc.h>
-}
-
 class PacketQueue
 {
 private: 
@@ -51,10 +47,10 @@ public:
 	PacketQueue(u32* buffer, u16 bufferLength);
 	u8* Reserve(u16 dataLength);
     bool Put(u8* data, u16 dataLength);
-	sizedData PeekNext() const;
-	sizedData PeekNext(u8 pos) const;
+	SizedData PeekNext() const;
+	SizedData PeekNext(u8 pos) const;
 	void DiscardNext();
-	sizedData PeekLast();
+	SizedData PeekLast();
 	void DiscardLast();
 	void Clean(void);
 

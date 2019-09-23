@@ -30,12 +30,9 @@
 #pragma once
 
 #include <Module.h>
+#include <ScanController.h>
 
-#ifdef ACTIVATE_ENROLLMENT_MODULE
-
-#ifdef ACTIVATE_MA_MODULE
 #include <MeshAccessModule.h>
-#endif
 
 enum class EnrollmentModuleSaveActions : u8{ 
 	SAVE_ENROLLMENT_ACTION, 
@@ -49,10 +46,10 @@ enum class enrollmentMethods : u8{
 };
 
 //These are enroll response codes
-#define ENROLL_RESPONSE_OK 0x00
+static constexpr int ENROLL_RESPONSE_OK = 0x00;
 // There are more enroll response codes that are taken from the Flash Storage response codes
-#define ENROLL_RESPONSE_ALREADY_ENROLLED_WITH_DIFFERENT_DATA 0x10
-#define ENROLL_RESPONSE_PREENROLLMENT_FAILED 0x11
+static constexpr int ENROLL_RESPONSE_ALREADY_ENROLLED_WITH_DIFFERENT_DATA = 0x10;
+static constexpr int ENROLL_RESPONSE_PREENROLLMENT_FAILED = 0x11;
 
 #pragma pack(push, 1)
 //Module configuration that is saved persistently
@@ -65,8 +62,8 @@ struct EnrollmentModuleConfiguration : ModuleConfiguration {
 #pragma pack(push)
 #pragma pack(1)
 
-	#define SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE_MIN (8)
-	#define SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE (73)
+	constexpr int  SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE_MIN = (8);
+	constexpr int  SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE     = (73);
 	typedef struct
 	{
 		u32 serialNumberIndex;
@@ -82,7 +79,7 @@ struct EnrollmentModuleConfiguration : ModuleConfiguration {
 	}EnrollmentModuleSetEnrollmentBySerialMessage;
 	STATIC_ASSERT_SIZE(EnrollmentModuleSetEnrollmentBySerialMessage, 73);
 
-	#define SIZEOF_ENROLLMENT_MODULE_REMOVE_ENROLLMENT (4)
+	constexpr int SIZEOF_ENROLLMENT_MODULE_REMOVE_ENROLLMENT = (4);
 	typedef struct
 	{
 		u32 serialNumberIndex;
@@ -166,16 +163,17 @@ class EnrollmentModule: public Module
 
 
 		//Save a few nearby node serials in this proposal message
-		#define ENROLLMENT_PROPOSAL_MESSAGE_NUM_ENTRIES 3
+		static constexpr int ENROLLMENT_PROPOSAL_MESSAGE_NUM_ENTRIES = 3;
 		u8 proposalIndexCounter;
 		EnrollmentModuleEnrollmentProposalMessage proposal;
 
+		ScanJob * p_scanJob;
 
 
 
 		void Enroll(connPacketModule* packet, u16 packetLength);
 
-		void EnrollOverMesh(connPacketModule* packet, u16 packetLength);
+		void EnrollOverMesh(connPacketModule* packet, u16 packetLength, BaseConnection* connection);
 
 		void SaveEnrollment(connPacketModule* packet, u16 packetLength);
 
@@ -183,9 +181,8 @@ class EnrollmentModule: public Module
 
 		void EnrollmentConnectionConnectedHandler();
 
-#ifdef ACTIVATE_MA_MODULE
 		void EnrollNodeViaMeshAccessConnection(fh_ble_gap_addr_t& addr, const meshAccessServiceAdvMessage* advMessage);
-#endif
+
 		void SendEnrollmentResponse(EnrollmentModuleActionResponseMessages responseType, NodeId receiver, u32 serialNumberIndex, u8 result, u8 requestHandle) const;
 
 		void Unenroll(connPacketModule* packet, u16 packetLength);
@@ -201,7 +198,7 @@ class EnrollmentModule: public Module
 
 		void TimerEventHandler(u16 passedTimeDs) override;
 
-		void BleEventHandler(const ble_evt_t& bleEvent) override;
+		void GapAdvertisementReportEventHandler(const GapAdvertisementReportEvent& advertisementReportEvent) override;
 
 		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) override;
 
@@ -212,13 +209,15 @@ class EnrollmentModule: public Module
 		void PreEnrollmentFailed();
 
 		//Handlers
-		void ButtonHandler(u8 buttonId, u32 holdTimeDs) USE_BUTTONS_OVERRIDE;
+#if IS_ACTIVE(BUTTONS)
+		void ButtonHandler(u8 buttonId, u32 holdTimeDs) override;
+#endif
 
 		#ifdef TERMINAL_ENABLED
 		bool TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize) override;
 		#endif
 
 		void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
-};
 
-#endif
+		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, u32 fmKeyId, DataDirection direction) override;
+};

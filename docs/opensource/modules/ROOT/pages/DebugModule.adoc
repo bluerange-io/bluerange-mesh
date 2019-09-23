@@ -1,0 +1,123 @@
+= Debug Module (moduleId 7)
+
+== Purpose
+The _Debug_ module contains a collection of commands to debug network problems and test other functionality.
+
+== Functionality
+The _Debug_ module does not perform a lot of functionality itself. It triggers actions from other moduels for debug purposes. It provides a flooding mode.
+
+== Terminal Commands
+
+=== Resetting Nodes
+Sometimes it is necessary to reset all nodes connected to a mesh at once. The reset command can be used for this purpose. After receiving the command, each node waits a predefined time before performing a reset. This time can be defined and is set to 10 seconds by default. This ensures that the packet is sent to all nodes before the reset process starts.
+[source, C++]
+----
+//Receiving nodes will reset within a few seconds
+action [nodeId] debug reset {waitSeconds}
+----
+
+=== Request Discover Buffer
+To debug problems with discovery, it is useful to fetch the contents of the xref:Specification.adoc[JOIN_ME] buffer from all nodes in a mesh.
+[source, C++]
+----
+//Receiving nodes will send back their buffer contents
+action [nodeId] debug get_buffer
+----
+
+=== Ping
+To determine the latency, a ping can be sent to nodes. Nodes can only be pinged one at a time. Timing issues may occur if multiple nodes are pinged simultaneously. The optional ping mode can be set to unreliable (write_cmd) or reliable (write_req).
+[source, C++]
+----
+//Sends a ping to a node and logs the time
+action [nodeId] debug ping [count] [mode = r / u]
+
+//Sends one ping message to nodeId 2 using write_cmd (unreliable)
+action 2 debug ping 1 u
+----
+
+=== PingPong
+A ping packet can bounce multiple times between two nodes to get a better average of the latency.
+[source, C++]
+----
+//Bounces a ping back and forth multiple times
+action [nodeId] debug pingpong [count] [mode]
+
+//Bounces a packet back and forth 10 times between the current node and node 45
+action 45 debug pingpong 10 u
+----
+
+=== Leaf Ping
+The leaf ping will sends a ping command through the mesh starting from the current node. All leaf nodes will respond and the ping times will be logged on the terminal.
+[source, C++]
+----
+//Start the leaf ping
+lping [count] [mode = r / u]
+----
+
+=== Flooding
+The DebugModule has a flooding mode where it generates messages every once in a while. This is helpful for generating a certain load on the network. Supported modes are:
+
+- **Off (0):** No flooding and no listening
+- **Unreliable (2):** Floods with WRITE_CMD packets
+- **Listen (3):** Listens for floods from given node and counts them
+-  **SplitData (4):** Sends big messages that are split into multiple packets
+[source, C++]
+----
+//Activates a flooding mode to generate packets
+action [nodeID] debug flood [destinationNodeId] [mode] [packetsPer100Sec]
+
+//Tell node 1 to flood node 2 with 1 packet each second
+action 1 debug flood 2 2 100
+
+//Instruct node 2 to count packets from node 1
+action 2 debug flood 1 3 0
+----
+
+== Saving & Retrieving Records
+It is possible to store, retrieve or delete a record by using the terminal on the local node. This will invoke the xref:RecordStorage.adoc[RecordStorage] class.
+[source, C++]
+----
+//Save record with given ID and data
+saverec [recordId] [hexString | base64String]
+
+//E.g. saves or updates a record with ID 1234 and data AA:BB:CC
+saverec 1234 AA:BB:CC
+
+//Get record with given ID
+getrec [recordId]
+
+//Delete record with given ID
+delrec [recordId]
+----
+
+=== Print Active Advertising Jobs
+Prints the registered advertising jobs of the advertising controller.
+[source, C++]
+----
+advjobs
+----
+
+=== Heap
+Prints statistics about the current heap usage.
+[source, C++]
+----
+heap
+----
+=== Flash Memory Map
+Prints a map of used flash memory blocks (1024 kb). 0 stands for empty and 1 for containing data.
+[source, C++]
+----
+memorymap
+----
+=== Read Memory
+Sometimes it is useful to read back some of the memory contents of a node while being connected.
+[source, C++]
+----
+readblock [number | "uicr" | "ficr" | "ram"] [numBlocks]
+
+//Read the first block of memory of the flash
+readblock 0 1
+----
+
+=== More
+There are more commands that are not documented here. You can find them by looking at the _TerminalCommandHandler_ in the source code. These commands may be removed or changed at any time.

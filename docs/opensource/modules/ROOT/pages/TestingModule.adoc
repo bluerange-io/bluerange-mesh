@@ -1,0 +1,255 @@
+= Testing Module (moduleId 12)
+
+== Purpose
+The Testing Module is designed to automate tests for battery and throughput measurements. The module allows to measure the battery consumption of each individual application and also assists in estimating the throughput of the network.
+
+== Functionality
+The Testing Module has two roles.
+
+* Master: Testing Module by default starts in test role "Master". Master node initializes the tests by sending a start test message to the node that performs tests.
+* Slave: Testing Module changes its role to slave when it receives a message to start the test.
+
+Each test runs for a maximum of 30 seconds. Master node initializes every test by first connecting to the slave node and then sending a message to start test. The slave node acknowledges this start test message, disconnects from the partner and switches its LEDs on for 2 sec to indicate the start of the test.
+
+== Test Applications
+The applications currently being tested are advertisement, scanning, LED, latency and connection tests.
+
+|===
+|Application Name     |Application ID
+
+|ALL                  |0
+|LED Test             |1
+|Advertisement Test   |2
+|Scanning Test        |3
+|Connection Test      |4
+|Latency Test         |5
+|===
+
+A detailed description of these application is given below.
+
+=== LED Test (Application ID 1)
+Slave node switches red LED on for 10 seconds and does nothing, then switches green LED on and does nothing.
+
+=== Advertisement Test (Application ID 2)
+The advertisement test is performed by using different values of the following advertisement parameters.
+
+==== Advertisement Type
+Advertisement types used by the testing module are:
+
+* Connectable Undirected: Advertisement type where any device can send scan response packets and connect requests to the advertiser.
+
+* Non Connectable Undirected: Advertisement type where advertiser will not accept any connect requests or scan requests.
+
+==== Advertisement Interval
+The advertisement interval specifies the time between advertising messages. The advertisement intervals used by the testing module are 20ms, 100ms, 1000ms and 4000ms.
+
+==== Payload Size
+Payload size is the size of the packets to be advertised. Payloads of 10 bytes and 30 bytes are advertised by the testing module.
+
+==== Transmit Power
+THe testing module advertises packets with TX power 0dbm and 4dbm.
+
+=== Scanning Test (Application ID 3)
+The scanning test is performed by using different values of the following scanning parameters.
+
+* Scan for a 3ms window in every 20ms interval.
+* Scan for a 10ms window in every 10ms interval (full duty cycle).
+
+=== Connection Test (Application ID 4)
+The master node fills as many packets in the send queue as possible, each packet that was successfully put in the send queue is counted and _MeshAccessConnection_ is used for sending these packets.
+
+=== Latency Test (Application ID 5)
+Packets between master and slave node keep bouncing back and fourth until their time to live (_ttl_) is 0. The master node keeps track of the time from the start of packet sending until _ttl_ is 0.
+
+== Terminal Commands
+
+=== LED Test
+[source, C++]
+----
+starttest [bleAddress] led
+----
+This command sends a message to the slave node to start a LED test. The slave node will start its LED test after it receives this message.
+
+Example:
+[source, C++]
+----
+//Master node sends a message to node with BLE address E3:8F:26:AD:82:DE
+//to start led test.
+
+starttest E3:8F:26:AD:82:DE led
+----
+
+=== Advertisement Test
+[source, C++]
+----
+starttest [bleAddress] adv [advInterval] [advTxPower] [advType] [advPayloadSize]
+----
+This command sends a message to the slave node to start an advertisement test. The slave node performs the advertisement test for 30 seconds after it receives this message.
+
+[cols="1,2"]
+|===
+|Command Argument    |Value
+
+|bleAddress          | BLE address of the slave node that performs the test
+|advInterval         | Advertising Interval in milliseconds: +
+32...16383 (default: 100)
+|advTxPower          | Transmit Power: +
+0: 0dBm (default) +
+4: 4dBm
+|advType             | Advertisement Type: +
+0: connectable undirected (default) +
+3: non-connectable undirected
+|advPayloadSize      | Payload Size: +
+0...30 (default: 10)
+|===
+
+Example:
+[source, C++]
+----
+//Master node sends a message to node with BLE address E3:8F:26:AD:82:DE to start
+//advertisement test with advertising interval 100ms, Tx Power 0dbm, advertisement
+//type connectable undirected and payload size 10 bytes.
+
+starttest E3:8F:26:AD:82:DE adv 100 0 0 10
+
+----
+
+=== Scanning Test
+[source, C++]
+----
+starttest [bleAddress] scan [scanInterval] [scanWindow]
+----
+This command sends a message to the slave node to start a scanning test. The slave node will scan for 30 secondss after it receives this message.
+
+[cols="1,2"]
+|===
+|Command Argument    |Value
+
+|bleAddress          | BLE address of the slave node that performs the test
+|scanInterval        | Scanning Interval in milliseconds: +
+4...16384 (recommended: 20)
+|scanWindow          | Scan window in milliseconds: +
+4...16384 (recommended: 5)
+|===
+
+Example:
+[source, C++]
+----
+//Master node sends a message to node having ble address E3:8F:26:AD:82:DE to start
+//scanning test with scan interval 20ms and scan window 20ms
+
+starttest E3:8F:26:AD:82:DE scan 20 20
+
+----
+
+=== Latency Test
+[source, C++]
+----
+starttest [bleAddress] lat [ttl]
+----
+This command sends a message to the slave node that a latency test should be performed. The master node starts the test after it receives acknowledgement message from slave.
+
+[cols="1,2"]
+|===
+|Command Argument    |Value
+
+|bleAddress          | BLE address of the slave node that performs the test
+|ttl                 | Time to live (ttl), default: 30
+|===
+
+Example:
+[source, C++]
+----
+//Master node sends a message to node having ble address E3:8F:26:AD:82:DE to start
+//latency test with ttl 20
+
+starttest E3:8F:26:AD:82:DE lat 20
+
+----
+=== Connection Test
+[source, C++]
+----
+starttest [bleAddress] conn [connPacketSize]
+----
+This command sends a message to the slave node that a connection test should be performed. The master node starts the test after it receives acknowledgement message from slave.
+
+[cols="1,2"]
+|===
+|Command Argument    |Value
+
+|bleAddress          | BLE address of the slave node that performs the test
+|connPacketSize      | Size of the packets to be queued. Default: 12
+|===
+
+Example:
+[source, C++]
+----
+//Master node sends a message to node having ble address E3:8F:26:AD:82:DE to start
+//connection test with connPacketSize 25
+starttest E3:8F:26:AD:82:DE conn 25
+----
+
+=== All Tests
+[source, C++]
+----
+starttest [bleAddress] all
+----
+This command runs each test sequentially for 30 seconds. Below is a list of covered tests.
+
+|===
+|Test Application|Parameters
+
+|LED TEST|
+|LATENCY TEST|ttl = 30
+|CONNECTION TEST|packetSize = 12, 36 bytes
+|SCANNING TEST|scanInterval = 20ms +
+scanWindow = 3ms, 20ms
+|ADVERTISEMENT TEST +
+advTxPower = 0dbm +
+advType = Connectable|advInterval = 100ms, 200ms +
+advPayloadSize = 30 bytes
+|ADVERTISEMENT TEST +
+advTxPower = 0dbm +
+advType = Non-Connectable|advInterval = 100, 400, 1000, 4000ms +
+advPayloadSize = 10, 30 bytes
+|ADVERTISEMENT TEST +
+advTxPower = 4dbm +
+advType = Non-Connectable|advInterval = 100ms +
+advPayloadSize = 30 bytes
+|===
+
+Example:
+[source, C++]
+----
+//Master node sends a message to node having ble address E3:8F:26:AD:82:DE to
+//start running tests sequentially each 30 sec
+
+starttest E3:8F:26:AD:82:DE all
+----
+
+== Messages
+=== Start Test
+==== Request
+actionType: `START_AUTOMATED_TEST`
+
+[cols="1,2,3"]
+|===
+|Bytes|Type|Description
+
+|8    |connPacketModule|
+|1    |application     | Application ID
+|2    |advInterval     | Advertising Interval
+|1    |advTxPower      | Advertising TX Power
+|1    |advPayloadSize  | Advertising Payload
+|1    |scanInterval    | Scanning Interval
+|1    |scanWindow      | Scanning Window
+|1    |ttl             | Time to live (ttl)
+|1    |connPacketSize  | Size of packets to be queued
+|===
+
+==== Response
+actionType: `START_AUTOMATED_TEST_RESPONSE`
+|===
+|Bytes |Type |Description
+|8 |connPacketModule |
+|===

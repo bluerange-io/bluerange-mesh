@@ -1,0 +1,28 @@
+= RecordStorage
+
+== Purpose
+_RecordStorage_ is a small file system for flash storage. It is used for storing persistent data, for example the enrollment data of a node or the module settings. Internally, it uses _FlashStorage_ to access the flash and queue its operations. _RecordStorage_ is fully failsafe against power loss and corruption. It will intelligently write all records to a single flash page until it is full and will swap the valid data to another page (defragmentation) once space is needed, thereby minimizing erase operations on the flash.
+
+== Functionality
+The most important features of _RecordStorage_ are:
+
+* creating new records in memory
+* updating existing records
+* deleting existing records
+* protection against power loss
+* defragmentation
+
+A record is identified by its _recordId_, thus every record need to have unique _recordId_. Records store some metadata like: ID, length, CRC, and the record version in addition to the data.
+
+The CRC of the record is checked every time a record is accessed. Records with invalid CRC are ignored and removed during next defragmentation or swap.
+
+The _versionCounter_ is used determine the version of the record. When a record is updated, it is not deleted, but a new record with an incremented _versionCounter_ is created. When reading, only the record with newest _versionCounter_ is returned, which means that a record becomes inactive as soon as a newer version of this record is stored. Inactive records are removed during defragmentation.
+
+NOTE: The _versionCounter_ and _pageVersion_ have a maximum value of 65535. This is the maximum number of times a record can be updated and the maximum number of times that pages can be swapped.
+
+Record storage needs to be assigned a number of pages in flash memory that are not used by the application. The minimium number of pages is 2 (one data and one swap page). The swap page is the page that currently doesn't contain any data. When all other pages are full, the page which can be defragmented the most is defragmented and copied to the swap page. After validation of the records, the old page is erased and becomes the swap page. During defragmentation, all active records will be moved but inactive records will be omitted.
+
+== Usage
+Saving or updating records and deleting them are all non-blocking operations which are cached and executed asynchronously. Users can register a listener when scheduling an operation to get notified once the operation was executed. In the handler, the user receives information about the result of the operation. A _userType_ and user context data can be given to identify the operation.
+
+Reading from _RecordStorage_ is done synchronously as a simple access to flash memory.

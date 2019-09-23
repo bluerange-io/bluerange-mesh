@@ -39,60 +39,29 @@
 #pragma once
 
 #include <types.h>
-#include <GlobalState.h>
 #include <FruityHal.h>
-
-extern "C"{
-#include <ble.h>
-#include <ble_gap.h>
-#include <ble_db_discovery.h>
-}
-
-class GATTControllerHandler
-{
-public:
-		GATTControllerHandler(){};
-	virtual ~GATTControllerHandler(){};
-
-	virtual void  GattDataReceivedHandler(ble_evt_t& bleEvent) = 0;
-	virtual void  GATTDataTransmittedHandler(ble_evt_t& bleEvent) = 0;
-	virtual void  GATTServiceDiscoveredHandler(u16 connHandle, ble_db_discovery_evt_t& evt) = 0;
-
-};
 
 class GATTController
 {
 public:
-	static GATTController& getInstance(){
-		if(!GS->gattController){
-			GS->gattController = new GATTController();
-		}
-		return *(GS->gattController);
-	}
+	GATTController();
+
+	void Init();
+
+	static GATTController& getInstance();
 
 	//FUNCTIONS
 
-	bool bleMeshServiceEventHandler(ble_evt_t &p_ble_evt);
 	void bleDiscoverHandlesOld(u16 connectionHandle, ble_uuid_t* startUuid);
 
 	u32 bleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable) const;
 	u32 bleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength) const;
 
-	void setGATTControllerHandler(GATTControllerHandler* handler);
-
 	u32 DiscoverService(u16 connHandle, const ble_uuid_t &p_uuid);
-
-private:
-	GATTController();
-
-	GATTControllerHandler* gattControllerHandler;
 
 	ble_db_discovery_t discoveredServices;
 
-
-	void meshServiceConnectHandler(ble_evt_t* bleEvent) const;
-	void meshServiceDisconnectHandler(ble_evt_t* bleEvent) const;
-	void attributeMissingHandler(const ble_evt_t& bleEvent) const;
+private:
 
 	static void ServiceDiscoveryDoneDispatcher(ble_db_discovery_evt_t *p_evt);
 

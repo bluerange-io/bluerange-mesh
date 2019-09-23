@@ -1,9 +1,0 @@
-<<README.adoc#,Home>>
-
-= ScanController
-
-== Purpose
-The ScanController makes sure that the scanning is restarted after connections are made. And should in the future allow a better seperation between modules.
-
-== Functionality
-At the moment, the ScanController does not allow to register ScanJobs similar to the advertising controller. This functionality will be implemented in the future. At the moment, there is no good abstraction between modules for scanning but all BleEvents will be reported in the BleEventHandler of the modules if one of the modules have started scanning. If a module stops scanning however, other modules might malfunction.
