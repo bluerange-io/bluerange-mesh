@@ -25,7 +25,7 @@ INC_PATHS += -I$(COMPONENTS)/drivers_nrf/spi_master
 
 CFLAGS += -DSOFTDEVICE_PRESENT -DS130 -DNRF51422
 
-SOFTDEVICE_PATH = $(COMPONENTS)/softdevice/s130/hex/s130_nrf51_2.0.0_softdevice.hex
+SOFTDEVICE_PATH = softdevice/s130_nrf51_2.0.1_softdevice.hex
 
 HEAP_SIZE = 2048
 STACK_SIZE = 2048
