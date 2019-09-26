@@ -42,9 +42,9 @@ extern "C"{
 }
 
 PingModule::PingModule()
-	: Module(moduleId::PING_MODULE_ID, "ping")
+	: Module(ModuleId::PING_MODULE, "ping")
 {
-	moduleVersion = PING_MODULE_CONFIG_VERSION;
+	//moduleVersion = PING_MODULE_CONFIG_VERSION;
 	//Register callbacks n' stuff
 
 	//Save configuration to base class variables
@@ -88,7 +88,7 @@ bool PingModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
 	//React on commands, return true if handled, false otherwise
 	if(TERMARGS(0, "pingmod")){
 		//Get the id of the target node
-		nodeID targetNodeId = atoi(commandArgs[1]);
+		NodeId targetNodeId = atoi(commandArgs[1]);
 		logt("PINGMOD", "Trying to ping node %u", targetNodeId);
 
 		//Some data
@@ -97,7 +97,7 @@ bool PingModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
 
 		//Send ping packet to that node
 		SendModuleActionMessage(
-				MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+				MessageType::MODULE_TRIGGER_ACTION,
 				targetNodeId,
 				PingModuleTriggerActionMessages::TRIGGER_PING,
 				0,
@@ -120,7 +120,7 @@ void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConn
 	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
 	//Filter trigger_action messages
-	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
+	if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
 		connPacketModule* packet = (connPacketModule*)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
@@ -137,7 +137,7 @@ void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConn
 
 				//Send ping packet to that node
 				SendModuleActionMessage(
-						MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+						MessageType::MODULE_ACTION_RESPONSE,
 						packetHeader->sender,
 						PingModuleActionResponseMessages::PING_RESPONSE,
 						0,
@@ -150,7 +150,7 @@ void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConn
 	}
 
 	//Parse Module action_response messages
-	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_ACTION_RESPONSE){
+	if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
 
 		connPacketModule* packet = (connPacketModule*)packetHeader;
 
