@@ -67,6 +67,7 @@ typedef int i32;		//This is not defined int32_t because GCC defines int32_t as l
 #else
 #define IGNOREEXCEPTION(T)
 #define SIMEXCEPTION(T)
+#define SIMEXCEPTIONFORCE(T)
 #endif
 
 #ifdef IAR
@@ -81,6 +82,13 @@ static_assert(sizeof(u32) == 4, "");
 static_assert(sizeof(i8 ) == 1, "");
 static_assert(sizeof(i16) == 2, "");
 static_assert(sizeof(i32) == 4, "");
+
+
+//Data types for the mesh
+typedef u16 NetworkId;
+typedef u16 NodeId;
+typedef u32 ClusterId;
+typedef i16 ClusterSize;
 
 /*## General defines #############################################################*/
 
@@ -102,6 +110,8 @@ static_assert(sizeof(i32) == 4, "");
 //Maximum data that can be transmitted with one write
 //Max value according to: http://developer.nordicsemi.com/nRF51_SDK/doc/7.1.0/s120/html/a00557.html
 #define MAX_DATA_SIZE_PER_WRITE 20
+
+#define BLE_GAP_SCAN_PACKET_BUFFER_SIZE (31)
 
 // An invalid entry or an empty word
 #define EMPTY_WORD 0xFFFFFFFFUL
@@ -131,54 +141,64 @@ enum class BleStackType {
 /*## Available Node ids #############################################################*/
 // Refer to protocol specification @https://github.com/mwaylabs/fruitymesh/wiki/Protocol-Specification
 
-#define NODE_ID_BROADCAST 0 //A broadcast will be received by all nodes within one mesh
+constexpr NodeId NODE_ID_BROADCAST               =     0; //A broadcast will be received by all nodes within one mesh
+constexpr NodeId NODE_ID_DEVICE_BASE             =     1; //Beginning from 1, we can assign nodeIds to individual devices
+constexpr NodeId NODE_ID_DEVICE_BASE_SIZE        =  1999;
 
-#define NODE_ID_DEVICE_BASE 1 //Beginning from 1, we can assign nodeIds to individual devices
-#define NODE_ID_DEVICE_BASE_SIZE 1999
+constexpr NodeId NODE_ID_VIRTUAL_BASE            =  2000; //Used to assign sub-addresses to connections that do not belong to the mesh but want to perform mesh activity. Used as a multiplier.
+constexpr NodeId NODE_ID_GROUP_BASE              = 20000; //Used to assign group ids to nodes. A node can take part in many groups at once
+constexpr NodeId NODE_ID_GROUP_BASE_SIZE         = 10000;
 
-#define NODE_ID_VIRTUAL_BASE 2000 //Used to assign sub-addresses to connections that do not belong to the mesh but want to perform mesh activity. Used as a multiplier.
+constexpr NodeId NODE_ID_LOCAL_LOOPBACK          = 30000; //30000 is like a local loopback address that will only send to the current node,
+constexpr NodeId NODE_ID_HOPS_BASE               = 30000; //30001 sends to the local node and one hop further, 30002 two hops
+constexpr NodeId NODE_ID_HOPS_BASE_SIZE          =  1000;
 
-#define NODE_ID_GROUP_BASE 20000 //Used to assign group ids to nodes. A node can take part in many groups at once
-#define NODE_ID_GROUP_BASE_SIZE 10000
+constexpr NodeId NODE_ID_SHORTEST_SINK           = 31000;
+constexpr NodeId NODE_ID_ANYCAST_THEN_BROADCAST  = 31001; //31001 will send the message to any one of the connected nodes and only that node will then broadcast this message
 
-#define NODE_ID_LOCAL_LOOPBACK 30000 //30000 is like a local loopback address that will only send to the current node,
+constexpr NodeId NODE_ID_APP_BASE                = 32000; //Custom GATT services, connections with Smartphones, should use (APP_BASE + moduleId)
+constexpr NodeId NODE_ID_APP_BASE_SIZE           =  1000;
 
-#define NODE_ID_HOPS_BASE 30000 //30001 sends to the local node and one hop further, 30002 two hops
-#define NODE_ID_HOPS_BASE_SIZE 1000
+constexpr NodeId NODE_ID_GLOBAL_DEVICE_BASE      = 33000; //Can be used to assign nodeIds that are valid organization wide (e.g. for assets)
+constexpr NodeId NODE_ID_GLOBAL_DEVICE_BASE_SIZE =  7000;
 
-#define NODE_ID_SHORTEST_SINK 31000
-
-#define NODE_ID_APP_BASE 32000 //Custom GATT services, connections with Smartphones, should use (APP_BASE + moduleId)
-#define NODE_ID_APP_BASE_SIZE 1000
-
-#define NODE_ID_GLOBAL_DEVICE_BASE 33000 //Can be used to assign nodeIds that are valid organization wide (e.g. for assets)
-#define NODE_ID_GLOBAL_DEVICE_BASE_SIZE 7000
-
-#define NODE_ID_RESERVED 40000 //Yet unassigned nodIds
+constexpr NodeId NODE_ID_CLC_SPECIFIC            = 40000; //see usage in CLC module
+constexpr NodeId NODE_ID_RESERVED                = 40001; //Yet unassigned nodIds
+constexpr NodeId NODE_ID_INVALID                 = 0xFFFF; //Special node id that is used in error cases. It must never be used as an sender or receiver.
 
 // The following static groupIds are predefined and are part of the nodeId range
 #define GROUP_ID_STATIC_BASE 20000
 
 // Chipset group ids. These define what kind of chipset the firmware is running on
-#define GROUP_ID_NRF51 20000
-#define GROUP_ID_NRF52 20001
-#define GROUP_ID_NRF52840 20002
+enum class Chipset : NodeId
+{
+	CHIP_INVALID  = 0,
+	CHIP_NRF51    = 20000,
+	CHIP_NRF52    = 20001,
+	CHIP_NRF52840 = 20015,
+};
 
 // Featureset group ids, these are used to determine if a firmware can be updated over the
 // air with a given firmware. For an update, the firmware group ids must match.
-#define GROUP_ID_NRF51_SINK 20002
-#define GROUP_ID_NRF51_MESH 20003
-#define GROUP_ID_NRF52_MESH 20004
-#define GROUP_ID_NRF51_ASSET 20005
-#define GROUP_ID_NRF52_ASSET 20006
-#define GROUP_ID_NRF52_CLC_MESH 20007
-#define GROUP_ID_NRF51_CLC_SINK 20008
-#define GROUP_ID_NRF52_VS_MESH 20009
-#define GROUP_ID_NRF52_VS_SINK 20010
-#define GROUP_ID_NRF52_SINK 20011
-#define GROUP_ID_NRF51_EINK 20012
-#define GROUP_ID_NRF52840_WM_MESH 20013
-#define GROUP_ID_NRF52_PC_BRIDGE 20014
+enum class FeatureSetGroup : NodeId
+{
+	INVALID                                          = 0,
+	//These comments are used to parse values with FruityDeploy.
+	/*FruityDeploy-FeatureSetGroup*/NRF51_SINK       = 20002,
+	/*FruityDeploy-FeatureSetGroup*/NRF51_MESH       = 20003,
+	/*FruityDeploy-FeatureSetGroup*/NRF52_MESH       = 20004,
+	/*FruityDeploy-FeatureSetGroup*/NRF51_ASSET      = 20005,
+	/*FruityDeploy-FeatureSetGroup*/NRF52_ASSET      = 20006,
+	/*FruityDeploy-FeatureSetGroup*/NRF52_CLC_MESH   = 20007,
+	/*FruityDeploy-FeatureSetGroup*/NRF51_CLC_SINK   = 20008,
+	/*FruityDeploy-FeatureSetGroup*/NRF52_VS_MESH    = 20009,
+	/*FruityDeploy-FeatureSetGroup*/NRF52_VS_SINK    = 20010,
+	/*FruityDeploy-FeatureSetGroup*/NRF52_SINK       = 20011,
+	/*FruityDeploy-FeatureSetGroup*/NRF51_EINK       = 20012,
+	/*FruityDeploy-FeatureSetGroup*/NRF52840_WM_MESH = 20013,
+	/*FruityDeploy-FeatureSetGroup*/NRF52_PC_BRIDGE  = 20014,
+	//                              CHIP_NRF52840    = 20015,
+};
 
 // This range of groupIds can be given dynamically
 #define GROUP_ID_DYNAMIC_BASE 21000
@@ -241,92 +261,37 @@ enum class ModuleId : u8{
 
 	//Other Modules
 	MY_CUSTOM_MODULE=200,
+	PING_MODULE=201,
+	TEMPLATE_MODULE=202,
 
 	//Invalid Module: 0xFF is the flash memory default and is therefore invalid
 	INVALID_MODULE=255
 };
 
-
-/*############ Error Types ################*/
-//Errors are saved in RAM and can be requested through the mesh
-
-enum class ErrorTypes : u8 {
-	SD_CALL_ERROR = 0, //Defined in "nrf_error.h" (NRF_ERROR_*)
-	HCI_ERROR = 1, //Defined in "ble_hci.h" (BLE_HCI_*)
-	CUSTOM = 2, //Defined below (CustomErrorTypes)
-	GATT_STATUS = 3, //Defined in "ble_gatt.h" (BLE_GATT_STATUS_*)
-	REBOOT = 4 //Defined below (RebootReason)
-};
-
-//There are a number of different error types (by convention)
-// FATAL_ are errors that must never occur, mostly implementation faults or critical connectivity issues
-// WARN_ is for errors that might occur from time to time and should be investigated if they happen too often
-// INFO_ is for noting important events that do not occur often
-// COUNT_ is for errors or information that might happen often but should not pass a certain threshold
-enum class CustomErrorTypes : u8{
-	FATAL_BLE_GATTC_EVT_TIMEOUT_FORCED_US = 1,
-	INFO_TRYING_CONNECTION_SUSTAIN = 2,
-	WARN_CONNECTION_SUSTAIN_FAILED_TO_ESTABLISH = 3,
-	COUNT_CONNECTION_SUCCESS = 4,
-	COUNT_HANDSHAKE_DONE = 5,
-	//REBOOT=6, deprectated, use error type REBOOT
-	WARN_HANDSHAKE_TIMEOUT = 7,
-	WARN_CM_FAIL_NO_SPOT = 8,
-	FATAL_QUEUE_NUM_MISMATCH = 9,
-	WARN_GATT_WRITE_ERROR = 10,
-	WARN_TX_WRONG_DATA = 11,
-	WARN_RX_WRONG_DATA = 12,
-	FATAL_CLUSTER_UPDATE_FLOW_MISMATCH = 13,
-	WARN_HIGH_PRIO_QUEUE_FULL = 14,
-	COUNT_NO_PENDING_CONNECTION = 15,
-	FATAL_HANDLE_PACKET_SENT_ERROR = 16,
-	COUNT_DROPPED_PACKETS = 17,
-	COUNT_SENT_PACKETS_RELIABLE = 18,
-	COUNT_SENT_PACKETS_UNRELIABLE = 19,
-	INFO_ERRORS_REQUESTED = 20,
-	INFO_CONNECTION_SUSTAIN_SUCCESS = 21,
-	COUNT_JOIN_ME_RECEIVED = 22,
-	WARN_CONNECT_AS_MASTER_NOT_POSSIBLE = 23,
-	FATAL_PENDING_NOT_CLEARED = 24,
-	FATAL_PROTECTED_PAGE_ERASE = 25,
-	INFO_IGNORING_CONNECTION_SUSTAIN = 26,
-	INFO_IGNORING_CONNECTION_SUSTAIN_LEAF = 27,
-	COUNT_GATT_CONNECT_FAILED = 28,
-	FATAL_PACKET_PROCESSING_FAILED = 29,
-	FATAL_PACKET_TOO_BIG = 30,
-	COUNT_HANDSHAKE_ACK1_DUPLICATE = 31,
-	COUNT_HANDSHAKE_ACK2_DUPLICATE = 32,
-	COUNT_ENROLLMENT_NOT_SAVED = 33,
-	COUNT_FLASH_OPERATION_ERROR = 34,
-	FATAL_WRONG_FLASH_STORAGE_COMMAND = 35,
-	FATAL_ABORTED_FLASH_TRANSACTION = 36,
-	FATAL_PACKETQUEUE_PACKET_TOO_BIG = 37,
-	FATAL_NO_RECORDSTORAGE_SPACE_LEFT = 38,
-	FATAL_RECORD_CRC_WRONG = 39,
-	COUNT_3RD_PARTY_TIMEOUT = 40,
-	FATAL_CONNECTION_ALLOCATOR_OUT_OF_MEMORY = 41,
-	FATAL_CONNECTION_REMOVED_WHILE_TIME_SYNC = 42,
-	FATAL_COULD_NOT_RETRIEVE_CAPABILITIES = 43,
-};
-
 // The reason why the device was rebooted
 enum class RebootReason : u8 {
-	UNKNOWN = 0,
-	HARDFAULT = 1,
-	APP_FAULT = 2,
-	SD_FAULT = 3,
-	PIN_RESET = 4,
-	WATCHDOG = 5,
-	FROM_OFF_STATE = 6,
-	LOCAL_RESET = 7,
-	REMOTE_RESET = 8,
-	ENROLLMENT = 9,
-	PREFERRED_CONNECTIONS = 10,
-	DFU = 11,
-	MODULE_ALLOCATOR_OUT_OF_MEMORY = 12,
+	UNKNOWN                          = 0,
+	HARDFAULT                        = 1,
+	APP_FAULT                        = 2,
+	SD_FAULT                         = 3,
+	PIN_RESET                        = 4,
+	WATCHDOG                         = 5,
+	FROM_OFF_STATE                   = 6,
+	LOCAL_RESET                      = 7,
+	REMOTE_RESET                     = 8,
+	ENROLLMENT                       = 9,
+	PREFERRED_CONNECTIONS            = 10,
+	DFU                              = 11,
+	MODULE_ALLOCATOR_OUT_OF_MEMORY   = 12,
+	MEMORY_MANAGEMENT                = 13,
+	BUS_FAULT                        = 14,
+	USAGE_FAULT                      = 15,
+	ENROLLMENT_REMOVE                = 16,
+	FACTORY_RESET_FAILED             = 17,
+	FACTORY_RESET_SUCCEEDED_FAILSAFE = 18,
 
-	USER_DEFINED_START = 200,
-	USER_DEFINED_END   = 255
+	USER_DEFINED_START               = 200,
+	USER_DEFINED_END                 = 255,
 };
 
 /*############ Live Report types ################*/
@@ -374,11 +339,20 @@ struct SizedData {
     u16		length; //Length of Data
 };
 
-//Data types for the mesh
-typedef u16 NetworkId;
-typedef u16 NodeId;
-typedef u32 ClusterId;
-typedef i16 ClusterSize;
+template<typename T>
+struct TwoDimStruct
+{
+	T x;
+	T y;
+};
+
+template<typename T>
+struct ThreeDimStruct
+{
+	T x;
+	T y;
+	T z;
+};
 
 // To determine from which location the node config was loaded
 enum class DeviceConfigOrigins : u8 {
@@ -494,6 +468,8 @@ struct BoardConfiguration : ModuleConfiguration {
 	int8_t calibratedTX;
 
 	uint8_t lfClockSource;
+	uint8_t lfClockAccuracy;
+
 	int8_t batteryAdcInputPin;
 	int8_t batteryMeasurementEnablePin;
 
@@ -502,6 +478,8 @@ struct BoardConfiguration : ModuleConfiguration {
 	int8_t spiM0MosiPin; // Spi Master Out, Slave In Pin
 	int8_t spiM0MisoPin; // Spi Master In, Slave Out Pin
 	int8_t spiM0SSAccPin; // Slave Select Pin for Spi Device 1
+	int8_t twiM1SDAAccPin; // Acc SDA pin, if interfaced on i2c
+	int8_t twiM1SCLAccPin; // Acc SCL pin, if interfaced on i2c
 	int8_t spiM0SSBmePin; // Slave Select Pin for Spi Device 2
 	int8_t sensorPowerEnablePin; //Enable Sensors on I2C bus
 	int8_t lis2dh12Interrupt1Pin; //Wake up interrupt pin for acceleromter
@@ -528,9 +506,9 @@ struct FakeNodePositionRecord {
 
 //Defines the different scanning intervals for each state
 enum class ScanState : u8{
-	LOW 		= 0,
-	HIGH 	= 1,
-	CUSTOM 	= 2
+	LOW     = 0,
+	HIGH    = 1,
+	CUSTOM  = 2,
 };
 
 // Radio notification irq priority
@@ -578,6 +556,47 @@ enum class LedMode : u8{
 	CUSTOM      = 6, // Led controlled by a specific module
 };
 
+//DFU ERROR CODES
+enum class DfuStartDfuResponseCode : u8
+{
+	OK = 0,
+	SAME_VERSION = 1,
+	RUNNING_NEWER_VERSION = 2,
+	ALREADY_IN_PROGRESS = 3,
+	NO_BOOTLOADER = 4,
+	FLASH_BUSY = 5,
+	NOT_ENOUGH_SPACE = 6,
+	CHUNKS_TOO_BIG = 7,
+	MODULE_NOT_AVAILABLE = 8,
+	MODULE_NOT_UPDATABLE = 9,
+	COMPONENT_NOT_UPDATEABLE = 10,
+	MODULE_QUERY_WAITING = 11, //Special code that is used internally if a module queries another controller and continues the process later
+	TOO_MANY_CHUNKS = 12,
+};
+
+enum class ErrorType : u32
+{
+	SUCCESS                     = 0,  ///< Successful command
+	SVC_HANDLER_MISSING         = 1,  ///< SVC handler is missing
+	BLE_STACK_NOT_ENABLED       = 2,  ///< Ble stack has not been enabled
+	INTERNAL                    = 3,  ///< Internal Error
+	NO_MEM                      = 4,  ///< No Memory for operation
+	NOT_FOUND                   = 5,  ///< Not found
+	NOT_SUPPORTED               = 6,  ///< Not supported
+	INVALID_PARAM               = 7,  ///< Invalid Parameter
+	INVALID_STATE               = 8,  ///< Invalid state, operation disallowed in this state
+	INVALID_LENGTH              = 9,  ///< Invalid Length
+	INVALID_FLAGS               = 10, ///< Invalid Flags
+	INVALID_DATA                = 11, ///< Invalid Data
+	DATA_SIZE                   = 12, ///< Data size exceeds limit
+	TIMEOUT                     = 13, ///< Operation timed out
+	NULL_ERROR                  = 14, ///< Null Pointer
+	FORBIDDEN                   = 15, ///< Forbidden Operation
+	INVALID_ADDR                = 16, ///< Bad Memory Address
+	BUSY                        = 17, ///< Busy
+	CONN_COUNT                  = 18, ///< Connection Count exceeded
+};
+
 /*## Bootloader stuff #############################################################*/
 // These defines are shared with the bootloader and must not change as this will make
 // the flashed bootloaders incompatible with fruitymesh
@@ -593,7 +612,7 @@ enum class LedMode : u8{
 #if defined(NRF51)
 #define BOOTLOADER_UICR_ADDRESS           (NRF_UICR->BOOTLOADERADDR)
 #define FLASH_REGION_START_ADDRESS			0x00000000
-#elif defined(NRF52)
+#elif defined(NRF52) || defined(NRF52840)
 #define BOOTLOADER_UICR_ADDRESS           (NRF_UICR->NRFFW[0])
 #define FLASH_REGION_START_ADDRESS			0x00000000UL
 #elif defined(SIM_ENABLED)
@@ -603,6 +622,8 @@ enum class LedMode : u8{
 // Bootloader settings page where the app needs to store the update information
 #if defined(NRF51) || defined(SIM_ENABLED)
 #define REGION_BOOTLOADER_SETTINGS_START (FLASH_REGION_START_ADDRESS + 0x0003FC00) //Last page of flash
+#elif defined(NRF52840)
+#define REGION_BOOTLOADER_SETTINGS_START (FLASH_REGION_START_ADDRESS + 0x000FF000) //Last page of flash
 #elif defined(NRF52)
 #define REGION_BOOTLOADER_SETTINGS_START (FLASH_REGION_START_ADDRESS + 0x0007F000) //Last page of flash
 #endif
@@ -656,10 +677,6 @@ STATIC_ASSERT_SIZE(BootloaderSettings, (16 + BOOTLOADER_BITMASK_SIZE + BOOTLOADE
 //space, but we need to align each module configuration on a 4-byte boundary
 //to be able to save it.
 
-#ifdef __ICCARM__
-#define DECLARE_CONFIG_AND_PACKED_STRUCT(structname) struct structname##Aligned : structname {} __attribute__((packed, aligned(4))); structname##Aligned configuration
-#define DYNAMIC_ARRAY(arrayName, size) u8* arrayName = (std::vector<u8>(size)).data()
-#endif
 #ifdef __GNUC__
 #define PACK_AND_ALIGN_4 __attribute__((aligned(4)))
 
@@ -674,13 +691,6 @@ STATIC_ASSERT_SIZE(BootloaderSettings, (16 + BOOTLOADER_BITMASK_SIZE + BOOTLOADE
 #define DECLARE_CONFIG_AND_PACKED_STRUCT(structname) structname configuration
 #define DYNAMIC_ARRAY(arrayName, size) u8* arrayName = (u8*)alloca(size)
 #endif
-
-
-/*## Errors #############################################################*/
-
-#define FRUITYMESH_ERROR_BASE 0xF000
-#define FRUITYMESH_ERROR_NO_FREE_CONNECTION_SLOTS (FRUITYMESH_ERROR_BASE + 1)
-#define FRUITYMESH_ERROR_PURE_VIRTUAL_FUNCTION_CALL (FRUITYMESH_ERROR_BASE + 2)
 
 //This struct represents the registers as dumped on the stack
 //by ARM Cortex Hardware once a hardfault occurs
@@ -715,7 +725,7 @@ struct stacked_regs_t
 #define SEC_TO_DS(sec) (((u32)(sec))*10)
 #define DS_TO_SEC(ds)  (((u32)(ds))/10)
 //Checks if packet contains the variable
-#define CHECK_MSG_SIZE(packetHeader, variable, size, dataLength) ((((u8*)variable) + (size)) - ((u8*)packetHeader) <= (dataLength))
+#define CHECK_MSG_SIZE(packetHeader, variable, size, dataLength) ((((const u8*)variable) + (size)) - ((const u8*)packetHeader) <= (dataLength))
 //Macros for concatenating
 #define CONCAT(x,y) x##y
 #define XCONCAT(x,y) CONCAT(x,y)
@@ -728,37 +738,14 @@ struct stacked_regs_t
 #ifndef SIM_ENABLED
 #define SIMSTATCOUNT(cmd) do{}while(0)
 #define SIMSTATAVG(key, value) do{}while(0)
-#define SIMERROR() do{}while(0)
 #endif
 
-//Check if a module is active
+//Check if a feature is active
 #define IS_ACTIVE(featureName) (ACTIVATE_##featureName == 1)
 #define IS_INACTIVE(featureName) (ACTIVATE_##featureName == 0)
 
 //Replacement for old TO_HEX macro. Converts pointer to HEX string array.
 #define PRINT_DEBUG(data, dataSize) DYNAMIC_ARRAY(data##Hex, (dataSize)*3+1); Logger::convertBufferToHexString(data, (dataSize), (char*)data##Hex, (dataSize)*3+1)
-
-#ifdef SIM_ENABLED
-#include <type_traits>
-//Regarding the following macro:
-//&((dst)[0])                                        makes sure that we have a pointer, even if an array was passed.
-//decltype(&((dst)[0]))                              gets the pointer type, for example T*
-//std::remove_pointer<decltype(&((dst)[0]))>::type   removes the pointer from the type, so that we only have the type T.
-//The following is not sufficient:
-//  decltype((dst)[0])
-//Because it would not work with an array of pointers, because decltype((dst)[0]) is a reference in that case, not a ptr!
-#define CheckedMemset(dst, val, size) \
-{\
-	static_assert( std::is_pod  <std::remove_pointer<decltype(&((dst)[0]))>::type>::value \
-				|| std::is_union<std::remove_pointer<decltype(&((dst)[0]))>::type>::value, "Tried to call memset on non pod type!"); /*CODE_ANALYZER_IGNORE Just a string.*/ \
-	memset((dst), (val), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemset*/ \
-}
-#else
-#define CheckedMemset(dst, src, size) \
-{\
-	memset((dst), (src), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemset*/ \
-}
-#endif
 
 /*############ Include packet definitions ################*/
 #include <adv_packets.h>

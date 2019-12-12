@@ -143,6 +143,7 @@ direct neighbours)
 |31000| Have a packet travel to the shortest sink
 possible (not yet implemented)
 |33000...39999| Assign nodeIds uniquely over multiple meshes for the same organization
+|65535| Invalid node ID, which is used for internal errors
 |others| All other node IDs are currently reserved
 |===
 

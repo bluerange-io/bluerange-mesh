@@ -50,9 +50,9 @@ ConnectionAllocator::AnyConnection * ConnectionAllocator::allocateMemory()
 {
 	if (dataHead == NO_NEXT_CONNECTION)
 	{
-		SIMEXCEPTION(OutOfMemoryException);														   //LCOV_EXCL_LINE assertion
+		SIMEXCEPTION(OutOfMemoryException);                                                       //LCOV_EXCL_LINE assertion
 		GS->logger.logCustomError(CustomErrorTypes::FATAL_CONNECTION_ALLOCATOR_OUT_OF_MEMORY, 0); //LCOV_EXCL_LINE assertion
-		return nullptr;																			   //LCOV_EXCL_LINE assertion
+		return nullptr;                                                                           //LCOV_EXCL_LINE assertion
 	}
 	AnyConnection* oldHead = dataHead; 
 	static_assert(sizeof(void*) == 4, "Only 32 bit supported!");
@@ -65,26 +65,26 @@ ConnectionAllocator::AnyConnection * ConnectionAllocator::allocateMemory()
 	return oldHead;
 }
 
-MeshConnection * ConnectionAllocator::allocateMeshConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress, u16 partnerWriteCharacteristicHandle)
+MeshConnection * ConnectionAllocator::allocateMeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, u16 partnerWriteCharacteristicHandle)
 {
 	MeshConnection* retVal = reinterpret_cast<MeshConnection*>(allocateMemory());
 	new (retVal) MeshConnection(id, direction, partnerAddress, partnerWriteCharacteristicHandle);
 	return retVal;
 }
-ResolverConnection * ConnectionAllocator::allocateResolverConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t * partnerAddress)
+ResolverConnection * ConnectionAllocator::allocateResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr * partnerAddress)
 {
 	ResolverConnection* retVal = reinterpret_cast<ResolverConnection*>(allocateMemory());
 	new (retVal) ResolverConnection(id, direction, partnerAddress);
 	return retVal;
 }
-MeshAccessConnection * ConnectionAllocator::allocateMeshAccessConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t * partnerAddress, u32 fmKeyId, MeshAccessTunnelType tunnelType)
+MeshAccessConnection * ConnectionAllocator::allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr * partnerAddress, u32 fmKeyId, MeshAccessTunnelType tunnelType)
 {
 	MeshAccessConnection* retVal = reinterpret_cast<MeshAccessConnection*>(allocateMemory());
 	new (retVal) MeshAccessConnection(id, direction, partnerAddress, fmKeyId, tunnelType);
 	return retVal;
 }
 #if IS_ACTIVE(CLC_CONN)
-ClcAppConnection * ConnectionAllocator::allocateClcAppConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t * partnerAddress)
+ClcAppConnection * ConnectionAllocator::allocateClcAppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr * partnerAddress)
 {
 	ClcAppConnection* retVal = reinterpret_cast<ClcAppConnection*>(allocateMemory());
 	new (retVal) ClcAppConnection(id, direction, partnerAddress);
@@ -107,6 +107,7 @@ void ConnectionAllocator::deallocate(BaseConnection * bc)
 	}
 
 	bc->~BaseConnection();
+	// cppcheck-suppress memsetClass
 	CheckedMemset((u8*)bc, 0, sizeof(AnyConnection));
 	
 	AnyConnection* ac = reinterpret_cast<AnyConnection*>(bc);

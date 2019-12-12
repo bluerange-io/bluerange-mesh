@@ -40,7 +40,7 @@ class ResolverConnection
 {
 private:
 public:
-	ResolverConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress);
+	ResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress);
 
 	void ConnectionSuccessfulHandler(u16 connectionHandle) override;
 

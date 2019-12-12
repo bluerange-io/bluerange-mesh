@@ -66,7 +66,7 @@ DebugModule::DebugModule()
 	packetsOut = 0;
 	packetsIn = 0;
 
-	pingSentTicks = 0;
+	pingSentTimeMs = 0;
 	pingHandle = 0;
 	pingCount = 0;
 	pingCountResponses = 0;
@@ -114,9 +114,6 @@ void DebugModule::SendStatistics(NodeId receiver) const
 }
 
 void DebugModule::TimerEventHandler(u16 passedTimeDs){
-
-	if(!configuration.moduleActive) return;
-
 #if IS_ACTIVE(TIME_SYNC_TEST_CODE) && !defined(SIM_ENABLED)
 
 	/*When time is synced, this will switch on green led after every 10 sec for 2 sec from the start of the minute*/
@@ -147,44 +144,98 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
 
 
 #if IS_INACTIVE(GW_SAVE_SPACE)
-	if(floodMode != FloodMode::OFF){
-		u8 numPacketsToSend = 0;
-		u32 timerEventsPer100Sec = 1000 * ticksPerSecond / MAIN_TIMER_TICK / 10;
+	//Counter message generation
+	if(currentCounter <= counterMaxCount){
+		if (counterMessagesPer10Sec != 0)
+		{
+			//Distribute the packets evenly over 10 seconds
+			counterMessagesSurplus += passedTimeDs * surplusAccuracy;
+			u32 numPacketsToSend    = (counterMessagesSurplus * counterMessagesPer10Sec) / SEC_TO_DS(10) / surplusAccuracy;
+			counterMessagesSurplus -= numPacketsToSend * SEC_TO_DS(10) * surplusAccuracy / counterMessagesPer10Sec;
 
-		//Distribute the packets evenly over 100 seconds
-		if (floodMessagesPer100Sec == 0) {
+			if (numPacketsToSend > 0) {
+				logt("DEBUGMOD", "Queuing %u counter packets at time %u", numPacketsToSend, GS->appTimerDs);
+			}
 
-		} else if (floodMessagesPer100Sec <= 1000) {
-			if (0 == (GS->appTimerDs % 1000) % (1000 / floodMessagesPer100Sec)) {
-				numPacketsToSend = 1;
+			for (u32 i = 0; i < numPacketsToSend; i++)
+			{
+				DebugModuleCounterMessage data;
+				data.counter = currentCounter;
+
+				//FIXME, should not increase if packet was not queued
+				currentCounter++;
+
+				SendModuleActionMessage(
+					MessageType::MODULE_TRIGGER_ACTION,
+					counterDestinationId,
+					(u8)DebugModuleTriggerActionMessages::COUNTER,
+					0,
+					(u8*)&data,
+					SIZEOF_DEBUG_MODULE_COUNTER_MESSAGE,
+					false);
 			}
 		}
-		else {
-			numPacketsToSend = floodMessagesPer100Sec / timerEventsPer100Sec;
-		}
+	}
 
-		if (numPacketsToSend > 0) {
-			logt("DEBUGMOD", "Queuing %u packets at time %u", numPacketsToSend, GS->appTimerDs);
-		}
-
-		for (int i = 0; i < numPacketsToSend; i++)
+	if(floodMode != FloodMode::OFF){
+		if (floodFrameSkip)
 		{
-			packetsOut++;
-
-			DebugModuleFloodMessage data;
-			data.packetsIn = packetsIn;
-			data.packetsOut = packetsOut;
-			CheckedMemset(data.chunkData, 0, 21);
-
-			SendModuleActionMessage(
-				MessageType::MODULE_TRIGGER_ACTION,
-				floodDestinationId,
-				(u8)DebugModuleTriggerActionMessages::FLOOD_MESSAGE,
-				0,
-				(u8*)&data,
-				floodMode == FloodMode::UNRELIABLE_SPLIT ? 25 : SIZEOF_DEBUG_MODULE_FLOOD_MESSAGE, //Send a big message that must be split
-				floodMode == FloodMode::RELIABLE ? true : false);
+			floodFrameSkip = false;
+			//Calculating the timeout here instead of the MeshMessageReceived handler
+			//to avoid lost packages when manually entering the command into the terminal
+			floodEndTimeDs = GS->appTimerDs + SEC_TO_DS(floodTimeoutSec);
 		}
+		else
+		{
+			if (GS->appTimerDs % 10 == 0) {
+				MeshConnections conns = GS->cm.GetMeshConnections(ConnectionDirection::INVALID);
+
+				logt("DEBUGMOD", "Sent %u: %u, %u, %u, %u",
+					GS->appTimerDs,
+					conns.count >= 1 ? conns.connections[0]->sentUnreliable : 0,
+					conns.count >= 2 ? conns.connections[1]->sentUnreliable : 0,
+					conns.count >= 3 ? conns.connections[2]->sentUnreliable : 0,
+					conns.count >= 4 ? conns.connections[3]->sentUnreliable : 0
+				);
+			}
+
+			if (floodMessagesPer10Sec != 0)
+			{
+				//Distribute the packets evenly over 10 seconds
+				floodMessagesSurplus +=  passedTimeDs * surplusAccuracy;
+				u32 numPacketsToSend  = (floodMessagesSurplus * floodMessagesPer10Sec) / SEC_TO_DS(10) / surplusAccuracy;
+				floodMessagesSurplus -=  numPacketsToSend * SEC_TO_DS(10) * surplusAccuracy / floodMessagesPer10Sec;
+
+				if (numPacketsToSend > 0) {
+					logt("DEBUGMOD", "Queuing %u flood packets at time %u", numPacketsToSend, GS->appTimerDs);
+				}
+
+				for (u32 i = 0; i < numPacketsToSend; i++)
+				{
+					packetsOut++;
+
+					DebugModuleFloodMessage data;
+					data.packetsIn = packetsIn;
+					data.packetsOut = packetsOut;
+					CheckedMemset(data.chunkData, 0, 21);
+
+					SendModuleActionMessage(
+						MessageType::MODULE_TRIGGER_ACTION,
+						floodDestinationId,
+						(u8)DebugModuleTriggerActionMessages::FLOOD_MESSAGE,
+						0,
+						(u8*)&data,
+						floodMode == FloodMode::UNRELIABLE_SPLIT ? 25 : 12, //Send a big message that must be split
+						floodMode == FloodMode::RELIABLE ? true : false);
+
+				}
+			}
+		}
+	}
+
+	if (GS->appTimerDs >= floodEndTimeDs && floodMode != FloodMode::OFF) {
+		logt("DEBUGMOD", "flood mode timeout");
+		floodMode = FloodMode::OFF;
 	}
 #endif
 }
@@ -203,10 +254,10 @@ void DebugModule::ButtonHandler(u8 buttonId, u32 holdTimeDs)
 //		//FruityHal::BleGapAdvStop();
 //		FruityHal::BleGapScanStop();
 //
-////		fh_ble_gap_adv_params_t advparams;
-////		CheckedMemset(&advparams, 0x00, sizeof(fh_ble_gap_adv_params_t));
+////		BleGapAdvParams advparams;
+////		CheckedMemset(&advparams, 0x00, sizeof(BleGapAdvParams));
 ////		advparams.interval = MSEC_TO_UNITS(100, UNIT_0_625_MS);
-////		advparams.type = GapAdvType::ADV_IND;
+////		advparams.type = BleGapAdvType::ADV_IND;
 ////		FruityHal::BleGapAdvStart(&advparams);
 //
 //
@@ -256,12 +307,12 @@ void DebugModule::ButtonHandler(u8 buttonId, u32 holdTimeDs)
 #endif
 
 #ifdef TERMINAL_ENABLED
-bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
+TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize)
 {
 	//React on commands, return true if handled, false otherwise
 	if(commandArgsSize >= 3 && (TERMARGS(2 ,moduleName) || TERMARGS(2 ,"eink")))
 	{
-		NodeId destinationNode = (TERMARGS(1 ,"this")) ? GS->node.configuration.nodeId : atoi(commandArgs[1]);
+		NodeId destinationNode = Utility::TerminalArgumentToNodeId(commandArgs[1]);
 
 
 		if(commandArgsSize >= 4 && TERMARGS(0 ,"action"))
@@ -278,7 +329,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 					false
 				);
 
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
 #endif
 #if IS_INACTIVE(SAVE_SPACE)
@@ -295,7 +346,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 					false
 				);
 
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
 			else if (TERMARGS(3, "send_max_message"))
 			{
@@ -308,7 +359,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 					0,
 					false
 				);
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
 			//Query for statistics
 			else if(TERMARGS(3, "get_stats"))
@@ -323,7 +374,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 					false
 				);
 
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
 			//Tell any node to generate a hardfault
 			else if(TERMARGS(3, "hardfault"))
@@ -339,16 +390,40 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 					false
 				);
 
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
+			}
+			//Queries a nodes to read back parts of its memory and send it back over the mesh
+			//This is helpful if a remote node has some issues and cannot be accessed
+			else if (TERMARGS(3, "readmem"))
+			{
+				DebugModuleReadMemoryMessage data;
+				CheckedMemset(&data, 0x00, sizeof(data));
+
+				data.address = Utility::StringToU32(commandArgs[4]);
+				data.length = Utility::StringToU16(commandArgs[5]);
+				
+				SendModuleActionMessage(
+					MessageType::MODULE_TRIGGER_ACTION,
+					destinationNode,
+					(u8)DebugModuleTriggerActionMessages::READ_MEMORY,
+					0,
+					(u8*)&data,
+					SIZEOF_DEBUG_MODULE_READ_MEMORY_MESSAGE,
+					false
+				);
+
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
 			//Flood the network with messages and count them
 			else if (TERMARGS(3, "flood") && commandArgsSize > 6)
 			{
 				DebugModuleSetFloodModeMessage data;
 
-				data.floodDestinationId = atoi(commandArgs[4]);
-				data.floodMode = atoi(commandArgs[5]);
-				data.packetsPer100Sec = atoi(commandArgs[6]);
+				data.floodDestinationId                 = Utility::TerminalArgumentToNodeId(commandArgs[4]);
+				data.floodMode                          = Utility::StringToU8 (commandArgs[5]);
+				data.packetsPer10Sec                    = Utility::StringToU16(commandArgs[6]);
+				if(commandArgsSize > 7) data.timeoutSec = Utility::StringToU16(commandArgs[7]);
+				else data.timeoutSec = 10;
 
 				SendModuleActionMessage(
 					MessageType::MODULE_TRIGGER_ACTION,
@@ -360,7 +435,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 					false
 				);
 
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
 			else if (TERMARGS(3, "ping") && commandArgsSize >= 6)
 			{
@@ -368,8 +443,8 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 				//Send 10 pings to node 45, unreliable with handle 7
 
 				//Save Ping sent time
-				pingSentTicks = FruityHal::GetRtc();
-				pingCount = atoi(commandArgs[4]);
+				pingSentTimeMs = FruityHal::GetRtcMs();
+				pingCount = Utility::StringToU16(commandArgs[4]);
 				pingCountResponses = 0;
 				u8 pingModeReliable = TERMARGS(5, "r");
 
@@ -384,7 +459,27 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 						pingModeReliable
 					);
 				}
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
+			}
+			else if (TERMARGS(3, "counter") && commandArgsSize >= 6)
+			{
+				DebugModuleStartCounterMessage data;
+
+				data.counterDestinationId = Utility::TerminalArgumentToNodeId(commandArgs[4]);
+				data.packetsPer10Sec = Utility::StringToU16(commandArgs[5]);
+				data.maxCount = Utility::StringToU32(commandArgs[6]);
+
+				SendModuleActionMessage(
+					MessageType::MODULE_TRIGGER_ACTION,
+					destinationNode,
+					(u8)DebugModuleTriggerActionMessages::START_COUNTER,
+					0,
+					(u8*)&data,
+					SIZEOF_DEBUG_MODULE_START_COUNTER_MESSAGE,
+					false
+				);
+
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
 			else if (TERMARGS(3, "pingpong") && commandArgsSize >= 6)
 			{
@@ -392,8 +487,8 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 				//Send 10 pings to node 45, which will pong it back, then it pings again
 
 				//Save Ping sent time
-				pingSentTicks = FruityHal::GetRtc();
-				pingCount = atoi(commandArgs[4]);
+				pingSentTimeMs = FruityHal::GetRtcMs();
+				pingCount = Utility::StringToU16(commandArgs[4]);
 				u8 pingModeReliable = TERMARGS(5 , "r");
 
 				DebugModulePingpongMessage data;
@@ -409,7 +504,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 					pingModeReliable
 				);
 
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
 #endif
 		}
@@ -440,14 +535,14 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 
 		GS->cm.SendMeshMessage((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, DeliveryPriority::LOW);
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	//Flood the network with messages and count them
 	else if (TERMARGS(0, "floodstat"))
 	{
 		logt("DEBUGMOD", "Flooding has %u packetsIn and %u packetsOut", packetsIn, packetsOut);
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	//Display the free heap
 	else if (TERMARGS(0, "heap"))
@@ -456,13 +551,13 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 		logjson("NODE", "{\"stack\":%u}" SEP, (u32)(&checkvar - 0x20000000));
 		logjson("NODE", "Module usage: %u" SEP, GS->moduleAllocator.getMemorySize());
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 
 	}
 	//Reads a page of the memory (0-256) and prints it
 	if(TERMARGS(0, "readblock"))
 	{
-		if(commandArgsSize <= 1) return false;
+		if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
 		u16 blockSize = 1024;
 
@@ -473,7 +568,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 
 		u16 numBlocks = 1;
 		if(commandArgsSize > 2){
-			numBlocks = atoi(commandArgs[2]);
+			numBlocks = Utility::StringToU16(commandArgs[2]);
 		}
 
 		u32 bufferSize = 32;
@@ -481,17 +576,17 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 		DYNAMIC_ARRAY(charBuffer, bufferSize * 3 + 1);
 
 		for(int j=0; j<numBlocks; j++){
-			u16 block = atoi(commandArgs[1]) + j;
+			u16 block = Utility::StringToU16(commandArgs[1]) + j;
 
 			for(u32 i=0; i<blockSize/bufferSize; i++)
 			{
-				memcpy(buffer, (u8*)(block*blockSize+i*bufferSize + offset), bufferSize);
+				CheckedMemcpy(buffer, (u8*)(block*blockSize+i*bufferSize + offset), bufferSize);
 				Logger::convertBufferToHexString(buffer, bufferSize, (char*)charBuffer, bufferSize*3+1);
 				trace("0x%08X: %s" EOL,(block*blockSize)+i*bufferSize + offset, charBuffer);
 			}
 		}
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	//Prints a map of empty (0) and used (1) memory pages
 	if(TERMARGS(0 ,"memorymap"))
@@ -511,47 +606,47 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 
 		trace(EOL);
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	if (TERMARGS(0,"log_error"))
 	{
-		if(commandArgsSize <= 2) return false;
+		if(commandArgsSize <= 2) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
-		u32 errorCode = atoi(commandArgs[1]);
-		u16 extra = atoi(commandArgs[2]);
+		u32 errorCode = Utility::StringToU32(commandArgs[1]);
+		u16 extra = Utility::StringToU16(commandArgs[2]);
 
-		GS->logger.logError(ErrorTypes::CUSTOM, errorCode, extra);
+		GS->logger.logError(LoggingError::CUSTOM, errorCode, extra);
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	else if (TERMARGS(0,"saverec"))
 	{
-		if(commandArgsSize <= 2) return false;
+		if(commandArgsSize <= 2) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
-		u32 recordId = atoi(commandArgs[1]);
+		u32 recordId = Utility::StringToU32(commandArgs[1]);
 
 		u8 buffer[50];
 		u16 len = Logger::parseEncodedStringToBuffer(commandArgs[2], buffer, 50);
 
 		GS->recordStorage.SaveRecord(recordId, buffer, len, nullptr, 0);
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	else if (TERMARGS(0,"delrec"))
 	{
-		if(commandArgsSize <= 1) return false;
+		if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
-		u32 recordId = atoi(commandArgs[1]);
+		u32 recordId = Utility::StringToU32(commandArgs[1]);
 
 		GS->recordStorage.DeactivateRecord(recordId, nullptr, 0);
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	else if (TERMARGS(0, "getrec"))
 	{
-		if(commandArgsSize <= 1) return false;
+		if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
-		u32 recordId = atoi(commandArgs[1]);
+		u32 recordId = Utility::StringToU32(commandArgs[1]);
 
 		SizedData data = GS->recordStorage.GetRecordData(recordId);
 
@@ -565,11 +660,11 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 			trace("Record not found" EOL);
 		}
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	else if (TERMARGS(0, "send"))
 	{
-		if(commandArgsSize <= 1) return false;
+		if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
 		//parameter 1: r=reliable, u=unreliable, b=both
 		//parameter 2: count
@@ -586,7 +681,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 		u8 reliable = (commandArgsSize < 2 || TERMARGS(1, "b")) ? 2 : (TERMARGS(1,"u") ? 0 : 1);
 
 		//Second parameter is number of messages
-		u8 count = commandArgsSize > 2 ? atoi(commandArgs[2]) : 5;
+		u8 count = commandArgsSize > 2 ? Utility::StringToU8(commandArgs[2]) : 5;
 
 		for (int i = 0; i < count; i++)
 		{
@@ -602,14 +697,14 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 				GS->cm.SendMeshMessageInternal((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, DeliveryPriority::LOW, true, true, true);
 			}
 		}
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	//Add an advertising job
 	else if (TERMARGS(0, "advadd") && commandArgsSize >= 4)
 	{
-		u8 slots = atoi(commandArgs[1]);
-		u8 delay = atoi(commandArgs[2]);
-		u8 advDataByte = atoi(commandArgs[3]);
+		u8 slots       = Utility::StringToU8(commandArgs[1]);
+		u8 delay       = Utility::StringToU8(commandArgs[2]);
+		u8 advDataByte = Utility::StringToU8(commandArgs[3]);
 
 		AdvJob job = {
 			AdvJobTypes::SCHEDULED,
@@ -619,7 +714,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 			0, //AdvChannel
 			0,
 			0,
-			GapAdvType::ADV_IND,
+			FruityHal::BleGapAdvType::ADV_IND,
 			{0x02, 0x01, 0x06, 0x05, 0xFF, 0x4D, 0x02, 0xAA, advDataByte},
 			9,
 			{0},
@@ -628,38 +723,38 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 
 		GS->advertisingController.AddJob(job);
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	else if (TERMARGS(0, "advrem"))
 	{
-		if(commandArgsSize <= 1) return false;
+		if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
-		i8 jobNum = atoi(commandArgs[1]);
+		i8 jobNum = Utility::StringToI8(commandArgs[1]);
 
-		if (jobNum >= ADVERTISING_CONTROLLER_MAX_NUM_JOBS) return false;
+		if (jobNum >= ADVERTISING_CONTROLLER_MAX_NUM_JOBS) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
 
 		GS->advertisingController.RemoveJob(&(GS->advertisingController.jobs[jobNum]));
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	else if (TERMARGS(0, "advjobs"))
 	{
 		AdvertisingController* advCtrl = &(GS->advertisingController);
 		char buffer[150];
 
-		for(u32 i=0; i<advCtrl->currentNumJobs; i++){
+		for (u32 i = 0; i < advCtrl->currentNumJobs; i++) {
 			Logger::convertBufferToHexString(advCtrl->jobs[i].advData, advCtrl->jobs[i].advDataLength, buffer, sizeof(buffer));
 			trace("Job type:%u, slots:%u, iv:%u, advData:%s" EOL, (u32)advCtrl->jobs[i].type, advCtrl->jobs[i].slots, advCtrl->jobs[i].advertisingInterval, buffer);
 		}
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	else if (TERMARGS(0, "feed"))
 	{
 		FruityHal::FeedWatchdog();
 		logt("WATCHDOG", "Watchdogs fed.");
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	else if (TERMARGS(0, "lping") && commandArgsSize >= 3)
 	{
@@ -667,8 +762,8 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 		//and reports the leafs nodeIds together with the number of hops
 
 		//Save Ping sent time
-		pingSentTicks = FruityHal::GetRtc();
-		pingCount = atoi(commandArgs[1]);
+		pingSentTimeMs = FruityHal::GetRtcMs();
+		pingCount = Utility::StringToU16(commandArgs[1]);
 		pingCountResponses = 0;
 		u8 pingModeReliable = TERMARGS(2, "r");
 
@@ -685,7 +780,7 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 				pingModeReliable
 			);
 		}
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	if (TERMARGS(0, "nswrite")  && commandArgsSize >= 3)	//jstodo rename nswrite to flashwrite? Might also be unused because we already have saverec
 	{
@@ -694,35 +789,35 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 		u16 dataLength = Logger::parseEncodedStringToBuffer(commandArgs[2], buffer, 200);
 
 
-		GS->flashStorage.WriteData((u32*)buffer, (u32*)addr, dataLength, nullptr, 0);
+		GS->flashStorage.CacheAndWriteData((u32*)buffer, (u32*)addr, dataLength, nullptr, 0);
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	if (TERMARGS(0, "erasepage"))
 	{
-		if(commandArgsSize <= 1) return false;
+		if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
-		u16 pageNum = atoi(commandArgs[1]);
+		u16 pageNum = Utility::StringToU16(commandArgs[1]);
 
 		GS->flashStorage.ErasePage(pageNum, nullptr, 0);
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	if (TERMARGS(0, "erasepages") && commandArgsSize >= 3)
 	{
 
-		u16 page = atoi(commandArgs[1]);
-		u16 numPages = atoi(commandArgs[2]);
+		u16 page = Utility::StringToU16(commandArgs[1]);
+		u16 numPages = Utility::StringToU16(commandArgs[2]);
 
 		GS->flashStorage.ErasePages(page, numPages, nullptr, 0);
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	if (TERMARGS(0, "filltx"))
 	{
 		GS->cm.fillTransmitBuffers();
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	if (TERMARGS(0, "getpending"))
 	{
@@ -734,14 +829,14 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 			logt("DEBUGMOD", "conn %u pend %u", conn->connectionId, conn->GetPendingPackets());
 		}
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 
 	if (TERMARGS(0, "writedata"))
 	{
-		if(commandArgsSize < 3) return false;
+		if(commandArgsSize < 3) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
-		u32 destAddr = atoi(commandArgs[1]) + FLASH_REGION_START_ADDRESS;
+		u32 destAddr = Utility::StringToU32(commandArgs[1]) + FLASH_REGION_START_ADDRESS;
 
 		u32 buffer[16];
 		u16 len = Logger::parseEncodedStringToBuffer(commandArgs[2], (u8*)buffer, 64);
@@ -749,39 +844,39 @@ bool DebugModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize
 		GS->flashStorage.CacheAndWriteData(buffer, (u32*)destAddr, len, nullptr, 0);
 
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 
 	if(TERMARGS(0, "clearqueue"))
 	{
-		if(commandArgsSize <= 1) return false;
+		if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
-		u16 hnd = atoi(commandArgs[1]);
+		u16 hnd = Utility::StringToU16(commandArgs[1]);
 		BaseConnection* conn = GS->cm.GetConnectionFromHandle(hnd);
 		if (conn != nullptr) {
 			conn->packetSendQueue.Clean();
 		}
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 
 	if(TERMARGS(0, "printqueue") )
 	{
-		if(commandArgsSize <= 1) return false;
+		if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
-		u16 hnd = atoi(commandArgs[1]);
+		u16 hnd = Utility::StringToU16(commandArgs[1]);
 		BaseConnection* conn = GS->cm.GetConnectionFromHandle(hnd);
 
 		if (conn != nullptr) {
 			conn->packetSendQueue.Print();
 		}
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 #endif
 
 	//Must be called to allow the module to get and set the config
-	return Module::TerminalCommandHandler( commandArgs, commandArgsSize);
+	return Module::TerminalCommandHandler(commandArgs, commandArgsSize);
 }
 #endif
 
@@ -803,8 +898,10 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 #if IS_INACTIVE(SAVE_SPACE)
 				DebugModuleSetFloodModeMessage* data = (DebugModuleSetFloodModeMessage*)packet->data;
 				floodMode = (FloodMode)data->floodMode;
+				floodFrameSkip = true;
 				floodDestinationId = data->floodDestinationId;
-				floodMessagesPer100Sec = data->packetsPer100Sec;
+				floodMessagesPer10Sec = data->packetsPer10Sec;
+				floodTimeoutSec = data->timeoutSec;
 
 				//If flood mode is disabled, clear count of incoming packets, if it is enabled clear packetsOut first
 				if (!(floodMode == FloodMode::OFF || floodMode == FloodMode::LISTEN)) {
@@ -820,6 +917,33 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 					false
 				);
 
+			}
+			if (actionType == DebugModuleTriggerActionMessages::START_COUNTER)
+			{
+				DebugModuleStartCounterMessage* data = (DebugModuleStartCounterMessage*)packet->data;
+				counterDestinationId = data->counterDestinationId;
+				counterMessagesPer10Sec = data->packetsPer10Sec;
+				counterMaxCount = data->maxCount;
+				currentCounter = 0;
+			}
+			if (actionType == DebugModuleTriggerActionMessages::COUNTER)
+			{
+				DebugModuleCounterMessage* data = (DebugModuleCounterMessage*)packet->data;
+
+				logjson("DEBUGMOD", "{\"type\":\"counter\",\"nodeId\":%u,\"value\":%u}" SEP, packet->header.sender, data->counter);
+
+				if (data->counter  == 0) {
+					counterCheck = 0;
+					logt("DEBUGMOD", "Resetting counter");
+				}
+				else if (data->counter == counterCheck) {
+					logt("DEBUGMOD", "Counter correct at %u", counterCheck);
+				}
+				else {
+					logt("DEBUGMOD", "Got wrong counter value %u instead of %u", data->counter, counterCheck);
+				}
+
+				counterCheck++;
 			}
 			else if (actionType == DebugModuleTriggerActionMessages::FLOOD_MESSAGE)
 			{
@@ -840,6 +964,32 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 				}
 #endif
 			}
+#if IS_ACTIVE(UNSECURE_MEMORY_READBACK)
+			//This part should not be used in release builds, otherwise, the whole memory
+			//contents can be read back. This is only for analyzing bugs
+			else if (actionType == DebugModuleTriggerActionMessages::READ_MEMORY)
+			{
+				DebugModuleReadMemoryMessage* data = (DebugModuleReadMemoryMessage*)packet->data;
+
+				if (data->length > readMemMaxLength) return;
+
+				DebugModuleMemoryMessage response;
+				CheckedMemset(&response, 0x00, sizeof(response));
+
+				response.address = data->address;
+				u8* memoryAddress = (u8*)data->address + FLASH_REGION_START_ADDRESS;
+				CheckedMemcpy(response.data, memoryAddress, data->length);
+
+				SendModuleActionMessage(
+					MessageType::MODULE_ACTION_RESPONSE,
+					packet->header.sender,
+					(u8)DebugModuleActionResponseMessages::MEMORY,
+					0,
+					(u8*)&response,
+					SIZEOF_DEBUG_MODULE_MEMORY_MESSAGE_HEADER + data->length,
+					false);
+			}
+#endif
 #if IS_INACTIVE(CLC_GW_SAVE_SPACE)
 			else if (packet->actionType == (u8)DebugModuleTriggerActionMessages::RESET_FLOOD_COUNTER)
 			{
@@ -979,12 +1129,10 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 					//Arrived at destination, print it
 				}
 				else {
-					u32 nowTicks;
-					u32 timePassed;
-					nowTicks = FruityHal::GetRtc();
-					timePassed = FruityHal::GetRtcDifference(nowTicks, pingSentTicks);
-
-					u32 timePassedMs = timePassed / (APP_TIMER_CLOCK_FREQ / 1000);
+					u32 nowTimeMs;
+					u32 timePassedMs;
+					nowTimeMs = FruityHal::GetRtcMs();
+					timePassedMs = FruityHal::GetRtcDifferenceMs(nowTimeMs, pingSentTimeMs);
 
 					logjson("DEBUGMOD", "{\"type\":\"pingpong_response\",\"passedTime\":%u}" SEP, timePassedMs);
 
@@ -1019,12 +1167,10 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 			else if(actionType == DebugModuleActionResponseMessages::PING_RESPONSE){
 				//Calculate the time it took to ping the other node
 
-				u32 nowTicks;
-				u32 timePassed;
-				nowTicks = FruityHal::GetRtc();
-				timePassed = FruityHal::GetRtcDifference(nowTicks, pingSentTicks);
-
-				u32 timePassedMs = timePassed / (APP_TIMER_CLOCK_FREQ / 1000);
+				u32 nowTimeMs;
+				u32 timePassedMs;
+				nowTimeMs = FruityHal::GetRtcMs();
+				timePassedMs = FruityHal::GetRtcDifferenceMs(nowTimeMs, pingSentTimeMs);
 
 				trace("p %u ms" EOL, timePassedMs);
 				//logjson("DEBUGMOD", "{\"type\":\"ping_response\",\"passedTime\":%u}" SEP, timePassedMs);
@@ -1041,17 +1187,34 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 				}
 				logjson("DEBUGMOD", "{\"nodeId\":%u,\"type\":\"send_max_message_response\", \"correctValues\":%u, \"expectedCorrectValues\":%u}" SEP, packet->header.sender, i, sizeof(message->data));
 			}
+			else if (actionType == DebugModuleActionResponseMessages::MEMORY) {
+				if (sendData->dataLength < SIZEOF_CONN_PACKET_MODULE + SIZEOF_DEBUG_MODULE_MEMORY_MESSAGE_HEADER) return;
+
+				DebugModuleMemoryMessage* message = (DebugModuleMemoryMessage*)packet->data;
+				
+				u16 memoryLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE - SIZEOF_DEBUG_MODULE_MEMORY_MESSAGE_HEADER;
+
+				u16 bufferLength = memoryLength * 3 + 1;
+				DYNAMIC_ARRAY(buffer, bufferLength);
+				CheckedMemset(buffer, 0x00, bufferLength);
+
+				Logger::convertBufferToHexString(message->data, memoryLength, (char*)buffer, bufferLength);
+
+				logjson("DEBUGMOD", "{\"nodeId\":%u,\"type\":\"memory\",\"address\":%u,\"data\":\"%s\"}" SEP,
+					packet->header.sender,
+					message->address,
+					buffer
+					);
+			}
 			else if(actionType == DebugModuleActionResponseMessages::LPING_RESPONSE){
 				//Calculate the time it took to ping the other node
 
 				DebugModuleLpingMessage* lpingData = (DebugModuleLpingMessage*)packet->data;
 
-				u32 nowTicks;
-				u32 timePassed;
-				nowTicks = FruityHal::GetRtc();
-				timePassed = FruityHal::GetRtcDifference(nowTicks, pingSentTicks);
-
-				u32 timePassedMs = timePassed / (APP_TIMER_CLOCK_FREQ / 1000);
+				u32 nowTimeMs;
+				u32 timePassedMs;
+				nowTimeMs = FruityHal::GetRtcMs();
+				timePassedMs = FruityHal::GetRtcDifferenceMs(nowTimeMs, pingSentTimeMs);
 
 				trace("lp %u(%u): %u ms" EOL, lpingData->leafNodeId, lpingData->hops, timePassedMs);
 			}
@@ -1061,7 +1224,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 			if(actionType == DebugModuleActionResponseMessages::JOIN_ME_BUFFER_ITEM){
 				//Must copy the data to not produce a hardfault because of unaligned access
 				joinMeBufferPacket data;
-				memcpy(&data, packet->data, sizeof(joinMeBufferPacket));
+				CheckedMemcpy(&data, packet->data, sizeof(joinMeBufferPacket));
 
 				logjson("DEBUG", "{\"buf\":\"advT %u,rssi %d,time %u,last %u,node %u,cid %u,csiz %d, in %u, out %u, devT %u, ack %x\"}" SEP,
 						(u32)data.advType,                  data.rssi,                          data.receivedTimeDs, data.lastConnectAttemptDs,

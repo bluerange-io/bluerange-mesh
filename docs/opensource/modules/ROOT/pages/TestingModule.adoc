@@ -1,7 +1,7 @@
-= Testing Module (moduleId 12)
+= Testing Module (ID 12)
 
 == Purpose
-The Testing Module is designed to automate tests for battery and throughput measurements. The module allows to measure the battery consumption of each individual application and also assists in estimating the throughput of the network.
+The _TestingModule_ with _ModuleId_ 12 is designed to automate tests for battery and throughput measurements. The module allows to measure the battery consumption of each individual application and also assists in estimating the throughput of the network.
 
 == Functionality
 The Testing Module has two roles.

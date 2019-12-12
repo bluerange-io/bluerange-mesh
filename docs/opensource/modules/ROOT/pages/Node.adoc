@@ -1,13 +1,11 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
-= Node
+= Node Module (ID 0)
 
-ModuleId 0
+The _NodeModule_ has _ModuleId_ 0.
 
 == Purpose
 
-The node module is the central part of the FruityMesh algorithm. It is a
-mandatory module. It is responsible for clustering and other mesh
-related tasks and functionalities that are part of FruityMesh.
+The _NodeModule_ is the central part of the FruityMesh algorithm. It is a mandatory module. It is responsible for clustering and other mesh related tasks and functionalities that are part of FruityMesh.
 
 == Functionality
 
@@ -108,6 +106,56 @@ The response acknowledges the receipt of the command.
 ----
 {"type":"set_preferred_connections_result","nodeId":123,"module":0}
 ----
+
+=== Ping a node
+
+`action [nodeId] node ping {requestHandle}`
+
+Pings the given nodeId. Once received, a ping response is sent back.
+
+Examples
+
+[source,C++]
+----
+action 123 node ping
+action 123 node ping 100
+----
+
+The response acknowledges the receipt of these commands.
+
+[source,Javascript]
+----
+{"type":"ping","nodeId":123,"module":0,"requestHandle":0}"
+{"type":"ping","nodeId":123,"module":0,"requestHandle":100}"
+----
+
+=== Generating load
+
+`action [nodeId] node generate_load [target] [size] [amountOfMessages] [timeBetweenMessagesDs] {requestHandle}`
+
+Can be used to put message load on the mesh, mainly for measuring and debug purposes of installations (thus not part of the DebugModule). After the node with nodeId receives this message it will send messages with a payload of size every timeBetweenMessagesDs to the target until it sent a total of amountOfMessages.
+
+Example
+
+[source,C++]
+----
+action 2 node generate_load 3 10 2 13 18
+----
+
+The response acknowledges the receipt of this command
+
+[source,Javascript]
+----
+{"type":"start_generate_load_result","nodeId":2,"requestHandle":18}
+----
+
+and starts sending generate_load_chunk messages to node 3. Node 3 then logs:
+[source,Javascript]
+----
+{"type":"generate_load_chunk","nodeId":2,"size":10,"payloadCorrect":1,"requestHandle":18}
+{"type":"generate_load_chunk","nodeId":2,"size":10,"payloadCorrect":1,"requestHandle":18}
+----
+
 
 === Querying Device Capabilities
 
@@ -642,6 +690,56 @@ This packet informs a node about a change in the cluster size or structure. It c
 |1 bit|u8 : 1|connectionMasterBitHandover|Hands over the _masterBit_ to the bigger cluster. If sent over the _MeshAccessConnection_, this is 1 if the node has the _masterBit_.
 |1 bit|u8 : 1|counter|Next expected sequence number for _clusterUpdate_
 |6 bit|u8 : 6|reserved|-
+|===
+
+==== ping
+
+[cols="1,2,2,3"]
+|===
+|Bytes |Type| Name| Description
+
+|8 |<<Specification.adoc#,connPacketModule>>| Conn Packet Module | ModuleId = 0, Message Type = 51, Action Type = 3.
+|===
+
+==== ping response
+
+[cols="1,2,2,3"]
+|===
+|Bytes |Type| Name| Description
+
+|8 |<<Specification.adoc#,connPacketModule>>| Conn Packet Module | ModuleId = 0, Message Type = 52, Action Type = 3.
+|===
+
+==== start generate load
+
+[cols="1,2,2,3"]
+|===
+|Bytes |Type| Name| Description
+
+|8 |<<Specification.adoc#,connPacketModule>>| Conn Packet Module | ModuleId = 0, Message Type = 51, Action Type = 4.
+|2 |NodeId| target | NodeId of the the target that should receive the chunks.
+|1 |u8| size | Size of the payload of each chunk.
+|1 |u8| amount | Amount of chunks to send.
+|1 |u8| timeBetweenMessagesDs | The time between each chunk in deciseconds.
+|===
+
+==== start generate load response
+
+[cols="1,2,2,3"]
+|===
+|Bytes |Type| Name| Description
+
+|8 |<<Specification.adoc#,connPacketModule>>| Conn Packet Module | ModuleId = 0, Message Type = 52, Action Type = 4.
+|===
+
+==== generate load chunk
+
+[cols="1,2,2,3"]
+|===
+|Bytes |Type| Name| Description
+
+|8 |<<Specification.adoc#,connPacketModule>>| Conn Packet Module | ModuleId = 0, Message Type = 51, Action Type = 5.
+|0-255|u8[0-255]| payload | The dummy payload, filled with the magic value 0x91.
 |===
 
 === Raw Data Messages

@@ -44,6 +44,7 @@ void ModuleAllocator::setMemory(u8 * block, u32 size)
 	this->currentDataPtr = block;
 	this->sizeLeft = size;
 	this->startSize = size;
+	CheckedMemset(block, 0, size);
 }
 
 u32 ModuleAllocator::getMemorySize()

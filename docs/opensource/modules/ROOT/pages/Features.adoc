@@ -41,10 +41,10 @@ interested.
 
 * xref:DfuModule.adoc[DfuModule] firmware updates over the mesh, not
 limited to FruityMesh, but also available for connected controllers
-* xref:AssetModule.adoc[AssetModule]: Broadcasting of asset telemetry
+* xref:bluerange-firmware:ROOT:AssetModule.adoc[AssetModule]: Broadcasting of asset telemetry
 messages that can be located indoors by our infrastructure
-* A number of custom modules and customization of FruityMesh have
-already been implemented for many customers. 
+* A number of xref:Tutorials.adoc[custom modules] and customization of FruityMesh have
+already been implemented for many customers.
 
 == Feature Roadmap
 

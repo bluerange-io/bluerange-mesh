@@ -39,88 +39,23 @@ It is clearly meant as a work in progress.
 
 //TODO: types.h should not include references to nrf sdk
 #include <types.h>
+#include <PortFeatures.h>
+#include <FruityHalError.h>
+#include <FruityHalBleTypes.h>
+#include <FruityHalBleGatt.h>
+#include <FruityHalBleGap.h>
 
+namespace FruityHal
+{
 typedef void(*SystemEventHandler) (u32 systemEvent);
-typedef void(*TimerEventHandler) (uint16_t passedTimeDs);
-typedef void(*ButtonEventHandler) (uint8_t buttonId, u32 buttonHoldTime);
+typedef void(*TimerEventHandler) (u16 passedTimeDs);
+typedef void(*ButtonEventHandler) (u8 buttonId, u32 buttonHoldTime);
 typedef void(*UartEventHandler) (void);
 typedef void(*AppErrorHandler) (u32 error_code);
 typedef void(*StackErrorHandler) (u32 id, u32 pc, u32 info);
 typedef void(*HardfaultHandler) (stacked_regs_t* stack);
 typedef void(*DBDiscoveryHandler) (ble_db_discovery_evt_t * p_dbEvent);
 typedef void(*EventLooperHandler) (void);
-
-#define _________________GAP_DEFINITIONS______________________
-
-/**@brief GAP Address types */
-#define FH_BLE_GAP_ADDR_TYPE_PUBLIC                        0x00 /**< Public address. */
-#define FH_BLE_GAP_ADDR_TYPE_RANDOM_STATIC                 0x01 /**< Random static address. */
-#define FH_BLE_GAP_ADDR_TYPE_RANDOM_PRIVATE_RESOLVABLE     0x02 /**< Random private resolvable address. */
-#define FH_BLE_GAP_ADDR_TYPE_RANDOM_PRIVATE_NON_RESOLVABLE 0x03 /**< Random private non-resolvable address. */
-
-/**@brief GAP Address */
-#define FH_BLE_SIZEOF_GAP_ADDR (7)
-#define FH_BLE_GAP_ADDR_LEN (6)
-struct fh_ble_gap_addr_t
-{
-public:
-  uint8_t addr_type;       /**< See FH_BLE_GAP_ADDR_TYPES. */
-  uint8_t addr[FH_BLE_GAP_ADDR_LEN]; /**< 48-bit address, LSB format. */
-};
-
-/**@brief GAP scanning parameters. */
-typedef struct
-{
-  uint16_t interval;            /**< Scan interval between 0x0004 and 0x4000 in 0.625 ms units (2.5 ms to 10.24 s). */
-  uint16_t window;              /**< Scan window between 0x0004 and 0x4000 in 0.625 ms units (2.5 ms to 10.24 s). */
-  uint16_t timeout;             /**< Scan timeout between 0x0001 and 0xFFFF in seconds, 0x0000 disables timeout. */
-} fh_ble_gap_scan_params_t;
-
-/**@brief GAP connection parameters. */
-typedef struct
-{
-	uint16_t min_conn_interval;         /**< Minimum Connection Interval in 1.25 ms units, see @ref BLE_GAP_CP_LIMITS.*/
-	uint16_t max_conn_interval;         /**< Maximum Connection Interval in 1.25 ms units, see @ref BLE_GAP_CP_LIMITS.*/
-	uint16_t slave_latency;             /**< Slave Latency in number of connection events, see @ref BLE_GAP_CP_LIMITS.*/
-	uint16_t conn_sup_timeout;          /**< Connection Supervision Timeout in 10 ms units, see @ref BLE_GAP_CP_LIMITS.*/
-} fh_ble_gap_conn_params_t;
-
-/**@brief Channel mask for RF channels used in advertising. */
-typedef struct
-{
-  uint8_t ch_37_off : 1;  /**< Setting this bit to 1 will turn off advertising on channel 37 */
-  uint8_t ch_38_off : 1;  /**< Setting this bit to 1 will turn off advertising on channel 38 */
-  uint8_t ch_39_off : 1;  /**< Setting this bit to 1 will turn off advertising on channel 39 */
-} fh_ble_gap_adv_ch_mask_t;
-
-
-enum class GapAdvType : u8
-{
-#if SDK == 15
-	ADV_IND         = 0x01,
-	ADV_DIRECT_IND  = 0x03,
-	ADV_SCAN_IND    = 0x04,
-	ADV_NONCONN_IND = 0x05,
-#else
-	ADV_IND         = 0x00,
-	ADV_DIRECT_IND  = 0x01,
-	ADV_SCAN_IND    = 0x02,
-	ADV_NONCONN_IND = 0x03,
-#endif
-};
-
-
-/**@brief GAP advertising parameters. */
-struct fh_ble_gap_adv_params_t
-{
-	GapAdvType               type;
-	uint16_t                 interval;             /**< Advertising interval between 0x0020 and 0x4000 in 0.625 ms units (20 ms to 10.24 s), see @ref BLE_GAP_ADV_INTERVALS.
-	                                                 - If type equals @ref BLE_GAP_ADV_TYPE_ADV_DIRECT_IND, this parameter must be set to 0 for high duty cycle directed advertising.
-	                                                 - If type equals @ref BLE_GAP_ADV_TYPE_ADV_DIRECT_IND, set @ref BLE_GAP_ADV_INTERVAL_MIN <= interval <= @ref BLE_GAP_ADV_INTERVAL_MAX for low duty cycle advertising.*/
-	uint16_t                 timeout;              /**< Advertising timeout between 0x0001 and 0x3FFF in seconds, 0x0000 disables timeout. See also @ref BLE_GAP_ADV_TIMEOUT_VALUES. If type equals @ref BLE_GAP_ADV_TYPE_ADV_DIRECT_IND, this parameter must be set to 0 for High duty cycle directed advertising. */
-	fh_ble_gap_adv_ch_mask_t channel_mask;         /**< Advertising channel mask. See @ref ble_gap_adv_ch_mask_t. */
-};
-
 
 #define ______________________EVENT_DEFINITIONS_______________________
 
@@ -167,7 +102,7 @@ public:
 	const u8* getData() const;
 	u32 getDataLength() const;
 	const u8* getPeerAddr() const;
-	u8 getPeerAddrType() const;
+	BleGapAddrType getPeerAddrType() const;
 	bool isConnectable() const;
 
 #if IS_ACTIVE(FAKE_NODE_POSITIONS)
@@ -195,7 +130,7 @@ class GapDisconnectedEvent : public GapEvent
 {
 public:
 	explicit GapDisconnectedEvent(void* evt);
-	u8 getReason() const;
+	FruityHal::BleHciError getReason() const;
 };
 
 enum class GapTimeoutSource : u8
@@ -203,7 +138,9 @@ enum class GapTimeoutSource : u8
 	ADVERTISING      = 0,
 	SECURITY_REQUEST = 1,
 	SCAN             = 2,
-	CONNECTION       = 3
+	CONNECTION       = 3,
+	AUTH_PAYLOAD     = 4,
+	INVALID          = 255
 };
 
 class GapTimeoutEvent : public GapEvent
@@ -250,7 +187,7 @@ class GattcEvent : public BleEvent
 public:
 	explicit GattcEvent(void* evt);
 	u16 getConnectionHandle() const;
-	u16 getGattStatus() const;
+	FruityHal::BleGattEror getGattStatus() const;
 };
 
 class GattcWriteResponseEvent : public GattcEvent
@@ -298,90 +235,113 @@ public:
 
 };
 
-
-namespace FruityHal
+struct UartReadCharBlockingResult
 {
-	constexpr u32 SUCCESS = 0;
-	enum class GeneralHardwareError : u32 {
-		SUCCESS = FruityHal::SUCCESS,
-		//Variables of this type may have any u32 value! Their interpretation is hardware dependent.
-		HIGHEST_POSSIBLE_ERROR = 0xFFFFFFFF,
+	bool didError = false;
+	char c = '0';
+};
+
+struct UartReadCharResult
+{
+	bool hasNewChar = false;
+	char c = '0';
+};
+
+	enum class TxRole : u8 {
+		CONNECTION  = 0x00,  // connection
+		ADVERTISING = 0x01,  // advertising
+		SCAN_INIT   = 0x02   // scanning and connection initiator
 	};
-	enum class HciErrorCode : u8 {
-		SUCCESS                                     = FruityHal::SUCCESS, //0
-		UNKNOWN_BTLE_COMMAND                        = 0x01, //1
-		UNKNOWN_CONNECTION_IDENTIFIER               = 0x02, //2
-		AUTHENTICATION_FAILURE                      = 0x05, //5
-		PIN_OR_KEY_MISSING                          = 0x06, //6
-		MEMORY_CAPACITY_EXCEEDED                    = 0x07, //7
-		CONNECTION_TIMEOUT                          = 0x08, //8
-		COMMAND_DISALLOWED                          = 0x0C, //12
-		INVALID_BTLE_COMMAND_PARAMETERS             = 0x12, //18
-		REMOTE_USER_TERMINATED_CONNECTION           = 0x13, //19
-		REMOTE_DEV_TERMINATION_DUE_TO_LOW_RESOURCES = 0x14, //20
-		REMOTE_DEV_TERMINATION_DUE_TO_POWER_OFF     = 0x15, //21
-		LOCAL_HOST_TERMINATED_CONNECTION            = 0x16, //22
-		UNSUPPORTED_REMOTE_FEATURE                  = 0x1A, //26
-		INVALID_LMP_PARAMETERS                      = 0x1E, //30
-		UNSPECIFIED_ERROR                           = 0x1F, //31
-		LMP_RESPONSE_TIMEOUT                        = 0x22, //34
-		LMP_PDU_NOT_ALLOWED                         = 0x24, //36
-		INSTANT_PASSED                              = 0x28, //40
-		PAIRING_WITH_UNIT_KEY_UNSUPPORTED           = 0x29, //41
-		DIFFERENT_TRANSACTION_COLLISION             = 0x2A, //42
-		CONTROLLER_BUSY                             = 0x3A, //58
-		CONN_INTERVAL_UNACCEPTABLE                  = 0x3B, //59
-		DIRECTED_ADVERTISER_TIMEOUT                 = 0x3C, //60
-		CONN_TERMINATED_DUE_TO_MIC_FAILURE          = 0x3D, //61
-		CONN_FAILED_TO_BE_ESTABLISHED               = 0x3E, //62
+
+	enum class ClockAccuracy : u8 {
+		CLOCK_ACCURACY_250_PPM = 0, //Default
+		CLOCK_ACCURACY_500_PPM = 1,
+		CLOCK_ACCURACY_150_PPM = 2,
+		CLOCK_ACCURACY_100_PPM = 3,
+		CLOCK_ACCURACY_75_PPM = 4,
+		CLOCK_ACCURACY_50_PPM = 5,
+		CLOCK_ACCURACY_30_PPM = 6,
+		CLOCK_ACCURACY_20_PPM = 7,
+		CLOCK_ACCURACY_10_PPM = 8,
+		CLOCK_ACCURACY_5_PPM = 9,
+		CLOCK_ACCURACY_2_PPM = 10,
+		CLOCK_ACCURACY_1_PPM = 11,
 	};
 
 	// ######################### Ble Stack and Event Handling ############################
-	GeneralHardwareError BleStackInit();
+	ErrorType BleStackInit();
+	void BleStackDeinit();
 	void EventLooper();
 	void DispatchBleEvents(void* evt);
 
 	// ######################### GAP ############################
-	u32 BleGapAddressGet(fh_ble_gap_addr_t *address);
-	u32 BleGapAddressSet(fh_ble_gap_addr_t const *address);
+	u32 BleGapAddressGet(BleGapAddr *address);
+	u32 BleGapAddressSet(BleGapAddr const *address);
 
-	u32 BleGapConnect(fh_ble_gap_addr_t const *peerAddress, fh_ble_gap_scan_params_t const *scanParams, fh_ble_gap_conn_params_t const *connectionParams);
+	ErrorType BleGapConnect(BleGapAddr const *peerAddress, BleGapScanParams const *scanParams, BleGapConnParams const *connectionParams);
 	u32 ConnectCancel();
-	u32 Disconnect(uint16_t conn_handle, FruityHal::HciErrorCode hci_status_code);
+	ErrorType Disconnect(u16 conn_handle, FruityHal::BleHciError hci_status_code);
 
-#if (SDK == 15)
-	u32 BleGapScanStart(fh_ble_gap_scan_params_t const *scanParams, u8 * p_scanData);
-#else
-	u32 BleGapScanStart(fh_ble_gap_scan_params_t const *scanParams);
-#endif
-	u32 BleGapScanStop();
+	ErrorType BleGapScanStart(BleGapScanParams const *scanParams);
+	ErrorType BleGapScanStop();
 
-#if (SDK == 15)
-	u32 BleGapAdvStart(u8 advHandle);
-	u32 BleGapAdvDataSet(u8 * p_advHandle, fh_ble_gap_adv_params_t const * p_advParams, const uint8_t *advData, uint8_t advDataLength, const uint8_t *scanData, uint8_t scanDataLength);
-	u32 BleGapAdvStop(u8 advHandle);
-#else
-	u32 BleGapAdvStart(fh_ble_gap_adv_params_t const *advParams);
-	u32 BleGapAdvDataSet(const uint8_t *advData, uint8_t advDataLength, const uint8_t *scanData, uint8_t scanDataLength);
-	u32 BleGapAdvStop();
-#endif
+	ErrorType BleGapAdvStart(u8 advHandle, BleGapAdvParams const *advParams);
+	ErrorType BleGapAdvDataSet(u8 * p_advHandle, BleGapAdvParams const * p_advParams, u8 *advData, u8 advDataLength, u8 *scanData, u8 scanDataLength);
+	ErrorType BleGapAdvStop(u8 advHandle);
 
-	u32 BleTxPacketCountGet(uint16_t connectionHandle, uint8_t* count);
+	ErrorType BleTxPacketCountGet(u16 connectionHandle, u8* count);
+
+	u32 BleGapNameSet(BleGapConnSecMode & mode, u8 const * p_dev_name, u16 len);
+	u32 BleGapAppearance(BleAppearance appearance);
+
+	u32 BleGapConnectionParamsUpdate(u16 conn_handle, BleGapConnParams const & params);
+	u32 BleGapConnectionPreferredParamsSet(BleGapConnParams const & params);
+
+	u32 BleGapDataLengthExtensionRequest(u16 connHandle);
+
+	u32 BleGapSecInfoReply(u16 conn_handle, BleGapEncInfo * p_info, u8 * p_id_info, u8 * p_sign_info);
+
+	u32 BleGapEncrypt(u16 conn_handle, BleGapMasterId const & master_id, BleGapEncInfo const & enc_info);
+
+	u32 BleGapRssiStart(u16 conn_handle, u8 threshold_dbm, u8 skip_count);
+	u32 BleGapRssiStop(u16 conn_handle);
 
 	// ######################### GATT ############################
 	u32 DiscovereServiceInit(DBDiscoveryHandler dbEventHandler);
-	u32 DiscoverService(u16 connHandle, const ble_uuid_t& p_uuid, ble_db_discovery_t * p_discoveredServices);
+	u32 DiscoverService(u16 connHandle, const BleGattUuid& p_uuid, ble_db_discovery_t * p_discoveredServices);
+
+	u32 BleGattSendNotification(u16 connHandle, BleGattWriteParams & params);
+	u32 BleGattWrite(u16 connHandle, BleGattWriteParams const & params);
+
+	u32 BleUuidVsAdd(u8 const * p_vs_uuid, u8 * p_uuid_type);
+	u32 BleGattServiceAdd(BleGattSrvcType type, BleGattUuid const & p_uuid, u16 * p_handle);
+	u32 BleGattCharAdd(u16 service_handle, BleGattCharMd const & char_md, BleGattAttribute const & attr_char_value, BleGattCharHandles & handles);
+
+	u32 BleGattMtuExchangeRequest(u16 connHandle, u16 clientRxMtu);
+	u32 BleGattMtuExchangeReply(u16 connHandle, u16 clientRxMtu);
+	
+	// ######################### Radio ############################
+	ErrorType RadioSetTxPower(i8 tx_power, TxRole role, u16 handle);
 
 	// ######################### Utility ############################
 
+	ErrorType WaitForEvent();
 	u32 InitializeButtons();
+	ErrorType GetRandomBytes(u8 * p_data, u8 len);
+	u32 ClearGeneralPurposeRegister(u32 gpregId, u32 mask);
+	u32 WriteGeneralPurposeRegister(u32 gpregId, u32 mask);
 
 	// ######################### Timers ############################
 
+	typedef void(*TimerHandler)(void * p_context);
+	typedef u32* swTimer;
 	u32 InitTimers();
 	u32 StartTimers();
-	u32 GetRtc();
-	u32 GetRtcDifference(u32 ticksTo, u32 ticksFrom);
+	u32 GetRtcMs();
+	u32 GetRtcDifferenceMs(u32 nowTimeMs, u32 previousTimeMs);
+	ErrorType CreateTimer(swTimer timer, bool repeated, TimerHandler handler);
+	ErrorType StartTimer(swTimer timer, u32 timeoutMs);
+	ErrorType StopTimer(swTimer timer);
 
 	// ######################### Utility ############################
 
@@ -393,37 +353,51 @@ namespace FruityHal
 	u32 GetBootloaderVersion();
 	void DelayUs(u32 delayMicroSeconds);
 	void DelayMs(u32 delayMs);
+	u32 EcbEncryptBlock(const u8 * p_key, const u8 * p_clearText, u8 * p_cipherText);
+
+	// ######################### FLASH ############################
+
+	ErrorType FlashPageErase(u32 page);
+	ErrorType FlashWrite(u32 * p_addr, u32 * p_data, u32 len);
+
+	// ######################### NVIC ############################
+
+	void nvicEnableIRQ(u32 irqType);
+	void nvicDisableIRQ(u32 irqType);
+	void nvicSetPriorityIRQ(u32 irqType, u8 level);
+	void nvicClearPendingIRQ(u32 irqType);
 
 	// ######################### Temporary conversion ############################
 	//These functions are temporary until event handling is implemented in the HAL and events
 	//are generated by the HAL
-	ble_gap_addr_t Convert(const fh_ble_gap_addr_t* address);
-	fh_ble_gap_addr_t Convert(const ble_gap_addr_t* p_addr);
+	ble_gap_addr_t Convert(const BleGapAddr* address);
+	BleGapAddr Convert(const ble_gap_addr_t* p_addr);
 
 	bool setRetentionRegisterTwo(u8 val);
 	void disableHardwareDfuBootloader();
 	void disableUart();
-	void enableUart();
+	void EnableUart(bool promptAndEchoMode);
 	void enableUartReadInterrupt();
 	bool checkAndHandleUartTimeout();
 	u32 checkAndHandleUartError();
-	bool readUartByte(char* outByte);
+	void UartHandleError(u32 error);
+	bool UartCheckInputAvailable();
+	UartReadCharBlockingResult UartReadCharBlocking();
+	void UartPutStringBlockingWithTimeout(const char* message);
+	void UartEnableReadInterrupt();
+	bool IsUartErroredAndClear();
+	bool IsUartTimedOutAndClear();
+	UartReadCharResult UartReadChar();
 
 	u32 getMasterBootRecordSize();
 	u32 getSoftDeviceSize();
+	u32 GetSoftDeviceVersion();
 	BleStackType GetBleStackType();
 	void bleStackErrorHandler(u32 id, u32 info);
 
 
 	//Functions for resolving error codes
 	const char* getBleEventNameString(u16 bleEventId);
-	const char* getGattStatusErrorString(u16 gattStatusCode);
-	const char* getGeneralErrorString(GeneralHardwareError nrfErrorCode);
-	const char* getHciErrorString(FruityHal::HciErrorCode hciErrorCode);
-	const char* getErrorLogErrorType(ErrorTypes type);
-	const char* getErrorLogCustomError(CustomErrorTypes type);
-	const char* getErrorLogRebootReason(RebootReason type);
-	const char* getErrorLogError(ErrorTypes type, u32 code);
 
 	u32* getUicrDataPtr();
 }

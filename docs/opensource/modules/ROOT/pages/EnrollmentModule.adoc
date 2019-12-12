@@ -1,8 +1,8 @@
-= Enrollment Module (moduleId 5)
+= Enrollment Module (ID 5)
 
 == Purpose
 
-New nodes are normally flashed without a `networkId` assigned (set to 0). This means they will not connect to a mesh as long as they are not enrolled. The term enrolled is used in synonym with provisioned or commisioned.
+The _EnrollmentModule_ has _ModuleId_ 5. New nodes are normally flashed without a `networkId` assigned (set to 0). This means they will not connect to a mesh as long as they are not enrolled. The term enrolled is used in synonym with provisioned or commisioned.
 
 In order to assign a node to a mesh, the user has to give a `networkId`, the `networkKey` and a unique `nodeId` for this mesh. This can be done by a MeshGateway or a dedicated enrollment app. The enrollment packet should be sent to the broadcast address 0 and must contain to serial number of the node to be enrolled.
 
@@ -23,6 +23,9 @@ The _EnrollmentModule_ supports _PreEnrollments_. A module can register itself u
 If `allowUnenrolledUnsecureConnections` is set in the feature set and the node is in an unenrolled state, nodes accept connections with `FM_KEY_ID_ZERO` for enrollment. This allows an easier enrollment process.
 
 WARNING: Such nodes should never be used in an environment where unauthorized people have access because these people also have easy access by design.
+
+=== Preferred Network Enrollment
+Preferred network enrollment is used for assets because we would like to set their network id in order for assets to send their measurement to nodes in a particular network. In case of preferred network enrollment, the asset won't restart. In PreferredNetwork only networkId and nodekey is given.
 
 === Different Enrollment Scenarios
 
@@ -71,6 +74,18 @@ action [nodeId] enroll remove [serialNumber] {requestHandle}
 //E.g. removing the enrollment of the node with serial number BCBCF
 action 0 enroll remove BCBCF
 ----
+
+=== Setting only the Network
+If the node is an asset, it allows rapid network id changes by using this command. A connection must have been established before executing this command, no mesh access connection is automatically created.
+[source, C++]
+----
+//Set a preferred network
+action [nodeId] enroll set_network [newNetworkId] {requestHandler}
+
+//E.g. set preferred network of the node with serial number BBBBN
+action 0 enroll set_network 12
+----
+
 == Messages
 === Message Types
 [source, C++]

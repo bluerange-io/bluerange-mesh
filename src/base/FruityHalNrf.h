@@ -37,7 +37,7 @@ extern "C"{
 #include <ble_gatt.h>
 #include <ble_gatts.h>
 #include <nrf_soc.h>
-#include <app_timer.h>
+#include "app_timer.h"
 
 #ifndef SIM_ENABLED
 #include <nrf_sdm.h>
@@ -57,14 +57,3 @@ extern "C"{
 #endif
 
 }
-
-//Any additional public functionality for the Nrf HAL can be given here
-
-#ifdef __cplusplus
-extern "C"{
-#endif
-
-
-#ifdef __cplusplus
-}
-#endif

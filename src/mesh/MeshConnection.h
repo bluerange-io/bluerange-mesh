@@ -84,6 +84,10 @@ class MeshConnection
 		u32 correctionTicks = 0;
 		TimePoint syncSendingOrdered;
 
+		//Reestablishing
+		bool mustRetryReestablishing = false;
+		u32 reestablishmentStartedDs = 0;
+
 #ifdef SIM_ENABLED
 		//Cluster validity checking in the Simulator
 		i16 validityClusterUpdatesToSend;
@@ -92,7 +96,7 @@ class MeshConnection
 
 	public:
 		//Init + Destroy
-		MeshConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress, u16 partnerWriteCharacteristicHandle);
+		MeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, u16 partnerWriteCharacteristicHandle);
 
 		virtual ~MeshConnection();
 		static BaseConnection* ConnTypeResolver(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8* data);
@@ -102,8 +106,11 @@ class MeshConnection
 
 		//Mesh Handshake
 		void StartHandshake() override;
+		void StartHandshakeAfterMtuExchange();
+		void ConnectionMtuUpgradedHandler(u16 gattPayloadSize) override;
 		void ReceiveHandshakePacketHandler(BaseConnectionSendData* sendData, u8* data);
 		void SendReconnectionHandshakePacket();
+		ErrorType SendReconnectionHandshakePacketAfterMtuExchange(); //Pay attention as this might disconnect the connection
 		void ReceiveReconnectionHandshakePacket(connPacketReconnect* packet);
 
 		bool SendHandshakeMessage(u8* data, u16 dataLength, bool reliable);
@@ -126,8 +133,8 @@ class MeshConnection
 		void ReceiveMeshMessageHandler(BaseConnectionSendData* sendData, u8* data);
 
 		//Handler
-		bool GapDisconnectionHandler(u8 hciDisconnectReason) override;
-		void GapReconnectionSuccessfulHandler(const GapConnectedEvent& connectedEvent) override;
+		bool GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason) override;
+		void GapReconnectionSuccessfulHandler(const FruityHal::GapConnectedEvent& connectedEvent) override;
 
 		//Helpers
 		void PrintStatus() override;
@@ -136,4 +143,5 @@ class MeshConnection
 
 		//Setter
 		void setHopsToSink(ClusterSize hops);
+		ClusterSize getHopsToSink();
 };

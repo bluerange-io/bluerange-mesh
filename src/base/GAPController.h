@@ -46,7 +46,7 @@ public:
 	void bleConfigureGAP() const;
 
 	//Connects to a peripheral with the specified address and calls the corresponding callbacks
-	u32 connectToPeripheral(const fh_ble_gap_addr_t &address, u16 connectionInterval, u16 timeout) const;
+	ErrorType connectToPeripheral(const FruityHal::BleGapAddr &address, u16 connectionInterval, u16 timeout) const;
 
 	//Encryption
 	void startEncryptingConnection(u16 connectionHandle) const;
@@ -57,10 +57,10 @@ public:
 
 
 	//This handler is called with bleEvents from the softdevice
-	void GapDisconnectedEventHandler(const GapDisconnectedEvent& disconnectEvent);
-	void GapConnectedEventHandler(const GapConnectedEvent& connvectedEvent);
-	void GapTimeoutEventHandler(const GapTimeoutEvent& gapTimeoutEvent);
-	void GapSecurityInfoRequestEvenetHandler(const GapSecurityInfoRequestEvent& securityInfoRequestEvent);
-	void GapConnectionSecurityUpdateEventHandler(const GapConnectionSecurityUpdateEvent& connectionSecurityUpdateEvent);
+	void GapDisconnectedEventHandler(const FruityHal::GapDisconnectedEvent& disconnectEvent);
+	void GapConnectedEventHandler(const FruityHal::GapConnectedEvent& connvectedEvent);
+	void GapTimeoutEventHandler(const FruityHal::GapTimeoutEvent& gapTimeoutEvent);
+	void GapSecurityInfoRequestEvenetHandler(const FruityHal::GapSecurityInfoRequestEvent& securityInfoRequestEvent);
+	void GapConnectionSecurityUpdateEventHandler(const FruityHal::GapConnectionSecurityUpdateEvent& connectionSecurityUpdateEvent);
 };
 

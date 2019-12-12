@@ -22,9 +22,7 @@ C_SOURCE_FILES += $(COMPONENTS)/libraries/util/app_util_platform.c
 C_SOURCE_FILES += $(COMPONENTS)/libraries/experimental_section_vars/nrf_section_iter.c
 C_SOURCE_FILES += $(COMPONENTS)/libraries/scheduler/app_scheduler.c
 C_SOURCE_FILES += $(COMPONENTS)/libraries/hardfault/nrf52/handler/hardfault_handler_gcc.c
-C_SOURCE_FILES += src/c/drivers/spi.c
-C_SOURCE_FILES += src/c/drivers/bme280.c
-C_SOURCE_FILES += src/c/drivers/lis2dh12.c
+
 
 ifeq ($(SDK),14)
 ASM_SOURCE_FILES += $(COMPONENTS)/toolchain/gcc/gcc_startup_nrf52840.s

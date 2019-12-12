@@ -33,7 +33,6 @@
 #include <types.h>
 #include <AppConnection.h>
 
-
 class MeshAccessModule;
 struct MeshAccessServiceStruct;
 
@@ -49,6 +48,18 @@ enum class MeshAccessTunnelType: u8
 	INVALID = 0xFF
 };
 
+#pragma pack(push)
+#pragma pack(1)
+struct DeadDataMessage
+{
+	connPacketHeader header;
+	u8 magicNumber[8];
+};
+constexpr u8 deadDataMagicNumber[] = { 0xDE, 0xAD, 0xDA, 0xDA, 0x00, 0xFF, 0x77, 0x33 };
+static_assert(sizeof(deadDataMagicNumber) == sizeof(DeadDataMessage::magicNumber), "The length of magic numbers does not match.");
+STATIC_ASSERT_SIZE(DeadDataMessage, 13);
+#pragma pack(pop)
+
 class MeshAccessConnection
 		: public AppConnection
 {
@@ -58,22 +69,29 @@ private:
 	MeshAccessServiceStruct* meshAccessService;
 	MeshAccessModule* meshAccessMod;
 
-	bool useCustomKey;
-	u8 key[16];
+	bool useCustomKey = false;
+	u8 key[16] = { 0 };
 
-	u32 fmKeyId;
+	u32 fmKeyId = 0;
 
-	u8 sessionEncryptionKey[16];
-	u8 sessionDecryptionKey[16];
+	static constexpr u32 MAX_CORRUPTED_MESSAGES = 32;
+	u32 amountOfCorruptedMessages = 0;
+	bool allowCorruptedEncryptionStart = false;
 
-	u32 encryptionNonce[2];
-	u32 decryptionNonce[2];
+	u8 sessionEncryptionKey[16] = { 0 };
+	u8 sessionDecryptionKey[16] = { 0 };
+
+	u32 encryptionNonce[2] = { 0 };
+	u32 decryptionNonce[2] = { 0 };
 
 
 	MessageType lastProcessedMessageType;
 
 
-	bool GenerateSessionKey(u8* nonce, NodeId centralNodeId, u32 fmKeyId, u8* keyOut);
+	bool GenerateSessionKey(const u8* nonce, NodeId centralNodeId, u32 fmKeyId, u8* keyOut);
+	void OnCorruptedMessage();
+
+	void LogKeys();
 
 public:
 
@@ -82,19 +100,19 @@ public:
 	//we have to decide whether we route data through the remote mesh or through the local mesh
 	MeshAccessTunnelType tunnelType;
 
-	u16 partnerRxCharacteristicHandle;
-	u16 partnerTxCharacteristicHandle;
-	u16 partnerTxCharacteristicCccdHandle;
+	u16 partnerRxCharacteristicHandle = 0;
+	u16 partnerTxCharacteristicHandle = 0;
+	u16 partnerTxCharacteristicCccdHandle = 0;
 
 	//Each MeshAccess connection is assigned a virtual partner id, that is used as a temporary NodeId in
 	//our own mesh network in order to participate
 	NodeId virtualPartnerId;
 
 	//If this is set to anything other than 0, the connectionState changes will be reported to this node
-	NodeId connectionStateSubscriberId;
+	NodeId connectionStateSubscriberId = 0;
 
 
-	MeshAccessConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress, u32 fmKeyId, MeshAccessTunnelType tunnelType);
+	MeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, u32 fmKeyId, MeshAccessTunnelType tunnelType);
 	virtual ~MeshAccessConnection();
 	static BaseConnection* ConnTypeResolver(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8* data);
 
@@ -102,7 +120,7 @@ public:
 
 	/*############### Connect ##################*/
 	//Returns the unique connection id that was created
-	static u16 ConnectAsMaster(fh_ble_gap_addr_t* address, u16 connIntervalMs, u16 connectionTimeoutSec, u32 fmKeyId, u8* customKey, MeshAccessTunnelType tunnelType);
+	static u32 ConnectAsMaster(FruityHal::BleGapAddr* address, u16 connIntervalMs, u16 connectionTimeoutSec, u32 fmKeyId, u8* customKey, MeshAccessTunnelType tunnelType);
 
 	//Will create a connection that collects potential candidates and connects to them
 	static u16 SearchAndConnectAsMaster(NetworkId networkId, u32 serialNumberIndex, u16 searchTimeDs, u16 connIntervalMs, u16 connectionTimeoutSec);
@@ -139,10 +157,11 @@ public:
 
 	/*############### Handler ##################*/
 	void ConnectionSuccessfulHandler(u16 connectionHandle) override;
-	bool GapDisconnectionHandler(u8 hciDisconnectReason) override;
+	bool GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason) override;
 	void GATTServiceDiscoveredHandler(ble_db_discovery_evt_t &evt) override;
 
 	void PrintStatus() override;
 
+	u32 getAmountOfCorruptedMessaged();
 };
 

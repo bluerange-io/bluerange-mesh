@@ -1,7 +1,7 @@
-= StatusReporterModule (moduleId 3)
+= Status Reporter Module (ID 3)
 
 == Purpose
-The _StatusReporterModule_ reports the node status in a configured interval. It provides methods for directly requesting different kinds of device info and status data.
+The _StatusReporterModule_ with _ModuleId_ 3 reports the node status in a configured interval. It provides methods for directly requesting different kinds of device info and status data.
 
 == Functionality
 The _StatusReporterModule_ can periodically send out
@@ -216,7 +216,7 @@ time.
 |===
 |Bytes|Type|Description
 
-|2|partnerId|_nodeId_ of the connected node 
+|2|partnerId|_nodeId_ of the connected node
 |1|rssi|RSSI as a signed integer
 |===
 

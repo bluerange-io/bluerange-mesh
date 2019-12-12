@@ -34,6 +34,7 @@
 #include <RecordStorage.h>
 #include <Module.h>
 #include <cctype>
+#include <limits>
 #include "GlobalState.h"
 
 u32 Utility::GetSettingsPageBaseAddress()
@@ -47,25 +48,23 @@ u32 Utility::GetSettingsPageBaseAddress()
 
 RecordStorageResultCode Utility::SaveModuleSettingsToFlash(const Module* module, ModuleConfiguration* configurationPointer, const u16 configurationLength, RecordStorageEventListener* listener, u32 userType, u8* userData, u16 userDataLength)
 {
-	return  Utility::SaveModuleSettingsToFlashWithId(module->moduleId, configurationPointer, configurationLength, listener, userType, userData, userDataLength);
+	return Utility::SaveModuleSettingsToFlashWithId(module->moduleId, configurationPointer, configurationLength, listener, userType, userData, userDataLength);
 }
 
 RecordStorageResultCode Utility::SaveModuleSettingsToFlashWithId(ModuleId moduleId, ModuleConfiguration * configurationPointer, const u16 configurationLength, RecordStorageEventListener * listener, u32 userType, u8 * userData, u16 userDataLength)
 {
-	RecordStorageResultCode err = GS->recordStorage.SaveRecord((u16)moduleId, (u8*)configurationPointer, configurationLength, listener, userType, userData, userDataLength);
-
-	return err;
+	return GS->recordStorage.SaveRecord((u16)moduleId, (u8*)configurationPointer, configurationLength, listener, userType, userData, userDataLength);
 }
 
 
 u32 Utility::GetRandomInteger(void)
 {
-	u32 err = NRF_ERROR_BUSY;
+	ErrorType err = ErrorType::BUSY;
 	u32 randomNumber;
 
-	while(err != FruityHal::SUCCESS){
+	while(err != ErrorType::SUCCESS){
 		//A busy loop is fine here because the nordic spec guarantees us, that we will, at some point, get a random number. If not, the node itself is broken.
-		err = sd_rand_application_vector_get((u8*) &randomNumber, 4);
+		err = FruityHal::GetRandomBytes((u8*) &randomNumber, 4);
 	}
 
 	return randomNumber;
@@ -181,6 +180,111 @@ bool Utility::IsPowerOfTwo(u32 val)
 	else return ((val & (val - 1ul)) == 0ul);
 }
 
+NodeId Utility::TerminalArgumentToNodeId(const char * arg)
+{
+	if (arg == nullptr)
+	{
+		SIMEXCEPTION(IllegalArgumentException);
+		return NODE_ID_INVALID;
+	}
+
+	// Special target values
+	if (strcmp(arg, "this") == 0) return GS->node.configuration.nodeId;
+
+	bool didError = false;
+	NodeId retVal = Utility::StringToU16(arg, &didError);
+	if (didError) return NODE_ID_INVALID;
+	return retVal;
+}
+
+long Utility::StringToLong(const char *str, bool *outDidError)
+{
+	static_assert(sizeof(long) >= sizeof(i32), "This function is used to parse strings to variables of size i32. Thus long must be at least as big.");
+	char *endPtr = nullptr;
+
+	const long retVal = strtol(str, &endPtr, 0);
+	if (endPtr == str || *endPtr != '\0')
+	{
+		if (outDidError != nullptr) *outDidError = true;
+		SIMEXCEPTION(NotANumberStringException);
+		return 0;
+	}
+
+	return retVal;
+}
+
+unsigned long Utility::StringToUnsignedLong(const char * str, bool *outDidError)
+{
+	static_assert(sizeof(unsigned long) >= sizeof(u32), "This function is used to parse strings to variables of size u32. Thus unsigned long must be at least as big.");
+	char *endPtr = nullptr;
+
+	const unsigned long retVal = strtoul(str, &endPtr, 0);
+	if (endPtr == str || *endPtr != '\0')
+	{
+		if (outDidError != nullptr) *outDidError = true;
+		SIMEXCEPTION(NotANumberStringException);
+		return 0;
+	}
+
+	return retVal;
+}
+
+template<typename T>
+static T StringToU(const char *str, bool *outDidError)
+{
+	const unsigned long retVal = Utility::StringToUnsignedLong(str, outDidError);
+	if (retVal > std::numeric_limits<T>::max())
+	{
+		if (outDidError != nullptr) *outDidError = true;
+		SIMEXCEPTION(NumberStringNotInRangeException);
+		return 0;
+	}
+	return retVal;
+}
+
+u8 Utility::StringToU8(const char * str, bool *outDidError)
+{
+	return StringToU<u8>(str, outDidError);
+}
+
+u16 Utility::StringToU16(const char * str, bool *outDidError)
+{
+	return StringToU<u16>(str, outDidError);
+}
+
+u32 Utility::StringToU32(const char * str, bool *outDidError)
+{
+	return StringToU<u32>(str, outDidError);
+}
+
+template<typename T>
+static T StringToI(const char *str, bool *outDidError)
+{
+	const long retVal = Utility::StringToLong(str, outDidError);
+	if (retVal > std::numeric_limits<T>::max() || retVal < std::numeric_limits<T>::min())
+	{
+		if (outDidError != nullptr) *outDidError = true;
+		SIMEXCEPTION(NumberStringNotInRangeException);
+		return 0;
+	}
+	return retVal;
+}
+
+i8 Utility::StringToI8(const char * str, bool *outDidError)
+{
+	return StringToI<i8>(str, outDidError);
+}
+
+i16 Utility::StringToI16(const char * str, bool *outDidError)
+{
+	return StringToI<i16>(str, outDidError);
+}
+
+i32 Utility::StringToI32(const char * str, bool *outDidError)
+{
+	return StringToI<i32>(str, outDidError);
+}
+
 /*
 void Utility::GetVersionStringFromInts(u16 major, char* outputBuffer)
 {
@@ -262,14 +366,8 @@ u32 Utility::CalculateCrc32(const u8* message, const i32 messageLength) {
 //Encrypts a message
 void Utility::Aes128BlockEncrypt(const Aes128Block* messageBlock, const Aes128Block* key, Aes128Block* encryptedMessage)
 {
-	u32 err;
-
-	nrf_ecb_hal_data_t blockToEncrypt;
-	memcpy(blockToEncrypt.key, key->data, 16);
-	memcpy(blockToEncrypt.cleartext, messageBlock->data, 16);
-
-	err = sd_ecb_block_encrypt(&blockToEncrypt);
-	memcpy(encryptedMessage->data, blockToEncrypt.ciphertext, 16);
+	// TODO: what should we do in case of error ?
+	FruityHal::EcbEncryptBlock((const u8*)key->data, (const u8*)messageBlock->data, (u8*)encryptedMessage->data);
 }
 
 void Utility::XorBytes(const u8* src1, const u8* src2, const u8 numBytes, u8* out) {

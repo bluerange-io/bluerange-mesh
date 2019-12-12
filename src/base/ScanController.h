@@ -42,7 +42,7 @@
 #define SCAN_CONTROLLER_JOBS_MAX	4
 
 enum class ScanJobState : u8{
-	INACTIVE,
+	INVALID,
 	ACTIVE,
 };
 
@@ -59,29 +59,29 @@ typedef struct ScanJob
 class ScanController
 {
 private:
-	fh_ble_gap_scan_params_t currentScanParams;
-	bool scanStateOk;
+	FruityHal::BleGapScanParams currentScanParams;
+	bool scanStateOk = true;
 	SimpleArray<ScanJob, SCAN_CONTROLLER_JOBS_MAX> jobs;
-	ScanJob* currentActiveJob;
+	ScanJob* currentActiveJob = nullptr;
 
 
 	void TryConfiguringScanState();
 
 public:
 	ScanController();
-#if SDK == 15
-	u8 scanBuffer[31];	// 31 = BLE_GAP_SCAN_BUFFER_MAX
-#endif
 	static ScanController& getInstance();
 
 	//Job Scheduling
 	ScanJob* AddJob(ScanJob& job);
 	void RefreshJobs();
 	void RemoveJob(ScanJob * p_jobHandle);
+	//Helper for a common use, where an old job should be removed (if set), and
+	//a new one should be created with a given ScanState and ScanJobState.
+	void UpdateJobPointer(ScanJob **outUpdatePtr, ScanState type, ScanJobState state);
 
 	void TimerEventHandler(u16 passedTimeDs);
 
-	bool ScanEventHandler(const GapAdvertisementReportEvent& advertisementReportEvent) const;
+	bool ScanEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) const;
 
 	//Must be called if scanning was stopped by any external procedure
 	void ScanningHasStopped();

@@ -75,22 +75,13 @@ void MeshAccessModule::ConfigurationLoadedHandler(ModuleConfiguration* migratabl
 	if(configuration.moduleActive)
 	{
 		RegisterGattService();
-
-		if (allowInboundConnections) {
-			BroadcastMeshAccessPacket();
-		} else {
-			DisableBroadcast();
-		}
-	} else {
-		DisableBroadcast();
 	}
+	UpdateMeshAccessBroadcastPacket();
 }
 
 
 void MeshAccessModule::TimerEventHandler(u16 passedTimeDs)
 {
-	if(!configuration.moduleActive) return;
-
 }
 
 void MeshAccessModule::RegisterGattService()
@@ -105,106 +96,125 @@ void MeshAccessModule::RegisterGattService()
 
 	//########################## At first, we register our custom service ########################
 	//Add our Service UUID to the BLE stack for management
-	ble_uuid128_t baseUUID128 = { MA_SERVICE_BASE_UUID };
-	err = sd_ble_uuid_vs_add(&baseUUID128, &meshAccessService.serviceUuid.type);
+	err = FruityHal::BleUuidVsAdd(MA_SERVICE_BASE_UUID, &meshAccessService.serviceUuid.type);
 	APP_ERROR_CHECK(err); //OK
 
 	//Add the service
 	meshAccessService.serviceUuid.uuid = MA_SERVICE_SERVICE_CHARACTERISTIC_UUID;
 
-	err = sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY, &meshAccessService.serviceUuid, &meshAccessService.serviceHandle);
+	err = FruityHal::BleGattServiceAdd(FruityHal::BleGattSrvcType::PRIMARY, meshAccessService.serviceUuid, &meshAccessService.serviceHandle);
 	APP_ERROR_CHECK(err); //OK
 
 	//########################## Now we need to add a characteristic to that service ########################
 	//Read and write permissions, variable length, etc...
-	ble_gatts_attr_md_t rxAttributeMetadata;
-	CheckedMemset(&rxAttributeMetadata, 0, sizeof(ble_gatts_attr_md_t));
-	BLE_GAP_CONN_SEC_MODE_SET_OPEN(&rxAttributeMetadata.read_perm);
-	BLE_GAP_CONN_SEC_MODE_SET_OPEN(&rxAttributeMetadata.write_perm);
-	rxAttributeMetadata.vloc = BLE_GATTS_VLOC_STACK; //We currently have the value on the SoftDevice stack, we might port that to the application space
-	rxAttributeMetadata.rd_auth = 0;
-	rxAttributeMetadata.wr_auth = 0;
-	rxAttributeMetadata.vlen = 1; //Make it a variable length attribute
+	FruityHal::BleGattAttributeMetadata rxAttributeMetadata;
+	CheckedMemset(&rxAttributeMetadata, 0, sizeof(rxAttributeMetadata));
+	FH_CONNECTION_SECURITY_MODE_SET_OPEN(&rxAttributeMetadata.readPerm);
+	FH_CONNECTION_SECURITY_MODE_SET_OPEN(&rxAttributeMetadata.writePerm);
+	rxAttributeMetadata.valueLocation = BLE_GATTS_VLOC_STACK; //We currently have the value on the SoftDevice stack, we might port that to the application space
+	rxAttributeMetadata.readAuthorization = 0;
+	rxAttributeMetadata.writeAuthorization = 0;
+	rxAttributeMetadata.variableLength = 1; //Make it a variable length attribute
 
 	//Characteristic metadata
-	ble_gatts_char_md_t rxCharacteristicMetadata;
-	CheckedMemset(&rxCharacteristicMetadata, 0, sizeof(ble_gatts_char_md_t));
-	rxCharacteristicMetadata.char_props.read = 0; /*Reading value permitted*/
-	rxCharacteristicMetadata.char_props.write = 1; /*Writing value with Write Request permitted*/
-	rxCharacteristicMetadata.char_props.write_wo_resp = 1; /*Writing value with Write Command permitted*/
-	rxCharacteristicMetadata.char_props.auth_signed_wr = 0; /*Writing value with Signed Write Command not permitted*/
-	rxCharacteristicMetadata.char_props.notify = 0; /*Notications of value permitted*/
-	rxCharacteristicMetadata.char_props.indicate = 0; /*Indications of value not permitted*/
-	rxCharacteristicMetadata.p_cccd_md = nullptr;//&clientCharacteristicConfigurationDescriptor;
+	FruityHal::BleGattCharMd rxCharacteristicMetadata;
+	CheckedMemset(&rxCharacteristicMetadata, 0, sizeof(rxCharacteristicMetadata));
+	rxCharacteristicMetadata.charProperties.read = 0; /*Reading value permitted*/
+	rxCharacteristicMetadata.charProperties.write = 1; /*Writing value with Write Request permitted*/
+	rxCharacteristicMetadata.charProperties.writeWithoutResponse = 1; /*Writing value with Write Command permitted*/
+	rxCharacteristicMetadata.charProperties.authSignedWrite = 0; /*Writing value with Signed Write Command not permitted*/
+	rxCharacteristicMetadata.charProperties.notify = 0; /*Notications of value permitted*/
+	rxCharacteristicMetadata.charProperties.indicate = 0; /*Indications of value not permitted*/
+	rxCharacteristicMetadata.p_cccdMd = nullptr;//&clientCharacteristicConfigurationDescriptor;
 
 	//The rxAttribute
-	ble_uuid_t rxAttributeUUID;
+	FruityHal::BleGattUuid rxAttributeUUID;
+	CheckedMemset(&rxAttributeUUID, 0, sizeof(rxAttributeUUID));
 	rxAttributeUUID.type = meshAccessService.serviceUuid.type;
 	rxAttributeUUID.uuid = MA_SERVICE_RX_CHARACTERISTIC_UUID;
 
-	ble_gatts_attr_t rxAttribute;
-	CheckedMemset(&rxAttribute, 0, sizeof(ble_gatts_attr_t));
+	FruityHal::BleGattAttribute rxAttribute;
+	CheckedMemset(&rxAttribute, 0, sizeof(rxAttribute));
 	rxAttribute.p_uuid = &rxAttributeUUID; /* The UUID of the Attribute*/
-	rxAttribute.p_attr_md = &rxAttributeMetadata; /* The previously defined attribute Metadata */
-	rxAttribute.max_len = MA_CHARACTERISTIC_MAX_LENGTH;
-	rxAttribute.init_len = 0;
-	rxAttribute.init_offs = 0;
+	rxAttribute.p_attributeMetadata = &rxAttributeMetadata; /* The previously defined attribute Metadata */
+	rxAttribute.maxLen = MA_CHARACTERISTIC_MAX_LENGTH;
+	rxAttribute.initLen = 0;
+	rxAttribute.initOffset = 0;
 
 	//Finally, add the characteristic
-	err = sd_ble_gatts_characteristic_add(meshAccessService.serviceHandle, &rxCharacteristicMetadata, &rxAttribute, &meshAccessService.rxCharacteristicHandle);
-	if(err != 0) logt("ERROR", "maRxHandle %u, err:%u", meshAccessService.rxCharacteristicHandle.value_handle, err);
+	err = FruityHal::BleGattCharAdd(meshAccessService.serviceHandle, rxCharacteristicMetadata, rxAttribute, meshAccessService.rxCharacteristicHandle);
+	if(err != 0) logt("ERROR", "maRxHandle %u, err:%u", meshAccessService.rxCharacteristicHandle.valueHandle, err);
 
 
 	//##################### Add another characteristic for Sending Data via notifications ####################
 	//Characteristic metadata
-	ble_gatts_char_md_t txCharacteristicMetadata;
-	CheckedMemset(&txCharacteristicMetadata, 0, sizeof(ble_gatts_char_md_t));
-	txCharacteristicMetadata.char_props.read = 1; /*Reading value permitted*/
-	txCharacteristicMetadata.char_props.write = 0; /*Writing value with Write Request permitted*/
-	txCharacteristicMetadata.char_props.write_wo_resp = 0; /*Writing value with Write Command permitted*/
-	txCharacteristicMetadata.char_props.auth_signed_wr = 0; /*Writing value with Signed Write Command not permitted*/
-	txCharacteristicMetadata.char_props.notify = 1; /*Notications of value permitted*/
-	txCharacteristicMetadata.char_props.indicate = 0; /*Indications of value not permitted*/
-	txCharacteristicMetadata.p_cccd_md = nullptr; /*Default values*/
+	FruityHal::BleGattCharMd txCharacteristicMetadata;
+	CheckedMemset(&txCharacteristicMetadata, 0, sizeof(txCharacteristicMetadata));
+	txCharacteristicMetadata.charProperties.read = 1; /*Reading value permitted*/
+	txCharacteristicMetadata.charProperties.write = 0; /*Writing value with Write Request permitted*/
+	txCharacteristicMetadata.charProperties.writeWithoutResponse = 0; /*Writing value with Write Command permitted*/
+	txCharacteristicMetadata.charProperties.authSignedWrite = 0; /*Writing value with Signed Write Command not permitted*/
+	txCharacteristicMetadata.charProperties.notify = 1; /*Notications of value permitted*/
+	txCharacteristicMetadata.charProperties.indicate = 0; /*Indications of value not permitted*/
+	txCharacteristicMetadata.p_cccdMd = nullptr; /*Default values*/
 
 	//Attribute Metadata
-	ble_gatts_attr_md_t txAttributeMetadata;
-	CheckedMemset(&txAttributeMetadata, 0, sizeof(ble_gatts_attr_md_t));
-	BLE_GAP_CONN_SEC_MODE_SET_OPEN(&txAttributeMetadata.read_perm);
-	BLE_GAP_CONN_SEC_MODE_SET_OPEN(&txAttributeMetadata.write_perm);
-	txAttributeMetadata.vloc = BLE_GATTS_VLOC_STACK; //We currently have the value on the SoftDevice stack, we might port that to the application space
-	txAttributeMetadata.rd_auth = 0;
-	txAttributeMetadata.wr_auth = 0;
-	txAttributeMetadata.vlen = 1; //Make it a variable length attribute
+	FruityHal::BleGattAttributeMetadata txAttributeMetadata;
+	CheckedMemset(&txAttributeMetadata, 0, sizeof(txAttributeMetadata));
+	FH_CONNECTION_SECURITY_MODE_SET_OPEN(&txAttributeMetadata.readPerm);
+	FH_CONNECTION_SECURITY_MODE_SET_OPEN(&txAttributeMetadata.writePerm);
+	txAttributeMetadata.valueLocation = BLE_GATTS_VLOC_STACK; //We currently have the value on the SoftDevice stack, we might port that to the application space
+	txAttributeMetadata.readAuthorization = 0;
+	txAttributeMetadata.writeAuthorization = 0;
+	txAttributeMetadata.variableLength = 1; //Make it a variable length attribute
 
 	//Attribute UUID
-	ble_uuid_t txAttributeUUID;
+	FruityHal::BleGattUuid txAttributeUUID;
+	CheckedMemset(&txAttributeUUID, 0, sizeof(txAttributeUUID));
 	txAttributeUUID.type = meshAccessService.serviceUuid.type;
 	txAttributeUUID.uuid = MA_SERVICE_TX_CHARACTERISTIC_UUID;
 
 	//TxAttribute for sending Data via Notifications
-	ble_gatts_attr_t txAttribute;
-	CheckedMemset(&txAttribute, 0, sizeof(ble_gatts_attr_t));
+	FruityHal::BleGattAttribute txAttribute;
+	CheckedMemset(&txAttribute, 0, sizeof(txAttribute));
 	txAttribute.p_uuid = &txAttributeUUID; /* The UUID of the Attribute*/
-	txAttribute.p_attr_md = &txAttributeMetadata; /* The previously defined attribute Metadata */
-	txAttribute.max_len = MA_CHARACTERISTIC_MAX_LENGTH;
-	txAttribute.init_len = 0;
-	txAttribute.init_offs = 0;
+	txAttribute.p_attributeMetadata = &txAttributeMetadata; /* The previously defined attribute Metadata */
+	txAttribute.maxLen = MA_CHARACTERISTIC_MAX_LENGTH;
+	txAttribute.initLen = 0;
+	txAttribute.initOffset = 0;
 
 	//Add the attribute
 
-	err = sd_ble_gatts_characteristic_add(meshAccessService.serviceHandle, &txCharacteristicMetadata, &txAttribute, &meshAccessService.txCharacteristicHandle);
+	err = FruityHal::BleGattCharAdd(meshAccessService.serviceHandle, txCharacteristicMetadata, txAttribute, meshAccessService.txCharacteristicHandle);
 
-	if(err != 0) logt("ERROR", "maTxHandle %u, err:%u", meshAccessService.txCharacteristicHandle.value_handle, err);
+	if(err != 0) logt("ERROR", "maTxHandle %u, err:%u", meshAccessService.txCharacteristicHandle.valueHandle, err);
 }
 
-void MeshAccessModule::BroadcastMeshAccessPacket()
+void MeshAccessModule::UpdateMeshAccessBroadcastPacket(u16 advIntervalMs,bool interestedInConnection)
 {
-	if(!enableAdvertising){
-		if(discoveryJobHandle != nullptr){
-			GS->advertisingController.RemoveJob(discoveryJobHandle);
-		}
+	if(    !enableAdvertising
+		|| !allowInboundConnections
+		|| !configuration.moduleActive)
+	{
+		DisableBroadcast();
 		return;
+	}
+
+	if (disableIfInMesh)
+	{
+		// Find out if we have an active mesh connection
+		// If we have an active connection, we disable broadcasting MeshAccessPackets
+		// The user will still be able to connect through the mesh afterwards
+		// (only if the other nodes do not do the same, which is a problem)
+
+		MeshConnections conns = GS->cm.GetMeshConnections(ConnectionDirection::INVALID);
+		for (u32 i = 0; i < conns.count; i++) {
+			if (conns.connections[i]->handshakeDone()) {
+				logt("MAMOD", "In Mesh, disabling MA broadcast");
+				DisableBroadcast();
+				return;
+			}
+		}
 	}
 	
 	//build advertising packet
@@ -212,11 +222,11 @@ void MeshAccessModule::BroadcastMeshAccessPacket()
 		AdvJobTypes::SCHEDULED, //JobType
 		5, //Slots
 		0, //Delay
-		MSEC_TO_UNITS((GS->node.isInBulkMode ? 1000 : 100), UNIT_0_625_MS), //AdvInterval
+		0, //AdvInterval
 		0, //AdvChannel
 		0, //CurrentSlots
 		0, //CurrentDelay
-		GapAdvType::ADV_IND, //Advertising Mode
+		FruityHal::BleGapAdvType::ADV_IND, //Advertising Mode
 		{0}, //AdvData
 		0, //AdvDataLength
 		{0}, //ScanData
@@ -224,37 +234,43 @@ void MeshAccessModule::BroadcastMeshAccessPacket()
 	};
 
 	//Select either the new advertising job or the already existing
-	u8* buffer;
+	AdvJob* currentJob;
 	if(discoveryJobHandle == nullptr){
-		buffer = job.advData;
+		currentJob = &job;
+		//buffer = job.advData;
 	} else {
-		buffer = discoveryJobHandle->advData;
+		currentJob = discoveryJobHandle;
 	}
-	u8* bufferPointer = buffer;
 
+	u8* buffer = currentJob->advData;
 
-	advStructureFlags* flags = (advStructureFlags*)bufferPointer;
+	currentJob->advertisingInterval = MSEC_TO_UNITS((GS->node.isInBulkMode ? 1000 : advIntervalMs), UNIT_0_625_MS);
+
+	advStructureFlags* flags = (advStructureFlags*)buffer;
 	flags->len = SIZEOF_ADV_STRUCTURE_FLAGS-1; //minus length field itself
 	flags->type = BLE_GAP_AD_TYPE_FLAGS;
 	flags->flags = BLE_GAP_ADV_FLAG_LE_GENERAL_DISC_MODE | BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED;
 
-	advStructureUUID16* serviceUuidList = (advStructureUUID16*)(bufferPointer+SIZEOF_ADV_STRUCTURE_FLAGS);
+	advStructureUUID16* serviceUuidList = (advStructureUUID16*)(buffer +SIZEOF_ADV_STRUCTURE_FLAGS);
 	serviceUuidList->len = SIZEOF_ADV_STRUCTURE_UUID16 - 1;
 	serviceUuidList->type = BLE_GAP_AD_TYPE_16BIT_SERVICE_UUID_COMPLETE;
 	serviceUuidList->uuid = SERVICE_DATA_SERVICE_UUID16;
 
-	advStructureMeshAccessServiceData* serviceData = (advStructureMeshAccessServiceData*)(bufferPointer+SIZEOF_ADV_STRUCTURE_FLAGS+SIZEOF_ADV_STRUCTURE_UUID16);
-	serviceData->len = SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA - 1;
-	serviceData->type = BLE_GAP_AD_TYPE_SERVICE_DATA;
-	serviceData->uuid = SERVICE_DATA_SERVICE_UUID16;
-	serviceData->messageType = SERVICE_DATA_MESSAGE_TYPE_MESH_ACCESS;
+	advStructureMeshAccessServiceData* serviceData = (advStructureMeshAccessServiceData*)(buffer +SIZEOF_ADV_STRUCTURE_FLAGS+SIZEOF_ADV_STRUCTURE_UUID16);
+	serviceData->data.uuid.len = SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA - 1;
+	serviceData->data.uuid.type = BLE_GAP_AD_TYPE_SERVICE_DATA;
+	serviceData->data.uuid.uuid = SERVICE_DATA_SERVICE_UUID16;
+	serviceData->data.messageType = ServiceDataMessageType::MESH_ACCESS;
 	serviceData->networkId = GS->node.configuration.networkId;
 	serviceData->isEnrolled = GS->node.configuration.enrollmentState == EnrollmentState::ENROLLED;
 	serviceData->isSink = GET_DEVICE_TYPE() == DeviceType::SINK ? 1 : 0;
 	serviceData->isZeroKeyConnectable = IsZeroKeyConnectable(ConnectionDirection::DIRECTION_IN) ? 1 : 0;
+	const u32 totalInConnections = GS->cm.GetBaseConnections(ConnectionDirection::DIRECTION_IN).count;
+	serviceData->isConnectable = totalInConnections < Conf::getInstance().totalInConnections ? 1 : 0;
+	serviceData->interestedInConnetion = (interestedInConnection) ? 1 : 0;
 	serviceData->serialIndex = RamConfig->GetSerialNumberIndex();
 	//Insert the moduleIds that should be advertised
-	memcpy(serviceData->moduleIds.getRaw(), moduleIdsToAdvertise.getRaw(), 3);
+	CheckedMemcpy(serviceData->moduleIds.getRaw(), moduleIdsToAdvertise.getRaw(), 3);
 
 	u32 length = SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_UUID16 + SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA;
 	job.advDataLength = length;
@@ -291,7 +307,7 @@ void MeshAccessModule::AddModuleIdToAdvertise(ModuleId moduleId)
 	for(u32 i=0; i<3; i++){
 		if(moduleIdsToAdvertise[i] == ModuleId::NODE){
 			moduleIdsToAdvertise[i] = moduleId;
-			BroadcastMeshAccessPacket();
+			UpdateMeshAccessBroadcastPacket();
 			return;
 		}
 	}
@@ -354,7 +370,7 @@ void MeshAccessModule::ReceivedMeshAccessConnectMessage(connPacketModule* packet
 	logt("MAMOD", "Received connect task");
 	MeshAccessModuleConnectMessage* message = (MeshAccessModuleConnectMessage*) packet->data;
 
-	u16 uniqueConnId = MeshAccessConnection::ConnectAsMaster(&message->targetAddress, 10, 4, message->fmKeyId, message->key.getRaw(), (MeshAccessTunnelType)message->tunnelType);
+	u32 uniqueConnId = MeshAccessConnection::ConnectAsMaster(&message->targetAddress, 10, 4, message->fmKeyId, message->key.getRaw(), (MeshAccessTunnelType)message->tunnelType);
 
 	MeshAccessConnection* conn = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(uniqueConnId);
 	if(conn != nullptr){
@@ -398,6 +414,13 @@ MeshAccessAuthorization MeshAccessModule::CheckMeshAccessPacketAuthorization(Bas
 			&& packet->messageType <= MessageType::ENCRYPT_CUSTOM_DONE)
 	{
 		return MeshAccessAuthorization::WHITELIST;
+	}
+
+	//The dead data message type must also always be allowed so that we can inform
+	//the connection partner about a malformed packet.
+	if (packet->messageType == MessageType::DEAD_DATA)
+	{
+		return MeshAccessAuthorization::LOCAL_ONLY;
 	}
 
 	//Default authorization for different keys
@@ -444,47 +467,32 @@ MeshAccessAuthorization MeshAccessModule::CheckAuthorizationForAll(BaseConnectio
 
 void MeshAccessModule::MeshConnectionChangedHandler(MeshConnection& connection)
 {
-	// Find out if we have an active mesh connection
-	// If we have an active connection, we disable broadcasting MeshAccessPackets
-	// The user will still be able to connect through the mesh afterwards
-	// (only if the other nodes do not do the same, which is a problem)
-	if(disableIfInMesh)
-	{
-		MeshConnections conns = GS->cm.GetMeshConnections(ConnectionDirection::INVALID);
-		for(u32 i=0; i<conns.count; i++){
-			if(conns.connections[i]->handshakeDone()){
-				logt("MAMOD", "In Mesh, disabling MA broadcast");
-				DisableBroadcast();
-				return;
-			}
-		}
-		logt("MAMOD", "Single node, enabling MA Broadcast");
-		BroadcastMeshAccessPacket();
-	}
+	UpdateMeshAccessBroadcastPacket();
 };
 
 #ifdef TERMINAL_ENABLED
-bool MeshAccessModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
+TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize)
 {
 #if IS_INACTIVE(SAVE_SPACE)
 	if(TERMARGS(0, "maconn"))
 	{
-		if(commandArgsSize <= 1) return false;
+		if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
 		//Allows us to connect to any node when giving the GAP Address
-		fh_ble_gap_addr_t addr;
+		FruityHal::BleGapAddr addr;
+		CheckedMemset(&addr, 0, sizeof(addr));
 		Logger::parseEncodedStringToBuffer(commandArgs[1], addr.addr, 6);
-		addr.addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC;
+		addr.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
 		Utility::swapBytes(addr.addr, 6);
 
 		u32 fmKeyId = FM_KEY_ID_NETWORK;
 		if(commandArgsSize > 2){
-			fmKeyId = atoi(commandArgs[2]);
+			fmKeyId = Utility::StringToU32(commandArgs[2]);
 		}
 
 		MeshAccessConnection::ConnectAsMaster(&addr, 10, 4, fmKeyId, nullptr, MeshAccessTunnelType::REMOTE_MESH);
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	else if(TERMARGS(0, "malog"))
 	{
@@ -492,7 +500,7 @@ bool MeshAccessModule::TerminalCommandHandler(char* commandArgs[], u8 commandArg
 		{
 			if (strlen(commandArgs[1]) + 1 > sizeof(logWildcard))
 			{
-				return false;
+				return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
 			}
 		}
 		CheckedMemset(logWildcard, 0, sizeof(logWildcard));
@@ -508,36 +516,37 @@ bool MeshAccessModule::TerminalCommandHandler(char* commandArgs[], u8 commandArg
 		}
 		
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 #endif
 
 	//React on commands, return true if handled, false otherwise
 	if(commandArgsSize >= 4 && TERMARGS(0, "action") && TERMARGS(2, moduleName))
 	{
-		NodeId destinationNode = (TERMARGS(1,"this")) ? GS->node.configuration.nodeId : atoi(commandArgs[1]);
+		NodeId destinationNode = Utility::TerminalArgumentToNodeId(commandArgs[1]);
 
 		//action this ma connect AA:BB:CC:DD:EE:FF fmKeyId nodeKey
-		if(TERMARGS(3,"connect") && commandArgsSize >= 5)
+		if(TERMARGS(3,"connect"))
 		{
+			if (commandArgsSize < 5) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 			MeshAccessModuleConnectMessage data;
 			CheckedMemset(&data, 0x00, sizeof(data));
 			data.fmKeyId = FM_KEY_ID_NODE;
 
 			//Allows us to connect to any node when giving the GAP Address
-			data.targetAddress.addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC;
+			data.targetAddress.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
 			Logger::parseEncodedStringToBuffer(commandArgs[4], data.targetAddress.addr, 6);
 			Utility::swapBytes(data.targetAddress.addr, 6);
 
-			if(commandArgsSize > 5) data.fmKeyId = atoi(commandArgs[5]);
+			if(commandArgsSize > 5) data.fmKeyId = Utility::StringToU32(commandArgs[5]);
 			if(commandArgsSize > 6){
 				Logger::parseEncodedStringToBuffer(commandArgs[6], data.key.getRaw(), 16);
 			} else {
 				//Set to invalid key so that the receiving node knows it should select from its own keys
 				data.key.setAllBytesTo(0xFF);
 			}
-			data.tunnelType = (commandArgsSize > 7) ? atoi(commandArgs[7]) : 0;
-			u8 requestHandle = (commandArgsSize > 8) ? atoi(commandArgs[8]) : 0;
+			data.tunnelType = (commandArgsSize > 7) ? Utility::StringToU8(commandArgs[7]) : 0;
+			u8 requestHandle = (commandArgsSize > 8) ? Utility::StringToU8(commandArgs[8]) : 0;
 
 			SendModuleActionMessage(
 				MessageType::MODULE_TRIGGER_ACTION,
@@ -549,19 +558,20 @@ bool MeshAccessModule::TerminalCommandHandler(char* commandArgs[], u8 commandArg
 				false
 			);
 
-			return true;
+			return TerminalCommandHandlerReturnType::SUCCESS;
 		}
-		else if(TERMARGS(3,"disconnect") && commandArgsSize >= 5)
+		else if(TERMARGS(3,"disconnect"))
 		{
+			if (commandArgsSize < 5) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 			MeshAccessModuleDisconnectMessage data;
 			CheckedMemset(&data, 0x00, sizeof(data));
 
 			//Allows us to connect to any node when giving the GAP Address
-			data.targetAddress.addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC;
+			data.targetAddress.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
 			Logger::parseEncodedStringToBuffer(commandArgs[4], data.targetAddress.addr, 6);
 			Utility::swapBytes(data.targetAddress.addr, 6);
 
-			u8 requestHandle = (commandArgsSize > 5) ? atoi(commandArgs[5]) : 0;
+			u8 requestHandle = (commandArgsSize > 5) ? Utility::StringToU8(commandArgs[5]) : 0;
 
 			SendModuleActionMessage(
 				MessageType::MODULE_TRIGGER_ACTION,
@@ -573,7 +583,7 @@ bool MeshAccessModule::TerminalCommandHandler(char* commandArgs[], u8 commandArg
 				false
 			);
 
-			return true;
+			return TerminalCommandHandlerReturnType::SUCCESS;
 		}
 	}
 
@@ -582,21 +592,20 @@ bool MeshAccessModule::TerminalCommandHandler(char* commandArgs[], u8 commandArg
 }
 #endif
 
-void MeshAccessModule::GapAdvertisementReportEventHandler(const GapAdvertisementReportEvent& advertisementReportEvent)
+void MeshAccessModule::GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent)
 {
+	const advPacketServiceAndDataHeader* packet = (const advPacketServiceAndDataHeader*)advertisementReportEvent.getData();
+	const advStructureMeshAccessServiceData* maPacket = (const advStructureMeshAccessServiceData*)&packet->data;
 #if IS_INACTIVE(GW_SAVE_SPACE)
 	if(logNearby){
-		const advPacketServiceAndDataHeader* packet = (const advPacketServiceAndDataHeader*)advertisementReportEvent.getData();
-		const advStructureMeshAccessServiceData* maPacket = (const advStructureMeshAccessServiceData*)&packet->data;
-
 		//Check if the advertising packet is an asset packet
 		if (
 				advertisementReportEvent.getDataLength() >= SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA
 				&& packet->flags.len == SIZEOF_ADV_STRUCTURE_FLAGS-1
 				&& packet->uuid.len == SIZEOF_ADV_STRUCTURE_UUID16-1
-				&& packet->data.type == BLE_GAP_AD_TYPE_SERVICE_DATA
-				&& packet->data.uuid == SERVICE_DATA_SERVICE_UUID16
-				&& packet->data.messageType == SERVICE_DATA_MESSAGE_TYPE_MESH_ACCESS
+				&& packet->data.uuid.type == BLE_GAP_AD_TYPE_SERVICE_DATA
+				&& packet->data.uuid.uuid == SERVICE_DATA_SERVICE_UUID16
+				&& packet->data.messageType == ServiceDataMessageType::MESH_ACCESS
 		){
 			char serialNumber[6];
 			Utility::GenerateBeaconSerialForIndex(maPacket->serialIndex, serialNumber);
@@ -621,6 +630,21 @@ void MeshAccessModule::GapAdvertisementReportEventHandler(const GapAdvertisement
 		}
 	}
 #endif
+	if (advertisementReportEvent.getDataLength() >= SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA
+		&& packet->flags.len == SIZEOF_ADV_STRUCTURE_FLAGS - 1
+		&& packet->uuid.len == SIZEOF_ADV_STRUCTURE_UUID16 - 1
+		&& packet->data.uuid.type == BLE_GAP_AD_TYPE_SERVICE_DATA
+		&& packet->data.uuid.uuid == SERVICE_DATA_SERVICE_UUID16
+		&& packet->data.messageType == ServiceDataMessageType::MESH_ACCESS
+		&& maPacket->interestedInConnetion == 1
+		&& (maPacket->networkId == GS->node.configuration.networkId
+			|| maPacket->networkId == 0)) {
+
+		FruityHal::BleGapAddr addr;
+		addr.addr_type = advertisementReportEvent.getPeerAddrType();
+		CheckedMemcpy(addr.addr,advertisementReportEvent.getPeerAddr(),6);
+		u16 connectionId = MeshAccessConnection::ConnectAsMaster(&addr, 10, 4, FM_KEY_ID_ORGANIZATION, GS->node.configuration.organizationKey, MeshAccessTunnelType::LOCAL_MESH);
+	}
 }
 
 bool MeshAccessModule::IsZeroKeyConnectable(const ConnectionDirection direction)

@@ -51,6 +51,10 @@ class DebugModule: public Module
 
 		static constexpr u8 debugButtonEnableUartDs = 0;
 
+		static constexpr u16 readMemMaxLength = 32;
+
+		static constexpr u32 surplusAccuracy = 10000;
+
 		#pragma pack(push, 1)
 		//Module configuration that is saved persistently
 		struct DebugModuleConfiguration : ModuleConfiguration{
@@ -60,14 +64,26 @@ class DebugModule: public Module
 
 		//Counters for flood messages
 		FloodMode floodMode;
+		bool floodFrameSkip = false; //When entering the flood command in the local terminal, the passed timeDs can be large. This skips these large values
 		NodeId floodDestinationId;
-		u32 floodMessagesPer100Sec; // the number of ticks per 100 sec should ideally be dividable by this or should be a multiple
+		u32 floodMessagesPer10Sec = 0; // the number of ticks per 100 sec should ideally be dividable by this or should be a multiple
+		u32 floodMessagesSurplus = 0;
+		u32 floodTimeoutSec = 0;
+		u32 floodEndTimeDs = 0;
 		//Counters for flood messages
 		u32 packetsOut;
 		u32 packetsIn;
 
+		//Variables for counter mode
+		NodeId counterDestinationId = 0;
+		u16 counterMessagesPer10Sec = 0;
+		u32 counterMessagesSurplus = 0;
+		u32 counterMaxCount = 0;
+		u32 currentCounter = 0;
+		u32 counterCheck = 0;
+
 		//Counters for ping
-		u32 pingSentTicks;
+		u32 pingSentTimeMs;
 		u8 pingHandle;
 		u16 pingCount;
 		u16 pingCountResponses;
@@ -133,20 +149,55 @@ class DebugModule: public Module
 		STATIC_ASSERT_SIZE(DebugModuleFloodMessage, 25);
 
 
-		static constexpr int SIZEOF_DEBUG_MODULE_SET_FLOOD_MODE_MESSAGE = 5;
+		static constexpr int SIZEOF_DEBUG_MODULE_SET_FLOOD_MODE_MESSAGE = 7;
 		typedef struct
 		{
 			NodeId floodDestinationId;
-			u16 packetsPer100Sec;
+			u16 packetsPer10Sec;
 			u8 floodMode;
+			u16 timeoutSec;
 
 		} DebugModuleSetFloodModeMessage;
-		STATIC_ASSERT_SIZE(DebugModuleSetFloodModeMessage, 5);
+		STATIC_ASSERT_SIZE(DebugModuleSetFloodModeMessage, 7);
+
+		static constexpr int SIZEOF_DEBUG_MODULE_START_COUNTER_MESSAGE = 8;
+		typedef struct
+		{
+			NodeId counterDestinationId;
+			u16 packetsPer10Sec;
+			u32 maxCount;
+
+		} DebugModuleStartCounterMessage;
+		STATIC_ASSERT_SIZE(DebugModuleStartCounterMessage, 8);
+
+		static constexpr int SIZEOF_DEBUG_MODULE_COUNTER_MESSAGE = 4;
+		typedef struct
+		{
+			u32 counter;
+		} DebugModuleCounterMessage;
+		STATIC_ASSERT_SIZE(DebugModuleCounterMessage, 4);
 
 		typedef struct
 		{
 			u8 data[MAX_MESH_PACKET_SIZE - SIZEOF_CONN_PACKET_MODULE];
 		} DebugModuleSendMaxMessageResponse;
+
+		//Read Memory
+		static constexpr int SIZEOF_DEBUG_MODULE_READ_MEMORY_MESSAGE = 6;
+		typedef struct
+		{
+			u32 address;
+			u16 length;
+		} DebugModuleReadMemoryMessage;
+		STATIC_ASSERT_SIZE(DebugModuleReadMemoryMessage, SIZEOF_DEBUG_MODULE_READ_MEMORY_MESSAGE);
+
+		static constexpr int SIZEOF_DEBUG_MODULE_MEMORY_MESSAGE_HEADER = 4;
+		typedef struct
+		{
+			u32 address;
+			u8 data[readMemMaxLength];
+		} DebugModuleMemoryMessage;
+		STATIC_ASSERT_SIZE(DebugModuleMemoryMessage, readMemMaxLength + SIZEOF_DEBUG_MODULE_MEMORY_MESSAGE_HEADER);
 
 		#pragma pack(pop)
 
@@ -174,6 +225,9 @@ class DebugModule: public Module
 			GET_JOIN_ME_BUFFER = 14,
 			RESET_FLOOD_COUNTER = 15,
 			SEND_MAX_MESSAGE = 16,
+			START_COUNTER = 17,
+			COUNTER = 18,
+			READ_MEMORY = 19,
 
 		};
 
@@ -185,6 +239,7 @@ class DebugModule: public Module
 			JOIN_ME_BUFFER_ITEM = 10,
 			EINK_SETANDDRAW_RESPONSE_DEPRECATED = 11,
 			SEND_MAX_MESSAGE_RESPONSE = 16,
+			MEMORY = 19,
 		};
 
 		DebugModule();
@@ -202,10 +257,11 @@ class DebugModule: public Module
 #endif
 
 		#ifdef TERMINAL_ENABLED
-		bool TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize) override;
+		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
 		#endif
 
 		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) override;
+
 		u32 getPacketsIn();
 		u32 getPacketsOut();
 		

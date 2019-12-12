@@ -44,16 +44,8 @@
 
 ScanController::ScanController()
 {
-	//Define scanning Parameters
-	currentScanParams.interval = 0;				// Scan interval.
-	currentScanParams.window = 0;	// Scan window.
-	currentScanParams.timeout = 0;					// Never stop scanning unless explicit asked to.
-
-	scanStateOk = true;
+	CheckedMemset(&currentScanParams, 0, sizeof(currentScanParams));
 	jobs.zeroData();
-#if SDK == 15
-	CheckedMemset(scanBuffer, 0, sizeof(scanBuffer));
-#endif
 }
 
 void ScanController::TimerEventHandler(u16 passedTimeDs)
@@ -82,7 +74,7 @@ ScanController & ScanController::getInstance()
 // If the new job has higher duty cycle than current job it will be set as current.
 ScanJob* ScanController::AddJob(ScanJob& job)
 {
-	if (job.state == ScanJobState::INACTIVE) return nullptr;
+	if (job.state == ScanJobState::INVALID) return nullptr;
 	if (job.type == ScanState::HIGH)
 	{
 		job.interval = Conf::getInstance().meshScanIntervalHigh;
@@ -107,7 +99,7 @@ ScanJob* ScanController::AddJob(ScanJob& job)
 
 	for (u8 i = 0; i < jobs.length; i++)
 	{
-		if (jobs[i].state == ScanJobState::ACTIVE) continue;
+		if (jobs[i].state != ScanJobState::INVALID) continue;
 		job.leftTimeoutDs = job.timeout * 10;
 		jobs[i] = job;
 		RefreshJobs();
@@ -160,22 +152,31 @@ void ScanController::RefreshJobs()
 void ScanController::RemoveJob(ScanJob * p_jobHandle)
 {
 	for (int i = 0; i < jobs.length; i++) {
-		if (&(jobs[i]) == p_jobHandle && jobs[i].state != ScanJobState::INACTIVE)
+		if (&(jobs[i]) == p_jobHandle && jobs[i].state != ScanJobState::INVALID)
 		{
-			p_jobHandle->state = ScanJobState::INACTIVE;
+			p_jobHandle->state = ScanJobState::INVALID;
 		}
 	}
 	RefreshJobs();
 }
 
+void ScanController::UpdateJobPointer(ScanJob **outUpdatePtr, ScanState type, ScanJobState state)
+{
+	GS->scanController.RemoveJob(*outUpdatePtr);
+	ScanJob scanJob = ScanJob();
+	scanJob.type = type;
+	scanJob.state = state;
+	*outUpdatePtr = GS->scanController.AddJob(scanJob);
+}
+
 //This will call the HAL to enable the current scan state
 void ScanController::TryConfiguringScanState()
 {
-	u32 err;
-		if(!scanStateOk){
+	ErrorType err;
+	if(!scanStateOk){
 		//First, try stopping
 		err = FruityHal::BleGapScanStop();
-		if ((err == NRF_SUCCESS) || (err == NRF_ERROR_INVALID_STATE)) {
+		if ((err == ErrorType::SUCCESS) || (err == ErrorType::INVALID_STATE)) {
 			if (currentScanParams.window == 0) {
 				scanStateOk = true;
 				return;
@@ -186,12 +187,8 @@ void ScanController::TryConfiguringScanState()
 			return;
 		}
 		//Next, try starting
-#if SDK == 15
-		err = FruityHal::BleGapScanStart(&currentScanParams, scanBuffer);
-#else
 		err = FruityHal::BleGapScanStart(&currentScanParams);
-#endif
-		if (err == NRF_SUCCESS) scanStateOk = true;
+		if (err == ErrorType::SUCCESS) scanStateOk = true;
 	}
 }
 
@@ -201,7 +198,7 @@ void ScanController::ScanningHasStopped()
 }
 
 //If a BLE event occurs, this handler will be called to do the work
-bool ScanController::ScanEventHandler(const GapAdvertisementReportEvent& advertisementReportEvent) const
+bool ScanController::ScanEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) const
 {
 	//Check if packet is a valid mesh advertising packet
 	const advPacketHeader* packetHeader = (const advPacketHeader*)advertisementReportEvent.getData();

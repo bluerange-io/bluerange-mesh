@@ -48,18 +48,8 @@ void Boardconf::ResetToDefaultConfiguration()
 	configuration.moduleActive = true;
 
 	//Set a default boardType for all different platforms in case we do not have the boardType in UICR
-#if defined(NRF51)
-	//NRF51-DK is default for platform NRF51
-	configuration.boardType = 1;
-#elif defined(NRF52832)
-	//NRF52-DK is default for platform NRF52
-	configuration.boardType = 4;
-#elif defined(NRF52840)
-	//NRF82840-DK is default for NRF52840
-	configuration.boardType = 18;
-#elif defined(SIM_ENABLED)
-configuration.boardType = 19;
-#endif
+	configuration.boardType = BOARD_TYPE;
+
 
 	//If there is data in the UICR, we use the boardType from there
 	u32* uicrData = FruityHal::getUicrDataPtr();
@@ -82,6 +72,7 @@ configuration.boardType = 19;
 	configuration.dBmRX = -90;
 	configuration.calibratedTX = -60;
 	configuration.lfClockSource = NRF_CLOCK_LF_SRC_RC;
+	configuration.lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_500_PPM; //Use a safe default if this is not given
 	configuration.batteryAdcInputPin = -1;
 	configuration.batteryMeasurementEnablePin = -1;
 	configuration.spiM0SckPin = -1;
@@ -89,6 +80,8 @@ configuration.boardType = 19;
 	configuration.spiM0MisoPin = -1;
 	configuration.spiM0SSAccPin = -1;
 	configuration.spiM0SSBmePin = -1;
+	configuration.twiM1SCLAccPin = -1;
+	configuration.twiM1SDAAccPin = -1;
 	configuration.twiM1SCLPin = -1;
 	configuration.twiM1SDAPin = -1;
 	configuration.lis2dh12Interrupt1Pin = -1;

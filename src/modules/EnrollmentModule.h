@@ -36,7 +36,8 @@
 
 enum class EnrollmentModuleSaveActions : u8{ 
 	SAVE_ENROLLMENT_ACTION, 
-	SAVE_REMOVE_ENROLLMENT_ACTION 
+	SAVE_REMOVE_ENROLLMENT_ACTION,
+	ERASE_RECORD_STORAGE,
 };
 
 enum class enrollmentMethods : u8{ 
@@ -45,11 +46,13 @@ enum class enrollmentMethods : u8{
 	SERIAL = 2 
 };
 
-//These are enroll response codes
-static constexpr int ENROLL_RESPONSE_OK = 0x00;
-// There are more enroll response codes that are taken from the Flash Storage response codes
-static constexpr int ENROLL_RESPONSE_ALREADY_ENROLLED_WITH_DIFFERENT_DATA = 0x10;
-static constexpr int ENROLL_RESPONSE_PREENROLLMENT_FAILED = 0x11;
+enum class EnrollmentResponseCode : u8 {
+	OK                                   = 0x00,
+	// There are more enroll response codes that are taken from the Flash Storage response codes
+	ALREADY_ENROLLED_WITH_DIFFERENT_DATA = 0x10,
+	PREENROLLMENT_FAILED                 = 0x11,
+	HIGHEST_POSSIBLE_VALUE               = 0xFF,
+};
 
 #pragma pack(push, 1)
 //Module configuration that is saved persistently
@@ -79,6 +82,24 @@ struct EnrollmentModuleConfiguration : ModuleConfiguration {
 	}EnrollmentModuleSetEnrollmentBySerialMessage;
 	STATIC_ASSERT_SIZE(EnrollmentModuleSetEnrollmentBySerialMessage, 73);
 
+	struct EnrollmentModuleSetNetworkMessage
+	{
+		NetworkId newNetworkId;
+	};
+	STATIC_ASSERT_SIZE(EnrollmentModuleSetNetworkMessage, 2);
+
+	enum class EnrollmentModuleSetNetworkResponse : u8
+	{
+		SUCCESS      = 0,
+		NOT_AN_ASSET = 1,
+		INVALID      = 255,
+	};
+
+	struct EnrollmentModuleSetNetworkResponseMessage
+	{
+		EnrollmentModuleSetNetworkResponse response;
+	};
+
 	constexpr int SIZEOF_ENROLLMENT_MODULE_REMOVE_ENROLLMENT = (4);
 	typedef struct
 	{
@@ -91,7 +112,7 @@ struct EnrollmentModuleConfiguration : ModuleConfiguration {
 	typedef struct
 	{
 		u32 serialNumberIndex;
-		u8 result;
+		EnrollmentResponseCode result;
 
 	}EnrollmentModuleEnrollmentResponse;
 	STATIC_ASSERT_SIZE(EnrollmentModuleEnrollmentResponse, 5);
@@ -111,15 +132,17 @@ class EnrollmentModule: public Module
 {
 	public:
 		enum class EnrollmentModuleTriggerActionMessages : u8{
-			SET_ENROLLMENT_BY_SERIAL=0,
-			REMOVE_ENROLLMENT=1,
-			//SET_ENROLLMENT_BY_SERIAL=2 //Deprecated since 0.7.22
+			SET_ENROLLMENT_BY_SERIAL   = 0,
+			REMOVE_ENROLLMENT          = 1,
+			//SET_ENROLLMENT_BY_SERIAL = 2, //Deprecated since version 0.7.22
+			SET_NETWORK                = 3,
 		};
 
 		enum class EnrollmentModuleActionResponseMessages : u8 {
-			ENROLLMENT_RESPONSE=0,
-			REMOVE_ENROLLMENT_RESPONSE=1,
-			ENROLLMENT_PROPOSAL=2
+			ENROLLMENT_RESPONSE        = 0,
+			REMOVE_ENROLLMENT_RESPONSE = 1,
+			ENROLLMENT_PROPOSAL        = 2,
+			SET_NETWORK_RESPONSE       = 3,
 		};
 
 		void DispatchPreEnrollment(Module* lastModuleCalled, PreEnrollmentReturnCode lastStatus);
@@ -143,6 +166,8 @@ class EnrollmentModule: public Module
 		};
 
 		//Data for enrolling over mesh access connections
+#pragma pack(push)
+#pragma pack(1)
 		struct TemporaryEnrollmentData{
 			EnrollmentStates state;
 			u16 packetLength;
@@ -153,8 +178,9 @@ class EnrollmentModule: public Module
 			};
 			u32 endTimeDs;
 
-			u16 uniqueConnId;
+			u32 uniqueConnId;
 		};
+#pragma pack(pop)
 
 		//While an enrollment request is active, we temporarily save the data here
 		//This can be used for an enrollment request
@@ -181,9 +207,9 @@ class EnrollmentModule: public Module
 
 		void EnrollmentConnectionConnectedHandler();
 
-		void EnrollNodeViaMeshAccessConnection(fh_ble_gap_addr_t& addr, const meshAccessServiceAdvMessage* advMessage);
+		void EnrollNodeViaMeshAccessConnection(FruityHal::BleGapAddr& addr, const meshAccessServiceAdvMessage* advMessage);
 
-		void SendEnrollmentResponse(EnrollmentModuleActionResponseMessages responseType, NodeId receiver, u32 serialNumberIndex, u8 result, u8 requestHandle) const;
+		void SendEnrollmentResponse(EnrollmentModuleActionResponseMessages responseType, EnrollmentResponseCode result, u8 requestHandle) const;
 
 		void Unenroll(connPacketModule* packet, u16 packetLength);
 
@@ -198,7 +224,7 @@ class EnrollmentModule: public Module
 
 		void TimerEventHandler(u16 passedTimeDs) override;
 
-		void GapAdvertisementReportEventHandler(const GapAdvertisementReportEvent& advertisementReportEvent) override;
+		void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override;
 
 		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) override;
 
@@ -214,7 +240,7 @@ class EnrollmentModule: public Module
 #endif
 
 		#ifdef TERMINAL_ENABLED
-		bool TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize) override;
+		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
 		#endif
 
 		void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;

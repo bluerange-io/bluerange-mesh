@@ -1,8 +1,8 @@
-= IO Module (moduleId 6)
+= IO Module (ID 6)
 
 == Purpose
 
-Driving and configuring all GPIOs. E.g. toggling a LED, a motor or reading values from a basic sensor.
+The _IoModule_ with _ModuleId_ 6 is driving and configuring all GPIOs. E.g. toggling a LED, a motor or reading values from a basic sensor.
 
 == Functionality
 The IO module only supports toggling of LEDs and

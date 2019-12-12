@@ -70,12 +70,15 @@ OUTPUT_FILENAME = $(PROJECT_NAME)
 ifeq ($(PLATFORM),NRF51)
 NRF5_SDK_PATH = sdk/sdk11
 SDK           = 11
+PORT_CONFIG   = sdk/config_nrf51
 else ifeq ($(PLATFORM),NRF52)
 NRF5_SDK_PATH = sdk/sdk14
 SDK           = 14
+PORT_CONFIG   = sdk/config_nrf52
 else
 NRF5_SDK_PATH = sdk/sdk15
 SDK           = 15
+PORT_CONFIG   = sdk/config_nrf52
 endif
 
 COMPONENTS     = $(NRF5_SDK_PATH)/components
@@ -111,8 +114,8 @@ NRFJPROG        := nrfjprog
 MERGEHEX        := mergehex
 
 # Toolchain commands
-CC              := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-gcc'
-CXX             := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-g++'
+CC              := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-gcc' 
+CXX             := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-g++' 
 AS              := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-as'
 AR              := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-ar' -r
 LD              := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-ld'
@@ -202,6 +205,7 @@ INC_PATHS += -isystem $(COMPONENTS)/drivers_nrf/delay
 INC_PATHS += -isystem $(COMPONENTS)/drivers_nrf/gpiote
 INC_PATHS += -isystem $(COMPONENTS)/drivers_nrf/hal
 endif
+INC_PATHS += -isystem $(PORT_CONFIG)
 INC_PATHS += -isystem $(COMPONENTS)/ble/common
 INC_PATHS += -isystem $(COMPONENTS)/ble/ble_db_discovery
 INC_PATHS += -isystem $(COMPONENTS)/ble/ble_radio_notification
@@ -242,14 +246,17 @@ CFLAGS += -D$(PLATFORM) -D__need___va_list -fno-strict-aliasing
 
 # C++ compiler flags
 CXXFLAGS += $(CFLAGS)
-CXXFLAGS += -Wall -Wlogical-op -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-variable -Wno-vla -Wno-unused-parameter -fabi-version=0 -fno-exceptions -fno-rtti -fno-use-cxa-atexit
+CXXFLAGS += -Wall -Wcast-qual -Wlogical-op -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-variable -Wno-vla -Wno-unused-parameter -fabi-version=0 -fno-exceptions -fno-rtti -fno-use-cxa-atexit
 CXXFLAGS += -fno-threadsafe-statics
 
 # Linker flags
 LDFLAGS += $(CFLAGS)
 LDFLAGS += -Llinker/ -T$(LINKER_SCRIPT) -Xlinker --gc-sections
 LDFLAGS += -Wl,-Map,"$(LISTING_DIRECTORY)/$(OUTPUT_FILENAME).map" --specs=nano.specs
-LDFLAGS += -Xlinker --wrap=malloc
+# prod_asset_ins_nrf52840 uses Tensorflow which unfortunatly depends on linking to malloc, even though it promisses to not use it.
+ifneq ("$(FEATURESET)","prod_asset_ins_nrf52840")
+	LDFLAGS += -Xlinker --wrap=malloc -Xlinker --wrap=calloc
+endif
 
 # Assembler flags
 ASMFLAGS += $(CFLAGS) -x assembler-with-cpp -D__HEAP_SIZE=$(HEAP_SIZE) -D__STACK_SIZE=$(STACK_SIZE)
@@ -382,7 +389,7 @@ flash_softdevice:
 	$(NO_ECHO)$(NRFJPROG) --reset -f $(PLATFORM) $(PROGFLAGS)
 
 BUILD_DIR     		= ../cmake_build
-FEATURESETS 	 		= prod_mesh_nrf51 prod_sink_nrf51 prod_sink_nrf52 prod_mesh_nrf52 github prod_eink_nrf51 prod_asset_nrf52 dev_asset_nrf52 prod_asset_nrf51 prod_clc_mesh_nrf52 prod_vs_nrf52 dev_wm_nrf52840 dev_automated_tests_master_nrf52 dev_automated_tests_slave_nrf52 prod_clc_sink_nrf51 dev_all_nrf52
+FEATURESETS 	 	= prod_mesh_nrf51 prod_sink_nrf51 prod_sink_nrf52 prod_mesh_nrf52 github prod_eink_nrf51 prod_asset_nrf52 dev_asset_nrf52 prod_asset_nrf51 prod_clc_mesh_nrf52 prod_vs_nrf52 dev_wm_nrf52840 dev_automated_tests_master_nrf52 dev_automated_tests_slave_nrf52 prod_clc_sink_nrf51 dev_all_nrf52 prod_asset_ins_nrf52840
 RELEASE_TARGETS     = $(foreach FEATURESET,$(FEATURESETS), $(FEATURESET)_release) 
 DEBUG_TARGETS       = $(foreach FEATURESET,$(FEATURESETS), $(FEATURESET)_debug)
 

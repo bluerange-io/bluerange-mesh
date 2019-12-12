@@ -46,54 +46,27 @@ constexpr int BASE_CONNECTION_MAX_SEND_FAIL  = 10;
 //discovery or encryption are handeled by the Connectionmanager so that we can control
 //The parallel flow of multiple connections
 
-BaseConnection::BaseConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress)
-	: packetSendQueue(packetSendBuffer, PACKET_SEND_BUFFER_SIZE),
-	packetSendQueueHighPrio(packetSendBufferHighPrio, PACKET_SEND_BUFFER_HIGH_PRIO_SIZE)
+BaseConnection::BaseConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress)
+	: connectionId(id),
+	uniqueConnectionId(GS->cm.GenerateUniqueConnectionId()),
+	direction(direction),
+	packetSendQueue(packetSendBuffer, PACKET_SEND_BUFFER_SIZE),
+	packetSendQueueHighPrio(packetSendBufferHighPrio, PACKET_SEND_BUFFER_HIGH_PRIO_SIZE),
+	partnerAddress(*partnerAddress),
+	creationTimeDs(GS->appTimerDs)
 {
 	//Initialize to defaults
-	connectionType = ConnectionType::INVALID;
-	unreliableBuffersFree = 0;
-	reliableBuffersFree = 1;
-	partnerId = 0;
-	connectionHandle = BLE_CONN_HANDLE_INVALID;
-	packetReassemblyPosition = 0;
-	packetQueuedHandleCounter = PACKET_QUEUED_HANDLE_COUNTER_START;
-	connectionHandshakedTimestampDs = 0;
-	disconnectedTimestampDs = 0;
-	connectionState = ConnectionState::CONNECTING;
-	encryptionState = EncryptionState::NOT_ENCRYPTED;
-	handshakeStartedDs = 0;
-	lastReportedRssi = 0;
-	rssiAverageTimes1000 = 0;
-	connectionStateBeforeDisconnection = ConnectionState::DISCONNECTED;
-	disconnectionReason = FruityHal::HciErrorCode::SUCCESS;
-	droppedPackets = 0;
-	sentReliable = 0;
-	sentUnreliable = 0;
-	connectionPayloadSize = MAX_DATA_SIZE_PER_WRITE;
 	clusterUpdateCounter = 0;
 	nextExpectedClusterUpdateCounter = 1;
-	manualPacketsSent = 0;
-	appDisconnectionReason = AppDisconnectReason::UNKNOWN;
 
-	//Save values from constructor
-	this->partnerAddress = *partnerAddress;
-	this->connectionId = id;
-	this->direction = direction;
+	packetReassemblyBuffer.zeroData();
 
-	//Generate a unique id for this connection
-	GS->cm.uniqueConnectionIdCounter++;
-	if(GS->cm.uniqueConnectionIdCounter == 0){
-		GS->cm.uniqueConnectionIdCounter = 1;
-	}
-	uniqueConnectionId = GS->cm.uniqueConnectionIdCounter;
-
-	//Save the creation time
-	creationTimeDs = GS->appTimerDs;
+	GS->cm.NotifyNewConnection();
 }
 
 BaseConnection::~BaseConnection()
 {
+	GS->cm.NotifyDeleteConnection();
 }
 
 /*######## PUBLIC FUNCTIONS ###################################*/
@@ -116,7 +89,7 @@ void BaseConnection::DisconnectAndRemove(AppDisconnectReason reason)
 	//if(GS->cm.pendingConnection == this) FruityHal::ConnectCancel();
 
 	//Disconnect if possible
-	FruityHal::Disconnect(connectionHandle, FruityHal::HciErrorCode::REMOTE_USER_TERMINATED_CONNECTION);
+	FruityHal::Disconnect(connectionHandle, FruityHal::BleHciError::REMOTE_USER_TERMINATED_CONNECTION);
 
 	//### STEP 3: Inform ConnectionManager to do the final cleanup
 	GS->cm.DeleteConnection(this, reason);
@@ -165,7 +138,7 @@ bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8* data,
 		sendDataPacked->dataLength = sendData.dataLength;
 		sendDataPacked->sendHandle = PACKET_QUEUED_HANDLE_NOT_QUEUED_IN_SD;
 
-		memcpy(buffer + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED, data, sendData.dataLength);
+		CheckedMemcpy(buffer + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED, data, sendData.dataLength);
 		if (fillTxBuffers) FillTransmitBuffers();
 		return true;
 	} else {
@@ -176,7 +149,7 @@ bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8* data,
 
 		//TODO: Error handling: What should happen when the queue is full?
 		//Currently, additional packets are dropped
-		logt("ERROR", "Send queue is already full");
+		logt("CM", "Send queue is already full");
 		SIMSTATCOUNT("sendQueueFull");
 
 		//For safety, we try to fill the transmitbuffers if it got stuck
@@ -189,10 +162,11 @@ void BaseConnection::FillTransmitBuffers()
 {
 	u32 err = 0;
 
+	if (bufferFull) return;
+
 	DYNAMIC_ARRAY(packetBuffer, connectionMtu);
 	BaseConnectionSendData sendDataStruct;
 	BaseConnectionSendData* sendData = &sendDataStruct;
-	u8* data;
 
 	while(isConnected() && connectionState != ConnectionState::REESTABLISHING && connectionState != ConnectionState::REESTABLISHING_HANDSHAKE)
 	{
@@ -216,7 +190,7 @@ void BaseConnection::FillTransmitBuffers()
 
 		if (activeQueue->_numElements < activeQueue->numUnsentElements) {
 			logt("ERROR", "Fail: Queue numElements");
-			SIMERROR();
+			SIMEXCEPTION(IllegalStateException);
 			GS->logger.logCustomError(CustomErrorTypes::FATAL_QUEUE_NUM_MISMATCH, (u16)(activeQueue == &packetSendQueue));
 
 			GS->cm.ForceDisconnectAllConnections(AppDisconnectReason::QUEUE_NUM_MISMATCH);
@@ -232,86 +206,77 @@ void BaseConnection::FillTransmitBuffers()
 		sendData->deliveryOption = (DeliveryOption)sendDataPacked->deliveryOption;
 		sendData->priority = (DeliveryPriority)sendDataPacked->priority;
 		sendData->dataLength = sendDataPacked->dataLength;
-		data = (packet.data + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
+		u8* data = (packet.data + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
 
-		// Check if we have a free buffer for the chosen DeliveryType
-		if (
-			(sendData->deliveryOption == DeliveryOption::WRITE_REQ && reliableBuffersFree > 0)
-			|| (sendData->deliveryOption == DeliveryOption::WRITE_CMD && unreliableBuffersFree > 0)
-			|| (sendData->deliveryOption == DeliveryOption::NOTIFICATION && unreliableBuffersFree > 0)
-			) {
+		//Check if this packet must be split, if yes make sure that there is no other split packet currently queued, we only allow one split
+		//packet to be queued at one time (after one was queued, the packetSendPosition is reset to 0, as long as there are packetSentRemaining
+		//we have not received acknowledgements for all parts
+		if (packet.length > connectionPayloadSize && activeQueue->packetSendPosition == 0 && activeQueue->packetSentRemaining != 0) {
+			return;
+		}
 
-			//Check if this packet must be split, if yes make sure that there is no other split packet currently queued, we only allow one split
-			//packet to be queued at one time (after one was queued, the packetSendPosition is reset to 0, as long as there are packetSentRemaining
-			//we have not received acknowledgements for all parts
-			if (packet.length > connectionPayloadSize && activeQueue->packetSendPosition == 0 && activeQueue->packetSentRemaining != 0) {
-				return;
-			}
+		//The subclass is allowed to modify the packet before it is sent, it will place the modified packet into the sentData struct
+		//This could be e.g. only a part of the original packet ( a split packet )
+		SizedData sentData = ProcessDataBeforeTransmission(sendData, data, packetBuffer);
 
-			//The subclass is allowed to modify the packet before it is sent, it will place the modified packet into the sentData struct
-			//This could be e.g. only a part of the original packet ( a split packet )
-			SizedData sentData = ProcessDataBeforeTransmission(sendData, data, packetBuffer);
+		if(sentData.length == 0){
+			logt("ERROR", "Packet processing failed");
+			GS->logger.logCustomError(CustomErrorTypes::FATAL_PACKET_PROCESSING_FAILED, partnerId);
+			return; //FIXME: this could break a connection
+		}
 
-			if(sentData.length == 0){
-				logt("ERROR", "Packet processing failed");
-				GS->logger.logCustomError(CustomErrorTypes::FATAL_PACKET_PROCESSING_FAILED, partnerId);
-				return; //FIXME: this could break a connection
-			}
+		//Send the packet to the SoftDevice
+		if(sendData->deliveryOption == DeliveryOption::WRITE_REQ)
+		{
+			err = GS->gattController.bleWriteCharacteristic(
+					connectionHandle,
+					sendData->characteristicHandle,
+					sentData.data,
+					sentData.length,
+					true);
+		}
+		else if(sendData->deliveryOption == DeliveryOption::WRITE_CMD)
+		{
+			err = GS->gattController.bleWriteCharacteristic(
+					connectionHandle,
+					sendData->characteristicHandle,
+					sentData.data,
+					sentData.length,
+					false);
+		}
+		else
+		{
+			err = GS->gattController.bleSendNotification(
+					connectionHandle,
+					sendData->characteristicHandle,
+					sentData.data,
+					sentData.length);
+		}
 
+		if(err == (u32)ErrorType::SUCCESS)
+		{
+			//FIXME: This is not using the preprocessed data (sentData)
+			PacketSuccessfullyQueuedWithSoftdevice(activeQueue, sendDataPacked, data, &sentData);
+		}
+		else if(err == NRF_ERROR_BUSY)
+		{
+			return;
+		}
+		else if(err == NRF_ERROR_RESOURCES){
+			//No free buffers in the softdevice, so packet could not be queued, go to next connection
+			//Also set the bufferFull variable
+			bufferFull = true;
+			return;
+		}
+		else
+		{
+			logt("ERROR", "GATT WRITE ERROR 0x%x on handle %u", err, connectionHandle);
 
-			//Send the packet to the SoftDevice
-			if(sendData->deliveryOption == DeliveryOption::WRITE_REQ)
-			{
-				err = GS->gattController.bleWriteCharacteristic(
-						connectionHandle,
-						sendData->characteristicHandle,
-						sentData.data,
-						sentData.length,
-						true);
-			}
-			else if(sendData->deliveryOption == DeliveryOption::WRITE_CMD)
-			{
-				err = GS->gattController.bleWriteCharacteristic(
-						connectionHandle,
-						sendData->characteristicHandle,
-						sentData.data,
-						sentData.length,
-						false);
-			}
-			else
-			{
-				err = GS->gattController.bleSendNotification(
-						connectionHandle,
-						sendData->characteristicHandle,
-						sentData.data,
-						sentData.length);
-			}
+			GS->logger.logCustomError(CustomErrorTypes::WARN_GATT_WRITE_ERROR, err);
 
-			if(err == FruityHal::SUCCESS){
-				//Consume a buffer because the packet was sent
-				if(sendData->deliveryOption == DeliveryOption::WRITE_REQ){
-					reliableBuffersFree--;
-				} else {
-					unreliableBuffersFree--;
-				}
+			HandlePacketQueuingFail(*activeQueue, sendDataPacked, err);
 
-				//FIXME: This is not using the preprocessed data (sentData)
-				PacketSuccessfullyQueuedWithSoftdevice(activeQueue, sendDataPacked, data, &sentData);
-
-			} else {
-				logt("ERROR", "GATT WRITE ERROR 0x%x on handle %u", err, connectionHandle);
-
-				GS->logger.logCustomError(CustomErrorTypes::WARN_GATT_WRITE_ERROR, err);
-
-				HandlePacketQueuingFail(*activeQueue, sendDataPacked, err);
-
-				//Stop queuing packets for this connection to prevent infinite loops
-				return;
-			}
-
-		} else {
-			//Go to next connection if a packet (either reliable or unreliable)
-			//could not be sent because the corresponding buffers are full
+			//Stop queuing packets for this connection to prevent infinite loops
 			return;
 		}
 	}
@@ -331,6 +296,8 @@ void BaseConnection::HandlePacketQueued(PacketQueue* activeQueue, BaseConnection
 
 void BaseConnection::HandlePacketSent(u8 sentUnreliable, u8 sentReliable)
 {
+	bufferFull = false;
+
 	//logt("CONN", "Data was sent %u, %u", sentUnreliable, sentReliable);
 
 	//TODO: are write cmds and write reqs sent sequentially?
@@ -353,11 +320,11 @@ void BaseConnection::HandlePacketSent(u8 sentUnreliable, u8 sentReliable)
 
 		SizedData packet = packetSendQueue.PeekNext();
 		BaseConnectionSendDataPacked* sendDataPacked = (BaseConnectionSendDataPacked*)packet.data;
-		u8 handle = packet.length > 0 ? sendDataPacked->sendHandle : PACKET_QUEUED_HANDLE_NOT_QUEUED_IN_SD;
+		u8 handle = sendDataPacked != nullptr ? sendDataPacked->sendHandle : PACKET_QUEUED_HANDLE_NOT_QUEUED_IN_SD;
 
 		packet = packetSendQueueHighPrio.PeekNext();
 		BaseConnectionSendDataPacked* sendDataPackedHighPrio = (BaseConnectionSendDataPacked*)packet.data;
-		u8 handleHighPrio = packet.length > 0 ? sendDataPackedHighPrio->sendHandle : PACKET_QUEUED_HANDLE_NOT_QUEUED_IN_SD;
+		u8 handleHighPrio = sendDataPackedHighPrio != nullptr ? sendDataPackedHighPrio->sendHandle : PACKET_QUEUED_HANDLE_NOT_QUEUED_IN_SD;
 
 		//If no queue has a handle, the packets must be from the normal queue because it was sending a split packet (but not all parts yet)
 		if (handle < PACKET_QUEUED_HANDLE_COUNTER_START && handleHighPrio < PACKET_QUEUED_HANDLE_COUNTER_START) {
@@ -391,7 +358,7 @@ void BaseConnection::HandlePacketSent(u8 sentUnreliable, u8 sentReliable)
 		if(activeQueue->_numElements == 0){
 			//TODO: Save Error
 			logt("ERROR", "Fail: Queue");
-			SIMERROR();
+			SIMEXCEPTION(IllegalStateException);
 
 			GS->logger.logCustomError(CustomErrorTypes::FATAL_HANDLE_PACKET_SENT_ERROR, partnerId);
 		}
@@ -408,7 +375,6 @@ void BaseConnection::HandlePacketSent(u8 sentUnreliable, u8 sentReliable)
 			SizedData data = activeQueue->PeekNext();
 
 			BaseConnectionSendDataPacked* sendData = (BaseConnectionSendDataPacked*)data.data;
-			connPacketHeader* packetHeader = (connPacketHeader*)(data.data + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
 
 			//We must only remove the packet if it has a handle, it might have only been sent partially so far
 			if (sendData->sendHandle != 0) {
@@ -429,12 +395,9 @@ void BaseConnection::HandlePacketSent(u8 sentUnreliable, u8 sentReliable)
 		}
 	}
 
-	//Note the buffers that are not free again
-	unreliableBuffersFree += sentUnreliable;
-	sentUnreliable += sentUnreliable;
-
-	reliableBuffersFree += sentReliable;
-	sentReliable += sentReliable;
+	//Log how many packets have been sent
+	this->sentUnreliable += sentUnreliable;
+	this->sentReliable += sentReliable;
 }
 
 void BaseConnection::HandlePacketQueuingFail(PacketQueue& activeQueue, BaseConnectionSendDataPacked* sendDataPacked, u32 err)
@@ -511,7 +474,7 @@ SizedData BaseConnection::GetSplitData(const BaseConnectionSendData &sendData, u
 		//End packet
 		resultHeader->splitMessageType = MessageType::SPLIT_WRITE_CMD_END;
 		resultHeader->splitCounter = packetSendQueue.packetSendPosition;
-		memcpy(
+		CheckedMemcpy(
 				packetBuffer + SIZEOF_CONN_PACKET_SPLIT_HEADER,
 			data + packetSendQueue.packetSendPosition * payloadSize,
 			sendData.dataLength - packetSendQueue.packetSendPosition * payloadSize);
@@ -529,7 +492,7 @@ SizedData BaseConnection::GetSplitData(const BaseConnectionSendData &sendData, u
 		//Intermediate packet
 		resultHeader->splitMessageType = MessageType::SPLIT_WRITE_CMD;
 		resultHeader->splitCounter = packetSendQueue.packetSendPosition;
-		memcpy(
+		CheckedMemcpy(
 				packetBuffer + SIZEOF_CONN_PACKET_SPLIT_HEADER,
 			data + packetSendQueue.packetSendPosition * payloadSize,
 			payloadSize);
@@ -554,7 +517,16 @@ u8* BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8* data)
 
 	//If reassembly is not needed, return packet without modifying
 	if(packetHeader->splitMessageType != MessageType::SPLIT_WRITE_CMD && packetHeader->splitMessageType != MessageType::SPLIT_WRITE_CMD_END){
+		currentMessageIsMissingASplit = false;
 		return data;
+	}
+
+	//If this is the first split we can reset the packet reassembly position to
+	//protect us against the drop of the last split of the previous message.
+	if (packetHeader->splitCounter == 0)
+	{
+		packetReassemblyPosition = 0;
+		currentMessageIsMissingASplit = false;
 	}
 
 	//Check if reassembly buffer limit is reached
@@ -562,6 +534,8 @@ u8* BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8* data)
 		logt("ERROR", "Packet too big for reassembly");
 		GS->logger.logCustomError(CustomErrorTypes::FATAL_PACKET_TOO_BIG, sendData->dataLength);
 		packetReassemblyPosition = 0;
+		currentMessageIsMissingASplit = true;
+		SIMEXCEPTION(PacketTooBigException);
 		return nullptr;
 	}
 
@@ -569,18 +543,24 @@ u8* BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8* data)
 
 	//Check if a packet was missing inbetween
 	if(packetReassemblyPosition != packetReassemblyDestination){
+		GS->logger.logCustomError(CustomErrorTypes::WARN_SPLIT_PACKET_MISSING, (packetReassemblyDestination - packetReassemblyPosition));
 		packetReassemblyPosition = 0;
+		currentMessageIsMissingASplit = true;
+		SIMEXCEPTION(SplitMissingException);
 		return nullptr;
 	}
 
 	//Intermediate packets must always be a full MTU
 	if(packetHeader->splitMessageType == MessageType::SPLIT_WRITE_CMD && sendData->dataLength != connectionPayloadSize){
+		GS->logger.logCustomError(CustomErrorTypes::WARN_SPLIT_PACKET_NOT_IN_MTU, sendData->dataLength);
 		packetReassemblyPosition = 0;
+		currentMessageIsMissingASplit = true;
+		SIMEXCEPTION(SplitNotInMTUException);
 		return nullptr;
 	}
 
 	//Save at correct position in the reassembly buffer
-	memcpy(
+	CheckedMemcpy(
 		packetReassemblyBuffer.getRaw() + packetReassemblyDestination,
 		data + SIZEOF_CONN_PACKET_SPLIT_HEADER,
 		sendData->dataLength);
@@ -602,7 +582,15 @@ u8* BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8* data)
 		//Reset the assembly buffer
 		packetReassemblyPosition = 0;
 
-		return data;
+		if (currentMessageIsMissingASplit)
+		{
+			currentMessageIsMissingASplit = false;
+			return nullptr;
+		}
+		else
+		{
+			return data;
+		}
 	}
 	return data;
 }
@@ -611,7 +599,7 @@ u8* BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8* data)
 
 void BaseConnection::ConnectionSuccessfulHandler(u16 connectionHandle)
 {
-	u32 err = 0;
+	ErrorType err = ErrorType::SUCCESS;
 
 	this->handshakeStartedDs = GS->appTimerDs;
 
@@ -621,26 +609,27 @@ void BaseConnection::ConnectionSuccessfulHandler(u16 connectionHandle)
 		logt("CONN", "Outgoing connection %d connected", connectionId);
 
 	this->connectionHandle = connectionHandle;
-	err = FruityHal::BleTxPacketCountGet(this->connectionHandle, &unreliableBuffersFree);
-	if(err != FruityHal::SUCCESS){
-		//BLE_ERROR_INVALID_CONN_HANDLE && NRF_ERROR_INVALID_ADDR can be ignored
-	}
 
 	connectionState = ConnectionState::CONNECTED;
 }
 
-void BaseConnection::GapReconnectionSuccessfulHandler(const GapConnectedEvent& connectedEvent){
+void BaseConnection::GapReconnectionSuccessfulHandler(const FruityHal::GapConnectedEvent& connectedEvent){
 	logt("CONN", "Reconnection Successful");
+
+	connectionMtu = MAX_DATA_SIZE_PER_WRITE;
+	connectionPayloadSize = MAX_DATA_SIZE_PER_WRITE;
 
 	connectionHandle = connectedEvent.getConnectionHandle();
 
-	//Reinitialize tx buffers
-	FruityHal::BleTxPacketCountGet(this->connectionHandle, &unreliableBuffersFree);
-	reliableBuffersFree = 1;
-
 	connectionState = ConnectionState::HANDSHAKE_DONE;
+}
 
-	//TODO: do we have to get the tx_packet_count or update any other variables?
+void BaseConnection::ConnectionMtuUpgradedHandler(u16 gattPayloadSize)
+{
+	//MTU in our case means the available payload in an ATT packet, payload is the same
+	//as we do not have any overhead for custom encryption
+	this->connectionMtu = gattPayloadSize;
+	this->connectionPayloadSize = gattPayloadSize;
 }
 
 void BaseConnection::GATTServiceDiscoveredHandler(ble_db_discovery_evt_t &evt)
@@ -649,12 +638,12 @@ void BaseConnection::GATTServiceDiscoveredHandler(ble_db_discovery_evt_t &evt)
 }
 
 //This is called when a connection gets disconnected before it is deleted
-bool BaseConnection::GapDisconnectionHandler(u8 hciDisconnectReason)
+bool BaseConnection::GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason)
 {
 	//Reason?
-	logt("CONN", "Disconnected %u from connId:%u, HCI:%u %s", partnerId, connectionId, hciDisconnectReason, FruityHal::getHciErrorString((FruityHal::HciErrorCode)hciDisconnectReason));
+	logt("CONN", "Disconnected %u from connId:%u, HCI:%u %s", partnerId, connectionId, (u32)hciDisconnectReason, Logger::getHciErrorString((FruityHal::BleHciError)hciDisconnectReason));
 
-	this->disconnectionReason = (FruityHal::HciErrorCode)hciDisconnectReason;
+	this->disconnectionReason = (FruityHal::BleHciError)hciDisconnectReason;
 	this->disconnectedTimestampDs = GS->appTimerDs;
 
 	//Save connection state before disconnection
@@ -673,9 +662,9 @@ bool BaseConnection::GapDisconnectionHandler(u8 hciDisconnectReason)
 i8 BaseConnection::GetAverageRSSI() const
 {
 	if(connectionState >= ConnectionState::CONNECTED){
-		i32 divisor = 1000;
+		constexpr i32 divisor = 1000;
 		//Round to closest rssi
-		return ((rssiAverageTimes1000 < 0) ^ (divisor < 0)) ? ((rssiAverageTimes1000 - divisor/2)/divisor) : ((rssiAverageTimes1000 + divisor/2)/divisor);
+		return (rssiAverageTimes1000 < 0) ? ((rssiAverageTimes1000 - divisor/2)/divisor) : ((rssiAverageTimes1000 + divisor/2)/divisor);
 	}
 	else return 0;
 }
@@ -730,7 +719,7 @@ void BaseConnection::PrintQueueInfo()
 			if (sendData->deliveryOption == (u8)DeliveryOption::WRITE_REQ) type = "WRITE_REQ";
 			if (sendData->deliveryOption == (u8)DeliveryOption::NOTIFICATION) type = "NOTIF";
 
-			printf("%s len %u, handle %u, messageType %u, (from %u to %u)" EOL, type, sendData->dataLength, sendData->sendHandle, header->messageType, header->sender, header->receiver);
+			printf("%s len %u, handle %u, messageType %u, (from %u to %u)" EOL, type, sendData->dataLength, sendData->sendHandle, (u32)header->messageType, header->sender, header->receiver);
 		}
 	}
 }

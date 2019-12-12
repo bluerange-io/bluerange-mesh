@@ -89,7 +89,7 @@ void IoModule::TimerEventHandler(u16 passedTimeDs)
 	else if (currentLedMode == LedMode::CONNECTIONS)
 	{
 		//Calculate the current blink step
-		ledBlinkPosition = (ledBlinkPosition + 1) % (((Conf::meshMaxInConnections + Conf::meshMaxOutConnections) + 2) * 2);
+		ledBlinkPosition = (ledBlinkPosition + 1) % (((GS->config.meshMaxInConnections + Conf::getInstance().meshMaxOutConnections) + 2) * 2);
 
 		//No Connections: Red blinking, Connected: Green blinking for connection count
 
@@ -102,8 +102,7 @@ void IoModule::TimerEventHandler(u16 passedTimeDs)
 		u8 countConnected = conns.count - countHandshakeDone;
 
 		u8 i = ledBlinkPosition / 2;
-
-		if(i < (Conf::meshMaxInConnections + Conf::meshMaxOutConnections)){
+		if(i < (Conf::getInstance().meshMaxInConnections + Conf::getInstance().meshMaxOutConnections)){
 			if(ledBlinkPosition % 2 == 0){
 				//No connections
 				if (conns.count == 0){ GS->ledRed.On(); }
@@ -112,7 +111,7 @@ void IoModule::TimerEventHandler(u16 passedTimeDs)
 				//Connected and handshake not done
 				else if(i < conns.count) { GS->ledBlue.On(); }
 				//A free connection
-				else if(i < (Conf::meshMaxInConnections + Conf::meshMaxOutConnections)) {  }
+				else if(i < (GS->config.meshMaxInConnections + Conf::getInstance().meshMaxOutConnections)) {  }
 			} else {
 				GS->ledRed.Off();
 				GS->ledGreen.Off();
@@ -144,25 +143,24 @@ void IoModule::TimerEventHandler(u16 passedTimeDs)
 }
 
 #ifdef TERMINAL_ENABLED
-bool IoModule::TerminalCommandHandler(char* commandArgs[],u8 commandArgsSize)
+TerminalCommandHandlerReturnType IoModule::TerminalCommandHandler(const char* commandArgs[],u8 commandArgsSize)
 {
 	//React on commands, return true if handled, false otherwise
 	if(commandArgsSize >= 3 && TERMARGS(2, moduleName))
 	{
 		if (TERMARGS(0, "action"))
 		{
-			if(!TERMARGS(2, moduleName)) return false;
-
-			NodeId destinationNode = (TERMARGS(1, "this")) ? GS->node.configuration.nodeId : atoi(commandArgs[1]);
+			NodeId destinationNode = Utility::TerminalArgumentToNodeId(commandArgs[1]);
 
 			//Example:
 #if IS_INACTIVE(GW_SAVE_SPACE)
-			if(commandArgsSize >= 6 && TERMARGS(3,"pinset"))
+			if(TERMARGS(3,"pinset"))
 			{
+				if (commandArgsSize < 6) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 				//Check how many GPIO ports we want to set
 				u8 numExtraParams = (u8) (commandArgsSize - 4);
 				u8 numPorts = numExtraParams / 2;
-				u8 requestHandle = (numExtraParams % 2 == 0) ? 0 : atoi(commandArgs[commandArgsSize - 1]);
+				u8 requestHandle = (numExtraParams % 2 == 0) ? 0 : Utility::StringToU8(commandArgs[commandArgsSize - 1]);
 
 				DYNAMIC_ARRAY(buffer, numPorts*SIZEOF_GPIO_PIN_CONFIG);
 
@@ -187,20 +185,21 @@ bool IoModule::TerminalCommandHandler(char* commandArgs[],u8 commandArgsSize)
 					numPorts*SIZEOF_GPIO_PIN_CONFIG,
 					false
 				);
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
 			//E.g. action 635 io led on
 			else
 #endif
-			if(commandArgsSize >= 5 && TERMARGS(3,"led"))
+			if(TERMARGS(3,"led"))
 			{
+				if (commandArgsSize < 5) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 				IoModuleSetLedMessage data;
 
 				if(TERMARGS(4, "on")) data.ledMode= LedMode::ON;
 				else if(TERMARGS(4, "cluster")) data.ledMode = LedMode::CLUSTERING;
 				else data.ledMode = Conf::getInstance().defaultLedMode == LedMode::OFF ? LedMode::OFF : LedMode::CONNECTIONS;
 
-				u8 requestHandle = commandArgsSize >= 6 ? atoi(commandArgs[5]) : 0;
+				u8 requestHandle = commandArgsSize >= 6 ? Utility::StringToU8(commandArgs[5]) : 0;
 
 				SendModuleActionMessage(
 					MessageType::MODULE_TRIGGER_ACTION,
@@ -212,11 +211,8 @@ bool IoModule::TerminalCommandHandler(char* commandArgs[],u8 commandArgsSize)
 					false
 				);
 
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
-
-			return false;
-
 		}
 	}
 

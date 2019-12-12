@@ -160,10 +160,10 @@ protected:
 		virtual void TimerEventHandler(u16 passedTimeDs){};
 
 		//This handler receives all ble events and can act on them
-		virtual void GapAdvertisementReportEventHandler(const GapAdvertisementReportEvent& advertisementReportEvent) {};
-		virtual void GapConnectedEventHandler(const GapConnectedEvent& connectedEvent) {};
-		virtual void GapDisconnectedEventHandler(const GapDisconnectedEvent& disconnectedEvent) {};
-		virtual void GattDataTransmittedEventHandler(const GattDataTransmittedEvent& gattDataTransmittedEvent) {};
+		virtual void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) {};
+		virtual void GapConnectedEventHandler(const FruityHal::GapConnectedEvent& connectedEvent) {};
+		virtual void GapDisconnectedEventHandler(const FruityHal::GapDisconnectedEvent& disconnectedEvent) {};
+		virtual void GattDataTransmittedEventHandler(const FruityHal::GattDataTransmittedEvent& gattDataTransmittedEvent) {};
 
 		//When a mesh connection is connected with handshake and everything or if it is disconnected, the ConnectionManager will call this handler
 		virtual void MeshConnectionChangedHandler(MeshConnection& connection){};
@@ -181,12 +181,15 @@ protected:
 
 		virtual void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
 
-#if defined(NRF52) || defined(SIM_ENABLED)
-		//Queries a single capability of a module. If no capability with the given index is available the type INVALID must be returned.
+#if FEATURE_AVAILABLE(DEVICE_CAPABILITIES)
+		//Queries a single capability of a module. If no capability with the given index is available the value INVALID must be returned.
 		//After the first invalid index, no valid indices must follow. To limit the amount of virtual methods, this method is called once
 		//for every capability per capability in the module, thus leading to a time complexity of O(n²). This means that this method
-		//should not do complex tasks!
-		virtual CapabilityEntry GetCapability(u32 index) {
+		//should not do complex tasks! The firstCall parameter tells the callee if this is the firstCall to the method for the current
+		//Capability retrieval run. This can be used for initialization tasks. Note that testing for "index == 0" is not sufficient as it
+		//is possible that the CapabilityEntryType is NOT_READY, which then later would call the function again with index == 0 but with
+		//firstCall false.
+		virtual CapabilityEntry GetCapability(u32 index, bool firstCall) {
 			CapabilityEntry retVal;
 			retVal.type = CapabilityEntryType::INVALID;
 			return retVal;
@@ -201,7 +204,7 @@ protected:
 		//This method must be implemented by modules that support component updates
 		//The module must answer weather it wants to accept the update (0) or not (negative result)
 		//If the request is handled asynchronously, the module must return dfu start response QUERY_WAITING and must then manually call ContinueDfuStart
-		virtual i32 CheckComponentUpdateRequest(connPacketModule* inPacket, u32 version, ImageType imageType, u8 componentId){ return -1; };
+		virtual DfuStartDfuResponseCode CheckComponentUpdateRequest(connPacketModule* inPacket, u32 version, ImageType imageType, u8 componentId){ return DfuStartDfuResponseCode::MODULE_NOT_UPDATABLE; };
 
 		//This method allows a module to update its component
 		//The module must ensure that subsequent calls to this method do not interfere with the update process
@@ -209,7 +212,7 @@ protected:
 
 		//The Terminal Command handler is called for all modules with the user input
 #ifdef TERMINAL_ENABLED
-		virtual bool TerminalCommandHandler(char* commandArgs[],u8 commandArgsSize);
+		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[],u8 commandArgsSize) override;
 #endif
 
 #if IS_ACTIVE(BUTTONS)

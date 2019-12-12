@@ -71,17 +71,15 @@ class TemplateModule: public Module
 	public:
 		TemplateModule();
 
-		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength);
+		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override;
 
-		void ResetToDefaultConfiguration();
+		void ResetToDefaultConfiguration() override;
 
-		void TimerEventHandler(u16 passedTimeDs);
+		void TimerEventHandler(u16 passedTimeDs) override;
 
-		//void BleEventHandler(ble_evt_t* bleEvent);
-
-		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader);
+		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) override;
 
 		#ifdef TERMINAL_ENABLED
-		bool TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize) override;
+		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
 		#endif
 };

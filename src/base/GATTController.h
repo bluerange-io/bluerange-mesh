@@ -57,7 +57,7 @@ public:
 	u32 bleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable) const;
 	u32 bleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength) const;
 
-	u32 DiscoverService(u16 connHandle, const ble_uuid_t &p_uuid);
+	u32 DiscoverService(u16 connHandle, const FruityHal::BleGattUuid &p_uuid);
 
 	ble_db_discovery_t discoveredServices;
 

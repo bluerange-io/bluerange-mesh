@@ -2,7 +2,7 @@ ifndef::imagesdir[:imagesdir: docs/opensource/modules/ROOT/assets/images]
 
 image:logo.png[fruitymesh]
 
-Version 0.8.540
+Version 0.8.1090
 
 FruityMesh is the reference implementation of the **BlueRange** initiative. It was the first open source implementation of a mesh network that is based on standard *Bluetooth Low Energy connections*. In contrast to meshes that use advertising and scanning, this allows for a network run with *battery powered* devices. FruityMesh works with the Nordic nRF51 or nRF52 chipset in combination with the *S130/S132 SoftDevices* and enables tons of devices to connect to each other with its auto-meshing capabilities. It is *always connected* with configurable connection intervals of *7.5 ms to 4 seconds* while still being able to run on batteries.
 

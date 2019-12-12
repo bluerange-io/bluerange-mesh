@@ -40,7 +40,7 @@
 uint32_t meshConnTypeResolver __attribute__((section(".ConnTypeResolvers"), used)) = (u32)MeshConnection::ConnTypeResolver;
 #endif
 
-MeshConnection::MeshConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress, u16 partnerWriteCharacteristicHandle)
+MeshConnection::MeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, u16 partnerWriteCharacteristicHandle)
 	: BaseConnection(id, direction, partnerAddress)
 {
 	logt("CONN", "New MeshConnection");
@@ -83,13 +83,13 @@ BaseConnection* MeshConnection::ConnTypeResolver(BaseConnection* oldConnection, 
 	logt("MACONN", "MeshConnResolver");
 
 	//Check if the message was written to our mesh characteristic
-	if(sendData->characteristicHandle == GS->node.meshService.sendMessageCharacteristicHandle.value_handle)
+	if(sendData->characteristicHandle == GS->node.meshService.sendMessageCharacteristicHandle.valueHandle)
 	{
 		//Check if we already have an inConnection
 		MeshConnections conn = GS->cm.GetMeshConnections(ConnectionDirection::DIRECTION_IN);
-		if(conn.count >= Conf::meshMaxInConnections){
+		if(conn.count >= GS->config.meshMaxInConnections){
 			logt("CM", "Too many mesh in connections");
-			u32 err = FruityHal::Disconnect(oldConnection->connectionHandle, FruityHal::HciErrorCode::REMOTE_USER_TERMINATED_CONNECTION);
+			FruityHal::Disconnect(oldConnection->connectionHandle, FruityHal::BleHciError::REMOTE_USER_TERMINATED_CONNECTION);
 			return nullptr;
 		}
 		else
@@ -101,7 +101,8 @@ BaseConnection* MeshConnection::ConnTypeResolver(BaseConnection* oldConnection, 
 				BLE_GATT_HANDLE_INVALID);
 
 			newConnection->handshakeStartedDs = oldConnection->handshakeStartedDs;
-			newConnection->unreliableBuffersFree = oldConnection->unreliableBuffersFree;
+			newConnection->connectionMtu = oldConnection->connectionMtu;
+			newConnection->connectionPayloadSize = oldConnection->connectionPayloadSize;
 
 			return newConnection;
 		}
@@ -121,6 +122,7 @@ void MeshConnection::DisconnectAndRemove(AppDisconnectReason reason)
 	ClusterSize connectedClusterSize = this->connectedClusterSize;
 	ClusterId connectedClusterId = this->connectedClusterId;
 	AppDisconnectReason appDisconnectionReason = this->appDisconnectionReason != AppDisconnectReason::UNKNOWN ? this->appDisconnectionReason : reason;
+	NodeId partnerIdBackup = partnerId;
 
 	logt("CONN", "before remove %u, %u, %u, %u", (u32)connectionStateBeforeDisconnection,
 			hadConnectionMasterBit,
@@ -134,18 +136,27 @@ void MeshConnection::DisconnectAndRemove(AppDisconnectReason reason)
 		}
 	}
 
-	if (connectionStateBeforeDisconnection >= ConnectionState::HANDSHAKE_DONE) {
-		logjson("SIM", "{\"type\":\"mesh_disconnect\",\"partnerId\":%u}" SEP, partnerId);
-
-		StatusReporterModule* statusMod = (StatusReporterModule*)GS->node.GetModuleById(ModuleId::STATUS_REPORTER_MODULE);
-		if (statusMod != nullptr) {
-			statusMod->SendLiveReport(LiveReportTypes::HANDSHAKED_MESH_DISCONNECTED, partnerId, (u8)appDisconnectionReason);
-		}
-	}
+	//WARNING: Make sure to not send packets before the connection was removed as this will result
+	//in an infinite loop, causing a stack overflow
 
 	//Will kill the connection. Deletion is at the end of the function.
 	//Do not use members after the following line! USE-AFTER-FREE!
 	BaseConnection::DisconnectAndRemove(reason);
+
+	//Send a live report into the remaining mesh with the reason for the issue
+	if (connectionStateBeforeDisconnection >= ConnectionState::HANDSHAKE_DONE) {
+		logjson("SIM", "{\"type\":\"mesh_disconnect\",\"partnerId\":%u}" SEP, partnerIdBackup);
+
+		StatusReporterModule* statusMod = (StatusReporterModule*)GS->node.GetModuleById(ModuleId::STATUS_REPORTER_MODULE);
+		if (statusMod != nullptr) {
+			statusMod->SendLiveReport(LiveReportTypes::HANDSHAKED_MESH_DISCONNECTED, 0, partnerIdBackup, (u8)appDisconnectionReason);
+		}
+	}
+
+	//Log the error if reestablishing failed
+	if(connectionStateBeforeDisconnection >= ConnectionState::REESTABLISHING){
+		GS->logger.logCustomError(CustomErrorTypes::WARN_CONNECTION_SUSTAIN_FAILED, (u8)appDisconnectionReason);
+	}
 
 	//Use our backup variables to tell the node about the lost connection
 	//Is safe to call after deletion. All variables were backuped at the start of this function.
@@ -157,7 +168,7 @@ void MeshConnection::DisconnectAndRemove(AppDisconnectReason reason)
 		connectedClusterId);
 }
 
-bool MeshConnection::GapDisconnectionHandler(const u8 hciDisconnectReason)
+bool MeshConnection::GapDisconnectionHandler(const FruityHal::BleHciError hciDisconnectReason)
 {
 	logt("CONN", "disconnection handler"); 
 
@@ -175,11 +186,19 @@ bool MeshConnection::GapDisconnectionHandler(const u8 hciDisconnectReason)
 //	}
 
 	u16 err = 0;
-	if (Conf::meshExtendedConnectionTimeoutSec == 0)                                               err |= 1 << 0;	//1
-	if (connectionStateBeforeDisconnection != ConnectionState::HANDSHAKE_DONE)                     err |= 1 << 1;	//2
-	if (hciDisconnectReason == (u8)FruityHal::HciErrorCode::LOCAL_HOST_TERMINATED_CONNECTION)      err |= 1 << 2;	//4
-	if (hciDisconnectReason == (u8)FruityHal::HciErrorCode::REMOTE_USER_TERMINATED_CONNECTION)     err |= 1 << 3;	//8
-	if (GS->appTimerDs - connectionHandshakedTimestampDs <= SEC_TO_DS(30))                         err |= 1 << 4;	//16
+
+	//If connection reestablishment is disabled we do not reestablish
+	if (Conf::meshExtendedConnectionTimeoutSec == 0) err |= 1 << 0; //1
+
+	//The connection must have done a mesh handshake before, if it disconnects again during reestablishment, we retry reestablishment
+	if (connectionStateBeforeDisconnection < ConnectionState::HANDSHAKE_DONE) err |= 1 << 1; //2
+
+	//If the connection was disconnected on purpose, we do not reestablish it
+	if (hciDisconnectReason == FruityHal::BleHciError::LOCAL_HOST_TERMINATED_CONNECTION)  err |= 1 << 2;	//4
+	if (hciDisconnectReason == FruityHal::BleHciError::REMOTE_USER_TERMINATED_CONNECTION) err |= 1 << 3;	//8
+
+	//The connection must have been stable for some time after the initial handshake
+	if (GS->appTimerDs - connectionHandshakedTimestampDs <= SEC_TO_DS(10)) err |= 1 << 4; //16
 
 	//We want to reestablish, so we do not want the connection to be killed, we only want this
 	//if reestablishing is activated and if the connection was handshaked for some time
@@ -190,18 +209,18 @@ bool MeshConnection::GapDisconnectionHandler(const u8 hciDisconnectReason)
 		GS->logger.logCustomError(CustomErrorTypes::INFO_TRYING_CONNECTION_SUSTAIN, partnerId);
 
 		connectionState = ConnectionState::REESTABLISHING;
-		disconnectedTimestampDs = GS->appTimerDs;
+		
+		//Set the reestablishment started time only if the connection was stable before
+		if (connectionStateBeforeDisconnection == ConnectionState::HANDSHAKE_DONE) {
+			reestablishmentStartedDs = GS->appTimerDs;
+		}
 
 		if(direction == ConnectionDirection::DIRECTION_OUT){
-			//Try to connect to peripheral again, if two connections are establishing at the same time, we
-			//will get an error, but we do not care, one will be dropped in that case
-			//TODO: Retry connecting if possible to alow multi-reestablishing
+			//Try to connect to the peripheral again
 			TryReestablishing();
 		} else {
-			//Actiavate discovery if not already activated so that we can be found
-			//GS->node.ChangeState(DiscoveryState::HIGH);
-
-			//TODO: We might want to use directed advertising for a faster reconnection?
+			//Enable fast advertising on the peripheral to guarantee a fast reestablishing
+			GS->node.StartFastJoinMeAdvertising();
 		}
 
 
@@ -218,15 +237,16 @@ bool MeshConnection::GapDisconnectionHandler(const u8 hciDisconnectReason)
 
 void MeshConnection::TryReestablishing()
 {
-	//Reset the disconnectedTimestamp once we try to reestablish to give multiple connections the chance to reestablish one after the other
-	disconnectedTimestampDs = GS->appTimerDs;
+	ErrorType err;
+	err = GS->gapController.connectToPeripheral(partnerAddress, Conf::getInstance().meshMinConnectionInterval, Conf::meshExtendedConnectionTimeoutSec);
 
-	u32 err = GS->gapController.connectToPeripheral(partnerAddress, Conf::getInstance().meshMinConnectionInterval, Conf::meshExtendedConnectionTimeoutSec);
+	//If the call to connect fails, the ConnectionManager must retry connecting periodically
+	mustRetryReestablishing = (err != ErrorType::SUCCESS);
 
-	logt("CONN", "reconnstatus %u", err);
+	logt("CONN", "reconnstatus %u", (u32)err);
 }
 
-void MeshConnection::GapReconnectionSuccessfulHandler(const GapConnectedEvent& connectedEvent)
+void MeshConnection::GapReconnectionSuccessfulHandler(const FruityHal::GapConnectedEvent& connectedEvent)
 {
 	BaseConnection::GapReconnectionSuccessfulHandler(connectedEvent);
 
@@ -327,41 +347,41 @@ bool MeshConnection::TransmitHighPrioData()
 		//If a clusterUpdate is available we send it immediately
 		u8* data = (u8*)&(currentClusterInfoUpdatePacket);
 
-		if(unreliableBuffersFree > 0){
-			if(!IsValidMessageType(((connPacketHeader*)data)->messageType)){
-				logt("ERROR", "POSSIBLE WRONG DATA TRANSMITTED!");
+		if(!IsValidMessageType(((connPacketHeader*)data)->messageType)){
+			logt("ERROR", "POSSIBLE WRONG DATA TRANSMITTED!");
 
-				GS->logger.logCustomError(CustomErrorTypes::WARN_TX_WRONG_DATA, (u32)((connPacketHeader*)data)->messageType);
-			}
+			GS->logger.logCustomError(CustomErrorTypes::WARN_TX_WRONG_DATA, (u32)((connPacketHeader*)data)->messageType);
+		}
 
-			//Use this to queue the clusterUpdate in the high prio queue
-			BaseConnectionSendData sendData;
-			sendData.characteristicHandle = partnerWriteCharacteristicHandle;
-			sendData.dataLength = SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE;
-			sendData.deliveryOption = DeliveryOption::WRITE_CMD;
-			sendData.priority = DeliveryPriority::MESH_INTERNAL_HIGH;
+		//Use this to queue the clusterUpdate in the high prio queue
+		BaseConnectionSendData sendData;
+		CheckedMemset(&sendData, 0x00, sizeof(BaseConnectionSendData));
 
-			//Set the counter for the packet
-			currentClusterInfoUpdatePacket.payload.counter = ++clusterUpdateCounter;
+		sendData.characteristicHandle = partnerWriteCharacteristicHandle;
+		sendData.dataLength = SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE;
+		sendData.deliveryOption = DeliveryOption::WRITE_CMD;
+		sendData.priority = DeliveryPriority::MESH_INTERNAL_HIGH;
 
-			bool queued = QueueData(sendData, data, false);
+		//Set the counter for the packet
+		currentClusterInfoUpdatePacket.payload.counter = ++clusterUpdateCounter;
 
-			if (queued) {
-				logt("CONN", "Queued CLUSTER UPDATE for CONN hnd %u", connectionHandle);
+		bool queued = QueueData(sendData, data, false);
 
-				//The current cluster info update message has been sent, we can now clear the packet
-				//Because we filled it in the buffer
-				ClearCurrentClusterInfoUpdatePacket();
-			}
-			else {
-				SIMSTATCOUNT("highPrioQueueFull");
-				logt("ERROR", "Could not queue CLUSTER_UPDATE");
+		if (queued) {
+			logt("CONN", "Queued CLUSTER UPDATE for CONN hnd %u", connectionHandle);
 
-				GS->logger.logCustomError(CustomErrorTypes::WARN_HIGH_PRIO_QUEUE_FULL, partnerId);
+			//The current cluster info update message has been sent, we can now clear the packet
+			//Because we filled it in the buffer
+			ClearCurrentClusterInfoUpdatePacket();
+		}
+		else {
+			SIMSTATCOUNT("highPrioQueueFull");
+			logt("ERROR", "Could not queue CLUSTER_UPDATE");
 
-				//We must reset our current counter as it was not used
-				clusterUpdateCounter--;
-			}
+			GS->logger.logCustomError(CustomErrorTypes::WARN_HIGH_PRIO_QUEUE_FULL, partnerId);
+
+			//We must reset our current counter as it was not used
+			clusterUpdateCounter--;
 		}
 	}
 
@@ -435,7 +455,7 @@ void MeshConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8* da
 	//Only accept packets to our mesh write handle, TODO: could disconnect if other data is received
 	if(
 		connectionState == ConnectionState::DISCONNECTED
-		|| sendData->characteristicHandle != GS->node.meshService.sendMessageCharacteristicHandle.value_handle
+		|| sendData->characteristicHandle != GS->node.meshService.sendMessageCharacteristicHandle.valueHandle
 	){
 		return;
 	}
@@ -463,27 +483,14 @@ void MeshConnection::ReceiveMeshMessageHandler(BaseConnectionSendData* sendData,
 	connPacketHeader* packetHeader = (connPacketHeader*) data;
 
 	//Some special handling for timestamp updates
-	if(packetHeader->messageType == MessageType::UPDATE_TIMESTAMP)
-	{
-		//Set our time to the received timestamp
-		connPacketUpdateTimestamp* packet = (connPacketUpdateTimestamp*)data;
-		if (sendData->dataLength >= offsetof(connPacketUpdateTimestamp, offset) + sizeof(packet->offset))
-		{
-			GS->timeManager.SetTime(packet->timestampSec, 0, packet->offset);
-		}
-		else
-		{
-			GS->timeManager.SetTime(packet->timestampSec, 0, 0);
-		}
-
-		logt("NODE", "time updated with timestamp:%u", GS->timeManager.GetTime());
-	}
+	GS->timeManager.HandleUpdateTimestampMessages(packetHeader, sendData->dataLength);
 
 	//Some logging
 	if(!IsValidMessageType(packetHeader->messageType)){
 		logt("ERROR", "POSSIBLE WRONG DATA RECEIVED!");
 
-		GS->logger.logCustomError(CustomErrorTypes::WARN_RX_WRONG_DATA, (u32)packetHeader->messageType);
+		//TODO set the extra value of the logCustomError back to the message type after the currently occurring issue is fixed.
+		GS->logger.logCustomError(CustomErrorTypes::WARN_RX_WRONG_DATA, (u32)sendData->dataLength);
 	}
 	//Print packet as hex
 	{
@@ -503,7 +510,39 @@ void MeshConnection::ReceiveMeshMessageHandler(BaseConnectionSendData* sendData,
 
 #define _________________HANDSHAKE_______________________
 
+void MeshConnection::ConnectionMtuUpgradedHandler(u16 gattPayloadSize)
+{
+	BaseConnection::ConnectionMtuUpgradedHandler(gattPayloadSize);
+
+	//Our central will start the handshake
+	if (direction == ConnectionDirection::DIRECTION_OUT) {
+		//Depending on the kind of handshake we should do, we call the appropriate method
+		if (connectionState < ConnectionState::REESTABLISHING_HANDSHAKE) {
+			StartHandshakeAfterMtuExchange();
+		}
+		else {
+			SendReconnectionHandshakePacketAfterMtuExchange();
+		}
+	}
+}
+
+//This is called in case our node is the central, otherwhise, the handshake is started by the partner
 void MeshConnection::StartHandshake()
+{
+	//Before starting our mesh handshake, we upgrade to a higher MTU if possible
+	u32 err = GS->cm.RequestDataLengthExtensionAndMtuExchange(this);
+
+	//If we could not upgrade the MTU, we continue with our handshake
+	if(err != NRF_SUCCESS){
+		GS->logger.logCustomError(CustomErrorTypes::WARN_MTU_UPGRADE_FAILED, err);
+
+		ConnectionMtuUpgradedHandler(MAX_DATA_SIZE_PER_WRITE);
+	}
+
+	// => The ConnectionMtuUpgradedHandler will be called next
+}
+
+void MeshConnection::StartHandshakeAfterMtuExchange()
 {
 	//Save a snapshot of the current clustering values, these are used in the handshake
 	//Changes to these values are only sent after the handshake has finished and the handshake
@@ -534,7 +573,7 @@ void MeshConnection::StartHandshake()
 
 	packet.payload.clusterId = clusterIDBackup;
 	packet.payload.clusterSize = clusterSizeBackup;
-	packet.payload.meshWriteHandle = GS->node.meshService.sendMessageCharacteristicHandle.value_handle; //Our own write handle
+	packet.payload.meshWriteHandle = GS->node.meshService.sendMessageCharacteristicHandle.valueHandle; //Our own write handle
 
 	//Now we set the hop counter to the closest sink
 	packet.payload.hopsToSink = GS->cm.GetMeshHopsToShortestSink(this);
@@ -682,7 +721,7 @@ void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendD
 			}
 
 			//Save ACK1 packet for later
-			memcpy(&clusterAck1Packet, data, sizeof(connPacketClusterAck1));
+			CheckedMemcpy(&clusterAck1Packet, data, sizeof(connPacketClusterAck1));
 
 			logt("HANDSHAKE", "IN <= %d  CLUSTER_ACK_1, hops:%d", clusterAck1Packet.header.sender, clusterAck1Packet.payload.hopsToSink);
 
@@ -731,7 +770,7 @@ void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendD
 			}
 
 			//Save Ack2 packet for later
-			memcpy(&clusterAck2Packet, data, sizeof(connPacketClusterAck2));
+			CheckedMemcpy(&clusterAck2Packet, data, sizeof(connPacketClusterAck2));
 
 			logt("HANDSHAKE", "IN <= %d CLUSTER_ACK_2 clusterID:%x, clusterSize:%d", clusterAck2Packet.header.sender, clusterAck2Packet.payload.clusterId, clusterAck2Packet.payload.clusterSize);
 
@@ -753,11 +792,24 @@ void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendD
 
 	StatusReporterModule* statusMod = (StatusReporterModule*)GS->node.GetModuleById(ModuleId::STATUS_REPORTER_MODULE);
 	if(statusMod != nullptr && handshakeFailCode != LiveReportHandshakeFailCode::SUCCESS){
-		statusMod->SendLiveReport(LiveReportTypes::HANDSHAKE_FAIL, tempPartnerId, (u32)handshakeFailCode);
+		statusMod->SendLiveReport(LiveReportTypes::HANDSHAKE_FAIL, 0, tempPartnerId, (u32)handshakeFailCode);
 	}
 }
 
 void MeshConnection::SendReconnectionHandshakePacket()
+{
+	//Before starting our mesh handshake, we upgrade to a higher MTU if possible
+	u32 err = GS->cm.RequestDataLengthExtensionAndMtuExchange(this);
+
+	//If we could not upgrade the MTU, we continue with our handshake
+	if(err != NRF_SUCCESS){
+		GS->logger.logCustomError(CustomErrorTypes::WARN_MTU_UPGRADE_FAILED, err);
+
+		ConnectionMtuUpgradedHandler(MAX_DATA_SIZE_PER_WRITE);
+	}
+}
+
+ErrorType MeshConnection::SendReconnectionHandshakePacketAfterMtuExchange()
 {
 	//Can not be done using the send queue because there might be data packets in these queues
 	//So instead, we queue the data directly in the softdevice. We can assume that this succeeds most of the time, otherwise reconneciton fails
@@ -771,25 +823,33 @@ void MeshConnection::SendReconnectionHandshakePacket()
 
 	//TODO: Add a check if the reliable buffer is free?
 
+	//We send the reconnect packet
 	u32 err = GS->gattController.bleWriteCharacteristic(
 		connectionHandle,
 		partnerWriteCharacteristicHandle,
 		(u8*)&packet,
 		SIZEOF_CONN_PACKET_RECONNECT,
-		true);
+		false);
 
 
 	logt("HANDSHAKE", "writing to connHnd %u, partnerWriteHnd %u, err %u",connectionHandle, partnerWriteCharacteristicHandle, err);
 
+	//TODO: If we notice that we have too many errors here, we can optimize this part and retry sending the reconnect packet
+
 	//We must account for buffers ourself if we do not use the queue
-	if (err == FruityHal::SUCCESS) {
+	if (err == (u32)ErrorType::SUCCESS) {
 		manualPacketsSent++;
-		reliableBuffersFree--;
 	}
 	else {
+		//We must disconnect, as otherwhise other packets from the queue will get sent, this will break the reestablishment
+		//We cannot disconnect the GAP connection on purpose as the partner will then stop the reestablishment
 		this->DisconnectAndRemove(AppDisconnectReason::RECONNECT_BLE_ERROR);
+
+		//WARNING: After this error was returned, we must not use the connection reference anymore
+		return ErrorType::INVALID_STATE;
 	}
 
+	return ErrorType::SUCCESS;
 }
 
 void MeshConnection::ReceiveReconnectionHandshakePacket(connPacketReconnect* packet)
@@ -799,8 +859,13 @@ void MeshConnection::ReceiveReconnectionHandshakePacket(connPacketReconnect* pac
 		packet->header.sender == partnerId
 		&& connectionState == ConnectionState::REESTABLISHING_HANDSHAKE
 	){
-		connectionState = ConnectionState::HANDSHAKE_DONE;
-		disconnectedTimestampDs = 0;
+		//Answer the handshake packet
+		ErrorType err = SendReconnectionHandshakePacketAfterMtuExchange();
+
+		if (err == ErrorType::SUCCESS) {
+			connectionState = ConnectionState::HANDSHAKE_DONE;
+			disconnectedTimestampDs = 0;
+		}
 
 	}
 }
@@ -824,6 +889,7 @@ bool MeshConnection::IsValidMessageType(MessageType t)
 		case(MessageType::UPDATE_TIMESTAMP):
 		case(MessageType::UPDATE_CONNECTION_INTERVAL):
 		case(MessageType::ASSET_V2):
+		case(MessageType::ASSET_GENERIC):
 		case(MessageType::MODULE_CONFIG):
 		case(MessageType::MODULE_TRIGGER_ACTION):
 		case(MessageType::MODULE_ACTION_RESPONSE):
@@ -850,10 +916,15 @@ void MeshConnection::PrintStatus()
 {
 	const char* directionString = (direction == ConnectionDirection::DIRECTION_IN) ? "IN " : "OUT";
 
-	trace("%s(%d) FM %u, state:%u, cluster:%x(%d), sink:%d, Queue:%u-%u(%u), Buf:%u/%u, mb:%u, hnd:%u, tSync:%u" EOL, directionString, connectionId, this->partnerId, (u32)this->connectionState, this->connectedClusterId, this->connectedClusterSize, this->hopsToSink, (packetSendQueue.readPointer - packetSendQueue.bufferStart), (packetSendQueue.writePointer - packetSendQueue.bufferStart), packetSendQueue._numElements, reliableBuffersFree, unreliableBuffersFree, connectionMasterBit, connectionHandle, (u32)timeSyncState);
+	trace("%s(%d) FM %u, state:%u, cluster:%x(%d), sink:%d, Queue:%u-%u(%u), mb:%u, hnd:%u, tSync:%u, sent:%u, rssi:%d" EOL, directionString, connectionId, this->partnerId, (u32)this->connectionState, this->connectedClusterId, this->connectedClusterSize, this->hopsToSink, (packetSendQueue.readPointer - packetSendQueue.bufferStart), (packetSendQueue.writePointer - packetSendQueue.bufferStart), packetSendQueue._numElements, connectionMasterBit, connectionHandle, (u32)timeSyncState, sentUnreliable, GetAverageRSSI());
 }
 
 void MeshConnection::setHopsToSink(ClusterSize hops)
 {
 	hopsToSink = hops;
+}
+
+ClusterSize MeshConnection::getHopsToSink()
+{
+	return hopsToSink;
 }

@@ -68,64 +68,44 @@ void Module::SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 
 //Constructs a simple trigger action message and can take aditional payload data
 void Module::SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool loopback) const
 {
-	DYNAMIC_ARRAY(buffer, SIZEOF_CONN_PACKET_MODULE + additionalDataSize);
-
-	connPacketModule* outPacket = (connPacketModule*)buffer;
-	outPacket->header.messageType = messageType;
-	outPacket->header.sender = GS->node.configuration.nodeId;
-	outPacket->header.receiver = toNode;
-
-	outPacket->moduleId = moduleId;
-	outPacket->requestHandle = requestHandle;
-	outPacket->actionType = actionType;
-
-	if(additionalData != nullptr && additionalDataSize > 0)
-	{
-		memcpy(&outPacket->data, additionalData, additionalDataSize);
-	}
-
-	//TODO: reliable is currently not supported and by default false. The input is ignored
-	GS->cm.SendMeshMessageInternal(buffer, SIZEOF_CONN_PACKET_MODULE + additionalDataSize, DeliveryPriority::LOW, false, loopback, true);
+	GS->cm.SendModuleActionMessage(messageType, moduleId, toNode, actionType, requestHandle, additionalData, additionalDataSize, reliable, loopback);
 }
 
 #ifdef TERMINAL_ENABLED
-bool Module::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
+TerminalCommandHandlerReturnType Module::TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize)
 {
 	//If somebody wants to set the module config over uart, he's welcome
 	//First, check if our module is meant
 	if(commandArgsSize >= 3 && TERMARGS(2, moduleName))
 	{
-		NodeId receiver = (TERMARGS(1,"this")) ? GS->node.configuration.nodeId : atoi(commandArgs[1]);
+		NodeId receiver = (TERMARGS(1,"this")) ? GS->node.configuration.nodeId : Utility::StringToU16(commandArgs[1]);
 
 		//E.g. UART_MODULE_SET_CONFIG 0 STATUS 00:FF:A0 => command, nodeId (this for current node), moduleId, hex-string
 		if(TERMARGS(0, "set_config"))
 		{
-			if(commandArgsSize >= 4)
-			{
-				//calculate configuration size
-				const char* configString = commandArgs[3];
-				u16 configLength = (u16) (strlen(commandArgs[3])+1)/3;
+			if (commandArgsSize < 4) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+			//calculate configuration size
+			const char* configString = commandArgs[3];
+			u16 configLength = (u16) (strlen(commandArgs[3])+1)/3;
 
-				u8 requestHandle = commandArgsSize >= 5 ? atoi(commandArgs[4]) : 0;
+			u8 requestHandle = commandArgsSize >= 5 ? Utility::StringToU8(commandArgs[4]) : 0;
 
-				//Send the configuration to the destination node
-				DYNAMIC_ARRAY(packetBuffer, configLength + SIZEOF_CONN_PACKET_MODULE);
-				connPacketModule* packet = (connPacketModule*)packetBuffer;
-				packet->header.messageType = MessageType::MODULE_CONFIG;
-				packet->header.sender = GS->node.configuration.nodeId;
-				packet->header.receiver = receiver;
+			//Send the configuration to the destination node
+			DYNAMIC_ARRAY(packetBuffer, configLength + SIZEOF_CONN_PACKET_MODULE);
+			connPacketModule* packet = (connPacketModule*)packetBuffer;
+			packet->header.messageType = MessageType::MODULE_CONFIG;
+			packet->header.sender = GS->node.configuration.nodeId;
+			packet->header.receiver = receiver;
 
-				packet->actionType = (u8)ModuleConfigMessages::SET_CONFIG;
-				packet->moduleId = moduleId;
-				packet->requestHandle = requestHandle;
-				//Fill data region with module config
-				Logger::parseEncodedStringToBuffer(configString, packet->data, configLength);
+			packet->actionType = (u8)ModuleConfigMessages::SET_CONFIG;
+			packet->moduleId = moduleId;
+			packet->requestHandle = requestHandle;
+			//Fill data region with module config
+			Logger::parseEncodedStringToBuffer(configString, packet->data, configLength);
 
-				GS->cm.SendMeshMessage(packetBuffer, configLength + SIZEOF_CONN_PACKET_MODULE, DeliveryPriority::LOW);
+			GS->cm.SendMeshMessage(packetBuffer, configLength + SIZEOF_CONN_PACKET_MODULE, DeliveryPriority::LOW);
 
-				return true;
-			}
-
+			return TerminalCommandHandlerReturnType::SUCCESS;
 		}
 		else if(TERMARGS(0,"get_config"))
 		{
@@ -139,14 +119,14 @@ bool Module::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
 
 			GS->cm.SendMeshMessage((u8*)&packet, SIZEOF_CONN_PACKET_MODULE, DeliveryPriority::LOW);
 
-			return true;
+			return TerminalCommandHandlerReturnType::SUCCESS;
 		}
 		else if(TERMARGS(0,"set_active"))
 		{
-			if(commandArgsSize <= 3) return false;
+			if(commandArgsSize <= 3) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
 			u8 moduleState = TERMARGS(3,"on") ? 1: 0;
-			u8 requestHandle = commandArgsSize >= 5 ? atoi(commandArgs[4]) : 0;
+			u8 requestHandle = commandArgsSize >= 5 ? Utility::StringToU8(commandArgs[4]) : 0;
 
 			connPacketModule packet;
 			packet.header.messageType = MessageType::MODULE_CONFIG;
@@ -160,11 +140,11 @@ bool Module::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
 
 			GS->cm.SendMeshMessage((u8*) &packet, SIZEOF_CONN_PACKET_MODULE + 1, DeliveryPriority::LOW);
 
-			return true;
+			return TerminalCommandHandlerReturnType::SUCCESS;
 		}
 	}
 
-	return false;
+	return TerminalCommandHandlerReturnType::UNKNOWN;
 }
 #endif
 
@@ -191,7 +171,7 @@ void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnecti
 					//Backup the module id because the provided moduleId in the payload might not be set.
 					ModuleId moduleId = configurationPointer->moduleId;
 					CheckedMemset(configurationPointer, 0x00, configurationLength);
-					memcpy(configurationPointer, packet->data, dataFieldLength);
+					CheckedMemcpy(configurationPointer, packet->data, dataFieldLength);
 					configurationPointer->moduleId = moduleId;
 
 					//Call the configuration loaded handler to reinitialize stuff if necessary (RAM config is already set)
@@ -231,7 +211,7 @@ void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnecti
 				outPacket->requestHandle = packet->requestHandle;
 				outPacket->actionType = (u8)ModuleConfigMessages::CONFIG;
 
-				memcpy(outPacket->data, (u8*)configurationPointer, configurationLength);
+				CheckedMemcpy(outPacket->data, (u8*)configurationPointer, configurationLength);
 
 				GS->cm.SendMeshMessage(buffer, SIZEOF_CONN_PACKET_MODULE + configurationLength, DeliveryPriority::LOW);
 			}
@@ -254,7 +234,7 @@ void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnecti
 						outPacket.moduleId = moduleId;
 						outPacket.requestHandle = packet->requestHandle;
 						outPacket.actionType = (u8)ModuleConfigMessages::SET_ACTIVE_RESULT;
-						outPacket.data[0] = FruityHal::SUCCESS; //Return ok
+						outPacket.data[0] = (u8)ErrorType::SUCCESS; //Return ok
 
 						GS->cm.SendMeshMessage((u8*) &outPacket, SIZEOF_CONN_PACKET_MODULE + 1, DeliveryPriority::LOW);
 

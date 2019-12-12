@@ -39,6 +39,14 @@
 
 #define ADV_PACKET_MAX_SIZE 31
 
+enum class ServiceDataMessageType : u16
+{
+	INVALID        = 0,
+	STANDARD_ASSET = 0x02,
+	MESH_ACCESS    = 0x03,
+	INS_ASSET      = 0x04,
+};
+
 //Start packing all these structures
 //These are packed so that they can be transmitted savely over the air
 //Smaller datatypes could be implemented with bitfields?
@@ -60,27 +68,6 @@ typedef struct
 }advStructureFlags;
 STATIC_ASSERT_SIZE(advStructureFlags, 3);
 
-//BLE AD Type full local name
-#define SIZEOF_ADV_STRUCTURE_NAME 4
-typedef struct
-{
-	u8 len;
-	u8 type;
-	u8 name[2];
-}advStructureName;
-STATIC_ASSERT_SIZE(advStructureName, 4);
-
-//BLE AD Type full list of services
-#define SIZEOF_ADV_STRUCTURE_UUID128 18
-typedef struct
-{
-	u8 len;
-	u8 type;
-	u8 uuid[16];
-}advStructureUUID128;
-STATIC_ASSERT_SIZE(advStructureUUID128, 18);
-
-
 //BLE AD Type list of 16-bit service UUIDs
 #define SIZEOF_ADV_STRUCTURE_UUID16 4
 typedef struct
@@ -95,10 +82,8 @@ STATIC_ASSERT_SIZE(advStructureUUID16, 4);
 #define SIZEOF_ADV_STRUCTURE_SERVICE_DATA_AND_TYPE 6
 typedef struct
 {
-	u8 len;
-	u8 type;
-	u16 uuid;
-	u16 messageType; //Message type depending on our custom service
+	advStructureUUID16 uuid;
+	ServiceDataMessageType messageType; //Message type depending on our custom service
 }advStructureServiceDataAndType;
 STATIC_ASSERT_SIZE(advStructureServiceDataAndType, 6);
 
@@ -130,16 +115,6 @@ STATIC_ASSERT_SIZE(advPacketServiceAndDataHeader, 13);
 
 
 //####### Advertising packets => Structs #################################################
-
-// Header that is used for custom data using the manufacturer specific ad type
-#define SIZEOF_ADV_PACKET_HEADER_MANUFACTURER (SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_MANUFACTURER + 1)
-typedef struct
-{
-	advStructureFlags flags;
-	advStructureManufacturer manufacturer;
-	u8 messageType;
-}advPacketHeaderManufacturer;
-STATIC_ASSERT_SIZE(advPacketHeaderManufacturer, 8);
 
 //Header that is common to all mesh advertising messages
 #define SIZEOF_ADV_PACKET_STUFF_AFTER_MANUFACTURER 4 //1byte mesh identifier + 2 byte networkid + 1 byte message type
@@ -188,34 +163,40 @@ STATIC_ASSERT_SIZE(advPacketPayloadJoinMeV0, 20);
  * a flooding manner. This is very inefficient and only one packet can be sent at once
  */
 
-#define SIZEOF_ADV_PACKET_FLOOD (SIZEOF_ADV_PACKET_HEADER + 5) //Data region is variable, add its size in bytes
-typedef struct
-{
-	advPacketHeader header;
-	NodeId senderId;
-	NodeId receiverId;
-	u8 packetId; //A packet id in combination with the senderId is unique for a long time period
-	u8 data[ADV_PACKET_MAX_SIZE - SIZEOF_ADV_PACKET_FLOOD]; //Data can be larger and will be transmitted in subsequent packets
-
-}advPacketFlood;
-STATIC_ASSERT_SIZE(advPacketFlood, 31);
-
 //####### Asset Tracking #################################################
-
-#define SERVICE_DATA_MESSAGE_TYPE_ASSET 0x02
 
 #pragma pack(push)
 #pragma pack(1)
+//Service Data (max. 24 byte)
+#define SIZEOF_ADV_STRUCTURE_ASSET_INS_SERVICE_DATA 24
+struct advPacketAssetInsServiceData
+{
+	//6 byte header
+	advStructureServiceDataAndType data;
+
+	//1 byte flags
+	u8 gyroscopeAvailable : 1;
+	u8 magnetometerAvailable : 1;
+	u8 moving : 1;
+	u8 reservedBits : 5;
+
+	//9 byte assetData
+	u16 assetNodeId;
+	u8 batteryPower; //0xFF = not available
+	u16 absolutePositionX; //0xFFFF = not available
+	u16 absolutePositionY; //0xFFFF = not available
+	u16 pressure; //0xFFFF = not available
+
+	//8 bytes reserved
+	u8 reserved[8]; //Must be set to 0
+};
+STATIC_ASSERT_SIZE(advPacketAssetInsServiceData, SIZEOF_ADV_STRUCTURE_ASSET_INS_SERVICE_DATA);
 
 //Service Data (max. 24 byte)
 #define SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA 24
-typedef struct
+struct advPacketAssetServiceData
 {
-	//6 byte header
-	u8 len;
-	u8 type;
-	u16 uuid;
-	u16 messageType; //0x02 for Asset Service
+	advStructureServiceDataAndType data;
 
 	//1 byte capabilities
 	u8 advertisingChannel : 2; // 0 = not available, 1=37, 2=38, 3=39
@@ -232,12 +213,10 @@ typedef struct
 	i8 temperature; //0xFF = not available
 	u8 humidity; //0xFF = not available
 
-	u16 reserved;
+	NodeId nodeId;
 
-	u32 encryptionMIC;
-
-
-}advPacketAssetServiceData;
+	u8 reserved[4];
+};
 STATIC_ASSERT_SIZE(advPacketAssetServiceData, SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA);
 
 #pragma pack(pop)
@@ -260,19 +239,6 @@ typedef struct
 	advPacketPayloadJoinMeV0 payload;
 }advPacketJoinMeV0;
 STATIC_ASSERT_SIZE(advPacketJoinMeV0, 31);
-
-
-//######## Scan Response packets ##############################################
-
-//A header that is used for scan response packets
-#define SIZEOF_SCAN_PACKET_HEADER (SIZEOF_ADV_STRUCTURE_NAME + SIZEOF_ADV_STRUCTURE_MANUFACTURER)
-typedef struct
-{
-	advStructureName name;
-	advStructureManufacturer manufacturer;
-}scanPacketHeader;
-STATIC_ASSERT_SIZE(scanPacketHeader, 8);
-
 
 //End Packing
 #pragma pack(pop)

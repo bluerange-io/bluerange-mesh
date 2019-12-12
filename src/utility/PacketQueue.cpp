@@ -36,23 +36,16 @@
 
 //Data will be 4-byte aligned if all inputs are 4 byte aligned
 PacketQueue::PacketQueue(u32* buffer, u16 bufferLength)
+	:bufferStart((u8*)buffer),
+	bufferEnd((u8*)buffer + bufferLength - 1), //FIXME: workaround to avoid 1byte overflow of the packet queue
+	bufferLength(bufferLength - 1) // s.o.
 {
-	this->_numElements = 0;
-	this->numUnsentElements = 0;
-	this->bufferStart = (u8*)buffer;
-	this->bufferEnd = ((u8*)buffer) + bufferLength - 1; //FIXME: workaround to avoid 1byte overflow of the packet queue
-	this->bufferLength = bufferLength - 1; // s.o.
-
 	this->readPointer = this->bufferStart;
 	this->writePointer = this->bufferStart;
 
 	((u16*)writePointer)[0] = 0;
 
 	CheckedMemset(buffer, 0, bufferLength);
-
-	packetSendPosition = 0;
-	packetSentRemaining = 0;
-	packetFailedToQueueCounter = 0;
 }
 
 //IF READ AND WRITE ARE EQUAL, THE QUEUE IS EMPTY
@@ -62,7 +55,7 @@ bool PacketQueue::Put(u8* data, u16 dataLength)
 	u8* dest = Reserve(dataLength);
 
 	if(dest != nullptr){
-		memcpy(dest, data, dataLength);
+		CheckedMemcpy(dest, data, dataLength);
 		return true;
 	} else {
 		return false;
@@ -120,6 +113,8 @@ u8* PacketQueue::Reserve(u16 dataLength)
 	_numElements++;
 
 	logt("PQ", "Reserve %u bytes, now %u elements", dataLength, _numElements);
+
+	CheckedMemset(dataPointer, 0, dataLength);
 
 	return dataPointer;
 }

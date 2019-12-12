@@ -34,6 +34,7 @@ endif::[]
 ** xref:fruitymesh::Class-Structure.adoc[Class Structure]
 ** xref:fruitymesh::Debugging.adoc[Debugging]
 ** xref:fruitymesh::Battery-Consumption.adoc[Battery Consumption]
+** xref:fruitymesh::Throughput.adoc[Throughput]
 ** xref:fruitymesh::RecordStorage.adoc[Record Storage]
 
 * xref:fruitymesh::The-FruityMesh-Algorithm.adoc[The Fruitymesh Algorithm]

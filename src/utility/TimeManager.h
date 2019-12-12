@@ -76,6 +76,8 @@ public:
 	void AddCorrection(u32 ticks);
 	void ProcessTicks();
 	
+	void HandleUpdateTimestampMessages(connPacketHeader* packetHeader, u16 dataLength);
+
 	//Trivial implementation for converting the timestamp in human readable format
 	//This does not pay respect to any leap seconds, gap years, whatever
 	void convertTimestampToString(char* buffer);

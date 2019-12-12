@@ -59,7 +59,7 @@ struct AdvJob {
 	u8 currentDelay;
 
 	//Advertising Data
-	GapAdvType advertisingType; //BLE_GAP_ADV_TYPES
+	FruityHal::BleGapAdvType advertisingType; //BLE_GAP_ADV_TYPES
 	u8 advData[31];
 	u8 advDataLength;
 	u8 scanData[31];
@@ -81,15 +81,13 @@ constexpr int ADVERTISING_CONTROLLER_MAX_NUM_JOBS = 4;
 class AdvertisingController
 {
 private:
-	u32 sumSlots;
-	u16 currentAdvertisingInterval;
-#if SDK == 15
-	u8 handle;
-#endif
+	u32 sumSlots = 0;
+	u16 currentAdvertisingInterval = UINT16_MAX;
+	u8 handle = 0xFF; //BLE_GAP_ADV_SET_HANDLE_NOT_SET
 
 	//The address that should be used for advertising, the Least Significant Byte
 	//May be changed by the advertiser to account for different advertising services
-	fh_ble_gap_addr_t baseGapAddress;
+	FruityHal::BleGapAddr baseGapAddress;
 
 	bool isActive = true;
 
@@ -97,10 +95,8 @@ public:
 	AdvertisingController();
 
 	SimpleArray<AdvJob, ADVERTISING_CONTROLLER_MAX_NUM_JOBS> jobs;
-#if SDK == 15
 	SimpleArray<AdvData, 2> advData;
-	u8 currentSlotUsed;
-#endif
+	u8 currentSlotUsed = 0;
 
 	enum class AdvertisingState : u8{
 		DISABLED,
@@ -113,15 +109,15 @@ public:
 		RESTART,
 	};
 
-	AdvertisingState advertisingState;
-	AdvertisingStateAction advertisingStateAction;
+	AdvertisingState advertisingState = AdvertisingState::DISABLED;
+	AdvertisingStateAction advertisingStateAction = AdvertisingStateAction::OK;
 
-	fh_ble_gap_adv_params_t currentAdvertisingParams;
-	u8 currentNumJobs;
+	FruityHal::BleGapAdvParams currentAdvertisingParams;
+	u8 currentNumJobs = 0;
 
 
-	AdvJob* currentActiveJob;
-	AdvJob* jobToSet;
+	AdvJob* currentActiveJob = nullptr;
+	AdvJob* jobToSet = nullptr;
 
 	static AdvertisingController& getInstance();
 
@@ -150,8 +146,8 @@ public:
 
 	void TimerEventHandler(u16 passedTimeDs);
 
-	void GapConnectedEventHandler(const GapConnectedEvent& connectedEvent);
-	void GapDisconnectedEventHandler(const GapDisconnectedEvent& disconnectedEvent);
+	void GapConnectedEventHandler(const FruityHal::GapConnectedEvent& connectedEvent);
+	void GapDisconnectedEventHandler(const FruityHal::GapDisconnectedEvent& disconnectedEvent);
 
 
 };

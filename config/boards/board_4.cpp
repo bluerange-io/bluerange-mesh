@@ -49,6 +49,7 @@ void setBoard_4(BoardConfiguration* c)
 		c->dBmRX = -96;
 		c->calibratedTX =  -60;
 		c->lfClockSource = NRF_CLOCK_LF_SRC_XTAL;
+		c->lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_20_PPM;
 		c->dcDcEnabled = true;
 	}
 #endif

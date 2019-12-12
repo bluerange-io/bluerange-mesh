@@ -53,15 +53,14 @@ u32 fruityMeshVersion = FM_VERSION;
 
 Conf::Conf()
 {
-	//If firmware groupids are defined, we save them in our config
+	CheckedMemset(_serialNumber, 0, sizeof(_serialNumber));
+	CheckedMemset(fwGroupIds, 0, sizeof(fwGroupIds));
+	CheckedMemset(defaultNetworkKey, 0, sizeof(defaultNetworkKey));
+	CheckedMemset(defaultUserBaseKey, 0, sizeof(defaultUserBaseKey));
+	CheckedMemset(&staticAccessAddress, 0, sizeof(staticAccessAddress));
 	CheckedMemset(fwGroupIds, 0x00, sizeof(fwGroupIds));
-#ifdef SET_FW_GROUPID_CHIPSET
-	fwGroupIds[0] = SET_FW_GROUPID_CHIPSET;
-#endif
-#ifdef SET_FW_GROUPID_FEATURESET
-	fwGroupIds[1] = SET_FW_GROUPID_FEATURESET;
-#endif
 
+	terminalMode = TerminalMode::DISABLED;
 }
 
 
@@ -71,6 +70,9 @@ Conf::Conf()
 void Conf::Initialize(bool safeBootEnabled)
 {
 	this->safeBootEnabled = safeBootEnabled;
+
+	fwGroupIds[0] = (NodeId)GET_CHIPSET();
+	fwGroupIds[1] = (NodeId)GET_FEATURE_SET_GROUP();
 
 	//First, fill with default Settings from the codebase
 	LoadDefaults();
@@ -116,13 +118,17 @@ void Conf::LoadDefaults(){
 		totalInConnections = 1;
 		meshMaxInConnections = 1;
 	}
+	else{
+		totalInConnections = 3;
+		meshMaxInConnections = 2;
+	}
 #endif
 
-	meshMinConnectionInterval = (u16)MSEC_TO_UNITS(10, UNIT_1_25_MS);
-	meshMaxConnectionInterval = (u16)MSEC_TO_UNITS(10, UNIT_1_25_MS);
+	meshMinConnectionInterval = 12; //FIXME_HAL: 12 units = 15ms (1.25ms steps)
+	meshMaxConnectionInterval = 12; //FIXME_HAL: 12 units = 15ms (1.25ms steps)
 
-	meshScanIntervalHigh = (u16)MSEC_TO_UNITS(20, UNIT_0_625_MS);
-	meshScanWindowHigh = (u16)MSEC_TO_UNITS(3, UNIT_0_625_MS);
+	meshScanIntervalHigh = 120; //FIXME_HAL: 120 units = 75ms (0.625ms steps)
+	meshScanWindowHigh = 12; //FIXME_HAL: 12 units = 7.5ms (0.625ms steps)
 
 	meshScanIntervalLow = (u16)MSEC_TO_UNITS(250, UNIT_0_625_MS);
 	meshScanWindowLow = (u16)MSEC_TO_UNITS(3, UNIT_0_625_MS);
@@ -135,7 +141,7 @@ void Conf::LoadDefaults(){
 	CheckedMemset(defaultNetworkKey, 0xFF, 16);
 	CheckedMemset(defaultUserBaseKey, 0xFF, 16);
 	CheckedMemset(&staticAccessAddress.addr, 0xFF, 6);
-	staticAccessAddress.addr_type = 0xFF;
+	staticAccessAddress.addr_type = FruityHal::BleGapAddrType::INVALID;
 	highToLowDiscoveryTimeSec = 0;
 }
 
@@ -164,7 +170,7 @@ void Conf::LoadUicr(){
 		//=> uicrData[1] was already read in the BoardConfig class
 
 		if(!isEmpty((u8*)(uicrData + 4), 16)){
-			memcpy(configuration.nodeKey, (u8*)(uicrData + 4), 16);
+			CheckedMemcpy(configuration.nodeKey, (u8*)(uicrData + 4), 16);
 		}
 		if(uicrData[8] != EMPTY_WORD) manufacturerId = (u16)uicrData[8];
 		if(uicrData[9] != EMPTY_WORD) defaultNetworkId = (u16)uicrData[9];
@@ -177,17 +183,17 @@ void Conf::LoadUicr(){
 			//and is still in use, that was not flashed with uicrData[12].
 			//If AND ONLY IF this is not the case, you can savely remove it.
 			char serialNumber[6];
-			memcpy((u8*)serialNumber, (u8*)(uicrData + 2), 5);
+			CheckedMemcpy((u8*)serialNumber, (u8*)(uicrData + 2), 5);
 			serialNumber[5] = '\0';
 			serialNumberIndex = Utility::GetIndexForSerial(serialNumber);
 		}
 
 		//If no network key is present in UICR but a node key is present, use the node key for both (to migrate settings for old nodes)
 		if(isEmpty((u8*)(uicrData + 13), 16) && !isEmpty(configuration.nodeKey, 16)){
-			memcpy(defaultNetworkKey, configuration.nodeKey, 16);
+			CheckedMemcpy(defaultNetworkKey, configuration.nodeKey, 16);
 		} else {
 			//Otherwise, we use the default network key
-			memcpy(defaultNetworkKey, (u8*)(uicrData + 13), 16);
+			CheckedMemcpy(defaultNetworkKey, (u8*)(uicrData + 13), 16);
 		}
 	}
 }
@@ -222,7 +228,7 @@ void Conf::LoadSettingsFromFlash(Module* module, ModuleId moduleId, ModuleConfig
 
 		//Check if configuration exists and has the correct version, if yes, copy to module configuration struct
 		if (configData.length > SIZEOF_MODULE_CONFIGURATION_HEADER && ((ModuleConfiguration*)configData.data)->moduleVersion == configurationPointer->moduleVersion) {
-			memcpy((u8*)configurationPointer, configData.data, configData.length);
+			CheckedMemcpy((u8*)configurationPointer, configData.data, configData.length);
 
 			logt("CONFIG", "Config for module %u loaded", (u32)moduleId);
 
@@ -312,20 +318,20 @@ const u8 * Conf::GetNodeKey() const
 void Conf::GetRestrainedKey(u8* buffer) const
 {
 	Aes128Block key;
-	memcpy(key.data, GetNodeKey(), 16);
+	CheckedMemcpy(key.data, GetNodeKey(), 16);
 
 	Aes128Block messageBlock;
-	memcpy(messageBlock.data, RESTRAINED_KEY_CLEAR_TEXT, 16);
+	CheckedMemcpy(messageBlock.data, RESTRAINED_KEY_CLEAR_TEXT, 16);
 
 	Aes128Block restrainedKeyBlock;
 	Utility::Aes128BlockEncrypt(&messageBlock, &key, &restrainedKeyBlock);
 
-	memcpy(buffer, restrainedKeyBlock.data, 16);
+	CheckedMemcpy(buffer, restrainedKeyBlock.data, 16);
 }
 
 void Conf::SetNodeKey(const u8 * key)
 {
-	memcpy(configuration.nodeKey, key, 16);
+	CheckedMemcpy(configuration.nodeKey, key, 16);
 
 	Utility::SaveModuleSettingsToFlashWithId(ModuleId::CONFIG, &configuration, sizeof(ConfigConfiguration), nullptr, 0, nullptr, 0);
 }

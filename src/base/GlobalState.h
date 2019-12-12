@@ -77,10 +77,10 @@ class GlobalState
 #endif
 
 		uint32_t SetEventHandlers(
-			SystemEventHandler systemEventHandler, TimerEventHandler timerEventHandler, 
-			ButtonEventHandler buttonEventHandler, AppErrorHandler   appErrorHandler, 
-			StackErrorHandler  stackErrorHandler,  HardfaultHandler  hardfaultHandler);
-		void SetUartHandler(UartEventHandler uartEventHandler);
+			FruityHal::SystemEventHandler systemEventHandler, FruityHal::TimerEventHandler timerEventHandler,
+            FruityHal::ButtonEventHandler buttonEventHandler, FruityHal::AppErrorHandler   appErrorHandler,
+            FruityHal::StackErrorHandler  stackErrorHandler, FruityHal::HardfaultHandler  hardfaultHandler);
+		void SetUartHandler(FruityHal::UartEventHandler uartEventHandler);
 
 		//#################### Event Buffer ###########################
 		//A global buffer for the current event, which must be 4-byte aligned
@@ -89,7 +89,7 @@ class GlobalState
 #if defined(NRF51) || defined(SIM_ENABLED)
 		u32 currentEventBuffer[CEIL_DIV(BLE_STACK_EVT_MSG_BUF_SIZE, sizeof(uint32_t))];
 #else
-		uint8_t currentEventBuffer[BLE_EVT_LEN_MAX(BLE_GATT_ATT_MTU_DEFAULT)];
+		uint8_t currentEventBuffer[BLE_EVT_LEN_MAX(MAX_MTU_SIZE)];
 #endif
 		static constexpr u16 SIZE_OF_EVENT_BUFFER = sizeof(currentEventBuffer);
 		#pragma pack(pop)
@@ -165,21 +165,28 @@ class GlobalState
 
 		RamRetainStruct* ramRetainStructPtr;
 		u32* rebootMagicNumberPtr; //Used to save a magic number for rebooting in safe mode
+
+		u8 scanBuffer[BLE_GAP_SCAN_PACKET_BUFFER_SIZE];
+
+#ifdef SIM_ENABLED
+		RamRetainStruct ramRetainStruct;
+		u32 rebootMagicNumber;
+#endif
 		RamRetainStruct ramRetainStructPreviousBoot;
 
-		SystemEventHandler systemEventHandler = nullptr;
-		TimerEventHandler  timerEventHandler = nullptr;
-		UartEventHandler   uartEventHandler = nullptr;
-		ButtonEventHandler buttonEventHandler = nullptr;
-		AppErrorHandler    appErrorHandler = nullptr;
-		StackErrorHandler  stackErrorHandler = nullptr;
-		HardfaultHandler   hardfaultHandler = nullptr;
+		FruityHal::SystemEventHandler systemEventHandler = nullptr;
+		FruityHal::TimerEventHandler  timerEventHandler = nullptr;
+		FruityHal::UartEventHandler   uartEventHandler = nullptr;
+		FruityHal::ButtonEventHandler buttonEventHandler = nullptr;
+		FruityHal::AppErrorHandler    appErrorHandler = nullptr;
+		FruityHal::StackErrorHandler  stackErrorHandler = nullptr;
+		FruityHal::HardfaultHandler   hardfaultHandler = nullptr;
 #ifdef SIM_ENABLED
-		DBDiscoveryHandler dbDiscoveryHandler = nullptr;
+		FruityHal::DBDiscoveryHandler dbDiscoveryHandler = nullptr;
 #endif
 		u32 amountOfEventLooperHandlers = 0;
-		SimpleArray<EventLooperHandler, 16> eventLooperHandlers;
-		void RegisterEventLooperHandler(EventLooperHandler handler
+		SimpleArray<FruityHal::EventLooperHandler, 16> eventLooperHandlers;
+		void RegisterEventLooperHandler(FruityHal::EventLooperHandler handler
 		);
 };
 

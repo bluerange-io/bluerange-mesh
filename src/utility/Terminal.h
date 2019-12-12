@@ -54,6 +54,15 @@ constexpr int MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS = 20;
 constexpr int READ_BUFFER_LENGTH = 250;
 constexpr int MAX_NUM_TERM_ARGS = 15;
 
+enum class TerminalCommandHandlerReturnType : u8
+{
+	//The command...
+	UNKNOWN              = 0, //...is unknown
+	SUCCESS              = 1, //...was successfully interpreted and executed
+	WRONG_ARGUMENT       = 2, //...exists but the given arguments were malformed
+	NOT_ENOUGH_ARGUMENTS = 3, //...exists but the amount of arguments was too low
+};
+
 class TerminalCommandListener
 {
 public:
@@ -63,7 +72,7 @@ public:
 #ifdef TERMINAL_ENABLED
 	//This method can be implemented by any subclass and will be notified when
 	//a command is entered via uart.
-	virtual bool TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize) /*nonconst*/ = 0;
+	virtual TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) /*nonconst*/ = 0;
 #endif
 
 };
@@ -74,29 +83,29 @@ class Terminal
 		friend class DebugModule;
 
 private:
-	char* commandArgsPtr[MAX_NUM_TERM_ARGS];
+	const char* commandArgsPtr[MAX_NUM_TERM_ARGS];
 	
 	//CommandListeners
-	u8 registeredCallbacksNum;
-	TerminalCommandListener* registeredCallbacks[MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS];
+	u8 registeredCallbacksNum = 0;
+	TerminalCommandListener* registeredCallbacks[MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS] = { 0 };
 
-	u8 readBufferOffset;
+	u8 readBufferOffset = 0;
 	char readBuffer[READ_BUFFER_LENGTH];
 
 	void WriteStdioLineToReadBuffer();
 
 
 	//Will be false after a timeout and true after input is received
-	bool uartActive;
+	bool uartActive = false;
 
 
 public:
 	static Terminal& getInstance();
 
 	//After the terminal has been initialized (all transports), this is true
-	bool terminalIsInitialized;
+	bool terminalIsInitialized = false;
 
-	bool lineToReadAvailable;
+	bool lineToReadAvailable = false;
 
 	//###### General ######
 	//Checks if a line is available or reads a line if input is detected
@@ -114,24 +123,19 @@ public:
 	void PutString(const char* buffer);
 	void PutChar(const char character);
 
-	char** getCommandArgsPtr();
+	const char** getCommandArgsPtr();
 	u8 getAmountOfRegisteredCommandListeners();
 	TerminalCommandListener** getRegisteredCommandListeners();
 	u8 getReadBufferOffset();
 	char* getReadBuffer();
 
-
 	//##### UART ######
 #if IS_ACTIVE(UART)
 private:
 	void UartEnable(bool promptAndEchoMode);
-	void UartDisable();
 	void UartCheckAndProcessLine();
-	void UartHandleError(u32 error);
 	//Read - blocking (non-interrupt based)
-	bool UartCheckInputAvailable();
 	void UartReadLineBlocking();
-	char UartReadCharBlocking();
 	//Write (always blocking)
 	void UartPutStringBlockingWithTimeout(const char* message);
 	void UartPutCharBlockingWithTimeout(const char character);
@@ -140,7 +144,6 @@ public:
 	void UartInterruptHandler();
 private:
 	void UartHandleInterruptRX(char byte);
-	void UartEnableReadInterrupt();
 #endif
 
 

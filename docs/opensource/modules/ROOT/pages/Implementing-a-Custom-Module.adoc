@@ -1,5 +1,5 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
-== Implementing A Custom Module
+== Implementing a Custom Module
 
 This tutorial guides you through the process of creating a new
 FruityMesh module. You'll implement a PingModule that allows you to ping a
@@ -26,8 +26,8 @@ Here is an overview over some of the handlers that it can use:
 configuration is loaded.
 * *TimerEventHandler*: Is called at a fixed interval to do periodic
 tasks.
-* *BleEventHandler*: Routes all Bluetooth Low Energy events to the
-module.
+* *BleHandlers*: Several handlers that are called when low level ble events
+occur.
 * *MeshMessageReceivedEventHandler*: Delivers data that has been sent
 over the mesh.
 * *TerminalCommandHandler*: Gets called when data is received over UART.
@@ -39,31 +39,36 @@ can ping another node over the network and parse the response.
 
 ==== Step 1
 
-First, clone the `TemplateModule.cpp` file from the `src/examples`
-folder into `src/modules/PingModule.cpp`, afterwards, do the same with
-`TemplateModule.h` but put it in the `inc/` folder. You need to
-refactor the Method names and some other variables. Use the search
-function and look for the string "template" anywhere in these two
-files and rename them accordingly.
+First, clone the `TemplateModule.cpp` and `TemplateModule.h` file from 
+the `src/examples` directory into `src/modules/PingModule.cpp` and 
+`src/modules/PingModule.h`. You need to refactor the method names and
+some other variables. Use the search function and look for the string
+"template" anywhere in these two files and rename them accordingly.
 
 ==== Step 2
 
-Activate your module by instantiating it in the constructor of
-`src/FruityMesh.cpp` where all the other modules are instantiated.
+Activate your module by instantiating it in the featureset
+`config/featuresets/github.cpp` where all the other modules are instantiated.
 You might need to increase the MAX_MODULE_COUNT in `config/Config.h`.
-Your PingModule Constructor needs a moduleID for instantiation. All
-module IDs are specified in Config.h (enum moduleID) as well. You
-should add a new enum entry under the section "Custom modules", e.g.
-`PING_MODULE_ID=200`.
+Your PingModule Constructor needs a ModuleId for instantiation. All
+Module IDs are specified in types.h (enum ModuleId) as well. An
+enum entry is already reserved under the section "Other Modules", see
+`PING_MODULE=201`. If you would like to create another module you'd have
+to add the ModuleId to this enum.
 
-The initialization may look like this:
+The initialization inside the featureset may look like this:
 
 [source,C++]
 ----
-activeModules[15] = new PingModule();
+size += GS->InitializeModule<PingModule>(createModule);
 ----
 
-You should also include the new `<PingModule.h>`.
+, just like the other modules in that file. Note that you have to add
+the return value of `InitializeModule` to the size of all modules and 
+pass it the boolean `createModule` so that the firmware is able to 
+determine how much memory must be allocated for all the modules.
+
+You should also include the new `"PingModule.h"`.
 
 Once the module's .cpp file is in the modules folder, it will automatically be included in the compilation.
 
@@ -91,18 +96,17 @@ of the function:
 ----
 if(TERMARGS(0, "pingmod")){
     //Get the id of the target node
-    nodeID targetNodeId = atoi(commandArgs[0]);
+    NodeId targetNodeId = Utility::StringToU16(commandArgs[0]);
     logt("PINGMOD", "Trying to ping node %u", targetNodeId);
 
     //TODO: Send ping packet to that node
 
-    return true;
+    return TerminalCommandHandler::SUCCESS;
 }
 ----
 
 The command name and command arguments should be in lowercase letters to
-be consistent with other commands. You must include `<stdlib.h>` for
-the atoi method to work.
+be consistent with other commands.
 
 Next, flash it to your device again and watch if it reacts on your
 pingmod command. If it does not, make sure you are using the logtag
@@ -139,7 +143,7 @@ other node. The previously written code now looks like this:
 ----
 if(TERMARGS(0, "pingmod")){
     //Get the id of the target node
-    nodeID targetNodeId = atoi(commandArgs[0]);
+    NodeId targetNodeId = Utility::StringToU16(commandArgs[0]);
     logt("PINGMOD", "Trying to ping node %u", targetNodeId);
 
     //Some data
@@ -148,7 +152,7 @@ if(TERMARGS(0, "pingmod")){
 
     //Send ping packet to that node
     SendModuleActionMessage(
-            MESSAGE_TYPE_MODULE_TRIGGER_ACTION,
+            MessageType::MODULE_TRIGGER_ACTION,
             targetNodeId,
             PingModuleTriggerActionMessages::TRIGGER_PING,
             0,
@@ -157,7 +161,7 @@ if(TERMARGS(0, "pingmod")){
             false
     );
 
-    return true;
+    return TerminalCommandHandler::SUCCESS;
 }
 ----
 
@@ -166,7 +170,7 @@ data is not necessary for a ping and is only added for illustration
 purposes. The message is sent as a ModuleMessage with the moduleId
 automatically added by the `SendModuleActionMessage` method. The
 actionType is TRIGGER_PING. The message type
-`MESSAGE_TYPE_MODULE_TRIGGER_ACTION` is used for sending messages that
+`MessageType::MODULE_TRIGGER_ACTION` is used for sending messages that
 await a response.
 
 The ConnectionManager (cm) will handle the transmission of this packet,
@@ -189,7 +193,7 @@ void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConn
     Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
     //Filter trigger_action messages
-    if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
+    if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
         connPacketModule* packet = (connPacketModule*)packetHeader;
 
         //Check if our module is meant and we should trigger an action
@@ -252,7 +256,7 @@ void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConn
     Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
     //Filter trigger_action messages
-    if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
+    if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
         connPacketModule* packet = (connPacketModule*)packetHeader;
 
         //Check if our module is meant and we should trigger an action
@@ -269,7 +273,7 @@ void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConn
 
                 //Send ping packet to that node
                 SendModuleActionMessage(
-                        MESSAGE_TYPE_MODULE_ACTION_RESPONSE,
+                        MessageType::MODULE_ACTION_RESPONSE,
                         packetHeader->sender,
                         PingModuleActionResponseMessages::PING_RESPONSE,
                         0,
@@ -282,7 +286,7 @@ void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConn
     }
 
     //Parse Module action_response messages
-    if(packetHeader->messageType == MESSAGE_TYPE_MODULE_ACTION_RESPONSE){
+    if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
 
         connPacketModule* packet = (connPacketModule*)packetHeader;
 

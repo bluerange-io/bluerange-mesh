@@ -38,10 +38,10 @@
 
 typedef struct MeshAccessServiceStruct
 {
-	ble_uuid_t						serviceUuid;
-	u16                     		serviceHandle;
-	ble_gatts_char_handles_t		txCharacteristicHandle;
-	ble_gatts_char_handles_t		rxCharacteristicHandle;
+	FruityHal::BleGattUuid          serviceUuid;
+	u16                                serviceHandle;
+	FruityHal::BleGattCharHandles    txCharacteristicHandle;
+	FruityHal::BleGattCharHandles    rxCharacteristicHandle;
 } MeshAccessServiceStruct;
 
 
@@ -51,16 +51,15 @@ typedef struct MeshAccessServiceStruct
 constexpr int SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA = 16;
 typedef struct
 {
-	u8 len;
-	u8 type;
-	u16 uuid;
+	advStructureServiceDataAndType data;
 
-	u16 messageType; //0x03 for MeshAccess Service
 	NetworkId networkId; //Mesh network id
 	u8 isEnrolled : 1; // Flag if this beacon is enrolled
 	u8 isSink : 1;
 	u8 isZeroKeyConnectable : 1;
-	u8 reserved : 5;
+	u8 isConnectable : 1;
+	u8 interestedInConnetion : 1;
+	u8 reserved : 3;
 	u32 serialIndex; //SerialNumber index of the beacon
 	SimpleArray<ModuleId, 3> moduleIds; //Additional subServices offered with their data
 
@@ -91,14 +90,12 @@ STATIC_ASSERT_SIZE(meshAccessServiceAdvMessage, 23);
 
 
 #define MA_SERVICE_UUID_TYPE BLE_UUID_TYPE_VENDOR_BEGIN
-#define MA_SERVICE_BASE_UUID 0x58, 0x18, 0x05, 0xA0, 0x07, 0x0C, 0xFD, 0x93, 0x3C, 0x42, 0xCE, 0xAC, 0x00, 0x00, 0x00, 0x00
+constexpr u8 MA_SERVICE_BASE_UUID[] = { 0x58, 0x18, 0x05, 0xA0, 0x07, 0x0C, 0xFD, 0x93, 0x3C, 0x42, 0xCE, 0xAC, 0x00, 0x00, 0x00, 0x00 };
 
 constexpr int MA_SERVICE_SERVICE_CHARACTERISTIC_UUID = 0x0001;
 constexpr int MA_SERVICE_RX_CHARACTERISTIC_UUID = 0x0002;
 constexpr int MA_SERVICE_TX_CHARACTERISTIC_UUID = 0x0003;
 constexpr int MA_CHARACTERISTIC_MAX_LENGTH = 20;
-
-constexpr int SERVICE_DATA_MESSAGE_TYPE_MESH_ACCESS = 0x03;
 
 
 enum class MeshAccessModuleTriggerActionMessages : u8{
@@ -121,7 +118,7 @@ enum class MeshAccessModuleGeneralMessages : u8{
 	constexpr int SIZEOF_MA_MODULE_CONNECT_MESSAGE = 28;
 	typedef struct
 	{
-		fh_ble_gap_addr_t targetAddress;
+		FruityHal::BleGapAddr targetAddress;
 		u32 fmKeyId;
 		SimpleArray<u8, 16> key;
 		u8 tunnelType : 2;
@@ -133,7 +130,7 @@ enum class MeshAccessModuleGeneralMessages : u8{
 	constexpr int SIZEOF_MA_MODULE_DISCONNECT_MESSAGE = 7;
 	typedef struct
 	{
-		fh_ble_gap_addr_t targetAddress;
+		FruityHal::BleGapAddr targetAddress;
 
 	}MeshAccessModuleDisconnectMessage;
 	STATIC_ASSERT_SIZE(MeshAccessModuleDisconnectMessage, 7);
@@ -166,7 +163,6 @@ class MeshAccessModule: public Module
 		u8 enableAdvertising = true; //Advertise the meshaccessPacket connectable
 		u8 disableIfInMesh = false; //Once a mesh connection is active, disable advertising
 		bool allowUnenrolledUnsecureConnections = false; //whether or not unsecure connections should be allowed when unenrolled
-
 	private:
 
 		SimpleArray<ModuleId, 3> moduleIdsToAdvertise;
@@ -180,7 +176,6 @@ class MeshAccessModule: public Module
 		char logWildcard[6];
 
 
-		void BroadcastMeshAccessPacket();
 
 		void ReceivedMeshAccessConnectMessage(connPacketModule* packet, u16 packetLength) const;
 		void ReceivedMeshAccessDisconnectMessage(connPacketModule* packet, u16 packetLength) const;
@@ -191,6 +186,7 @@ class MeshAccessModule: public Module
 		DECLARE_CONFIG_AND_PACKED_STRUCT(MeshAccessModuleConfiguration);
 
 		MeshAccessModule();
+		void UpdateMeshAccessBroadcastPacket(u16 advIntervalMs = 100, bool interestedInConnection = false);
 
 		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override;
 
@@ -213,9 +209,9 @@ class MeshAccessModule: public Module
 		void MeshAccessMessageReceivedHandler(MeshAccessConnection* connection, BaseConnectionSendData* sendData, u8* data) const;
 
 		#ifdef TERMINAL_ENABLED
-		bool TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize) override;
+		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
 		#endif
-		void GapAdvertisementReportEventHandler(const GapAdvertisementReportEvent& advertisementReportEvent) override;
+		void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override;
 
 		bool IsZeroKeyConnectable(const ConnectionDirection direction);
 

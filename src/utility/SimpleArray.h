@@ -54,6 +54,11 @@ public:
 		return data;
 	}
 
+	const T* getRaw() const
+	{
+		return data;
+	}
+
 	T& operator[](int index) {
 #ifdef SIM_ENABLED
 		if (index >= length || index < 0)

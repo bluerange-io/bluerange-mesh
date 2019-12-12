@@ -132,6 +132,23 @@ void TimeManager::ProcessTicks()
 	additionalTicks -= seconds * ticksPerSecond;
 }
 
+void TimeManager::HandleUpdateTimestampMessages(connPacketHeader * packetHeader, u16 dataLength)
+{
+	if (packetHeader->messageType == MessageType::UPDATE_TIMESTAMP)
+	{
+		//Set our time to the received timestamp
+		connPacketUpdateTimestamp* packet = (connPacketUpdateTimestamp*)packetHeader;
+		if (dataLength >= offsetof(connPacketUpdateTimestamp, offset) + sizeof(packet->offset))
+		{
+			SetTime(packet->timestampSec, 0, packet->offset);
+		}
+		else
+		{
+			SetTime(packet->timestampSec, 0, 0);
+		}
+	}
+}
+
 void TimeManager::convertTimestampToString(char * buffer)
 {
 	ProcessTicks();

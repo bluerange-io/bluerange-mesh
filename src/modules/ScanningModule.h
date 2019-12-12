@@ -49,27 +49,28 @@ constexpr int SCAN_FILTER_NUMBER = 2;//Number of filters that can be set
 constexpr int NUM_ADDRESSES_TRACKED = 50;
 
 constexpr int ASSET_PACKET_BUFFER_SIZE = 30;
+constexpr int ASSET_INS_PACKET_BUFFER_SIZE = 30;
 constexpr int ASSET_PACKET_RSSI_SEND_THRESHOLD = -88;
 
 constexpr int SCAN_BUFFERS_SIZE = 10; //Max number of packets that are buffered
 
-		enum class GroupingType : u8 {
-			GROUP_BY_ADDRESS=1, 
-			NO_GROUPING=2
-		};
+enum class GroupingType : u8 {
+	GROUP_BY_ADDRESS =1, 
+	NO_GROUPING      =2,
+};
 
-		typedef struct
-		{
-			u8 active;
-			GroupingType grouping;
-			fh_ble_gap_addr_t address;
-			i8 minRSSI;
-			i8 maxRSSI;
-			u8 advertisingType;
-			SimpleArray<u8, 31> byteMask;
-			SimpleArray<u8, 31> mandatory;
+typedef struct
+{
+	u8 active;
+	GroupingType grouping;
+	FruityHal::BleGapAddr address;
+	i8 minRSSI;
+	i8 maxRSSI;
+	u8 advertisingType;
+	SimpleArray<u8, 31> byteMask;
+	SimpleArray<u8, 31> mandatory;
 
-		} scanFilterEntry;
+} scanFilterEntry;
 
 #pragma pack(push, 1)
 //Module configuration that is saved persistently
@@ -90,24 +91,31 @@ class ScanningModule: public Module
 		 *
 		 * */
 
-		//Storage for advertising packets
-		typedef struct
+		struct RssiContainer
 		{
-			u32 serialNumberIndex;
 			u8 rssi37;
 			u8 rssi38;
 			u8 rssi39;
 			u8 count;
+			u16 channelCount[3];
+		};
+
+		//Storage for advertising packets
+		struct ScannedAssetTrackingStorage
+		{
+			RssiContainer rssiContainer;
+			u32 serialNumberIndex;
+			NodeId nodeId;
 			u8 speed;
 			u8 direction;
 			u16 pressure;
-		} scannedAssetTrackingPacket;
+		};
 
-		SimpleArray<scannedAssetTrackingPacket, ASSET_PACKET_BUFFER_SIZE> assetPackets;
+		SimpleArray<ScannedAssetTrackingStorage, ASSET_PACKET_BUFFER_SIZE> assetPackets;
 
 		typedef struct
 		{
-			fh_ble_gap_addr_t address;
+			FruityHal::BleGapAddr address;
 			u32 rssiSum;
 			u16 count;
 		} scannedPacket;
@@ -134,7 +142,8 @@ class ScanningModule: public Module
 
 		enum class ScanModuleMessages : u8{
 			//TOTAL_SCANNED_PACKETS=0,  //Removed as of 21.05.2019
-			ASSET_TRACKING_PACKET=1
+			//ASSET_TRACKING_PACKET=1,  //Removed as of 24.10.2019
+			ASSET_INS_TRACKING_PACKET = 2,
 		};
 
 		//####### Module specific message structs (these need to be packed)
@@ -145,7 +154,7 @@ class ScanningModule: public Module
 		static constexpr int SIZEOF_SCAN_MODULE_TRACKED_ASSET_V2 = 8;
 		typedef struct
 		{
-			u32 assetId : 24;
+			u32 assetId : 24;	//Either part of the serialNumberIndex (old assets) or the nodeId
 			i32 rssi37 : 8;		//Compilerhack! MSVC refuses to combine this bitfield with the previous one if we declare it as i8!
 			i8 rssi38;
 			i8 rssi39;
@@ -159,18 +168,49 @@ class ScanningModule: public Module
 		{
 			connPacketHeader header;
 			trackedAssetV2 trackedAssets[1];
-
 		} ScanModuleTrackedAssetsV2Message;
+
+		struct TrackedAssetInsMessage
+		{
+			NodeId assetNodeId;
+			i8 rssi37;
+			i8 rssi38;
+			i8 rssi39;
+			u8 batteryPower;
+			u16 absolutePositionX;
+			u16 absolutePositionY;
+			u8 pressure;
+			u8 moving : 1;
+			u8 reservedBits : 7;
+		};
+		STATIC_ASSERT_SIZE(TrackedAssetInsMessage, 12);
+
+		//Storage for INS advertising packets
+		struct ScannedAssetInsTrackingStorage
+		{
+			RssiContainer rssiContainer;
+			NodeId assetNodeId;
+			u8 batteryPower;
+			u16 absolutePositionX;
+			u16 absolutePositionY;
+			u16 pressure;
+			u8 moving : 1;
+		};
+
+		SimpleArray<ScannedAssetInsTrackingStorage, ASSET_INS_PACKET_BUFFER_SIZE> assetInsPackets;
 
 		//####### End of Module specitic messages
 		#pragma pack(pop)
 
 
 		//Asset packet handling
-		void HandleAssetV2Packets(const GapAdvertisementReportEvent& advertisementReportEvent);
+		void HandleAssetV2Packets(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent);
+		void HandleAssetInsPackets(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent);
 		bool addTrackedAsset(const advPacketAssetServiceData* packet, i8 rssi);
+		bool addTrackedAssetIns(const advPacketAssetInsServiceData* packet, i8 rssi);
 		void ReceiveTrackedAssets(BaseConnectionSendData* sendData, ScanModuleTrackedAssetsV2Message* packet) const;
-
+		void ReceiveTrackedAssetsIns(TrackedAssetInsMessage *msg, u32 amount, NodeId sender) const;
+		void RssiRunningAverageCalculationInPlace(RssiContainer &container, u8 advertisingChannel, i8 rssi);
 
 		//Byte muss gesetzt sein, byte darf nicht gesetzt sein, byte ist egal
 		bool setScanFilter(scanFilterEntry* filter);
@@ -180,6 +220,7 @@ class ScanningModule: public Module
 		bool isAssetTrackingData(u8* data, u8 dataLength);
 		void resetAssetTrackingTable();
 		void SendTrackedAssets();
+		void SendTrackedAssetsIns();
 		bool isAssetTrackingDataFromiOSDeviceInForegroundMode(u8* data, u8 dataLength);
 
 		bool advertiseDataWasSentFromMobileDevice(u8* data, u8 dataLength);
@@ -196,7 +237,8 @@ class ScanningModule: public Module
 		void updateTotalRssiAndTotalMessagesForDevice(i8 rssi, uint8_t* address);
 		u32 computeTotalRSSI();
 
-
+		static u8 ConvertServiceDataToMeshMessageSpeed(u8 serviceDataSpeed);
+		u8 ConvertServiceDataToMeshMessagePressure(u16 serviceDataPressure);
 
 
 	public:
@@ -214,12 +256,12 @@ class ScanningModule: public Module
 
 		void TimerEventHandler(u16 passedTimeDs) override;
 
-		virtual void GapAdvertisementReportEventHandler(const GapAdvertisementReportEvent& advertisementReportEvent) override;
+		virtual void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override;
 
 		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) override;
 
 		#ifdef TERMINAL_ENABLED
-		bool TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize) override;
+		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
 		#endif
 };
 

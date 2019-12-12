@@ -45,6 +45,42 @@ typedef struct Aes128Block {
 class Module;
 class RecordStorageEventListener;
 
+#ifdef SIM_ENABLED
+#include <type_traits>
+//Regarding the following macro:
+//&((dst)[0])                                        makes sure that we have a pointer, even if an array was passed.
+//decltype(&((dst)[0]))                              gets the pointer type, for example T*
+//std::remove_pointer<decltype(&((dst)[0]))>::type   removes the pointer from the type, so that we only have the type T.
+//The following is not sufficient:
+//  decltype((dst)[0])
+//Because it would not work with an array of pointers, because decltype((dst)[0]) is a reference in that case, not a ptr!
+#define CheckedMemset(dst, val, size) \
+{\
+	static_assert( std::is_pod  <std::remove_pointer<decltype(&((dst)[0]))>::type>::value \
+				|| std::is_union<std::remove_pointer<decltype(&((dst)[0]))>::type>::value, "Tried to call memset on non pod type!"); /*CODE_ANALYZER_IGNORE Just a string.*/ \
+	memset((dst), (val), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemset*/ \
+}
+#else
+#define CheckedMemset(dst, val, size) \
+{\
+	memset((dst), (val), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemset*/ \
+}
+#endif
+#ifdef SIM_ENABLED
+#include <type_traits>
+#define CheckedMemcpy(dst, src, size) \
+{\
+	static_assert( std::is_pod  <std::remove_pointer<decltype(&((dst)[0]))>::type>::value \
+				|| std::is_union<std::remove_pointer<decltype(&((dst)[0]))>::type>::value, "Tried to call memcpy on non pod type!"); /*CODE_ANALYZER_IGNORE Just a string.*/ \
+	memcpy((dst), (src), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemcpy*/ \
+}
+#else
+#define CheckedMemcpy(dst, src, size) \
+{\
+	memcpy((dst), (src), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemcpy*/ \
+}
+#endif
+
 namespace Utility
 {
 	const char serialAlphabet[] = "BCDFGHJKLMNPQRSTVWXYZ123456789";
@@ -88,5 +124,20 @@ namespace Utility
 	bool Contains(const u8* data, const u32 length, const u8 searchValue);
 
 	bool IsPowerOfTwo(u32 val);
+
+	NodeId TerminalArgumentToNodeId(const char* arg);
+
+	//The outDidError varaible can be nullptr, in which case it is ignored.
+	//If it's not set to nullptr, the underlying value must be initialized
+	//with false. The functions only set it to true or don't change it at
+	//all. That way you can use the same variable for several calls.
+	long          StringToLong        (const char *str, bool *outDidError = nullptr);
+	unsigned long StringToUnsignedLong(const char *str, bool *outDidError = nullptr);
+	u8            StringToU8          (const char *str, bool *outDidError = nullptr);
+	u16           StringToU16         (const char *str, bool *outDidError = nullptr);
+	u32           StringToU32         (const char *str, bool *outDidError = nullptr);
+	i8            StringToI8          (const char *str, bool *outDidError = nullptr);
+	i16           StringToI16         (const char *str, bool *outDidError = nullptr);
+	i32           StringToI32         (const char *str, bool *outDidError = nullptr);
 }
 

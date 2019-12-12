@@ -48,7 +48,7 @@ void GATTController::Init()
 	FruityHal::DiscovereServiceInit(GATTController::ServiceDiscoveryDoneDispatcher);
 }
 
-u32 GATTController::DiscoverService(u16 connHandle, const ble_uuid_t &p_uuid)
+u32 GATTController::DiscoverService(u16 connHandle, const FruityHal::BleGattUuid &p_uuid)
 {
 	logt("GATTCTRL", "Starting Service discovery %04x type %u, connHnd %u", p_uuid.uuid, p_uuid.type, connHandle);
 
@@ -77,7 +77,7 @@ u32 GATTController::bleWriteCharacteristic(u16 connectionHandle, u16 characteris
 {
 	u32 err = 0;
 
-	logt("CONN_DATA", "Data size is: %d, handles(%d, %d), reliable %d", dataLength, connectionHandle, characteristicHandle, reliable);
+	logt("CONN_DATA", "TX Data size is: %d, handles(%d, %d), reliable %d", dataLength, connectionHandle, characteristicHandle, reliable);
 
 	char stringBuffer[100];
 	Logger::convertBufferToHexString(data, dataLength, stringBuffer, sizeof(stringBuffer));
@@ -85,27 +85,27 @@ u32 GATTController::bleWriteCharacteristic(u16 connectionHandle, u16 characteris
 
 
 	//Configure the write parameters with reliable/unreliable, writehandle, etc...
-	ble_gattc_write_params_t writeParameters;
-	CheckedMemset(&writeParameters, 0, sizeof(ble_gattc_write_params_t));
+	FruityHal::BleGattWriteParams writeParameters;
+	CheckedMemset(&writeParameters, 0, sizeof(writeParameters));
 	writeParameters.handle = characteristicHandle;
 	writeParameters.offset = 0;
 	writeParameters.len = dataLength;
-	writeParameters.p_value = data;
+	writeParameters.p_data = data;
 
 	if (reliable)
 	{
-		writeParameters.write_op = BLE_GATT_OP_WRITE_REQ;
+		writeParameters.type = FruityHal::BleGattWriteType::WRITE_REQ;
 
-		err = sd_ble_gattc_write(connectionHandle, &writeParameters);
+		err = FruityHal::BleGattWrite(connectionHandle, writeParameters);
 
 		return err;
 
 	}
 	else
 	{
-		writeParameters.write_op = BLE_GATT_OP_WRITE_CMD;
+		writeParameters.type = FruityHal::BleGattWriteType::WRITE_CMD;
 
-		err = sd_ble_gattc_write(connectionHandle, &writeParameters);
+		err = FruityHal::BleGattWrite(connectionHandle, writeParameters);
 
 		return err;
 	}
@@ -123,14 +123,15 @@ u32 GATTController::bleSendNotification(u16 connectionHandle, u16 characteristic
 	logt("CONN_DATA", "%s", stringBuffer);
 
 
-	ble_gatts_hvx_params_t notificationParams;
+	FruityHal::BleGattWriteParams notificationParams;
+	CheckedMemset(&notificationParams, 0, sizeof(notificationParams));
 	notificationParams.handle = characteristicHandle;
 	notificationParams.offset = 0;
 	notificationParams.p_data = data;
-	notificationParams.p_len = &dataLength;
-	notificationParams.type = BLE_GATT_HVX_NOTIFICATION;
+	notificationParams.len = dataLength;
+	notificationParams.type = FruityHal::BleGattWriteType::NOTIFICATION;
 
-	err = sd_ble_gatts_hvx(connectionHandle, &notificationParams);
+	err = FruityHal::BleGattSendNotification(connectionHandle, notificationParams);
 
 	return err;
 }

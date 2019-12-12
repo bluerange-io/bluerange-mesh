@@ -93,14 +93,14 @@ void AdvertisingModule::ConfigurationLoadedHandler(ModuleConfiguration* migratab
 			0, //AdvChannel
 			0, //CurrentSlots
 			0, //CurrentDelay
-			GapAdvType::ADV_IND, //Advertising Mode
+			FruityHal::BleGapAdvType::ADV_IND, //Advertising Mode
 			{0}, //AdvData
 			0, //AdvDataLength
 			{0}, //ScanData
 			0 //ScanDataLength
 		};
 
-		memcpy(&job.advData, configuration.messageData[i].messageData.getRaw(), configuration.messageData[i].messageLength);
+		CheckedMemcpy(&job.advData, configuration.messageData[i].messageData.getRaw(), configuration.messageData[i].messageLength);
 		job.advDataLength = configuration.messageData[i].messageLength;
 
 		advJobHandles[i] = GS->advertisingController.AddJob(job);
@@ -110,7 +110,7 @@ void AdvertisingModule::ConfigurationLoadedHandler(ModuleConfiguration* migratab
 
 
 #ifdef TERMINAL_ENABLED
-bool AdvertisingModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
+TerminalCommandHandlerReturnType AdvertisingModule::TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize)
 {
 	//Must be called to allow the module to get and set the config
 	return Module::TerminalCommandHandler(commandArgs, commandArgsSize);

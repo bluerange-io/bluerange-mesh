@@ -31,7 +31,7 @@
 /**
  *
  * The RecordStorage class enables easy access to flash storage with a simple API.
- * Internally it uses NewStorage to queue flash operations and allows a configurable retry counter.
+ * Internally it uses FlashStorage to queue flash operations and allows a configurable retry counter.
  * The user can either use SaveRecord or DeactivateRecord which will handle the operation in the background.
  * Both methods will call a listener after a flash operation has succeeded or failed.
  * This listener will be passed the userType and in some cases, it is even possible to store some
@@ -80,8 +80,7 @@ RecordStorage::RecordStorage()
 void RecordStorage::Init()
 {
 	startPage = (u8*)Utility::GetSettingsPageBaseAddress();
-	numPages = RECORD_STORAGE_NUM_PAGES;
-	GS->flashStorage.SetQueueEmptyHandler(this);
+	RepairPages();
 	isInit = true;
 }
 
@@ -95,39 +94,41 @@ RecordStorage & RecordStorage::getInstance()
 	return GS->recordStorage;
 }
 
-void RecordStorage::InitialRepair()
-{
-	logt("RS", "RecordStorage startPage %u, numPages %u, pageSize %u", ((u32)startPage - (u32)FLASH_REGION_START_ADDRESS) / (u32)PAGE_SIZE, numPages, (u32)PAGE_SIZE);
-
-	RepairPages();
-}
-
-
 /* ######################
 # Public functions that allow write access
 # A call will be queued first, and will then be executed
 ######################### */
 
-RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType)
+RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, ModuleId lockDownModule)
 {
-	return RecordStorage::SaveRecord(recordId, data, dataLength, callback, userType, nullptr, 0);
+	if (recordStorageLockDown && lockDownModule != lockDownModuleId)
+	{
+		SIMEXCEPTION(RecordStorageIsLockedDownException);
+		return RecordStorageResultCode::RECORD_STORAGE_LOCK_DOWN;
+	}
+	return RecordStorage::SaveRecord(recordId, data, dataLength, callback, userType, nullptr, 0, lockDownModule);
 }
 
-RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength)
+RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength, ModuleId lockDownModule)
 {
+	if (recordStorageLockDown && lockDownModule != lockDownModuleId)
+	{
+		SIMEXCEPTION(RecordStorageIsLockedDownException);
+		return RecordStorageResultCode::RECORD_STORAGE_LOCK_DOWN;
+	}
 	//Cache the operation to be processed later
 	u8* buffer = opQueue.Reserve(SIZEOF_RECORD_STORAGE_SAVE_RECORD_OP + dataLength + userDataLength);
 
 	if (buffer != nullptr) {
 		SaveRecordOperation* op = (SaveRecordOperation*)buffer;
 		op->op.type = (u8)RecordStorageOperationType::SAVE_RECORD;
-		op->op.stage = 0;
 		op->op.callback = callback;
 		op->op.userType = userType;
+		op->stage = RecordStorageSaveStage::FIRST_STAGE;
 		op->recordId = recordId;
 		op->dataLength = dataLength;
-		memcpy(op->data, data, dataLength);
-		if (userData != nullptr) memcpy(buffer + (SIZEOF_RECORD_STORAGE_SAVE_RECORD_OP + dataLength), userData, userDataLength);
+		CheckedMemcpy(op->data, data, dataLength);
+		if (userData != nullptr) CheckedMemcpy(buffer + (SIZEOF_RECORD_STORAGE_SAVE_RECORD_OP + dataLength), userData, userDataLength);
 
 		ProcessQueue(false);
 		return RecordStorageResultCode::SUCCESS;
@@ -137,18 +138,23 @@ RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 da
 	}
 }
 
-RecordStorageResultCode RecordStorage::DeactivateRecord(u16 recordId, RecordStorageEventListener* callback, u32 userType)
+RecordStorageResultCode RecordStorage::DeactivateRecord(u16 recordId, RecordStorageEventListener* callback, u32 userType, ModuleId lockDownModule)
 {
+	if (recordStorageLockDown && lockDownModule != lockDownModuleId)
+	{
+		SIMEXCEPTION(RecordStorageIsLockedDownException);
+		return RecordStorageResultCode::RECORD_STORAGE_LOCK_DOWN;
+	}
 	//Cache the operation to be processed later
 	u8* buffer = opQueue.Reserve(SIZEOF_RECORD_STORAGE_DEACTIVATE_RECORD_OP);
 
 	if (buffer != nullptr) {
 		DeactivateRecordOperation* op = (DeactivateRecordOperation*)buffer;
 		op->op.type = (u8)RecordStorageOperationType::DEACTIVATE_RECORD;
-		op->op.stage = 0;
 		op->op.callback = callback;
 		op->op.userType = userType;
 		op->recordId = recordId;
+		op->stage = RecordStorageDeactivateStage::FIRST_STAGE;
 
 		ProcessQueue(false);
 		return RecordStorageResultCode::SUCCESS;
@@ -163,19 +169,19 @@ RecordStorageResultCode RecordStorage::DeactivateRecord(u16 recordId, RecordStor
 ######################### */
 
 //This function is called from the queue multiple times to do the actual store operations
-void RecordStorage::SaveRecordInt(SaveRecordOperation* op)
+void RecordStorage::SaveRecordInternal(SaveRecordOperation& op)
 {
 	u32 err = 0;
 
 	//If any of the previous operations failed, call the callback with an error code
-	if (op->op.flashStorageErrorCode != FlashStorageError::SUCCESS) {
-		return RecordOperationFinished(&op->op, RecordStorageResultCode::BUSY);
+	if (op.op.flashStorageErrorCode != FlashStorageError::SUCCESS) {
+		return RecordOperationFinished(op.op, RecordStorageResultCode::BUSY);
 	}
 
-	if (op->op.stage == 0) {
-		logt("RS", "SaveRecord id %u, len %u", op->recordId, op->dataLength);
+	if (op.stage == RecordStorageSaveStage::DEFRAGMENT_IF_NEEDED) {
+		logt("RS", "SaveRecord id %u, len %u", op.recordId, op.dataLength);
 
-		u16 recordLength = op->dataLength + SIZEOF_RECORD_STORAGE_RECORD_HEADER;
+		u16 recordLength = op.dataLength + SIZEOF_RECORD_STORAGE_RECORD_HEADER;
 
 		//First, check if we have enough space to simply save the record
 		u8* freeSpace = GetFreeRecordSpace(recordLength);
@@ -184,21 +190,21 @@ void RecordStorage::SaveRecordInt(SaveRecordOperation* op)
 		if (freeSpace == nullptr) {
 			RecordStoragePage* pageToDefragment = FindPageToDefragment();
 			if (pageToDefragment != nullptr) {
-				op->op.stage = 1;
-				return DefragmentPage(pageToDefragment, false);
+				op.stage = RecordStorageSaveStage::SAVE;
+				return DefragmentPage(*pageToDefragment, false);
 			}
 		}
 
-		op->op.stage = 1;
+		op.stage = RecordStorageSaveStage::SAVE;
 	}
 
-	if (op->op.stage == 1) {
+	if (op.stage == RecordStorageSaveStage::SAVE) {
 
 		//Data must be saved als multiple of 4 bytes, so we pad the data with 0xFF
 		//userData needs no padding as it is not written to flash
-		u8 padding = (4-op->dataLength%4)%4;
+		u8 padding = (4-op.dataLength%4)%4;
 
-		u16 recordLength = op->dataLength + SIZEOF_RECORD_STORAGE_RECORD_HEADER + padding;
+		u16 recordLength = op.dataLength + SIZEOF_RECORD_STORAGE_RECORD_HEADER + padding;
 
 		//Afterwards, there must be enough free space, otherwise it is not possible to save this record
 		u8* freeSpace = GetFreeRecordSpace(recordLength);
@@ -207,11 +213,11 @@ void RecordStorage::SaveRecordInt(SaveRecordOperation* op)
 
 			//Check if we have an old record with the same id
 			//If yes, save this one with a newer versionCounter
-			RecordStorageRecord* oldRecord = GetRecord(op->recordId);
+			RecordStorageRecord* oldRecord = GetRecord(op.recordId);
 
 			//Currently, we only support updating a record up to 65000 times
 			if (oldRecord != nullptr && oldRecord->versionCounter == UINT16_MAX) {
-				return RecordOperationFinished(&op->op, RecordStorageResultCode::NO_SPACE);
+				return RecordOperationFinished(op.op, RecordStorageResultCode::NO_SPACE);
 			}
 
 			u16 recordVersion = oldRecord == nullptr ? 1 : oldRecord->versionCounter + 1;
@@ -223,22 +229,22 @@ void RecordStorage::SaveRecordInt(SaveRecordOperation* op)
 			newRecord->recordActive = 1;
 			newRecord->padding = padding; //Padding must be stored so we can substract it later when retrieving the record
 			newRecord->recordLength = recordLength;
-			newRecord->recordId = op->recordId;
+			newRecord->recordId = op.recordId;
 			newRecord->versionCounter = recordVersion;
-			memcpy(newRecord->data, op->data, op->dataLength);
+			CheckedMemcpy(newRecord->data, op.data, op.dataLength);
 
 			//Check if the old record matches the new record and do not write to flash in this case
 			if(oldRecord != nullptr && oldRecord->recordActive && oldRecord->recordLength == newRecord->recordLength && oldRecord->padding == newRecord->padding){
-				u32 cmp = memcmp(oldRecord->data, newRecord->data, op->dataLength);
+				u32 cmp = memcmp(oldRecord->data, newRecord->data, op.dataLength);
 				if(cmp == 0){
-					return RecordOperationFinished(&op->op, RecordStorageResultCode::SUCCESS);
+					return RecordOperationFinished(op.op, RecordStorageResultCode::SUCCESS);
 				}
 			}
 
 			//The crc is calculated over the record header and data, excluding the first two byte (crc and flags)
 			newRecord->crc = Utility::CalculateCrc8(((u8*)newRecord) + 2, newRecord->recordLength - 2);
-			op->op.stage = 2;
-			GS->flashStorage.CacheAndWriteData((u32*)newRecord, (u32*)freeSpace, recordLength, this, 0);
+			op.stage = RecordStorageSaveStage::CALLBACKS_AND_FINISH;
+			GS->flashStorage.CacheAndWriteData((u32*)newRecord, (u32*)freeSpace, recordLength, this, (u32)FlashUserTypes::DEFAULT);
 			return;
 
 		}
@@ -246,57 +252,82 @@ void RecordStorage::SaveRecordInt(SaveRecordOperation* op)
 			logt("ERROR", "no space in RS");
 			GS->logger.logCustomError(CustomErrorTypes::FATAL_NO_RECORDSTORAGE_SPACE_LEFT, recordLength);
 
-			for (u32 i = 0; i < numPages; i++) {
-				RecordStoragePage* page = (RecordStoragePage*)(startPage + PAGE_SIZE * i);
-				u16 freeSpace = GetFreeSpaceWhenDefragmented(page);
-				logt("ERROR", "freeSpace in page %u: %u", ((u32)page - (u32)FLASH_REGION_START_ADDRESS) / (u32)PAGE_SIZE, freeSpace);
+			for (u32 i = 0; i < RECORD_STORAGE_NUM_PAGES; i++) {
+				RecordStoragePage& page = getPage(i);
+				u16 freeSpaceAfterDefragment = GetFreeSpaceWhenDefragmented(page);
+				logt("ERROR", "freeSpace in page %u: %u", ((u32)&page - (u32)FLASH_REGION_START_ADDRESS) / (u32)PAGE_SIZE, freeSpaceAfterDefragment);
 			}
 
-			return RecordOperationFinished(&op->op, RecordStorageResultCode::NO_SPACE);
+			return RecordOperationFinished(op.op, RecordStorageResultCode::NO_SPACE);
 		}
 	}
 	
-	if (op->op.stage == 2)
+	if (op.stage == RecordStorageSaveStage::CALLBACKS_AND_FINISH)
 	{
-		return RecordOperationFinished(&op->op, RecordStorageResultCode::SUCCESS);
+		return RecordOperationFinished(op.op, RecordStorageResultCode::SUCCESS);
 	}
 }
 
 //Deactivating a record will set the deleted flag of the newest entry for this recordId, it will be deleted after a page is defragmented
-void RecordStorage::DeactivateRecordInt(DeactivateRecordOperation* op)
+void RecordStorage::DeactivateRecordInternal(DeactivateRecordOperation& op)
 {
 	//If any of the previous operations failed, call the callback with an error code
-	if (op->op.flashStorageErrorCode != FlashStorageError::SUCCESS) {
-		return RecordOperationFinished(&op->op, RecordStorageResultCode::BUSY);
+	if (op.op.flashStorageErrorCode != FlashStorageError::SUCCESS) {
+		return RecordOperationFinished(op.op, RecordStorageResultCode::BUSY);
 	}
 
-	if (op->op.stage == 0) {
-		logt("RS", "DeactivateRecord id %u", op->recordId);
+	if (op.stage == RecordStorageDeactivateStage::DEACTIVATE) {
+		logt("RS", "DeactivateRecord id %u", op.recordId);
 
-		RecordStorageRecord* record = GetRecord(op->recordId);
+		RecordStorageRecord* record = GetRecord(op.recordId);
 
 		if (record == nullptr || record->recordActive == 0) {
-			return RecordOperationFinished(&op->op, RecordStorageResultCode::SUCCESS);
+			return RecordOperationFinished(op.op, RecordStorageResultCode::SUCCESS);
 		}
 
 		RecordStorageRecord newRecordHeader;
 		CheckedMemset(&newRecordHeader, 0xFF, SIZEOF_RECORD_STORAGE_RECORD_HEADER);
 		newRecordHeader.recordActive = 0;
 
-		op->op.stage = 1;
-		GS->flashStorage.CacheAndWriteData((u32*)&newRecordHeader, (u32*)record, SIZEOF_RECORD_STORAGE_RECORD_HEADER, this, 0);
+		op.stage = RecordStorageDeactivateStage::CALLBACKS_AND_FINISH;
+		GS->flashStorage.CacheAndWriteData((u32*)&newRecordHeader, (u32*)record, SIZEOF_RECORD_STORAGE_RECORD_HEADER, this, (u32)FlashUserTypes::DEFAULT);
 		return;
 	}
 	
-	if (op->op.stage == 1)
+	if (op.stage == RecordStorageDeactivateStage::CALLBACKS_AND_FINISH)
 	{
-		return RecordOperationFinished(&op->op, RecordStorageResultCode::SUCCESS);
+		return RecordOperationFinished(op.op, RecordStorageResultCode::SUCCESS);
 	}
 }
 
-void RecordStorage::ClearAllSettings()
+RecordStorageResultCode RecordStorage::LockDownAndClearAllSettings(ModuleId responsibleModuleForShutDown, RecordStorageEventListener * callback, u32 userType)
 {
-	GS->flashStorage.ErasePages(Utility::GetSettingsPageBaseAddress()/PAGE_SIZE, RECORD_STORAGE_NUM_PAGES, nullptr, 0);
+	//Check if we already have locked down
+	if (recordStorageLockDown)
+	{
+		return RecordStorageResultCode::RECORD_STORAGE_LOCK_DOWN;
+	}
+	while (opQueue._numElements > 0)
+	{
+		SizedData data = opQueue.PeekNext();
+		RecordStorageOperation* op = (RecordStorageOperation*)data.data;
+		ExecuteCallback(*op, RecordStorageResultCode::RECORD_STORAGE_LOCK_DOWN);
+		opQueue.DiscardNext();
+	}
+	opQueue.Clean();
+	lockDownCallback = callback;
+	lockDownUserType = userType;
+	lockDownModuleId = responsibleModuleForShutDown;
+	FlashStorageError flashRetVal = GS->flashStorage.ErasePages(TO_PAGE(startPage), RECORD_STORAGE_NUM_PAGES, this, (u32)FlashUserTypes::LOCK_DOWN);
+	if (flashRetVal == FlashStorageError::SUCCESS)
+	{
+		recordStorageLockDown = true;
+		return RecordStorageResultCode::SUCCESS;
+	}
+	else
+	{
+		return RecordStorageResultCode::BUSY;
+	}
 }
 
 /*#################################
@@ -309,9 +340,8 @@ void RecordStorage::ClearAllSettings()
 //This method must be called again until it finishes
 void RecordStorage::RepairPages()
 {
-	if (!repairInProgress) {
-		repairInProgress = true;
-		repairStep = 0;
+	if (repairStage == RepairStage::NO_REPAIR) {
+		repairStage = RepairStage::ERASE_CORRUPT_PAGES;
 	}
 
 	//If there are items in the flashStorage queue, we wait until we get called after the queue is empty
@@ -320,23 +350,23 @@ void RecordStorage::RepairPages()
 		return;
 	}
 	
-	if (repairStep == 0)
+	if (repairStage == RepairStage::ERASE_CORRUPT_PAGES)
 	{
 		//Erase all corrupt pages
-		for (u32 i = 0; i < numPages; i++) {
-			RecordStoragePage* page = (RecordStoragePage*)(startPage + PAGE_SIZE * i);
+		for (u32 i = 0; i < RECORD_STORAGE_NUM_PAGES; i++) {
+			RecordStoragePage& page = getPage(i);
 			RecordStoragePageState pageState = GetPageState(page);
 
 			if (pageState == RecordStoragePageState::CORRUPT) {
-				GS->flashStorage.ErasePage(((u32)page - FLASH_REGION_START_ADDRESS) / PAGE_SIZE, nullptr, 0);
+				GS->flashStorage.ErasePage(((u32)&page - FLASH_REGION_START_ADDRESS) / PAGE_SIZE, nullptr, (u32)FlashUserTypes::DEFAULT);
 				return;
 			}
 		}
 
-		repairStep = 1;
+		repairStage = RepairStage::CLEAR_SWAP_PAGE_IF_NEEDED;
 	}
 	
-	if (repairStep == 1)
+	if (repairStage == RepairStage::CLEAR_SWAP_PAGE_IF_NEEDED)
 	{
 		//Check if there is now at least one swap page
 		RecordStoragePage* swapPage = GetSwapPage();
@@ -346,63 +376,64 @@ void RecordStorage::RepairPages()
 		//the other page at the end
 		u16 maxVersionCounter = 0;
 		if (swapPage == nullptr) {
-			for (u32 i = 0; i < numPages; i++) {
-				RecordStoragePage* page = (RecordStoragePage*)(startPage + PAGE_SIZE * i);
-				if (page->versionCounter > maxVersionCounter) {
-					swapPage = page;
-					maxVersionCounter = page->versionCounter;
+			for (u32 i = 0; i < RECORD_STORAGE_NUM_PAGES; i++) {
+				RecordStoragePage& page = getPage(i);
+				if (page.versionCounter > maxVersionCounter) {
+					swapPage = &page;
+					maxVersionCounter = page.versionCounter;
 				}
 			}
 
 			//Clear the swap page
-			GS->flashStorage.ErasePage(((u32)swapPage - FLASH_REGION_START_ADDRESS) / PAGE_SIZE, nullptr, 0);
+			GS->flashStorage.ErasePage(((u32)swapPage - FLASH_REGION_START_ADDRESS) / PAGE_SIZE, nullptr, (u32)FlashUserTypes::DEFAULT);
 			return;
 		}
 
-		repairStep = 2;
+		repairStage = RepairStage::ACTIVATE_PAGES;
 	}
 	
-	if (repairStep == 2)
+	if (repairStage == RepairStage::ACTIVATE_PAGES)
 	{
 		RecordStoragePage* swapPage = GetSwapPage();
 
 		//Determine max version counter
 		u16 maxVersionCounter = 0;
-		for (u32 i = 0; i < numPages; i++) {
-			RecordStoragePage* page = (RecordStoragePage*)(startPage + PAGE_SIZE * i);
-			if (GetPageState(page) == RecordStoragePageState::ACTIVE && page->versionCounter > maxVersionCounter) {
-				maxVersionCounter = page->versionCounter;
+		for (u32 i = 0; i < RECORD_STORAGE_NUM_PAGES; i++) {
+			RecordStoragePage& page = getPage(i);
+			if (GetPageState(page) == RecordStoragePageState::ACTIVE && page.versionCounter > maxVersionCounter) {
+				maxVersionCounter = page.versionCounter;
 			}
 		}
 
 		//Check that all pages except the swap page are active
 		//Marks empty pages active with incrementing versionCounters
-		for (u32 i = 0; i < numPages; i++) {
-			RecordStoragePage* page = (RecordStoragePage*)(startPage + PAGE_SIZE * i);
-			if (page != swapPage && GetPageState(page) == RecordStoragePageState::EMPTY) {
+		for (u32 i = 0; i < RECORD_STORAGE_NUM_PAGES; i++) {
+			RecordStoragePage& page = getPage(i);
+			if (&page != swapPage && GetPageState(page) == RecordStoragePageState::EMPTY) {
 				RecordStoragePage pageHeader;
+				CheckedMemset(&pageHeader, 0, sizeof(pageHeader));
 				pageHeader.magicNumber = RECORD_STORAGE_ACTIVE_PAGE_MAGIC_NUMBER;
 				pageHeader.versionCounter = ++maxVersionCounter;
 
-				GS->flashStorage.CacheAndWriteData((u32*)&pageHeader, (u32*)page, SIZEOF_RECORD_STORAGE_PAGE_HEADER, nullptr, 0);
+				GS->flashStorage.CacheAndWriteData((u32*)&pageHeader, (u32*)&page, SIZEOF_RECORD_STORAGE_PAGE_HEADER, nullptr, (u32)FlashUserTypes::DEFAULT);
 				return;
 			}
 		}
 
-		repairStep = 3;
+		repairStage = RepairStage::VALIDATE_PAGES;
 	}
 	
 	//TODO: untested
 	//Check if, for all active pages, there is only free space after the last valid record
 	//if not, defragment this page. There can only be one such page after a power loss
-	if(repairStep == 3)
+	if(repairStage == RepairStage::VALIDATE_PAGES)
 	{
-		for (u32 i = 0; i < numPages; i++) {
-			RecordStoragePage* page = (RecordStoragePage*)(startPage + PAGE_SIZE * i);
+		for (u32 i = 0; i < RECORD_STORAGE_NUM_PAGES; i++) {
+			RecordStoragePage& page = getPage(i);
 			RecordStoragePageState pageState = GetPageState(page);
 
 			if (pageState == RecordStoragePageState::ACTIVE) {
-				RecordStorageRecord* record = (RecordStorageRecord*)page->data;
+				RecordStorageRecord* record = (RecordStorageRecord*)page.data;
 
 				//Iterate through all records to find the last valid one (record will then point to free space)
 				while (IsRecordValid(page, record)) {
@@ -410,11 +441,11 @@ void RecordStorage::RepairPages()
 				}
 
 				//Now, we must check that the rest of the page is clean
-				u32* pageData = (u32*) page;
+				u32* pageData = (u32*)&page;
 				u32 freeSpaceOffset = ((u32)record) - ((u32)pageData);
-				for(u32 j=freeSpaceOffset; j<PAGE_SIZE; j+=4){
+				for(u32 j=freeSpaceOffset; j<PAGE_SIZE; j+=sizeof(u32)){
 					if(pageData[j/4] != 0xFFFFFFFF){
-						repairStep = 4;
+						repairStage = RepairStage::FINALIZE;
 						logt("RS", "Corruption after record detected, defragmenting");
 						DefragmentPage(page, true);
 						return;
@@ -423,12 +454,27 @@ void RecordStorage::RepairPages()
 			}
 		}
 
-		repairStep = 4;
+		repairStage = RepairStage::FINALIZE;
 	}
 
-	if (repairStep == 4)
+	if (repairStage == RepairStage::FINALIZE)
 	{
-		repairInProgress = false;
+		repairStage = RepairStage::NO_REPAIR;
+
+		//If this repair process was initiated from a lock down.
+		if (recordStorageLockDown)
+		{
+			if (lockDownCallback != nullptr)
+			{
+				lockDownCallback->RecordStorageEventHandler(0, RecordStorageResultCode::SUCCESS, lockDownUserType, nullptr, 0);
+			}
+
+			if (GS->node.IsRebootScheduled() == false)
+			{
+				//This protects us against a callee to the factory reset that forgot to reboot the node.
+				GS->node.Reboot(SEC_TO_DS(15 * 60), RebootReason::FACTORY_RESET_SUCCEEDED_FAILSAFE);
+			}
+		}
 
 		//Call the listener manually because we did not queue another task
 		ProcessQueue(true);
@@ -439,24 +485,29 @@ void RecordStorage::RepairPages()
 //This will copy the contents of a page to the swap page while ignoring invalid records
 //The implementation only queues one item at a time and will continue from there after being called again
 //This allows us to keep queue size and ram usage to an absolute minimum
-void RecordStorage::DefragmentPage(RecordStoragePage* pageToDefragment, bool force)
+void RecordStorage::DefragmentPage(RecordStoragePage& pageToDefragment, bool force)
 {
 	logt("WARNING", "defr");
 
-	if (!defragmentInProgress) {
-		defragmentInProgress = true;
-		defragmentPage = pageToDefragment;
+	if (defragmentationStage == DefragmentationStage::NO_DEFRAGMENTATION) {
+		defragmentPage = &pageToDefragment;
 		defragmentSwapPage = GetSwapPage();
-		defragmentStep = 0;
-		defragRecordCounter = 0;
+		defragmentationStage = DefragmentationStage::MOVE_TO_SWAP_PAGE;
 
-		if (!force && GetFreeSpaceOnPage(defragmentPage) == GetFreeSpaceWhenDefragmented(defragmentPage)) {
+		if (!force && GetFreeSpaceOnPage(*defragmentPage) == GetFreeSpaceWhenDefragmented(*defragmentPage)) {
 			logt("RS", "No defrag possible");
-			defragmentInProgress = false;
+			defragmentationStage = DefragmentationStage::NO_DEFRAGMENTATION;
+			return;
+		}
+		if (defragmentSwapPage == nullptr)
+		{
+			GS->logger.logCustomError(CustomErrorTypes::FATAL_RECORD_STORAGE_COULD_NOT_FIND_SWAP_PAGE, 0);
+			defragmentationStage = DefragmentationStage::NO_DEFRAGMENTATION;
+			SIMEXCEPTION(IllegalStateException);
 			return;
 		}
 
-		logt("RS", "Defragmenting Page %u (free %u, after %u)", ((u32)defragmentPage - (u32)FLASH_REGION_START_ADDRESS) / (u32)PAGE_SIZE, GetFreeSpaceOnPage(defragmentPage), GetFreeSpaceWhenDefragmented(defragmentPage));
+		logt("RS", "Defragmenting Page %u (free %u, after %u)", ((u32)defragmentPage - (u32)FLASH_REGION_START_ADDRESS) / (u32)PAGE_SIZE, GetFreeSpaceOnPage(*defragmentPage), GetFreeSpaceWhenDefragmented(*defragmentPage));
 	}
 
 	//If there are items in the flashStorage queue, we wait until we get called after the queue is empty
@@ -465,7 +516,7 @@ void RecordStorage::DefragmentPage(RecordStoragePage* pageToDefragment, bool for
 		return;
 	}
 
-	if (defragmentStep == 0)
+	if (defragmentationStage == DefragmentationStage::MOVE_TO_SWAP_PAGE)
 	{
 		//Move records one by one to the swap page
 		RecordStorageRecord* record = (RecordStorageRecord*)defragmentPage->data;
@@ -473,14 +524,14 @@ void RecordStorage::DefragmentPage(RecordStoragePage* pageToDefragment, bool for
 		RecordStorageRecord* freeSpacePtr = (RecordStorageRecord*)defragmentSwapPage->data;
 
 		//This loop goes through all records, if it finds a record that needs to be moved (and wasn't already), it will move it
-		while (IsRecordValid(defragmentPage, record))
+		while (IsRecordValid(*defragmentPage, record))
 		{
 			//Only copy record if it is not outdated (e.g. newer version on a different page)
 			if (GetRecord(record->recordId) == record && record->recordActive)
 			{
 				//Check if record was already moved to swap page
 				bool found = false;
-				while (IsRecordValid(defragmentSwapPage, swapRecord)) {
+				while (IsRecordValid(*defragmentSwapPage, swapRecord)) {
 					if (record->recordId == swapRecord->recordId) {
 						freeSpacePtr = (RecordStorageRecord*)((u8*)swapRecord + swapRecord->recordLength);
 						found = true;
@@ -491,7 +542,7 @@ void RecordStorage::DefragmentPage(RecordStoragePage* pageToDefragment, bool for
 				//If the record was not found on the swap page, we must move it
 				if (!found) {
 					logt("RS", "Moving record %u", (u32)record);
-					GS->flashStorage.WriteData((u32*)record, (u32*)freeSpacePtr, record->recordLength, nullptr, 0);
+					GS->flashStorage.CacheAndWriteData((u32*)record, (u32*)freeSpacePtr, record->recordLength, nullptr, (u32)FlashUserTypes::DEFAULT);
 					return;
 				}
 			}
@@ -499,46 +550,53 @@ void RecordStorage::DefragmentPage(RecordStoragePage* pageToDefragment, bool for
 			record = (RecordStorageRecord*)((u8*)record + record->recordLength);
 		}
 
-		defragmentStep = 1;
+		defragmentationStage = DefragmentationStage::WRITE_PAGE_HEADER;
 	}
 	
-	if (defragmentStep == 1)
+	if (defragmentationStage == DefragmentationStage::WRITE_PAGE_HEADER)
 	{
 
 		//Check the current versionCounter of all pages
 		u16 maxVersionCounter = 0;
-		for (u32 i = 0; i < numPages; i++) {
-			RecordStoragePage* page = (RecordStoragePage*)(startPage + PAGE_SIZE * i);
+		for (u32 i = 0; i < RECORD_STORAGE_NUM_PAGES; i++) {
+			RecordStoragePage& page = getPage(i);
 			if (GetPageState(page) != RecordStoragePageState::ACTIVE) continue;
-			if (page->versionCounter > maxVersionCounter) {
-				maxVersionCounter = page->versionCounter;
+			if (page.versionCounter > maxVersionCounter) {
+				maxVersionCounter = page.versionCounter;
 			}
 		}
 
 		//Currently, we do not support more than 65000 erase cycles
 		if (maxVersionCounter == UINT16_MAX) {
+			GS->logger.logCustomError(CustomErrorTypes::FATAL_RECORD_STORAGE_ERASE_CYCLES_HIGH, (u32)maxVersionCounter);
+			SIMEXCEPTION(IllegalStateException);
 			return;
+		}
+		else if (maxVersionCounter >= UINT16_MAX) {
+			GS->logger.logCustomError(CustomErrorTypes::WARN_RECORD_STORAGE_ERASE_CYCLES_HIGH, (u32)maxVersionCounter);
+			SIMEXCEPTION(IllegalStateException);
 		}
 
 		//Next, write Active to this page with a version that is newer than all other pages
 		RecordStoragePage pageHeader;
+		CheckedMemset(&pageHeader, 0, sizeof(pageHeader));
 		pageHeader.magicNumber = RECORD_STORAGE_ACTIVE_PAGE_MAGIC_NUMBER;
 		pageHeader.versionCounter = maxVersionCounter + 1;
 
-		GS->flashStorage.CacheAndWriteData((u32*)&pageHeader, (u32*)defragmentSwapPage, SIZEOF_RECORD_STORAGE_PAGE_HEADER, nullptr, 0);
+		GS->flashStorage.CacheAndWriteData((u32*)&pageHeader, (u32*)defragmentSwapPage, SIZEOF_RECORD_STORAGE_PAGE_HEADER, nullptr, (u32)FlashUserTypes::DEFAULT);
 		
-		defragmentStep = 2;
+		defragmentationStage = DefragmentationStage::ERASE_OLD_PAGE;
 	}
-	else if (defragmentStep == 2)
+	else if (defragmentationStage == DefragmentationStage::ERASE_OLD_PAGE)
 	{
 		//Finally, erase the page that we just swapped
-		GS->flashStorage.ErasePage(((u32)defragmentPage - FLASH_REGION_START_ADDRESS) / PAGE_SIZE, this, 0);
+		GS->flashStorage.ErasePage(((u32)defragmentPage - FLASH_REGION_START_ADDRESS) / PAGE_SIZE, this, (u32)FlashUserTypes::DEFAULT);
 
-		defragmentStep = 3;
+		defragmentationStage = DefragmentationStage::FINALIZE;
 	}
-	else if (defragmentStep == 3)
+	else if (defragmentationStage == DefragmentationStage::FINALIZE)
 	{
-		defragmentInProgress = false;
+		defragmentationStage = DefragmentationStage::NO_DEFRAGMENTATION;
 
 		//Call the listener manually because we did not queue another task
 		ProcessQueue(true);
@@ -552,20 +610,9 @@ void RecordStorage::DefragmentPage(RecordStoragePage* pageToDefragment, bool for
 
 
 //This will call the callback of the operation and will remove it from the queue
-void RecordStorage::RecordOperationFinished(RecordStorageOperation* op, RecordStorageResultCode code)
+void RecordStorage::RecordOperationFinished(RecordStorageOperation& op, RecordStorageResultCode code)
 {
-	if (op->callback != nullptr) {
-		if (op->type == (u8)RecordStorageOperationType::SAVE_RECORD)
-		{
-			SaveRecordOperation* sop = (SaveRecordOperation*)op;
-			op->callback->RecordStorageEventHandler(sop->recordId, code, op->userType, ((u8*)op) + SIZEOF_RECORD_STORAGE_SAVE_RECORD_OP + sop->dataLength, op->userDataLength);
-		}
-		else if (op->type == (u8)RecordStorageOperationType::DEACTIVATE_RECORD)
-		{
-			DeactivateRecordOperation* dop = (DeactivateRecordOperation*)op;
-			op->callback->RecordStorageEventHandler(dop->recordId, code, op->userType, ((u8*)op) + SIZEOF_RECORD_STORAGE_DEACTIVATE_RECORD_OP, op->userDataLength);
-		}
-	}
+	ExecuteCallback(op, code);
 
 	//Clear operation from operation queue
 	opQueue.DiscardNext();
@@ -574,31 +621,55 @@ void RecordStorage::RecordOperationFinished(RecordStorageOperation* op, RecordSt
 	ProcessQueue(true);
 }
 
+void RecordStorage::ExecuteCallback(RecordStorageOperation & op, RecordStorageResultCode code)
+{
+	if (op.callback != nullptr) {
+		if (op.type == (u8)RecordStorageOperationType::SAVE_RECORD)
+		{
+			SaveRecordOperation* sop = (SaveRecordOperation*)&op;
+			op.callback->RecordStorageEventHandler(sop->recordId, code, op.userType, ((u8*)&op) + SIZEOF_RECORD_STORAGE_SAVE_RECORD_OP + sop->dataLength, op.userDataLength);
+		}
+		else if (op.type == (u8)RecordStorageOperationType::DEACTIVATE_RECORD)
+		{
+			DeactivateRecordOperation* dop = (DeactivateRecordOperation*)&op;
+			op.callback->RecordStorageEventHandler(dop->recordId, code, op.userType, ((u8*)&op) + SIZEOF_RECORD_STORAGE_DEACTIVATE_RECORD_OP, op.userDataLength);
+		}
+	}
+}
+
 RecordStoragePage* RecordStorage::FindPageToDefragment() const
 {
 	RecordStoragePage* pageToDefragment = nullptr;
 	u32 maxFreeSpace = 0;
 
 	//Go through all pages to find page with the most free space
-	u16 maxVersionCounter = 0;
-	for (u32 i = 0; i<numPages; i++)
+	for (u32 i = 0; i< RECORD_STORAGE_NUM_PAGES; i++)
 	{
 		//Check if this page is active
-		RecordStoragePage* page = (RecordStoragePage*)(startPage + PAGE_SIZE * i);
+		RecordStoragePage& page = getPage(i);
 		if (GetPageState(page) != RecordStoragePageState::ACTIVE) continue;
 
 		u16 freeSpace = GetFreeSpaceWhenDefragmented(page);
 
 		if (freeSpace > maxFreeSpace) {
 			maxFreeSpace = freeSpace;
-			pageToDefragment = page;
-		}
-
-		if (page->versionCounter > maxVersionCounter) {
-			maxVersionCounter = page->versionCounter;
+			pageToDefragment = &page;
 		}
 	}
 	return pageToDefragment;
+}
+
+RecordStoragePage& RecordStorage::getPage(u32 index) const
+{
+	if (index >= RECORD_STORAGE_NUM_PAGES)
+	{
+		SIMEXCEPTION(IllegalArgumentException);
+	}
+	if (startPage == nullptr)
+	{
+		SIMEXCEPTION(IllegalStateException);
+	}
+	return *(RecordStoragePage*)(startPage + PAGE_SIZE * index);
 }
 
 //Will return only the data of the record and will return nullptr if record has been deactivated
@@ -626,14 +697,14 @@ RecordStorageRecord* RecordStorage::GetRecord(u16 recordId) const
 	RecordStorageRecord* result = nullptr;
 
 	//Go through all pages
-	for(u32 i = 0; i<numPages; i++)
+	for(u32 i = 0; i< RECORD_STORAGE_NUM_PAGES; i++)
 	{
 		//Check if this page is active
-		RecordStoragePage* page = (RecordStoragePage*)(startPage + PAGE_SIZE * i);
+		RecordStoragePage& page = getPage(i);
 		if(GetPageState(page) != RecordStoragePageState::ACTIVE) continue;
 
 		//Get first record
-		RecordStorageRecord* record = (RecordStorageRecord*)page->data;
+		RecordStorageRecord* record = (RecordStorageRecord*)page.data;
 
 		//Iterate through all valid records
 		while(IsRecordValid(page, record))
@@ -661,14 +732,14 @@ RecordStorageRecord* RecordStorage::GetRecord(u16 recordId) const
 u8* RecordStorage::GetFreeRecordSpace(u16 dataLength) const
 {
 	//Go through all pages
-	for(u32 i = 0; i<numPages; i++)
+	for(u32 i = 0; i< RECORD_STORAGE_NUM_PAGES; i++)
 	{
 		//Check if this page is active
-		RecordStoragePage* page = (RecordStoragePage*)(startPage + PAGE_SIZE * i);
+		RecordStoragePage& page = getPage(i);
 		if(GetPageState(page) != RecordStoragePageState::ACTIVE) continue;
 
 		//Get first record
-		RecordStorageRecord* record = (RecordStorageRecord*)page->data;
+		RecordStorageRecord* record = (RecordStorageRecord*)page.data;
 
 		//Iterate through all valid records
 		while(IsRecordValid(page, record))
@@ -677,7 +748,7 @@ u8* RecordStorage::GetFreeRecordSpace(u16 dataLength) const
 		}
 
 		//Check if we have enough space left till the end of the page
-		if((u32)record - (u32)page + dataLength <= PAGE_SIZE){
+		if((u32)record - (u32)&page + dataLength <= PAGE_SIZE){
 			return (u8*)record;
 		}
 	}
@@ -685,22 +756,22 @@ u8* RecordStorage::GetFreeRecordSpace(u16 dataLength) const
 	return nullptr;
 }
 
-u16 RecordStorage::GetFreeSpaceOnPage(RecordStoragePage* page) const
+u16 RecordStorage::GetFreeSpaceOnPage(const RecordStoragePage& page) const
 {
 	if (GetPageState(page) != RecordStoragePageState::ACTIVE) return 0;
 
 	//Get first record
-	RecordStorageRecord* record = (RecordStorageRecord*)page->data;
+	const RecordStorageRecord* record = (const RecordStorageRecord*)page.data;
 	//Iterate through all valid records until it jumps to the first invalid record
 	while (IsRecordValid(page, record)) {
-		record = (RecordStorageRecord*)((u8*)record + record->recordLength);
+		record = (const RecordStorageRecord*)((const u8*)record + record->recordLength);
 	}
 
-	return (PAGE_SIZE - ((u32)record - (u32)page));
+	return (PAGE_SIZE - ((u32)record - (u32)&page));
 }
 
 //Calculates the free storage that would be available when defragmenting the page
-u16 RecordStorage::GetFreeSpaceWhenDefragmented(RecordStoragePage* page) const
+u16 RecordStorage::GetFreeSpaceWhenDefragmented(const RecordStoragePage& page) const
 {
 	u32 usedSpace = SIZEOF_RECORD_STORAGE_PAGE_HEADER;
 
@@ -708,7 +779,7 @@ u16 RecordStorage::GetFreeSpaceWhenDefragmented(RecordStoragePage* page) const
 	if(GetPageState(page) != RecordStoragePageState::ACTIVE) return 0;
 
 	//Get first record
-	RecordStorageRecord* record = (RecordStorageRecord*)page->data;
+	const RecordStorageRecord * record = (const RecordStorageRecord *)page.data;
 
 	while (IsRecordValid(page, record))
 	{
@@ -718,7 +789,7 @@ u16 RecordStorage::GetFreeSpaceWhenDefragmented(RecordStoragePage* page) const
 			usedSpace += record->recordLength;
 		}
 
-		record = (RecordStorageRecord*)((u8*)record + record->recordLength);
+		record = (const RecordStorageRecord*)((const u8*)record + record->recordLength);
 	}
 
 	return (PAGE_SIZE - usedSpace);
@@ -726,11 +797,11 @@ u16 RecordStorage::GetFreeSpaceWhenDefragmented(RecordStoragePage* page) const
 
 RecordStoragePage* RecordStorage::GetSwapPage() const
 {
-	for(u32 i = 0; i<numPages; i++)
+	for(u32 i = 0; i< RECORD_STORAGE_NUM_PAGES; i++)
 	{
-		RecordStoragePage* page = (RecordStoragePage*)(startPage + PAGE_SIZE * i);
+		RecordStoragePage& page = getPage(i);
 		if(GetPageState(page) == RecordStoragePageState::EMPTY){
-			return page;
+			return &page;
 		}
 	}
 
@@ -739,16 +810,16 @@ RecordStoragePage* RecordStorage::GetSwapPage() const
 
 //This will only check if a record is valid in terms of crc and basic check against corruption
 //If a record is markes as deactivated, it is still valid
-bool RecordStorage::IsRecordValid(RecordStoragePage* page, RecordStorageRecord* record) const
+bool RecordStorage::IsRecordValid(const RecordStoragePage& page, RecordStorageRecord const * record) const
 {
 	//Check if length is within page boundaries
-	if(record == nullptr || ((u32)record - (u32)page) + record->recordLength > PAGE_SIZE){
+	if(record == nullptr || ((u32)record - (u32)&page) + record->recordLength > PAGE_SIZE){
 		return false;
 	}
 
 	//Check if CRC is valid
-	if(Utility::CalculateCrc8(((u8*)record) + sizeof(u16), record->recordLength - 2) != record->crc){
-		logt("ERROR", "crc %u not matching %u", record->crc, Utility::CalculateCrc8(((u8*)record) + sizeof(u16), record->recordLength - 2));
+	if(Utility::CalculateCrc8(((const u8*)record) + sizeof(u16), record->recordLength - 2) != record->crc){
+		logt("ERROR", "crc %u not matching %u", record->crc, Utility::CalculateCrc8(((const u8*)record) + sizeof(u16), record->recordLength - 2));
 		GS->logger.logCustomError(CustomErrorTypes::FATAL_RECORD_CRC_WRONG, record->recordId);
 
 		return false;
@@ -757,14 +828,14 @@ bool RecordStorage::IsRecordValid(RecordStoragePage* page, RecordStorageRecord* 
 	return true;
 }
 
-RecordStoragePageState RecordStorage::GetPageState(RecordStoragePage* page) const
+RecordStoragePageState RecordStorage::GetPageState(const RecordStoragePage& page) const
 {
-	if(page->magicNumber == RECORD_STORAGE_ACTIVE_PAGE_MAGIC_NUMBER){
+	if(page.magicNumber == RECORD_STORAGE_ACTIVE_PAGE_MAGIC_NUMBER){
 		return RecordStoragePageState::ACTIVE;
 	}
 
-	for(u32 i=0; i<PAGE_SIZE/4; i++){
-		if(((u32*)page)[i] != 0xFFFFFFFF){
+	for(u32 i=0; i<PAGE_SIZE/sizeof(u32); i++){
+		if(((const u32*)&page)[i] != 0xFFFFFFFF){
 			return RecordStoragePageState::CORRUPT;
 		}
 	}
@@ -780,53 +851,87 @@ void RecordStorage::ProcessQueue(bool force)
 	}
 }
 
-//This is the handler that is notified once a newstorage task has executed
+//This is the handler that is notified once a FlashStorage task has executed
 void RecordStorage::FlashStorageItemExecuted(FlashStorageTaskItem* task, FlashStorageError errorCode)
 {
-	processQueueInProgress = true;
-
-	//TODO: Use errorCode
-
-	//If either a repair or defrag is in Progress, do nothing, these are called from the QueueEmptyHandler
-	if (repairInProgress || defragmentInProgress) {
-		processQueueInProgress = false;
-		return;
-	}
-	//Check if we have other high level operations to be executed
-	else if(opQueue._numElements > 0)
+	if (task == nullptr || task->header.userType == (u32)FlashUserTypes::DEFAULT)
 	{
-		SizedData data = opQueue.PeekNext();
-		RecordStorageOperation* op = (RecordStorageOperation*)data.data;
+		processQueueInProgress = true;
 
-		if (op->type == (u8)RecordStorageOperationType::SAVE_RECORD)
-		{
-			op->flashStorageErrorCode = errorCode;
-			SaveRecordInt((SaveRecordOperation*)op);
+		//TODO: Use errorCode
+
+		//If either a repair or defrag is in Progress, do nothing, these are called from the QueueEmptyHandler
+		if (repairStage != RepairStage::NO_REPAIR || defragmentationStage != DefragmentationStage::NO_DEFRAGMENTATION) {
+			processQueueInProgress = false;
+			return;
 		}
-		else if (op->type == (u8)RecordStorageOperationType::DEACTIVATE_RECORD)
+		//Check if we have other high level operations to be executed
+		else if (opQueue._numElements > 0)
 		{
-			op->flashStorageErrorCode = errorCode;
-			DeactivateRecordInt((DeactivateRecordOperation*)op);
+			SizedData data = opQueue.PeekNext();
+			RecordStorageOperation* op = (RecordStorageOperation*)data.data;
+
+			if (op->type == (u8)RecordStorageOperationType::SAVE_RECORD)
+			{
+				op->flashStorageErrorCode = errorCode;
+				SaveRecordInternal(*(SaveRecordOperation*)op);
+			}
+			else if (op->type == (u8)RecordStorageOperationType::DEACTIVATE_RECORD)
+			{
+				op->flashStorageErrorCode = errorCode;
+				DeactivateRecordInternal(*(DeactivateRecordOperation*)op);
+			}
+		}
+
+		if (opQueue._numElements == 0) {
+			processQueueInProgress = false;
 		}
 	}
-	
-	if(opQueue._numElements == 0){
-		processQueueInProgress = false;
+	else if (task != nullptr && task->header.userType == (u32)FlashUserTypes::LOCK_DOWN)
+	{
+		//If we were not successful and havn't exceeded our retry counter, we try again. 
+		if (errorCode != FlashStorageError::SUCCESS && lockDownRetryCounter < LOCK_DOWN_RETRY_MAX)
+		{
+			lockDownRetryCounter++;
+			recordStorageLockDown = false; //Will be set to true in LockDownAndClearAllSettings again.
+			if (LockDownAndClearAllSettings(lockDownModuleId, lockDownCallback, lockDownUserType) != RecordStorageResultCode::SUCCESS)
+			{
+				GS->node.Reboot(SEC_TO_DS(4), RebootReason::FACTORY_RESET_FAILED);
+			}
+		}
+		//If we were not successful and have exceeded our retry counter, we inform the callback about the failure.
+		else if (errorCode != FlashStorageError::SUCCESS)
+		{
+			if (lockDownCallback != nullptr)
+			{
+				lockDownCallback->RecordStorageEventHandler(0, RecordStorageResultCode::BUSY, lockDownUserType, nullptr, 0);
+			}
+			GS->node.Reboot(SEC_TO_DS(4), RebootReason::FACTORY_RESET_FAILED);
+		}
+		//If we were successful we inform the callback about success.
+		else
+		{
+			RepairPages();
+		}
+	}
+	else
+	{
+		SIMEXCEPTION(IllegalArgumentException);
 	}
 }
 
 void RecordStorage::FlashStorageQueueEmptyHandler()
 {
 	//Repair and Defragment are only executed once the queue is empty to guarantee success
-	if (repairInProgress) {
+	if (repairStage != RepairStage::NO_REPAIR) {
 		RepairPages();
 		//Repair might have ended without queuing another task
-		if(!repairInProgress && defragmentInProgress){
-			DefragmentPage(nullptr, false);
+		if(repairStage == RepairStage::NO_REPAIR && defragmentationStage != DefragmentationStage::NO_DEFRAGMENTATION){
+			DefragmentPage(*defragmentPage, false);
 		}
 	}
-	else if (defragmentInProgress)
+	else if (defragmentationStage != DefragmentationStage::NO_DEFRAGMENTATION)
 	{
-		DefragmentPage(nullptr, false);
+		DefragmentPage(*defragmentPage, false);
 	}
 }

@@ -106,6 +106,6 @@ class AdvertisingModule: public Module
 		void ResetToDefaultConfiguration() override;
 
 		#ifdef TERMINAL_ENABLED
-		bool TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize) override;
+		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
 		#endif
 };

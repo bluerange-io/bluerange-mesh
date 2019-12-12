@@ -51,7 +51,7 @@ class RecordStorageEventListener;
 #define FM_VERSION_MINOR 8
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 540
+#define FM_VERSION_PATCH 1090
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -77,11 +77,19 @@ extern void SET_FEATURESET_CONFIGURATION(ModuleConfiguration* config, void* modu
 extern u32 INITIALIZE_MODULES(bool createModule);
 #define GET_DEVICE_TYPE XCONCAT(getDeviceType_,FEATURESET)
 extern DeviceType GET_DEVICE_TYPE();
+#define GET_CHIPSET XCONCAT(getChipset_,FEATURESET)
+extern Chipset GET_CHIPSET();
+#define GET_FEATURE_SET_GROUP XCONCAT(getFeatureSetGroup_,FEATURESET)
+extern FeatureSetGroup GET_FEATURE_SET_GROUP();
 #elif SIM_ENABLED
 #define SET_FEATURESET_CONFIGURATION(configuration, module) setFeaturesetConfiguration_CherrySim(configuration, module);
 #define INITIALIZE_MODULES(createModule) initializeModules_CherrySim((createModule));
 extern DeviceType getDeviceType_CherrySim();
 #define GET_DEVICE_TYPE() getDeviceType_CherrySim()
+extern Chipset getChipset_CherrySim();
+#define GET_CHIPSET() getChipset_CherrySim()
+extern FeatureSetGroup getFeatureSetGroup_CherrySim();
+#define GET_FEATURE_SET_GROUP() getFeatureSetGroup_CherrySim();
 #else
 static_assert(false, "Featureset was not defined, which is mandatory!");
 #endif
@@ -141,6 +149,18 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 // Size of Attribute table can be set lower than the default if we do not need that much
 #ifndef ATTR_TABLE_MAX_SIZE
 #define ATTR_TABLE_MAX_SIZE 0x200
+#endif
+
+// Maximum MTU size for GATT operations. Using a higher MTU will increase the RAM usage of the SoftDevice
+// enormously as it will consume multiple buffers per connection. Linker script needs to be changed
+// This should be a multiple of 20 bytes + 3 as the ATT header adds 3 bytes, this will make it easier to
+// optimize the application packets in 20 byte chunks. Default and minimum MTU according to BLE is 23 byte
+#ifndef MAX_MTU_SIZE
+#ifdef NRF51
+#define MAX_MTU_SIZE 23
+#else
+#define MAX_MTU_SIZE 63
+#endif
 #endif
 
 // ########### Flash Settings ##########################################
@@ -283,13 +303,13 @@ class Conf
 
 		//Buffer for the serialNumber in ASCII format
 		mutable char _serialNumber[6];
-		mutable u32 serialNumberIndex;
+		mutable u32 serialNumberIndex = 0;
 
 	public:
 		Conf();
 		static Conf& getInstance();
 
-		bool safeBootEnabled;
+		bool safeBootEnabled = false;
 
 		void LoadSettingsFromFlash(Module* module, ModuleId moduleId, ModuleConfiguration* configurationPointer, u16 configurationLength);
 		void LoadSettingsFromFlashWithId(ModuleId moduleId, ModuleConfiguration* configurationPointer, u16 configurationLength);
@@ -311,22 +331,22 @@ class Conf
 		//################ The following data is can use defaults from the code but is
 		//################ overwritten if it exists in the UICR
 		//Not loaded from UICR but set to the place id that the config was loaded from
-		DeviceConfigOrigins deviceConfigOrigin;
+		DeviceConfigOrigins deviceConfigOrigin = DeviceConfigOrigins::RANDOM_CONFIG;
 		//According to the BLE company identifiers: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
 		// (loaded from UICR if 0)
-		u16 manufacturerId;
+		u16 manufacturerId = 0;
 		//Allows a number of mesh networks to coexist in the same physical space without collision
 		//Allowed range is 0x0000 - 0xFF00 (0 - 65280), others are reserved for special purpose
 		// (loaded from UICR if 0)
-		NetworkId defaultNetworkId;
+		NetworkId defaultNetworkId = 0;
 		//Default network key if preenrollment should be used  (loaded from UICR if 0)
 		u8 defaultNetworkKey[16];
 		//Default user base key
 		u8 defaultUserBaseKey[16];
 		//The default nodeId after flashing (loaded from UICR if 0)
-		NodeId defaultNodeId;
+		NodeId defaultNodeId = 0;
 		//Used to set a static random BLE address (loaded from UICR if type set to 0xFF)
-		fh_ble_gap_addr_t staticAccessAddress;
+		FruityHal::BleGapAddr staticAccessAddress;
 		//##################
 
 
@@ -352,11 +372,11 @@ class Conf
 
 		//INITIATING
 		//(20-1024) in 0.625ms units
-		static constexpr u16 meshConnectingScanInterval = (u16)MSEC_TO_UNITS(20, UNIT_0_625_MS);
+		static constexpr u16 meshConnectingScanInterval = 120; //FIXME_HAL: 120 units = 75ms (0.625ms steps)
 		//(2.5-1024) in 0.625ms units
-		static constexpr u16 meshConnectingScanWindow = (u16)MSEC_TO_UNITS(4, UNIT_0_625_MS);
+		static constexpr u16 meshConnectingScanWindow = 60; //FIXME_HAL: 60 units = 37.5ms (0.625ms steps)
 		//(0-...) in seconds
-		static constexpr u16 meshConnectingScanTimeout = 3;
+		static constexpr u16 meshConnectingScanTimeout = 2;
 
 		//HANDSHAKE
 		//If the handshake has not finished after this time, the connection will be disconnected
@@ -390,39 +410,39 @@ class Conf
 		//If not enough nodes were found, decide after this timeout
 		static constexpr u16 maxTimeUntilDecisionDs = SEC_TO_DS(2);
 		//Switch to low discovery if no other nodes were found for # seconds, set to 0 to disable low discovery state
-		u16 highToLowDiscoveryTimeSec; // if is not configured in featureset, low discovery will be disabled and will always be in high discovery mode
+		u16 highToLowDiscoveryTimeSec = 0; // if is not configured in featureset, low discovery will be disabled and will always be in high discovery mode
 
-		LedMode defaultLedMode;
+		LedMode defaultLedMode = LedMode::OFF;
 
 		//Configures whether the terminal will start in interactive mode or not
 		TerminalMode terminalMode : 8;
 
-		bool enableSinkRouting;
+		bool enableSinkRouting = false;
 		// ########### TIMINGS ################################################
 
 		//Mesh connection parameters (used when a connection is set up)
 		//(7.5-4000) Minimum acceptable connection interval
-		u16 meshMinConnectionInterval;
+		u16 meshMinConnectionInterval = 0;
 		//(7.5-4000) Maximum acceptable connection interval
-		u16 meshMaxConnectionInterval;
+		u16 meshMaxConnectionInterval = 0;
 		//(100-32000) Connection supervisory timeout
-		static constexpr u16 meshConnectionSupervisionTimeout = (u16)MSEC_TO_UNITS(6000, UNIT_10_MS);
+		static constexpr u16 meshConnectionSupervisionTimeout = (u16)MSEC_TO_UNITS(1000, UNIT_10_MS);
 
 		//Mesh discovery parameters
 		//DISCOVERY_HIGH
 		//(20-1024) (100-1024 for non connectable advertising!) Determines advertising interval in units of 0.625 millisecond.
 		static constexpr u16 meshAdvertisingIntervalHigh = (u16)MSEC_TO_UNITS(100, UNIT_0_625_MS);
 		//From 4 to 16384 (2.5ms to 10s) in 0.625ms Units
-		u16 meshScanIntervalHigh;
+		u16 meshScanIntervalHigh = 0;
 		//From 4 to 16384 (2.5ms to 10s) in 0.625ms Units
-		u16 meshScanWindowHigh;
+		u16 meshScanWindowHigh = 0;
 
 
 		//DISCOVERY_LOW
 		//(20-1024) Determines scan interval in units of 0.625 millisecond.
-		u16 meshScanIntervalLow;
+		u16 meshScanIntervalLow = 0;
 		//(2.5-1024) Determines scan window in units of 0.625 millisecond.
-		u16 meshScanWindowLow;
+		u16 meshScanWindowLow = 0;
 
 
 		// ########### CONNECTION ################################################
@@ -440,19 +460,23 @@ class Conf
 		static constexpr u8 totalOutConnections = 3;
 		// Total connections for building the mesh, if more than one inConnection is configured,
 		// it will be used only temporarily but not for permanent connections
-		static constexpr u8 meshMaxInConnections = 1;
+		u8 meshMaxInConnections = 1;
 		static constexpr u8 meshMaxOutConnections = 3;
 #elif NRF52
 		static constexpr u8 totalInConnections = 3;
 		static constexpr u8 totalOutConnections = 3;
-		static constexpr u8 meshMaxInConnections = 2;
+		u8 meshMaxInConnections = 2;
 		static constexpr u8 meshMaxOutConnections = 3;
 #elif SIM_ENABLED
 		//Use a default setting for the nrf52
 		inline static u8 totalInConnections = 3;
 		inline static u8 totalOutConnections = 3;
-		inline static u8 meshMaxInConnections = 2;
+		u8 meshMaxInConnections = 2;
 		inline static u8 meshMaxOutConnections = 3;
+#endif
+
+#ifndef SIM_ENABLED
+		static_assert(totalOutConnections >= meshMaxOutConnections, "meshMaxOutConnections must not be bigger than totalOutConnections");
 #endif
 
 		static constexpr size_t MAX_AMOUNT_PREFERRED_PARTNER_IDS = 8;
@@ -485,12 +509,6 @@ class Conf
 	extern u32 __application_start_address;
 	extern u32 __application_end_address;
 	extern u32 __application_ram_start_address;
-	extern u32 __start_conn_type_resolvers;
-	extern u32 __stop_conn_type_resolvers;
-#elif defined(__ICCARM__)
-	extern u32 __ICFEDIT_region_ROM_start__; //Variable is set in the linker script
-	extern u32 __ICFEDIT_region_ROM_end__; //Variable is set in the linker script
-	extern u32 __ICFEDIT_region_RAM_start__; //Variable is set in the linker script
 	extern u32 __start_conn_type_resolvers;
 	extern u32 __stop_conn_type_resolvers;
 #else

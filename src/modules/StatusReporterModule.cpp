@@ -40,6 +40,7 @@
 #include <cstdlib>
 
 constexpr u8 STATUS_REPORTER_MODULE_CONFIG_VERSION = 2;
+constexpr u16 STATUS_REPORTER_MODULE_MAX_HOPS = NODE_ID_HOPS_BASE + NODE_ID_HOPS_BASE_SIZE - 1;
 
 StatusReporterModule::StatusReporterModule()
 	: Module(ModuleId::STATUS_REPORTER_MODULE, "status")
@@ -88,15 +89,15 @@ void StatusReporterModule::TimerEventHandler(u16 passedTimeDs)
 	}
 	//Status
 	if(SHOULD_IV_TRIGGER(GS->appTimerDs+GS->appTimerRandomOffsetDs, passedTimeDs, configuration.statusReportingIntervalDs)){
-		SendStatus(NODE_ID_BROADCAST, MessageType::MODULE_ACTION_RESPONSE);
+		SendStatus(NODE_ID_BROADCAST, 0, MessageType::MODULE_ACTION_RESPONSE);
 	}
 	//Connections
 	if(SHOULD_IV_TRIGGER(GS->appTimerDs+GS->appTimerRandomOffsetDs, passedTimeDs, configuration.connectionReportingIntervalDs)){
-		SendAllConnections(NODE_ID_BROADCAST, MessageType::MODULE_GENERAL);
+		SendAllConnections(NODE_ID_BROADCAST, 0, MessageType::MODULE_GENERAL);
 	}
 	//Nearby Nodes
 	if(SHOULD_IV_TRIGGER(GS->appTimerDs+GS->appTimerRandomOffsetDs, passedTimeDs, configuration.nearbyReportingIntervalDs)){
-		SendNearbyNodes(NODE_ID_BROADCAST, MessageType::MODULE_ACTION_RESPONSE);
+		SendNearbyNodes(NODE_ID_BROADCAST, 0, MessageType::MODULE_ACTION_RESPONSE);
 	}
 	//BatteryMeasurement (measure short after reset and then priodically)
 	if( (GS->appTimerDs < SEC_TO_DS(40) && Boardconfig->batteryAdcInputPin != -1 )
@@ -110,7 +111,7 @@ void StatusReporterModule::TimerEventHandler(u16 passedTimeDs)
 }
 
 //This method sends the node's status over the network
-void StatusReporterModule::SendStatus(NodeId toNode, MessageType messageType) const
+void StatusReporterModule::SendStatus(NodeId toNode, u8 requestHandle, MessageType messageType) const
 {
 	MeshConnections conn = GS->cm.GetMeshConnections(ConnectionDirection::DIRECTION_IN);
 	MeshConnection* inConnection = nullptr;
@@ -136,7 +137,7 @@ void StatusReporterModule::SendStatus(NodeId toNode, MessageType messageType) co
 		messageType,
 		toNode,
 		(u8)StatusModuleActionResponseMessages::STATUS,
-		0,
+		requestHandle,
 		(u8*)&data,
 		SIZEOF_STATUS_REPORTER_MODULE_STATUS_MESSAGE,
 		false
@@ -150,7 +151,11 @@ void StatusReporterModule::SendDeviceInfoV2(NodeId toNode, u8 requestHandle, Mes
 
 	data.manufacturerId = RamConfig->manufacturerId;
 	data.deviceType = GET_DEVICE_TYPE();
-	memcpy(data.chipId, (u8*)NRF_FICR->DEVICEADDR, 8);
+	for (u32 i = 0; i < sizeof(data.chipId); i++)
+	{
+		// Not CheckedMemcpy, as DEVICEADDR is volatile.
+		data.chipId[i] = ((const volatile u8*)NRF_FICR->DEVICEADDR)[i];
+	}
 	data.serialNumberIndex = RamConfig->GetSerialNumberIndex();
 	FruityHal::BleGapAddressGet(&data.accessAddress);
 	data.nodeVersion = GS->config.getFruityMeshVersion();
@@ -173,7 +178,7 @@ void StatusReporterModule::SendDeviceInfoV2(NodeId toNode, u8 requestHandle, Mes
 	);
 }
 
-void StatusReporterModule::SendNearbyNodes(NodeId toNode, MessageType messageType)
+void StatusReporterModule::SendNearbyNodes(NodeId toNode, u8 requestHandle, MessageType messageType)
 {
 	u16 numMeasurements = 0;
 	for(int i=0; i<NUM_NODE_MEASUREMENTS; i++){
@@ -190,8 +195,8 @@ void StatusReporterModule::SendNearbyNodes(NodeId toNode, MessageType messageTyp
 			NodeId sender = nodeMeasurements[i].nodeId;
 			i8 rssi = (i8)(nodeMeasurements[i].rssiSum / nodeMeasurements[i].packetCount);
 
-			memcpy(buffer + j*3 + 0, &sender, 2);
-			memcpy(buffer + j*3 + 2, &rssi, 1);
+			CheckedMemcpy(buffer + j*3 + 0, &sender, 2);
+			CheckedMemcpy(buffer + j*3 + 2, &rssi, 1);
 
 			j++;
 		}
@@ -204,7 +209,7 @@ void StatusReporterModule::SendNearbyNodes(NodeId toNode, MessageType messageTyp
 		messageType,
 		toNode,
 		(u8)StatusModuleActionResponseMessages::NEARBY_NODES,
-		0,
+		requestHandle,
 		buffer,
 		packetSize,
 		false
@@ -213,7 +218,7 @@ void StatusReporterModule::SendNearbyNodes(NodeId toNode, MessageType messageTyp
 
 
 //This method sends information about the current connections over the network
-void StatusReporterModule::SendAllConnections(NodeId toNode, MessageType messageType) const
+void StatusReporterModule::SendAllConnections(NodeId toNode, u8 requestHandle, MessageType messageType) const
 {
 	StatusReporterModuleConnectionsMessage message;
 	CheckedMemset(&message, 0x00, sizeof(StatusReporterModuleConnectionsMessage));
@@ -224,41 +229,41 @@ void StatusReporterModule::SendAllConnections(NodeId toNode, MessageType message
 	u8* buffer = (u8*)&message;
 
 	if(connIn.count > 0){
-		memcpy(buffer, &connIn.connections[0]->partnerId, 2);
+		CheckedMemcpy(buffer, &connIn.connections[0]->partnerId, 2);
 		i8 avgRssi = connIn.connections[0]->GetAverageRSSI();
-		memcpy(buffer + 2, &avgRssi, 1);
+		CheckedMemcpy(buffer + 2, &avgRssi, 1);
 	}
 
 	for(u32 i=0; i<connOut.count; i++){
-		memcpy(buffer + (i+1)*3, &connOut.connections[i]->partnerId, 2);
+		CheckedMemcpy(buffer + (i+1)*3, &connOut.connections[i]->partnerId, 2);
 		i8 avgRssi = connOut.connections[i]->GetAverageRSSI();
-		memcpy(buffer + (i+1)*3 + 2, &avgRssi, 1);
+		CheckedMemcpy(buffer + (i+1)*3 + 2, &avgRssi, 1);
 	}
 
 	SendModuleActionMessage(
 		MessageType::MODULE_ACTION_RESPONSE,
 		NODE_ID_BROADCAST,
 		(u8)StatusModuleActionResponseMessages::ALL_CONNECTIONS,
-		0,
+		requestHandle,
 		(u8*)&message,
 		SIZEOF_STATUS_REPORTER_MODULE_CONNECTIONS_MESSAGE,
 		false
 	);
 }
 
-void StatusReporterModule::SendRebootReason(NodeId toNode) const
+void StatusReporterModule::SendRebootReason(NodeId toNode, u8 requestHandle) const
 {
 	SendModuleActionMessage(
 		MessageType::MODULE_ACTION_RESPONSE,
 		toNode,
 		(u8)StatusModuleActionResponseMessages::REBOOT_REASON,
-		0,
+		requestHandle,
 		(u8*)&(GS->ramRetainStructPreviousBoot),
 		sizeof(RamRetainStruct) - sizeof(u32), //crc32 not needed
 		false
 	);
 }
-void StatusReporterModule::SendErrors(NodeId toNode) const{
+void StatusReporterModule::SendErrors(NodeId toNode, u8 requestHandle) const{
 
 	//Log another error so that we know the uptime of the node when the errors were requested
 	GS->logger.logCustomError(CustomErrorTypes::INFO_ERRORS_REQUESTED, GS->logger.errorLogPosition);
@@ -274,7 +279,7 @@ void StatusReporterModule::SendErrors(NodeId toNode) const{
 			MessageType::MODULE_ACTION_RESPONSE,
 			toNode,
 			(u8)StatusModuleActionResponseMessages::ERROR_LOG_ENTRY,
-			0,
+			requestHandle,
 			(u8*)&data,
 			SIZEOF_STATUS_REPORTER_MODULE_ERROR_LOG_ENTRY_MESSAGE,
 			false
@@ -286,7 +291,7 @@ void StatusReporterModule::SendErrors(NodeId toNode) const{
 }
 
 
-void StatusReporterModule::SendLiveReport(LiveReportTypes type, u32 extra, u32 extra2) const
+void StatusReporterModule::SendLiveReport(LiveReportTypes type, u16 requestHandle, u32 extra, u32 extra2) const
 {
 	//Live reporting states are off=0, error=50, warn=100, info=150, debug=200
 	if (type > configuration.liveReportingState) return;
@@ -301,7 +306,7 @@ void StatusReporterModule::SendLiveReport(LiveReportTypes type, u32 extra, u32 e
 		MessageType::MODULE_GENERAL,
 		NODE_ID_BROADCAST, //TODO: Could use gateway
 		(u8)StatusModuleGeneralMessages::LIVE_REPORT,
-		0,
+		requestHandle,
 		(u8*)&data,
 		SIZEOF_STATUS_REPORTER_MODULE_LIVE_REPORT_MESSAGE,
 		false
@@ -317,7 +322,7 @@ void StatusReporterModule::StartConnectionRSSIMeasurement(MeshConnection& connec
 		connection.lastReportedRssi = 0;
 		connection.rssiAverageTimes1000 = 0;
 
-		err = sd_ble_gap_rssi_start(connection.connectionHandle, 2, 7);
+		err = FruityHal::BleGapRssiStart(connection.connectionHandle, 2, 7);
 		if(err == NRF_ERROR_INVALID_STATE || err == BLE_ERROR_INVALID_CONN_HANDLE){
 			//Both errors are due to a disconnect and we can simply ignore them
 		} else {
@@ -333,7 +338,7 @@ void StatusReporterModule::StopConnectionRSSIMeasurement(const MeshConnection& c
 
 	if (connection.isConnected())
 	{
-		err = sd_ble_gap_rssi_stop(connection.connectionHandle);
+		err = FruityHal::BleGapRssiStop(connection.connectionHandle);
 		if(err == NRF_ERROR_INVALID_STATE || err == BLE_ERROR_INVALID_CONN_HANDLE){
 			//Both errors are due to a disconnect and we can simply ignore them
 		} else {
@@ -345,7 +350,7 @@ void StatusReporterModule::StopConnectionRSSIMeasurement(const MeshConnection& c
 }
 
 
-void StatusReporterModule::GapAdvertisementReportEventHandler(const GapAdvertisementReportEvent & advertisementReportEvent)
+void StatusReporterModule::GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent & advertisementReportEvent)
 {
 	const u8* data = advertisementReportEvent.getData();
 	u16 dataLength = advertisementReportEvent.getDataLength();
@@ -390,18 +395,16 @@ void StatusReporterModule::GapAdvertisementReportEventHandler(const GapAdvertise
 }
 
 #ifdef TERMINAL_ENABLED
-bool StatusReporterModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
+TerminalCommandHandlerReturnType StatusReporterModule::TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize)
 {
 	//React on commands, return true if handled, false otherwise
-	if(commandArgsSize >= 3 && TERMARGS(2, moduleName))
+	if(commandArgsSize >= 4 && TERMARGS(2, moduleName))
 	{
 		if(TERMARGS(0, "action"))
 		{
-			//Rewrite "this" to our own node id, this will actually build the packet
-			//But reroute it to our own node
-			NodeId destinationNode = (TERMARGS(1, "this")) ? GS->node.configuration.nodeId : atoi(commandArgs[1]);
+			NodeId destinationNode = Utility::TerminalArgumentToNodeId(commandArgs[1]);
 
-			if(commandArgsSize >= 4 && TERMARGS(3, "get_status"))
+			if(TERMARGS(3, "get_status"))
 			{
 				SendModuleActionMessage(
 					MessageType::MODULE_TRIGGER_ACTION,
@@ -413,9 +416,9 @@ bool StatusReporterModule::TerminalCommandHandler(char* commandArgs[], u8 comman
 					false
 				);
 
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
-			else if(commandArgsSize >= 4 && TERMARGS(3,"get_device_info"))
+			else if(TERMARGS(3,"get_device_info"))
 			{
 				SendModuleActionMessage(
 					MessageType::MODULE_TRIGGER_ACTION,
@@ -427,9 +430,9 @@ bool StatusReporterModule::TerminalCommandHandler(char* commandArgs[], u8 comman
 					false
 				);
 
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
-			else if(commandArgsSize >= 4 && TERMARGS(3,"get_connections"))
+			else if(TERMARGS(3,"get_connections"))
 			{
 				SendModuleActionMessage(
 					MessageType::MODULE_TRIGGER_ACTION,
@@ -441,9 +444,9 @@ bool StatusReporterModule::TerminalCommandHandler(char* commandArgs[], u8 comman
 					false
 				);
 
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
-			else if(commandArgsSize >= 4 && TERMARGS(3, "get_nearby"))
+			else if(TERMARGS(3, "get_nearby"))
 			{
 				SendModuleActionMessage(
 					MessageType::MODULE_TRIGGER_ACTION,
@@ -455,9 +458,9 @@ bool StatusReporterModule::TerminalCommandHandler(char* commandArgs[], u8 comman
 					false
 				);
 
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
-			else if(commandArgsSize >= 4 && TERMARGS(3,"set_init"))
+			else if(TERMARGS(3,"set_init"))
 			{
 				SendModuleActionMessage(
 					MessageType::MODULE_TRIGGER_ACTION,
@@ -469,10 +472,12 @@ bool StatusReporterModule::TerminalCommandHandler(char* commandArgs[], u8 comman
 					false
 				);
 
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
-			else if(commandArgsSize >= 4 && TERMARGS(3, "keep_alive"))
+			else if(TERMARGS(3, "keep_alive"))
 			{
+				// Sink routing self checking mechanism requires keep_alive message to be hops based.
+				destinationNode = STATUS_REPORTER_MODULE_MAX_HOPS;
 				SendModuleActionMessage(
 					MessageType::MODULE_TRIGGER_ACTION,
 					destinationNode,
@@ -483,9 +488,9 @@ bool StatusReporterModule::TerminalCommandHandler(char* commandArgs[], u8 comman
 					false
 				);
 
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
-			else if(commandArgsSize >= 4 && TERMARGS(3, "get_errors"))
+			else if(TERMARGS(3, "get_errors"))
 			{
 				SendModuleActionMessage(
 					MessageType::MODULE_TRIGGER_ACTION,
@@ -497,11 +502,12 @@ bool StatusReporterModule::TerminalCommandHandler(char* commandArgs[], u8 comman
 					false
 				);
 
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
-			else if(commandArgsSize >= 5 && TERMARGS(3 ,"livereports")){
+			else if(TERMARGS(3 ,"livereports")){
+					if (commandArgsSize < 5) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 					//Enables or disables live reporting of connection establishments
-					u8 liveReportingState = atoi(commandArgs[4]);
+					u8 liveReportingState = Utility::StringToU8(commandArgs[4]);
 
 					SendModuleActionMessage(
 						MessageType::MODULE_TRIGGER_ACTION,
@@ -513,9 +519,9 @@ bool StatusReporterModule::TerminalCommandHandler(char* commandArgs[], u8 comman
 						false
 					);
 
-					return true;
+					return TerminalCommandHandlerReturnType::SUCCESS;
 				}
-			else if(commandArgsSize >= 4 && TERMARGS(3, "get_rebootreason"))
+			else if(TERMARGS(3, "get_rebootreason"))
 			{
 				SendModuleActionMessage(
 					MessageType::MODULE_TRIGGER_ACTION,
@@ -527,7 +533,7 @@ bool StatusReporterModule::TerminalCommandHandler(char* commandArgs[], u8 comman
 					false
 				);
 
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
 		}
 	}
@@ -552,7 +558,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 			StatusModuleTriggerActionMessages actionType = (StatusModuleTriggerActionMessages)packet->actionType;
 			if(actionType == StatusModuleTriggerActionMessages::GET_STATUS)
 			{
-				SendStatus(packet->header.sender, MessageType::MODULE_ACTION_RESPONSE);
+				SendStatus(packet->header.sender, packet->requestHandle, MessageType::MODULE_ACTION_RESPONSE);
 
 			}
 			//We were queried for our device info v2
@@ -564,12 +570,12 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 			//We were queried for our connections
 			else if(actionType == StatusModuleTriggerActionMessages::GET_ALL_CONNECTIONS)
 			{
-				StatusReporterModule::SendAllConnections(packetHeader->sender, MessageType::MODULE_ACTION_RESPONSE);
+				StatusReporterModule::SendAllConnections(packetHeader->sender, packet->requestHandle, MessageType::MODULE_ACTION_RESPONSE);
 			}
 			//We were queried for nearby nodes (nodes in the join_me buffer)
 			else if(actionType == StatusModuleTriggerActionMessages::GET_NEARBY_NODES)
 			{
-				StatusReporterModule::SendNearbyNodes(packetHeader->sender, MessageType::MODULE_ACTION_RESPONSE);
+				StatusReporterModule::SendNearbyNodes(packetHeader->sender, packet->requestHandle, MessageType::MODULE_ACTION_RESPONSE);
 			}
 			//We should set ourselves initialized
 			else if(actionType == StatusModuleTriggerActionMessages::SET_INITIALIZED)
@@ -580,7 +586,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 					MessageType::MODULE_ACTION_RESPONSE,
 					packet->header.sender,
 					(u8)StatusModuleActionResponseMessages::SET_INITIALIZED_RESULT,
-					0,
+					packet->requestHandle,
 					nullptr,
 					0,
 					false
@@ -589,11 +595,29 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 			else if(actionType == StatusModuleTriggerActionMessages::SET_KEEP_ALIVE)
 			{
 				FruityHal::FeedWatchdog();
+				if (connection != nullptr)
+				{
+					u16 receivedHopsToSink = STATUS_REPORTER_MODULE_MAX_HOPS - packetHeader->receiver;
+					MeshConnection * meshconn = GS->cm.GetMeshConnectionToPartner(connection->partnerId);
+					if (meshconn != nullptr)
+					{
+						//meshconn can be nullptr if the connection for example is a mesh access connection.
+						u16 hopsToSink = meshconn->getHopsToSink();
+
+						if (receivedHopsToSink != hopsToSink)
+						{
+							GS->logger.logCustomError(CustomErrorTypes::FATAL_INCORRECT_HOPS_TO_SINK, (receivedHopsToSink << 16) | hopsToSink);
+							logt("DEBUGMOD", "FATAL receivedHopsToSink: %d", receivedHopsToSink);
+							logt("DEBUGMOD", "FATAL getHopsToSink: %d", hopsToSink);
+							meshconn->setHopsToSink(receivedHopsToSink);
+						}
+					}
+				}
 			}
 			//Send back the errors
 			else if(actionType == StatusModuleTriggerActionMessages::GET_ERRORS)
 			{
-				SendErrors(packet->header.sender);
+				SendErrors(packet->header.sender, packet->requestHandle);
 			}
 			//Configures livereporting
 			else if(actionType == StatusModuleTriggerActionMessages::SET_LIVEREPORTING)
@@ -604,7 +628,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 			//Send back the reboot reason
 			else if(actionType == StatusModuleTriggerActionMessages::GET_REBOOT_REASON)
 			{
-				SendRebootReason(packet->header.sender);
+				SendRebootReason(packet->header.sender, packet->requestHandle);
 			}
 		}
 	}
@@ -667,8 +691,8 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 					u16 nodeId;
 					i8 rssi;
 					//TODO: Find a nicer way to access unaligned data in packets
-					memcpy(&nodeId, packet->data + i*3+0, 2);
-					memcpy(&rssi, packet->data + i*3+2, 1);
+					CheckedMemcpy(&nodeId, packet->data + i*3+0, 2);
+					CheckedMemcpy(&rssi, packet->data + i*3+2, 1);
 					if(!first){
 						logjson("STATUSMOD", ",");
 					}
@@ -691,7 +715,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 				//As the time is currently only 3 byte, use this formula to get the current unix timestamp in UTC: now()  - (now() % (2^24)) + timestamp
 				logjson("STATUSMOD", "\"errType\":%u,\"code\":%u,\"extra\":%u,\"time\":%u", (u32)data->errorType, data->errorCode, data->extraInfo, data->timestamp);
 #if IS_INACTIVE(GW_SAVE_SPACE)
-				logjson("STATUSMOD", ",\"typeStr\":\"%s\",\"codeStr\":\"%s\"", FruityHal::getErrorLogErrorType((ErrorTypes)data->errorType), FruityHal::getErrorLogError((ErrorTypes)data->errorType, data->errorCode));
+				logjson("STATUSMOD", ",\"typeStr\":\"%s\",\"codeStr\":\"%s\"", Logger::getErrorLogErrorType((LoggingError)data->errorType), Logger::getErrorLogError((LoggingError)data->errorType, data->errorCode));
 #endif
 				logjson("STATUSMOD", "}" SEP);
 			}

@@ -39,7 +39,7 @@ class AppConnection
 {
 private:
 public:
-	AppConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress);
+	AppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress);
 
 	bool SendData(const BaseConnectionSendData& sendData, u8* data);
 

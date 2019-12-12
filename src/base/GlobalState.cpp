@@ -44,9 +44,6 @@
 GlobalState GlobalState::instance;
 __attribute__ ((section (".noinit"))) RamRetainStruct ramRetainStruct;
 __attribute__ ((section (".noinit"))) u32 rebootMagicNumber;
-#else
-RamRetainStruct ramRetainStruct;
-u32 rebootMagicNumber;
 #endif
 
 GlobalState::GlobalState()
@@ -55,15 +52,18 @@ GlobalState::GlobalState()
 	ramRetainStructPtr = &ramRetainStruct;
 	rebootMagicNumberPtr = &rebootMagicNumber;
 	eventLooperHandlers.zeroData();
+	CheckedMemset(currentEventBuffer, 0, sizeof(currentEventBuffer));
+	CheckedMemset(&ramRetainStructPreviousBoot, 0, sizeof(ramRetainStructPreviousBoot)); //Safe to set to 0 as its written to only after the boot process is done.
+	CheckedMemset(scanBuffer, 0, sizeof(scanBuffer));
 }
 
 uint32_t GlobalState::SetEventHandlers(
-	SystemEventHandler systemEventHandler, 
-	TimerEventHandler  timerEventHandler, 
-	ButtonEventHandler buttonEventHandler, 
-	AppErrorHandler    appErrorHandler, 
-	StackErrorHandler  stackErrorHandler, 
-	HardfaultHandler   hardfaultHandler)
+    FruityHal::SystemEventHandler systemEventHandler,
+    FruityHal::TimerEventHandler  timerEventHandler,
+    FruityHal::ButtonEventHandler buttonEventHandler,
+    FruityHal::AppErrorHandler    appErrorHandler,
+    FruityHal::StackErrorHandler  stackErrorHandler,
+    FruityHal::HardfaultHandler   hardfaultHandler)
 {
 	this->systemEventHandler = systemEventHandler;
 	this->timerEventHandler  = timerEventHandler;
@@ -74,12 +74,12 @@ uint32_t GlobalState::SetEventHandlers(
 	return 0;
 }
 
-void GlobalState::SetUartHandler(UartEventHandler uartEventHandler)
+void GlobalState::SetUartHandler(FruityHal::UartEventHandler uartEventHandler)
 {
 	this->uartEventHandler = uartEventHandler;
 }
 
-void GlobalState::RegisterEventLooperHandler(EventLooperHandler handler)
+void GlobalState::RegisterEventLooperHandler(FruityHal::EventLooperHandler handler)
 {
 	if (amountOfEventLooperHandlers >= eventLooperHandlers.length)
 	{

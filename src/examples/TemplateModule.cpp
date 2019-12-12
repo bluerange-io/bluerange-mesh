@@ -28,22 +28,16 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TEMPLATE_MODULE_CONFIG_VERSION 1
-
 #include <TemplateModule.h>
 #include <Logger.h>
 #include <Utility.h>
 #include <Node.h>
 
-extern "C"{
-
-}
+constexpr u8 TEMPLATE_MODULE_CONFIG_VERSION = 1;
 
 TemplateModule::TemplateModule()
-	: Module(moduleID::TEMPLATE_MODULE_ID, "template")
+	: Module(ModuleId::TEMPLATE_MODULE, "template")
 {
-	moduleVersion = TEMPLATE_MODULE_CONFIG_VERSION;
-
 	//Register callbacks n' stuff
 
 	//Save configuration to base class variables
@@ -85,27 +79,27 @@ void TemplateModule::TimerEventHandler(u16 passedTimeDs)
 }
 
 #ifdef TERMINAL_ENABLED
-bool TemplateModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
+TerminalCommandHandlerReturnType TemplateModule::TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize)
 {
 	//React on commands, return true if handled, false otherwise
 	if(commandArgsSize >= 3 && TERMARGS(2, moduleName))
 	{
 		if(TERMARGS(0, "action"))
 		{
-			if(!TERMARGS(2, moduleName)) return false;
+			if(!TERMARGS(2, moduleName)) return TerminalCommandHandlerReturnType::UNKNOWN;
 
 			if(commandArgsSize >= 4 && TERMARGS(3, "argument_a"))
 			{
 
-			return true;
+			return TerminalCommandHandlerReturnType::SUCCESS;
 			}
 			else if(commandArgsSize >= 4 && TERMARGS(3, "argument_b"))
 			{
 
-			return true;
+			return TerminalCommandHandlerReturnType::SUCCESS;
 			}
 
-			return false;
+			return TerminalCommandHandlerReturnType::UNKNOWN;
 
 		}
 	}
@@ -121,7 +115,7 @@ void TemplateModule::MeshMessageReceivedHandler(BaseConnection* connection, Base
 	//Must call superclass for handling
 	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
-	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_TRIGGER_ACTION){
+	if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
 		connPacketModule* packet = (connPacketModule*)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
@@ -133,7 +127,7 @@ void TemplateModule::MeshMessageReceivedHandler(BaseConnection* connection, Base
 	}
 
 	//Parse Module responses
-	if(packetHeader->messageType == MESSAGE_TYPE_MODULE_ACTION_RESPONSE){
+	if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
 		connPacketModule* packet = (connPacketModule*)packetHeader;
 
 		//Check if our module is meant and we should trigger an action

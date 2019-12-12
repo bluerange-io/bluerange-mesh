@@ -43,9 +43,8 @@ void setFeaturesetConfiguration_github(ModuleConfiguration* config, void* module
 {
 	if(config->moduleId == ModuleId::BOARD_CONFIG)
 	{
-		BoardConfiguration* c = (BoardConfiguration*) config;
-
 		//Additional boards can be put in here to be selected at runtime
+		//BoardConfiguration* c = (BoardConfiguration*)config;
 		//e.g. setBoard_123(c);
 	}
 	else if (config->moduleId == ModuleId::CONFIG)
@@ -80,4 +79,14 @@ u32 initializeModules_github(bool createModule)
 DeviceType getDeviceType_github()
 {
 	return DeviceType::STATIC;
+}
+
+Chipset getChipset_github()
+{
+	return Chipset::CHIP_NRF52;
+}
+
+FeatureSetGroup getFeatureSetGroup_github()
+{
+	return FeatureSetGroup::NRF52_MESH;
 }

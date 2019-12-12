@@ -144,8 +144,8 @@ You may now enter a number of commands to trigger actions. Here are some importa
 === Connect Second Development Kit
 Next, flash and connect another node to the network and you should observe that they connect to each other after a short amount of time. You'll see that the LEDs will switch from blinking red to a single green pattern.
 
-* If you enter the command *action 0 io leds on*, both nodes should
-switch their led to white (all LEDs on). After you enter *action 0 io leds off*, it will go back to connection signaling mode.
+* If you enter the command *action 0 io led on*, both nodes should
+switch their led to white (all LEDs on). After you enter *action 0 io led off*, it will go back to connection signaling mode.
 * Now, connect with another terminal to the second node and enter *data* in the command prompt and observe how the data is sent to the other node and outputted on the other terminal.
 * You can add as many nodes as you like to the network and see how it reacts. If you remove a node, the network will try to repair this connection. You can observe the size change of the cluster by entering *status* from time to time.
 

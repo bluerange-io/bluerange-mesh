@@ -136,6 +136,9 @@ void BootFruityMesh()
 	Terminal::getInstance().Init();
 	Logger::getInstance().Init(); 
 
+	//Initialize ConnectionManager
+	ConnectionManager::getInstance();
+	ConnectionManager::getInstance().Init();
 #ifdef SIM_ENABLED
 	cherrySimInstance->ChooseSimulatorTerminal(); //TODO: Maybe remove
 #endif
@@ -143,12 +146,14 @@ void BootFruityMesh()
 #if IS_INACTIVE(GW_SAVE_SPACE)
 	//Enable logging for some interesting log tags
 	Logger::getInstance().enableTag("MAIN");
+	Logger::getInstance().enableTag("INS");
 	Logger::getInstance().enableTag("NODE");
 	Logger::getInstance().enableTag("STORAGE");
 	Logger::getInstance().enableTag("FLASH"); //FLASHSTORAGE
 	Logger::getInstance().enableTag("DATA");
 	Logger::getInstance().enableTag("SEC");
 	Logger::getInstance().enableTag("HANDSHAKE");
+//	Logger::getInstance().enableTag("DECISION");
 //	Logger::getInstance().enableTag("DISCOVERY");
 	Logger::getInstance().enableTag("CONN");
 	Logger::getInstance().enableTag("STATES");
@@ -159,7 +164,7 @@ void BootFruityMesh()
 //	Logger::getInstance().enableTag("JOIN");
 	Logger::getInstance().enableTag("GATTCTRL");
 	Logger::getInstance().enableTag("CONN");
-	// Logger::getInstance().enableTag("CONN_DATA");
+//	Logger::getInstance().enableTag("CONN_DATA");
 	Logger::getInstance().enableTag("MACONN");
 	Logger::getInstance().enableTag("EINK");
 	Logger::getInstance().enableTag("RCONN");
@@ -182,22 +187,31 @@ void BootFruityMesh()
 //	Logger::getInstance().enableTag("CLCCOMM");
 //	Logger::getInstance().enableTag("VSMOD");
 	Logger::getInstance().enableTag("VSDBG");
-//	Logger::getInstance().enableTag("ASMOD");
+//	Logger::getInstance().enableTag("VSCOMM");
+	Logger::getInstance().enableTag("ASMOD");
 //	Logger::getInstance().enableTag("EVENTS");
 //	Logger::getInstance().enableTag("SC");
-	// Logger::getInstance().enableTag("WMCOMM");
-	// Logger::getInstance().enableTag("WMMOD");
+//	Logger::getInstance().enableTag("WMCOMM");
+//	Logger::getInstance().enableTag("WMMOD");
+//	Logger::getInstance().enableTag("BME");
+//	Logger::getInstance().enableTag("ADVS");
 #endif
 	
 	//Log the reboot reason to our ram log so that it is automatically queried by the sink
-	Logger::getInstance().logError(ErrorTypes::REBOOT, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1);
+	Logger::getInstance().logError(LoggingError::REBOOT, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1);
 	
 	//If the nordic secure dfu bootloader is enabled, disable it as soon as fruitymesh boots the first time
 #if IS_INACTIVE(GW_SAVE_SPACE)
 	FruityHal::disableHardwareDfuBootloader();
 #endif
 
-	logjson("MAIN", "{\"type\":\"reboot\",\"reason\":%u,\"code1\":%u,\"stack\":%u,\"version\":%u}" SEP, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1, GS->ramRetainStructPtr->stacktrace[0], FM_VERSION);
+	if (GS->ramRetainStructPtr->rebootReason == RebootReason::FACTORY_RESET_SUCCEEDED_FAILSAFE)
+	{
+		//The failsafe should not happen. If it does, it indicates to some implementation error.
+		SIMEXCEPTION(IllegalStateException);
+	}
+
+	logjson("MAIN", "{\"type\":\"reboot\",\"reason\":%u,\"code1\":%u,\"stack\":%u,\"version\":%u,\"blversion\":%u}" SEP, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1, GS->ramRetainStructPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion());
 
 	//Stacktrace can be evaluated using addr2line -e FruityMesh.out 1D3FF
 	//Note: Convert to hex first!
@@ -212,9 +226,9 @@ void BootFruityMesh()
 	FruityHal::InitializeButtons();
 
 #if IS_ACTIVE(BUTTONS)
-	ButtonEventHandler buttonHandler = DispatchButtonEvents;
+	FruityHal::ButtonEventHandler buttonHandler = DispatchButtonEvents;
 #else
-	ButtonEventHandler buttonHandler = nullptr;
+	FruityHal::ButtonEventHandler buttonHandler = nullptr;
 #endif
 
 	//Initialialize the SoftDevice and the BLE stack
@@ -223,15 +237,11 @@ void BootFruityMesh()
 			buttonHandler, FruityMeshErrorHandler,
 			BleStackErrorHandler, HardFaultErrorHandler);
 
-	FruityHal::GeneralHardwareError err = FruityHal::BleStackInit();
+	ErrorType err = FruityHal::BleStackInit();
 
 #ifdef SIM_ENABLED
-	if(err == FruityHal::GeneralHardwareError::SUCCESS) cherrySimInstance->currentNode->state.initialized = true; //TODO: Remove or move to FruityHal
+	if(err == ErrorType::SUCCESS) cherrySimInstance->currentNode->state.initialized = true; //TODO: Remove or move to FruityHal
 #endif
-
-	//Initialize NewStorage and RecordStorage
-	FlashStorage::getInstance();
-	RecordStorage::getInstance().InitialRepair();
 
 	//Initialize GAP and GATT
 	GAPController::getInstance().bleConfigureGAP();
@@ -239,8 +249,6 @@ void BootFruityMesh()
 	AdvertisingController::getInstance().Initialize();
 	ScanController::getInstance();
 
-	//Initialize ConnectionManager
-	ConnectionManager::getInstance();
 }
 
 void BootModules()
@@ -252,8 +260,10 @@ void BootModules()
 
 	//Instanciate all other modules as necessary
 
-	// Init app_timer in case any module is using it.
+	// Init timers in case any module is using it.
+#ifndef SIM_ENABLED
 	FruityHal::InitTimers();
+#endif
 
 	INITIALIZE_MODULES(true);
 
@@ -263,8 +273,9 @@ void BootModules()
 	}
 
 	//Configure a periodic timer that will call the TimerEventHandlers
+#ifndef SIM_ENABLED
 	FruityHal::StartTimers();
-
+#endif
 
 	GS->ramRetainStructPreviousBoot = *GS->ramRetainStructPtr;
 	FruityHal::ClearRebootReason();
@@ -430,11 +441,6 @@ void HardFaultErrorHandler(stacked_regs_t* stack)
 
     //1 Second delay to write out debug messages before reboot
 	FruityHal::DelayMs(1000);
-
-	//Protect against saving the fault if another fault was the case for this fault
-	if(GS->ramRetainStructPtr->rebootReason != RebootReason::UNKNOWN){
-		NVIC_SystemReset();
-	}
 
 	//Save the crashdump to the ramRetain struct so that we can evaluate it when rebooting
 	CheckedMemset((u8*)GS->ramRetainStructPtr, 0x00, sizeof(RamRetainStruct));

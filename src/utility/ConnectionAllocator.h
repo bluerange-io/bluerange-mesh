@@ -73,11 +73,11 @@ public:
 	static ConnectionAllocator& getInstance();
 
 
-	MeshConnection*       allocateMeshConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress, u16 partnerWriteCharacteristicHandle);
-	ResolverConnection*   allocateResolverConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress);
-	MeshAccessConnection* allocateMeshAccessConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress, u32 fmKeyId, MeshAccessTunnelType tunnelType);
+	MeshConnection*       allocateMeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, u16 partnerWriteCharacteristicHandle);
+	ResolverConnection*   allocateResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress);
+	MeshAccessConnection* allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, u32 fmKeyId, MeshAccessTunnelType tunnelType);
 #if IS_ACTIVE(CLC_CONN)
-	ClcAppConnection*     allocateClcAppConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress);
+	ClcAppConnection*     allocateClcAppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress);
 #endif
 
 	void deallocate(BaseConnection* bc);

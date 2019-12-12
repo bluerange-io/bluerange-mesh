@@ -1,7 +1,7 @@
-= ScanningModule (moduleId 2)
+= Scanning Module (ID 2)
 
 == Purpose
-The _ScanningModule_ is configurable with a number of filters that allow it to scan for advertising messages from other devices in the future. These can be smartphones or other BLE devices. Once such a message is scanned, it is processed and reported according to the filter rules such as:
+The _ScanningModule_ with _ModuleId_ 2 is configurable with a number of filters that allow it to scan for advertising messages from other devices in the future. These can be smartphones or other BLE devices. Once such a message is scanned, it is processed and reported according to the filter rules such as:
 
 * count the total number of scanned messages
 * report any found message

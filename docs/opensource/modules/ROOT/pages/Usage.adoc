@@ -1,7 +1,7 @@
 = Usage
+
 == LED Codes
-When a node is powered up, the red LED is flashing to signal that it is not connected. Once two nodes are connected to
-each other, they perform a handshake, which is signaled by a blue LED. Once they are connected and the handshake has taken place, they signal their connection with a single short green flash. The number of green flashes corresponds to the number of active connections to other nodes. If your hardware doesn't have colored LEDs, the LEDs are LED1 for red, LED2 for green and LED3 for blue.
+When a node is powered up, the red LED is flashing to signal that it is not connected. Once two nodes are connected to each other, they perform a handshake, which is signaled by a blue LED. Once they are connected and the handshake has taken place, they signal their connection with a single short green flash. The number of green flashes corresponds to the number of active connections to other nodes. If your hardware doesn't have colored LEDs, the LEDs are LED1 for red, LED2 for green and LED3 for blue.
 
 == Terminal Commands
 All classes can implement An interface called

@@ -66,11 +66,14 @@ extern "C" {
 #endif
 }
 
-
 #define APP_TIMER_PRESCALER     0 // Value of the RTC1 PRESCALER register
-#define APP_TIMER_MAX_TIMERS    1 //Maximum number of simultaneously created timers (2 + BSP_APP_TIMERS_NUMBER)
 #define APP_TIMER_OP_QUEUE_SIZE 1 //Size of timer operation queues
 
+#define APP_TIMER_MAX_TIMERS    5 //Maximum number of simultaneously created timers (2 + BSP_APP_TIMERS_NUMBER)
+
+#ifndef SIM_ENABLED
+static SimpleArray <app_timer_t, APP_TIMER_MAX_TIMERS> swTimers;
+#endif 
 
 //This tag is used to set the SoftDevice configuration and must be used when advertising or creating connections
 constexpr int BLE_CONN_CFG_TAG_FM = 1;
@@ -96,7 +99,30 @@ static u32 getramend(void)
 	return 0x20000000 + ram_total_size;
 }
 
-FruityHal::GeneralHardwareError FruityHal::BleStackInit()
+static inline FruityHal::BleGattEror nrfErrToGenericGatt(u32 code)
+{
+	if (code == BLE_GATT_STATUS_SUCCESS)
+	{
+		return FruityHal::BleGattEror::SUCCESS;
+	}
+	else if ((code == BLE_GATT_STATUS_ATTERR_INVALID) || (code == BLE_GATT_STATUS_ATTERR_INVALID_HANDLE))
+	{
+		return FruityHal::BleGattEror::UNKNOWN;
+	}
+	else
+	{
+		return FruityHal::BleGattEror(code - 0x0100);
+	}
+}
+
+static inline ErrorType nrfErrToGeneric(u32 code)
+{
+	//right now generic error has the same meaning and numering
+	//FIXME: This is not true
+	return (ErrorType)code;
+}
+
+ErrorType FruityHal::BleStackInit()
 {
 	u32 err = 0;
 
@@ -122,8 +148,8 @@ FruityHal::GeneralHardwareError FruityHal::BleStackInit()
 	CheckedMemset(&params, 0x00, sizeof(params));
 
 	//Configure the number of connections as peripheral and central
-	params.gap_enable_params.periph_conn_count = Conf::totalInConnections; //Number of connections as Peripheral
-	params.gap_enable_params.central_conn_count = Conf::totalOutConnections; //Number of connections as Central
+	params.gap_enable_params.periph_conn_count = GS->config.totalInConnections; //Number of connections as Peripheral
+	params.gap_enable_params.central_conn_count = GS->config.totalOutConnections; //Number of connections as Central
 
 	err = sd_ble_enable(&params, nullptr);
 #endif
@@ -191,19 +217,20 @@ FruityHal::GeneralHardwareError FruityHal::BleStackInit()
 
 	//After the SoftDevice was enabled, we need to specifiy that we want a high bandwidth configuration
 	// for both peripheral and central (6 packets for connInterval
-	ble_opt_t bw_opt;
-	bw_opt.common_opt.conn_bw.role               = BLE_GAP_ROLE_PERIPH;
-	bw_opt.common_opt.conn_bw.conn_bw.conn_bw_rx = BLE_CONN_BW_HIGH;
-	bw_opt.common_opt.conn_bw.conn_bw.conn_bw_tx = BLE_CONN_BW_HIGH;
-	err = sd_ble_opt_set(BLE_COMMON_OPT_CONN_BW, &bw_opt);
+	ble_opt_t opt;
+	CheckedMemset(&opt, 0x00, sizeof(opt));
+	opt.common_opt.conn_bw.role               = BLE_GAP_ROLE_PERIPH;
+	opt.common_opt.conn_bw.conn_bw.conn_bw_rx = BLE_CONN_BW_HIGH;
+	opt.common_opt.conn_bw.conn_bw.conn_bw_tx = BLE_CONN_BW_HIGH;
+	err = sd_ble_opt_set(BLE_COMMON_OPT_CONN_BW, &opt);
 	if(err != 0) logt("ERROR", "could not set bandwith %u", err);
 
-	bw_opt.common_opt.conn_bw.role               = BLE_GAP_ROLE_CENTRAL;
-	bw_opt.common_opt.conn_bw.conn_bw.conn_bw_rx = BLE_CONN_BW_HIGH;
-	bw_opt.common_opt.conn_bw.conn_bw.conn_bw_tx = BLE_CONN_BW_HIGH;
-	err = sd_ble_opt_set(BLE_COMMON_OPT_CONN_BW, &bw_opt);
+	CheckedMemset(&opt, 0x00, sizeof(opt));
+	opt.common_opt.conn_bw.role               = BLE_GAP_ROLE_CENTRAL;
+	opt.common_opt.conn_bw.conn_bw.conn_bw_rx = BLE_CONN_BW_HIGH;
+	opt.common_opt.conn_bw.conn_bw.conn_bw_tx = BLE_CONN_BW_HIGH;
+	err = sd_ble_opt_set(BLE_COMMON_OPT_CONN_BW, &opt);
 	if(err != 0) logt("ERROR", "could not set bandwith %u", err);
-
 
 #elif defined(NRF52)
 
@@ -212,20 +239,18 @@ FruityHal::GeneralHardwareError FruityHal::BleStackInit()
 
 	// Configure the clock source
     nrf_clock_lf_cfg_t clock_lf_cfg;
-    if(Boardconfig->lfClockSource == NRF_CLOCK_LF_SRC_XTAL){
-        clock_lf_cfg.source = NRF_CLOCK_LF_SRC_XTAL;
-        clock_lf_cfg.rc_ctiv = 0;
-        clock_lf_cfg.rc_temp_ctiv = 0;
+    if(Boardconfig->lfClockSource == NRF_CLOCK_LF_SRC_XTAL || Boardconfig->lfClockSource == NRF_CLOCK_LF_SRC_SYNTH){
+        clock_lf_cfg.source = Boardconfig->lfClockSource;
+        clock_lf_cfg.rc_ctiv = 0; //Must be 0 for this clock source
+        clock_lf_cfg.rc_temp_ctiv = 0; //Must be 0 for this clock source
+        clock_lf_cfg.accuracy = Boardconfig->lfClockAccuracy;
     } else {
+    	//Use the internal clock of the nrf52 with recommended settings
         clock_lf_cfg.source = NRF_CLOCK_LF_SRC_RC;
-        clock_lf_cfg.rc_ctiv = 16;
-        clock_lf_cfg.rc_temp_ctiv = 2;
+        clock_lf_cfg.rc_ctiv = 16; //recommended setting for nrf52
+        clock_lf_cfg.rc_temp_ctiv = 2; //recommended setting for nrf52
+        clock_lf_cfg.accuracy = NRF_CLOCK_LF_ACCURACY_500_PPM; //ppm of the internal clock source for all nrf52 (due to chip errata
     }
-#if defined(NRF52840)
-    clock_lf_cfg.accuracy = NRF_CLOCK_LF_ACCURACY_100_PPM;
-#else
-    clock_lf_cfg.accuracy = NRF_CLOCK_LF_ACCURACY_100_PPM;
-#endif
 
     //Enable SoftDevice using given clock source
     err = sd_softdevice_enable(&clock_lf_cfg, app_error_fault_handler);
@@ -247,7 +272,7 @@ FruityHal::GeneralHardwareError FruityHal::BleStackInit()
 	CheckedMemset(&ble_cfg, 0, sizeof(ble_cfg));
 	ble_cfg.conn_cfg.conn_cfg_tag                     = BLE_CONN_CFG_TAG_FM;
 	ble_cfg.conn_cfg.params.gap_conn_cfg.conn_count   = Conf::totalInConnections + Conf::totalOutConnections;
-	ble_cfg.conn_cfg.params.gap_conn_cfg.event_length = NRF_SDH_BLE_GAP_EVENT_LENGTH; //TODO: do some tests and put in config
+	ble_cfg.conn_cfg.params.gap_conn_cfg.event_length = 4; //4 units = 5ms (1.25ms steps) this is the time used to handle one connection
 
 	err = sd_ble_cfg_set(BLE_CONN_CFG_GAP, &ble_cfg, ram_start);
 	if(err){
@@ -280,14 +305,12 @@ FruityHal::GeneralHardwareError FruityHal::BleStackInit()
 	sd_ble_cfg_set(BLE_CONN_CFG_GATTC, &ble_cfg, ram_start);
 
 	// Configure the maximum ATT MTU.
-#if false
 	CheckedMemset(&ble_cfg, 0x00, sizeof(ble_cfg));
 	ble_cfg.conn_cfg.conn_cfg_tag                 = BLE_CONN_CFG_TAG_FM;
-	ble_cfg.conn_cfg.params.gatt_conn_cfg.att_mtu = BLE_GATT_ATT_MTU_DEFAULT;
+	ble_cfg.conn_cfg.params.gatt_conn_cfg.att_mtu = MAX_MTU_SIZE;
 
 	err = sd_ble_cfg_set(BLE_CONN_CFG_GATT, &ble_cfg, ram_start);
 	APP_ERROR_CHECK(err);
-#endif
 
 	// Configure number of custom UUIDS.
 	CheckedMemset(&ble_cfg, 0, sizeof(ble_cfg));
@@ -324,6 +347,17 @@ FruityHal::GeneralHardwareError FruityHal::BleStackInit()
 	logt("ERROR", "Err %u, Linker Ram section should be at %x, len %x", err, (u32)ram_start, (u32)(getramend() - ram_start));
 	APP_ERROR_CHECK(finalErr);
 	APP_ERROR_CHECK(err);
+
+
+	//We also configure connection event length extension to increase the throughput
+	ble_opt_t opt;
+	CheckedMemset(&opt, 0x00, sizeof(opt));
+	opt.common_opt.conn_evt_ext.enable = 1;
+
+	err = sd_ble_opt_set(BLE_COMMON_OPT_CONN_EVT_EXT, &opt);
+	if (err != 0) logt("ERROR", "Could not configure conn length extension %u", err);
+
+
 #endif //NRF52
 
 	//Enable DC/DC (needs external LC filter, cmp. nrf51 reference manual page 43)
@@ -336,19 +370,18 @@ FruityHal::GeneralHardwareError FruityHal::BleStackInit()
 	logt("ERROR", "sd_power_mode_set %u", err);
 	APP_ERROR_CHECK(err); //OK
 
-#if SDK != 15
-	//Set preferred TX power
-	err = sd_ble_gap_tx_power_set(Conf::defaultDBmTX);
+	err = (u32)FruityHal::RadioSetTxPower(Conf::defaultDBmTX, FruityHal::TxRole::SCAN_INIT, 0);
 	APP_ERROR_CHECK(err); //OK
-#else
-	err = sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_SCAN_INIT, 0, Conf::defaultDBmTX);
-	logt("ERROR", "sd_ble_gap_tx_power_set %u", err);
-	APP_ERROR_CHECK(err); //OK
-#endif
 
-	return (FruityHal::GeneralHardwareError)err;
+	return (ErrorType)err;
 }
 
+void FruityHal::BleStackDeinit()
+{
+#ifndef SIM_ENABLED
+	sd_softdevice_disable();
+#endif
+}
 
 /*
 	########################
@@ -444,7 +477,7 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 {
 	ble_evt_t& bleEvent = *((ble_evt_t*)eventVirtualPointer);
 	u16 eventId = bleEvent.header.evt_id;
-
+	u32 err;
 	if (eventId == BLE_GAP_EVT_ADV_REPORT || eventId == BLE_GAP_EVT_RSSI_CHANGED) {
 		logt("EVENTS2", "BLE EVENT %s (%d)", FruityHal::getBleEventNameString(eventId), eventId);
 	}
@@ -470,6 +503,17 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 	case BLE_GAP_EVT_ADV_REPORT:
 		{
 			GapAdvertisementReportEvent are(&bleEvent);
+#if (SDK == 15)
+			//In the later version of the SDK, we need to call sd_ble_gap_scan_start again with a nullpointer to continue to receive scan data
+			if (bleEvent.evt.gap_evt.params.adv_report.type.status != BLE_GAP_ADV_DATA_STATUS_INCOMPLETE_MORE_DATA)
+			{
+				ble_data_t scan_data;
+				scan_data.len = BLE_GAP_SCAN_BUFFER_MAX;
+				scan_data.p_data = GS->scanBuffer;
+				err = sd_ble_gap_scan_start(NULL, &scan_data);
+				APP_ERROR_CHECK(err);
+			}
+#endif
 #if IS_ACTIVE(FAKE_NODE_POSITIONS)
 			if (!GS->node.modifyEventForFakePositions(are))
 			{
@@ -488,7 +532,7 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 		break;
 	case BLE_GAP_EVT_CONNECTED:
 		{
-			GapConnectedEvent ce(&bleEvent);
+			FruityHal::GapConnectedEvent ce(&bleEvent);
 			GAPController::getInstance().GapConnectedEventHandler(ce);
 			AdvertisingController::getInstance().GapConnectedEventHandler(ce);
 			for (u32 i = 0; i < GS->amountOfModules; i++) {
@@ -500,7 +544,7 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 		break;
 	case BLE_GAP_EVT_DISCONNECTED:
 		{
-			GapDisconnectedEvent de(&bleEvent);
+			FruityHal::GapDisconnectedEvent de(&bleEvent);
 			GAPController::getInstance().GapDisconnectedEventHandler(de);
 			AdvertisingController::getInstance().GapDisconnectedEventHandler(de);
 			for (u32 i = 0; i < GS->amountOfModules; i++) {
@@ -512,19 +556,19 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 		break;
 	case BLE_GAP_EVT_TIMEOUT:
 		{
-			GapTimeoutEvent gte(&bleEvent);
+			FruityHal::GapTimeoutEvent gte(&bleEvent);
 			GAPController::getInstance().GapTimeoutEventHandler(gte);
 		}
 		break;
 	case BLE_GAP_EVT_SEC_INFO_REQUEST:
 		{
-			GapSecurityInfoRequestEvent sire(&bleEvent);
+			FruityHal::GapSecurityInfoRequestEvent sire(&bleEvent);
 			GAPController::getInstance().GapSecurityInfoRequestEvenetHandler(sire);
 		}
 		break;
 	case BLE_GAP_EVT_CONN_SEC_UPDATE:
 		{
-			GapConnectionSecurityUpdateEvent csue(&bleEvent);
+			FruityHal::GapConnectionSecurityUpdateEvent csue(&bleEvent);
 			GAPController::getInstance().GapConnectionSecurityUpdateEventHandler(csue);
 		}
 		break;
@@ -533,25 +577,25 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 #ifdef SIM_ENABLED
 			//if(cherrySimInstance->currentNode->id == 37 && bleEvent.evt.gattc_evt.conn_handle == 680) printf("%04u Q@NODE %u EVT_WRITE_RSP received" EOL, cherrySimInstance->globalBreakCounter++, cherrySimInstance->currentNode->id);
 #endif
-			GattcWriteResponseEvent wre(&bleEvent);
+			FruityHal::GattcWriteResponseEvent wre(&bleEvent);
 			ConnectionManager::getInstance().GattcWriteResponseEventHandler(wre);
 		}
 		break;
 	case BLE_GATTC_EVT_TIMEOUT: //jstodo untested event
 		{
-			GattcTimeoutEvent gte(&bleEvent);
+			FruityHal::GattcTimeoutEvent gte(&bleEvent);
 			ConnectionManager::getInstance().GattcTimeoutEventHandler(gte);
 		}
 		break;
 	case BLE_GATTS_EVT_WRITE:
 		{
-			GattsWriteEvent gwe(&bleEvent);
+			FruityHal::GattsWriteEvent gwe(&bleEvent);
 			ConnectionManager::getInstance().GattsWriteEventHandler(gwe);
 		}
 		break;
 	case BLE_GATTC_EVT_HVX:
 		{
-			GattcHandleValueEvent hve(&bleEvent);	
+			FruityHal::GattcHandleValueEvent hve(&bleEvent);	
 			ConnectionManager::getInstance().GattcHandleValueEventHandler(hve);
 		}
 		break;
@@ -565,7 +609,7 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 #ifdef SIM_ENABLED
 			//if (cherrySimInstance->currentNode->id == 37 && bleEvent.evt.common_evt.conn_handle == 680) printf("%04u Q@NODE %u WRITE_CMD_TX_COMPLETE %u received" EOL, cherrySimInstance->globalBreakCounter++, cherrySimInstance->currentNode->id, bleEvent.evt.common_evt.params.tx_complete.count);
 #endif
-			GattDataTransmittedEvent gdte(&bleEvent);
+			FruityHal::GattDataTransmittedEvent gdte(&bleEvent);
 			ConnectionManager::getInstance().GattDataTransmittedEventHandler(gdte);
 			for (int i = 0; i < MAX_MODULE_COUNT; i++) {
 				if (GS->activeModules[i] != nullptr
@@ -585,31 +629,55 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 		   to deal with them here. */
 
 #if defined(NRF52)
-#ifndef NRF52840
-	case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
-		{
-			ble_gap_phys_t phy;
-			phy.rx_phys = BLE_GAP_PHY_1MBPS;
-			phy.tx_phys = BLE_GAP_PHY_1MBPS;
-
-			sd_ble_gap_phy_update(bleEvent.evt.gap_evt.conn_handle, &phy);
-		}
-		break;
-#endif
 	case BLE_GAP_EVT_DATA_LENGTH_UPDATE_REQUEST:
-		{
-			sd_ble_gap_data_length_update(bleEvent.evt.gap_evt.conn_handle, nullptr, nullptr);
-		}
-		break;
-#endif
-#ifdef NRF52
+	{
+		//We automatically answer all data length update requests
+		//The softdevice will chose the parameters so that our configured MAX_MTU_SIZE fits into a link layer packet
+		sd_ble_gap_data_length_update(bleEvent.evt.gap_evt.conn_handle, nullptr, nullptr);
+	}
+	break;
+
+	case BLE_GAP_EVT_DATA_LENGTH_UPDATE:
+	{
+		ble_gap_evt_data_length_update_t* params = (ble_gap_evt_data_length_update_t*) &bleEvent.evt.gap_evt.params.data_length_update;
+
+		logt("FH", "DLE Result: rx %u/%u, tx %u/%u",
+				params->effective_params.max_rx_octets,
+				params->effective_params.max_rx_time_us,
+				params->effective_params.max_tx_octets,
+				params->effective_params.max_tx_time_us);
+
+		// => We do not notify the application and can assume that it worked if the other device has enough resources
+		//    If it does not work, this link will have a slightly reduced throughput, so this is monitored in another place
+	}
+	break;
+
 	case BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST:
 	{
-		//Use default MTU if requested
-		sd_ble_gatts_exchange_mtu_reply(bleEvent.evt.gatts_evt.conn_handle, BLE_GATT_ATT_MTU_DEFAULT);
+		//We answer all MTU update requests with our max mtu that was configured
+		u32 err = sd_ble_gatts_exchange_mtu_reply(bleEvent.evt.gatts_evt.conn_handle, MAX_MTU_SIZE);
+
+		u16 partnerMtu = bleEvent.evt.gatts_evt.params.exchange_mtu_request.client_rx_mtu;
+		u16 effectiveMtu = MAX_MTU_SIZE < partnerMtu ? MAX_MTU_SIZE : partnerMtu;
+
+		logt("FH", "Reply MTU Exchange (%u) on conn %u with %u", err, bleEvent.evt.gatts_evt.conn_handle, effectiveMtu);
+
+		ConnectionManager::getInstance().MtuUpdatedHandler(bleEvent.evt.gatts_evt.conn_handle, effectiveMtu);
 
 		break;
 	}
+
+	case BLE_GATTC_EVT_EXCHANGE_MTU_RSP:
+	{
+		u16 partnerMtu = bleEvent.evt.gattc_evt.params.exchange_mtu_rsp.server_rx_mtu;
+		u16 effectiveMtu = MAX_MTU_SIZE < partnerMtu ? MAX_MTU_SIZE : partnerMtu;
+
+		logt("FH", "MTU for hnd %u updated to %u", bleEvent.evt.gattc_evt.conn_handle, effectiveMtu);
+
+		ConnectionManager::getInstance().MtuUpdatedHandler(bleEvent.evt.gattc_evt.conn_handle, effectiveMtu);
+	}
+	break;
+
 #endif
 	case BLE_GATTS_EVT_SYS_ATTR_MISSING:	//jstodo untested event
 		{
@@ -619,7 +687,20 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 			logt("ERROR", "SysAttr %u", err);
 		}
 		break;
+#ifdef NRF52
+	case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
+		{
+			//Required for some iOS devices. 
+			ble_gap_phys_t phy;
+			phy.rx_phys = BLE_GAP_PHY_1MBPS;
+			phy.tx_phys = BLE_GAP_PHY_1MBPS;
+
+			sd_ble_gap_phy_update(bleEvent.evt.gap_evt.conn_handle, &phy);
+		}
+		break;
+#endif
 	}
+
 
 	if (eventId == BLE_GAP_EVT_ADV_REPORT || eventId == BLE_GAP_EVT_RSSI_CHANGED) {
 		logt("EVENTS2", "End of event");
@@ -631,7 +712,7 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 
 static ble_evt_t* currentEvent = nullptr;
 
-GapConnParamUpdateEvent::GapConnParamUpdateEvent(void* _evt)
+FruityHal::GapConnParamUpdateEvent::GapConnParamUpdateEvent(void* _evt)
 	:GapEvent(_evt)
 {
 	if (currentEvent->header.evt_id != BLE_GAP_EVT_CONN_PARAM_UPDATE)
@@ -640,22 +721,22 @@ GapConnParamUpdateEvent::GapConnParamUpdateEvent(void* _evt)
 	}
 }
 
-GapEvent::GapEvent(void* _evt)
+FruityHal::GapEvent::GapEvent(void* _evt)
 	: BleEvent(_evt)
 {
 }
 
-u16 GapEvent::getConnectionHandle() const
+u16 FruityHal::GapEvent::getConnectionHandle() const
 {
 	return currentEvent->evt.gap_evt.conn_handle;
 }
 
-u16 GapConnParamUpdateEvent::getMaxConnectionInterval() const
+u16 FruityHal::GapConnParamUpdateEvent::getMaxConnectionInterval() const
 {
 	return currentEvent->evt.gap_evt.params.conn_param_update.conn_params.max_conn_interval;
 }
 
-GapRssiChangedEvent::GapRssiChangedEvent(void* _evt)
+FruityHal::GapRssiChangedEvent::GapRssiChangedEvent(void* _evt)
 	:GapEvent(_evt)
 {
 	if (currentEvent->header.evt_id != BLE_GAP_EVT_RSSI_CHANGED)
@@ -664,12 +745,12 @@ GapRssiChangedEvent::GapRssiChangedEvent(void* _evt)
 	}
 }
 
-i8 GapRssiChangedEvent::getRssi() const
+i8 FruityHal::GapRssiChangedEvent::getRssi() const
 {
 	return currentEvent->evt.gap_evt.params.rssi_changed.rssi;
 }
 
-GapAdvertisementReportEvent::GapAdvertisementReportEvent(void* _evt)
+FruityHal::GapAdvertisementReportEvent::GapAdvertisementReportEvent(void* _evt)
 	:GapEvent(_evt)
 {
 	if (currentEvent->header.evt_id != BLE_GAP_EVT_ADV_REPORT)
@@ -678,7 +759,7 @@ GapAdvertisementReportEvent::GapAdvertisementReportEvent(void* _evt)
 	}
 }
 
-i8 GapAdvertisementReportEvent::getRssi() const
+i8 FruityHal::GapAdvertisementReportEvent::getRssi() const
 {
 #if IS_ACTIVE(FAKE_NODE_POSITIONS)
 	if (fakeRssiSet) {
@@ -688,7 +769,7 @@ i8 GapAdvertisementReportEvent::getRssi() const
 	return currentEvent->evt.gap_evt.params.adv_report.rssi;
 }
 
-const u8 * GapAdvertisementReportEvent::getData() const
+const u8 * FruityHal::GapAdvertisementReportEvent::getData() const
 {
 #if (SDK == 15)
 	return currentEvent->evt.gap_evt.params.adv_report.data.p_data;
@@ -697,7 +778,7 @@ const u8 * GapAdvertisementReportEvent::getData() const
 #endif
 }
 
-u32 GapAdvertisementReportEvent::getDataLength() const
+u32 FruityHal::GapAdvertisementReportEvent::getDataLength() const
 {
 #if (SDK == 15)
 	return currentEvent->evt.gap_evt.params.adv_report.data.len;
@@ -706,17 +787,17 @@ u32 GapAdvertisementReportEvent::getDataLength() const
 #endif
 }
 
-const u8 * GapAdvertisementReportEvent::getPeerAddr() const
+const u8 * FruityHal::GapAdvertisementReportEvent::getPeerAddr() const
 {
 	return currentEvent->evt.gap_evt.params.adv_report.peer_addr.addr;
 }
 
-u8 GapAdvertisementReportEvent::getPeerAddrType() const
+FruityHal::BleGapAddrType FruityHal::GapAdvertisementReportEvent::getPeerAddrType() const
 {
-	return currentEvent->evt.gap_evt.params.adv_report.peer_addr.addr_type;
+	return (BleGapAddrType)currentEvent->evt.gap_evt.params.adv_report.peer_addr.addr_type;
 }
 
-bool GapAdvertisementReportEvent::isConnectable() const
+bool FruityHal::GapAdvertisementReportEvent::isConnectable() const
 {
 #if (SDK == 15)
 	return currentEvent->evt.gap_evt.params.adv_report.type.connectable == 0x01;
@@ -733,7 +814,7 @@ void AdvertisementReportEvent::setFakeRssi(i8 rssi)
 }
 #endif
 
-BleEvent::BleEvent(void *_evt)
+FruityHal::BleEvent::BleEvent(void *_evt)
 {
 	if (currentEvent != nullptr) {
 		//This is thrown if two events are processed at the same time, which is illegal.
@@ -743,13 +824,13 @@ BleEvent::BleEvent(void *_evt)
 }
 
 #ifdef SIM_ENABLED
-BleEvent::~BleEvent()
+FruityHal::BleEvent::~BleEvent()
 {
 	currentEvent = nullptr;
 }
 #endif
 
-GapConnectedEvent::GapConnectedEvent(void* _evt)
+FruityHal::GapConnectedEvent::GapConnectedEvent(void* _evt)
 	:GapEvent(_evt)
 {
 	if (currentEvent->header.evt_id != BLE_GAP_EVT_CONNECTED)
@@ -758,27 +839,27 @@ GapConnectedEvent::GapConnectedEvent(void* _evt)
 	}
 }
 
-GapRole GapConnectedEvent::getRole() const
+FruityHal::GapRole FruityHal::GapConnectedEvent::getRole() const
 {
 	return (GapRole)(currentEvent->evt.gap_evt.params.connected.role);
 }
 
-u8 GapConnectedEvent::getPeerAddrType() const
+u8 FruityHal::GapConnectedEvent::getPeerAddrType() const
 {
 	return (currentEvent->evt.gap_evt.params.connected.peer_addr.addr_type);
 }
 
-u16 GapConnectedEvent::getMinConnectionInterval() const
+u16 FruityHal::GapConnectedEvent::getMinConnectionInterval() const
 {
 	return currentEvent->evt.gap_evt.params.connected.conn_params.min_conn_interval;
 }
 
-const u8 * GapConnectedEvent::getPeerAddr() const
+const u8 * FruityHal::GapConnectedEvent::getPeerAddr() const
 {
 	return (currentEvent->evt.gap_evt.params.connected.peer_addr.addr);
 }
 
-GapDisconnectedEvent::GapDisconnectedEvent(void* _evt)
+FruityHal::GapDisconnectedEvent::GapDisconnectedEvent(void* _evt)
 	: GapEvent(_evt)
 {
 	if (currentEvent->header.evt_id != BLE_GAP_EVT_DISCONNECTED)
@@ -787,12 +868,12 @@ GapDisconnectedEvent::GapDisconnectedEvent(void* _evt)
 	}
 }
 
-u8 GapDisconnectedEvent::getReason() const
+FruityHal::BleHciError FruityHal::GapDisconnectedEvent::getReason() const
 {
-	return currentEvent->evt.gap_evt.params.disconnected.reason;
+	return (FruityHal::BleHciError)currentEvent->evt.gap_evt.params.disconnected.reason;
 }
 
-GapTimeoutEvent::GapTimeoutEvent(void* _evt)
+FruityHal::GapTimeoutEvent::GapTimeoutEvent(void* _evt)
 	: GapEvent(_evt)
 {
 	if (currentEvent->header.evt_id != BLE_GAP_EVT_TIMEOUT)
@@ -801,12 +882,42 @@ GapTimeoutEvent::GapTimeoutEvent(void* _evt)
 	}
 }
 
-GapTimeoutSource GapTimeoutEvent::getSource() const
+FruityHal::GapTimeoutSource FruityHal::GapTimeoutEvent::getSource() const
 {
-	return (GapTimeoutSource)(currentEvent->evt.gap_evt.params.timeout.src);
+#if defined(NRF51) || defined(SIM_ENABLED)
+	switch (currentEvent->evt.gap_evt.params.timeout.src)
+	{
+	case BLE_GAP_TIMEOUT_SRC_ADVERTISING:
+		return GapTimeoutSource::ADVERTISING;
+	case BLE_GAP_TIMEOUT_SRC_SECURITY_REQUEST:
+		return GapTimeoutSource::SECURITY_REQUEST;
+	case BLE_GAP_TIMEOUT_SRC_SCAN:
+		return GapTimeoutSource::SCAN;
+	case BLE_GAP_TIMEOUT_SRC_CONN:
+		return GapTimeoutSource::CONNECTION;
+	default:
+		return GapTimeoutSource::INVALID;
+	}
+#elif defined(NRF52)
+	switch (currentEvent->evt.gap_evt.params.timeout.src)
+	{
+#if (SDK != 15)
+	case BLE_GAP_TIMEOUT_SRC_ADVERTISING:
+		return GapTimeoutSource::ADVERTISING;
+#endif
+	case BLE_GAP_TIMEOUT_SRC_SCAN:
+		return GapTimeoutSource::SCAN;
+	case BLE_GAP_TIMEOUT_SRC_CONN:
+		return GapTimeoutSource::CONNECTION;
+	case BLE_GAP_TIMEOUT_SRC_AUTH_PAYLOAD:
+		return GapTimeoutSource::AUTH_PAYLOAD;
+	default:
+		return GapTimeoutSource::INVALID;
+	}
+#endif
 }
 
-GapSecurityInfoRequestEvent::GapSecurityInfoRequestEvent(void* _evt)
+FruityHal::GapSecurityInfoRequestEvent::GapSecurityInfoRequestEvent(void* _evt)
 	: GapEvent(_evt)
 {
 	if (currentEvent->header.evt_id != BLE_GAP_EVT_SEC_INFO_REQUEST)
@@ -815,7 +926,7 @@ GapSecurityInfoRequestEvent::GapSecurityInfoRequestEvent(void* _evt)
 	}
 }
 
-GapConnectionSecurityUpdateEvent::GapConnectionSecurityUpdateEvent(void* _evt)
+FruityHal::GapConnectionSecurityUpdateEvent::GapConnectionSecurityUpdateEvent(void* _evt)
 	: GapEvent(_evt)
 {
 	if (currentEvent->header.evt_id != BLE_GAP_EVT_CONN_SEC_UPDATE)
@@ -824,37 +935,37 @@ GapConnectionSecurityUpdateEvent::GapConnectionSecurityUpdateEvent(void* _evt)
 	}
 }
 
-u8 GapConnectionSecurityUpdateEvent::getKeySize() const
+u8 FruityHal::GapConnectionSecurityUpdateEvent::getKeySize() const
 {
 	return currentEvent->evt.gap_evt.params.conn_sec_update.conn_sec.encr_key_size;
 }
 
-SecurityLevel GapConnectionSecurityUpdateEvent::getSecurityLevel() const
+FruityHal::SecurityLevel FruityHal::GapConnectionSecurityUpdateEvent::getSecurityLevel() const
 {
-	return (SecurityLevel)(currentEvent->evt.gap_evt.params.conn_sec_update.conn_sec.sec_mode.lv);
+	return (FruityHal::SecurityLevel)(currentEvent->evt.gap_evt.params.conn_sec_update.conn_sec.sec_mode.lv);
 }
 
-SecurityMode GapConnectionSecurityUpdateEvent::getSecurityMode() const
+FruityHal::SecurityMode FruityHal::GapConnectionSecurityUpdateEvent::getSecurityMode() const
 {
-	return (SecurityMode)(currentEvent->evt.gap_evt.params.conn_sec_update.conn_sec.sec_mode.sm);
+	return (FruityHal::SecurityMode)(currentEvent->evt.gap_evt.params.conn_sec_update.conn_sec.sec_mode.sm);
 }
 
-GattcEvent::GattcEvent(void* _evt)
+FruityHal::GattcEvent::GattcEvent(void* _evt)
 	: BleEvent(_evt)
 {
 }
 
-u16 GattcEvent::getConnectionHandle() const
+u16 FruityHal::GattcEvent::getConnectionHandle() const
 {
 	return currentEvent->evt.gattc_evt.conn_handle;
 }
 
-u16 GattcEvent::getGattStatus() const
+FruityHal::BleGattEror FruityHal::GattcEvent::getGattStatus() const
 {
-	return currentEvent->evt.gattc_evt.gatt_status;
+	return nrfErrToGenericGatt(currentEvent->evt.gattc_evt.gatt_status);
 }
 
-GattcWriteResponseEvent::GattcWriteResponseEvent(void* _evt)
+FruityHal::GattcWriteResponseEvent::GattcWriteResponseEvent(void* _evt)
 	: GattcEvent(_evt)
 {
 	if (currentEvent->header.evt_id != BLE_GATTC_EVT_WRITE_RSP)
@@ -863,7 +974,7 @@ GattcWriteResponseEvent::GattcWriteResponseEvent(void* _evt)
 	}
 }
 
-GattcTimeoutEvent::GattcTimeoutEvent(void* _evt)
+FruityHal::GattcTimeoutEvent::GattcTimeoutEvent(void* _evt)
 	: GattcEvent(_evt)
 {
 	if (currentEvent->header.evt_id != BLE_GATTC_EVT_TIMEOUT)
@@ -872,7 +983,7 @@ GattcTimeoutEvent::GattcTimeoutEvent(void* _evt)
 	}
 }
 
-GattDataTransmittedEvent::GattDataTransmittedEvent(void* _evt)
+FruityHal::GattDataTransmittedEvent::GattDataTransmittedEvent(void* _evt)
 	:BleEvent(_evt)
 {
 #if defined(NRF51) || defined(SIM_ENABLED)
@@ -883,7 +994,7 @@ GattDataTransmittedEvent::GattDataTransmittedEvent(void* _evt)
 #endif
 }
 
-u16 GattDataTransmittedEvent::getConnectionHandle() const
+u16 FruityHal::GattDataTransmittedEvent::getConnectionHandle() const
 {
 #if defined(NRF51) || defined(SIM_ENABLED)
 	return currentEvent->evt.common_evt.conn_handle;
@@ -899,12 +1010,12 @@ u16 GattDataTransmittedEvent::getConnectionHandle() const
 #endif
 }
 
-bool GattDataTransmittedEvent::isConnectionHandleValid() const
+bool FruityHal::GattDataTransmittedEvent::isConnectionHandleValid() const
 {
 	return getConnectionHandle() != BLE_CONN_HANDLE_INVALID;
 }
 
-u32 GattDataTransmittedEvent::getCompleteCount() const
+u32 FruityHal::GattDataTransmittedEvent::getCompleteCount() const
 {
 #if defined(NRF51) || defined(SIM_ENABLED)
 	return currentEvent->evt.common_evt.params.tx_complete.count;
@@ -920,7 +1031,7 @@ u32 GattDataTransmittedEvent::getCompleteCount() const
 #endif
 }
 
-GattsWriteEvent::GattsWriteEvent(void* _evt)
+FruityHal::GattsWriteEvent::GattsWriteEvent(void* _evt)
 	: BleEvent(_evt)
 {
 	if (currentEvent->header.evt_id != BLE_GATTS_EVT_WRITE)
@@ -929,32 +1040,32 @@ GattsWriteEvent::GattsWriteEvent(void* _evt)
 	}
 }
 
-u16 GattsWriteEvent::getAttributeHandle() const
+u16 FruityHal::GattsWriteEvent::getAttributeHandle() const
 {
 	return currentEvent->evt.gatts_evt.params.write.handle;
 }
 
-bool GattsWriteEvent::isWriteRequest() const
+bool FruityHal::GattsWriteEvent::isWriteRequest() const
 {
 	return currentEvent->evt.gatts_evt.params.write.op == BLE_GATTS_OP_WRITE_REQ;
 }
 
-u16 GattsWriteEvent::getLength() const
+u16 FruityHal::GattsWriteEvent::getLength() const
 {
 	return currentEvent->evt.gatts_evt.params.write.len;
 }
 
-u16 GattsWriteEvent::getConnectionHandle() const
+u16 FruityHal::GattsWriteEvent::getConnectionHandle() const
 {
 	return currentEvent->evt.gatts_evt.conn_handle;
 }
 
-u8 * GattsWriteEvent::getData() const
+u8 * FruityHal::GattsWriteEvent::getData() const
 {
 	return (u8*)currentEvent->evt.gatts_evt.params.write.data;
 }
 
-GattcHandleValueEvent::GattcHandleValueEvent(void* _evt)
+FruityHal::GattcHandleValueEvent::GattcHandleValueEvent(void* _evt)
 	:GattcEvent(_evt)
 {
 	if (currentEvent->header.evt_id != BLE_GATTC_EVT_HVX)
@@ -963,17 +1074,17 @@ GattcHandleValueEvent::GattcHandleValueEvent(void* _evt)
 	}
 }
 
-u16 GattcHandleValueEvent::getHandle() const
+u16 FruityHal::GattcHandleValueEvent::getHandle() const
 {
 	return currentEvent->evt.gattc_evt.params.hvx.handle;
 }
 
-u16 GattcHandleValueEvent::getLength() const
+u16 FruityHal::GattcHandleValueEvent::getLength() const
 {
 	return currentEvent->evt.gattc_evt.params.hvx.len;
 }
 
-u8 * GattcHandleValueEvent::getData() const
+u8 * FruityHal::GattcHandleValueEvent::getData() const
 {
 	return currentEvent->evt.gattc_evt.params.hvx.data;
 }
@@ -989,11 +1100,11 @@ u8 * GattcHandleValueEvent::getData() const
 
 #define __________________GAP____________________
 
-u32 FruityHal::BleGapAddressSet(fh_ble_gap_addr_t const *address)
+u32 FruityHal::BleGapAddressSet(FruityHal::BleGapAddr const *address)
 {
 	ble_gap_addr_t addr;
-	memcpy(addr.addr, address->addr, FH_BLE_GAP_ADDR_LEN);
-	addr.addr_type = address->addr_type;
+	CheckedMemcpy(addr.addr, address->addr, FH_BLE_GAP_ADDR_LEN);
+	addr.addr_type = (u8)address->addr_type;
 
 #if defined(NRF51) || defined(SIM_ENABLED)
 	u32 err = sd_ble_gap_address_set(BLE_GAP_ADDR_CYCLE_MODE_NONE, &addr);
@@ -1005,7 +1116,7 @@ u32 FruityHal::BleGapAddressSet(fh_ble_gap_addr_t const *address)
 	return err;
 }
 
-u32 FruityHal::BleGapAddressGet(fh_ble_gap_addr_t *address)
+u32 FruityHal::BleGapAddressGet(FruityHal::BleGapAddr *address)
 {
 	u32 err;
 	ble_gap_addr_t p_addr;
@@ -1017,8 +1128,8 @@ u32 FruityHal::BleGapAddressGet(fh_ble_gap_addr_t *address)
 #endif
 
 	if(err == NRF_SUCCESS){
-		memcpy(address->addr, p_addr.addr, FH_BLE_GAP_ADDR_LEN);
-		address->addr_type = p_addr.addr_type;
+		CheckedMemcpy(address->addr, p_addr.addr, FH_BLE_GAP_ADDR_LEN);
+		address->addr_type = (BleGapAddrType)p_addr.addr_type;
 	}
 
 	logt("FH", "Gap Addr Get (%u)", err);
@@ -1026,37 +1137,25 @@ u32 FruityHal::BleGapAddressGet(fh_ble_gap_addr_t *address)
 	return err;
 }
 
-#if (SDK == 15)
-u32 FruityHal::BleGapScanStart(fh_ble_gap_scan_params_t const *scanParams, u8 * p_scanBuffer)
+ErrorType FruityHal::BleGapScanStart(BleGapScanParams const *scanParams)
 {
 	u32 err;
-	ble_data_t scan_data;
-	scan_data.len = BLE_GAP_SCAN_BUFFER_MAX;
-	scan_data.p_data = p_scanBuffer;
 	ble_gap_scan_params_t scan_params;
+	CheckedMemset(&scan_params, 0x00, sizeof(ble_gap_scan_params_t));
+
 	scan_params.active = 0;
 	scan_params.interval = scanParams->interval;
 	scan_params.timeout = scanParams->timeout;
 	scan_params.window = scanParams->window;
+
+#if (SDK == 15)	
 	scan_params.report_incomplete_evts = 0;
 	scan_params.filter_policy = BLE_GAP_SCAN_FP_ACCEPT_ALL;
 	scan_params.extended = 0;
-	CheckedMemset(scan_params.channel_mask, 0, sizeof(u8) * 5);
-
-	err = sd_ble_gap_scan_start(&scan_params, &scan_data);
-	logt("FH", "Scan start(%u) iv %u, w %u", err, scan_params.interval, scan_params.window);
-	return err;
-}
+	scan_params.scan_phys = BLE_GAP_PHY_1MBPS;
+	scan_params.timeout = scanParams->timeout * 100; //scanTimeout is now in ms since SDK15 instead of seconds
+	CheckedMemset(scan_params.channel_mask, 0, sizeof(ble_gap_ch_mask_t));
 #else
-u32 FruityHal::BleGapScanStart(fh_ble_gap_scan_params_t const *scanParams)
-{
-	u32 err;
-	ble_gap_scan_params_t scan_params;
-	scan_params.active = 0;
-	scan_params.interval = scanParams->interval;
-	scan_params.timeout = scanParams->timeout;
-	scan_params.window = scanParams->window;
-
 #if defined(NRF51) || defined(SIM_ENABLED)
 	scan_params.p_whitelist = nullptr;
 	scan_params.selective = 0;
@@ -1064,39 +1163,71 @@ u32 FruityHal::BleGapScanStart(fh_ble_gap_scan_params_t const *scanParams)
 	scan_params.adv_dir_report = 0;
 	scan_params.use_whitelist = 0;
 #endif
-
-
-	err = sd_ble_gap_scan_start(&scan_params);
-	logt("FH", "Scan start(%u) iv %u, w %u", err, scan_params.interval, scan_params.window);
-	return err;
-}
 #endif
 
+#if (SDK == 15)
+	ble_data_t scan_data;
+	scan_data.len = BLE_GAP_SCAN_BUFFER_MAX;
+	scan_data.p_data = GS->scanBuffer;
+	err = sd_ble_gap_scan_start(&scan_params, &scan_data);
+#else
+	err = sd_ble_gap_scan_start(&scan_params);
+#endif
+	logt("FH", "Scan start(%u) iv %u, w %u, t %u", err, scan_params.interval, scan_params.window, scan_params.timeout);
+	return nrfErrToGeneric(err);
+}
 
-u32 FruityHal::BleGapScanStop()
+
+ErrorType FruityHal::BleGapScanStop()
 {
 	u32 err = sd_ble_gap_scan_stop();
 	logt("FH", "Scan stop(%u)", err);
-	return err;
+	return nrfErrToGeneric(err);
 }
 
+ErrorType FruityHal::BleGapAdvStart(u8 advHandle, BleGapAdvParams const *advParams)
+{
+	u32 err;
 #if (SDK == 15)
-u32 FruityHal::BleGapAdvDataSet(u8 * p_advHandle, fh_ble_gap_adv_params_t const * p_advParams, const u8 *advData, u8 advDataLength, const u8 *scanData, u8 scanDataLength)
+	err = sd_ble_gap_adv_start(advHandle, BLE_CONN_CFG_TAG_FM);
+	logt("FH", "Adv start (%u)", err);
+#else      
+	ble_gap_adv_params_t adv_params;
+	adv_params.channel_mask.ch_37_off = advParams->channelMask.ch37Off;
+	adv_params.channel_mask.ch_38_off = advParams->channelMask.ch38Off;
+	adv_params.channel_mask.ch_39_off= advParams->channelMask.ch39Off;
+	adv_params.fp = BLE_GAP_ADV_FP_ANY;
+	adv_params.interval = advParams->interval;
+	adv_params.p_peer_addr = nullptr;
+	adv_params.timeout = advParams->timeout;
+	adv_params.type = (u8)advParams->type;
+#if defined(NRF51) || defined(SIM_ENABLED)
+	err = sd_ble_gap_adv_start(&adv_params);
+#elif defined(NRF52)
+	err = sd_ble_gap_adv_start(&adv_params, BLE_CONN_CFG_TAG_FM);
+#endif
+	logt("FH", "Adv start (%u) typ %u, iv %u, mask %u", err, adv_params.type, adv_params.interval, *((u8*)&adv_params.channel_mask));
+#endif
+	return nrfErrToGeneric(err);
+}
+
+ErrorType FruityHal::BleGapAdvDataSet(u8 * p_advHandle, BleGapAdvParams const * p_advParams, u8 *advData, u8 advDataLength, u8 *scanData, u8 scanDataLength)
 {
 	u32 err = 0;
+#if (SDK == 15)
 	ble_gap_adv_params_t adv_params;
 	ble_gap_adv_data_t adv_data;
 	CheckedMemset(&adv_params, 0, sizeof(adv_params));
 	CheckedMemset(&adv_data, 0, sizeof(adv_data));
 	if (p_advParams != nullptr)	{
-		adv_params.channel_mask[4] |= (p_advParams->channel_mask.ch_37_off << 5);
-		adv_params.channel_mask[4] |= (p_advParams->channel_mask.ch_38_off << 6);
-		adv_params.channel_mask[4] |= (p_advParams->channel_mask.ch_39_off << 7);
+		adv_params.channel_mask[4] |= (p_advParams->channelMask.ch37Off << 5);
+		adv_params.channel_mask[4] |= (p_advParams->channelMask.ch38Off << 6);
+		adv_params.channel_mask[4] |= (p_advParams->channelMask.ch39Off << 7);
 		adv_params.filter_policy = BLE_GAP_ADV_FP_ANY;
 		adv_params.interval = p_advParams->interval;
 		adv_params.p_peer_addr = nullptr;
 		adv_params.duration = p_advParams->timeout;
-		adv_params.properties.type = (uint8_t)p_advParams->type;
+		adv_params.properties.type = (u8)p_advParams->type;
 	}
 	adv_data.adv_data.p_data = (u8 *)advData;
 	adv_data.adv_data.len = advDataLength;
@@ -1119,28 +1250,7 @@ u32 FruityHal::BleGapAdvDataSet(u8 * p_advHandle, fh_ble_gap_adv_params_t const 
 	}
 
 	logt("FH", "Adv data set (%u) typ %u, iv %lu, mask %u, handle %u", err, adv_params.properties.type, adv_params.interval, adv_params.channel_mask[4], *p_advHandle);
-	return err;
-
-}
-
-u32 FruityHal::BleGapAdvStart(u8 advHandle)
-{
-	u32 err;
-	err = sd_ble_gap_adv_start(advHandle, BLE_CONN_CFG_TAG_FM);
-	logt("FH", "Adv start (%u)", err);
-	return err;
-}
-
-u32 FruityHal::BleGapAdvStop(u8 advHandle)
-{
-	u32 err = sd_ble_gap_adv_stop(advHandle);
-	logt("FH", "Adv stop (%u)", err);
-	return err;
-}
 #else
-u32 FruityHal::BleGapAdvDataSet(const u8 *advData, u8 advDataLength, const u8 *scanData, u8 scanDataLength)
-{
-	u32 err;
 	err = sd_ble_gap_adv_data_set(
 				advData,
 				advDataLength,
@@ -1149,48 +1259,29 @@ u32 FruityHal::BleGapAdvDataSet(const u8 *advData, u8 advDataLength, const u8 *s
 			);
 
 	logt("FH", "Adv data set (%u)", err);
-	return err;
-
+#endif
+	return nrfErrToGeneric(err);
 }
 
-u32 FruityHal::BleGapAdvStart(fh_ble_gap_adv_params_t const *advParams)
+ErrorType FruityHal::BleGapAdvStop(u8 advHandle)
 {
 	u32 err;
-	ble_gap_adv_params_t adv_params;
-	adv_params.channel_mask.ch_37_off = advParams->channel_mask.ch_37_off;
-	adv_params.channel_mask.ch_38_off = advParams->channel_mask.ch_38_off;
-	adv_params.channel_mask.ch_39_off= advParams->channel_mask.ch_39_off;
-	adv_params.fp = BLE_GAP_ADV_FP_ANY;
-	adv_params.interval = advParams->interval;
-	adv_params.p_peer_addr = nullptr;
-	adv_params.timeout = advParams->timeout;
-	adv_params.type = (u8)advParams->type;
-
-#if defined(NRF51) || defined(SIM_ENABLED)
-	err = sd_ble_gap_adv_start(&adv_params);
-#elif defined(NRF52)
-	err = sd_ble_gap_adv_start(&adv_params, BLE_CONN_CFG_TAG_FM);
+#if (SDK == 15)
+	err = sd_ble_gap_adv_stop(advHandle);
+#else
+	err = sd_ble_gap_adv_stop();
 #endif
-
-	logt("FH", "Adv start (%u) typ %u, iv %u, mask %u", err, adv_params.type, adv_params.interval, *((u8*)&adv_params.channel_mask));
-	return err;
-}
-
-u32 FruityHal::BleGapAdvStop()
-{
-	u32 err = sd_ble_gap_adv_stop();
 	logt("FH", "Adv stop (%u)", err);
-	return err;
+	return nrfErrToGeneric(err);
 }
-#endif
 
-u32 FruityHal::BleGapConnect(fh_ble_gap_addr_t const *peerAddress, fh_ble_gap_scan_params_t const *scanParams, fh_ble_gap_conn_params_t const *connectionParams)
+ErrorType FruityHal::BleGapConnect(FruityHal::BleGapAddr const *peerAddress, BleGapScanParams const *scanParams, BleGapConnParams const *connectionParams)
 {
 	u32 err;
 	ble_gap_addr_t p_peer_addr;
 	CheckedMemset(&p_peer_addr, 0x00, sizeof(p_peer_addr));
-	p_peer_addr.addr_type = peerAddress->addr_type;
-	memcpy(p_peer_addr.addr, peerAddress->addr, sizeof(peerAddress->addr));
+	p_peer_addr.addr_type = (u8)peerAddress->addr_type;
+	CheckedMemcpy(p_peer_addr.addr, peerAddress->addr, sizeof(peerAddress->addr));
 
 	ble_gap_scan_params_t p_scan_params;
 	CheckedMemset(&p_scan_params, 0x00, sizeof(p_scan_params));
@@ -1213,10 +1304,10 @@ u32 FruityHal::BleGapConnect(fh_ble_gap_addr_t const *peerAddress, fh_ble_gap_sc
 
 	ble_gap_conn_params_t p_conn_params;
 	CheckedMemset(&p_conn_params, 0x00, sizeof(p_conn_params));
-	p_conn_params.conn_sup_timeout = connectionParams->conn_sup_timeout;
-	p_conn_params.max_conn_interval = connectionParams->max_conn_interval;
-	p_conn_params.min_conn_interval = connectionParams->min_conn_interval;
-	p_conn_params.slave_latency = connectionParams->slave_latency;
+	p_conn_params.conn_sup_timeout = connectionParams->connSupTimeout;
+	p_conn_params.max_conn_interval = connectionParams->maxConnInterval;
+	p_conn_params.min_conn_interval = connectionParams->minConnInterval;
+	p_conn_params.slave_latency = connectionParams->slaveLatency;
 
 
 #if defined(NRF51) || defined(SIM_ENABLED)
@@ -1230,7 +1321,7 @@ u32 FruityHal::BleGapConnect(fh_ble_gap_addr_t const *peerAddress, fh_ble_gap_sc
 	//Tell our ScanController, that scanning has stopped
 	GS->scanController.ScanningHasStopped();
 
-	return err;
+	return nrfErrToGeneric(err);
 }
 
 
@@ -1243,24 +1334,106 @@ u32 FruityHal::ConnectCancel()
 	return err;
 }
 
-u32 FruityHal::Disconnect(uint16_t conn_handle, FruityHal::HciErrorCode hci_status_code)
+ErrorType FruityHal::Disconnect(u16 conn_handle, FruityHal::BleHciError hci_status_code)
 {
 	u32 err = sd_ble_gap_disconnect(conn_handle, (u8)hci_status_code);
 
 	logt("FH", "Disconnect (%u)", err);
 
-	return err;
+	return nrfErrToGeneric(err);
 }
 
-u32 FruityHal::BleTxPacketCountGet(u16 connectionHandle, u8* count)
+ErrorType FruityHal::BleTxPacketCountGet(u16 connectionHandle, u8* count)
 {
 #if defined(NRF51) || defined(SIM_ENABLED)
-	return sd_ble_tx_packet_count_get(connectionHandle, count);
+	return nrfErrToGeneric(sd_ble_tx_packet_count_get(connectionHandle, count));
 #elif defined(NRF52)
 //TODO: must be read from somewhere else
 	*count = BLE_CONN_CFG_GAP_PACKET_BUFFERS;
-	return 0;
+	return ErrorType::SUCCESS;
 #endif
+}
+
+u32 FruityHal::BleGapNameSet(BleGapConnSecMode & mode, u8 const * p_dev_name, u16 len)
+{
+	ble_gap_conn_sec_mode_t sec_mode;
+	CheckedMemset(&sec_mode, 0, sizeof(sec_mode));
+	sec_mode.sm = mode.securityMode;
+	sec_mode.lv = mode.level;
+	return sd_ble_gap_device_name_set(&sec_mode, p_dev_name, len);
+}
+
+u32 FruityHal::BleGapAppearance(BleAppearance appearance)
+{
+	return sd_ble_gap_appearance_set((u32)appearance);
+}
+
+ble_gap_conn_params_t translate(FruityHal::BleGapConnParams const & params)
+{
+	ble_gap_conn_params_t gapConnectionParams;
+	CheckedMemset(&gapConnectionParams, 0, sizeof(gapConnectionParams));
+
+	gapConnectionParams.min_conn_interval = params.minConnInterval;
+	gapConnectionParams.max_conn_interval = params.maxConnInterval;
+	gapConnectionParams.slave_latency = params.slaveLatency;
+	gapConnectionParams.conn_sup_timeout = params.connSupTimeout;
+	return gapConnectionParams;
+}
+
+u32 FruityHal::BleGapConnectionParamsUpdate(u16 conn_handle, BleGapConnParams const & params)
+{
+	ble_gap_conn_params_t gapConnectionParams = translate(params);
+	return sd_ble_gap_conn_param_update(conn_handle, &gapConnectionParams);
+}
+
+u32 FruityHal::BleGapConnectionPreferredParamsSet(BleGapConnParams const & params)
+{
+	ble_gap_conn_params_t gapConnectionParams = translate(params);
+	return sd_ble_gap_ppcp_set(&gapConnectionParams);
+}
+
+u32 FruityHal::BleGapSecInfoReply(u16 conn_handle, BleGapEncInfo * p_info, u8 * p_id_info, u8 * p_sign_info)
+{
+	ble_gap_enc_info_t info;
+	CheckedMemset(&info, 0, sizeof(info));
+	CheckedMemcpy(info.ltk, p_info->longTermKey, p_info->longTermKeyLength);
+	info.lesc = p_info->isGeneratedUsingLeSecureConnections ;
+	info.auth = p_info->isAuthenticatedKey;
+	info.ltk_len = p_info->longTermKeyLength;
+
+	return sd_ble_gap_sec_info_reply(
+		conn_handle,
+		&info, //This is our stored long term key
+		nullptr, //We do not have an identity resolving key
+		nullptr //We do not have signing info
+	);
+}
+
+u32 FruityHal::BleGapEncrypt(u16 conn_handle, BleGapMasterId const & master_id, BleGapEncInfo const & enc_info)
+{
+	ble_gap_master_id_t keyId;
+	CheckedMemset(&keyId, 0, sizeof(keyId));
+	keyId.ediv = master_id.encryptionDiversifier;
+	CheckedMemcpy(keyId.rand, master_id.rand, BLE_GAP_SEC_RAND_LEN);
+
+	ble_gap_enc_info_t info;
+	CheckedMemset(&info, 0, sizeof(info));
+	CheckedMemcpy(info.ltk, enc_info.longTermKey, enc_info.longTermKeyLength);
+	info.lesc = enc_info.isGeneratedUsingLeSecureConnections ;
+	info.auth = enc_info.isAuthenticatedKey;
+	info.ltk_len = enc_info.longTermKeyLength;
+
+	return sd_ble_gap_encrypt(conn_handle, &keyId, &info);
+}
+
+u32 FruityHal::BleGapRssiStart(u16 conn_handle, u8 threshold_dbm, u8 skip_count)
+{
+	return sd_ble_gap_rssi_start(conn_handle, threshold_dbm, skip_count);
+}
+
+u32 FruityHal::BleGapRssiStop(u16 conn_handle)
+{
+	return sd_ble_gap_rssi_stop(conn_handle);
 }
 
 u32 FruityHal::DiscovereServiceInit(DBDiscoveryHandler dbEventHandler)
@@ -1273,12 +1446,16 @@ u32 FruityHal::DiscovereServiceInit(DBDiscoveryHandler dbEventHandler)
 	return 0;
 }
 
-u32 FruityHal::DiscoverService(u16 connHandle, const ble_uuid_t &p_uuid, ble_db_discovery_t * p_discoveredServices)
+u32 FruityHal::DiscoverService(u16 connHandle, const BleGattUuid &p_uuid, ble_db_discovery_t * p_discoveredServices)
 {
 	uint32_t err = 0;
+	ble_uuid_t uuid;
+	CheckedMemset(&uuid, 0, sizeof(uuid));
+	uuid.uuid = p_uuid.uuid;
+	uuid.type = p_uuid.type;
 #ifndef SIM_ENABLED
 	CheckedMemset(p_discoveredServices, 0x00, sizeof(*p_discoveredServices));
-	err = ble_db_discovery_evt_register(&p_uuid);
+	err = ble_db_discovery_evt_register(&uuid);
 	if (err) {
 		logt("ERROR", "err %u", (u32)err);
 		return err;
@@ -1290,11 +1467,145 @@ u32 FruityHal::DiscoverService(u16 connHandle, const ble_uuid_t &p_uuid, ble_db_
 		return err;
 	}
 #else
-	cherrySimInstance->StartServiceDiscovery(connHandle, p_uuid, 1000);
+	cherrySimInstance->StartServiceDiscovery(connHandle, uuid, 1000);
 #endif
 	return err;
 }
 
+u32 FruityHal::BleGattSendNotification(u16 connHandle, BleGattWriteParams & params)
+{	
+	ble_gatts_hvx_params_t notificationParams;
+	CheckedMemset(&notificationParams, 0, sizeof(ble_gatts_hvx_params_t));
+	notificationParams.handle = params.handle;
+	notificationParams.offset = params.offset;
+	notificationParams.p_data = params.p_data;
+	notificationParams.p_len = &params.len;
+
+	if (params.type == BleGattWriteType::NOTIFICATION) notificationParams.type = BLE_GATT_HVX_NOTIFICATION;
+	else if (params.type == BleGattWriteType::INDICATION) notificationParams.type = BLE_GATT_HVX_INDICATION;
+	else return NRF_ERROR_INVALID_PARAM;
+	
+	return sd_ble_gatts_hvx(connHandle, &notificationParams);
+}
+
+u32 FruityHal::BleGattWrite(u16 connHandle, BleGattWriteParams const & params)
+{
+	ble_gattc_write_params_t writeParameters;
+	CheckedMemset(&writeParameters, 0, sizeof(ble_gattc_write_params_t));
+	writeParameters.handle = params.handle;
+	writeParameters.offset = params.offset;
+	writeParameters.len = params.len;
+	writeParameters.p_value = params.p_data;
+
+	if (params.type == BleGattWriteType::WRITE_REQ) writeParameters.write_op = BLE_GATT_OP_WRITE_REQ;
+	else if (params.type == BleGattWriteType::WRITE_CMD) writeParameters.write_op = BLE_GATT_OP_WRITE_CMD;
+	else return NRF_ERROR_INVALID_PARAM;
+
+	return sd_ble_gattc_write(connHandle, &writeParameters);	
+}
+
+u32 FruityHal::BleUuidVsAdd(u8 const * p_vs_uuid, u8 * p_uuid_type)
+{
+	ble_uuid128_t vs_uuid;
+	CheckedMemset(&vs_uuid, 0, sizeof(vs_uuid));
+	CheckedMemcpy(vs_uuid.uuid128, p_vs_uuid, sizeof(vs_uuid));
+	return sd_ble_uuid_vs_add(&vs_uuid, p_uuid_type);
+}
+
+u32 FruityHal::BleGattServiceAdd(BleGattSrvcType type, BleGattUuid const & p_uuid, u16 * p_handle)
+{
+	ble_uuid_t uuid;
+	CheckedMemset(&uuid, 0, sizeof(uuid));
+	uuid.uuid = p_uuid.uuid;
+	uuid.type = p_uuid.type;
+	return sd_ble_gatts_service_add((u8)type, &uuid, p_handle);
+}
+
+u32 FruityHal::BleGattCharAdd(u16 service_handle, BleGattCharMd const & char_md, BleGattAttribute const & attr_char_value, BleGattCharHandles & handles)
+{
+	ble_gatts_char_md_t sd_char_md;
+	ble_gatts_attr_t sd_attr_char_value;
+	
+	static_assert(SDK <= 15, "Check mapping");
+
+	CheckedMemcpy(&sd_char_md, &char_md, sizeof(ble_gatts_char_md_t));
+	CheckedMemcpy(&sd_attr_char_value, &attr_char_value, sizeof(ble_gatts_attr_t));
+	return sd_ble_gatts_characteristic_add(service_handle, &sd_char_md, &sd_attr_char_value, (ble_gatts_char_handles_t *)&handles);
+}
+
+u32 FruityHal::BleGapDataLengthExtensionRequest(u16 connHandle)
+{
+#ifdef NRF52
+	//We let the SoftDevice decide the maximum according to the MAX_MTU_SIZE and connection configuration
+	u32 err = sd_ble_gap_data_length_update(connHandle, nullptr, nullptr);
+	logt("FH", "Start DLE Update (%u) on conn %u", err, connHandle);
+
+	return err;
+#else
+	//TODO: We should implement DLE in the Simulator as soon as it is based on the NRF52
+
+	return NRF_ERROR_NOT_SUPPORTED;
+#endif
+}
+
+u32 FruityHal::BleGattMtuExchangeRequest(u16 connHandle, u16 clientRxMtu)
+{
+#ifdef NRF52
+	u32 err = sd_ble_gattc_exchange_mtu_request(connHandle, clientRxMtu);
+
+	logt("FH", "Start MTU Exchange (%u) on conn %u with %u", err, connHandle, clientRxMtu);
+
+	return err;
+#else
+	//TODO: We should implement MTU Exchange in the Simulator as soon as it is based on the NRF52
+
+	return NRF_ERROR_NOT_SUPPORTED;
+#endif
+}
+
+u32 FruityHal::BleGattMtuExchangeReply(u16 connHandle, u16 clientRxMtu)
+{
+#ifdef NRF52
+	u32 err = sd_ble_gatts_exchange_mtu_reply(connHandle, clientRxMtu);
+
+	logt("ERROR", "Reply MTU Exchange (%u) on conn %u with %u", err, connHandle, clientRxMtu);
+
+	return err;
+#else
+	return NRF_ERROR_NOT_SUPPORTED;
+#endif
+}
+
+// Supported tx_power values for this implementation: -40dBm, -20dBm, -16dBm, -12dBm, -8dBm, -4dBm, 0dBm, +3dBm and +4dBm.
+ErrorType FruityHal::RadioSetTxPower(i8 tx_power, TxRole role, u16 handle)
+{
+	if (tx_power != -40 && 
+		  tx_power != -30 && 
+		  tx_power != -20 && 
+		  tx_power != -16 && 
+		  tx_power != -12 && 
+		  tx_power != -8  && 
+		  tx_power != -4  && 
+		  tx_power != 0   && 
+		  tx_power != 4) {
+		SIMEXCEPTION(IllegalArgumentException);
+		return ErrorType::INVALID_PARAM;
+	}
+
+	u32 err;
+#if (SDK == 15)
+	u8 txRole;
+	if (role == TxRole::CONNECTION) txRole = BLE_GAP_TX_POWER_ROLE_CONN;
+	else if (role == TxRole::ADVERTISING) txRole = BLE_GAP_TX_POWER_ROLE_ADV;
+	else if (role == TxRole::SCAN_INIT) txRole = BLE_GAP_TX_POWER_ROLE_SCAN_INIT;
+	else return ErrorType::INVALID_PARAM;;
+	err = sd_ble_gap_tx_power_set(txRole, handle, tx_power);
+#else
+	err = sd_ble_gap_tx_power_set(tx_power);
+#endif
+
+	return nrfErrToGeneric(err);
+}
 
 
 //################################################
@@ -1318,6 +1629,11 @@ void button_interrupt_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t ac
 	}
 }
 #endif
+
+ErrorType FruityHal::WaitForEvent()
+{
+	return nrfErrToGeneric(sd_app_evt_wait());
+}
 
 u32 FruityHal::InitializeButtons()
 {
@@ -1348,6 +1664,33 @@ u32 FruityHal::InitializeButtons()
 	return err;
 }
 
+ErrorType FruityHal::GetRandomBytes(u8 * p_data, u8 len)
+{
+	return nrfErrToGeneric(sd_rand_application_vector_get(p_data, len));
+}
+
+u32 FruityHal::ClearGeneralPurposeRegister(u32 gpregId, u32 mask)
+{
+#ifdef NRF52
+	return sd_power_gpregret_clr(gpregId, mask);
+#elif NRF51
+	return sd_power_gpregret_clr(gpregId);
+#else
+	return NRF_SUCCESS;
+#endif
+}
+
+u32 FruityHal::WriteGeneralPurposeRegister(u32 gpregId, u32 mask)
+{
+#ifdef NRF52
+	return sd_power_gpregret_set(gpregId, mask);
+#elif NRF51
+	return sd_power_gpregret_set(gpregId);
+#else
+	return NRF_SUCCESS;
+#endif
+}
+
 //################################################
 #define _________________UART_____________________
 
@@ -1364,6 +1707,8 @@ extern "C"{
 	}
 }
 #endif
+
+
 
 //################################################
 #define _________________TIMERS___________________
@@ -1387,6 +1732,7 @@ extern "C"{
 
 u32 FruityHal::InitTimers()
 {
+	SIMEXCEPTION(NotImplementedException);
 #if defined(NRF51)
 	APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, nullptr);
 #elif defined(NRF52)
@@ -1398,39 +1744,97 @@ u32 FruityHal::InitTimers()
 
 u32 FruityHal::StartTimers()
 {
+	SIMEXCEPTION(NotImplementedException);
 	u32 err = 0;
+#ifndef SIM_ENABLED
 
-#if defined(NRF51) || defined (NRF52)
 	APP_TIMER_DEF(mainTimerMsId);
 
 	err = app_timer_create(&mainTimerMsId, APP_TIMER_MODE_REPEATED, app_timer_handler);
 	if (err != NRF_SUCCESS) return err;
 
 	err = app_timer_start(mainTimerMsId, MAIN_TIMER_TICK, nullptr);
-#endif
+#endif // SIM_ENABLED
 	return err;
 }
 
-u32 FruityHal::GetRtc()
+ErrorType FruityHal::CreateTimer(FruityHal::swTimer timer, bool repeated, TimerHandler handler)
+{	
+	SIMEXCEPTION(NotImplementedException);
+	u32 err;
+#ifndef SIM_ENABLED
+	static u8 timersCreated = 0;
+
+	timer = (u32 *)&swTimers[timersCreated];
+	CheckedMemset(timer, 0x00, sizeof(app_timer_t));
+
+	app_timer_mode_t mode = repeated ? APP_TIMER_MODE_REPEATED : APP_TIMER_MODE_SINGLE_SHOT;
+	
+	err = app_timer_create((app_timer_id_t *)(&timer), mode, handler);
+	if (err != NRF_SUCCESS) return nrfErrToGeneric(err);
+
+	timersCreated++;
+#endif
+	return ErrorType::SUCCESS;
+}
+
+ErrorType FruityHal::StartTimer(FruityHal::swTimer timer, u32 timeoutMs)
 {
-#if defined(NRF51) || defined(SIM_ENABLED)
-	uint32_t count;
-	app_timer_cnt_get(&count);
-	return count;
-#elif defined(NRF52)
-	return app_timer_cnt_get();
+	SIMEXCEPTION(NotImplementedException);
+#ifndef SIM_ENABLED
+	if (timer == nullptr) return ErrorType::INVALID_PARAM;
+
+#ifdef NRF51
+	u32 err = app_timer_start((app_timer_id_t)timer, APP_TIMER_TICKS(timeoutMs, APP_TIMER_PRESCALER), NULL);
+#else
+	// APP_TIMER_TICKS number of parameters has changed from SDK 11 to SDK 14
+	// cppcheck-suppress preprocessorErrorDirective
+	u32 err = app_timer_start((app_timer_id_t)timer, APP_TIMER_TICKS(timeoutMs), NULL);
+#endif
+	return nrfErrToGeneric(err);
+#else
+	return ErrorType::SUCCESS;
 #endif
 }
 
-u32 FruityHal::GetRtcDifference(u32 ticksTo, u32 ticksFrom)
+ErrorType FruityHal::StopTimer(FruityHal::swTimer timer)
 {
-#if defined(NRF51) || defined(SIM_ENABLED)
-	uint32_t diff;
-	app_timer_cnt_diff_compute(ticksTo, ticksFrom, &diff);
-	return diff;
-#elif defined(NRF52)
-	return app_timer_cnt_diff_compute(ticksTo, ticksFrom);
+	SIMEXCEPTION(NotImplementedException);
+#ifndef SIM_ENABLED
+	if (timer == nullptr) return ErrorType::INVALID_PARAM;
+
+	u32 err = app_timer_stop((app_timer_id_t)timer);
+	return nrfErrToGeneric(err);
+#else
+	return ErrorType::SUCCESS;
 #endif
+}
+
+u32 FruityHal::GetRtcMs()
+{
+	uint32_t rtcTicks;
+#if defined(NRF51) || defined(SIM_ENABLED)
+	app_timer_cnt_get(&rtcTicks);
+#elif defined(NRF52)
+	rtcTicks = app_timer_cnt_get();
+#endif
+	return rtcTicks * 1000 / APP_TIMER_CLOCK_FREQ;
+}
+
+// In this port limitation is that max diff between nowTimeMs and previousTimeMs
+// can be 0xFFFFFE measured in app_timer ticks. If the difference is bigger the
+// result will be faulty
+u32 FruityHal::GetRtcDifferenceMs(u32 nowTimeMs, u32 previousTimeMs)
+{
+	u32 nowTimeTicks = nowTimeMs * APP_TIMER_CLOCK_FREQ / 1000;
+	u32 previousTimeTicks = previousTimeMs * APP_TIMER_CLOCK_FREQ / 1000;
+	uint32_t diffTicks;
+#if defined(NRF51) || defined(SIM_ENABLED)
+	app_timer_cnt_diff_compute(nowTimeTicks, previousTimeTicks, &diffTicks);
+#elif defined(NRF52)
+	diffTicks = app_timer_cnt_diff_compute(nowTimeTicks, previousTimeTicks);
+#endif
+	return diffTicks * 1000 / APP_TIMER_CLOCK_FREQ;
 }
 
 //################################################
@@ -1447,10 +1851,10 @@ extern "C"
 	}
 
 	//The app_error handler is called by all APP_ERROR_CHECK functions when DEBUG is defined
-	void app_error_handler(uint32_t error_code, uint32_t line_num, const uint8_t * p_file_name)
+	void app_error_handler(uint32_t error_code, uint32_t line_num, const u8 * p_file_name)
 	{
 		app_error_handler_bare(error_code);
-		logt("ERROR", "App error code:%s(%u), file:%s, line:%u", FruityHal::getGeneralErrorString((FruityHal::GeneralHardwareError)error_code), (u32)error_code, p_file_name, (u32)line_num);
+		logt("ERROR", "App error code:%s(%u), file:%s, line:%u", Logger::getGeneralErrorString((ErrorType)error_code), (u32)error_code, p_file_name, (u32)line_num);
 	}
 
 	//Called when the softdevice crashes
@@ -1470,13 +1874,16 @@ extern "C"
 	//NRF52 uses more handlers, we currently just reboot if they are called
 	//TODO: Redirect to hardfault handler, but be aware that the stack will shift by calling the function
 #ifdef NRF52
-	void MemoryManagement_Handler(){
+	__attribute__((used)) void MemoryManagement_Handler(){
+		GS->ramRetainStructPtr->rebootReason = RebootReason::MEMORY_MANAGEMENT;
 		NVIC_SystemReset();
 	}
-	void BusFault_Handler(){
+	__attribute__((used)) void BusFault_Handler(){
+		GS->ramRetainStructPtr->rebootReason = RebootReason::BUS_FAULT;
 		NVIC_SystemReset();
 	}
-	void UsageFault_Handler(){
+	__attribute__((used)) void UsageFault_Handler(){
+		GS->ramRetainStructPtr->rebootReason = RebootReason::USAGE_FAULT;
 		NVIC_SystemReset();
 	}
 #endif
@@ -1583,34 +1990,88 @@ void FruityHal::DelayMs(u32 delayMs)
 #endif
 }
 
+u32 FruityHal::EcbEncryptBlock(const u8 * p_key, const u8 * p_clearText, u8 * p_cipherText)
+{
+	u32 error;
+	nrf_ecb_hal_data_t ecbData;
+	CheckedMemset(&ecbData, 0x00, sizeof(ecbData));
+	CheckedMemcpy(ecbData.key, p_key, SOC_ECB_KEY_LENGTH);
+	CheckedMemcpy(ecbData.cleartext, p_clearText, SOC_ECB_CLEARTEXT_LENGTH);
+	error = sd_ecb_block_encrypt(&ecbData);
+	CheckedMemcpy(p_cipherText, ecbData.ciphertext, SOC_ECB_CIPHERTEXT_LENGTH);
+	return error;
+}
+
+ErrorType FruityHal::FlashPageErase(u32 page)
+{
+	return nrfErrToGeneric(sd_flash_page_erase(page));
+}
+
+ErrorType FruityHal::FlashWrite(u32 * p_addr, u32 * p_data, u32 len)
+{
+	return nrfErrToGeneric(sd_flash_write((uint32_t *)p_addr, (uint32_t *)p_data, len));
+}
+
+void FruityHal::nvicEnableIRQ(u32 irqType)
+{
+#ifndef SIM_ENABLED
+	sd_nvic_EnableIRQ((IRQn_Type)irqType);
+#endif
+}
+
+void FruityHal::nvicDisableIRQ(u32 irqType)
+{
+#ifndef SIM_ENABLED
+	sd_nvic_DisableIRQ((IRQn_Type)irqType);
+#endif
+}
+
+void FruityHal::nvicSetPriorityIRQ(u32 irqType, u8 level)
+{
+#ifndef SIM_ENABLED
+	sd_nvic_SetPriority((IRQn_Type)irqType, (uint32_t)level);
+#endif
+}
+
+void FruityHal::nvicClearPendingIRQ(u32 irqType)
+{
+#ifndef SIM_ENABLED
+	sd_nvic_ClearPendingIRQ((IRQn_Type)irqType);
+#endif
+}
+
 #ifndef SIM_ENABLED
 extern "C"{
 //Eliminate Exception overhead when using pure virutal functions
 //http://elegantinvention.com/blog/information/smaller-binary-size-with-c-on-baremetal-g/
 	void __cxa_pure_virtual() {
+		// Must never be called.
 		logt("ERROR", "PVF call");
-		APP_ERROR_CHECK(FRUITYMESH_ERROR_PURE_VIRTUAL_FUNCTION_CALL);
+		constexpr u32 pureVirtualFunctionCalledError = 0xF002;
+		APP_ERROR_CHECK(pureVirtualFunctionCalledError);
 	}
 }
 #endif
 
 #define __________________CONVERT____________________
 
-ble_gap_addr_t FruityHal::Convert(const fh_ble_gap_addr_t* address)
+ble_gap_addr_t FruityHal::Convert(const FruityHal::BleGapAddr* address)
 {
 	ble_gap_addr_t addr;
-	memcpy(addr.addr, address->addr, FH_BLE_GAP_ADDR_LEN);
-	addr.addr_type = address->addr_type;
+	CheckedMemset(&addr, 0x00, sizeof(addr));
+	CheckedMemcpy(addr.addr, address->addr, FH_BLE_GAP_ADDR_LEN);
+	addr.addr_type = (u8)address->addr_type;
 #ifdef NRF52
 	addr.addr_id_peer = 0;
 #endif
 	return addr;
 }
-fh_ble_gap_addr_t FruityHal::Convert(const ble_gap_addr_t* p_addr)
+FruityHal::BleGapAddr FruityHal::Convert(const ble_gap_addr_t* p_addr)
 {
-	fh_ble_gap_addr_t address;
-	memcpy(address.addr, p_addr->addr, FH_BLE_GAP_ADDR_LEN);
-	address.addr_type = p_addr->addr_type;
+	FruityHal::BleGapAddr address;
+	CheckedMemset(&address, 0x00, sizeof(address));
+	CheckedMemcpy(address.addr, p_addr->addr, FH_BLE_GAP_ADDR_LEN);
+	address.addr_type = (BleGapAddrType)p_addr->addr_type;
 
 	return address;
 }
@@ -1658,9 +2119,41 @@ u32 FruityHal::getMasterBootRecordSize()
 u32 FruityHal::getSoftDeviceSize()
 {
 #ifdef SIM_ENABLED
-	return 1024 * 110;
+	//Even though the soft device size is not strictly dependent on the chipset, it is a good approximation.
+	//These values were measured on real hardware on 26.09.2019.
+	switch (GET_CHIPSET())
+	{
+	case Chipset::CHIP_NRF51:
+		return 110592;
+	case Chipset::CHIP_NRF52:
+	case Chipset::CHIP_NRF52840:
+		return 143360;
+	default:
+		SIMEXCEPTION(IllegalStateException);
+	}
+	return 0;
 #else
 	return SD_SIZE_GET(MBR_SIZE);
+#endif
+}
+
+u32 FruityHal::GetSoftDeviceVersion()
+{
+#ifdef SIM_ENABLED
+	switch (GetBleStackType())
+	{
+	case BleStackType::NRF_SD_130_ANY:
+		return 0x0087;
+	case BleStackType::NRF_SD_132_ANY:
+		return 0x00A8;
+	case BleStackType::NRF_SD_140_ANY:
+		return 0x00A9;
+	default:
+		SIMEXCEPTION(IllegalStateException);
+	}
+	return 0;
+#else
+	return SD_FWID_GET(MBR_SIZE);
 #endif
 }
 
@@ -1699,7 +2192,7 @@ void FruityHal::bleStackErrorHandler(u32 id, u32 info)
 			GS->ramRetainStructPtr->code2 = ((assert_info_t *)info)->line_num;
 			u8 len = (u8)strlen((const char*)((assert_info_t *)info)->p_file_name);
 			if (len > (RAM_PERSIST_STACKSTRACE_SIZE - 1) * 4) len = (RAM_PERSIST_STACKSTRACE_SIZE - 1) * 4;
-			memcpy(GS->ramRetainStructPtr->stacktrace + 1, ((assert_info_t *)info)->p_file_name, len);
+			CheckedMemcpy(GS->ramRetainStructPtr->stacktrace + 1, ((assert_info_t *)info)->p_file_name, len);
 			break;
 		}
 		case NRF_FAULT_ID_SDK_ERROR: //SDK errors
@@ -1710,7 +2203,7 @@ void FruityHal::bleStackErrorHandler(u32 id, u32 info)
 			//Copy filename to stacktrace
 			u8 len = (u8)strlen((const char*)((error_info_t *)info)->p_file_name);
 			if (len > (RAM_PERSIST_STACKSTRACE_SIZE - 1) * 4) len = (RAM_PERSIST_STACKSTRACE_SIZE - 1) * 4;
-			memcpy(GS->ramRetainStructPtr->stacktrace + 1, ((error_info_t *)info)->p_file_name, len);
+			CheckedMemcpy(GS->ramRetainStructPtr->stacktrace + 1, ((error_info_t *)info)->p_file_name, len);
 			break;
 		}
 	}
@@ -1792,6 +2285,18 @@ const char* FruityHal::getBleEventNameString(u16 bleEventId)
 #ifdef NRF52
 	case BLE_GATTS_EVT_HVN_TX_COMPLETE:
 		return "BLE_GATTS_EVT_HVN_TX_COMPLETE";
+	case BLE_GATTC_EVT_WRITE_CMD_TX_COMPLETE:
+		return "BLE_GATTC_EVT_WRITE_CMD_TX_COMPLETE";
+	case BLE_GAP_EVT_DATA_LENGTH_UPDATE_REQUEST:
+		return "BLE_GAP_EVT_DATA_LENGTH_UPDATE_REQUEST";
+	case BLE_GAP_EVT_DATA_LENGTH_UPDATE:
+		return "BLE_GAP_EVT_DATA_LENGTH_UPDATE";
+	case BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST:
+		return "BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST";
+	case BLE_GATTC_EVT_EXCHANGE_MTU_RSP:
+		return "BLE_GATTC_EVT_EXCHANGE_MTU_RSP";
+	case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
+		return "BLE_GAP_EVT_PHY_UPDATE_REQUEST";
 #endif
 	default:
 		SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
@@ -1802,422 +2307,15 @@ const char* FruityHal::getBleEventNameString(u16 bleEventId)
 #endif
 }
 
-const char* FruityHal::getGattStatusErrorString(u16 gattStatusCode)
-{
-#if defined(TERMINAL_ENABLED)
-	switch (gattStatusCode)
-	{
-	case BLE_GATT_STATUS_SUCCESS:
-		return "Success";
-	case BLE_GATT_STATUS_UNKNOWN:
-		return "Unknown or not applicable status";
-	case BLE_GATT_STATUS_ATTERR_INVALID:
-		return "ATT Error: Invalid Error Code";
-	case BLE_GATT_STATUS_ATTERR_INVALID_HANDLE:
-		return "ATT Error: Invalid Attribute Handle";
-	case BLE_GATT_STATUS_ATTERR_READ_NOT_PERMITTED:
-		return "ATT Error: Read not permitted";
-	case BLE_GATT_STATUS_ATTERR_WRITE_NOT_PERMITTED:
-		return "ATT Error: Write not permitted";
-	case BLE_GATT_STATUS_ATTERR_INVALID_PDU:
-		return "ATT Error: Used in ATT as Invalid PDU";
-	case BLE_GATT_STATUS_ATTERR_INSUF_AUTHENTICATION:
-		return "ATT Error: Authenticated link required";
-	case BLE_GATT_STATUS_ATTERR_REQUEST_NOT_SUPPORTED:
-		return "ATT Error: Used in ATT as Request Not Supported";
-	case BLE_GATT_STATUS_ATTERR_INVALID_OFFSET:
-		return "ATT Error: Offset specified was past the end of the attribute";
-	case BLE_GATT_STATUS_ATTERR_INSUF_AUTHORIZATION:
-		return "ATT Error: Used in ATT as Insufficient Authorisation";
-	case BLE_GATT_STATUS_ATTERR_PREPARE_QUEUE_FULL:
-		return "ATT Error: Used in ATT as Prepare Queue Full";
-	case BLE_GATT_STATUS_ATTERR_ATTRIBUTE_NOT_FOUND:
-		return "ATT Error: Used in ATT as Attribute not found";
-	case BLE_GATT_STATUS_ATTERR_ATTRIBUTE_NOT_LONG:
-		return "ATT Error: Attribute cannot be read or written using read/write blob requests";
-	case BLE_GATT_STATUS_ATTERR_INSUF_ENC_KEY_SIZE:
-		return "ATT Error: Encryption key size used is insufficient";
-	case BLE_GATT_STATUS_ATTERR_INVALID_ATT_VAL_LENGTH:
-		return "ATT Error: Invalid value size";
-	case BLE_GATT_STATUS_ATTERR_UNLIKELY_ERROR:
-		return "ATT Error: Very unlikely error";
-	case BLE_GATT_STATUS_ATTERR_INSUF_ENCRYPTION:
-		return "ATT Error: Encrypted link required";
-	case BLE_GATT_STATUS_ATTERR_UNSUPPORTED_GROUP_TYPE:
-		return "ATT Error: Attribute type is not a supported grouping attribute";
-	case BLE_GATT_STATUS_ATTERR_INSUF_RESOURCES:
-		return "ATT Error: Encrypted link required";
-	case BLE_GATT_STATUS_ATTERR_RFU_RANGE1_BEGIN:
-		return "ATT Error: Reserved for Future Use range #1 begin";
-	case BLE_GATT_STATUS_ATTERR_RFU_RANGE1_END:
-		return "ATT Error: Reserved for Future Use range #1 end";
-	case BLE_GATT_STATUS_ATTERR_APP_BEGIN:
-		return "ATT Error: Application range begin";
-	case BLE_GATT_STATUS_ATTERR_APP_END:
-		return "ATT Error: Application range end";
-	case BLE_GATT_STATUS_ATTERR_RFU_RANGE2_BEGIN:
-		return "ATT Error: Reserved for Future Use range #2 begin";
-	case BLE_GATT_STATUS_ATTERR_RFU_RANGE2_END:
-		return "ATT Error: Reserved for Future Use range #2 end";
-	case BLE_GATT_STATUS_ATTERR_RFU_RANGE3_BEGIN:
-		return "ATT Error: Reserved for Future Use range #3 begin";
-	case BLE_GATT_STATUS_ATTERR_RFU_RANGE3_END:
-		return "ATT Error: Reserved for Future Use range #3 end";
-	case BLE_GATT_STATUS_ATTERR_CPS_CCCD_CONFIG_ERROR:
-		return "ATT Common Profile and Service Error: Client Characteristic Configuration Descriptor improperly configured";
-	case BLE_GATT_STATUS_ATTERR_CPS_PROC_ALR_IN_PROG:
-		return "ATT Common Profile and Service Error: Procedure Already in Progress";
-	case BLE_GATT_STATUS_ATTERR_CPS_OUT_OF_RANGE:
-		return "ATT Common Profile and Service Error: Out Of Range";
-	default:
-		SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
-		return "Unknown GATT status";
-	}
-#else
-	return nullptr;
-#endif
-}
-
-const char* FruityHal::getGeneralErrorString(GeneralHardwareError nrfErrorCode)
-{
-#if defined(TERMINAL_ENABLED)
-	switch ((u32)nrfErrorCode)
-	{
-	case NRF_SUCCESS:
-		return "NRF_SUCCESS";
-	case NRF_ERROR_SVC_HANDLER_MISSING:
-		return "NRF_ERROR_SVC_HANDLER_MISSING";
-	case NRF_ERROR_SOFTDEVICE_NOT_ENABLED:
-		return "NRF_ERROR_SOFTDEVICE_NOT_ENABLED";
-	case NRF_ERROR_INTERNAL:
-		return "NRF_ERROR_INTERNAL";
-	case NRF_ERROR_NO_MEM:
-		return "NRF_ERROR_NO_MEM";
-	case NRF_ERROR_NOT_FOUND:
-		return "NRF_ERROR_NOT_FOUND";
-	case NRF_ERROR_NOT_SUPPORTED:
-		return "NRF_ERROR_NOT_SUPPORTED";
-	case NRF_ERROR_INVALID_PARAM:
-		return "NRF_ERROR_INVALID_PARAM";
-	case NRF_ERROR_INVALID_STATE:
-		return "NRF_ERROR_INVALID_STATE";
-	case NRF_ERROR_INVALID_LENGTH:
-		return "NRF_ERROR_INVALID_LENGTH";
-	case NRF_ERROR_INVALID_FLAGS:
-		return "NRF_ERROR_INVALID_FLAGS";
-	case NRF_ERROR_INVALID_DATA:
-		return "NRF_ERROR_INVALID_DATA";
-	case NRF_ERROR_DATA_SIZE:
-		return "NRF_ERROR_DATA_SIZE";
-	case NRF_ERROR_TIMEOUT:
-		return "NRF_ERROR_TIMEOUT";
-	case NRF_ERROR_NULL:
-		return "NRF_ERROR_NULL";
-	case NRF_ERROR_FORBIDDEN:
-		return "NRF_ERROR_FORBIDDEN";
-	case NRF_ERROR_INVALID_ADDR:
-		return "NRF_ERROR_INVALID_ADDR";
-	case NRF_ERROR_BUSY:
-		return "NRF_ERROR_BUSY";
-	case BLE_ERROR_INVALID_CONN_HANDLE:
-		return "BLE_ERROR_INVALID_CONN_HANDLE";
-	case BLE_ERROR_INVALID_ATTR_HANDLE:
-		return "BLE_ERROR_INVALID_ATTR_HANDLE";
-#if defined(NRF51)
-	case BLE_ERROR_NO_TX_PACKETS:
-		return "BLE_ERROR_NO_TX_PACKETS";
-#endif
-	case 0xDEADBEEF:
-		return "DEADBEEF";
-	default:
-		SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
-		return "UNKNOWN_ERROR";
-	}
-#else
-	return nullptr;
-#endif
-}
-
-const char* FruityHal::getHciErrorString(FruityHal::HciErrorCode hciErrorCode)
-{
-#if defined(TERMINAL_ENABLED)
-	switch (hciErrorCode)
-	{
-	case FruityHal::HciErrorCode::SUCCESS:
-		return "Success";
-
-	case FruityHal::HciErrorCode::UNKNOWN_BTLE_COMMAND:
-		return "Unknown BLE Command";
-
-	case FruityHal::HciErrorCode::UNKNOWN_CONNECTION_IDENTIFIER:
-		return "Unknown Connection Identifier";
-
-	case FruityHal::HciErrorCode::AUTHENTICATION_FAILURE:
-		return "Authentication Failure";
-
-	case FruityHal::HciErrorCode::CONN_FAILED_TO_BE_ESTABLISHED:
-		return "Connection Failed to be Established";
-
-	case FruityHal::HciErrorCode::CONN_INTERVAL_UNACCEPTABLE:
-		return "Connection Interval Unacceptable";
-
-	case FruityHal::HciErrorCode::CONN_TERMINATED_DUE_TO_MIC_FAILURE:
-		return "Connection Terminated due to MIC Failure";
-
-	case FruityHal::HciErrorCode::CONNECTION_TIMEOUT:
-		return "Connection Timeout";
-
-	case FruityHal::HciErrorCode::CONTROLLER_BUSY:
-		return "Controller Busy";
-
-	case FruityHal::HciErrorCode::DIFFERENT_TRANSACTION_COLLISION:
-		return "Different Transaction Collision";
-
-	case FruityHal::HciErrorCode::DIRECTED_ADVERTISER_TIMEOUT:
-		return "Directed Adverisement Timeout";
-
-	case FruityHal::HciErrorCode::INSTANT_PASSED:
-		return "Instant Passed";
-
-	case FruityHal::HciErrorCode::LOCAL_HOST_TERMINATED_CONNECTION:
-		return "Local Host Terminated Connection";
-
-	case FruityHal::HciErrorCode::MEMORY_CAPACITY_EXCEEDED:
-		return "Memory Capacity Exceeded";
-
-	case FruityHal::HciErrorCode::PAIRING_WITH_UNIT_KEY_UNSUPPORTED:
-		return "Pairing with Unit Key Unsupported";
-
-	case FruityHal::HciErrorCode::REMOTE_DEV_TERMINATION_DUE_TO_LOW_RESOURCES:
-		return "Remote Device Terminated Connection due to low resources";
-
-	case FruityHal::HciErrorCode::REMOTE_DEV_TERMINATION_DUE_TO_POWER_OFF:
-		return "Remote Device Terminated Connection due to power off";
-
-	case FruityHal::HciErrorCode::REMOTE_USER_TERMINATED_CONNECTION:
-		return "Remote User Terminated Connection";
-
-	case FruityHal::HciErrorCode::COMMAND_DISALLOWED:
-		return "Command Disallowed";
-
-	case FruityHal::HciErrorCode::INVALID_BTLE_COMMAND_PARAMETERS:
-		return "Invalid BLE Command Parameters";
-
-	case FruityHal::HciErrorCode::INVALID_LMP_PARAMETERS:
-		return "Invalid LMP Parameters";
-
-	case FruityHal::HciErrorCode::LMP_PDU_NOT_ALLOWED:
-		return "LMP PDU Not Allowed";
-
-	case FruityHal::HciErrorCode::LMP_RESPONSE_TIMEOUT:
-		return "LMP Response Timeout";
-
-	case FruityHal::HciErrorCode::PIN_OR_KEY_MISSING:
-		return "Pin or Key missing";
-
-	case FruityHal::HciErrorCode::UNSPECIFIED_ERROR:
-		return "Unspecified Error";
-
-	case FruityHal::HciErrorCode::UNSUPPORTED_REMOTE_FEATURE:
-		return "Unsupported Remote Feature";
-	default:
-		SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
-		return "Unknown HCI error";
-	}
-#else
-	return nullptr;
-#endif
-}
-
-const char* FruityHal::getErrorLogErrorType(ErrorTypes type)
-{
-#if defined(TERMINAL_ENABLED)
-	switch (type)
-	{
-		case ErrorTypes::SD_CALL_ERROR:
-			return "SD_CALL_ERROR";
-		case ErrorTypes::HCI_ERROR:
-			return "HCI_ERROR";
-		case ErrorTypes::CUSTOM:
-			return "CUSTOM";
-		case ErrorTypes::GATT_STATUS:
-			return "GATT_STATUS";
-		case ErrorTypes::REBOOT:
-			return "REBOOT";
-		default:
-			SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
-			return "UNKNOWN_ERROR";
-	}
-#else
-	return nullptr;
-#endif
-}
-
-const char* FruityHal::getErrorLogCustomError(CustomErrorTypes type)
-{
-#if defined(TERMINAL_ENABLED)
-	switch (type)
-	{
-	case CustomErrorTypes::FATAL_BLE_GATTC_EVT_TIMEOUT_FORCED_US:
-		return "FATAL_BLE_GATTC_EVT_TIMEOUT_FORCED_US";
-	case CustomErrorTypes::INFO_TRYING_CONNECTION_SUSTAIN:
-		return "INFO_TRYING_CONNECTION_SUSTAIN";
-	case CustomErrorTypes::WARN_CONNECTION_SUSTAIN_FAILED_TO_ESTABLISH:
-		return "WARN_CONNECTION_SUSTAIN_FAILED_TO_ESTABLISH";
-	case CustomErrorTypes::COUNT_CONNECTION_SUCCESS:
-		return "COUNT_CONNECTION_SUCCESS";
-	case CustomErrorTypes::COUNT_HANDSHAKE_DONE:
-		return "COUNT_HANDSHAKE_DONE";
-	case CustomErrorTypes::WARN_HANDSHAKE_TIMEOUT:
-		return "WARN_HANDSHAKE_TIMEOUT";
-	case CustomErrorTypes::WARN_CM_FAIL_NO_SPOT:
-		return "WARN_CM_FAIL_NO_SPOT";
-	case CustomErrorTypes::FATAL_QUEUE_NUM_MISMATCH:
-		return "FATAL_QUEUE_NUM_MISMATCH";
-	case CustomErrorTypes::WARN_GATT_WRITE_ERROR:
-		return "WARN_GATT_WRITE_ERROR";
-	case CustomErrorTypes::WARN_TX_WRONG_DATA:
-		return "WARN_TX_WRONG_DATA";
-	case CustomErrorTypes::WARN_RX_WRONG_DATA:
-		return "WARN_RX_WRONG_DATA";
-	case CustomErrorTypes::FATAL_CLUSTER_UPDATE_FLOW_MISMATCH:
-		return "FATAL_CLUSTER_UPDATE_FLOW_MISMATCH";
-	case CustomErrorTypes::WARN_HIGH_PRIO_QUEUE_FULL:
-		return "WARN_HIGH_PRIO_QUEUE_FULL";
-	case CustomErrorTypes::COUNT_NO_PENDING_CONNECTION:
-		return "COUNT_NO_PENDING_CONNECTION";
-	case CustomErrorTypes::FATAL_HANDLE_PACKET_SENT_ERROR:
-		return "FATAL_HANDLE_PACKET_SENT_ERROR";
-	case CustomErrorTypes::COUNT_DROPPED_PACKETS:
-		return "COUNT_DROPPED_PACKETS";
-	case CustomErrorTypes::COUNT_SENT_PACKETS_RELIABLE:
-		return "COUNT_SENT_PACKETS_RELIABLE";
-	case CustomErrorTypes::COUNT_SENT_PACKETS_UNRELIABLE:
-		return "COUNT_SENT_PACKETS_UNRELIABLE";
-	case CustomErrorTypes::INFO_ERRORS_REQUESTED:
-		return "INFO_ERRORS_REQUESTED";
-	case CustomErrorTypes::INFO_CONNECTION_SUSTAIN_SUCCESS:
-		return "INFO_CONNECTION_SUSTAIN_SUCCESS";
-	case CustomErrorTypes::COUNT_JOIN_ME_RECEIVED:
-		return "COUNT_JOIN_ME_RECEIVED";
-	case CustomErrorTypes::WARN_CONNECT_AS_MASTER_NOT_POSSIBLE:
-		return "WARN_CONNECT_AS_MASTER_NOT_POSSIBLE";
-	case CustomErrorTypes::FATAL_PENDING_NOT_CLEARED:
-		return "FATAL_PENDING_NOT_CLEARED";
-	case CustomErrorTypes::FATAL_PROTECTED_PAGE_ERASE:
-		return "FATAL_PROTECTED_PAGE_ERASE";
-	case CustomErrorTypes::INFO_IGNORING_CONNECTION_SUSTAIN:
-		return "INFO_IGNORING_CONNECTION_SUSTAIN";
-	case CustomErrorTypes::INFO_IGNORING_CONNECTION_SUSTAIN_LEAF:
-		return "INFO_IGNORING_CONNECTION_SUSTAIN_LEAF";
-	case CustomErrorTypes::COUNT_GATT_CONNECT_FAILED:
-		return "COUNT_GATT_CONNECT_FAILED";
-	case CustomErrorTypes::FATAL_PACKET_PROCESSING_FAILED:
-		return "FATAL_PACKET_PROCESSING_FAILED";
-	case CustomErrorTypes::FATAL_PACKET_TOO_BIG:
-		return "FATAL_PACKET_TOO_BIG";
-	case CustomErrorTypes::COUNT_HANDSHAKE_ACK1_DUPLICATE:
-		return "COUNT_HANDSHAKE_ACK1_DUPLICATE";
-	case CustomErrorTypes::COUNT_HANDSHAKE_ACK2_DUPLICATE:
-		return "COUNT_HANDSHAKE_ACK2_DUPLICATE";
-	case CustomErrorTypes::COUNT_ENROLLMENT_NOT_SAVED:
-		return "COUNT_ENROLLMENT_NOT_SAVED";
-	case CustomErrorTypes::COUNT_FLASH_OPERATION_ERROR:
-		return "COUNT_FLASH_OPERATION_ERROR";
-	case CustomErrorTypes::FATAL_WRONG_FLASH_STORAGE_COMMAND:
-		return "FATAL_WRONG_FLASH_STORAGE_COMMAND";
-	case CustomErrorTypes::FATAL_ABORTED_FLASH_TRANSACTION:
-		return "FATAL_ABORTED_FLASH_TRANSACTION";
-	case CustomErrorTypes::FATAL_PACKETQUEUE_PACKET_TOO_BIG:
-		return "FATAL_PACKETQUEUE_PACKET_TOO_BIG";
-	case CustomErrorTypes::FATAL_NO_RECORDSTORAGE_SPACE_LEFT:
-		return "FATAL_NO_RECORDSTORAGE_SPACE_LEFT";
-	case CustomErrorTypes::FATAL_RECORD_CRC_WRONG:
-		return "FATAL_RECORD_CRC_WRONG";
-	case CustomErrorTypes::COUNT_3RD_PARTY_TIMEOUT:
-		return "COUNT_3RD_PARTY_TIMEOUT";
-	case CustomErrorTypes::FATAL_CONNECTION_ALLOCATOR_OUT_OF_MEMORY:
-		return "FATAL_CONNECTION_ALLOCATOR_OUT_OF_MEMORY";
-	case CustomErrorTypes::FATAL_CONNECTION_REMOVED_WHILE_TIME_SYNC:
-		return "FATAL_CONNECTION_REMOVED_WHILE_TIME_SYNC";
-	case CustomErrorTypes::FATAL_COULD_NOT_RETRIEVE_CAPABILITIES:
-		return "FATAL_COULD_NOT_RETRIEVE_CAPABILITIES";
-	default:
-		SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
-		return "UNKNOWN_ERROR";
-	}
-#else
-	return nullptr;
-#endif
-}
-
-const char* FruityHal::getErrorLogRebootReason(RebootReason type)
-{
-#if defined(TERMINAL_ENABLED)
-	switch (type)
-	{
-	case RebootReason::UNKNOWN:
-		return "UNKNOWN";
-	case RebootReason::HARDFAULT:
-		return "HARDFAULT";
-	case RebootReason::APP_FAULT:
-		return "APP_FAULT";
-	case RebootReason::SD_FAULT:
-		return "SD_FAULT";
-	case RebootReason::PIN_RESET:
-		return "PIN_RESET";
-	case RebootReason::WATCHDOG:
-		return "WATCHDOG";
-	case RebootReason::FROM_OFF_STATE:
-		return "FROM_OFF_STATE";
-	case RebootReason::LOCAL_RESET:
-		return "LOCAL_RESET";
-	case RebootReason::REMOTE_RESET:
-		return "REMOTE_RESET";
-	case RebootReason::ENROLLMENT:
-		return "ENROLLMENT";
-	case RebootReason::PREFERRED_CONNECTIONS:
-		return "PREFERRED_CONNECTIONS";
-	case RebootReason::DFU:
-		return "DFU";
-	default:
-		SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
-		return "UNDEFINED";
-	}
-#else
-	return nullptr;
-#endif
-}
-
-const char * FruityHal::getErrorLogError(ErrorTypes type, u32 code)
-{
-#if defined(TERMINAL_ENABLED)
-	switch (type)
-	{
-		case ErrorTypes::SD_CALL_ERROR:
-			return getGeneralErrorString((GeneralHardwareError)code);
-		case ErrorTypes::HCI_ERROR:
-			return getHciErrorString((HciErrorCode)code);
-		case ErrorTypes::CUSTOM:
-			return getErrorLogCustomError((CustomErrorTypes)code);
-		case ErrorTypes::GATT_STATUS:
-			return getGattStatusErrorString(code);
-		case ErrorTypes::REBOOT:
-			return getErrorLogRebootReason((RebootReason)code);
-		default:
-			SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
-			return "UNKNOWN_TYPE";
-	}
-#else
-	return nullptr;
-#endif
-}
-
 u32 * FruityHal::getUicrDataPtr()
 {
 	//We are using a magic number to determine if the UICR data present was put there by fruitydeploy
 	if (NRF_UICR->CUSTOMER[0] == UICR_SETTINGS_MAGIC_WORD) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+		// The following casts away volatile, which is intended behavior and is okay, as the CUSTOMER data won't change during runtime.
 		return (u32*)NRF_UICR->CUSTOMER;
+#pragma GCC diagnostic pop
 	}
 	else if(GS->recordStorage.IsInit()){
 		//On some devices, we are not able to store data in UICR as they are flashed by a 3rd party
@@ -2268,7 +2366,120 @@ void FruityHal::disableUart()
 #endif
 }
 
-void FruityHal::enableUart()
+void FruityHal::UartHandleError(u32 error)
+{
+	//Errorsource is given, but has to be cleared to be handled
+	NRF_UART0->ERRORSRC = error;
+
+	//FIXME: maybe we need some better error handling here
+}
+
+bool FruityHal::UartCheckInputAvailable()
+{
+	return NRF_UART0->EVENTS_RXDRDY == 1;
+}
+
+FruityHal::UartReadCharBlockingResult FruityHal::UartReadCharBlocking()
+{
+	UartReadCharBlockingResult retVal;
+
+#if IS_INACTIVE(GW_SAVE_SPACE)
+	while (NRF_UART0->EVENTS_RXDRDY != 1) {
+		if (NRF_UART0->EVENTS_ERROR) {
+			FruityHal::UartHandleError(NRF_UART0->ERRORSRC);
+			retVal.didError = true;
+		}
+		// Info: No timeout neede here, as we are waiting for user input
+	}
+	NRF_UART0->EVENTS_RXDRDY = 0;
+	retVal.c = NRF_UART0->RXD;
+#endif
+
+	return retVal;
+}
+
+void FruityHal::UartPutStringBlockingWithTimeout(const char* message)
+{
+	uint_fast8_t i = 0;
+	uint8_t byte = message[i++];
+
+	while (byte != '\0')
+	{
+		NRF_UART0->TXD = byte;
+		byte = message[i++];
+
+		int i = 0;
+		while (NRF_UART0->EVENTS_TXDRDY != 1) {
+			//Timeout if it was not possible to put the character
+			if (i > 10000) {
+				return;
+			}
+			i++;
+			//FIXME: Do we need error handling here? Will cause lost characters
+		}
+		NRF_UART0->EVENTS_TXDRDY = 0;
+	}
+}
+
+bool FruityHal::IsUartErroredAndClear()
+{
+	if (nrf_uart_int_enable_check(NRF_UART0, NRF_UART_INT_MASK_ERROR) &&
+		nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_ERROR))
+	{
+		nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_ERROR);
+
+		FruityHal::UartHandleError(NRF_UART0->ERRORSRC);
+
+		return true;
+	}
+	return false;
+}
+
+bool FruityHal::IsUartTimedOutAndClear()
+{
+	if (nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_RXTO))
+	{
+		nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXTO);
+
+		//Restart transmission and clear previous buffer
+		nrf_uart_task_trigger(NRF_UART0, NRF_UART_TASK_STARTRX);
+
+		return true;
+
+		//TODO: can we check if this works???
+	}
+	return false;
+}
+
+FruityHal::UartReadCharResult FruityHal::UartReadChar()
+{
+	UartReadCharResult retVal;
+
+	if (nrf_uart_int_enable_check(NRF_UART0, NRF_UART_INT_MASK_RXDRDY) &&
+		nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_RXDRDY))
+	{
+		//Reads the byte
+		nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXDRDY);
+#ifndef SIM_ENABLED
+		retVal.c = NRF_UART0->RXD;
+#else
+		retVal.c = nrf_uart_rxd_get(NRF_UART0);
+#endif
+		retVal.hasNewChar = true;
+
+		//Disable the interrupt to stop receiving until instructed further
+		nrf_uart_int_disable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
+	}
+
+	return retVal;
+}
+
+void FruityHal::UartEnableReadInterrupt()
+{
+	nrf_uart_int_enable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
+}
+
+void FruityHal::EnableUart(bool promptAndEchoMode)
 {
 	//Configure pins
 	nrf_gpio_pin_set(Boardconfig->uartTXPin);
@@ -2287,13 +2498,16 @@ void FruityHal::enableUart()
 		nrf_uart_hwfc_pins_set(NRF_UART0, Boardconfig->uartRTSPin, Boardconfig->uartCTSPin);
 	}
 
-	//Enable Interrupts + timeout events
-	nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXTO);
-	nrf_uart_int_enable(NRF_UART0, NRF_UART_INT_MASK_RXTO);
+	if (!promptAndEchoMode)
+	{
+		//Enable Interrupts + timeout events
+		nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXTO);
+		nrf_uart_int_enable(NRF_UART0, NRF_UART_INT_MASK_RXTO);
 
-	sd_nvic_SetPriority(UART0_IRQn, APP_IRQ_PRIORITY_LOW);
-	sd_nvic_ClearPendingIRQ(UART0_IRQn);
-	sd_nvic_EnableIRQ(UART0_IRQn);
+		sd_nvic_SetPriority(UART0_IRQn, APP_IRQ_PRIORITY_LOW);
+		sd_nvic_ClearPendingIRQ(UART0_IRQn);
+		sd_nvic_EnableIRQ(UART0_IRQn);
+	}
 
 	//Enable UART
 	nrf_uart_enable(NRF_UART0);
@@ -2307,9 +2521,11 @@ void FruityHal::enableUart()
 	nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_TXDRDY);
 	nrf_uart_task_trigger(NRF_UART0, NRF_UART_TASK_STARTTX);
 
-	//Start receiving RX events
-	FruityHal::enableUartReadInterrupt();
-
+	if (!promptAndEchoMode)
+	{
+		//Start receiving RX events
+		FruityHal::enableUartReadInterrupt();
+	}
 }
 
 void FruityHal::enableUartReadInterrupt()
@@ -2351,27 +2567,4 @@ u32 FruityHal::checkAndHandleUartError()
 	}
 #endif
 	return 0;
-}
-
-bool FruityHal::readUartByte(char * outByte)
-{
-
-	if (nrf_uart_int_enable_check(NRF_UART0, NRF_UART_INT_MASK_RXDRDY) &&
-		nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_RXDRDY))
-	{
-		//Reads the byte
-		nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXDRDY);
-#ifndef SIM_ENABLED
-		*outByte = NRF_UART0->RXD;
-#else
-		*outByte = nrf_uart_rxd_get(NRF_UART0);
-#endif
-
-		//Disable the interrupt to stop receiving until instructed further
-		nrf_uart_int_disable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
-
-		return true;
-	}
-
-	return false;
 }

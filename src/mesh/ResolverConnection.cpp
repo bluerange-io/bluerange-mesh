@@ -41,7 +41,7 @@
  * @param direction
  */
 
-ResolverConnection::ResolverConnection(u8 id, ConnectionDirection direction, fh_ble_gap_addr_t* partnerAddress)
+ResolverConnection::ResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress)
 	: BaseConnection(id, direction, partnerAddress)
 {
 	logt("RCONN", "New Resolver Connection");
@@ -73,5 +73,5 @@ void ResolverConnection::PrintStatus()
 {
 	const char* directionString = (direction == ConnectionDirection::DIRECTION_IN) ? "IN " : "OUT";
 
-	trace("%s RSV state:%u, Queue:%u-%u(%u), Buf%u/%u, hnd:%u" EOL, directionString, (u32)this->connectionState, (packetSendQueue.readPointer - packetSendQueue.bufferStart), (packetSendQueue.writePointer - packetSendQueue.bufferStart), packetSendQueue._numElements, reliableBuffersFree, unreliableBuffersFree, connectionHandle);
+	trace("%s RSV state:%u, Queue:%u-%u(%u), hnd:%u" EOL, directionString, (u32)this->connectionState, (packetSendQueue.readPointer - packetSendQueue.bufferStart), (packetSendQueue.writePointer - packetSendQueue.bufferStart), packetSendQueue._numElements, connectionHandle);
 }

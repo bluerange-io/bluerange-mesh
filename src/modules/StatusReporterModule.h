@@ -169,7 +169,7 @@ private:
 				u16 manufacturerId;
 				u32 serialNumberIndex;
 				u8 chipId[8];
-				fh_ble_gap_addr_t accessAddress;
+				FruityHal::BleGapAddr accessAddress;
 				NetworkId networkId;
 				u32 nodeVersion;
 				i8 dBmRX;
@@ -240,12 +240,12 @@ private:
 		nrf_saadc_value_t m_buffer[BATTERY_SAMPLES_IN_BUFFER];
 #endif
 
-		void SendStatus(NodeId toNode, MessageType messageType) const;
+		void SendStatus(NodeId toNode, u8 requestHandle, MessageType messageType) const;
 		void SendDeviceInfoV2(NodeId toNode, u8 requestHandle, MessageType messageType) const;
-		void SendNearbyNodes(NodeId toNode, MessageType messageType);
-		void SendAllConnections(NodeId toNode, MessageType messageType) const;
-		void SendErrors(NodeId toNode) const;
-		void SendRebootReason(NodeId toNode) const;
+		void SendNearbyNodes(NodeId toNode, u8 requestHandle, MessageType messageType);
+		void SendAllConnections(NodeId toNode, u8 requestHandle, MessageType messageType) const;
+		void SendErrors(NodeId toNode, u8 requestHandle) const;
+		void SendRebootReason(NodeId toNode, u8 requestHandle) const;
 
 		void StartConnectionRSSIMeasurement(MeshConnection& connection) const;
 		void StopConnectionRSSIMeasurement(const MeshConnection& connection) const;
@@ -271,16 +271,16 @@ private:
 		void TimerEventHandler(u16 passedTimeDs) override;
 
 		#ifdef TERMINAL_ENABLED
-		bool TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize) override;
+		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
 		#endif
 
 		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) override;
 
-		void GapAdvertisementReportEventHandler(const GapAdvertisementReportEvent& advertisementReportEvent) override;
+		void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override;
 
 		void MeshConnectionChangedHandler(MeshConnection& connection) override;
 
-		void SendLiveReport(LiveReportTypes type, u32 extra, u32 extra2) const;
+		void SendLiveReport(LiveReportTypes type, u16 requestHandle, u32 extra, u32 extra2) const;
 
 		u8 GetBatteryVoltage() const;
 

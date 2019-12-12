@@ -47,7 +47,7 @@ This module should allow configuration of network id, network key, NodeId and ot
 
 constexpr u8 ENROLLMENT_MODULE_CONFIG_VERSION = 1;
 
-constexpr int ENROLLMENT_MODULE_PRE_ENROLLMENT_TIMEOUT_DS = 60;
+constexpr int ENROLLMENT_MODULE_PRE_ENROLLMENT_TIMEOUT_DS = SEC_TO_DS(15);
 
 
 EnrollmentModule::EnrollmentModule()
@@ -134,32 +134,35 @@ void EnrollmentModule::TimerEventHandler(u16 passedTimeDs)
 }
 
 #ifdef TERMINAL_ENABLED
-bool EnrollmentModule::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
+TerminalCommandHandlerReturnType EnrollmentModule::TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize)
 {
 	//React on commands, return true if handled, false otherwise
 	if(commandArgsSize >= 3 && TERMARGS(2 ,moduleName))
 	{
-		NodeId receiver = (TERMARGS(1,"this")) ? GS->node.configuration.nodeId : atoi(commandArgs[1]);
+		NodeId receiver = Utility::TerminalArgumentToNodeId(commandArgs[1]);
 
 
 		if(TERMARGS(0 ,"action"))
 		{
-			if(commandArgsSize >= 7 && TERMARGS(3,"basic"))
+			if(TERMARGS(3,"basic"))
 			{
+				if (commandArgsSize < 7) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 				EnrollmentModuleSetEnrollmentBySerialMessage enrollmentMessage;
 				CheckedMemset(&enrollmentMessage, 0x00, SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE);
 
 				//We clear the nodeKey with all F's for invalid key
 				CheckedMemset(enrollmentMessage.nodeKey.getRaw(), 0xFF, sizeof(enrollmentMessage.nodeKey));
 
+				bool didError = false;
+
 				enrollmentMessage.serialNumberIndex = Utility::GetIndexForSerial(commandArgs[4]);
-				enrollmentMessage.newNodeId = atoi(commandArgs[5]);
-				enrollmentMessage.newNetworkId = atoi(commandArgs[6]);
+				enrollmentMessage.newNodeId = Utility::StringToU16(commandArgs[5], &didError);
+				enrollmentMessage.newNetworkId = Utility::StringToU16(commandArgs[6], &didError);
 				if (enrollmentMessage.newNodeId == 0 || enrollmentMessage.newNetworkId <= 1)
 				{
 					// Neither nodeId == 0 nor networkId == 0 are correct enrollments.
 					// networkId == 1 is the enrollment network and also must not be used.
-					return false;
+					return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
 				}
 				if(commandArgsSize > 7){
 					Logger::parseEncodedStringToBuffer(commandArgs[7], enrollmentMessage.newNetworkKey.getRaw(), 16);
@@ -173,9 +176,11 @@ bool EnrollmentModule::TerminalCommandHandler(char* commandArgs[], u8 commandArg
 				if(commandArgsSize > 10){
 					Logger::parseEncodedStringToBuffer(commandArgs[10], enrollmentMessage.nodeKey.getRaw(), 16);
 				}
-				enrollmentMessage.timeoutSec = commandArgsSize > 11? atoi(commandArgs[11]) : 10;
-				enrollmentMessage.enrollOnlyIfUnenrolled = commandArgsSize > 12 ? atoi(commandArgs[12]) : 0;
-				u8 requestHandle = commandArgsSize > 13 ? atoi(commandArgs[13]) : 0;
+				enrollmentMessage.timeoutSec = commandArgsSize > 11? Utility::StringToU8(commandArgs[11], &didError) : 10;
+				enrollmentMessage.enrollOnlyIfUnenrolled = commandArgsSize > 12 ? Utility::StringToU8(commandArgs[12], &didError) : 0;
+				u8 requestHandle = commandArgsSize > 13 ? Utility::StringToU8(commandArgs[13], &didError) : 0;
+
+				if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
 
 				SendModuleActionMessage(
 					MessageType::MODULE_TRIGGER_ACTION,
@@ -187,14 +192,36 @@ bool EnrollmentModule::TerminalCommandHandler(char* commandArgs[], u8 commandArg
 					false
 				);
 
-				return true;
-			} else if(commandArgsSize > 4 && TERMARGS(3, "remove"))
+				return TerminalCommandHandlerReturnType::SUCCESS;
+			}
+
+			else if (TERMARGS(3, "set_network")) {
+				if (commandArgsSize < 5) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+				EnrollmentModuleSetNetworkMessage setNetworkMessage;
+				CheckedMemset(&setNetworkMessage, 0x00, sizeof(setNetworkMessage));
+				setNetworkMessage.newNetworkId = Utility::StringToU16(commandArgs[4]);
+				u8 requestHandle = commandArgsSize > 5 ? Utility::StringToU8(commandArgs[5]) : 0;
+
+				SendModuleActionMessage(
+					MessageType::MODULE_TRIGGER_ACTION,
+					receiver,
+					(u8)EnrollmentModuleTriggerActionMessages::SET_NETWORK,
+					requestHandle,
+					(u8*)&setNetworkMessage,
+					sizeof(EnrollmentModuleSetNetworkMessage),
+					false
+				);
+				return TerminalCommandHandlerReturnType::SUCCESS;
+			}
+
+			else if(TERMARGS(3, "remove"))
 			{
+				if (commandArgsSize < 5) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 				EnrollmentModuleRemoveEnrollmentMessage message;
 				CheckedMemset(&message, 0x00, SIZEOF_ENROLLMENT_MODULE_REMOVE_ENROLLMENT);
 
 				message.serialNumberIndex = Utility::GetIndexForSerial(commandArgs[4]);
-				u8 requestHandle = commandArgsSize > 5 ? atoi(commandArgs[5]) : 0;
+				u8 requestHandle = commandArgsSize > 5 ? Utility::StringToU8(commandArgs[5]) : 0;
 
 
 				SendModuleActionMessage(
@@ -207,7 +234,7 @@ bool EnrollmentModule::TerminalCommandHandler(char* commandArgs[], u8 commandArg
 					false
 				);
 
-				return true;
+				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
 		}
 	}
@@ -255,12 +282,42 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 			} else if(actionType == EnrollmentModuleTriggerActionMessages::REMOVE_ENROLLMENT)
 			{
 				EnrollmentModuleRemoveEnrollmentMessage* data = (EnrollmentModuleRemoveEnrollmentMessage*)packet->data;
-
 				if(data->serialNumberIndex == RamConfig->GetSerialNumberIndex())
 				{
-
 					Unenroll(packet, sendData->dataLength);
 				}
+			}
+			else if (actionType == EnrollmentModuleTriggerActionMessages::SET_NETWORK)
+			{
+				EnrollmentModuleSetNetworkMessage* data = (EnrollmentModuleSetNetworkMessage*)packet->data;
+
+				EnrollmentModuleSetNetworkResponseMessage response;
+				CheckedMemset(&response, 0, sizeof(response));
+				response.response = EnrollmentModuleSetNetworkResponse::INVALID;
+				
+				if (GET_DEVICE_TYPE() == DeviceType::ASSET)
+				{
+					GS->node.configuration.networkId = data->newNetworkId;
+					MeshAccessModule* maMod = (MeshAccessModule*)GS->node.GetModuleById(ModuleId::MESH_ACCESS_MODULE);
+					if (maMod != nullptr) {
+						maMod->UpdateMeshAccessBroadcastPacket();
+					}
+					response.response = EnrollmentModuleSetNetworkResponse::SUCCESS;
+				}
+				else
+				{
+					response.response = EnrollmentModuleSetNetworkResponse::NOT_AN_ASSET;
+				}
+
+				SendModuleActionMessage(
+					MessageType::MODULE_ACTION_RESPONSE,
+					packet->header.sender,
+					(u8)EnrollmentModuleActionResponseMessages::SET_NETWORK_RESPONSE,
+					packet->requestHandle,
+					(u8*)&response,
+					sizeof(response),
+					false
+				);
 			}
 		}
 	}
@@ -274,8 +331,9 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 		{
 			EnrollmentModuleActionResponseMessages actionType = (EnrollmentModuleActionResponseMessages)packet->actionType;
 			if(
-					actionType == EnrollmentModuleActionResponseMessages::ENROLLMENT_RESPONSE
-					|| actionType == EnrollmentModuleActionResponseMessages::REMOVE_ENROLLMENT_RESPONSE
+				(actionType == EnrollmentModuleActionResponseMessages::ENROLLMENT_RESPONSE
+				|| actionType == EnrollmentModuleActionResponseMessages::REMOVE_ENROLLMENT_RESPONSE)
+				&& sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE + sizeof(EnrollmentModuleEnrollmentResponse)
 			){
 				EnrollmentModuleEnrollmentResponse* data = (EnrollmentModuleEnrollmentResponse*)packet->data;
 
@@ -290,12 +348,25 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 					if (connection != nullptr) {
 						connection->DisconnectAndRemove(AppDisconnectReason::ENROLLMENT_RESPONSE_RECEIVED);
 					}
+
+					//We need to send that packet back to our mesh that we were handling the enrollment
+					//This is not done automatically as the packet is not whitelisted by the MeshAccessConnection
+					//Because we are connected using a node key
+					SendModuleActionMessage(
+						MessageType::MODULE_ACTION_RESPONSE,
+						NODE_ID_BROADCAST,
+						(u8)packet->actionType,
+						packet->requestHandle,
+						(u8*)data,
+						sizeof(EnrollmentModuleEnrollmentResponse),
+						false
+					);
 				}
 
 				const char* cmdName = packet->actionType == (u8)EnrollmentModuleActionResponseMessages::ENROLLMENT_RESPONSE ? "enroll_response_serial" : "remove_enroll_response_serial";
 
 				logjson("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"%s\",\"module\":%d,", packet->header.sender, cmdName, (u32)moduleId);
-				logjson("ENROLLMOD", "\"requestId\":%u,\"serialNumber\":\"%s\",\"code\":%u}" SEP,  packet->requestHandle, serialNumber, data->result);
+				logjson("ENROLLMOD", "\"requestId\":%u,\"serialNumber\":\"%s\",\"code\":%u}" SEP,  packet->requestHandle, serialNumber, (u32)data->result);
 			}
 			else if(actionType == EnrollmentModuleActionResponseMessages::ENROLLMENT_PROPOSAL)
 			{
@@ -303,6 +374,12 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 
 				logjson("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"enroll_proposal\",\"module\":%d,", packet->header.sender, (u32)moduleId);
 				logjson("ENROLLMOD", "\"proposals\":[%u,%u,%u]}" SEP, data->serialNumberIndex[0], data->serialNumberIndex[1], data->serialNumberIndex[2]);
+			}
+			else if (actionType == EnrollmentModuleActionResponseMessages::SET_NETWORK_RESPONSE)
+			{
+				EnrollmentModuleSetNetworkResponseMessage* data = (EnrollmentModuleSetNetworkResponseMessage*)packet->data;
+
+				logjson("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"set_network_response\",\"code\":%d,\"module\":%d,\"requestHandle\":%d}" SEP, packet->header.sender, (u32)data->response, (u32)packet->moduleId, (u32)packet->requestHandle);
 			}
 		}
 	}
@@ -323,16 +400,14 @@ void EnrollmentModule::Enroll(connPacketModule* packet, u16 packetLength)
 		GS->node.configuration.enrollmentState == EnrollmentState::ENROLLED
 		&& GS->node.configuration.nodeId == data->newNodeId
 		&& GS->node.configuration.networkId == data->newNetworkId
-		&& (CHECK_MSG_SIZE(packet, data->newNetworkKey.getRaw(), 16, packetLength) && memcmp(data->newNetworkKey.getRaw(), GS->node.configuration.networkKey, 16) == 0)
-		&& (CHECK_MSG_SIZE(packet, data->newUserBaseKey.getRaw(), 16, packetLength) && memcmp(data->newUserBaseKey.getRaw(), GS->node.configuration.userBaseKey, 16) == 0)
-		&& (CHECK_MSG_SIZE(packet, data->newOrganizationKey.getRaw(), 16, packetLength) && memcmp(data->newOrganizationKey.getRaw(), GS->node.configuration.organizationKey, 16) == 0)
+		&& (!CHECK_MSG_SIZE(packet, data->newNetworkKey.getRaw(),      16, packetLength) || Utility::CompareMem(0, data->newNetworkKey     .getRaw(), 16) || memcmp(data->newNetworkKey.getRaw(),      GS->node.configuration.networkKey,      16) == 0)
+		&& (!CHECK_MSG_SIZE(packet, data->newUserBaseKey.getRaw(),     16, packetLength) || Utility::CompareMem(0, data->newUserBaseKey    .getRaw(), 16) || memcmp(data->newUserBaseKey.getRaw(),     GS->node.configuration.userBaseKey,     16) == 0)
+		&& (!CHECK_MSG_SIZE(packet, data->newOrganizationKey.getRaw(), 16, packetLength) || Utility::CompareMem(0, data->newOrganizationKey.getRaw(), 16) || memcmp(data->newOrganizationKey.getRaw(), GS->node.configuration.organizationKey, 16) == 0)
 	){
 		// Already enrolled with same data, send ok, do not reboot
 		SendEnrollmentResponse(
 				EnrollmentModuleActionResponseMessages::ENROLLMENT_RESPONSE,
-				NODE_ID_BROADCAST, //To be sure because own node id changes
-				RamConfig->GetSerialNumberIndex(),
-				ENROLL_RESPONSE_OK,
+				EnrollmentResponseCode::OK,
 				packet->requestHandle);
 
 		return;
@@ -345,9 +420,7 @@ void EnrollmentModule::Enroll(connPacketModule* packet, u16 packetLength)
 		// Node is enrolled with different data, send an error
 		SendEnrollmentResponse(
 				EnrollmentModuleActionResponseMessages::ENROLLMENT_RESPONSE,
-				NODE_ID_BROADCAST, //To be sure because own node id changes
-				RamConfig->GetSerialNumberIndex(),
-				ENROLL_RESPONSE_ALREADY_ENROLLED_WITH_DIFFERENT_DATA,
+				EnrollmentResponseCode::ALREADY_ENROLLED_WITH_DIFFERENT_DATA,
 				packet->requestHandle);
 
 		return;
@@ -361,32 +434,36 @@ void EnrollmentModule::SaveEnrollment(connPacketModule* packet, u16 packetLength
 {
 	EnrollmentModuleSetEnrollmentBySerialMessage* data = (EnrollmentModuleSetEnrollmentBySerialMessage*)packet->data;
 
-	//First, clear all settings that are stored on the chip
-	//GS->recordStorage.ClearAllSettings();
-
 	//Save values to persistent config of the node
 	GS->node.configuration.enrollmentState = EnrollmentState::ENROLLED;
 	if(data->newNodeId != 0) GS->node.configuration.nodeId = data->newNodeId;
+
 	GS->node.configuration.networkId = data->newNetworkId;
 
 	if(
 		CHECK_MSG_SIZE(packet, data->newNetworkKey.getRaw(), 16, packetLength)
 		&& !Utility::CompareMem(0x00, data->newNetworkKey.getRaw(), 16)
 	){
-		memcpy(GS->node.configuration.networkKey, data->newNetworkKey.getRaw(), 16);
+		CheckedMemcpy(GS->node.configuration.networkKey, data->newNetworkKey.getRaw(), 16);
 	}
 	if(
 		CHECK_MSG_SIZE(packet, data->newUserBaseKey.getRaw(), 16, packetLength)
 		&& !Utility::CompareMem(0x00, data->newUserBaseKey.getRaw(), 16)
 	){
-		memcpy(GS->node.configuration.userBaseKey, data->newUserBaseKey.getRaw(), 16);
+		CheckedMemcpy(GS->node.configuration.userBaseKey, data->newUserBaseKey.getRaw(), 16);
 	}
 	if(
 		CHECK_MSG_SIZE(packet, data->newOrganizationKey.getRaw(), 16, packetLength)
 		&& !Utility::CompareMem(0x00, data->newOrganizationKey.getRaw(), 16)
 	){
-		memcpy(GS->node.configuration.organizationKey, data->newOrganizationKey.getRaw(), 16);
+		CheckedMemcpy(GS->node.configuration.organizationKey, data->newOrganizationKey.getRaw(), 16);
 	}
+
+
+	//Cache some of the data in a struct to have it available when it is saved
+	SaveEnrollmentAction userData;
+	userData.sender = packet->header.sender;
+	userData.requestHandle = packet->requestHandle;
 
 	//Stop advertising until reboot
 	MeshAccessModule* maModule = (MeshAccessModule*)GS->node.GetModuleById(ModuleId::MESH_ACCESS_MODULE);
@@ -396,13 +473,6 @@ void EnrollmentModule::SaveEnrollment(connPacketModule* packet, u16 packetLength
 
 	//Stop advertising immediately
 	GS->advertisingController.Deactivate();
-
-
-	//Cache some of the data in a struct to have it available when it is saved
-	SaveEnrollmentAction userData;
-	userData.sender = packet->header.sender;
-	userData.requestHandle = packet->requestHandle;
-
 	//Save the new node config to flash
 	GS->recordStorage.SaveRecord(
 		(u16)ModuleId::NODE,
@@ -411,7 +481,8 @@ void EnrollmentModule::SaveEnrollment(connPacketModule* packet, u16 packetLength
 		this,
 		(u32)EnrollmentModuleSaveActions::SAVE_ENROLLMENT_ACTION,
 		(u8*)&userData,
-		sizeof(SaveEnrollmentAction));
+		sizeof(SaveEnrollmentAction),
+		moduleId);
 }
 
 void EnrollmentModule::Unenroll(connPacketModule* packet, u16 packetLength)
@@ -425,9 +496,7 @@ void EnrollmentModule::Unenroll(connPacketModule* packet, u16 packetLength)
 		// Already enrolled with same data, send ok, do not reboot
 		SendEnrollmentResponse(
 				EnrollmentModuleActionResponseMessages::REMOVE_ENROLLMENT_RESPONSE,
-				NODE_ID_BROADCAST, //To be sure because own node id changes
-				RamConfig->GetSerialNumberIndex(),
-				ENROLL_RESPONSE_OK,
+				EnrollmentResponseCode::OK,
 				packet->requestHandle);
 
 		return;
@@ -468,7 +537,8 @@ void EnrollmentModule::SaveUnenrollment(connPacketModule* packet, u16 packetLeng
 		this,
 		(u32)EnrollmentModuleSaveActions::SAVE_REMOVE_ENROLLMENT_ACTION,
 		(u8*)&userData,
-		sizeof(SaveEnrollmentAction));
+		sizeof(SaveEnrollmentAction),
+		moduleId);
 }
 
 #define _____________PRE_ENROLLMENT_____________
@@ -480,7 +550,7 @@ void EnrollmentModule::StoreTemporaryEnrollmentDataAndDispatch(connPacketModule*
 	ted.state = EnrollmentStates::PREENROLLMENT_RUNNING;
 	ted.endTimeDs = GS->appTimerDs + ENROLLMENT_MODULE_PRE_ENROLLMENT_TIMEOUT_DS;
 	ted.packetLength = packetLength;
-	memcpy(&ted.requestHeader, packet, packetLength);
+	CheckedMemcpy(&ted.requestHeader, packet, packetLength);
 
 	DispatchPreEnrollment(nullptr, PreEnrollmentReturnCode::DONE);
 }
@@ -528,16 +598,12 @@ void EnrollmentModule::DispatchPreEnrollment(Module* lastModuleCalled, PreEnroll
 
 	logt("ENROLLMOD", "PreEnrollment succeeded");
 
-
-	// Set to not enrolling to ensure that the PreEnrollmentTimeout doesn't trigger in the meantime
-	ted.state = EnrollmentStates::NOT_ENROLLING;
-
-	if(ted.requestHeader.actionType == (u8)EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_SERIAL){
-		SaveEnrollment(&ted.requestHeader, ted.packetLength);
-	}
-	else if(ted.requestHeader.actionType == (u8)EnrollmentModuleTriggerActionMessages::REMOVE_ENROLLMENT)
+	//First, clear all settings that are stored on the chip
+	RecordStorageResultCode errorCode = GS->recordStorage.LockDownAndClearAllSettings(moduleId, this, (u32)EnrollmentModuleSaveActions::ERASE_RECORD_STORAGE);
+	if (errorCode != RecordStorageResultCode::SUCCESS)
 	{
-		SaveUnenrollment(&ted.requestHeader, ted.packetLength);
+		logt("ERROR", "Could not save because %u", (u32)errorCode);
+		GS->logger.logCustomError(CustomErrorTypes::WARN_ENROLLMENT_LOCK_DOWN_FAILED, (u16)errorCode);
 	}
 }
 
@@ -552,9 +618,7 @@ void EnrollmentModule::PreEnrollmentFailed()
 	//Send a response to the enroller that the preenrollment failed
 	SendEnrollmentResponse(
 			EnrollmentModuleActionResponseMessages::ENROLLMENT_RESPONSE,
-			NODE_ID_BROADCAST, //To be sure because own node id changes
-			RamConfig->GetSerialNumberIndex(),
-			ENROLL_RESPONSE_PREENROLLMENT_FAILED,
+			EnrollmentResponseCode::PREENROLLMENT_FAILED,
 			ted.requestHeader.requestHandle);
 }
 
@@ -611,8 +675,9 @@ void EnrollmentModule::EnrollOverMesh(connPacketModule* packet, u16 packetLength
 	//enrollment, but we cannot easily distinguish between used and unused meshAccessConnections
 	BaseConnections conns = GS->cm.GetConnectionsOfType(ConnectionType::MESH_ACCESS, ConnectionDirection::INVALID);
 	for(u32 i=0; i<conns.count; i++){
-		BaseConnection *conn = GS->cm.allConnections[conns.connectionIndizes[i]];
-		if (conn != nullptr) {
+		MeshAccessConnection *conn = (MeshAccessConnection*)GS->cm.allConnections[conns.connectionIndizes[i]];
+		//We make sure that we do not disconnect the sender of the enrollment
+		if (conn != nullptr && conn->virtualPartnerId != packet->header.sender) {
 			conn->DisconnectAndRemove(AppDisconnectReason::NEEDED_FOR_ENROLLMENT);
 		}
 	}
@@ -631,11 +696,7 @@ void EnrollmentModule::EnrollOverMesh(connPacketModule* packet, u16 packetLength
 	//TODO: Should use a scancontroller that allows job handling
 	ted.state = EnrollmentStates::SCANNING;
 
-	ScanJob scanJob = ScanJob();
-	scanJob.type = ScanState::HIGH;
-	scanJob.state = ScanJobState::ACTIVE;
-	GS->scanController.RemoveJob(p_scanJob);
-	p_scanJob = GS->scanController.AddJob(scanJob);
+	GS->scanController.UpdateJobPointer(&p_scanJob, ScanState::HIGH, ScanJobState::ACTIVE);
 
 	//=> Next, we simple wait for the timeout or if a handler is called with a matching advertisement
 
@@ -643,7 +704,7 @@ void EnrollmentModule::EnrollOverMesh(connPacketModule* packet, u16 packetLength
 }
 
 //This is triggered once we receive an advertising of a node that should be enrolled over the mesh
-void EnrollmentModule::EnrollNodeViaMeshAccessConnection(fh_ble_gap_addr_t& addr, const meshAccessServiceAdvMessage* advMessage)
+void EnrollmentModule::EnrollNodeViaMeshAccessConnection(FruityHal::BleGapAddr& addr, const meshAccessServiceAdvMessage* advMessage)
 {
 	if(ted.state != EnrollmentStates::SCANNING) return;
 
@@ -694,13 +755,13 @@ void EnrollmentModule::EnrollmentConnectionConnectedHandler()
 	
 	//We need to overwrite the receiver as our node might have been instructed to enroll the remote node
 	//If we send the message unmodified, our partner would not accept the packet as it was not adressed to him
-	ted.requestHeader.header.receiver = conn->virtualPartnerId;
+	ted.requestHeader.header.receiver = conn != nullptr ? conn->virtualPartnerId : 0;
 
 	//Send the enrollment to our partner after we are connected
 	u8 len = SIZEOF_CONN_PACKET_MODULE + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE;
 	DYNAMIC_ARRAY(buffer, len);
-	memcpy(buffer, &ted.requestHeader, SIZEOF_CONN_PACKET_MODULE);
-	memcpy(buffer + SIZEOF_CONN_PACKET_MODULE, &ted.requestData, SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE);
+	CheckedMemcpy(buffer, &ted.requestHeader, SIZEOF_CONN_PACKET_MODULE);
+	CheckedMemcpy(buffer + SIZEOF_CONN_PACKET_MODULE, &ted.requestData, SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE);
 
 	logt("ENROLLMOD", "Sender was %u", ted.requestHeader.header.sender);
 
@@ -712,22 +773,22 @@ void EnrollmentModule::EnrollmentConnectionConnectedHandler()
 	ted.state = EnrollmentStates::MESSAGE_SENT;
 }
 
-void EnrollmentModule::SendEnrollmentResponse(EnrollmentModuleActionResponseMessages responseType, NodeId receiver, u32 serialNumberIndex, u8 result, u8 requestHandle) const
+void EnrollmentModule::SendEnrollmentResponse(EnrollmentModuleActionResponseMessages responseType, EnrollmentResponseCode result, u8 requestHandle) const
 {
 	//Pay attention when testing: This command is sent to the node that requested the enrollment
 	//If only testing on a single node, its nodeId will have changed after it was enrolled, so it will not
 	//receive the response itself
 
-	logt("WARNING", "Sending enrollment response %u", result);
+	logt("WARNING", "Sending enrollment response %u", (u32)result);
 
 	//Inform the sender, that the enrollment was successful
 	EnrollmentModuleEnrollmentResponse data;
 	data.result = result;
-	data.serialNumberIndex = serialNumberIndex;
+	data.serialNumberIndex = RamConfig->GetSerialNumberIndex();
 
 	SendModuleActionMessage(
 		MessageType::MODULE_ACTION_RESPONSE,
-		receiver,
+		NODE_ID_BROADCAST,
 		(u8)responseType,
 		requestHandle,
 		(u8*)&data,
@@ -768,12 +829,13 @@ void EnrollmentModule::ButtonHandler(u8 buttonId, u32 holdTimeDs)
 #endif
 
 
-void EnrollmentModule::GapAdvertisementReportEventHandler(const GapAdvertisementReportEvent& advertisementReportEvent)
+void EnrollmentModule::GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent)
 {
 	if(!configuration.moduleActive) return;
 
-	fh_ble_gap_addr_t addr;
-	memcpy(addr.addr, advertisementReportEvent.getPeerAddr(), BLE_GAP_ADDR_LEN);
+	FruityHal::BleGapAddr addr;
+	CheckedMemset(&addr, 0, sizeof(addr));
+	CheckedMemcpy(addr.addr, advertisementReportEvent.getPeerAddr(), BLE_GAP_ADDR_LEN);
 	addr.addr_type = advertisementReportEvent.getPeerAddrType();
 	const u8* data = advertisementReportEvent.getData();
 	u16 dataLength = advertisementReportEvent.getDataLength();
@@ -787,7 +849,7 @@ void EnrollmentModule::GapAdvertisementReportEventHandler(const GapAdvertisement
 		&& dataLength >= SIZEOF_MESH_ACCESS_SERVICE_DATA_ADV_MESSAGE
 		&& message->flags.type == BLE_GAP_AD_TYPE_FLAGS
 		&& message->serviceUuids.uuid == SERVICE_DATA_SERVICE_UUID16
-		&& message->serviceData.messageType == SERVICE_DATA_MESSAGE_TYPE_MESH_ACCESS
+		&& message->serviceData.data.messageType == ServiceDataMessageType::MESH_ACCESS
 	){
 		//Check if the nearby serial is in our proposal list and save it if it is not
 		//This will ensure that the list of proposals is always changing "randomly"
@@ -817,15 +879,13 @@ void EnrollmentModule::RecordStorageEventHandler(u16 recordId, RecordStorageResu
 	{
 		SaveEnrollmentAction* data = (SaveEnrollmentAction*)userData;
 
-		//Set ted state to not enrolling so that a timeout won't trigger
+		//Set ted state to not enrolling so that a timeout won't trigger, also ted is not used anymore
 		ted.state = EnrollmentStates::NOT_ENROLLING;
 
 		SendEnrollmentResponse(
-				EnrollmentModuleActionResponseMessages::ENROLLMENT_RESPONSE,
-				NODE_ID_BROADCAST, //To be sure because own node id changes
-				RamConfig->GetSerialNumberIndex(),
-				(u8)resultCode,
-				data->requestHandle);
+			EnrollmentModuleActionResponseMessages::ENROLLMENT_RESPONSE,
+			(EnrollmentResponseCode)resultCode,
+			data->requestHandle);
 
 		if(resultCode == RecordStorageResultCode::SUCCESS){
 			//Enable green light, first switch io module led control off
@@ -838,7 +898,8 @@ void EnrollmentModule::RecordStorageEventHandler(u16 recordId, RecordStorageResu
 			GS->ledBlue.Off();
 
 			// Reboot after successful enroll
-			//TODO: Should ideally listen for an event that the message has been sent
+			// If the reboot happened before we were able to sent the success message,
+			// the response will be sent once the enroller will try to enroll us again.
 			GS->node.Reboot(SEC_TO_DS(4), RebootReason::ENROLLMENT);
 		} else {
 			logt("ERROR", "Could not save because %u", (u32)resultCode);
@@ -849,24 +910,42 @@ void EnrollmentModule::RecordStorageEventHandler(u16 recordId, RecordStorageResu
 	{
 		SaveEnrollmentAction* saveData = (SaveEnrollmentAction*)userData;
 
-		//Set ted state to not enrolling so that a timeout won't trigger
+		//Set ted state to not enrolling so that a timeout won't trigger, also ted is not used anymore
 		ted.state = EnrollmentStates::NOT_ENROLLING;
 
 		//Inform the sender, that the enrollment was removed successfully
 		if(saveData->sender != 0){
 			SendEnrollmentResponse(
 					EnrollmentModuleActionResponseMessages::REMOVE_ENROLLMENT_RESPONSE,
-					NODE_ID_BROADCAST, //To be sure because own node id changes
-					RamConfig->GetSerialNumberIndex(),
-					(u8)resultCode,
+					(EnrollmentResponseCode)resultCode,
 					saveData->requestHandle);
 		}
 
 		if(resultCode == RecordStorageResultCode::SUCCESS){
-			GS->node.Reboot(SEC_TO_DS(4), RebootReason::ENROLLMENT);
+			logt("ENROLLMOD", "Unenrollment successful");
+			GS->node.Reboot(SEC_TO_DS(1), RebootReason::ENROLLMENT_REMOVE);
 		} else {
 			logt("ERROR", "Could not save because %u", (u32)resultCode);
 			GS->logger.logCustomError(CustomErrorTypes::COUNT_ENROLLMENT_NOT_SAVED, (u16)resultCode);
+		}
+	}
+	else if (userType == (u32)EnrollmentModuleSaveActions::ERASE_RECORD_STORAGE)
+	{
+		if (resultCode == RecordStorageResultCode::SUCCESS)
+		{
+			if (ted.requestHeader.actionType == (u8)EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_SERIAL)
+			{
+				SaveEnrollment(&ted.requestHeader, ted.packetLength);
+			}
+			else if (ted.requestHeader.actionType == (u8)EnrollmentModuleTriggerActionMessages::REMOVE_ENROLLMENT)
+			{
+				SaveUnenrollment(&ted.requestHeader, ted.packetLength);
+			}
+		}
+		else
+		{
+			logt("ERROR", "Could not save because %u", (u32)resultCode);
+			GS->logger.logCustomError(CustomErrorTypes::WARN_ENROLLMENT_ERASE_FAILED, (u16)resultCode);
 		}
 	}
 }

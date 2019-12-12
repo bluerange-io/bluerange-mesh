@@ -42,6 +42,7 @@ Logger::Logger()
 {
 	errorLogPosition = 0;
 	activeLogTags.zeroData();
+	CheckedMemset(errorLog, 0, sizeof(errorLog));
 }
 
 Logger & Logger::getInstance()
@@ -145,6 +146,9 @@ void Logger::uart_error_f(UartErrorType type) const
 		case UartErrorType::TOO_MANY_ARGUMENTS:
 			logjson("ERROR", "{\"type\":\"error\",\"code\":3,\"text\":\"Too many arguments\"}" SEP);
 			break;
+		case UartErrorType::TOO_FEW_ARGUMENTS:
+			logjson("ERROR", "{\"type\":\"error\",\"code\":4,\"text\":\"Too few arguments\"}" SEP);
+			break;
 		default:
 			logjson("ERROR", "{\"type\":\"error\",\"code\":%u,\"text\":\"Unknown Error\"}" SEP, (u32)type);
 			break;
@@ -177,7 +181,11 @@ void Logger::enableTag(const char* tag)
 	if (!found && emptySpot >= 0) {
 		strcpy(&activeLogTags[emptySpot * MAX_LOG_TAG_LENGTH], tagUpper);
 	}
-	else if (!found && emptySpot < 0) logt("ERROR", "Too many tags");
+	else if (!found && emptySpot < 0)
+	{
+		logt("ERROR", "Too many tags");
+		SIMEXCEPTION(IllegalStateException);
+	}
 
 	return;
 
@@ -248,7 +256,10 @@ void Logger::toggleTag(const char* tag)
 	if (!found && emptySpot >= 0) {
 		strcpy(&activeLogTags[emptySpot * MAX_LOG_TAG_LENGTH], tagUpper);
 	}
-	else if (!found && emptySpot < 0) logt("ERROR", "Too many tags");
+	else if (!found && emptySpot < 0) {
+		logt("ERROR", "Too many tags");
+		SIMEXCEPTION(IllegalStateException);
+	}
 
 #endif
 }
@@ -268,7 +279,7 @@ void Logger::printEnabledTags() const
 }
 
 #ifdef TERMINAL_ENABLED
-bool Logger::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
+TerminalCommandHandlerReturnType Logger::TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize)
 {
 #if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
 	if (TERMARGS(0, "debug") && commandArgsSize >= 2)
@@ -286,36 +297,483 @@ bool Logger::TerminalCommandHandler(char* commandArgs[], u8 commandArgsSize)
 			toggleTag(commandArgs[1]);
 		}
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	else if (TERMARGS(0, "debugtags"))
 	{
 		printEnabledTags();
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 	else if (TERMARGS(0, "errors"))
 	{
 		for(int i=0; i<errorLogPosition; i++){
-			if(errorLog[i].errorType == ErrorTypes::HCI_ERROR)
+			if(errorLog[i].errorType == LoggingError::HCI_ERROR)
 			{
-				trace("HCI %u %s @%u" EOL, errorLog[i].errorCode, FruityHal::getHciErrorString((FruityHal::HciErrorCode)errorLog[i].errorCode), errorLog[i].timestamp);
+				trace("HCI %u %s @%u" EOL, errorLog[i].errorCode, Logger::getHciErrorString((FruityHal::BleHciError)errorLog[i].errorCode), errorLog[i].timestamp);
 			}
-			else if(errorLog[i].errorType == ErrorTypes::SD_CALL_ERROR)
+			else if(errorLog[i].errorType == LoggingError::GENERAL_ERROR)
 			{
-				trace("SD %u %s @%u" EOL, errorLog[i].errorCode, FruityHal::getGeneralErrorString((FruityHal::GeneralHardwareError)errorLog[i].errorCode), errorLog[i].timestamp);
+				trace("GENERAL %u %s @%u" EOL, errorLog[i].errorCode, Logger::getGeneralErrorString((ErrorType)errorLog[i].errorCode), errorLog[i].timestamp);
 			} else {
 				trace("CUSTOM %u %u @%u" EOL, (u32)errorLog[i].errorType, errorLog[i].errorCode, errorLog[i].timestamp);
 			}
 		}
 
-		return true;
+		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 
 #endif
-	return false;
+	return TerminalCommandHandlerReturnType::UNKNOWN;
 }
 #endif
+
+const char* Logger::getErrorLogErrorType(LoggingError type)
+{
+#if defined(TERMINAL_ENABLED)
+	switch (type)
+	{
+	case LoggingError::GENERAL_ERROR:
+		return "GENERAL_ERROR";
+	case LoggingError::HCI_ERROR:
+		return "HCI_ERROR";
+	case LoggingError::CUSTOM:
+		return "CUSTOM";
+	case LoggingError::GATT_STATUS:
+		return "GATT_STATUS";
+	case LoggingError::REBOOT:
+		return "REBOOT";
+	default:
+		SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
+		return "UNKNOWN_ERROR";
+	}
+#else
+	return nullptr;
+#endif
+}
+
+const char* Logger::getErrorLogCustomError(CustomErrorTypes type)
+{
+#if defined(TERMINAL_ENABLED)
+	switch (type)
+	{
+	case CustomErrorTypes::FATAL_BLE_GATTC_EVT_TIMEOUT_FORCED_US:
+		return "FATAL_BLE_GATTC_EVT_TIMEOUT_FORCED_US";
+	case CustomErrorTypes::INFO_TRYING_CONNECTION_SUSTAIN:
+		return "INFO_TRYING_CONNECTION_SUSTAIN";
+	case CustomErrorTypes::WARN_CONNECTION_SUSTAIN_FAILED_TO_ESTABLISH:
+		return "WARN_CONNECTION_SUSTAIN_FAILED_TO_ESTABLISH";
+	case CustomErrorTypes::COUNT_CONNECTION_SUCCESS:
+		return "COUNT_CONNECTION_SUCCESS";
+	case CustomErrorTypes::COUNT_HANDSHAKE_DONE:
+		return "COUNT_HANDSHAKE_DONE";
+	case CustomErrorTypes::WARN_HANDSHAKE_TIMEOUT:
+		return "WARN_HANDSHAKE_TIMEOUT";
+	case CustomErrorTypes::WARN_CM_FAIL_NO_SPOT:
+		return "WARN_CM_FAIL_NO_SPOT";
+	case CustomErrorTypes::FATAL_QUEUE_NUM_MISMATCH:
+		return "FATAL_QUEUE_NUM_MISMATCH";
+	case CustomErrorTypes::WARN_GATT_WRITE_ERROR:
+		return "WARN_GATT_WRITE_ERROR";
+	case CustomErrorTypes::WARN_TX_WRONG_DATA:
+		return "WARN_TX_WRONG_DATA";
+	case CustomErrorTypes::WARN_RX_WRONG_DATA:
+		return "WARN_RX_WRONG_DATA";
+	case CustomErrorTypes::FATAL_CLUSTER_UPDATE_FLOW_MISMATCH:
+		return "FATAL_CLUSTER_UPDATE_FLOW_MISMATCH";
+	case CustomErrorTypes::WARN_HIGH_PRIO_QUEUE_FULL:
+		return "WARN_HIGH_PRIO_QUEUE_FULL";
+	case CustomErrorTypes::COUNT_NO_PENDING_CONNECTION:
+		return "COUNT_NO_PENDING_CONNECTION";
+	case CustomErrorTypes::FATAL_HANDLE_PACKET_SENT_ERROR:
+		return "FATAL_HANDLE_PACKET_SENT_ERROR";
+	case CustomErrorTypes::COUNT_DROPPED_PACKETS:
+		return "COUNT_DROPPED_PACKETS";
+	case CustomErrorTypes::COUNT_SENT_PACKETS_RELIABLE:
+		return "COUNT_SENT_PACKETS_RELIABLE";
+	case CustomErrorTypes::COUNT_SENT_PACKETS_UNRELIABLE:
+		return "COUNT_SENT_PACKETS_UNRELIABLE";
+	case CustomErrorTypes::INFO_ERRORS_REQUESTED:
+		return "INFO_ERRORS_REQUESTED";
+	case CustomErrorTypes::INFO_CONNECTION_SUSTAIN_SUCCESS:
+		return "INFO_CONNECTION_SUSTAIN_SUCCESS";
+	case CustomErrorTypes::COUNT_JOIN_ME_RECEIVED:
+		return "COUNT_JOIN_ME_RECEIVED";
+	case CustomErrorTypes::WARN_CONNECT_AS_MASTER_NOT_POSSIBLE:
+		return "WARN_CONNECT_AS_MASTER_NOT_POSSIBLE";
+	case CustomErrorTypes::FATAL_PENDING_NOT_CLEARED:
+		return "FATAL_PENDING_NOT_CLEARED";
+	case CustomErrorTypes::FATAL_PROTECTED_PAGE_ERASE:
+		return "FATAL_PROTECTED_PAGE_ERASE";
+	case CustomErrorTypes::INFO_IGNORING_CONNECTION_SUSTAIN:
+		return "INFO_IGNORING_CONNECTION_SUSTAIN";
+	case CustomErrorTypes::INFO_IGNORING_CONNECTION_SUSTAIN_LEAF:
+		return "INFO_IGNORING_CONNECTION_SUSTAIN_LEAF";
+	case CustomErrorTypes::COUNT_GATT_CONNECT_FAILED:
+		return "COUNT_GATT_CONNECT_FAILED";
+	case CustomErrorTypes::FATAL_PACKET_PROCESSING_FAILED:
+		return "FATAL_PACKET_PROCESSING_FAILED";
+	case CustomErrorTypes::FATAL_PACKET_TOO_BIG:
+		return "FATAL_PACKET_TOO_BIG";
+	case CustomErrorTypes::COUNT_HANDSHAKE_ACK1_DUPLICATE:
+		return "COUNT_HANDSHAKE_ACK1_DUPLICATE";
+	case CustomErrorTypes::COUNT_HANDSHAKE_ACK2_DUPLICATE:
+		return "COUNT_HANDSHAKE_ACK2_DUPLICATE";
+	case CustomErrorTypes::COUNT_ENROLLMENT_NOT_SAVED:
+		return "COUNT_ENROLLMENT_NOT_SAVED";
+	case CustomErrorTypes::COUNT_FLASH_OPERATION_ERROR:
+		return "COUNT_FLASH_OPERATION_ERROR";
+	case CustomErrorTypes::FATAL_WRONG_FLASH_STORAGE_COMMAND:
+		return "FATAL_WRONG_FLASH_STORAGE_COMMAND";
+	case CustomErrorTypes::FATAL_ABORTED_FLASH_TRANSACTION:
+		return "FATAL_ABORTED_FLASH_TRANSACTION";
+	case CustomErrorTypes::FATAL_PACKETQUEUE_PACKET_TOO_BIG:
+		return "FATAL_PACKETQUEUE_PACKET_TOO_BIG";
+	case CustomErrorTypes::FATAL_NO_RECORDSTORAGE_SPACE_LEFT:
+		return "FATAL_NO_RECORDSTORAGE_SPACE_LEFT";
+	case CustomErrorTypes::FATAL_RECORD_CRC_WRONG:
+		return "FATAL_RECORD_CRC_WRONG";
+	case CustomErrorTypes::COUNT_3RD_PARTY_TIMEOUT:
+		return "COUNT_3RD_PARTY_TIMEOUT";
+	case CustomErrorTypes::FATAL_CONNECTION_ALLOCATOR_OUT_OF_MEMORY:
+		return "FATAL_CONNECTION_ALLOCATOR_OUT_OF_MEMORY";
+	case CustomErrorTypes::FATAL_CONNECTION_REMOVED_WHILE_TIME_SYNC:
+		return "FATAL_CONNECTION_REMOVED_WHILE_TIME_SYNC";
+	case CustomErrorTypes::FATAL_COULD_NOT_RETRIEVE_CAPABILITIES:
+		return "FATAL_COULD_NOT_RETRIEVE_CAPABILITIES";
+	case CustomErrorTypes::FATAL_INCORRECT_HOPS_TO_SINK:
+		return "FATAL_INCORRECT_HOPS_TO_SINK";
+	case CustomErrorTypes::WARN_SPLIT_PACKET_MISSING:
+		return "WARN_SPLIT_PACKET_MISSING";
+	case CustomErrorTypes::WARN_SPLIT_PACKET_NOT_IN_MTU:
+		return "WARN_SPLIT_PACKET_NOT_IN_MTU";
+	case CustomErrorTypes::FATAL_DFU_FLASH_OPERATION_FAILED:
+		return "FATAL_DFU_FLASH_OPERATION_FAILED";
+	case CustomErrorTypes::WARN_RECORD_STORAGE_ERASE_CYCLES_HIGH:
+		return "WARN_RECORD_STORAGE_ERASE_CYCLES_HIGH";
+	case CustomErrorTypes::FATAL_RECORD_STORAGE_ERASE_CYCLES_HIGH:
+		return "FATAL_RECORD_STORAGE_ERASE_CYCLES_HIGH";
+	case CustomErrorTypes::FATAL_RECORD_STORAGE_COULD_NOT_FIND_SWAP_PAGE:
+		return "FATAL_RECORD_STORAGE_COULD_NOT_FIND_SWAP_PAGE";
+	case CustomErrorTypes::WARN_MTU_UPGRADE_FAILED:
+		return "WARN_MTU_UPGRADE_FAILED";
+	case CustomErrorTypes::WARN_ENROLLMENT_ERASE_FAILED:
+		return "WARN_ENROLLMENT_ERASE_FAILED";
+	case CustomErrorTypes::FATAL_RECORD_STORAGE_UNLOCK_FAILED:
+		return "FATAL_RECORD_STORAGE_UNLOCK_FAILED";
+	case CustomErrorTypes::WARN_ENROLLMENT_LOCK_DOWN_FAILED:
+		return "WARN_ENROLLMENT_LOCK_DOWN_FAILED";
+	case CustomErrorTypes::WARN_CONNECTION_SUSTAIN_FAILED:
+		return "WARN_CONNECTION_SUSTAIN_FAILED";
+	default:
+		SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
+		return "UNKNOWN_ERROR";
+	}
+#else
+	return nullptr;
+#endif
+}
+
+const char* Logger::getGattStatusErrorString(FruityHal::BleGattEror gattStatusCode)
+{
+#if defined(TERMINAL_ENABLED)
+	switch (gattStatusCode)
+	{
+	case FruityHal::BleGattEror::SUCCESS:
+		return "Success";
+	case FruityHal::BleGattEror::UNKNOWN:
+		return "Unknown or not applicable status";
+	case FruityHal::BleGattEror::READ_NOT_PERMITTED:
+		return "ATT Error: Read not permitted";
+	case FruityHal::BleGattEror::WRITE_NOT_PERMITTED:
+		return "ATT Error: Write not permitted";
+	case FruityHal::BleGattEror::INVALID_PDU:
+		return "ATT Error: Used in ATT as Invalid PDU";
+	case FruityHal::BleGattEror::INSUF_AUTHENTICATION:
+		return "ATT Error: Authenticated link required";
+	case FruityHal::BleGattEror::REQUEST_NOT_SUPPORTED:
+		return "ATT Error: Used in ATT as Request Not Supported";
+	case FruityHal::BleGattEror::INVALID_OFFSET:
+		return "ATT Error: Offset specified was past the end of the attribute";
+	case FruityHal::BleGattEror::INSUF_AUTHORIZATION:
+		return "ATT Error: Used in ATT as Insufficient Authorisation";
+	case FruityHal::BleGattEror::PREPARE_QUEUE_FULL:
+		return "ATT Error: Used in ATT as Prepare Queue Full";
+	case FruityHal::BleGattEror::ATTRIBUTE_NOT_FOUND:
+		return "ATT Error: Used in ATT as Attribute not found";
+	case FruityHal::BleGattEror::ATTRIBUTE_NOT_LONG:
+		return "ATT Error: Attribute cannot be read or written using read/write blob requests";
+	case FruityHal::BleGattEror::INSUF_ENC_KEY_SIZE:
+		return "ATT Error: Encryption key size used is insufficient";
+	case FruityHal::BleGattEror::INVALID_ATT_VAL_LENGTH:
+		return "ATT Error: Invalid value size";
+	case FruityHal::BleGattEror::UNLIKELY_ERROR:
+		return "ATT Error: Very unlikely error";
+	case FruityHal::BleGattEror::INSUF_ENCRYPTION:
+		return "ATT Error: Encrypted link required";
+	case FruityHal::BleGattEror::UNSUPPORTED_GROUP_TYPE:
+		return "ATT Error: Attribute type is not a supported grouping attribute";
+	case FruityHal::BleGattEror::INSUF_RESOURCES:
+		return "ATT Error: Encrypted link required";
+	case FruityHal::BleGattEror::RFU_RANGE1_BEGIN:
+		return "ATT Error: Reserved for Future Use range #1 begin";
+	case FruityHal::BleGattEror::RFU_RANGE1_END:
+		return "ATT Error: Reserved for Future Use range #1 end";
+	case FruityHal::BleGattEror::APP_BEGIN:
+		return "ATT Error: Application range begin";
+	case FruityHal::BleGattEror::APP_END:
+		return "ATT Error: Application range end";
+	case FruityHal::BleGattEror::RFU_RANGE2_BEGIN:
+		return "ATT Error: Reserved for Future Use range #2 begin";
+	case FruityHal::BleGattEror::RFU_RANGE2_END:
+		return "ATT Error: Reserved for Future Use range #2 end";
+	case FruityHal::BleGattEror::RFU_RANGE3_BEGIN:
+		return "ATT Error: Reserved for Future Use range #3 begin";
+	case FruityHal::BleGattEror::RFU_RANGE3_END:
+		return "ATT Error: Reserved for Future Use range #3 end";
+	case FruityHal::BleGattEror::CPS_CCCD_CONFIG_ERROR:
+		return "ATT Common Profile and Service Error: Client Characteristic Configuration Descriptor improperly configured";
+	case FruityHal::BleGattEror::CPS_PROC_ALR_IN_PROG:
+		return "ATT Common Profile and Service Error: Procedure Already in Progress";
+	case FruityHal::BleGattEror::CPS_OUT_OF_RANGE:
+		return "ATT Common Profile and Service Error: Out Of Range";
+	default:
+		SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
+		return "Unknown GATT status";
+	}
+#else
+	return nullptr;
+#endif
+}
+
+const char* Logger::getGeneralErrorString(ErrorType nrfErrorCode)
+{
+#if defined(TERMINAL_ENABLED)
+	switch ((u32)nrfErrorCode)
+	{
+	case (u32)ErrorType::SUCCESS:
+		return "NRF_SUCCESS";
+	case (u32)ErrorType::SVC_HANDLER_MISSING:
+		return "NRF_ERROR_SVC_HANDLER_MISSING";
+	case (u32)ErrorType::BLE_STACK_NOT_ENABLED:
+		return "NRF_ERROR_SOFTDEVICE_NOT_ENABLED";
+	case (u32)ErrorType::INTERNAL:
+		return "NRF_ERROR_INTERNAL";
+	case (u32)ErrorType::NO_MEM:
+		return "NRF_ERROR_NO_MEM";
+	case (u32)ErrorType::NOT_FOUND:
+		return "NRF_ERROR_NOT_FOUND";
+	case (u32)ErrorType::NOT_SUPPORTED:
+		return "NRF_ERROR_NOT_SUPPORTED";
+	case (u32)ErrorType::INVALID_PARAM:
+		return "NRF_ERROR_INVALID_PARAM";
+	case (u32)ErrorType::INVALID_STATE:
+		return "NRF_ERROR_INVALID_STATE";
+	case (u32)ErrorType::INVALID_LENGTH:
+		return "NRF_ERROR_INVALID_LENGTH";
+	case (u32)ErrorType::INVALID_FLAGS:
+		return "NRF_ERROR_INVALID_FLAGS";
+	case (u32)ErrorType::INVALID_DATA:
+		return "NRF_ERROR_INVALID_DATA";
+	case (u32)ErrorType::DATA_SIZE:
+		return "NRF_ERROR_DATA_SIZE";
+	case (u32)ErrorType::TIMEOUT:
+		return "NRF_ERROR_TIMEOUT";
+	case (u32)ErrorType::NULL_ERROR:
+		return "NRF_ERROR_NULL";
+	case (u32)ErrorType::FORBIDDEN:
+		return "NRF_ERROR_FORBIDDEN";
+	case (u32)ErrorType::INVALID_ADDR:
+		return "NRF_ERROR_INVALID_ADDR";
+	case (u32)ErrorType::BUSY:
+		return "NRF_ERROR_BUSY";
+	case (u32)ErrorType::CONN_COUNT:
+		return "CONN_COUNT";
+	case BLE_ERROR_INVALID_CONN_HANDLE:
+		return "BLE_ERROR_INVALID_CONN_HANDLE";
+	case BLE_ERROR_INVALID_ATTR_HANDLE:
+		return "BLE_ERROR_INVALID_ATTR_HANDLE";
+#if defined(NRF51)
+	case BLE_ERROR_NO_TX_PACKETS:
+		return "BLE_ERROR_NO_TX_PACKETS";
+#endif
+	case 0xDEADBEEF:
+		return "DEADBEEF";
+	default:
+		SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
+		return "UNKNOWN_ERROR";
+	}
+#else
+	return nullptr;
+#endif
+}
+
+const char* Logger::getHciErrorString(FruityHal::BleHciError hciErrorCode)
+{
+#if defined(TERMINAL_ENABLED)
+	switch (hciErrorCode)
+	{
+	case FruityHal::BleHciError::SUCCESS:
+		return "Success";
+
+	case FruityHal::BleHciError::UNKNOWN_BLE_COMMAND:
+		return "Unknown BLE Command";
+
+	case FruityHal::BleHciError::UNKNOWN_CONNECTION_IDENTIFIER:
+		return "Unknown Connection Identifier";
+
+	case FruityHal::BleHciError::AUTHENTICATION_FAILURE:
+		return "Authentication Failure";
+
+	case FruityHal::BleHciError::CONN_FAILED_TO_BE_ESTABLISHED:
+		return "Connection Failed to be Established";
+
+	case FruityHal::BleHciError::CONN_INTERVAL_UNACCEPTABLE:
+		return "Connection Interval Unacceptable";
+
+	case FruityHal::BleHciError::CONN_TERMINATED_DUE_TO_MIC_FAILURE:
+		return "Connection Terminated due to MIC Failure";
+
+	case FruityHal::BleHciError::CONNECTION_TIMEOUT:
+		return "Connection Timeout";
+
+	case FruityHal::BleHciError::CONTROLLER_BUSY:
+		return "Controller Busy";
+
+	case FruityHal::BleHciError::DIFFERENT_TRANSACTION_COLLISION:
+		return "Different Transaction Collision";
+
+	case FruityHal::BleHciError::DIRECTED_ADVERTISER_TIMEOUT:
+		return "Directed Adverisement Timeout";
+
+	case FruityHal::BleHciError::INSTANT_PASSED:
+		return "Instant Passed";
+
+	case FruityHal::BleHciError::LOCAL_HOST_TERMINATED_CONNECTION:
+		return "Local Host Terminated Connection";
+
+	case FruityHal::BleHciError::MEMORY_CAPACITY_EXCEEDED:
+		return "Memory Capacity Exceeded";
+
+	case FruityHal::BleHciError::PAIRING_WITH_UNIT_KEY_UNSUPPORTED:
+		return "Pairing with Unit Key Unsupported";
+
+	case FruityHal::BleHciError::REMOTE_DEV_TERMINATION_DUE_TO_LOW_RESOURCES:
+		return "Remote Device Terminated Connection due to low resources";
+
+	case FruityHal::BleHciError::REMOTE_DEV_TERMINATION_DUE_TO_POWER_OFF:
+		return "Remote Device Terminated Connection due to power off";
+
+	case FruityHal::BleHciError::REMOTE_USER_TERMINATED_CONNECTION:
+		return "Remote User Terminated Connection";
+
+	case FruityHal::BleHciError::COMMAND_DISALLOWED:
+		return "Command Disallowed";
+
+	case FruityHal::BleHciError::INVALID_BLE_COMMAND_PARAMETERS:
+		return "Invalid BLE Command Parameters";
+
+	case FruityHal::BleHciError::INVALID_LMP_PARAMETERS:
+		return "Invalid LMP Parameters";
+
+	case FruityHal::BleHciError::LMP_PDU_NOT_ALLOWED:
+		return "LMP PDU Not Allowed";
+
+	case FruityHal::BleHciError::LMP_RESPONSE_TIMEOUT:
+		return "LMP Response Timeout";
+
+	case FruityHal::BleHciError::PIN_OR_KEY_MISSING:
+		return "Pin or Key missing";
+
+	case FruityHal::BleHciError::UNSPECIFIED_ERROR:
+		return "Unspecified Error";
+
+	case FruityHal::BleHciError::UNSUPPORTED_REMOTE_FEATURE:
+		return "Unsupported Remote Feature";
+	default:
+		SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
+		return "Unknown HCI error";
+	}
+#else
+	return nullptr;
+#endif
+}
+
+const char* Logger::getErrorLogRebootReason(RebootReason type)
+{
+#if defined(TERMINAL_ENABLED)
+	switch (type)
+	{
+	case RebootReason::UNKNOWN:
+		return "UNKNOWN";
+	case RebootReason::HARDFAULT:
+		return "HARDFAULT";
+	case RebootReason::APP_FAULT:
+		return "APP_FAULT";
+	case RebootReason::SD_FAULT:
+		return "SD_FAULT";
+	case RebootReason::PIN_RESET:
+		return "PIN_RESET";
+	case RebootReason::WATCHDOG:
+		return "WATCHDOG";
+	case RebootReason::FROM_OFF_STATE:
+		return "FROM_OFF_STATE";
+	case RebootReason::LOCAL_RESET:
+		return "LOCAL_RESET";
+	case RebootReason::REMOTE_RESET:
+		return "REMOTE_RESET";
+	case RebootReason::ENROLLMENT:
+		return "ENROLLMENT";
+	case RebootReason::PREFERRED_CONNECTIONS:
+		return "PREFERRED_CONNECTIONS";
+	case RebootReason::DFU:
+		return "DFU";
+	case RebootReason::MODULE_ALLOCATOR_OUT_OF_MEMORY:
+		return "MODULE_ALLOCATOR_OUT_OF_MEMORY";
+	case RebootReason::MEMORY_MANAGEMENT:
+		return "MEMORY_MANAGEMENT";
+	case RebootReason::BUS_FAULT:
+		return "BUS_FAULT";
+	case RebootReason::USAGE_FAULT:
+		return "USAGE_FAULT";
+	case RebootReason::ENROLLMENT_REMOVE:
+		return "ENROLLMENT_REMOVE";
+	case RebootReason::FACTORY_RESET_FAILED:
+		return "FACTORY_RESET_FAILED";
+	case RebootReason::FACTORY_RESET_SUCCEEDED_FAILSAFE:
+		return "FACTORY_RESET_SUCCEEDED_FAILSAFE";
+	default:
+		SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
+		return "UNDEFINED";
+	}
+#else
+	return nullptr;
+#endif
+}
+
+const char * Logger::getErrorLogError(LoggingError type, u32 code)
+{
+#if defined(TERMINAL_ENABLED)
+	switch (type)
+	{
+	case LoggingError::GENERAL_ERROR:
+		return getGeneralErrorString((ErrorType)code);
+	case LoggingError::HCI_ERROR:
+		return getHciErrorString((FruityHal::BleHciError)code);
+	case LoggingError::CUSTOM:
+		return getErrorLogCustomError((CustomErrorTypes)code);
+	case LoggingError::GATT_STATUS:
+		return getGattStatusErrorString((FruityHal::BleGattEror)code);
+	case LoggingError::REBOOT:
+		return getErrorLogRebootReason((RebootReason)code);
+	default:
+		SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
+		return "UNKNOWN_TYPE";
+	}
+#else
+	return nullptr;
+#endif
+}
 
 void Logger::blePrettyPrintAdvData(SizedData advData) const
 {
@@ -341,7 +799,7 @@ void Logger::blePrettyPrintAdvData(SizedData advData) const
 	}
 }
 
-void Logger::logError(ErrorTypes errorType, u32 errorCode, u32 extraInfo)
+void Logger::logError(LoggingError errorType, u32 errorCode, u32 extraInfo)
 {
 	errorLog[errorLogPosition].errorType = errorType;
 	errorLog[errorLogPosition].errorCode = errorCode;
@@ -354,11 +812,11 @@ void Logger::logError(ErrorTypes errorType, u32 errorCode, u32 extraInfo)
 
 void Logger::logCustomError(CustomErrorTypes customErrorType, u32 extraInfo)
 {
-	logError(ErrorTypes::CUSTOM, (u32)customErrorType, extraInfo);
+	logError(LoggingError::CUSTOM, (u32)customErrorType, extraInfo);
 }
 
 //can be called multiple times and will increment the extra each time this happens
-void Logger::logCount(ErrorTypes errorType, u32 errorCode)
+void Logger::logCount(LoggingError errorType, u32 errorCode)
 {
 	//Check if the erroLogEntry exists already and increment the extra if yes
 	for (u32 i = 0; i < errorLogPosition; i++) {
@@ -380,7 +838,7 @@ void Logger::logCount(ErrorTypes errorType, u32 errorCode)
 
 void Logger::logCustomCount(CustomErrorTypes customErrorType)
 {
-	logCount(ErrorTypes::CUSTOM, (u32)customErrorType);
+	logCount(LoggingError::CUSTOM, (u32)customErrorType);
 }
 
 const char* base64Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

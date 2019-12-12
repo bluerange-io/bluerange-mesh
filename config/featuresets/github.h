@@ -34,12 +34,3 @@
 #define ACTIVATE_JSON_LOGGING 1 //Undefine to remove json communication over uart
 #define ACTIVATE_UART 1 //Undefine to remove the UART terminal
 #define ACTIVATE_SEGGER_RTT 1 //Undefine to disable debugging over Segger Rtt
-
-//The following shouldn't be modified
-#ifdef NRF51
-#define SET_FW_GROUPID_CHIPSET GROUP_ID_NRF51
-#define SET_FW_GROUPID_FEATURESET GROUP_ID_NRF51_MESH
-#else
-#define SET_FW_GROUPID_CHIPSET GROUP_ID_NRF52
-#define SET_FW_GROUPID_FEATURESET GROUP_ID_NRF52_MESH
-#endif

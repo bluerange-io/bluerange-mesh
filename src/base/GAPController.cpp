@@ -61,52 +61,53 @@ void GAPController::bleConfigureGAP() const{
 	//Set up an open link write permission
 	//There are multiple security modes defined in the BLE spec
 	//Use these macros: http://developer.nordicsemi.com/nRF51_SDK/doc/7.1.0/s110/html/a00813.html
-	ble_gap_conn_sec_mode_t secPermissionClosed;
-	BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(&secPermissionClosed);
+	
+	// no access
+	FruityHal::BleGapConnSecMode secPermissionClosed;
+	FH_CONNECTION_SECURITY_MODE_SET_NO_ACCESS(&secPermissionClosed);
 
-	//Set the GAP device name
-	err = sd_ble_gap_device_name_set(&secPermissionClosed, (u8*)DEVICE_NAME, (u16)strlen(DEVICE_NAME));
+	err = FruityHal::BleGapNameSet(secPermissionClosed, (const u8*)DEVICE_NAME, (u16)strlen(DEVICE_NAME));
 	APP_ERROR_CHECK(err); //OK
 
 	//Set the appearance of the device as defined in http://developer.nordicsemi.com/nRF51_SDK/doc/7.1.0/s110/html/a00837.html
-	err = sd_ble_gap_appearance_set(BLE_APPEARANCE_GENERIC_COMPUTER);
+	err = FruityHal::BleGapAppearance(FruityHal::BleAppearance::GENERIC_COMPUTER);
 	APP_ERROR_CHECK(err); //OK
 
 	//Set gap peripheral preferred connection parameters (not used by the mesh implementation)
-	ble_gap_conn_params_t gapConnectionParams;
+	FruityHal::BleGapConnParams gapConnectionParams;
 	CheckedMemset(&gapConnectionParams, 0, sizeof(gapConnectionParams));
 
-	gapConnectionParams.min_conn_interval = Conf::getInstance().meshMinConnectionInterval;
-	gapConnectionParams.max_conn_interval = Conf::getInstance().meshMaxConnectionInterval;
-	gapConnectionParams.slave_latency = Conf::meshPeripheralSlaveLatency;
-	gapConnectionParams.conn_sup_timeout = Conf::meshConnectionSupervisionTimeout;
-	err = sd_ble_gap_ppcp_set(&gapConnectionParams);
+	gapConnectionParams.minConnInterval = Conf::getInstance().meshMinConnectionInterval;
+	gapConnectionParams.maxConnInterval = Conf::getInstance().meshMaxConnectionInterval;
+	gapConnectionParams.slaveLatency = Conf::meshPeripheralSlaveLatency;
+	gapConnectionParams.connSupTimeout = Conf::meshConnectionSupervisionTimeout;
+	err = FruityHal::BleGapConnectionPreferredParamsSet(gapConnectionParams);
 	APP_ERROR_CHECK(err); //OK
 }
 
 //Connect to a specific peripheral
-u32 GAPController::connectToPeripheral(const fh_ble_gap_addr_t &address, u16 connectionInterval, u16 timeout) const
+ErrorType GAPController::connectToPeripheral(const FruityHal::BleGapAddr &address, u16 connectionInterval, u16 timeout) const
 {
-	u32 err = 0;
+	ErrorType err = ErrorType::SUCCESS;
 
-	fh_ble_gap_scan_params_t scanParams;
+	FruityHal::BleGapScanParams scanParams;
 	CheckedMemset(&scanParams, 0x00, sizeof(scanParams));
-	fh_ble_gap_conn_params_t connectionParams;
+	FruityHal::BleGapConnParams connectionParams;
 	CheckedMemset(&connectionParams, 0x00, sizeof(connectionParams));
 
 	scanParams.interval = Conf::meshConnectingScanInterval;
 	scanParams.window = Conf::meshConnectingScanWindow;
 	scanParams.timeout = timeout;
 
-	connectionParams.min_conn_interval = connectionInterval;
-	connectionParams.max_conn_interval = connectionInterval;
-	connectionParams.slave_latency = Conf::meshPeripheralSlaveLatency;
-	connectionParams.conn_sup_timeout = Conf::meshConnectionSupervisionTimeout;
+	connectionParams.minConnInterval = connectionInterval;
+	connectionParams.maxConnInterval = connectionInterval;
+	connectionParams.slaveLatency = Conf::meshPeripheralSlaveLatency;
+	connectionParams.connSupTimeout = Conf::meshConnectionSupervisionTimeout;
 
 	//Connect to the peripheral
 	err = FruityHal::BleGapConnect(&address, &scanParams, &connectionParams);
-	if(err != FruityHal::SUCCESS){
-		logt("ERROR", "GATT connect fail %d", err);
+	if(err != ErrorType::SUCCESS){
+		logt("ERROR", "GATT connect fail %d", (u8)err);
 		GS->logger.logCustomCount(CustomErrorTypes::COUNT_GATT_CONNECT_FAILED);
 		//Just ignore it, the connection will not happen
 		return err;
@@ -114,16 +115,16 @@ u32 GAPController::connectToPeripheral(const fh_ble_gap_addr_t &address, u16 con
 
 	logt("CONN", "pairing");
 
-	return FruityHal::SUCCESS;
+	return ErrorType::SUCCESS;
 }
 
-void GAPController::GapDisconnectedEventHandler(const GapDisconnectedEvent & disconnectEvent)
+void GAPController::GapDisconnectedEventHandler(const FruityHal::GapDisconnectedEvent & disconnectEvent)
 {
-	logt("C", "Disconnected device %d", disconnectEvent.getReason());
+	logt("C", "Disconnected device %d", (u8)disconnectEvent.getReason());
 	ConnectionManager::getInstance().GapConnectionDisconnectedHandler(disconnectEvent);
 }
 
-void GAPController::GapConnectedEventHandler(const GapConnectedEvent & connvectedEvent)
+void GAPController::GapConnectedEventHandler(const FruityHal::GapConnectedEvent & connvectedEvent)
 {
 	logt("C", "Connected device");
 
@@ -131,15 +132,15 @@ void GAPController::GapConnectedEventHandler(const GapConnectedEvent & connvecte
 	ConnectionManager::getInstance().GapConnectionConnectedHandler(connvectedEvent);
 }
 
-void GAPController::GapTimeoutEventHandler(const GapTimeoutEvent& gapTimeoutEvent)
+void GAPController::GapTimeoutEventHandler(const FruityHal::GapTimeoutEvent& gapTimeoutEvent)
 {
-	if (gapTimeoutEvent.getSource() == GapTimeoutSource::CONNECTION)
+	if (gapTimeoutEvent.getSource() == FruityHal::GapTimeoutSource::CONNECTION)
 	{
 		ConnectionManager::getInstance().GapConnectingTimeoutHandler(gapTimeoutEvent);
 	}
 }
 
-void GAPController::GapSecurityInfoRequestEvenetHandler(const GapSecurityInfoRequestEvent & securityInfoRequestEvent)
+void GAPController::GapSecurityInfoRequestEvenetHandler(const FruityHal::GapSecurityInfoRequestEvent & securityInfoRequestEvent)
 {
 	if (Conf::encryptionEnabled) {
 		//With this request, we receive the key identifier and a random number
@@ -149,14 +150,15 @@ void GAPController::GapSecurityInfoRequestEvenetHandler(const GapSecurityInfoReq
 		//If we want multiple keys, we need to implement some more logic to select the key
 
 		//This is our security key
-		ble_gap_enc_info_t key;
-		key.lesc = 0;
-		key.auth = 1; //This key is authenticated
-		memcpy(&key.ltk, GS->node.configuration.networkKey, 16); //Copy our mesh network key
-		key.ltk_len = 16;
+		FruityHal::BleGapEncInfo key;
+		CheckedMemset(&key, 0x00, sizeof(key));
+		key.isGeneratedUsingLeSecureConnections  = 0;
+		key.isAuthenticatedKey = 1; //This key is authenticated
+		CheckedMemcpy(&key.longTermKey, GS->node.configuration.networkKey, 16); //Copy our mesh network key
+		key.longTermKeyLength = 16;
 
 		//Reply  with our stored key
-		sd_ble_gap_sec_info_reply(
+		FruityHal::BleGapSecInfoReply(
 			securityInfoRequestEvent.getConnectionHandle(),
 			&key, //This is our stored long term key
 			nullptr, //We do not have an identity resolving key
@@ -164,21 +166,21 @@ void GAPController::GapSecurityInfoRequestEvenetHandler(const GapSecurityInfoReq
 		);
 
 		logt("SEC", "SEC_INFO_REQUEST received, replying with key %02x:%02x:%02x...%02x:%02x", 
-			key.ltk[0], key.ltk[1], key.ltk[2], key.ltk[14], key.ltk[15]);
+			key.longTermKey[0], key.longTermKey[1], key.longTermKey[2], key.longTermKey[14], key.longTermKey[15]);
 	}
 	else {
 		logt("SEC", "No Encryption available");
-		FruityHal::Disconnect(securityInfoRequestEvent.getConnectionHandle(), FruityHal::HciErrorCode::REMOTE_USER_TERMINATED_CONNECTION);
+		FruityHal::Disconnect(securityInfoRequestEvent.getConnectionHandle(), FruityHal::BleHciError::REMOTE_USER_TERMINATED_CONNECTION);
 	}
 }
 
-void GAPController::GapConnectionSecurityUpdateEventHandler(const GapConnectionSecurityUpdateEvent &connectionSecurityUpdateEvent)
+void GAPController::GapConnectionSecurityUpdateEventHandler(const FruityHal::GapConnectionSecurityUpdateEvent &connectionSecurityUpdateEvent)
 {
 	//This event tells us that the security keys are now in use
 	u8 keySize = connectionSecurityUpdateEvent.getKeySize();
 
-	SecurityLevel level = connectionSecurityUpdateEvent.getSecurityLevel();
-	SecurityMode securityMode = connectionSecurityUpdateEvent.getSecurityMode();
+	FruityHal::SecurityLevel level = connectionSecurityUpdateEvent.getSecurityLevel();
+	FruityHal::SecurityMode securityMode = connectionSecurityUpdateEvent.getSecurityMode();
 
 	logt("SEC", "Connection key is now %u bytes, level %u, securityMode %u", keySize, (u8)level, (u8)securityMode);
 
@@ -191,22 +193,23 @@ void GAPController::startEncryptingConnection(u16 connectionHandle) const
 
 	//Key identification data
 	//We do not need a key identification currently, because we only have one
-	ble_gap_master_id_t keyId;
-	keyId.ediv = 0;
+	FruityHal::BleGapMasterId keyId;
+	CheckedMemset(&keyId, 0x00, sizeof(keyId));
+	keyId.encryptionDiversifier = 0;
 	CheckedMemset(&keyId.rand, 0x00, BLE_GAP_SEC_RAND_LEN);
 
 	//Our mesh network key
-	ble_gap_enc_info_t key;
-	key.auth = 1;
-	memcpy(&key.ltk, GS->node.configuration.networkKey, BLE_GAP_SEC_KEY_LEN);
-	key.ltk_len = 16;
-
+	FruityHal::BleGapEncInfo key;
+	CheckedMemset(&key, 0x00, sizeof(key));
+	key.isGeneratedUsingLeSecureConnections  = 0;
+	key.isAuthenticatedKey = 1;
+	CheckedMemcpy(&key.longTermKey, GS->node.configuration.networkKey, BLE_GAP_SEC_KEY_LEN);
+	key.longTermKeyLength = 16;
 
 	//This starts the Central Encryption Establishment using stored keys
 	//http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.s130.api.v1.0.0/group___b_l_e___g_a_p___c_e_n_t_r_a_l___e_n_c___m_s_c.html
 	//http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.s130.api.v1.0.0/group___b_l_e___g_a_p___p_e_r_i_p_h___e_n_c___m_s_c.html
-	err = sd_ble_gap_encrypt(connectionHandle, &keyId, &key);
-
+	err = FruityHal::BleGapEncrypt(connectionHandle, keyId, key);
 	logt("SEC", "encrypting connection handle %u with key. result %u", connectionHandle, err);
 }
 
@@ -214,14 +217,15 @@ void GAPController::RequestConnectionParameterUpdate(u16 connectionHandle, u16 m
 {
 	u32 err = 0;
 
-	ble_gap_conn_params_t connParams;
-	connParams.min_conn_interval = minConnectionInterval;
-	connParams.max_conn_interval = maxConnectionInterval;
-	connParams.slave_latency = slaveLatency;
-	connParams.conn_sup_timeout = supervisionTimeout;
+	FruityHal::BleGapConnParams connParams;
+	CheckedMemset(&connParams, 0x00, sizeof(connParams));
+	connParams.minConnInterval = minConnectionInterval;
+	connParams.maxConnInterval = maxConnectionInterval;
+	connParams.slaveLatency = slaveLatency;
+	connParams.connSupTimeout = supervisionTimeout;
 
 	//TODO: Check against compatibility with gap connection parameters limits
-	err = sd_ble_gap_conn_param_update(connectionHandle, &connParams);
+	err = FruityHal::BleGapConnectionParamsUpdate(connectionHandle, connParams);
 	if (err != NRF_ERROR_BUSY) {
 		APP_ERROR_CHECK(err);
 	}

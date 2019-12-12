@@ -68,32 +68,35 @@ class ConnectionManager
 		void QueuePacket(BaseConnection* connection, u8* data, u16 dataLength, bool reliable) const;
 
 		//Checks wether a successful connection is from a reestablishment
-		BaseConnection* IsConnectionReestablishment(const GapConnectedEvent& connectedEvent) const;
+		BaseConnection* IsConnectionReestablishment(const FruityHal::GapConnectedEvent& connectedEvent) const;
 
 		static constexpr u16 TIME_BETWEEN_TIME_SYNC_INTERVALS_DS = SEC_TO_DS(5);
 		u16 timeSinceLastTimeSyncIntervalDs = 0;	//Let's not spam the connections with time syncs.
 
+		u32 uniqueConnectionIdCounter = 0; //Counts all created connections to assign "unique" ids
+
 	public:
 		ConnectionManager();
+		void Init();
 		static ConnectionManager& getInstance();
 
 		//This method is called when empty buffers are available and there is data to send
 		void fillTransmitBuffers() const;
 
-		u8 freeMeshInConnections;
-		u8 freeMeshOutConnections;
+		u8 freeMeshInConnections = 0;
+		u8 freeMeshOutConnections = 0;
 
-		BaseConnection* pendingConnection;
+		BaseConnection* pendingConnection = nullptr;
 
-		u16 uniqueConnectionIdCounter; //Counts all created connections to assign "unique" ids
-
-		u16 droppedMeshPackets;
-		u16 sentMeshPacketsUnreliable;
-		u16 sentMeshPacketsReliable;
+		u16 droppedMeshPackets = 0;
+		u16 sentMeshPacketsUnreliable = 0;
+		u16 sentMeshPacketsReliable = 0;
 
 		//ConnectionType Resolving
 		void ResolveConnection(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8* data);
 
+		void NotifyNewConnection();
+		void NotifyDeleteConnection();
 
 		BaseConnections GetBaseConnections(ConnectionDirection direction) const;
 		MeshConnections GetMeshConnections(ConnectionDirection direction) const;
@@ -106,7 +109,7 @@ class ConnectionManager
 		//Returns the connection that is currently doing a handshake or nullptr
 		MeshConnection* GetConnectionInHandshakeState() const;
 
-		void ConnectAsMaster(NodeId partnerId, fh_ble_gap_addr_t* address, u16 writeCharacteristicHandle, u16 connectionIv);
+		ErrorType ConnectAsMaster(NodeId partnerId, FruityHal::BleGapAddr* address, u16 writeCharacteristicHandle, u16 connectionIv);
 
 		void ForceDisconnectOtherMeshConnections(const MeshConnection* ignoreConnection, AppDisconnectReason appDisconnectReason) const;
 		void ForceDisconnectOtherHandshakedMeshConnections(const MeshConnection* ignoreConnection, AppDisconnectReason appDisconnectReason) const;
@@ -117,7 +120,7 @@ class ConnectionManager
 		//Functions used for sending messages
 		void SendMeshMessage(u8* data, u16 dataLength, DeliveryPriority priority) const;
 
-		void SendModuleActionMessage(MessageType messageType, ModuleId moduleId, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable) const;
+		void SendModuleActionMessage(MessageType messageType, ModuleId moduleId, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool lookback) const;
 
 		void BroadcastMeshPacket(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable) const;
 
@@ -134,7 +137,7 @@ class ConnectionManager
 
 
 		BaseConnection* GetConnectionFromHandle(u16 connectionHandle) const;
-		BaseConnection* GetConnectionByUniqueId(u16 uniqueConnectionId) const;
+		BaseConnection* GetConnectionByUniqueId(u32 uniqueConnectionId) const;
 		MeshConnection* GetMeshConnectionToPartner(NodeId partnerId) const;
 
 		MeshConnection* GetMeshConnectionToShortestSink(const BaseConnection* excludeConnection) const;
@@ -149,27 +152,33 @@ class ConnectionManager
 		//Connection callbacks
 		void MessageReceivedCallback(BaseConnectionSendData* sendData, u8* data) const;
 
+
+		u32 RequestDataLengthExtensionAndMtuExchange(BaseConnection* c);
+		void MtuUpdatedHandler(u16 connHandle, u16 mtu);
+
+		void GapConnectionReadyForHandshakeHandler(BaseConnection* c);
+
 		//These methods can be accessed by the Connection classes
 
 		//GAPController Handlers
-		void GapConnectingTimeoutHandler(const GapTimeoutEvent & gapTimeoutEvent);
-		void GapConnectionConnectedHandler(const GapConnectedEvent & connectedEvent);
-		void GapConnectionEncryptedHandler(const GapConnectionSecurityUpdateEvent &connectionSecurityUpdateEvent);
-		void GapConnectionDisconnectedHandler(const GapDisconnectedEvent& disconnectedEvent);
+		void GapConnectingTimeoutHandler(const FruityHal::GapTimeoutEvent & gapTimeoutEvent);
+		void GapConnectionConnectedHandler(const FruityHal::GapConnectedEvent & connectedEvent);
+		void GapConnectionEncryptedHandler(const FruityHal::GapConnectionSecurityUpdateEvent &connectionSecurityUpdateEvent);
+		void GapConnectionDisconnectedHandler(const FruityHal::GapDisconnectedEvent& disconnectedEvent);
 
 		//GATTController Handlers
 		void ForwardReceivedDataToConnection(u16 connectionHandle, BaseConnectionSendData &sendData, u8* data);
-		void GattsWriteEventHandler(const GattsWriteEvent& gattsWriteEvent);
-		void GattcHandleValueEventHandler(const GattcHandleValueEvent& handleValueEvent);
-		void GattDataTransmittedEventHandler(const GattDataTransmittedEvent& gattDataTransmitted);
-		void GattcWriteResponseEventHandler(const GattcWriteResponseEvent& writeResponseEvent);
+		void GattsWriteEventHandler(const FruityHal::GattsWriteEvent& gattsWriteEvent);
+		void GattcHandleValueEventHandler(const FruityHal::GattcHandleValueEvent& handleValueEvent);
+		void GattDataTransmittedEventHandler(const FruityHal::GattDataTransmittedEvent& gattDataTransmitted);
+		void GattcWriteResponseEventHandler(const FruityHal::GattcWriteResponseEvent& writeResponseEvent);
 		void GATTServiceDiscoveredHandler(u16 connHandle, ble_db_discovery_evt_t &evt);
-		void GattcTimeoutEventHandler(const GattcTimeoutEvent& gattcTimeoutEvent);
+		void GattcTimeoutEventHandler(const FruityHal::GattcTimeoutEvent& gattcTimeoutEvent);
 
 		void PacketSuccessfullyQueuedCallback(MeshConnection* connection, SizedData packetData) const;
 
 		//Callbacks are kinda complicated, so we handle BLE events directly in this class
-		void GapRssiChangedEventHandler(const GapRssiChangedEvent& rssiChangedEvent) const;
+		void GapRssiChangedEventHandler(const FruityHal::GapRssiChangedEvent& rssiChangedEvent) const;
 		void TimerEventHandler(u16 passedTimeDs);
 
 		void ResetTimeSync();
@@ -177,5 +186,7 @@ class ConnectionManager
 		void TimeSyncInitialReplyReceivedHandler(const TimeSyncInitialReply& reply);
 		void TimeSyncCorrectionReplyReceivedHandler(const TimeSyncCorrectionReply& reply);
 
+
+		u32 GenerateUniqueConnectionId();
 };
 

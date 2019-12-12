@@ -74,6 +74,7 @@ enum class MessageType : u8
 	UPDATE_CONNECTION_INTERVAL = 31, //Intructs a node to use a different connection interval
 	ASSET_V2 = 32,
 	CAPABILITY = 33,
+	ASSET_GENERIC = 34,
 
 	//Module messages: Protocol defined (yet unfinished)
 	//MODULE_CONFIG: Used for many different messages that set and get the module config
@@ -92,6 +93,7 @@ enum class MessageType : u8
 	COMPONENT_SENSE = 59, //Sensor messages
 
 	TIME_SYNC = 60,
+	DEAD_DATA = 61, //Used by the MeshAccessConnection when malformed data was received.
 
 	//Other packets: User space (IDs 80 - 110)
 	DATA_1 = 80,

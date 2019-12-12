@@ -1,0 +1,29 @@
+= Throughput
+
+== Throughput Optimization
+
+Many tests were done with the nRF SoftDevice S132 v5.1.0. The decision was to change the default connectionInterval to 7.5 ms, the eventLength to 7.5 ms, turn event length extension on and change the scan interval to 75 ms and the scan window to 7.5 ms. An advertiser was active with a 100 ms advertising interval. This resulted in the best throughput and distribution of traffic over all connections.
+
+Setting the event length to the same value as the connection interval will result in all central connections overlapping each other. Peripheral connections will by design always overlap 2 connection events most of the time. This will result in a round robin scheduling of the connections so that each connection will approximately receive the same amount of time. If there are less connections, they have a higher bandwidth. This is ideal as it will allow the highest throughput for all scenarios as it is not easily possible to modify the connection parameters after a connection was made. We do however not know how many connections we will need to establish beforehand.
+
+Updating the PHY to 2Mbit did result in serious problems with these settings as connections  would randomly drop during the upgrade and the performance would decrease, rather than increase. As the link budget also decreases with the 2Mbit PHY, it was decided to stick with the 1Mbit PHY as there was not much performance to gain by upgrading with different settings.
+
+The scan interval and window were increased so that the scan does rarely interrupt the connections, while still being able to pick up a high number of advertisements during its increased and uninterrupted scan window.
+
+Using packet splitting will result in significant throughput reduction and an increased latency as packets need to be reassembled on each node. Using a higher MTU has to be implemented to reduce the performance hit by packet splitting. Increasing the MTU will not affect the throughput of packets with a size of 20 byte.
+
+=== Measurement Results
+
+Measurements were done with an active scanner at 75 ms scan interval and 7.5 ms scan window. The advertiser was also active with a 100 ms interval. Disabling advertising and scanning, for example after the mesh was sucessfully set up, will increase the connection throughput.
+
+Devices were placed close to each other for this test, so they had a good link budget. Increasing the distance of devices to each other until they reach the stable connection threshold RSSI of around -85 will result in a slightly decreased throughput by around 10 to 20%. If devices are forced to communicate to each other with a link budget worse than -85, the throughput will decrease a lot. This is however prevented in the mesh implementation. Having a lot of other devices transmitting on the BLE advertising and connection channels could also affect the mesh performance in different ways that are hard to measure or predict.
+
+With *3 connections as a central and one connection as a peripheral* (all devices close to each other), it was possible to achieve an average throughput of about 1000 packets (each 20 byte) per 10 seconds on each connection. The lowest measured throughput of one connection was around 850 packets per 10 seconds. This is an average throughput of around *2 kbyte/s per connection* or around *8 kbyte/s in total*.
+
+With less central connections, the throughput will increase. For example, having *one peripheral and one central connection* resulted in a throughput of around 2000 packets per 10 seconds. This is around *4 kbyte/s per connection* and again around *8 kbyte/s in total*.
+
+== Conclusion
+
+The throughput of FruityMesh is around *20 times higher* than other solutions that rely on a flooding mesh. FruityMesh has a measured throughput of around 8 kbyte/s. The theoretical throughput of flooding mesh implementations is usually stated as 3.5 kbit/s, which means around 0.4 kbyte/s. Also, FruityMesh uses all 37 connection channels of BLE while most flooding mesh implementations only use one channel and cannot use more than 3. This does further reduce the throughput of these implementations in real world use-cases.
+
+Also, there is more room for improvement: Increasing the MTU will increase the throughput drastically if messages are grouped together or if bigger messages are sent through the mesh.
