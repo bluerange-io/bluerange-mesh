@@ -44,6 +44,7 @@ action [nodeId] status get_connections
 action [nodeId] status get_nearby
 ----
 
+[#LiveReports]
 === Live Reports
 Live reports are a way to send information about errors, connections, disconnections and other important events to the user through the mesh. Each live report has a unique ID according to its importance. Liver reports are activated by setting the _livereports_ level to a value greater than 0. The different levels are:
 
@@ -53,7 +54,7 @@ Live reports are a way to send information about errors, connections, disconnect
 * Info (150)
 * Debug (200)
 
-Live reports can be generated in the firmware using the _SendLiveReport_ method. Two extra parameters can be given that can contain additional information for the specific report/error.
+Live reports can be generated in the firmware using the `SendLiveReport` method. Two extra parameters can be given that can contain additional information for the specific report/error. These will of course only be received if the node is currently part of the mesh. If this is not the case, than it might be better to use the xref:Logger.adoc#_error_log[error log].
 
 [source,C++]
 ----

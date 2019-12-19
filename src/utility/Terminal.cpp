@@ -71,8 +71,20 @@ extern "C"
 
 Terminal::Terminal(){
 	CheckedMemset(commandArgsPtr, 0, sizeof(commandArgsPtr));
-	CheckedMemset(registeredCallbacks, 0, sizeof(registeredCallbacks));
+	CheckedMemset(registeredCommandCallbacks, 0, sizeof(registeredCommandCallbacks));
 	CheckedMemset(readBuffer, 0, sizeof(readBuffer));
+}
+
+void Terminal::AddTerminalJsonListener(TerminalJsonListener * callback)
+{
+#ifdef TERMINAL_ENABLED
+	if (registeredJsonCallbacksNum >= MAX_TERMINAL_JSON_LISTENER_CALLBACKS) {
+		SIMEXCEPTION(TooManyTerminalJsonListenersException); //LCOV_EXCL_LINE assertion
+		return;
+	}
+	registeredJsonCallbacks[registeredJsonCallbacksNum] = callback;
+	registeredJsonCallbacksNum++;
+#endif
 }
 
 //Initialize the mhTerminal
@@ -155,11 +167,11 @@ Terminal & Terminal::getInstance()
 void Terminal::AddTerminalCommandListener(TerminalCommandListener* callback)
 {
 #ifdef TERMINAL_ENABLED
-	if (registeredCallbacksNum >= MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS) {
+	if (registeredCommandCallbacksNum >= MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS) {
 		SIMEXCEPTION(TooManyTerminalCommandListenersException); //LCOV_EXCL_LINE assertion
 	}
-	registeredCallbacks[registeredCallbacksNum] = callback;
-	registeredCallbacksNum++;
+	registeredCommandCallbacks[registeredCommandCallbacksNum] = callback;
+	registeredCommandCallbacksNum++;
 #endif
 }
 
@@ -190,6 +202,26 @@ void Terminal::PutChar(const char character)
 #endif
 }
 
+void Terminal::OnJsonLogged(const char * json)
+{
+#if defined(TERMINAL_ENABLED) && IS_ACTIVE(JSON_LOGGING)
+	if (!currentlyExecutingJsonCallbacks)
+	{
+		currentlyExecutingJsonCallbacks = true;
+		for (u32 i = 0; i < registeredJsonCallbacksNum; i++)
+		{
+			(registeredJsonCallbacks[i])->TerminalJsonHandler(json);
+		}
+		currentlyExecutingJsonCallbacks = false;
+	}
+	else
+	{
+		//It looks like you printed a json inside the JsonHandler, which is forbidden as it would create an endless recursion.
+		SIMEXCEPTION(IllegalStateException);
+	}
+#endif
+}
+
 const char ** Terminal::getCommandArgsPtr()
 {
 	return commandArgsPtr;
@@ -197,12 +229,12 @@ const char ** Terminal::getCommandArgsPtr()
 
 u8 Terminal::getAmountOfRegisteredCommandListeners()
 {
-	return registeredCallbacksNum;
+	return registeredCommandCallbacksNum;
 }
 
 TerminalCommandListener ** Terminal::getRegisteredCommandListeners()
 {
-	return registeredCallbacks;
+	return registeredCommandCallbacks;
 }
 
 u8 Terminal::getReadBufferOffset()
@@ -252,8 +284,8 @@ void Terminal::ProcessLine(char* line)
 	//Call all callbacks
 	TerminalCommandHandlerReturnType handled = TerminalCommandHandlerReturnType::UNKNOWN;
 
-	for(u32 i=0; i<registeredCallbacksNum; i++){
-		TerminalCommandHandlerReturnType currentHandled = (registeredCallbacks[i])->TerminalCommandHandler(commandArgsPtr, (u8)commandArgsSize);
+	for(u32 i=0; i<registeredCommandCallbacksNum; i++){
+		TerminalCommandHandlerReturnType currentHandled = (registeredCommandCallbacks[i])->TerminalCommandHandler(commandArgsPtr, (u8)commandArgsSize);
 
 		if (          handled != TerminalCommandHandlerReturnType::UNKNOWN
 			&& currentHandled != TerminalCommandHandlerReturnType::UNKNOWN)

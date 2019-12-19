@@ -19,6 +19,7 @@ enum class ConnectionState{
 };
 ----
 
+[#PacketSplitting]
 === Packet Splitting
 Whenever data that is requested to be send is bigger than payload size of 1 packet then that data is splitted into few messages. The header of split message has additional information about index of split message so that full data can be easily and realiably reconstructed. For connections that use the basic packet format with the _connPacketHeader_ (cf. xref:Specification.adoc[Specification]), packet splitting can be used. The _MeshConnection_ and _MeshAccessConnection_ use this.
 
@@ -43,7 +44,7 @@ This connection is instantiated as soon as another device connects to the node, 
 
 == MeshConnection
 MeshConnections are initiated by the node and are used to connect between two mesh nodes. They store important information for clustering such as the _clusterId_ and _clusterSize_ of their partner.
-It also implements the handshake for two partners to be connected to the same cluster. It works closely together with the xref:Node.adoc[Node]. They can transfer message of any size as they use xref:Connections.adoc#_packet_splitting[packet splitting].
+It also implements the handshake for two partners to be connected to the same cluster. It works closely together with the xref:Node.adoc[Node]. They can transfer message of any size as they use xref:Connections.adoc#PacketSplitting[packet splitting].
 
 == MeshAccessConnection
 The MeshAccessConnection is documented to a large extent in the documentation of the xref:MeshAccessModule.adoc[MeshAccessModule].

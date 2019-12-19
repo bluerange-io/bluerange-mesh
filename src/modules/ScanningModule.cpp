@@ -200,14 +200,16 @@ void ScanningModule::HandleAssetV2Packets(const FruityHal::GapAdvertisementRepor
 	){
 		char serial[6];
 		Utility::GenerateBeaconSerialForIndex(assetPacket->serialNumberIndex, serial);
-		logt("SCANMOD", "RX ASSETV2 ADV: serial %s, pressure %u, speed %u, temp %u, humid %u, cn %u, rssi %d",
-				serial,
-				assetPacket->pressure,
-				assetPacket->speed,
-				assetPacket->temperature,
-				assetPacket->humidity,
-				assetPacket->advertisingChannel,
-				advertisementReportEvent.getRssi());
+		logt("SCANMOD", "RX ASSETV2 ADV: serial %s, pressure %u, speed %u, temp %u, humid %u, cn %u, rssi %d, nodeId %u",
+			serial,
+			assetPacket->pressure,
+			assetPacket->speed,
+			assetPacket->temperature,
+			assetPacket->humidity,
+			assetPacket->advertisingChannel,
+			advertisementReportEvent.getRssi(),
+			(u32)assetPacket->nodeId
+		);
 
 		if (assetPacket->serialNumberIndex != 0)
 		{

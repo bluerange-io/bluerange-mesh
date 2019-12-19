@@ -27,6 +27,9 @@ WARNING: Such nodes should never be used in an environment where unauthorized pe
 === Preferred Network Enrollment
 Preferred network enrollment is used for assets because we would like to set their network id in order for assets to send their measurement to nodes in a particular network. In case of preferred network enrollment, the asset won't restart. In PreferredNetwork only networkId and nodekey is given.
 
+=== Nearby Enrollment
+It is possible to activate nearby enrollment by enabling `allowUnenrolledUnsecureConnections` through the featureset. A node can then be enrolled using a MeshAccessConnection with the known xref:Specification.adoc#EncryptionKeys[ZeroKey]. This can only be done if a node is unenrolled. This is useful if no QR code or other method is available to distribute the device key. The featureset has to provide some means of resetting the node to an unenrolled state, e.g. by pressing a button, resetting the power, etc,... This is necessary because the user might lose access to the Network Key and might be unable to remove the enrollment afterwards.
+
 === Different Enrollment Scenarios
 
 ==== Unenrolled Node
@@ -84,6 +87,32 @@ action [nodeId] enroll set_network [newNetworkId] {requestHandler}
 
 //E.g. set preferred network of the node with serial number BBBBN
 action 0 enroll set_network 12
+----
+
+=== Requesting specific proposals
+In some situations (e.g. when the nodes are placed in a line) it can be helpful to specifically query which node sees which serial numbers before sending the enrollment. Therefore, it is possible to send the request_proposals message with several serialNumbers that are then temporarily stored on the target node. The target node will respond with a proposal message as soon as it receives a broadcast message of one of the nodes to be enrolled.
+[source, C++]
+----
+//Query which node sees which serial numbers
+action [nodeId] enroll request_proposals [up to 11 serial numbers]
+
+//E.g. ask all connected nodes which of them sees any of the given serial numbers
+action 0 enroll request_proposals BBBBD BBBBF BBBBG BBBBH BBBBJ BBBBK BBBBL BBBBM BBBBN BBBBP BBBBQ
+//E.g. only ask for three serial numbers
+action 0 enroll request_proposals BBZ3F ZZZZZ ZFGBB
+----
+
+The nodes then scan for one minute if they see any of the specified serial numbers. Upon arrival, the message is answered with the following JSON (1 JSON per serial number):
+[source]
+----
+{
+	//NodeID 1 was able to scan serialNumber BBBBG
+	"nodeId":1,
+	"type":"request_proposals_response",
+	"serialNumber":BBBBG,
+	"module":5,
+	"requestHandle":0
+}
 ----
 
 == Messages
@@ -178,4 +207,22 @@ actionType: `REMOVE_ENROLLMENT_RESPONSE`
 |8|connPacketModule|
 |4|serialNumberIndex|Index of the serial number that was enrolled
 |1|result|See above for possible result codes
+|===
+
+=== Requesting Proposals
+==== Request
+actionType: `REQUEST_PROPOSALS (4)`
+[cols="1,2,3"]
+|===
+|Bytes|Type|Description
+|8|connPacketModule	|
+|4 - 44|serialNumberIndices|Up to 11 serial indices.
+|===
+==== Response
+actionType: `REQUEST_PROPOSALS_RESPONSE (4)`
+[cols="1,2,3"]
+|===
+|Bytes|Type|Description
+|8|connPacketModule|
+|4|serialNumberIndex|The serial index that was possible to scan.
 |===

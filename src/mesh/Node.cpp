@@ -778,6 +778,80 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 				logt("NODE", "Scheduled reboot in %u seconds", message->resetSeconds);
 				Reboot(message->resetSeconds*10, RebootReason::REMOTE_RESET);
 			}
+			else if (packet->actionType == (u8)NodeModuleTriggerActionMessages::EMERGENCY_DISCONNECT)
+			{
+				EmergencyDisconnectResponseMessage response;
+				CheckedMemset(&response, 0, sizeof(response));
+
+				if (GS->cm.freeMeshOutConnections == 0)
+				{
+					MeshConnection* connToDisconnect = nullptr;
+
+					//We want to disconnect connections with a low number of connected nodes
+					//Therefore we give these a higher chance to get disconnected
+					u16 rnd = Utility::GetRandomInteger();
+					u32 sum = 0;
+
+					MeshConnections conns = GS->cm.GetMeshConnections(ConnectionDirection::DIRECTION_OUT);
+
+					u16 handshakedConnections = 0;
+					for (u32 i = 0; i < conns.count; i++) {
+						if (conns.connections[i]->handshakeDone()) handshakedConnections++;
+					}
+
+					//We try to find a connection that we should disconnect based on probability.
+					//Connections with less connectedClusterSize should be preferredly disconnected
+					for (u32 i = 0; i < conns.count; i++) {
+						MeshConnection* conn = (MeshConnection*)conns.connections[i];
+						if (!conn->handshakeDone()) continue;
+
+						//The probability from 0 to UINT16_MAX that this connection will be removed
+						//Because our node counts against the clusterSize but is not included in the connectedClusterSizes, we substract 1
+						//We also check that we do not have a divide by 0 exception
+						u32 removalProbability = (handshakedConnections <= 1 || clusterSize <= 1) ? 1 : ((clusterSize - 1) - conn->connectedClusterSize) * UINT16_MAX / ((handshakedConnections - 1) * (clusterSize - 1));
+
+						sum += removalProbability;
+
+						//TODO: Maybe we do not want linear probablility but more sth. exponential?
+
+						if (sum > rnd) {
+							connToDisconnect = conn;
+							break;
+						}
+					}
+
+					if (connToDisconnect) {
+						logt("ERROR", "Emergency disconnect from %u", connToDisconnect->partnerId);
+						response.code = EmergencyDisconnectErrorCode::SUCCESS;
+
+						connToDisconnect->DisconnectAndRemove(AppDisconnectReason::EMERGENCY_DISCONNECT);
+						GS->logger.logCustomError(CustomErrorTypes::INFO_EMERGENCY_DISCONNECT_SUCCESSFUL, 0);
+
+						//TODO: Blacklist other node for a short time
+
+						//FIXME: Approach will not work if other node does not have a freeInConnection, the other node must also kill its connection
+					}
+					else {
+						response.code = EmergencyDisconnectErrorCode::CANT_DISCONNECT_ANYBODY;
+						GS->logger.logCustomCount(CustomErrorTypes::COUNT_EMERGENCY_CONNECTION_CANT_DISCONNECT_ANYBODY);
+						logt("ERROR", "WOULD DISCONNECT NOBODY");
+					}
+				}
+				else
+				{
+					response.code = EmergencyDisconnectErrorCode::NOT_ALL_CONNECTIONS_USED_UP;
+				}
+
+				SendModuleActionMessage(
+					MessageType::MODULE_ACTION_RESPONSE,
+					packetHeader->sender,
+					(u8)NodeModuleActionResponseMessages::EMERGENCY_DISCONNECT_RESULT,
+					0,
+					(u8*)&response,
+					sizeof(response),
+					false
+				);
+			}
 #if FEATURE_AVAILABLE(PREFERRED_CONNECTIONS)
 			else if (packet->actionType == (u8)NodeModuleTriggerActionMessages::SET_PREFERRED_CONNECTIONS)
 			{
@@ -815,30 +889,43 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 	}
 
 	if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
-			connPacketModule* packet = (connPacketModule*)packetHeader;
-			//Check if our module is meant and we should trigger an action
-			if(packet->moduleId == ModuleId::NODE){
+		connPacketModule* packet = (connPacketModule*)packetHeader;
+		//Check if our module is meant and we should trigger an action
+		if(packet->moduleId == ModuleId::NODE){
 
-				if (packet->actionType == (u8)NodeModuleActionResponseMessages::SET_DISCOVERY_RESULT)
-				{
-					logjson("NODE", "{\"type\":\"set_discovery_result\",\"nodeId\":%d,\"module\":%d}" SEP, packetHeader->sender, (u32)ModuleId::NODE);
-				}
-				else if (packet->actionType == (u8)NodeModuleActionResponseMessages::PING)
-				{
-					logjson("NODE", "{\"type\":\"ping\",\"nodeId\":%d,\"module\":%d,\"requestHandle\":%u}" SEP, packetHeader->sender, (u32)ModuleId::NODE, packet->requestHandle);
-				}
-				else if (packet->actionType == (u8)NodeModuleActionResponseMessages::START_GENERATE_LOAD_RESULT)
-				{
-					logjson("NODE", "{\"type\":\"start_generate_load_result\",\"nodeId\":%d,\"requestHandle\":%u}" SEP, packetHeader->sender, packet->requestHandle);
-				}
-#if FEATURE_AVAILABLE(PREFERRED_CONNECTIONS)
-				else if (packet->actionType == (u8)NodeModuleActionResponseMessages::SET_PREFERRED_CONNECTIONS_RESULT)
-				{
-					logjson("NODE", "{\"type\":\"set_preferred_connections_result\",\"nodeId\":%d,\"module\":%d}" SEP, packetHeader->sender, (u32)ModuleId::NODE);
-				}
-#endif
+			if (packet->actionType == (u8)NodeModuleActionResponseMessages::SET_DISCOVERY_RESULT)
+			{
+				logjson("NODE", "{\"type\":\"set_discovery_result\",\"nodeId\":%d,\"module\":%d}" SEP, packetHeader->sender, (u32)ModuleId::NODE);
 			}
+			else if (packet->actionType == (u8)NodeModuleActionResponseMessages::PING)
+			{
+				logjson("NODE", "{\"type\":\"ping\",\"nodeId\":%d,\"module\":%d,\"requestHandle\":%u}" SEP, packetHeader->sender, (u32)ModuleId::NODE, packet->requestHandle);
+			}
+			else if (packet->actionType == (u8)NodeModuleActionResponseMessages::START_GENERATE_LOAD_RESULT)
+			{
+				logjson("NODE", "{\"type\":\"start_generate_load_result\",\"nodeId\":%d,\"requestHandle\":%u}" SEP, packetHeader->sender, packet->requestHandle);
+			}
+			else if (packet->actionType == (u8)NodeModuleActionResponseMessages::EMERGENCY_DISCONNECT_RESULT)
+			{
+				EmergencyDisconnectResponseMessage* msg = (EmergencyDisconnectResponseMessage*)packet->data;
+				if (msg->code == EmergencyDisconnectErrorCode::SUCCESS || msg->code == EmergencyDisconnectErrorCode::NOT_ALL_CONNECTIONS_USED_UP)
+				{
+					//All fine, we are now able to connect to the partner via a MeshConnection
+				}
+				else if (msg->code == EmergencyDisconnectErrorCode::CANT_DISCONNECT_ANYBODY)
+				{
+					GS->logger.logCustomError(CustomErrorTypes::WARN_EMERGENCY_DISCONNECT_PARTNER_COULDNT_DISCONNECT_ANYBODY, 0);
+				}
+				ResetEmergencyDisconnect();
+			}
+#if FEATURE_AVAILABLE(PREFERRED_CONNECTIONS)
+			else if (packet->actionType == (u8)NodeModuleActionResponseMessages::SET_PREFERRED_CONNECTIONS_RESULT)
+			{
+				logjson("NODE", "{\"type\":\"set_preferred_connections_result\",\"nodeId\":%d,\"module\":%d}" SEP, packetHeader->sender, (u32)ModuleId::NODE);
+			}
+#endif
 		}
+	}
 
 	if (packetHeader->messageType == MessageType::TIME_SYNC) {
 		const TimeSyncHeader* packet = (TimeSyncHeader*)packetHeader;
@@ -1305,153 +1392,48 @@ Node::DecisionStruct Node::DetermineBestClusterAvailable(void)
 {
 	DecisionStruct result = { DecisionResult::NO_NODES_FOUND, 0, 0 };
 
-	u32 bestScore = 0;
-	joinMeBufferPacket* bestCluster = nullptr;
-
-	//Determine the best Cluster to connect to as a master
-	for (int i = 0; i < joinMePackets.length; i++)
-	{
-		joinMeBufferPacket* packet = &joinMePackets[i];
-		if (packet->payload.sender == 0) continue;
-
-		u32 score = CalculateClusterScoreAsMaster(packet);
-		if (score > bestScore)
-		{
-			bestScore = score;
-			bestCluster = packet;
-		}
-	}
-
-
-	//FIXME: We should change the implementation for emergency disconnects (IOT-2538)
-	// We might have the problem, that all of our outgoing connections are taken but
-	// another cluster would be available
-	// In this case, we randomly disconnect a node in the hope that it will be added
-	// to our cluster by somebody else
-	// This prevents situations where we are the only partner that can connect to a node
-	if (bestCluster && GS->cm.freeMeshOutConnections == 0)
-	{
-		MeshConnection* connToDisconnect = nullptr;
-
-		//We want to disconnect connections with a low number of connected nodes
-		//Therefore we give these a higher chance to get disconnected
-		u16 rnd = Utility::GetRandomInteger();
-		u32 sum = 0;
-
-		MeshConnections conns = GS->cm.GetMeshConnections(ConnectionDirection::DIRECTION_OUT);
-
-		u16 handshakedConnections = 0;
-		for (u32 i = 0; i < conns.count; i++) {
-			if (conns.connections[i]->handshakeDone()) handshakedConnections++;
-		}
-
-		//We try to find a connection that we should disconnect based on probability.
-		//Connections with less connectedClusterSize should be preferredly disconnected
-		for (u32 i = 0; i < conns.count; i++) {
-			MeshConnection* conn = (MeshConnection*)conns.connections[i];
-			if (!conn->handshakeDone()) continue;
-
-			//The probability from 0 to UINT16_MAX that this connection will be removed
-			//Because our node counts against the clusterSize but is not included in the connectedClusterSizes, we substract 1
-			//We also check that we do not have a divide by 0 exception
-			u32 removalProbability = (handshakedConnections <= 1 || clusterSize <= 1) ? 1 : ((clusterSize - 1) - conn->connectedClusterSize) * UINT16_MAX / ((handshakedConnections - 1) * (clusterSize - 1));
-
-			sum += removalProbability;
-
-			//TODO: Maybe we do not want linear probablility but more sth. exponential?
-
-			if (sum > rnd) {
-				connToDisconnect = conn;
-				break;
-			}
-		}
-
-		if (connToDisconnect) {
-			emergencyDisconnectCounter++;
-
-			logt("ERROR", "Node in emergency detected");
-
-			if (emergencyDisconnectCounter > 20) {
-				logt("ERROR", "Emergency disconnect from %u", connToDisconnect->partnerId);
-
-				connToDisconnect->DisconnectAndRemove(AppDisconnectReason::EMERGENCY_DISCONNECT);
-				GS->logger.logCustomError(CustomErrorTypes::INFO_EMERGENCY_DISCONNECT_SUCCESSFUL, (u32)bestCluster->payload.clusterId);
-
-				//TODO: Blacklist other node for a short time
-
-				//FIXME: Approach will not work if other node does not have a freeInConnection, the other node must also kill its connection
-
-				emergencyDisconnectCounter = 0;
-			}
-		}
-		else {
-			GS->logger.logCustomCount(CustomErrorTypes::COUNT_EMERGENCY_CONNECTION_CANT_DISCONNECT_ANYBODY);
-			logt("ERROR", "WOULD DISCONNECT NOBODY");
-		}
-	}
-	else {
-		//We reset our counter as there has not been an emergency in the last iteration
-		emergencyDisconnectCounter = 0;
-	}
+	joinMeBufferPacket* bestClusterAsMaster = DetermineBestClusterAsMaster();
 
 	//If we still do not have a freeOutConnection, we have no viable cluster to connect to
-	if (GS->cm.freeMeshOutConnections == 0){
-		bestScore = 0;
-		bestCluster = nullptr;
-	}
-
 	if (GS->cm.freeMeshOutConnections > 0)
 	{
 		//Now, if we want to be a master in the connection, we simply answer the ad packet that
 		//informs us about that cluster
-		if (bestCluster != nullptr)
+		if (bestClusterAsMaster != nullptr)
 		{
 			currentAckId = 0;
 
-			FruityHal::BleGapAddr address = bestCluster->addr;
+			FruityHal::BleGapAddr address = bestClusterAsMaster->addr;
 
 			//Choose a different connection interval for leaf nodes
 			u16 connectionIv = Conf::getInstance().meshMinConnectionInterval;
-			if(bestCluster->payload.deviceType == DeviceType::LEAF){
+			if(bestClusterAsMaster->payload.deviceType == DeviceType::LEAF){
 				connectionIv = MSEC_TO_UNITS(90, UNIT_1_25_MS);
 			}
 
-			ErrorType err = GS->cm.ConnectAsMaster(bestCluster->payload.sender, &address, bestCluster->payload.meshWriteHandle, connectionIv);
+			ErrorType err = GS->cm.ConnectAsMaster(bestClusterAsMaster->payload.sender, &address, bestClusterAsMaster->payload.meshWriteHandle, connectionIv);
 
 			//Note the time that we tried to connect to this node so that we can blacklist it for some time if it does not work
 			if (err == ErrorType::SUCCESS) {
-				bestCluster->lastConnectAttemptDs = GS->appTimerDs;
-				if(bestCluster->attemptsToConnect <= 20) bestCluster->attemptsToConnect++;
+				bestClusterAsMaster->lastConnectAttemptDs = GS->appTimerDs;
+				if(bestClusterAsMaster->attemptsToConnect <= 20) bestClusterAsMaster->attemptsToConnect++;
 			}
 
 			result.result = DecisionResult::CONNECT_AS_MASTER;
-			result.preferredPartner = bestCluster->payload.sender;
+			result.preferredPartner = bestClusterAsMaster->payload.sender;
 			return result;
 		}
 	}
 
 	//If no good cluster could be found (all are bigger than mine)
 	//Find the best cluster that should connect to us (we as slave)
-
-	for (int i = 0; i < joinMePackets.length; i++)
-	{
-		currentAckId = 0;
-
-		joinMeBufferPacket* packet = &joinMePackets[i];
-		if (packet->payload.sender == 0) continue;
-
-		u32 score = CalculateClusterScoreAsSlave(packet);
-		if (score > bestScore)
-		{
-			bestScore = score;
-			bestCluster = packet;
-		}
-	}
+	currentAckId = 0;
+	joinMeBufferPacket* bestClusterAsSlave = DetermineBestClusterAsSlave();
 
 	//Set our ack field to the best cluster that we want to be a part of
-	if (bestCluster != nullptr)
+	if (bestClusterAsSlave != nullptr)
 	{
-		currentAckId = bestCluster->payload.clusterId;
+		currentAckId = bestClusterAsSlave->payload.clusterId;
 
 		logt("DECISION", "Other clusters are bigger, we are going to be a slave of %u", currentAckId);
 
@@ -1475,7 +1457,7 @@ Node::DecisionStruct Node::DetermineBestClusterAvailable(void)
 				if (
 					//Check if we have either different clusterSizes or if similar, only disconnect randomly
 					//to prevent recurrent situations where two nodes will always disconnect at the same time
-					clusterSize != bestCluster->payload.clusterSize
+					clusterSize != bestClusterAsSlave->payload.clusterSize
 					|| Utility::GetRandomInteger() < UINT32_MAX / 4
 				) {
 					GS->cm.ForceDisconnectOtherMeshConnections(nullptr, AppDisconnectReason::SHOULD_WAIT_AS_SLAVE);
@@ -1489,7 +1471,7 @@ Node::DecisionStruct Node::DetermineBestClusterAvailable(void)
 		UpdateJoinMePacket();
 
 		result.result = DecisionResult::CONNECT_AS_SLAVE;
-		result.preferredPartner = bestCluster->payload.sender;
+		result.preferredPartner = bestClusterAsSlave->payload.sender;
 		return result;
 	}
 
@@ -1524,77 +1506,126 @@ u32 Node::ModifyScoreBasedOnPreferredPartners(u32 score, NodeId partner) const
 	return score;
 }
 
+joinMeBufferPacket * Node::DetermineBestCluster(u32(Node::*clusterRatingFunction)(joinMeBufferPacket &packet) const)
+{
+	u32 bestScore = 0;
+	joinMeBufferPacket* bestCluster = nullptr;
+
+	for (int i = 0; i < joinMePackets.length; i++)
+	{
+		joinMeBufferPacket* packet = &joinMePackets[i];
+		if (packet->payload.sender == 0) continue;
+
+		u32 score = (this->*clusterRatingFunction)(*packet);
+		if (score > bestScore)
+		{
+			bestScore = score;
+			bestCluster = packet;
+		}
+	}
+	return bestCluster;
+}
+
+joinMeBufferPacket* Node::DetermineBestClusterAsSlave()
+{
+	return DetermineBestCluster(&Node::CalculateClusterScoreAsSlave);
+}
+
+joinMeBufferPacket* Node::DetermineBestClusterAsMaster()
+{
+	return DetermineBestCluster(&Node::CalculateClusterScoreAsMaster);
+}
+
 //Calculates the score for a cluster
 //Connect to big clusters but big clusters must connect nodes that are not able 
-u32 Node::CalculateClusterScoreAsMaster(joinMeBufferPacket* packet) const
+u32 Node::CalculateClusterScoreAsMaster(joinMeBufferPacket& packet) const
 {
 	//If the packet is too old, filter it out
-	if (GS->appTimerDs - packet->receivedTimeDs > MAX_JOIN_ME_PACKET_AGE_DS) return 0;
+	if (GS->appTimerDs - packet.receivedTimeDs > MAX_JOIN_ME_PACKET_AGE_DS) return 0;
 
 	//If we are already connected to that cluster, the score is 0
-	if (packet->payload.clusterId == this->clusterId) return 0;
+	if (packet.payload.clusterId == this->clusterId) return 0;
 
 	//If there are zero free in connections, we cannot connect as master
-	if (packet->payload.freeMeshInConnections == 0) return 0;
+	if (packet.payload.freeMeshInConnections == 0) return 0;
 
 	//If the other node wants to connect as a slave to another cluster, do not connect
-	if (packet->payload.ackField != 0 && packet->payload.ackField != this->clusterId) return 0;
+	if (packet.payload.ackField != 0 && packet.payload.ackField != this->clusterId) return 0;
 
 	//If the other cluster is bigger, we cannot connect as master
-	if (packet->payload.clusterSize > this->clusterSize) return 0;
+	if (packet.payload.clusterSize > this->clusterSize) return 0;
 
 	//Check if we recently tried to connect to him and blacklist him for a short amount of time
 	if (
-		packet->lastConnectAttemptDs != 0
-		&& packet->attemptsToConnect > connectAttemptsBeforeBlacklisting
-		&& packet->lastConnectAttemptDs + SEC_TO_DS(1) * packet->attemptsToConnect > GS->appTimerDs) {
+		packet.lastConnectAttemptDs != 0
+		&& packet.attemptsToConnect > connectAttemptsBeforeBlacklisting
+		&& packet.lastConnectAttemptDs + SEC_TO_DS(1) * packet.attemptsToConnect > GS->appTimerDs) {
 		SIMSTATCOUNT("tempBlacklist");
-		logt("NODE", "temporarily blacklisting node %u, attempts: %u", packet->payload.sender, packet->attemptsToConnect);
+		logt("NODE", "temporarily blacklisting node %u, attempts: %u", packet.payload.sender, packet.attemptsToConnect);
 		return 0;
 	}
 
 	//Do not connect if we are already connected to that partner
-	if (GS->cm.GetMeshConnectionToPartner(packet->payload.sender) != nullptr) return 0;
+	if (GS->cm.GetMeshConnectionToPartner(packet.payload.sender) != nullptr) return 0;
 
 	//Connection should have a minimum of stability
-	if(packet->rssi < STABLE_CONNECTION_RSSI_THRESHOLD) return 0;
+	if(packet.rssi < STABLE_CONNECTION_RSSI_THRESHOLD) return 0;
 
-	u32 rssiScore = 100 + packet->rssi;
+	u32 rssiScore = 100 + packet.rssi;
 
 	//If we are a leaf node, we must not connect to anybody
 	if(GET_DEVICE_TYPE() == DeviceType::LEAF) return 0;
 
 	//Free in connections are best, free out connections are good as well
 	//TODO: RSSI should be factored into the score as well, maybe battery runtime, device type, etc...
-	u32 score = (u32)(packet->payload.freeMeshInConnections) * 10000 + (u32)(packet->payload.freeMeshOutConnections) * 100 + rssiScore;
+	u32 score = (u32)(packet.payload.freeMeshInConnections) * 10000 + (u32)(packet.payload.freeMeshOutConnections) * 100 + rssiScore;
 
-	return ModifyScoreBasedOnPreferredPartners(score, packet->payload.sender);
+	return ModifyScoreBasedOnPreferredPartners(score, packet.payload.sender);
 }
 
 //If there are only bigger clusters around, we want to find the best
 //And set its id in our ack field
-u32 Node::CalculateClusterScoreAsSlave(joinMeBufferPacket* packet) const
+u32 Node::CalculateClusterScoreAsSlave(joinMeBufferPacket& packet) const
 {
 	//If the packet is too old, filter it out
-	if (GS->appTimerDs - packet->receivedTimeDs > MAX_JOIN_ME_PACKET_AGE_DS) return 0;
+	if (GS->appTimerDs - packet.receivedTimeDs > MAX_JOIN_ME_PACKET_AGE_DS) return 0;
 
 	//If we are already connected to that cluster, the score is 0
-	if (packet->payload.clusterId == this->clusterId) return 0;
+	if (packet.payload.clusterId == this->clusterId) return 0;
 
 	//Do not check for freeOut == 0 as the partner will probably free up a conneciton for us and we should be ready
 
 	//We will only be a slave of a bigger or equal cluster
-	if (packet->payload.clusterSize < this->clusterSize) return 0;
+	if (packet.payload.clusterSize < this->clusterSize) return 0;
 
 	//Connection should have a minimum of stability
-	if(packet->rssi < STABLE_CONNECTION_RSSI_THRESHOLD) return 0;
+	if(packet.rssi < STABLE_CONNECTION_RSSI_THRESHOLD) return 0;
 
-	u32 rssiScore = 100 + packet->rssi;
+	u32 rssiScore = 100 + packet.rssi;
 
 	//Choose the one with the biggest cluster size, if there are more, prefer the most outConnections
-	u32 score = (u32)(packet->payload.clusterSize) * 10000 + (u32)(packet->payload.freeMeshOutConnections) * 100 + rssiScore;
+	u32 score = (u32)(packet.payload.clusterSize) * 10000 + (u32)(packet.payload.freeMeshOutConnections) * 100 + rssiScore;
 
-	return ModifyScoreBasedOnPreferredPartners(score, packet->payload.sender);
+	return ModifyScoreBasedOnPreferredPartners(score, packet.payload.sender);
+}
+
+bool Node::DoesBiggerKnownClusterExist()
+{
+	return DetermineBestClusterAsSlave() != nullptr;
+}
+
+void Node::ResetEmergencyDisconnect()
+{
+	emergencyDisconnectTimerDs = 0;
+	if (emergencyDisconnectValidationConnectionUniqueId != 0)
+	{
+		MeshAccessConnection* mac = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(emergencyDisconnectValidationConnectionUniqueId);
+		if (mac != nullptr)
+		{
+			mac->DisconnectAndRemove(AppDisconnectReason::EMERGENCY_DISCONNECT_RESET);
+		}
+		emergencyDisconnectValidationConnectionUniqueId = 0;
+	}
 }
 
 //All advertisement packets are received here if they are valid
@@ -1695,10 +1726,10 @@ joinMeBufferPacket* Node::findTargetBuffer(const advPacketJoinMeV0* packet)
 
 		u32 score = 0;
 		if (packet->payload.clusterSize >= clusterSize) {
-			score = CalculateClusterScoreAsMaster(tmpPacket);
+			score = CalculateClusterScoreAsMaster(*tmpPacket);
 		}
 		else {
-			score = CalculateClusterScoreAsSlave(tmpPacket);
+			score = CalculateClusterScoreAsSlave(*tmpPacket);
 		}
 
 		if(score < minScore){
@@ -1794,6 +1825,57 @@ void Node::TimerEventHandler(u16 passedTimeDs)
 	{
 		//Go to the next state
 		ChangeState(nextDiscoveryState);
+	}
+
+	if (DoesBiggerKnownClusterExist())
+	{
+		const u32 emergencyDisconnectTimerBackupDs = emergencyDisconnectTimerDs;
+		emergencyDisconnectTimerDs += passedTimeDs;
+
+		//If the emergencyDisconnectTimerTriggerDs was surpassed in this TimerEventHandler
+		if(    emergencyDisconnectTimerBackupDs <  emergencyDisconnectTimerTriggerDs
+			&& emergencyDisconnectTimerDs       >= emergencyDisconnectTimerTriggerDs)
+		{
+			joinMeBufferPacket* bestCluster = DetermineBestClusterAsSlave();
+			emergencyDisconnectValidationConnectionUniqueId = MeshAccessConnection::ConnectAsMaster(&bestCluster->addr, 10, 10, FM_KEY_ID_NETWORK, nullptr, MeshAccessTunnelType::PEER_TO_PEER);
+			//If a connection wasn't possible to establish
+			if (emergencyDisconnectValidationConnectionUniqueId == 0)
+			{
+				//We reset all the emergency disconnect values and try again after emergencyDisconnectTimerTriggerDs
+				ResetEmergencyDisconnect();
+				GS->logger.logCustomError(CustomErrorTypes::WARN_COULD_NOT_CREATE_EMERGENCY_DISCONNECT_VALIDATION_CONNECTION, bestCluster->payload.clusterId);
+			}
+		}
+		else if (emergencyDisconnectTimerDs >= emergencyDisconnectTimerTriggerDs)
+		{
+			MeshAccessConnection* mac = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(emergencyDisconnectValidationConnectionUniqueId);
+			if (mac != nullptr)
+			{
+				if (mac->connectionState == ConnectionState::HANDSHAKE_DONE)
+				{
+					SendModuleActionMessage(
+						MessageType::MODULE_TRIGGER_ACTION,
+						mac->virtualPartnerId,
+						(u8)NodeModuleTriggerActionMessages::EMERGENCY_DISCONNECT,
+						0,
+						nullptr,
+						0,
+						false
+					);
+				}
+			}
+			else
+			{
+				ResetEmergencyDisconnect();
+				//This can happen in very rare conditions where several nodes enter the emergency state at the same time
+				//and report their emergency to the same node.
+				GS->logger.logCustomError(CustomErrorTypes::WARN_UNEXPECTED_REMOVAL_OF_EMERGENCY_DISCONNECT_VALIDATION_CONNECTION, 0);
+			}
+		}
+	}
+	else
+	{
+		ResetEmergencyDisconnect();
 	}
 
 	//Count the nodes that are a good choice for connecting

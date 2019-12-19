@@ -1,44 +1,27 @@
 #
-# This is platform-specific configuration for nRF52 SoC included in main
+# This is the platform specific makefile for the nRF52840 and the SDK15
 # makefile
 #
 
 CPU := cortex-m4
-ifeq ($(SDK),14)
-LINKER_SCRIPT := linker/gcc_nrf52840_s140.ld
-else
-LINKER_SCRIPT := linker/gcc_nrf52840_s140_sdk15.ld
-endif
 
-ifeq ($(SDK),14)
-C_SOURCE_FILES += $(COMPONENTS)/toolchain/system_nrf52840.c
-C_SOURCE_FILES += $(COMPONENTS)/drivers_nrf/saadc/nrf_drv_saadc.c
-C_SOURCE_FILES += $(COMPONENTS)/drivers_nrf/hal/nrf_saadc.c
-else
+LINKER_SCRIPT := linker/gcc_nrf52840_s140v6_256kb.ld
+
 C_SOURCE_FILES += $(MODULES)/nrfx/mdk/system_nrf52840.c
 C_SOURCE_FILES += $(DRIVERS)/src/nrfx_saadc.c
-endif
 C_SOURCE_FILES += $(COMPONENTS)/libraries/util/app_util_platform.c
 C_SOURCE_FILES += $(COMPONENTS)/libraries/experimental_section_vars/nrf_section_iter.c
 C_SOURCE_FILES += $(COMPONENTS)/libraries/scheduler/app_scheduler.c
 C_SOURCE_FILES += $(COMPONENTS)/libraries/hardfault/nrf52/handler/hardfault_handler_gcc.c
 
 
-ifeq ($(SDK),14)
-ASM_SOURCE_FILES += $(COMPONENTS)/toolchain/gcc/gcc_startup_nrf52840.s
-else
 ASM_SOURCE_FILES += $(MODULES)/nrfx/mdk/gcc_startup_nrf52840.s
-endif
 
 INC_PATHS += -I$(COMPONENTS)/softdevice/s140/headers
 INC_PATHS += -I$(COMPONENTS)/softdevice/s140/headers/nrf52
-ifeq ($(SDK),14)
-INC_PATHS += -I$(NRF5_SDK_PATH)/components/libraries/experimental_log/src
-INC_PATHS += -I$(NRF5_SDK_PATH)/components/libraries/experimental_log
-else
+
 INC_PATHS += -I$(NRF5_SDK_PATH)/components/libraries/log/src
 INC_PATHS += -I$(NRF5_SDK_PATH)/components/libraries/log
-endif
 INC_PATHS += -I$(COMPONENTS)/libraries/experimental_section_vars
 INC_PATHS += -I$(COMPONENTS)/libraries/strerror
 INC_PATHS += -I$(COMPONENTS)/libraries/scheduler
@@ -52,7 +35,6 @@ INC_PATHS += -I$(MODULES)/nrfx/drivers/src
 
 CFLAGS += -DSOFTDEVICE_PRESENT -DS140 -DNRF52 -DNRF52840_XXAA -DNRF52840
 CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
-
 
 SOFTDEVICE_PATH = softdevice/s140_nrf52_6.1.0_softdevice.hex
 

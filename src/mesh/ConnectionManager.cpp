@@ -281,9 +281,16 @@ void ConnectionManager::SendMeshMessage(u8* data, u16 dataLength, DeliveryPriori
 
 void ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable, bool loopback, bool toMeshAccess) const
 {
-	if (dataLength > MAX_MESH_PACKET_SIZE) {
+	if (dataLength > MAX_MESH_PACKET_SIZE)
+	{
 		SIMEXCEPTION(PaketTooBigException);
 		logt("ERROR", "Packet too big for sending!");
+		return;
+	}
+	if (dataLength < sizeof(connPacketHeader))
+	{
+		SIMEXCEPTION(PaketTooSmallException);
+		logt("ERROR", "Packet too small for sending!");
 		return;
 	}
 

@@ -119,6 +119,11 @@ enum class CustomErrorTypes : u8 {
 	WARN_CONNECTION_SUSTAIN_FAILED = 55,
 	COUNT_EMERGENCY_CONNECTION_CANT_DISCONNECT_ANYBODY = 56,
 	INFO_EMERGENCY_DISCONNECT_SUCCESSFUL = 57,
+	WARN_COULD_NOT_CREATE_EMERGENCY_DISCONNECT_VALIDATION_CONNECTION = 58,
+	WARN_UNEXPECTED_REMOVAL_OF_EMERGENCY_DISCONNECT_VALIDATION_CONNECTION = 59,
+	WARN_EMERGENCY_DISCONNECT_PARTNER_COULDNT_DISCONNECT_ANYBODY = 60,
+	WARN_REQUEST_PROPOSALS_UNEXPECTED_LENGTH = 61,
+	WARN_REQUEST_PROPOSALS_TOO_LONG = 62,
 };
 
 #ifdef _MSC_VER
@@ -173,7 +178,7 @@ public:
 #else
 #define CheckPrintfFormating(...) /*do nothing*/
 #endif
-	void log_f(bool printLine, const char* file, i32 line, const char* message, ...) const CheckPrintfFormating(5, 6);
+	void log_f(bool printLine, bool isJson, const char* file, i32 line, const char* message, ...) const CheckPrintfFormating(6, 7);
 	void logTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...) const CheckPrintfFormating(6, 7);
 #undef CheckPrintfFormating
 
@@ -226,7 +231,7 @@ private:
 
 //Used for UART communication between node and attached pc
 #if IS_ACTIVE(JSON_LOGGING)
-#define logjson(tag, message, ...) Logger::getInstance().log_f(false, "", 0, message, ##__VA_ARGS__)
+#define logjson(tag, message, ...) Logger::getInstance().log_f(false, true, "", 0, message, ##__VA_ARGS__)
 #define logjson_error(type) Logger::getInstance().uart_error_f(type)
 #else
 #define logjson(tag, message, ...) do{}while(0)
@@ -235,13 +240,13 @@ private:
 
 //Currently, tracing is always enabled if we have a terminal
 #if defined(TERMINAL_ENABLED) && IS_ACTIVE(TRACE)
-#define trace(message, ...) Logger::getInstance().log_f(false, "", 0, message, ##__VA_ARGS__)
+#define trace(message, ...) Logger::getInstance().log_f(false, false, "", 0, message, ##__VA_ARGS__)
 #else
 #define trace(message, ...) do{}while(0)
 #endif
 
 #if IS_ACTIVE(LOGGING)
-#define logs(message, ...) Logger::getInstance().log_f(true, __FILE_S__, __LINE__, message, ##__VA_ARGS__)
+#define logs(message, ...) Logger::getInstance().log_f(true, false, __FILE_S__, __LINE__, message, ##__VA_ARGS__)
 #define logt(tag, message, ...) Logger::getInstance().logTag_f(Logger::LogType::LOG_LINE, __FILE_S__, __LINE__, tag, message, ##__VA_ARGS__)
 #define TO_BASE64(data, dataSize) DYNAMIC_ARRAY(data##Hex, (dataSize)*3+1); Logger::convertBufferToBase64String(data, (dataSize), (char*)data##Hex, (dataSize)*3+1)
 #define TO_BASE64_2(data, dataSize) Logger::convertBufferToBase64String(data, (dataSize), (char*)data##Hex, (dataSize)*3+1)

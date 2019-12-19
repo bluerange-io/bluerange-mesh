@@ -114,12 +114,12 @@ extern "C" {
 #if defined(TWIM_IN_USE) && defined(TWI_IN_USE)
     #define NRF_DRV_TWI_PERIPHERAL(id)           \
         (CONCAT_3(TWI, id, _USE_EASY_DMA) == 1 ? \
-            (void *)CONCAT_2(NRF_TWIM, id)       \
-          : (void *)CONCAT_2(NRF_TWI, id))
+            (NRF_TWI_Type*)CONCAT_2(NRF_TWIM, id)       \
+          : (NRF_TWI_Type*)CONCAT_2(NRF_TWI, id))
 #elif defined(TWIM_IN_USE) && !defined(TWI_IN_USE)
-    #define NRF_DRV_TWI_PERIPHERAL(id)  (void *)CONCAT_2(NRF_TWIM, id)
+    #define NRF_DRV_TWI_PERIPHERAL(id)  (NRF_TWI_Type*)CONCAT_2(NRF_TWIM, id)
 #else
-    #define NRF_DRV_TWI_PERIPHERAL(id)  (void *)CONCAT_2(NRF_TWI, id)
+    #define NRF_DRV_TWI_PERIPHERAL(id)  (NRF_TWI_Type*)CONCAT_2(NRF_TWI, id)
 #endif
 
 #ifndef TWI_PRESENT

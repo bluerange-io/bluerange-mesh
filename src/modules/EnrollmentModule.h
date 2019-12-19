@@ -101,28 +101,37 @@ struct EnrollmentModuleConfiguration : ModuleConfiguration {
 	};
 
 	constexpr int SIZEOF_ENROLLMENT_MODULE_REMOVE_ENROLLMENT = (4);
-	typedef struct
+	struct EnrollmentModuleRemoveEnrollmentMessage
 	{
 		u32 serialNumberIndex;
-
-	}EnrollmentModuleRemoveEnrollmentMessage;
+	};
 	STATIC_ASSERT_SIZE(EnrollmentModuleRemoveEnrollmentMessage, SIZEOF_ENROLLMENT_MODULE_REMOVE_ENROLLMENT);
 
 	//Answers
-	typedef struct
+	struct EnrollmentModuleEnrollmentResponse
 	{
 		u32 serialNumberIndex;
 		EnrollmentResponseCode result;
-
-	}EnrollmentModuleEnrollmentResponse;
+	};
 	STATIC_ASSERT_SIZE(EnrollmentModuleEnrollmentResponse, 5);
 
-	typedef struct
+	struct EnrollmentModuleEnrollmentProposalMessage
 	{
 		u32 serialNumberIndex[3];
-
-	}EnrollmentModuleEnrollmentProposalMessage;
+	};
 	STATIC_ASSERT_SIZE(EnrollmentModuleEnrollmentProposalMessage, 12);
+
+	struct EnrollmentModuleRequestProposalMessage
+	{
+		u32 serialNumberIndices[1]; //More serial Number indices may follow
+	};
+	STATIC_ASSERT_SIZE(EnrollmentModuleRequestProposalMessage, 4);
+
+	struct EnrollmentModuleRequestProposalResponse
+	{
+		u32 serialNumberIndex;
+	};
+	STATIC_ASSERT_SIZE(EnrollmentModuleRequestProposalResponse, 4);
 
 #pragma pack(pop)
 //####### Module messages end
@@ -136,6 +145,7 @@ class EnrollmentModule: public Module
 			REMOVE_ENROLLMENT          = 1,
 			//SET_ENROLLMENT_BY_SERIAL = 2, //Deprecated since version 0.7.22
 			SET_NETWORK                = 3,
+			REQUEST_PROPOSALS          = 4,
 		};
 
 		enum class EnrollmentModuleActionResponseMessages : u8 {
@@ -143,6 +153,7 @@ class EnrollmentModule: public Module
 			REMOVE_ENROLLMENT_RESPONSE = 1,
 			ENROLLMENT_PROPOSAL        = 2,
 			SET_NETWORK_RESPONSE       = 3,
+			REQUEST_PROPOSALS_RESPONSE = 4,
 		};
 
 		void DispatchPreEnrollment(Module* lastModuleCalled, PreEnrollmentReturnCode lastStatus);
@@ -190,12 +201,17 @@ class EnrollmentModule: public Module
 
 		//Save a few nearby node serials in this proposal message
 		static constexpr int ENROLLMENT_PROPOSAL_MESSAGE_NUM_ENTRIES = 3;
-		u8 proposalIndexCounter;
+		u8 proposalIndexCounter = 0;
 		EnrollmentModuleEnrollmentProposalMessage proposal;
 
-		ScanJob * p_scanJob;
+		ScanJob * p_scanJob = nullptr;
 
-
+		static constexpr u32 REQUEST_PROPOSAL_INDICES_LENGTH = 11;
+		u32 requestProposalIndices[REQUEST_PROPOSAL_INDICES_LENGTH];
+		NodeId reqeustProposalReqeusterNodeId = 0;
+		static constexpr u32 REQUEST_PROPOSAL_TIMEOUT_DS = SEC_TO_DS(60);
+		u32 requestProposalTimestampDs = 0;
+		u8 requestProposalRequestHandle = 0;
 
 		void Enroll(connPacketModule* packet, u16 packetLength);
 
@@ -212,6 +228,12 @@ class EnrollmentModule: public Module
 		void SendEnrollmentResponse(EnrollmentModuleActionResponseMessages responseType, EnrollmentResponseCode result, u8 requestHandle) const;
 
 		void Unenroll(connPacketModule* packet, u16 packetLength);
+
+		void NotifyNewStableSerialIndexScanned(u32 serialIndex);
+
+		bool IsSerialIndexInRequestProposalAndRemove(u32 serialIndex);
+
+		void SendRequestProposalResponse(u32 serialIndex);
 
 	public:
 		DECLARE_CONFIG_AND_PACKED_STRUCT(EnrollmentModuleConfiguration);

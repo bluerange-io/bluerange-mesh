@@ -51,6 +51,7 @@
 
 
 constexpr int MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS = 20;
+constexpr int MAX_TERMINAL_JSON_LISTENER_CALLBACKS = 1;
 constexpr int READ_BUFFER_LENGTH = 250;
 constexpr int MAX_NUM_TERM_ARGS = 15;
 
@@ -77,6 +78,20 @@ public:
 
 };
 
+class TerminalJsonListener
+{
+public:
+	TerminalJsonListener() {};
+	virtual ~TerminalJsonListener() {};
+
+#ifdef TERMINAL_ENABLED
+	//This method can be implemented by any subclass and will be notified when
+	//a message is written to the Terminal.
+	virtual void TerminalJsonHandler(const char* json) /*nonconst*/ = 0;
+#endif
+
+};
+
 
 class Terminal
 {
@@ -86,8 +101,12 @@ private:
 	const char* commandArgsPtr[MAX_NUM_TERM_ARGS];
 	
 	//CommandListeners
-	u8 registeredCallbacksNum = 0;
-	TerminalCommandListener* registeredCallbacks[MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS] = { 0 };
+	u8 registeredCommandCallbacksNum = 0;
+	TerminalCommandListener* registeredCommandCallbacks[MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS] = { 0 };
+
+	u8 registeredJsonCallbacksNum = 0;
+	TerminalJsonListener* registeredJsonCallbacks[MAX_TERMINAL_JSON_LISTENER_CALLBACKS] = { 0 };
+	bool currentlyExecutingJsonCallbacks = false;	//Avoids endless recursion, where outputCallbacks themselves want to print something.
 
 	u8 readBufferOffset = 0;
 	char readBuffer[READ_BUFFER_LENGTH];
@@ -115,6 +134,7 @@ public:
 
 	//Register a class that will be notified when the activation string is entered
 	void AddTerminalCommandListener(TerminalCommandListener* callback);
+	void AddTerminalJsonListener(TerminalJsonListener* callback);
 
 	//###### Log Transport ######
 	//Must be called before using the Terminal
@@ -122,6 +142,8 @@ public:
 	void Init();
 	void PutString(const char* buffer);
 	void PutChar(const char character);
+
+	void OnJsonLogged(const char* json);
 
 	const char** getCommandArgsPtr();
 	u8 getAmountOfRegisteredCommandListeners();

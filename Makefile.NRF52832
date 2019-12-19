@@ -1,43 +1,29 @@
 #
-# This is platform-specific configuration for nRF52 SoC included in main
+# This is the platform specific makefile for the nRF51822/nRF51422 and the SDK14
 # makefile
 #
 
 CPU := cortex-m4
-ifeq ($(SDK),14)
-LINKER_SCRIPT := linker/gcc_nrf52_s132.ld
-else
-LINKER_SCRIPT := linker/gcc_nrf52_s132_sdk15.ld
-endif
 
-ifeq ($(SDK),14)
+LINKER_SCRIPT := linker/gcc_nrf52832_s132v5_64kb.ld
+
 C_SOURCE_FILES += $(COMPONENTS)/toolchain/system_nrf52.c
 C_SOURCE_FILES += $(COMPONENTS)/drivers_nrf/saadc/nrf_drv_saadc.c
 C_SOURCE_FILES += $(COMPONENTS)/drivers_nrf/hal/nrf_saadc.c
-else
-C_SOURCE_FILES += $(MODULES)/nrfx/mdk/system_nrf52.c
-C_SOURCE_FILES += $(DRIVERS)/src/nrfx_saadc.c
-endif
+
 C_SOURCE_FILES += $(COMPONENTS)/libraries/util/app_util_platform.c
 C_SOURCE_FILES += $(COMPONENTS)/libraries/experimental_section_vars/nrf_section_iter.c
 C_SOURCE_FILES += $(COMPONENTS)/libraries/scheduler/app_scheduler.c
 C_SOURCE_FILES += $(COMPONENTS)/libraries/hardfault/nrf52/handler/hardfault_handler_gcc.c
 
-ifeq ($(SDK),14)
 ASM_SOURCE_FILES += $(COMPONENTS)/toolchain/gcc/gcc_startup_nrf52.s
-else
-ASM_SOURCE_FILES += $(MODULES)/nrfx/mdk/gcc_startup_nrf52.s
-endif
 
 INC_PATHS += -I$(COMPONENTS)/softdevice/s132/headers
 INC_PATHS += -I$(COMPONENTS)/softdevice/s132/headers/nrf52
-ifeq ($(SDK),14)
+
 INC_PATHS += -I$(NRF5_SDK_PATH)/components/libraries/experimental_log/src
 INC_PATHS += -I$(NRF5_SDK_PATH)/components/libraries/experimental_log
-else
-INC_PATHS += -I$(NRF5_SDK_PATH)/components/libraries/log/src
-INC_PATHS += -I$(NRF5_SDK_PATH)/components/libraries/log
-endif
+
 INC_PATHS += -I$(COMPONENTS)/libraries/experimental_section_vars
 INC_PATHS += -I$(COMPONENTS)/libraries/strerror
 INC_PATHS += -I$(COMPONENTS)/drivers_nrf/hal
@@ -51,7 +37,7 @@ INC_PATHS += -I$(COMPONENTS)/libraries/balloc
 INC_PATHS += -Isrc/c/drivers
 INC_PATHS += -Isrc/nrf52
 
-CFLAGS += -DSOFTDEVICE_PRESENT -DS132 -DNRF52832_XXAA -DNRF52832
+CFLAGS += -DSOFTDEVICE_PRESENT -DS132 -DNRF52 -DNRF52832_XXAA -DNRF52832
 CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 
 

@@ -339,7 +339,7 @@ struct UartReadCharResult
 	u32 StartTimers();
 	u32 GetRtcMs();
 	u32 GetRtcDifferenceMs(u32 nowTimeMs, u32 previousTimeMs);
-	ErrorType CreateTimer(swTimer timer, bool repeated, TimerHandler handler);
+	ErrorType CreateTimer(swTimer &timer, bool repeated, TimerHandler handler);
 	ErrorType StartTimer(swTimer timer, u32 timeoutMs);
 	ErrorType StopTimer(swTimer timer);
 
@@ -366,6 +366,23 @@ struct UartReadCharResult
 	void nvicDisableIRQ(u32 irqType);
 	void nvicSetPriorityIRQ(u32 irqType, u8 level);
 	void nvicClearPendingIRQ(u32 irqType);
+
+	// ######################### SERIAL COMMUNICATION ############################
+
+	// i2c
+	ErrorType twi_init(u32 sclPin, u32 sdaPin );
+	void twi_uninit(u32 sclPin, u32 sdaPin);
+	ErrorType twi_registerWrite(u8 slaveAddress, u8 const * pTransferData, u8 length);
+	ErrorType twi_registerRead(u8 slaveAddress, u8 reg, u8 * pReceiveData, u8 length);
+	ErrorType twi_read(u8 slaveAddress, u8 * pReceiveData, u8 length);
+	bool twi_isInitialized(void);
+	void twi_gpio_address_pin_set_and_wait(bool high, u8 sdaPin);
+
+	//spi
+	void spi_init(u8 sckPin, u8 misoPin, u8 mosiPin);
+	bool spi_isInitialized(void);
+	ErrorType spi_transfer(u8* const p_toWrite, u8 count, u8* const p_toRead, u8 slaveSelectPin);
+	void spi_configureSlaveSelectPin(u32 pin);
 
 	// ######################### Temporary conversion ############################
 	//These functions are temporary until event handling is implemented in the HAL and events

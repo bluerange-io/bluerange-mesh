@@ -1,0 +1,118 @@
+ifndef::imagesdir[:imagesdir: ../assets/images]
+= Concepts
+
+== Basic FruityMesh concepts
+
+FruityMesh is a profile specification of a connection-based Bluetooth Mesh implementation, developed and published by M-Way Solutions GmbH. Our commercial implementation is called BlueRange.
+
+This document explains the basic concepts of FruityMesh and gives an overview of the operation and capabilities. It also explains the life cycle of the mesh network and a mesh device (aka. node). Also, it offers some direct comparisons to the BLE SIG mesh implementation.
+
+== Relation to Bluetooth Low Energy
+
+FruityMesh is based on the Bluetooth low energy part of the Bluetooth 4.1 Specification and is built on top of the host layer. On-air, FruityMesh physical representation is compatible with existing Bluetooth low energy devices as mesh messages are contained inside the payload of Bluetooth low energy connection packets. FruityMesh adds logic on top of the Bluetooth low energy host layer to automatically build connections with other mesh devices within the same mesh network. As it is implemented on top of the host, just as any normal BLE application would be, it is highly portable between chipsets and fully compatible with other Bluetooth Low Energy devices.
+
+In contrast to the SIG mesh, there is no use-case specific node configuration necessary. There is no concept of relay nodes, friend nodes or proxy nodes as each Node can do this decision based on the FruityMesh Algorithm at Runtime. There is however a concept of a Gateway (Sink) and Asset Nodes (movable nodes with very little battery capacity). Leaf nodes (aka. friend nodes) can be used for very specific use-cases.
+
+image:fruitymesh.png[FruityMesh]
+
+== Application areas
+
+FruityMesh, in opposite to the Bluetooth (SIG) Mesh, uses standard Bluetooth low energy connections. This allows it to be much more power efficient and can also allow all nodes to run with battery power, depending on the use-case. While a SIG mesh node needs to scan at all times to be able to receive messages, FruityMesh nodes have scheduled connections with their connection partners. This has the other advantage that the mesh throughput is multiple times higher for FruityMesh nodes.
+
+FruityMesh targets both simple control or monitoring applications as well as sensor data collection or asset tracking. It is a better solution than the SIG mesh once a higher throughput or battery efficiency is required. Is can be used for lighting and automation as there is often the need to collect sensor data in the same network or combine it with asset tracking.
+
+Per specification, FruityMesh supports up to 1999 nodes in one network, with a maximum network diameter of 1000 hops.
+
+== Network topology and relaying
+
+The FruityMesh algorithm builds a connection-based network graph that is a tree. It guarantees, that each node is connected to this network if the node can reach at least one node that is part of the network. Each node can send messages to any other node within the network because every node can relay messages in the network tree. Because the algorithm guarantees that there are no circles in the connection-based network, messages do not need a time to live.
+
+image:connection-based.png[connection-based]
+
+Using MeshAccess Connections (similar to the GATT Proxy in the SIG mesh), it is possible for non-mesh devices, such as Smartphones to connect to a mesh network. This can also be used to set up connections between a mesh and a node of a different mesh.
+
+=== Mesh transport
+
+Standard Bluetooth Low Energy connections are utilized by FruityMesh to create its mesh network. Once connected, two FruityMesh nodes will use the BLE GATT protocol to exchange information. A BLE service with RX and TX characteristics is used to transport serial data from node to node. The packet format is specified fully in the xref:Specification.adoc[Specification]. The connections are encrypted using the NetworkKey as Long Term Key. This key is exchanged during enrollment (aka. provisioning).
+
+=== Throughput
+
+As mentioned, FruityMesh has much higher throughput than the SIG Mesh. The difference is in transport layer - FruityMesh uses more reliable Bluetooth Low Energy connections. It has been measured that FruityMesh has a 16 (!) times higher throughput than Bluetooth Mesh. This exact measurement depends on multiple factors such as node density, interference and the used connection parameters. However, because of the underlying transport, FruityMesh will most likely perform better in any use-case.
+
+=== Relaying
+
+Each node in the network relays received messages in all directions except the direction from which a message was received. If the node is the only receiver of the message, the message will not be relayed. There are also special messages that only travel a specific number of hops. In some cases, such as messages being sent to a gateway, it is possible to improve the message relaying using a routing table to optimize throughput. Because there are no circles in the network, there is no need to cache received messages as must be done in the SIG mesh.
+
+=== Power consumption
+
+Because FruityMesh, unlike Bluetooth SIG Mesh does not need to continuously keep the radio in listening mode, it has a significantly lower power consumption and makes it an ideal solution for energy harvesting hardware solutions. In other cases, such as Asset tracking, however, the nodes will need to listen for advertising messages. Depending on the required latency of the asset tracking, this can significantly increase the power consumption.
+
+For more information on battery consumption of FruityMesh, read the xref:Battery-Consumption.adoc[Battery Consumption] chapter.
+
+== Proxy
+
+Each FruityMesh node will allow standard BLE connections if it has free resources. This means, that any legacy Bluetooth Low Energy device has the possibility to connect to the mesh by either using the MeshAccess connection protocol or by implementing a custom connection type. This is similar to the SIG mesh GATT proxy, but doesn't interfere with the mesh in a similar manner as it can be scheduled much better together with mesh activity. The MeshAccessConnections provide security and can be used with a number of different keys. More information about connecting to a mesh network can be found in the documentation of the xref:MeshAccessModule.adoc[MeshAccessModule].
+
+== Addressing
+
+The FruityMesh addressing scheme is similar to the SIG mesh addressing:
+
+* *Broadcast Address* +
+The special address 0 can be used to send a message to all devices in the mesh at one time.
+
+* *NodeId* +
+A NodeId is assigned to a node once it is added to a mesh network. Unicast addresses can be used by any application to directly send a message to a device. This is a unicast address.
+
+* *GroupId* +
+A group address may represent any number of devices and a device may be part of any number of groups. These groups can be defined at compile time or can be configured and changed at runtime. A single message can therefore be used to contact any number of nodes in the network.
+
+* *Virtual addresses* +
+The virtual addresses are temporary addresses that are assigned to devices that connect to the mesh network using the MeshAccess connections.
+
+There are more address types available and documented here: xref:Specification.adoc#NodeIds[Node Ids]
+
+== Modules
+
+Just like Bluetooth Mesh communication is structured into models and elements, communication within FruityMesh is structured into modules. The idea is very similar to the SIG Mesh: communication is structured, so that new components can easily be created and are interoperable.
+
+Each module has a purpose and a known address (moduleId) within the network. We can then send messages to this module and it will process them if they are understood. If not, they will be ignored.
+
+Currently there are few generic modules that ease development of FruityMesh based applications. These are part of the standard, e.g. the StatusReporterModule or the EnrollmentModule and have a well defined set of messages. You can find the full list of FruityMesh modules xref:Modules.adoc[here].
+
+== Enrollment / Provisioning
+
+This documentation is often referring to the term _enrolling_ which is essentially the same as _provisioning_. Those terms are referring to the same actions of adding node to a network. 
+
+Before a device can participate in a mesh network, it must be provisioned. During provisioning, a device is added to the network by assigning a NodeId, the NetworkKey and a number of other optional keys. The provisioning is done by a Provisioner, which is a trusted device with access to the full list of devices in the network. FruityMesh enables provisioning through mobile apps or Gateways, such as the SIG mesh. In addition to that, provisioning over the mesh is also possible. This allows us to provision whole buildings with a single provisioner that does not need to move around. A more detailed description can be found in the xref:EnrollmentModule.adoc[EnrollmentModule] documentation.
+
+== Security
+
+FruityMesh employs several security measures to prevent third-party interference and monitoring. Each device is flashed with a unique and cryptographically secure 128bit NodeKey (Device Key). This key is used to set up a secure connection with the provisioner and is transmitted out of band, e.g. by using a QR code. A less secure option of initially enrolling nearby devices without the device key is also supported and can be enabled. After provisioning, the node possesses a NetworkKey that is used to encrypt all communication in the mesh.
+
+Optionally, a UserBaseKey and an OrganizationKey can be given during enrollment. These keys can be used to authenticate multiple users and to decrypt information from assets that move within an organization. The different key types are documented xref:Specification.adoc#EncryptionKeys[here].
+
+Both mesh connections and MeshAccessConnections use AES encryption and are protected using a MIC and a nonce from replay, man in the middle, known plaintext or other known attacks.
+
+== Summary
+
+=== FruityMesh is easy to setup
+
+There is no need for configuring anything options such as proxy node, relay node, advertising channels, etc,... manually such as in SIG mesh. As FruityMesh allows provisioning over the mesh and with a Gateway it can be done from remote, which is not possible for Bluetooth Mesh. 
+
+=== FruityMesh is low power
+
+As FruityMesh uses standard BLE connections it is much better optimized for power consumption. Hence there is no need to distinguish between battery powered nodes or nodes powered by electricity. It also means that there is no need for additional manual configuration of low power nodes as all FruityMesh nodes are low power.
+
+=== FruityMesh is fast
+
+The achievable throughput of FruityMesh has been measured to be up to 16 times as high as the SIG mesh throughput.
+
+=== FruityMesh is interoperable
+
+FruityMesh can work with other Bluetooth 4.1 or higher devices. It supports both central and peripheral connections so it can connect to smartphones but also to BLE enabled sensors to collect data.
+
+=== Relation to Bluetooth SIG Mesh
+
+FruityMesh is a technology very similar to Bluetooth Mesh. They both utilize BLE technology to transfer some data to nearby devices, they both require some provisioning to get started, they both use a similar addressing model and both provide many-to-many communication. 
+
+However, the main difference is the transport layer where FruityMesh uses standard BLE connections while Bluetooth Mesh uses advertising / scanning for communication. FruityMesh approach has many advantages without having any major drawbacks.

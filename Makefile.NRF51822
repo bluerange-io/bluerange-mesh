@@ -1,14 +1,11 @@
 #
-# This is platform-specific configuration for nRF51 SoC included in main
+# This is the platform specific makefile for the nRF51822/nRF51422 and the SDK11
 # makefile
 #
 
-
-
 CPU := cortex-m0
-LINKER_SCRIPT := linker/gcc_nrf51_s130_32kb.ld
 
-
+LINKER_SCRIPT := linker/gcc_nrf51822_s130v2_32kb.ld
 
 C_SOURCE_FILES += $(COMPONENTS)/toolchain/system_nrf51.c
 C_SOURCE_FILES += $(COMPONENTS)/softdevice/common/softdevice_handler/softdevice_handler.c
@@ -23,7 +20,7 @@ INC_PATHS += -I$(COMPONENTS)/softdevice/s130/headers/nrf51
 INC_PATHS += -I$(COMPONENTS)/drivers_nrf/adc
 INC_PATHS += -I$(COMPONENTS)/drivers_nrf/spi_master
 
-CFLAGS += -DSOFTDEVICE_PRESENT -DS130 -DNRF51422
+CFLAGS += -DSOFTDEVICE_PRESENT -DS130 -DNRF51 -DNRF51422 -DNRF51822
 
 SOFTDEVICE_PATH = softdevice/s130_nrf51_2.0.1_softdevice.hex
 

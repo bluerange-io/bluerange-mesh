@@ -120,10 +120,9 @@ The following describes the format of the extended header:
 |...|u8[] |_data_| additional payload data for the command
 |===
 
-== Node ID
-A node ID (_nodeId_) is a way of addressing devices in a network. Each
-device in a network must have a unique _nodeId_ assigned to it that must
-not clash with the node ID of another device.
+[#NodeIds]
+== Node IDs
+A NodeId is a way of addressing devices in a network. Each device in a network must have a unique _nodeId_ assigned to it that must not clash with the node ID of another device.
 
 There are different node ID ranges that are used for different purposes:
 
@@ -137,9 +136,7 @@ There are different node ID ranges that are used for different purposes:
 |2000...19999| Virtual addresses to address smartphones connected to the mesh
 |20000...20999| Address groups
 |30000| Address for the current node itself
-|30001...30999| Specify the number of hops that a packet
-can travel. (30 001 e.g. specifies that the packet must only reach the
-direct neighbours)
+|30001...30999| Specify the number of hops that a packet can travel. (30 001 e.g. specifies that the packet must only reach the direct neighbours)
 |31000| Have a packet travel to the shortest sink
 possible (not yet implemented)
 |33000...39999| Assign nodeIds uniquely over multiple meshes for the same organization
@@ -157,7 +154,8 @@ unsigned integer that can be uniquely mapped from and to a serial number
 using the _GenerateBeaconSerialForIndex_ and _GetIndexForSerial_ methods in
 the _Utility_ class.
 
-== EncryptionKeys
+[#EncryptionKeys]
+== Encryption Keys
 There are a number of different keys used throughout
 FruityMesh. These are all 128-bit keys and are used for AES encryption
 between the nodes, as well as for communication with smartphones or other
@@ -240,6 +238,7 @@ leaf but will not relay any data (Useful if its position changes but it
 needs a constant data connection)
 |===
 
+[#UICR]
 == UICR
 The UICR is a special persistant storage that is used to store
 factory defaults once a node is flashed. The NRF_UICR->CUSTOMER area is

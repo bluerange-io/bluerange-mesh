@@ -92,8 +92,6 @@ open source release:
 * xref:EnrollmentModule.adoc[_EnrollmentModule_ (_ModuleId_ 5)]
 * xref:IoModule.adoc[_IoModule_ (_ModuleId_ 6)]
 * xref:DebugModule.adoc[_DebugModule_ (_ModuleId_ 7)]
-* Config (_ModuleId_ 8)
-* BoardConfig (_ModuleId_ 9)
 * xref:MeshAccessModule.adoc[_MeshAccessModule_ (_ModuleId_ 10)]
 
 == Proprietary Modules

@@ -102,6 +102,8 @@ make flash
 
 to flash the firmware on a device.
 
+TIP: The safest and most straight forward setup for flashing is to only have a single board connected to the computer while flashing.
+
 ==== Using Eclipse For Development
 image:eclipsescreen.png[eclipsescreenshot]
 
@@ -116,8 +118,9 @@ Now, let's see how we can use FruityMesh. The preconmpiled firmware and the stan
 
 === Open Serial Terminal & Connect
 (On Windows,
-http://www.chiark.greenend.org.uk/~sgtatham/putty/download.html[Putty] is the best tool. The screen utility can be used on macOS or Linux.) You have to connect to UART using the following settings:
+http://www.chiark.greenend.org.uk/~sgtatham/putty/download.html[PuTTY] is the best tool. The screen utility can be used on macOS or Linux.) You have to connect to UART using the following settings:
 
+* *Serial line to connect to:* COMX (see blow)
 * *Connection Type:* Serial
 * *Speed:* 1000000
 * *Data bits:* 8
@@ -126,6 +129,8 @@ http://www.chiark.greenend.org.uk/~sgtatham/putty/download.html[Putty] is the be
 * *Flow control:* RTS/CTS (Hardware)
 
 TIP: OSX users: To find out which serial port to open, you can list all devices under `/dev/cu.` and pick the one that says usbmodem.
+
+TIP: On Windows you can find the correct COM port to connect to by opening the device manager and then under (COM & LPT) you should see a JLink entry with the COM number at the end (e.g. COM3). All the serial settings can be found in PuTTY under Connection/Serial.
 
 === Reset Development Kit
 Once your terminal is connected to the serial port, press the reset button on the Development Kit and the Terminal should provide you with some output similar to this:
@@ -149,9 +154,9 @@ switch their led to white (all LEDs on). After you enter *action 0 io led off*, 
 * Now, connect with another terminal to the second node and enter *data* in the command prompt and observe how the data is sent to the other node and outputted on the other terminal.
 * You can add as many nodes as you like to the network and see how it reacts. If you remove a node, the network will try to repair this connection. You can observe the size change of the cluster by entering *status* from time to time.
 
-WARNING: Two nodes will only connect to each other once they have been enrolled in the same network. The Github configuration will automatically have all nodes enrolled in the same network after flashing. If you do not want this, take a look at the xref:Specification.adoc#_UICR[UICR configuration].
+WARNING: Two nodes will only connect to each other once they have been enrolled in the same network. The Github configuration will automatically have all nodes enrolled in the same network after flashing. If you do not want this, take a look at the xref:Specification.adoc#UICR[UICR configuration] or change the default network id to 0.
 
 == What's Next
-Take a look at the xref:Features.adoc[Features] page for a detailed overview of the possibilities and check out xref:Usage.adoc[Usage] for usage instructions. If you're ready to contribute to the development of FruityMesh, cf. xref:Developers.adoc[Developers] for a roadmap and for instructions on how to participate.
+Take a look at the xref:Features.adoc[Features] page for a detailed overview of the possibilities and check out xref:BasicUsage.adoc[Basic Usage] for usage instructions. If you're ready to contribute to the development of FruityMesh, cf. xref:Developers.adoc[Developers] for a roadmap and for instructions on how to participate.
 
 If you want to start programming with FruityMesh, you should have a look at the xref:Tutorials.adoc[Tutorials] page for a guided introduction.

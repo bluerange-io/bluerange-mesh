@@ -3,53 +3,30 @@
 == File Structure
 This is a list and description of the most important folders in the repository.
 
-[cols="2m,3",width="100%",grid="none"]
-|===
-├── config/ +
-├── └── featuresets/ +
-├── inc/ +
-├── ├── c/ +
-├── └── nrf52/ +
-├── inc_c/ +
-├── linker/ +
-├── sdk/ +
-├── softdevice/ +
-├── src/ +
-├── ├── base/ +
-├── ├── c/ +
-├── ├── mesh/ +
-├── ├── modules/ +
-├── ├── utility/ +
-├── ├── Boardconfig.cpp +
-├── ├── Config.cpp +
-├── ├── FruityMesh.cpp +
-├── ├── GlobalState.cpp +
-├── └── Main.cpp +
-├── util/ +
-└── src_examples/
-| configuration header files +
-different build configurations +
-main include directory for C++ headers +
-includes for c code +
-specific nrf52 includes +
-include directory for C headers +
-linker scripts +
-modified nRF SDKs +
-softdevice hex files +
- +
-wrappers for SoftDevice functions +
-drivers and other c code +
-mesh functionality +
-functionality wrapped in modules +
-helper classes +
-runtime pin and board configuration +
-configuration +
-bootup and main functionality +
-holds references to basic classes +
-Startup Code +
-tools and utilities +
-code templates and examples
-|===
+----
+├── config/                   configuration header files
+├── └── featuresets/          different build configurations
+├── inc/                      main include directory for C++ headers
+├── ├── c/                    includes for c code
+├── └── nrf52/                specific nrf52 includes
+├── inc_c/                    include directory for C headers
+├── linker/                   linker scripts
+├── sdk/                      modified nRF SDKs
+├── softdevice/               softdevice hex files
+├── src/                      
+├── ├── base/                 wrappers for BLE stack functionality
+├── ├── c/                    drivers and other c code
+├── ├── mesh/                 mesh functionality
+├── ├── modules/              functionality wrapped in modules
+├── ├── utility/              helper classes
+├── ├── Boardconfig.cpp       runtime pin and board configuration
+├── ├── Config.cpp            configuration
+├── ├── FruityMesh.cpp        bootup and main functionality
+├── ├── GlobalState.cpp       holds references to basic classes
+├── └── Main.cpp              Startup Code
+├── util/                     tools and utilities
+└── src_examples/             code templates and examples
+----
 
 Functionality that is not part of the meshing algorithm should be placed in the `fruitymesh/modules/` folder and the module class extended. A module receives all events that it is interested in and can save and load its configuration from flash memory.
 
@@ -60,8 +37,11 @@ There are some utilities in the `/util` folder, for example a python script that
 == Configuring FruityMesh
 Most settings are found in the `fruitymesh/config/` folder in `Config.h`. Module specific settings are kept within the module's header and cpp file.
 
+[#Featuresets]
 == Feature Sets
-FruityMesh uses so called featuresets for creating different distributions for different use-cases. A featureset defines the compile time and run time configuration for a node. The make process can be configured differently for a featureset, a number of different defines or macros can be used during compile time and different code is used during runtime. This also allows FruityMesh to run on a number of different boards (different pin settings or configuration) with the same binary. You can specify the featureset by e.g. calling make with `make FEATURESET=featureset_name` or by creating a `Makefile.local`.
+FruityMesh uses so called featuresets for creating different distributions for different use-cases. A featureset defines the compile time and run time configuration for a node. The make process can be configured differently for a featureset, a number of different defines or macros can be used during compile time and different code is used during runtime. This allows us to tailor the firmware functionality and size to each use-case and also allows FruityMesh to compile for different chipsets from the same source. You can specify the featureset by e.g. calling make with `make FEATURESET=featureset_name` or by creating a `Makefile.local`.
+
+A featureset can contain a number of xref:BoardConfig.adoc[Board Configurations] which allows you to flash and run the binary of the featureset on a number of different boards.
 
 == Memory Requirements
 FruityMesh doesn't run on devices with only 16kb of RAM. It may be possible to optimize the build and resize some buffers, but this is currently not supported. The binary of FruityMesh is around 50kb depending on the configuration and will easily fit on devices with 256kb flash together with the softdevice and still be updatable using dual bank updates.

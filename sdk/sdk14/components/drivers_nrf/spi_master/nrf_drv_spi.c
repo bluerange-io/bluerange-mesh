@@ -1,3 +1,10 @@
+// CHANGES BY MWAY to spi master driver from nordic!!!! Had to include SDK file.
+/**
+ * Changed line 241 from nrf_gpio_cfg_input(miso_pin, NRF_GPIO_PIN_PULLDOWN); to
+ * nrf_gpio_cfg_input(miso_pin, NRF_GPIO_PIN_NOPULL);
+ * To solve a problem with ruuvi tags because SPI MISO is not connected with a resistor to GND
+ */
+
 /**
  * Copyright (c) 2015 - 2017, Nordic Semiconductor ASA
  * 
@@ -231,7 +238,7 @@ ret_code_t nrf_drv_spi_init(nrf_drv_spi_t const * const p_instance,
     if (p_config->miso_pin != NRF_DRV_SPI_PIN_NOT_USED)
     {
         miso_pin = p_config->miso_pin;
-        nrf_gpio_cfg_input(miso_pin, NRF_GPIO_PIN_PULLDOWN);
+        nrf_gpio_cfg_input(miso_pin, NRF_GPIO_PIN_NOPULL);
     }
     else
     {

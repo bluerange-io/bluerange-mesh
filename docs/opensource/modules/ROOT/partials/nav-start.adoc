@@ -10,36 +10,51 @@ ifdef::open-source[]
 endif::[]
 
 * xref:fruitymesh::Quick-Start.adoc[Quick Start]
-* xref:fruitymesh::Usage.adoc[Usage]
+* xref:fruitymesh::BasicUsage.adoc[Basic Usage]
+* xref:fruitymesh::Concepts.adoc[Concepts]
 * xref:fruitymesh::Features.adoc[Features]
-* xref:fruitymesh::Developers.adoc[Developers]
 * xref:fruitymesh::Specification.adoc[Specification]
 
-* xref:fruitymesh::Modules.adoc[Modules]
-** xref:fruitymesh::AdvertisingModule.adoc[Advertising Module]
-** xref:fruitymesh::DebugModule.adoc[Debug Module]
-** xref:fruitymesh::DfuModule.adoc[DFU Module]
-** xref:fruitymesh::EnrollmentModule.adoc[Enrollment Module]
-** xref:fruitymesh::IoModule.adoc[IO Module]
-** xref:fruitymesh::MeshAccessModule.adoc[Mesh Access Module]
-** xref:fruitymesh::Node.adoc[Node]
-** xref:fruitymesh::ScanningModule.adoc[Scanning Module]
-** xref:fruitymesh::StatusReporterModule.adoc[Status Report Module]
-
-* Other Classes
-** xref:fruitymesh::Logger.adoc[Logger]
-** xref:fruitymesh::RecordStorage.adoc[Record Storage]
-
-* Other
+* Developers
+** xref:fruitymesh::Developers.adoc[Developer Overview]
 ** xref:fruitymesh::Class-Structure.adoc[Class Structure]
 ** xref:fruitymesh::Debugging.adoc[Debugging]
+** xref:fruitymesh::DocumentationTemplate.adoc[Documentation Template]
+
+* Mesh
+** xref:fruitymesh::Node.adoc[Node]
+** xref:fruitymesh::Connections.adoc[Connections]
+
+* Modules
+** xref:fruitymesh::Modules.adoc[Module Overview]
+** xref:fruitymesh::AdvertisingModule.adoc[AdvertisingModule]
+** xref:fruitymesh::DebugModule.adoc[DebugModule]
+** xref:fruitymesh::DfuModule.adoc[DfuModule]
+** xref:fruitymesh::EnrollmentModule.adoc[EnrollmentModule]
+** xref:fruitymesh::IoModule.adoc[IoModule]
+** xref:fruitymesh::MeshAccessModule.adoc[MeshAccessModule]
+** xref:fruitymesh::ScanningModule.adoc[ScanningModule]
+** xref:fruitymesh::StatusReporterModule.adoc[StatusReportModule]
+
+* Simulator
+** xref:fruitymesh::Simulator.adoc[Old Simulator]
+** xref:fruitymesh::CherrySim.adoc[CherrySim]
+
+* Other Classes
+** xref:fruitymesh::AdvertisingController.adoc[AdvertisingController]
+** xref:fruitymesh::FruityHal.adoc[FruityHal]
+** xref:fruitymesh::Logger.adoc[Logger]
+** xref:fruitymesh::RecordStorage.adoc[Record Storage]
+** xref:fruitymesh::ScanController.adoc[ScanController]
+
+* Measurements
 ** xref:fruitymesh::Battery-Consumption.adoc[Battery Consumption]
 ** xref:fruitymesh::Throughput.adoc[Throughput]
-** xref:fruitymesh::RecordStorage.adoc[Record Storage]
 
-* xref:fruitymesh::The-FruityMesh-Algorithm.adoc[The Fruitymesh Algorithm]
+* The Fruitymesh Algorithm
+** xref:fruitymesh::The-FruityMesh-Algorithm.adoc[The Fruitymesh Algorithm Basics]
 ** xref:fruitymesh::The-Algorithm-in-Detail.adoc[The Algorithm in Detail]
-** xref:fruitymesh::Simulator.adoc[Simulator]
 
-* xref:fruitymesh::Tutorials.adoc[Tutorials]
+* Tutorials
+** xref:fruitymesh::Tutorials.adoc[Tutorial Overview]
 ** xref:fruitymesh::Implementing-a-Custom-Module.adoc[Implementing a Custom Module]

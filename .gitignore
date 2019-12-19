@@ -27,6 +27,11 @@ fruityloader/.settings/
 .project
 .settings/
 
+#Documentation
+node_modules/
+package-lock.json
+ui-bundle.zip
+
 ## Intellij
 .idea/
 *.iml
@@ -58,3 +63,11 @@ packages/
 
 # cmake
 cmake_build*
+
+# Flash storage files
+*TestFlashStorageFile.bin
+*CherrySimFlashState.bin
+cmake_build*
+
+# Source Distributions files
+sourceDistributions/*

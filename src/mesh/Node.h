@@ -203,6 +203,19 @@ struct CapabilityEndMessage
 };
 STATIC_ASSERT_SIZE(CapabilityEndMessage, 10);
 #endif // FEATURE_AVAILABLE(DEVICE_CAPABILITIES)
+
+enum class EmergencyDisconnectErrorCode : u8
+{
+	SUCCESS                     = 0,
+	NOT_ALL_CONNECTIONS_USED_UP = 1,
+	CANT_DISCONNECT_ANYBODY     = 2,
+};
+
+struct EmergencyDisconnectResponseMessage
+{
+	EmergencyDisconnectErrorCode code;
+};
+STATIC_ASSERT_SIZE(EmergencyDisconnectResponseMessage, 1);
 #pragma pack(pop)
 
 typedef struct
@@ -252,7 +265,8 @@ private:
 			SET_PREFERRED_CONNECTIONS = 2,
 			PING                      = 3,
 			START_GENERATE_LOAD       = 4,
-			GENERATE_LOAD_CHUNK       = 5
+			GENERATE_LOAD_CHUNK       = 5,
+			EMERGENCY_DISCONNECT      = 6,
 		};
 
 		enum class NodeModuleActionResponseMessages : u8
@@ -261,6 +275,7 @@ private:
 			SET_PREFERRED_CONNECTIONS_RESULT = 2,
 			PING                             = 3,
 			START_GENERATE_LOAD_RESULT       = 4,
+			EMERGENCY_DISCONNECT_RESULT      = 5,
 		};
 
 		bool stateMachineDisabled = false;
@@ -274,10 +289,14 @@ private:
 
 		u32 ModifyScoreBasedOnPreferredPartners(u32 score, NodeId partner) const;
 		
+		joinMeBufferPacket* DetermineBestCluster		(u32(Node::*clusterRatingFunction)(joinMeBufferPacket& packet) const);
+		joinMeBufferPacket* DetermineBestClusterAsSlave ();
+		joinMeBufferPacket* DetermineBestClusterAsMaster();
 
-		//Incremented if other nodes are found that cannot connect to our cluster because we do not have
-		//any more free outgoing connections
-		u16 emergencyDisconnectCounter = 0;
+		u32 CalculateClusterScoreAsMaster(joinMeBufferPacket& packet) const;
+		u32 CalculateClusterScoreAsSlave(joinMeBufferPacket& packet) const;
+
+		bool DoesBiggerKnownClusterExist();
 
 #if FEATURE_AVAILABLE(DEVICE_CAPABILITIES)
 		bool isSendingCapabilities = false;
@@ -307,6 +326,11 @@ private:
 		u8 generateLoadRequestHandle = 0;
 		constexpr static u8 generateLoadMagicNumber = 0x91;
 		NodeId generateLoadTarget = 0;
+
+		u32 emergencyDisconnectTimerDs = 0; //The time since this node was not involved in any mesh. Can be reset by other means as well, e.g. when an emergency disconnect was sent.
+		constexpr static u32 emergencyDisconnectTimerTriggerDs = SEC_TO_DS(/*Two minutes*/ 2 * 60);
+		u32 emergencyDisconnectValidationConnectionUniqueId = 0;
+		void ResetEmergencyDisconnect(); //Resets all the emergency disconnect variables and closes the validation connection.
 
 	public:
 		DECLARE_CONFIG_AND_PACKED_STRUCT(NodeConfiguration);
@@ -429,8 +453,6 @@ private:
 		
 		bool HasAllMasterBits() const;
 
-		u32 CalculateClusterScoreAsMaster(joinMeBufferPacket* packet) const;
-		u32 CalculateClusterScoreAsSlave(joinMeBufferPacket* packet) const;
 		void PrintStatus() const;
 		void PrintBufferStatus() const;
 		void SetTerminalTitle() const;

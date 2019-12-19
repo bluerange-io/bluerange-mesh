@@ -15,8 +15,8 @@ The node only permits one mesh handshake at a certain time. During the handshake
 
 TIP: There are a number of undocumented commands. These are mostly for debugging and there is no guarantee that they will be available in future builds.
 
+[#RebootMessage]
 == Reboot Message
-
 On reboot, the firmware sends a JSON to the connected device, providing more information about the reboot. The JSON has the following structure:
 
 [source,Javascript]
@@ -49,6 +49,8 @@ The reason can have the following values:
 |10|PREFERRED_CONNECTIONS|The preferred connections were set.
 |200-255|USER_DEFINED|Some user defined reboot reasons.
 |===
+
+The reboot reason is also stored in the error log
 
 == Terminal Commands
 
@@ -350,8 +352,8 @@ feed '\r' is received. All output messages are in JSON format.
 To reset the node via the terminal, enter this command
 and a software reboot is performed.
 
+[#TimeSynchronization]
 == Time Synchronization
-
 To synchronize a time over the mesh, the
 time needs first to be set on the local node using the _settime_ command.
 The time is stored internally as an unsigned 32-bit integer.

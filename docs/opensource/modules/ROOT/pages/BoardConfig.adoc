@@ -1,0 +1,9 @@
+= BoardConfig
+
+== Purpose
+BoardConfigurations provide a way to run the same firmware on multiple boards. This allows you to easily develop a firmware on a development kit, then flash the same firmware on different types of custom hardware PCBs.
+
+== How it works
+Each xref:Developers.adoc#FeatureSets[Featureset] can contain a number of board configurations. So if you develop your custom featureset, you can choose to include all the boards that you want to run this firmware on. The different Board Configurations can be found in the `config/boards/` folder. Each board has an ID that must be stored in the xref:Specification.adoc#UICR[UICR] while flashing the firmware on that board. During boot, FruityMesh will then load the correct board settings that include the pin configuration, clock source and everything else that is board specific. You only have to specify the settings that are necessary for your board as everything else is set to save defaults.
+
+Make sure to choose your board ids so that they start from 10000 to leave enough space for boardids that we might open source in the future.

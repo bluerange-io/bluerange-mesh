@@ -53,8 +53,7 @@ constexpr int ENROLLMENT_MODULE_PRE_ENROLLMENT_TIMEOUT_DS = SEC_TO_DS(15);
 EnrollmentModule::EnrollmentModule()
 	: Module(ModuleId::ENROLLMENT_MODULE, "enroll")
 {
-	proposalIndexCounter = 0;
-	p_scanJob = nullptr;
+	CheckedMemset(&requestProposalIndices, 0xFF, sizeof(requestProposalIndices));
 
 	//Save configuration to base class variables
 	//sizeof configuration must be a multiple of 4 bytes
@@ -236,6 +235,39 @@ TerminalCommandHandlerReturnType EnrollmentModule::TerminalCommandHandler(const 
 
 				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
+
+			else if (TERMARGS(3, "request_proposals"))
+			{
+				//   0   1    2             3         4     5     6     7     8     9    10    11    12    13    14
+				//action 0 enroll request_proposals BBBBD BBBBF BBBBG BBBBH BBBBJ BBBBK BBBBL BBBBM BBBBN BBBBP BBBBQ
+				constexpr int firstProposalIndex = 4;
+				constexpr int  lastProposalIndex = firstProposalIndex + REQUEST_PROPOSAL_INDICES_LENGTH;
+				if (commandArgsSize <= firstProposalIndex) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+				if (commandArgsSize >  lastProposalIndex)  return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+
+				const u32 amountOfProposals = commandArgsSize - firstProposalIndex;
+				const u32 messageLength = amountOfProposals * sizeof(u32);
+
+				DYNAMIC_ARRAY(buffer, messageLength);
+
+				EnrollmentModuleRequestProposalMessage* msg = (EnrollmentModuleRequestProposalMessage*)buffer;
+				for (u32 i = 0; i < amountOfProposals; i++)
+				{
+					msg->serialNumberIndices[i] = Utility::GetIndexForSerial(commandArgs[firstProposalIndex + i]);
+				}
+
+				SendModuleActionMessage(
+					MessageType::MODULE_TRIGGER_ACTION,
+					receiver,
+					(u8)EnrollmentModuleTriggerActionMessages::REQUEST_PROPOSALS,
+					0,
+					(u8*)buffer,
+					messageLength,
+					false
+				);
+
+				return TerminalCommandHandlerReturnType::SUCCESS;
+			}
 		}
 	}
 
@@ -319,6 +351,58 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 					false
 				);
 			}
+			else if (actionType == EnrollmentModuleTriggerActionMessages::REQUEST_PROPOSALS)
+			{
+				EnrollmentModuleRequestProposalMessage* data = (EnrollmentModuleRequestProposalMessage*)packet->data;
+				const u32 payloadLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE;
+				
+				if (payloadLength % sizeof(u32) != 0)
+				{
+					GS->logger.logCustomError(CustomErrorTypes::WARN_REQUEST_PROPOSALS_UNEXPECTED_LENGTH, payloadLength);
+					SIMEXCEPTION(IllegalArgumentException);
+					return;
+				}
+
+				u32 amountOfProposals = payloadLength / sizeof(u32);
+
+				if (amountOfProposals > REQUEST_PROPOSAL_INDICES_LENGTH)
+				{
+					amountOfProposals = REQUEST_PROPOSAL_INDICES_LENGTH;
+					GS->logger.logCustomError(CustomErrorTypes::WARN_REQUEST_PROPOSALS_TOO_LONG, payloadLength);
+					SIMEXCEPTION(IllegalArgumentException);
+					//To maintain portability between versions we just clamp too many values,
+					//instead of discarding them completely. So no return at this place!
+				}
+
+				//Clear the indices buffer
+				CheckedMemset(&requestProposalIndices, 0xFF, sizeof(requestProposalIndices));
+
+				//Write the values
+				for (u32 i = 0; i < amountOfProposals; i++)
+				{
+					requestProposalIndices[i] = data->serialNumberIndices[i];
+				}
+				reqeustProposalReqeusterNodeId = packet->header.sender;
+				requestProposalTimestampDs = GS->appTimerDs;
+				requestProposalRequestHandle = packet->requestHandle;
+
+				//We do not stop the scanner as the node also needs it //TODO: scanning should be stopped once we have a scanController
+				GS->scanController.UpdateJobPointer(&p_scanJob, ScanState::HIGH, ScanJobState::ACTIVE);
+
+				logjson("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"request_proposals\",\"serialNumbers\":[", packet->header.sender);
+				for (u32 i = 0; i < amountOfProposals; i++)
+				{
+					requestProposalIndices[i] = data->serialNumberIndices[i];
+					char serialBuffer[NODE_SERIAL_NUMBER_LENGTH + 1];
+					Utility::GenerateBeaconSerialForIndex(requestProposalIndices[i], serialBuffer);
+					logjson("ENROLLMOD", "\"%s\"", serialBuffer);
+					if (i != amountOfProposals - 1)
+					{
+						logjson("ENROLLMOD", ", ");
+					}
+				}
+				logjson("ENROLLMOD", "], \"module\":%d,\"requestHandle\":%d}" SEP, (u32)packet->moduleId, (u32)packet->requestHandle);
+			}
 		}
 	}
 
@@ -380,6 +464,14 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 				EnrollmentModuleSetNetworkResponseMessage* data = (EnrollmentModuleSetNetworkResponseMessage*)packet->data;
 
 				logjson("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"set_network_response\",\"code\":%d,\"module\":%d,\"requestHandle\":%d}" SEP, packet->header.sender, (u32)data->response, (u32)packet->moduleId, (u32)packet->requestHandle);
+			}
+			else if (actionType == EnrollmentModuleActionResponseMessages::REQUEST_PROPOSALS_RESPONSE)
+			{
+				EnrollmentModuleRequestProposalResponse* data = (EnrollmentModuleRequestProposalResponse*)packet->data;
+				char serialBuffer[NODE_SERIAL_NUMBER_LENGTH + 1];
+				Utility::GenerateBeaconSerialForIndex(data->serialNumberIndex, serialBuffer);
+
+				logjson("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"request_proposals_response\",\"serialNumber\":\"%s\",\"module\":%d,\"requestHandle\":%d}" SEP, packet->header.sender, serialBuffer, (u32)packet->moduleId, (u32)packet->requestHandle);
 			}
 		}
 	}
@@ -503,6 +595,59 @@ void EnrollmentModule::Unenroll(connPacketModule* packet, u16 packetLength)
 	}
 
 	StoreTemporaryEnrollmentDataAndDispatch(packet, packetLength);
+}
+
+void EnrollmentModule::NotifyNewStableSerialIndexScanned(u32 serialIndex)
+{
+	//Check if the nearby serial is in our proposal list and save it if it is not
+	//This will ensure that the list of proposals is always changing "randomly"
+	if (   proposal.serialNumberIndex[0] != serialIndex
+		&& proposal.serialNumberIndex[1] != serialIndex
+		&& proposal.serialNumberIndex[2] != serialIndex
+	) {
+		proposal.serialNumberIndex[proposalIndexCounter] = serialIndex;
+		proposalIndexCounter = (proposalIndexCounter + 1) % ENROLLMENT_PROPOSAL_MESSAGE_NUM_ENTRIES;
+	}
+
+	if (IsSerialIndexInRequestProposalAndRemove(serialIndex))
+	{
+		SendRequestProposalResponse(serialIndex);
+	}
+}
+
+bool EnrollmentModule::IsSerialIndexInRequestProposalAndRemove(u32 serialIndex)
+{
+	if (requestProposalTimestampDs == 0)                                           return false; //Not set
+	if (requestProposalTimestampDs + REQUEST_PROPOSAL_TIMEOUT_DS < GS->appTimerDs) return false; //Time out
+
+	for (u32 i = 0; i < REQUEST_PROPOSAL_INDICES_LENGTH; i++)
+	{
+		if (requestProposalIndices[i] == serialIndex)
+		{
+			//Remove the Serial Index from the array so that the response is only sent once per request.
+			requestProposalIndices[i] = INVALID_SERIAL_NUMBER;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void EnrollmentModule::SendRequestProposalResponse(u32 serialIndex)
+{
+	EnrollmentModuleRequestProposalResponse msg;
+	CheckedMemset(&msg, 0, sizeof(msg));
+	msg.serialNumberIndex = serialIndex;
+
+	SendModuleActionMessage(
+		MessageType::MODULE_ACTION_RESPONSE,
+		reqeustProposalReqeusterNodeId,
+		(u8)EnrollmentModuleActionResponseMessages::REQUEST_PROPOSALS_RESPONSE,
+		requestProposalRequestHandle,
+		(u8*)&msg,
+		sizeof(msg),
+		false
+	);
 }
 
 void EnrollmentModule::SaveUnenrollment(connPacketModule* packet, u16 packetLength)
@@ -845,21 +990,13 @@ void EnrollmentModule::GapAdvertisementReportEventHandler(const FruityHal::GapAd
 	//Check if this is a connectable mesh access packet
 	if (
 		advertisementReportEvent.isConnectable()
-		&& advertisementReportEvent.getRssi() > STABLE_CONNECTION_RSSI_THRESHOLD
 		&& dataLength >= SIZEOF_MESH_ACCESS_SERVICE_DATA_ADV_MESSAGE
 		&& message->flags.type == BLE_GAP_AD_TYPE_FLAGS
 		&& message->serviceUuids.uuid == SERVICE_DATA_SERVICE_UUID16
 		&& message->serviceData.data.messageType == ServiceDataMessageType::MESH_ACCESS
 	){
-		//Check if the nearby serial is in our proposal list and save it if it is not
-		//This will ensure that the list of proposals is always changing "randomly"
-		if(
-			proposal.serialNumberIndex[0] != message->serviceData.serialIndex
-			&& proposal.serialNumberIndex[1] != message->serviceData.serialIndex
-			&& proposal.serialNumberIndex[2] != message->serviceData.serialIndex
-		){
-			proposal.serialNumberIndex[proposalIndexCounter] = message->serviceData.serialIndex;
-			proposalIndexCounter = (proposalIndexCounter + 1) % ENROLLMENT_PROPOSAL_MESSAGE_NUM_ENTRIES;
+		if(advertisementReportEvent.getRssi() > STABLE_CONNECTION_RSSI_THRESHOLD){
+			NotifyNewStableSerialIndexScanned(message->serviceData.serialIndex);
 		}
 
 		// Check if we received a message from a beacon that must be enrolled

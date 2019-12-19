@@ -1,0 +1,5 @@
+ifndef::imagesdir[:imagesdir: ../assets/images]
+= FruityHal
+
+== Purpose
+In order to compile and run FruityMesh on different chipsets and architectures, we decided to abstract chip specific behaviour in our FruityHal. This is an ongoing process and the documentation for this will continously be expanded. Our Hal is more than a standard Hal, it abstracts the functionality at a higher level to allow it to run on top of different BLE stacks. For the interface of the Hal, take a look at `FruityHal.h` and for the implementation for the nRF chipsets, take a look at `FruityHalNrf.cpp`

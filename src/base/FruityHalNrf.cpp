@@ -63,6 +63,10 @@ extern "C" {
 #include <app_util_platform.h>
 #include <nrf_uart.h>
 #include <nrf_mbr.h>
+#ifdef NRF52
+#include <nrf_drv_twi.h>
+#include <nrf_drv_spi.h>
+#endif
 #endif
 }
 
@@ -1758,7 +1762,7 @@ u32 FruityHal::StartTimers()
 	return err;
 }
 
-ErrorType FruityHal::CreateTimer(FruityHal::swTimer timer, bool repeated, TimerHandler handler)
+ErrorType FruityHal::CreateTimer(FruityHal::swTimer &timer, bool repeated, TimerHandler handler)
 {	
 	SIMEXCEPTION(NotImplementedException);
 	u32 err;
@@ -2568,3 +2572,284 @@ u32 FruityHal::checkAndHandleUartError()
 #endif
 	return 0;
 }
+
+// We only need twi and spi for asset and there is no target for nrf51
+#if !defined(NRF51) && defined(ACTIVATE_ASSET_MODULE)
+#ifndef SIM_ENABLED
+#define TWI_INSTANCE_ID     1
+static const nrf_drv_twi_t twi = NRF_DRV_TWI_INSTANCE(TWI_INSTANCE_ID);
+static volatile bool twiXferDone = false;
+static bool twiInitDone = false;
+#endif
+
+#ifndef SIM_ENABLED
+static void twi_handler(nrf_drv_twi_evt_t const * pEvent, void * pContext)
+{
+	switch (pEvent->type) {
+	// Transfer completed event.
+	case NRF_DRV_TWI_EVT_DONE:
+		twiXferDone = true;
+		break;
+
+	// NACK received after sending the address
+	case NRF_DRV_TWI_EVT_ADDRESS_NACK:
+		break;
+
+	// NACK received after sending a data byte.
+	case NRF_DRV_TWI_EVT_DATA_NACK:
+		break;
+
+	default:
+		break;
+	}
+}
+#endif
+
+ErrorType FruityHal::twi_init(u32 sclPin, u32 sdaPin)
+{
+	u32 errCode = NRF_SUCCESS;
+#ifndef SIM_ENABLED
+	// twi.reg          = {NRF_DRV_TWI_PERIPHERAL(TWI_INSTANCE_ID)};
+	// twi.drv_inst_idx = CONCAT_3(TWI, TWI_INSTANCE_ID, _INSTANCE_INDEX);
+	// twi.use_easy_dma = TWI_USE_EASY_DMA(TWI_INSTANCE_ID);
+
+	const nrf_drv_twi_config_t twiConfig = {
+			.scl                = sclPin,
+			.sda                = sdaPin,
+#if SDK == 15
+			.frequency          = NRF_DRV_TWI_FREQ_250K,
+#else
+			.frequency          = NRF_TWI_FREQ_250K,
+#endif
+			.interrupt_priority = APP_IRQ_PRIORITY_HIGH,
+			.clear_bus_init     = false,
+			.hold_bus_uninit    = false
+	};
+
+	errCode = nrf_drv_twi_init(&twi, &twiConfig, twi_handler, NULL);
+	if (errCode != NRF_ERROR_INVALID_STATE && errCode != NRF_SUCCESS) {
+		APP_ERROR_CHECK(errCode);
+	}
+
+	nrf_drv_twi_enable(&twi);
+
+	twiInitDone = true;
+#else
+	errCode = cherrySimInstance->currentNode->twiWasInit ? NRF_ERROR_INVALID_STATE : NRF_SUCCESS;
+	if (cherrySimInstance->currentNode->twiWasInit)
+	{
+		//Was already initialized!
+		SIMEXCEPTION(IllegalStateException);
+	}
+	cherrySimInstance->currentNode->twiWasInit = true;
+#endif
+	return nrfErrToGeneric(errCode);
+}
+
+void FruityHal::twi_uninit(u32 sclPin, u32 sdaPin)
+{
+#ifndef SIM_ENABLED
+	nrf_drv_twi_disable(&twi);
+	nrf_drv_twi_uninit(&twi);
+	nrf_gpio_cfg_default(sclPin);
+	nrf_gpio_cfg_default(sdaPin);
+	NRF_TWI1->ENABLE = 0;
+
+	twiInitDone = false;
+#endif
+}
+
+void FruityHal::twi_gpio_address_pin_set_and_wait(bool high, u8 sdaPin)
+{
+#ifndef SIM_ENABLED
+	nrf_gpio_cfg_output(sdaPin);
+	if (high) {
+		nrf_gpio_pin_set(sdaPin);
+		nrf_delay_us(200);
+	}
+	else {
+		nrf_gpio_pin_clear(sdaPin);
+		nrf_delay_us(200);
+	}
+
+	nrf_gpio_pin_set(sdaPin);
+#endif
+}
+
+ErrorType FruityHal::twi_registerWrite(u8 slaveAddress, u8 const * pTransferData, u8 length)
+{
+	// Slave Address (Command) (7 Bit) + WriteBit (1 Bit) + register Byte (1 Byte) + Data (n Bytes)
+
+	u32 errCode = NRF_SUCCESS;
+#ifndef SIM_ENABLED
+	twiXferDone = false;
+
+	errCode =  nrf_drv_twi_tx(&twi, slaveAddress, pTransferData, length, false);
+
+	if (errCode != NRF_SUCCESS)
+	{
+		return nrfErrToGeneric(errCode);
+	}
+	// wait for transmission complete
+	while(twiXferDone == false);
+	twiXferDone = false;
+#endif
+	return nrfErrToGeneric(errCode);
+}
+
+ErrorType FruityHal::twi_registerRead(u8 slaveAddress, u8 reg, u8 * pReceiveData, u8 length)
+{
+	// Slave Address (7 Bit) (Command) + WriteBit (1 Bit) + register Byte (1 Byte) + Repeated Start + Slave Address + ReadBit + Data.... + nAck
+	u32 errCode = NRF_SUCCESS;
+#ifndef SIM_ENABLED
+	twiXferDone = false;
+
+	nrf_drv_twi_xfer_desc_t xfer = NRF_DRV_TWI_XFER_DESC_TXRX(slaveAddress, &reg, 1, pReceiveData, length);
+
+	errCode = nrf_drv_twi_xfer(&twi, &xfer, 0);
+
+	if (errCode != NRF_SUCCESS)
+	{
+		return nrfErrToGeneric(errCode);
+	}
+
+	// wait for transmission and read complete
+	while(twiXferDone == false);
+	twiXferDone = false;
+#endif
+	return nrfErrToGeneric(errCode);
+}
+
+bool FruityHal::twi_isInitialized(void)
+{
+#ifndef SIM_ENABLED
+	return twiInitDone;
+#else
+	return cherrySimInstance->currentNode->twiWasInit;
+#endif
+}
+
+ErrorType FruityHal::twi_read(u8 slaveAddress, u8 * pReceiveData, u8 length)
+{
+	// Slave Address (7 Bit) (Command) + ReadBit (1 Bit) + Data.... + nAck
+
+	u32 errCode = NRF_SUCCESS;
+#ifndef SIM_ENABLED
+	twiXferDone = false;
+
+	nrf_drv_twi_xfer_desc_t xfer;// = NRF_DRV_TWI_XFER_DESC_RX(slaveAddress, pReceiveData, length);
+	CheckedMemset(&xfer, 0x00, sizeof(xfer));
+	xfer.type = NRF_DRV_TWI_XFER_RX;
+	xfer.address = slaveAddress;
+	xfer.primary_length = length;
+	xfer.p_primary_buf  = pReceiveData;
+
+	errCode = nrf_drv_twi_xfer(&twi, &xfer, 0);
+
+	if (errCode != NRF_SUCCESS)
+	{
+		return nrfErrToGeneric(errCode);
+	}
+
+	// wait for transmission and read complete
+	while(twiXferDone == false);
+	twiXferDone = false;
+#endif
+	return nrfErrToGeneric(errCode);
+}
+
+#ifndef SIM_ENABLED
+#define SPI_INSTANCE  0
+static const nrf_drv_spi_t spi = NRF_DRV_SPI_INSTANCE(SPI_INSTANCE);  
+volatile bool spiXferDone;
+static bool spiInitDone = false;
+#endif
+
+#ifndef SIM_ENABLED
+void spi_event_handler(nrf_drv_spi_evt_t const * p_event, void* p_context)
+{
+	spiXferDone = true;
+	logt("FH", "SPI Xfer done");
+}
+#endif
+
+void FruityHal::spi_init(u8 sckPin, u8 misoPin, u8 mosiPin)
+{
+#ifndef SIM_ENABLED
+	/* Conigure SPI Interface */
+	nrf_drv_spi_config_t spi_config = NRF_DRV_SPI_DEFAULT_CONFIG;
+	spi_config.sck_pin = sckPin;
+	spi_config.miso_pin = misoPin;
+	spi_config.mosi_pin = mosiPin;
+	spi_config.frequency = NRF_DRV_SPI_FREQ_4M;
+
+	APP_ERROR_CHECK(nrf_drv_spi_init(&spi, &spi_config, spi_event_handler,NULL));
+
+	spiXferDone = true;
+	spiInitDone = true;
+#else
+	if (cherrySimInstance->currentNode->spiWasInit)
+	{
+		//Already initialized!
+		SIMEXCEPTION(IllegalStateException);
+	}
+	cherrySimInstance->currentNode->spiWasInit = true;
+#endif
+
+}
+
+
+bool FruityHal::spi_isInitialized(void)
+{
+#ifndef SIM_ENABLED
+	return spiInitDone;
+#else
+	return cherrySimInstance->currentNode->spiWasInit;
+#endif
+}
+
+ErrorType FruityHal::spi_transfer(u8* const p_toWrite, u8 count, u8* const p_toRead, u8 slaveSelectPin)
+{
+
+	u32 retVal = NRF_SUCCESS;
+#ifndef SIM_ENABLED
+	logt("FH", "Transferring to BME");
+
+	if ((NULL == p_toWrite) || (NULL == p_toRead))
+	{
+		retVal = NRF_ERROR_INTERNAL;
+	}
+
+	
+	/* check if an other SPI transfer is running */
+	if ((true == spiXferDone) && (NRF_SUCCESS == retVal))
+	{
+		spiXferDone = false;
+
+		nrf_gpio_pin_clear(slaveSelectPin);
+		APP_ERROR_CHECK(nrf_drv_spi_transfer(&spi, p_toWrite, count, p_toRead, count));
+		//Locks if run in interrupt context
+		while (!spiXferDone)
+		{
+			sd_app_evt_wait();
+		}
+		nrf_gpio_pin_set(slaveSelectPin);
+		retVal = NRF_SUCCESS;
+	}
+	else
+	{
+		retVal = NRF_ERROR_BUSY;
+	}
+#endif
+	return nrfErrToGeneric(retVal);
+}
+
+void FruityHal::spi_configureSlaveSelectPin(u32 pin)
+{
+#ifndef SIM_ENABLED
+	nrf_gpio_pin_dir_set(pin, NRF_GPIO_PIN_DIR_OUTPUT);
+	nrf_gpio_cfg_output(pin);
+	nrf_gpio_pin_set(pin);
+#endif
+}
+#endif // ifndef NRF51

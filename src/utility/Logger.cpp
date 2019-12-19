@@ -55,7 +55,7 @@ void Logger::Init()
 	GS->terminal.AddTerminalCommandListener(this);
 }
 
-void Logger::log_f(bool printLine, const char* file, i32 line, const char* message, ...) const
+void Logger::log_f(bool printLine, bool isJson, const char* file, i32 line, const char* message, ...) const
 {
 	char mhTraceBuffer[TRACE_BUFFER_SIZE] = { 0 };
 
@@ -76,6 +76,11 @@ void Logger::log_f(bool printLine, const char* file, i32 line, const char* messa
 	else
 	{
 		log_transport_putstring(mhTraceBuffer);
+	}
+
+	if (isJson)
+	{
+		GS->terminal.OnJsonLogged(mhTraceBuffer);
 	}
 }
 
@@ -255,10 +260,15 @@ void Logger::toggleTag(const char* tag)
 	//If we haven't found it, we enable it by using the previously found empty spot
 	if (!found && emptySpot >= 0) {
 		strcpy(&activeLogTags[emptySpot * MAX_LOG_TAG_LENGTH], tagUpper);
+		logt("ERROR", "Tag enabled");
 	}
 	else if (!found && emptySpot < 0) {
 		logt("ERROR", "Too many tags");
 		SIMEXCEPTION(IllegalStateException);
+	}
+	else if (found)
+	{
+		logt("ERROR", "Tag disabled");
 	}
 
 #endif

@@ -34,12 +34,12 @@
 # *******************************************************************************************
 # You can edit the following parameters for specifying the build, but it is better to copy
 # Makefile.local.template to Makefile.local and set the parameters there or alternatively
-# Give the parameters to make directly, e.g. make -j4 PLATFORM=NRF51 FEATURESET=dev51
+# Give the parameters to make directly, e.g. make -j4 PLATFORM=NRF52832 FEATURESET=dev
 
 # Build types are: debug, release
 BUILD_TYPE       ?= release
-# Platforms are: NRF51, NRF52, NRF52840
-PLATFORM         ?= NRF52
+# Platforms are: NRF51822, NRF52832, NRF52840
+PLATFORM         ?= NRF52832
 VERBOSE          ?= 0
 # Featuresets are found in config/featuresets
 FEATURESET       ?= github
@@ -50,6 +50,15 @@ FAIL_ON_SIZE_TOO_BIG 		?= 0
 DISABLE_STACK_UNWINDING 	?= 1
 
 # *******************************************************************************************
+
+# For backward compatibility, we rename the platform if only NRF51 or NRF52 is given
+ifeq ($(PLATFORM),NRF51)
+override PLATFORM := NRF51822
+endif
+
+ifeq ($(PLATFORM),NRF52)
+override PLATFORM := NRF52832
+endif
 
 # Check if Featureset makefile exists and include if yes
 ifneq ("$(wildcard config/featuresets/$(FEATURESET).make)","")
@@ -65,13 +74,13 @@ PROJECT_NAME     ?= FruityMesh
 
 OUTPUT_FILENAME = $(PROJECT_NAME)
 
-# NRF51 and NRF52/NRF52840 need different SDKs because the latest SDK isn't compatible with nRF51 anymore
+# NRF51822 needs a different SDK than NRF52832/NRF52840 because the newer SDKs are not compatible with nRF51 anymore
 # The sdks are part of the project because bugs had to be fixed
-ifeq ($(PLATFORM),NRF51)
+ifeq ($(PLATFORM),NRF51822)
 NRF5_SDK_PATH = sdk/sdk11
 SDK           = 11
 PORT_CONFIG   = sdk/config_nrf51
-else ifeq ($(PLATFORM),NRF52)
+else ifeq ($(PLATFORM),NRF52832)
 NRF5_SDK_PATH = sdk/sdk14
 SDK           = 14
 PORT_CONFIG   = sdk/config_nrf52
@@ -83,6 +92,7 @@ endif
 
 COMPONENTS     = $(NRF5_SDK_PATH)/components
 TEMPLATE_PATH  = $(COMPONENTS)/toolchain/gcc
+
 ifeq ($(SDK),15)
 MODULES        = $(NRF5_SDK_PATH)/modules
 INTEGRATION    = $(NRF5_SDK_PATH)/integration
@@ -160,15 +170,6 @@ ifneq ("$(wildcard config/featuresets/$(FEATURESET).cpp)","")
 	CPP_SOURCE_FILES += config/featuresets/$(FEATURESET).cpp
 endif
 
-# We use generic board definitions, as we determine the board at runtime
-ifneq ($(filter $(PLATFORM),NRF51),)
-  BOARD ?= NRF51_BOARD
-else ifneq ($(filter $(PLATFORM),NRF52),)
-  BOARD ?= NRF52_BOARD
- else ifneq ($(filter $(PLATFORM),NRF52840),)
-  BOARD ?= NRF52840_BOARD
-endif
-
 #Build directories
 BASE_DIRECTORY ?= _build
 PLATFORM_DIRECTORY ?= $(BASE_DIRECTORY)/$(BUILD_TYPE)/$(PLATFORM)/$(FEATURESET)
@@ -182,9 +183,9 @@ BUILD_DIRECTORIES := $(sort $(OBJECT_DIRECTORY) $(OUTPUT_BINARY_DIRECTORY) $(LIS
 
 # Debug flags
 ifeq ($(BUILD_TYPE),release)
-  DEBUG_FLAGS += -D NDEBUG -Os -g
+  DEBUG_FLAGS += -DNDEBUG -Os -g
 else ifeq ($(BUILD_TYPE),debug)
-  DEBUG_FLAGS += -D DEBUG -Og -g
+  DEBUG_FLAGS += -DDEBUG -Og -g
 endif
 
 # Platform specific flags
@@ -241,8 +242,8 @@ CFLAGS += -DSDK=$(SDK)
 # Flags common to all targets
 CFLAGS += -mcpu=$(CPU) -mthumb -fmessage-length=0 -fsigned-char
 CFLAGS += -ffunction-sections -fdata-sections -flto -fno-move-loop-invariants -fno-math-errno -fno-unroll-loops
-CFLAGS += -Wextra -Werror -DBLE_STACK_SUPPORT_REQD $(DEBUG_FLAGS) -D$(BOARD) -DFEATURESET=$(FEATURESET)
-CFLAGS += -D$(PLATFORM) -D__need___va_list -fno-strict-aliasing
+CFLAGS += -Wextra -Werror -DBLE_STACK_SUPPORT_REQD $(DEBUG_FLAGS) -DFEATURESET=$(FEATURESET)
+CFLAGS += -D__need___va_list -fno-strict-aliasing
 
 # C++ compiler flags
 CXXFLAGS += $(CFLAGS)
