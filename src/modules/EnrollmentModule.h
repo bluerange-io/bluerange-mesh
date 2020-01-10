@@ -213,6 +213,9 @@ class EnrollmentModule: public Module
 		u32 requestProposalTimestampDs = 0;
 		u8 requestProposalRequestHandle = 0;
 
+		static constexpr u32 SCAN_TIME_DS = SEC_TO_DS(60);
+		void RefreshScanJob();
+
 		void Enroll(connPacketModule* packet, u16 packetLength);
 
 		void EnrollOverMesh(connPacketModule* packet, u16 packetLength, BaseConnection* connection);
@@ -267,5 +270,5 @@ class EnrollmentModule: public Module
 
 		void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
 
-		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, u32 fmKeyId, DataDirection direction) override;
+		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, FmKeyId fmKeyId, DataDirection direction) override;
 };

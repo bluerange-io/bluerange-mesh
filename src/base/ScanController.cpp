@@ -53,11 +53,14 @@ void ScanController::TimerEventHandler(u16 passedTimeDs)
 	for (u8 i = 0; i < jobs.length; i++)
 	{
 		if ((jobs[i].state == ScanJobState::ACTIVE) &&
-			(jobs[i].timeout != 0))
+			(jobs[i].timeMode == ScanJobTimeMode::TIMED))
 		{
-			//logt("SC", "Active scan job: %d", jobs[i].leftTimeoutDs);
-			jobs[i].leftTimeoutDs -= passedTimeDs;
-			if (jobs[i].leftTimeoutDs <= 0) RemoveJob(&jobs[i]);
+			jobs[i].timeLeftDs -= passedTimeDs;
+			if (jobs[i].timeLeftDs <= 0)
+			{
+				logt("SC", "Job timed out with id %u", i);
+				RemoveJob(&jobs[i]);
+			}
 		}
 	}
 	//To be absolutely sure that scanning is in the correct state, we call this function
@@ -79,13 +82,13 @@ ScanJob* ScanController::AddJob(ScanJob& job)
 	{
 		job.interval = Conf::getInstance().meshScanIntervalHigh;
 		job.window = Conf::getInstance().meshScanWindowHigh;
-		job.timeout = 0;
+		job.timeMode = ScanJobTimeMode::ENDLESS;
 	}
 	else if (job.type == ScanState::LOW)
 	{
 		job.interval = Conf::getInstance().meshScanIntervalLow;
 		job.window = Conf::getInstance().meshScanWindowLow;
-		job.timeout = 0;
+		job.timeMode = ScanJobTimeMode::ENDLESS;
 	}
 	else if (job.type == ScanState::CUSTOM)
 	{
@@ -100,7 +103,6 @@ ScanJob* ScanController::AddJob(ScanJob& job)
 	for (u8 i = 0; i < jobs.length; i++)
 	{
 		if (jobs[i].state != ScanJobState::INVALID) continue;
-		job.leftTimeoutDs = job.timeout * 10;
 		jobs[i] = job;
 		RefreshJobs();
 		return &jobs[i];

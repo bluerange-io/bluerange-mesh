@@ -75,7 +75,7 @@ public:
 
 	MeshConnection*       allocateMeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, u16 partnerWriteCharacteristicHandle);
 	ResolverConnection*   allocateResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress);
-	MeshAccessConnection* allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, u32 fmKeyId, MeshAccessTunnelType tunnelType);
+	MeshAccessConnection* allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType);
 #if IS_ACTIVE(CLC_CONN)
 	ClcAppConnection*     allocateClcAppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress);
 #endif

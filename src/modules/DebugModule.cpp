@@ -501,7 +501,8 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 					0,
 					(u8*)&data,
 					SIZEOF_DEBUG_MODULE_PINGPONG_MESSAGE,
-					pingModeReliable
+					pingModeReliable,
+					false	//A loopback would have the potential to cause a stack overflow (even for small ping counts of 12), so we don't loopback here.
 				);
 
 				return TerminalCommandHandlerReturnType::SUCCESS;

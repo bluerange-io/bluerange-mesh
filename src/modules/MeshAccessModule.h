@@ -119,7 +119,7 @@ enum class MeshAccessModuleGeneralMessages : u8{
 	typedef struct
 	{
 		FruityHal::BleGapAddr targetAddress;
-		u32 fmKeyId;
+		FmKeyId fmKeyId;
 		SimpleArray<u8, 16> key;
 		u8 tunnelType : 2;
 		u8 reserved;
@@ -201,8 +201,8 @@ class MeshAccessModule: public Module
 		void DisableBroadcast();
 
 		//Authorization
-		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, u32 fmKeyId, DataDirection direction) override;
-		MeshAccessAuthorization CheckAuthorizationForAll(BaseConnectionSendData* sendData, u8* data, u32 fmKeyId, DataDirection direction) const;
+		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, FmKeyId fmKeyId, DataDirection direction) override;
+		MeshAccessAuthorization CheckAuthorizationForAll(BaseConnectionSendData* sendData, u8* data, FmKeyId fmKeyId, DataDirection direction) const;
 
 		//Messages
 		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) override;

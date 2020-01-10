@@ -68,7 +68,7 @@
 uint32_t meshAccessConnTypeResolver __attribute__((section(".ConnTypeResolvers"), used)) = (u32)MeshAccessConnection::ConnTypeResolver;
 #endif
 
-MeshAccessConnection::MeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, u32 fmKeyId, MeshAccessTunnelType tunnelType)
+MeshAccessConnection::MeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType)
 	: AppConnection(id, direction, partnerAddress)
 {
 	logt("MACONN", "New MeshAccessConnection");
@@ -123,11 +123,11 @@ BaseConnection* MeshAccessConnection::ConnTypeResolver(BaseConnection* oldConnec
 			|| sendData->characteristicHandle == meshAccessMod->meshAccessService.txCharacteristicHandle.cccdHandle
 		){
 			return ConnectionAllocator::getInstance().allocateMeshAccessConnection(
-					oldConnection->connectionId,
-					oldConnection->direction,
-					&oldConnection->partnerAddress,
-					0, //fmKeyId unknown at this point, partner must query
-					MeshAccessTunnelType::INVALID); //TunnelType also unknown
+			        oldConnection->connectionId,
+			        oldConnection->direction,
+			        &oldConnection->partnerAddress,
+			        FmKeyId::ZERO, //fmKeyId unknown at this point, partner must query
+			        MeshAccessTunnelType::INVALID); //TunnelType also unknown
 		}
 	}
 
@@ -137,7 +137,7 @@ BaseConnection* MeshAccessConnection::ConnTypeResolver(BaseConnection* oldConnec
 
 #define ________________________CONNECTION_________________________
 
-u32 MeshAccessConnection::ConnectAsMaster(FruityHal::BleGapAddr* address, u16 connIntervalMs, u16 connectionTimeoutSec, u32 fmKeyId, u8* customKey, MeshAccessTunnelType tunnelType)
+u32 MeshAccessConnection::ConnectAsMaster(FruityHal::BleGapAddr* address, u16 connIntervalMs, u16 connectionTimeoutSec, FmKeyId fmKeyId, u8* customKey, MeshAccessTunnelType tunnelType)
 {
 	//Only connect when not currently in another connection and when there are free connections
 	if (GS->cm.pendingConnection != nullptr) return 0;
@@ -216,7 +216,7 @@ void MeshAccessConnection::RegisterForNotifications()
 }
 
 //This method is called by the Central and will start the encryption handshake
-void MeshAccessConnection::StartHandshake(u16 fmKeyId)
+void MeshAccessConnection::StartHandshake(FmKeyId fmKeyId)
 {
 	if(connectionState >= ConnectionState::HANDSHAKING) return;
 
@@ -250,7 +250,7 @@ void MeshAccessConnection::HandshakeANonce(connPacketEncryptCustomStart* inPacke
 	//Process Starthandshake packet
 	//P=>C: Type=ANouce (Will stay the same random number until attempt was made), supportedKeyIds=1,2,345,56,...,supportsAuthenticate(true/false)
 
-	logt("MACONN", "-- TX ANonce, fmKeyId %u", inPacket->fmKeyId);
+	logt("MACONN", "-- TX ANonce, fmKeyId %u", (u32)inPacket->fmKeyId);
 
 	connectionState = ConnectionState::HANDSHAKING;
 
@@ -464,36 +464,36 @@ void MeshAccessConnection::NotifyConnectionStateSubscriber(ConnectionState state
 
 //Session Key S generated as Enc#(Anonce, nodeIndex); Enc# is the chosen key
 
-bool MeshAccessConnection::GenerateSessionKey(const u8* nonce, NodeId centralNodeId, u32 fmKeyId, u8* keyOut)
+bool MeshAccessConnection::GenerateSessionKey(const u8* nonce, NodeId centralNodeId, FmKeyId fmKeyId, u8* keyOut)
 {
 	u8 ltKey[16];
 
 	if(useCustomKey){
 		logt("MACONN", "Using custom key");
 		CheckedMemcpy(ltKey, key, 16);
-	} else if(fmKeyId == FM_KEY_ID_ZERO
+	} else if(fmKeyId == FmKeyId::ZERO
 			&& meshAccessMod->IsZeroKeyConnectable(direction)) {
-		//If the fmKeyId is FM_KEY_ID_ZERO and we allow unsecure connections, we use
+		//If the fmKeyId is FmKeyId::ZERO and we allow unsecure connections, we use
 		//the zero encryption key (basically no encryption) if we are not enrolled or 
 		//we are the one opening the connection.
 		logt("MACONN", "Using key none");
 		CheckedMemset(ltKey, 0x00, 16);
-	} else if(fmKeyId == FM_KEY_ID_NODE) {
+	} else if(fmKeyId == FmKeyId::NODE) {
 		logt("MACONN", "Using node key");
 		CheckedMemcpy(ltKey, RamConfig->GetNodeKey(), 16);
-	} else if(fmKeyId == FM_KEY_ID_NETWORK) {
+	} else if(fmKeyId == FmKeyId::NETWORK) {
 		logt("MACONN", "Using network key");
 		CheckedMemcpy(ltKey, GS->node.configuration.networkKey, 16);
-	} else if(fmKeyId == FM_KEY_ID_ORGANIZATION) {
+	} else if(fmKeyId == FmKeyId::ORGANIZATION) {
 		logt("MACONN", "Using orga key");
 		CheckedMemcpy(ltKey, GS->node.configuration.organizationKey, 16);
-	} else if (fmKeyId == FM_KEY_ID_RESTRAINED) {
+	} else if (fmKeyId == FmKeyId::RESTRAINED) {
 		logt("MACONN", "Using restrained key");
 		RamConfig->GetRestrainedKey(ltKey);
 	}
-	else if(fmKeyId >= FM_KEY_ID_USER_DERIVED_START && fmKeyId <= FM_KEY_ID_USER_DERIVED_END)
+	else if(fmKeyId >= FmKeyId::USER_DERIVED_START && fmKeyId <= FmKeyId::USER_DERIVED_END)
 	{
-		logt("MACONN", "Using derived user key %u", fmKeyId);
+		logt("MACONN", "Using derived user key %u", (u32)fmKeyId);
 		//Construct some cleartext with the user id to construct the user key
 		u8 cleartext[16];
 		CheckedMemset(cleartext, 0x00, 16);
@@ -778,6 +778,23 @@ bool MeshAccessConnection::SendData(u8* data, u16 dataLength, DeliveryPriority p
 	}
 
 	return SendData(&sendData, data);
+}
+
+bool MeshAccessConnection::ShouldSendDataToNodeId(NodeId nodeId) const
+{
+	return
+		//The ID matches
+		   nodeId == virtualPartnerId
+		//Broadcasts, by definition always go everywhere
+		|| nodeId == NODE_ID_BROADCAST
+		//NODE_ID_ANYCAST_THEN_BROADCAST is inteded to be sent through MeshAccessConnections
+		|| nodeId == NODE_ID_ANYCAST_THEN_BROADCAST
+		//A given hops count may also go through a MeshAccessConnection
+		|| (nodeId >= NODE_ID_HOPS_BASE          && nodeId < (NODE_ID_HOPS_BASE          + NODE_ID_HOPS_BASE_SIZE))
+		//The range of APP_BASE nodeIds is reserved for smartphones etc. that always connect via MeshAccessConnections
+		|| (nodeId >= NODE_ID_APP_BASE           && nodeId < (NODE_ID_APP_BASE           + NODE_ID_APP_BASE_SIZE ))
+		//Organization wide NodeIds. These are commonly used for assets that connect via MeshAccessConnections
+		|| (nodeId >= NODE_ID_GLOBAL_DEVICE_BASE && nodeId < (NODE_ID_GLOBAL_DEVICE_BASE + NODE_ID_GLOBAL_DEVICE_BASE_SIZE));
 }
 
 

@@ -60,6 +60,13 @@ ifeq ($(PLATFORM),NRF52)
 override PLATFORM := NRF52832
 endif
 
+# Determine the family as this is necessary for flashing
+ifeq ($(PLATFORM),NRF51822)
+FAMILY := NRF51
+else
+FAMILY := NRF52
+endif
+
 # Check if Featureset makefile exists and include if yes
 ifneq ("$(wildcard config/featuresets/$(FEATURESET).make)","")
 include config/featuresets/$(FEATURESET).make
@@ -374,20 +381,20 @@ cleanobj:
 flash: $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex
 	@echo Flashing: $< + softdevice
 	$(NO_ECHO)$(MERGEHEX) -m $(SOFTDEVICE_PATH) $< -o $(OUTPUT_BINARY_DIRECTORY)/fruitymesh_merged.hex
-	$(NO_ECHO)$(NRFJPROG) --program $(OUTPUT_BINARY_DIRECTORY)/fruitymesh_merged.hex -f $(PLATFORM) --chiperase $(PROGFLAGS)
-	$(NO_ECHO)$(NRFJPROG) --reset -f $(PLATFORM) $(PROGFLAGS)
+	$(NO_ECHO)$(NRFJPROG) --program $(OUTPUT_BINARY_DIRECTORY)/fruitymesh_merged.hex -f $(FAMILY) --chiperase $(PROGFLAGS)
+	$(NO_ECHO)$(NRFJPROG) --reset -f $(FAMILY) $(PROGFLAGS)
 
 ## Flash app only
 flash_app: $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex
 	@echo Flashing: $<
-	$(NO_ECHO)$(NRFJPROG) --program $< -f $(PLATFORM) --sectorerase $(PROGFLAGS)
-	$(NO_ECHO)$(NRFJPROG) --reset -f $(PLATFORM) $(PROGFLAGS)
+	$(NO_ECHO)$(NRFJPROG) --program $< -f $(FAMILY) --sectorerase $(PROGFLAGS)
+	$(NO_ECHO)$(NRFJPROG) --reset -f $(FAMILY) $(PROGFLAGS)
 
 ## Flash softdevice only
 flash_softdevice:
 	@echo Flashing: $(SOFTDEVICE_PATH)
-	$(NO_ECHO)$(NRFJPROG) --program $(SOFTDEVICE_PATH) -f $(PLATFORM) --chiperase $(PROGFLAGS)
-	$(NO_ECHO)$(NRFJPROG) --reset -f $(PLATFORM) $(PROGFLAGS)
+	$(NO_ECHO)$(NRFJPROG) --program $(SOFTDEVICE_PATH) -f $(FAMILY) --chiperase $(PROGFLAGS)
+	$(NO_ECHO)$(NRFJPROG) --reset -f $(FAMILY) $(PROGFLAGS)
 
 BUILD_DIR     		= ../cmake_build
 FEATURESETS 	 	= prod_mesh_nrf51 prod_sink_nrf51 prod_sink_nrf52 prod_mesh_nrf52 github prod_eink_nrf51 prod_asset_nrf52 dev_asset_nrf52 prod_asset_nrf51 prod_clc_mesh_nrf52 prod_vs_nrf52 dev_wm_nrf52840 dev_automated_tests_master_nrf52 dev_automated_tests_slave_nrf52 prod_clc_sink_nrf51 dev_all_nrf52 prod_asset_ins_nrf52840

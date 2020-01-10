@@ -72,7 +72,7 @@ private:
 	bool useCustomKey = false;
 	u8 key[16] = { 0 };
 
-	u32 fmKeyId = 0;
+	FmKeyId fmKeyId = FmKeyId::ZERO;
 
 	static constexpr u32 MAX_CORRUPTED_MESSAGES = 32;
 	u32 amountOfCorruptedMessages = 0;
@@ -88,7 +88,7 @@ private:
 	MessageType lastProcessedMessageType;
 
 
-	bool GenerateSessionKey(const u8* nonce, NodeId centralNodeId, u32 fmKeyId, u8* keyOut);
+	bool GenerateSessionKey(const u8* nonce, NodeId centralNodeId, FmKeyId fmKeyId, u8* keyOut);
 	void OnCorruptedMessage();
 
 	void LogKeys();
@@ -112,7 +112,7 @@ public:
 	NodeId connectionStateSubscriberId = 0;
 
 
-	MeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, u32 fmKeyId, MeshAccessTunnelType tunnelType);
+	MeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType);
 	virtual ~MeshAccessConnection();
 	static BaseConnection* ConnTypeResolver(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8* data);
 
@@ -120,7 +120,7 @@ public:
 
 	/*############### Connect ##################*/
 	//Returns the unique connection id that was created
-	static u32 ConnectAsMaster(FruityHal::BleGapAddr* address, u16 connIntervalMs, u16 connectionTimeoutSec, u32 fmKeyId, u8* customKey, MeshAccessTunnelType tunnelType);
+	static u32 ConnectAsMaster(FruityHal::BleGapAddr* address, u16 connIntervalMs, u16 connectionTimeoutSec, FmKeyId fmKeyId, u8* customKey, MeshAccessTunnelType tunnelType);
 
 	//Will create a connection that collects potential candidates and connects to them
 	static u16 SearchAndConnectAsMaster(NetworkId networkId, u32 serialNumberIndex, u16 searchTimeDs, u16 connIntervalMs, u16 connectionTimeoutSec);
@@ -128,7 +128,7 @@ public:
 	void RegisterForNotifications();
 
 	/*############### Handshake ##################*/
-	void StartHandshake(u16 fmKeyId);
+	void StartHandshake(FmKeyId fmKeyId);
 	void HandshakeANonce(connPacketEncryptCustomStart* inPacket);
 	void HandshakeSNonce(connPacketEncryptCustomANonce* inPacket);
 	void HandshakeDone(connPacketEncryptCustomSNonce* inPacket);
@@ -149,6 +149,7 @@ public:
 	SizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer) override;
 	bool SendData(BaseConnectionSendData* sendData, u8* data);
 	bool SendData(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable) override;
+	bool ShouldSendDataToNodeId(NodeId nodeId) const;
 	void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData) override;
 
 	/*############### Receiving ##################*/

@@ -199,7 +199,7 @@ protected:
 		//MeshAccessConnections should only allow authorized packets to be sent into the mesh
 		//This function is called once a packet was received through a meshAccessConnection to
 		//query if the packet can be sent through. It can also be modified by this handler
-		virtual MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, u32 fmKeyId, DataDirection direction){ return MeshAccessAuthorization::UNDETERMINED; };
+		virtual MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, FmKeyId fmKeyId, DataDirection direction){ return MeshAccessAuthorization::UNDETERMINED; };
 
 		//This method must be implemented by modules that support component updates
 		//The module must answer weather it wants to accept the update (0) or not (negative result)

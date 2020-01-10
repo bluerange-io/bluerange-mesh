@@ -70,6 +70,13 @@ typedef int i32;		//This is not defined int32_t because GCC defines int32_t as l
 #define SIMEXCEPTIONFORCE(T)
 #endif
 
+#ifdef SIM_ENABLED
+#include "StackWatcher.h"
+#define START_OF_FUNCTION() StackWatcher sw;
+#else
+#define START_OF_FUNCTION
+#endif
+
 #ifdef IAR
 #include "vector"
 #endif
@@ -210,14 +217,17 @@ enum class FeatureSetGroup : NodeId
 /*## Key Types #############################################################*/
 
 //Types of keys used by the mesh and other modules
-#define FM_KEY_ID_ZERO 0
-#define FM_KEY_ID_NODE 1
-#define FM_KEY_ID_NETWORK 2
-#define FM_KEY_ID_BASE_USER 3
-#define FM_KEY_ID_ORGANIZATION 4
-#define FM_KEY_ID_RESTRAINED 5
-#define FM_KEY_ID_USER_DERIVED_START 10
-#define FM_KEY_ID_USER_DERIVED_END (UINT32_MAX / 2)
+enum class FmKeyId : u32
+{
+	ZERO               =  0,
+	NODE               =  1,
+	NETWORK            =  2,
+	BASE_USER          =  3,
+	ORGANIZATION       =  4,
+	RESTRAINED         =  5,
+	USER_DERIVED_START = 10,
+	USER_DERIVED_END   = (UINT32_MAX / 2),
+};
 
 
 /*## RecordIds #############################################################*/
@@ -227,7 +237,7 @@ enum class FeatureSetGroup : NodeId
 //Specific Record Ids
 #define RECORD_STORAGE_RECORD_ID_UPDATE_STATUS 1000 //Stores the done status of an update
 #define RECORD_STORAGE_RECORD_ID_UICR_REPLACEMENT 1001 //Can be used, if UICR can not be flashed, e.g. when updating another beacon with different firmware
-#define RECORD_STORAGE_RECORD_ID_FAKE_NODE_POSITIONS 1002 //Used to store fake positions for nodes to modify the incoming events
+#define RECORD_STORAGE_RECORD_ID_DEPRECATED 1002 //Was used to store fake positions for nodes to modify the incoming events
 
 
 /*## Modules #############################################################*/
@@ -289,6 +299,8 @@ enum class RebootReason : u8 {
 	ENROLLMENT_REMOVE                = 16,
 	FACTORY_RESET_FAILED             = 17,
 	FACTORY_RESET_SUCCEEDED_FAILSAFE = 18,
+	SET_SERIAL_SUCCESS               = 19,
+	SET_SERIAL_FAILED                = 20,
 
 	USER_DEFINED_START               = 200,
 	USER_DEFINED_END                 = 255,

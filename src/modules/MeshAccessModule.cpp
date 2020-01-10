@@ -405,7 +405,7 @@ void MeshAccessModule::ReceivedMeshAccessConnectionStateMessage(connPacketModule
 	logjson("MAMOD",  "\"requestHandle\":%u,\"vPartnerId\":%u,\"state\":%u}" SEP, packet->requestHandle, message->vPartnerId, message->state);
 }
 
-MeshAccessAuthorization MeshAccessModule::CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, u32 fmKeyId, DataDirection direction)
+MeshAccessAuthorization MeshAccessModule::CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, FmKeyId fmKeyId, DataDirection direction)
 {
 	connPacketHeader* packet = (connPacketHeader*)data;
 
@@ -425,17 +425,17 @@ MeshAccessAuthorization MeshAccessModule::CheckMeshAccessPacketAuthorization(Bas
 
 	//Default authorization for different keys
 	//This can be further restricted by other modules, but allowing more rights is not currently possible
-	if(fmKeyId == FM_KEY_ID_ZERO){
+	if(fmKeyId == FmKeyId::ZERO){
 		return MeshAccessAuthorization::UNDETERMINED;
-	} else if(fmKeyId == FM_KEY_ID_NODE){
+	} else if(fmKeyId == FmKeyId::NODE){
 		return MeshAccessAuthorization::LOCAL_ONLY;
-	} else if(fmKeyId == FM_KEY_ID_NETWORK){
+	} else if(fmKeyId == FmKeyId::NETWORK){
 		return MeshAccessAuthorization::WHITELIST;
-	} else if(fmKeyId >= FM_KEY_ID_USER_DERIVED_START && fmKeyId <= FM_KEY_ID_USER_DERIVED_END){
+	} else if(fmKeyId >= FmKeyId::USER_DERIVED_START && fmKeyId <= FmKeyId::USER_DERIVED_END){
 		return MeshAccessAuthorization::UNDETERMINED;
-	} else if(fmKeyId == FM_KEY_ID_ORGANIZATION){
+	} else if(fmKeyId == FmKeyId::ORGANIZATION){
 		return MeshAccessAuthorization::UNDETERMINED;
-	} else if (fmKeyId == FM_KEY_ID_RESTRAINED) {
+	} else if (fmKeyId == FmKeyId::RESTRAINED) {
 		return MeshAccessAuthorization::UNDETERMINED;
 	}
 	else {
@@ -443,7 +443,7 @@ MeshAccessAuthorization MeshAccessModule::CheckMeshAccessPacketAuthorization(Bas
 	}
 }
 
-MeshAccessAuthorization MeshAccessModule::CheckAuthorizationForAll(BaseConnectionSendData* sendData, u8* data, u32 fmKeyId, DataDirection direction) const
+MeshAccessAuthorization MeshAccessModule::CheckAuthorizationForAll(BaseConnectionSendData* sendData, u8* data, FmKeyId fmKeyId, DataDirection direction) const
 {
 	//Check if our partner is authorized to send this packet, so we ask
 	//all of our modules if this message is whitelisted or not
@@ -485,9 +485,9 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
 		addr.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
 		Utility::swapBytes(addr.addr, 6);
 
-		u32 fmKeyId = FM_KEY_ID_NETWORK;
+		FmKeyId fmKeyId = FmKeyId::NETWORK;
 		if(commandArgsSize > 2){
-			fmKeyId = Utility::StringToU32(commandArgs[2]);
+			fmKeyId = (FmKeyId)Utility::StringToU32(commandArgs[2]);
 		}
 
 		MeshAccessConnection::ConnectAsMaster(&addr, 10, 4, fmKeyId, nullptr, MeshAccessTunnelType::REMOTE_MESH);
@@ -531,14 +531,14 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
 			if (commandArgsSize < 5) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 			MeshAccessModuleConnectMessage data;
 			CheckedMemset(&data, 0x00, sizeof(data));
-			data.fmKeyId = FM_KEY_ID_NODE;
+			data.fmKeyId = FmKeyId::NODE;
 
 			//Allows us to connect to any node when giving the GAP Address
 			data.targetAddress.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
 			Logger::parseEncodedStringToBuffer(commandArgs[4], data.targetAddress.addr, 6);
 			Utility::swapBytes(data.targetAddress.addr, 6);
 
-			if(commandArgsSize > 5) data.fmKeyId = Utility::StringToU32(commandArgs[5]);
+			if(commandArgsSize > 5) data.fmKeyId = (FmKeyId)Utility::StringToU32(commandArgs[5]);
 			if(commandArgsSize > 6){
 				Logger::parseEncodedStringToBuffer(commandArgs[6], data.key.getRaw(), 16);
 			} else {
@@ -643,7 +643,7 @@ void MeshAccessModule::GapAdvertisementReportEventHandler(const FruityHal::GapAd
 		FruityHal::BleGapAddr addr;
 		addr.addr_type = advertisementReportEvent.getPeerAddrType();
 		CheckedMemcpy(addr.addr,advertisementReportEvent.getPeerAddr(),6);
-		u16 connectionId = MeshAccessConnection::ConnectAsMaster(&addr, 10, 4, FM_KEY_ID_ORGANIZATION, GS->node.configuration.organizationKey, MeshAccessTunnelType::LOCAL_MESH);
+		u16 connectionId = MeshAccessConnection::ConnectAsMaster(&addr, 10, 4, FmKeyId::ORGANIZATION, GS->node.configuration.organizationKey, MeshAccessTunnelType::LOCAL_MESH);
 	}
 }
 

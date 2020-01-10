@@ -112,7 +112,7 @@ struct FlashStorageTaskItem
 #pragma pack(pop)
 
 
-constexpr int FLASH_STORAGE_RETRY_COUNT = 3;
+constexpr int FLASH_STORAGE_RETRY_COUNT = 10;
 #if defined(NRF51)
 constexpr int FLASH_STORAGE_QUEUE_SIZE = 512;
 #else

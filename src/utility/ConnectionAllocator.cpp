@@ -77,7 +77,7 @@ ResolverConnection * ConnectionAllocator::allocateResolverConnection(u8 id, Conn
 	new (retVal) ResolverConnection(id, direction, partnerAddress);
 	return retVal;
 }
-MeshAccessConnection * ConnectionAllocator::allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr * partnerAddress, u32 fmKeyId, MeshAccessTunnelType tunnelType)
+MeshAccessConnection * ConnectionAllocator::allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType)
 {
 	MeshAccessConnection* retVal = reinterpret_cast<MeshAccessConnection*>(allocateMemory());
 	new (retVal) MeshAccessConnection(id, direction, partnerAddress, fmKeyId, tunnelType);

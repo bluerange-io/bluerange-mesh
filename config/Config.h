@@ -36,6 +36,7 @@
 #pragma once
 
 #include <types.h>
+#include "RecordStorage.h"
 
 #ifdef __cplusplus
 #include <LedWrapper.h>
@@ -51,7 +52,7 @@ class RecordStorageEventListener;
 #define FM_VERSION_MINOR 8
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 1230
+#define FM_VERSION_PATCH 1350
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -200,12 +201,6 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 #define ACTIVATE_STACK_UNWINDING 0
 #endif
 
-// By enabling this, we can store a record with positions for all beaocns in a mesh, the rssi of incoming events
-// will then be manipulated to reflect these positions. Useful for easier mesh testing but complicated to use
-#ifndef ACTIVATE_FAKE_NODE_POSITIONS
-#define ACTIVATE_FAKE_NODE_POSITIONS 0
-#endif
-
 // ########### Logging ##########################################
 // Define which kind of output should be compiled in or not
 // Enabling different kinds of output will increase the size of the binary a lot
@@ -296,6 +291,7 @@ enum class PreferredConnectionMode : u8 {
 
 class Module;
 class Conf
+	: public RecordStorageEventListener
 {
 	private:
 		void generateRandomSerialAndNodeId();
@@ -304,6 +300,12 @@ class Conf
 		//Buffer for the serialNumber in ASCII format
 		mutable char _serialNumber[6];
 		mutable u32 serialNumberIndex = 0;
+
+
+		enum class RecordTypeConf : u32
+		{
+			SET_SERIAL = 0,
+		};
 
 	public:
 		Conf();
@@ -349,7 +351,7 @@ class Conf
 		FruityHal::BleGapAddr staticAccessAddress;
 		//##################
 
-
+		void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
 
 		void Initialize(bool safeBootEnabled);
 

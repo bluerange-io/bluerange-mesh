@@ -386,8 +386,8 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 				requestProposalTimestampDs = GS->appTimerDs;
 				requestProposalRequestHandle = packet->requestHandle;
 
-				//We do not stop the scanner as the node also needs it //TODO: scanning should be stopped once we have a scanController
-				GS->scanController.UpdateJobPointer(&p_scanJob, ScanState::HIGH, ScanJobState::ACTIVE);
+				//We do not stop the scanner as the node also needs it
+				RefreshScanJob();
 
 				logjson("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"request_proposals\",\"serialNumbers\":[", packet->header.sender);
 				for (u32 i = 0; i < amountOfProposals; i++)
@@ -479,6 +479,16 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 
 
 #define _____________LOCAL_ENROLLMENT_____________
+
+void EnrollmentModule::RefreshScanJob()
+{
+	GS->scanController.UpdateJobPointer(&p_scanJob, ScanState::HIGH, ScanJobState::ACTIVE);
+	if (p_scanJob != nullptr)
+	{
+		p_scanJob->timeMode = ScanJobTimeMode::TIMED;
+		p_scanJob->timeLeftDs = SCAN_TIME_DS;
+	}
+}
 
 void EnrollmentModule::Enroll(connPacketModule* packet, u16 packetLength)
 {
@@ -841,7 +851,7 @@ void EnrollmentModule::EnrollOverMesh(connPacketModule* packet, u16 packetLength
 	//TODO: Should use a scancontroller that allows job handling
 	ted.state = EnrollmentStates::SCANNING;
 
-	GS->scanController.UpdateJobPointer(&p_scanJob, ScanState::HIGH, ScanJobState::ACTIVE);
+	RefreshScanJob();
 
 	//=> Next, we simple wait for the timeout or if a handler is called with a matching advertisement
 
@@ -871,11 +881,11 @@ void EnrollmentModule::EnrollNodeViaMeshAccessConnection(FruityHal::BleGapAddr& 
 	//TODO: replace hardcoded value
 	ted.state = EnrollmentStates::CONNECTING;
 
-	u32 fmKeyId = FM_KEY_ID_NODE;
+	FmKeyId fmKeyId = FmKeyId::NODE;
 
 	//If the given key was 000....000, we try to connect using key id none
 	if(Utility::CompareMem(0x00, ted.requestData.nodeKey.getRaw(), ted.requestData.nodeKey.length)){
-		fmKeyId = FM_KEY_ID_ZERO;
+		fmKeyId = FmKeyId::ZERO;
 	}
 
 	ted.uniqueConnId = MeshAccessConnection::ConnectAsMaster(&addr, 10, timeLeftSec, fmKeyId, ted.requestData.nodeKey.getRaw(), MeshAccessTunnelType::PEER_TO_PEER);
@@ -1087,7 +1097,7 @@ void EnrollmentModule::RecordStorageEventHandler(u16 recordId, RecordStorageResu
 	}
 }
 
-MeshAccessAuthorization EnrollmentModule::CheckMeshAccessPacketAuthorization(BaseConnectionSendData * sendData, u8 * data, u32 fmKeyId, DataDirection direction)
+MeshAccessAuthorization EnrollmentModule::CheckMeshAccessPacketAuthorization(BaseConnectionSendData * sendData, u8 * data, FmKeyId fmKeyId, DataDirection direction)
 {
 	connPacketHeader* packet = (connPacketHeader*)data;
 

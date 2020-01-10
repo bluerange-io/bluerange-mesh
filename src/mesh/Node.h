@@ -418,7 +418,7 @@ private:
 		//Connection
 		void HandshakeTimeoutHandler() const;
 		void HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinner); 
-		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, u32 fmKeyId, DataDirection direction) override;
+		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, FmKeyId fmKeyId, DataDirection direction) override;
 
 		void SendComponentMessage(connPacketComponentMessage& message, u16 payloadSize);
 
@@ -478,10 +478,6 @@ private:
 		//Methods of ConnectionManagerCallback
 		void MeshConnectionDisconnectedHandler(AppDisconnectReason appDisconnectReason, ConnectionState connectionStateBeforeDisconnection, u8 hadConnectionMasterBit, i16 connectedClusterSize, u32 connectedClusterId);
 		
-		bool GetKey(u32 fmKeyId, u8* keyOut) const;
+		bool GetKey(FmKeyId fmKeyId, u8* keyOut) const;
 		bool IsPreferredConnection(NodeId id) const;
-
-#if IS_ACTIVE(FAKE_NODE_POSITIONS)
-		bool modifyEventForFakePositions(FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) const;
-#endif
 };

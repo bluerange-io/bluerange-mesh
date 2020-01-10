@@ -518,14 +518,6 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 				APP_ERROR_CHECK(err);
 			}
 #endif
-#if IS_ACTIVE(FAKE_NODE_POSITIONS)
-			if (!GS->node.modifyEventForFakePositions(are))
-			{
-				//The position was faked to such a far place that we
-				//should not do anything with the event.
-				return;
-			}
-#endif
 			ScanController::getInstance().ScanEventHandler(are);
 			for (u32 i = 0; i < GS->amountOfModules; i++) {
 				if (GS->activeModules[i]->configurationPointer->moduleActive) {
@@ -765,11 +757,6 @@ FruityHal::GapAdvertisementReportEvent::GapAdvertisementReportEvent(void* _evt)
 
 i8 FruityHal::GapAdvertisementReportEvent::getRssi() const
 {
-#if IS_ACTIVE(FAKE_NODE_POSITIONS)
-	if (fakeRssiSet) {
-		return fakeRssi;
-	}
-#endif
 	return currentEvent->evt.gap_evt.params.adv_report.rssi;
 }
 
@@ -809,14 +796,6 @@ bool FruityHal::GapAdvertisementReportEvent::isConnectable() const
 	return currentEvent->evt.gap_evt.params.adv_report.type == BLE_GAP_ADV_TYPE_ADV_IND;
 #endif
 }
-
-#if IS_ACTIVE(FAKE_NODE_POSITIONS)
-void AdvertisementReportEvent::setFakeRssi(i8 rssi)
-{
-	this->fakeRssi = rssi;
-	fakeRssiSet = true;
-}
-#endif
 
 FruityHal::BleEvent::BleEvent(void *_evt)
 {
@@ -2528,14 +2507,8 @@ void FruityHal::EnableUart(bool promptAndEchoMode)
 	if (!promptAndEchoMode)
 	{
 		//Start receiving RX events
-		FruityHal::enableUartReadInterrupt();
+		FruityHal::UartEnableReadInterrupt();
 	}
-}
-
-void FruityHal::enableUartReadInterrupt()
-{
-	//Enables Interrupts
-	nrf_uart_int_enable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
 }
 
 bool FruityHal::checkAndHandleUartTimeout()
@@ -2557,7 +2530,6 @@ bool FruityHal::checkAndHandleUartTimeout()
 
 u32 FruityHal::checkAndHandleUartError()
 {
-#ifndef SIM_ENABLED
 	//Checks if an error occured
 	if (nrf_uart_int_enable_check(NRF_UART0, NRF_UART_INT_MASK_ERROR) &&
 		nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_ERROR))
@@ -2569,7 +2541,6 @@ u32 FruityHal::checkAndHandleUartError()
 
 		return NRF_UART0->ERRORSRC;
 	}
-#endif
 	return 0;
 }
 

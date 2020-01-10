@@ -351,25 +351,25 @@ void Node::HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinn
 	HandOverMasterBitIfNecessary();
 }
 
-MeshAccessAuthorization Node::CheckMeshAccessPacketAuthorization(BaseConnectionSendData * sendData, u8 * data, u32 fmKeyId, DataDirection direction)
+MeshAccessAuthorization Node::CheckMeshAccessPacketAuthorization(BaseConnectionSendData * sendData, u8 * data, FmKeyId fmKeyId, DataDirection direction)
 {
 	connPacketHeader* packet = (connPacketHeader*)data;
 	
 	if (   packet->messageType == MessageType::MODULE_RAW_DATA
 		|| packet->messageType == MessageType::MODULE_RAW_DATA_LIGHT)
 	{
-		if (fmKeyId == FM_KEY_ID_NETWORK)
+		if (fmKeyId == FmKeyId::NETWORK)
 		{
 			return MeshAccessAuthorization::WHITELIST;
 		}
-		else if (fmKeyId == FM_KEY_ID_NODE)
+		else if (fmKeyId == FmKeyId::NODE)
 		{
 			return MeshAccessAuthorization::LOCAL_ONLY;
 		}
 	}
 	if (packet->messageType == MessageType::CLUSTER_INFO_UPDATE)
 	{
-		if (fmKeyId == FM_KEY_ID_NETWORK)
+		if (fmKeyId == FmKeyId::NETWORK)
 		{
 			return MeshAccessAuthorization::WHITELIST;
 		}
@@ -378,8 +378,21 @@ MeshAccessAuthorization Node::CheckMeshAccessPacketAuthorization(BaseConnectionS
 			return MeshAccessAuthorization::UNDETERMINED;
 		}
 	}
+	if (packet->messageType == MessageType::UPDATE_TIMESTAMP)
+	{
+		//Don't allow the time to be set if it's already set and we didn't receive this message via FM_KEY_ID_NETWORK.
+		//Note: FM_KEY_ID_NODE is not sufficient, as the time is a property of the mesh by design.
+		if (GS->timeManager.IsTimeSynced() && fmKeyId != FmKeyId::NETWORK)
+		{
+			return MeshAccessAuthorization::BLACKLIST;
+		}
+		else
+		{
+			return MeshAccessAuthorization::WHITELIST;
+		}
+	}
 	if (packet->messageType == MessageType::COMPONENT_SENSE) {
-		if (fmKeyId == FM_KEY_ID_ORGANIZATION) {
+		if (fmKeyId == FmKeyId::ORGANIZATION) {
 			return MeshAccessAuthorization::WHITELIST;
 		}
 	}
@@ -1837,7 +1850,7 @@ void Node::TimerEventHandler(u16 passedTimeDs)
 			&& emergencyDisconnectTimerDs       >= emergencyDisconnectTimerTriggerDs)
 		{
 			joinMeBufferPacket* bestCluster = DetermineBestClusterAsSlave();
-			emergencyDisconnectValidationConnectionUniqueId = MeshAccessConnection::ConnectAsMaster(&bestCluster->addr, 10, 10, FM_KEY_ID_NETWORK, nullptr, MeshAccessTunnelType::PEER_TO_PEER);
+			emergencyDisconnectValidationConnectionUniqueId = MeshAccessConnection::ConnectAsMaster(&bestCluster->addr, 10, 10, FmKeyId::NETWORK, nullptr, MeshAccessTunnelType::PEER_TO_PEER);
 			//If a connection wasn't possible to establish
 			if (emergencyDisconnectValidationConnectionUniqueId == 0)
 			{
@@ -2059,21 +2072,21 @@ ClusterId Node::GenerateClusterID(void) const
 	return newId;
 }
 
-bool Node::GetKey(u32 fmKeyId, u8* keyOut) const
+bool Node::GetKey(FmKeyId fmKeyId, u8* keyOut) const
 {
-	if(fmKeyId == FM_KEY_ID_NODE){
+	if(fmKeyId == FmKeyId::NODE){
 		CheckedMemcpy(keyOut, RamConfig->GetNodeKey(), 16);
 		return true;
-	} else if(fmKeyId == FM_KEY_ID_NETWORK){
+	} else if(fmKeyId == FmKeyId::NETWORK){
 		CheckedMemcpy(keyOut, GS->node.configuration.networkKey, 16);
 		return true;
-	} else if(fmKeyId == FM_KEY_ID_ORGANIZATION){
+	} else if(fmKeyId == FmKeyId::ORGANIZATION){
 		CheckedMemcpy(keyOut, GS->node.configuration.organizationKey, 16);
 		return true;
-	} else if (fmKeyId == FM_KEY_ID_RESTRAINED) {
+	} else if (fmKeyId == FmKeyId::RESTRAINED) {
 		RamConfig->GetRestrainedKey(keyOut);
 		return true;
-	} else if(fmKeyId >= FM_KEY_ID_USER_DERIVED_START && fmKeyId <= FM_KEY_ID_USER_DERIVED_END){
+	} else if(fmKeyId >= FmKeyId::USER_DERIVED_START && fmKeyId <= FmKeyId::USER_DERIVED_END){
 		//Construct some cleartext with the user id to construct the user key
 		u8 cleartext[16];
 		CheckedMemset(cleartext, 0x00, 16);
@@ -2849,35 +2862,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 	//Get the status information of this node
 	else if(TERMARGS(0, "get_plugged_in"))
 	{
-		#if IS_INACTIVE(ACTIVATE_FAKE_NODE_POSITIONS)
-			logjson("NODE", "{\"type\":\"plugged_in\",\"nodeId\":%u,\"serialNumber\":\"%s\"}" SEP, configuration.nodeId, RamConfig->GetSerialNumber());
-		#else
-			u8 xM = 0;
-			u8 yM = 0;
-
-			//Get the record with all fake beacon positions
-			SizedData data = GS->recordStorage.GetRecordData(RECORD_STORAGE_RECORD_ID_FAKE_NODE_POSITIONS);
-			FakeNodePositionRecord* record = (FakeNodePositionRecord*) data.data;
-			if(data.length != 0){
-
-				//Get our own position and that of our partner
-				FakeNodePositionRecordEntry* ownEntry = nullptr;
-
-				FruityHal::BleGapAddr own_addr;
-				FruityHal::BleGapAddressGet(&own_addr);
-
-				for(u32 i=0; i<record->count; i++){
-					 if(memcmp(&record->entries[i].addr, &own_addr, sizeof(ble_gap_addr_t)) == 0){
-						ownEntry = record->entries + i;
-						xM = ownEntry->xM;
-						yM = ownEntry->yM;
-					}
-				}
-			}
-
-			logjson("NODE", "{\"type\":\"plugged_in\",\"nodeId\":%u,\"serialNumber\":\"%s\",\"xM\":%u,\"yM\":%u}" SEP, configuration.nodeId, RamConfig->getSerialNumber(), xM, yM);
-		#endif
-
+		logjson("NODE", "{\"type\":\"plugged_in\",\"nodeId\":%u,\"serialNumber\":\"%s\"}" SEP, configuration.nodeId, RamConfig->GetSerialNumber());
 		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 #if IS_INACTIVE(SAVE_SPACE)
@@ -2968,58 +2953,6 @@ bool Node::IsPreferredConnection(NodeId id) const
 	return true;
 #endif
 }
-
-#if IS_ACTIVE(FAKE_NODE_POSITIONS)
-bool Node::modifyEventForFakePositions(FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) const
-{
-	//TODO: Implement for connection rssi as well, but we need to get the partner address from our implementation
-
-	//Get the record with all fake beacon positions
-	SizedData data = GS->recordStorage.GetRecordData(RECORD_STORAGE_RECORD_ID_FAKE_NODE_POSITIONS);
-	FakeNodePositionRecord* record = (FakeNodePositionRecord*) data.data;
-
-	//No data available. The event should be passed on.
-	if(data.length == 0) return true;
-
-	//Get our own position and that of our partner
-	FakeNodePositionRecordEntry* ownEntry = nullptr;
-	FakeNodePositionRecordEntry* partnerEntry = nullptr;
-
-	FruityHal::BleGapAddr own_addr;
-	FruityHal::BleGapAddressGet(&own_addr);
-
-	for(u32 i=0; i<record->count; i++){
-		if (memcmp(&record->entries[i].addr.addr, advertisementReportEvent.getPeerAddr(), 6) == 0
-			&& record->entries[i].addr.addr_type == advertisementReportEvent.getPeerAddrType()){
-			partnerEntry = record->entries + i;
-		} else if(memcmp(&record->entries[i].addr, &own_addr, sizeof(ble_gap_addr_t)) == 0){
-			ownEntry = record->entries + i;
-		}
-	}
-
-	//If no data is available either about us or our partner, do not modify the event
-	if(ownEntry == nullptr || partnerEntry == nullptr){
-		return true;
-	}
-
-	//Calculate the RSSI based on the distance
-	double N = 2.5;
-	double dist = sqrt(  pow((double)(ownEntry->xM) - (double)(partnerEntry->xM), (double)2) + pow((double)(ownEntry->yM) - (double)(partnerEntry->yM), (double)2)  );
-
-	if(dist > 40){
-		//The event should be dropped
-		return false;
-	} else {
-		//Modify the event with the new rssi
-		i8 rssi = (double)((i32)-40 + Conf::defaultDBmTX) - log10(dist) * 10 * N;
-		advertisementReportEvent.setFakeRssi(rssi);
-
-		//The event should be passed on to other Handlers.
-		return true;
-	}
-
-}
-#endif
 
 void Node::SendRawError(NodeId receiver, ModuleId moduleId, RawDataErrorType type, RawDataErrorDestination destination, u8 requestHandle) const
 {

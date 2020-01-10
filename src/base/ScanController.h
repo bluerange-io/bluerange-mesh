@@ -46,10 +46,15 @@ enum class ScanJobState : u8{
 	ACTIVE,
 };
 
+enum class ScanJobTimeMode : u8 {
+	ENDLESS,
+	TIMED,
+};
+
 typedef struct ScanJob
 {
-	i32				timeout;
-	i32				leftTimeoutDs;
+	ScanJobTimeMode timeMode;
+	i32				timeLeftDs;
 	u16				interval;
 	u16				window;
 	ScanJobState	state;

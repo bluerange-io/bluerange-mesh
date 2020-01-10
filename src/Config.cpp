@@ -67,6 +67,22 @@ Conf::Conf()
 
 #define _____________INITIALIZING_______________
 
+void Conf::RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8 * userData, u16 userDataLength)
+{
+	if (userType == (u32)RecordTypeConf::SET_SERIAL)
+	{
+		if (resultCode == RecordStorageResultCode::SUCCESS)
+		{
+			GS->node.Reboot(SEC_TO_DS(1), RebootReason::SET_SERIAL_SUCCESS);
+		}
+		else
+		{
+			//Rebooting in this case is the safest bet. The initialization sequence will just restart by the other side.
+			GS->node.Reboot(SEC_TO_DS(1), RebootReason::SET_SERIAL_FAILED);
+		}
+	}
+}
+
 void Conf::Initialize(bool safeBootEnabled)
 {
 	this->safeBootEnabled = safeBootEnabled;
@@ -304,10 +320,18 @@ void Conf::SetSerialNumberIndex(u32 serialNumber)
 		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
 	}
 
+	//Already has this serial number
+	if (serialNumber == configuration.overwrittenSerialNumberIndex && configuration.isSerialNumberIndexOverwritten) return;
+
 	configuration.overwrittenSerialNumberIndex = serialNumber;
 	configuration.isSerialNumberIndexOverwritten = true;
 
-	Utility::SaveModuleSettingsToFlashWithId(ModuleId::CONFIG, &configuration, sizeof(ConfigConfiguration), nullptr, 0, nullptr, 0);
+	RecordStorageResultCode err = Utility::SaveModuleSettingsToFlashWithId(ModuleId::CONFIG, &configuration, sizeof(ConfigConfiguration), this, (u32)RecordTypeConf::SET_SERIAL, nullptr, 0);
+	if (err != RecordStorageResultCode::SUCCESS)
+	{
+		//Rebooting in this case is the safest bet. The initialization sequence will just restart by the other side.
+		GS->node.Reboot(SEC_TO_DS(1), RebootReason::SET_SERIAL_FAILED);
+	}
 }
 
 const u8 * Conf::GetNodeKey() const

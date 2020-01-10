@@ -247,7 +247,7 @@ typedef struct
 {
 	connPacketHeader header;
 	u8 version;
-	u32 fmKeyId;
+	FmKeyId fmKeyId;
 	u8 tunnelType : 2;
 	u8 reserved : 6;
 

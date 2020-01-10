@@ -92,10 +92,6 @@ public:
 
 class GapAdvertisementReportEvent : public GapEvent
 {
-#if IS_ACTIVE(FAKE_NODE_POSITIONS)
-	i8 fakeRssi;
-	bool fakeRssiSet = false;
-#endif
 public:
 	explicit GapAdvertisementReportEvent(void* evt);
 	i8 getRssi() const;
@@ -104,10 +100,6 @@ public:
 	const u8* getPeerAddr() const;
 	BleGapAddrType getPeerAddrType() const;
 	bool isConnectable() const;
-
-#if IS_ACTIVE(FAKE_NODE_POSITIONS)
-	void setFakeRssi(i8 rssi);
-#endif
 };
 
 enum class GapRole : u8 {
@@ -394,7 +386,6 @@ struct UartReadCharResult
 	void disableHardwareDfuBootloader();
 	void disableUart();
 	void EnableUart(bool promptAndEchoMode);
-	void enableUartReadInterrupt();
 	bool checkAndHandleUartTimeout();
 	u32 checkAndHandleUartError();
 	void UartHandleError(u32 error);

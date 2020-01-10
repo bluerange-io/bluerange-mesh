@@ -315,7 +315,7 @@ void ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, Delive
 		BaseConnections maConn = GetConnectionsOfType(ConnectionType::MESH_ACCESS, ConnectionDirection::INVALID);
 		for (u32 i = 0; i < maConn.count; i++) {
 			MeshAccessConnection* c = (MeshAccessConnection*)allConnections[maConn.connectionIndizes[i]];
-			if (c == nullptr) {
+			if (c == nullptr || !c->ShouldSendDataToNodeId(packetHeader->receiver)) {
 				continue;
 			}
 			if (packetHeader->receiver == NODE_ID_ANYCAST_THEN_BROADCAST) {
