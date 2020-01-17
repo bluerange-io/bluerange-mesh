@@ -67,127 +67,128 @@ class Module;
 
 class GlobalState
 {
-	public:
-		GlobalState();
+public:
+	GlobalState();
 #ifndef SIM_ENABLED
-		static GlobalState& getInstance() {
-			return instance;
-		}
-		static GlobalState instance;
+	static GlobalState &getInstance()
+	{
+		return instance;
+	}
+	static GlobalState instance;
 #endif
 
-		uint32_t SetEventHandlers(
-			FruityHal::SystemEventHandler systemEventHandler, FruityHal::TimerEventHandler timerEventHandler,
-            FruityHal::ButtonEventHandler buttonEventHandler, FruityHal::AppErrorHandler   appErrorHandler,
-            FruityHal::StackErrorHandler  stackErrorHandler, FruityHal::HardfaultHandler  hardfaultHandler);
-		void SetUartHandler(FruityHal::UartEventHandler uartEventHandler);
+	uint32_t SetEventHandlers(
+		FruityHal::SystemEventHandler systemEventHandler, FruityHal::TimerEventHandler timerEventHandler,
+		FruityHal::ButtonEventHandler buttonEventHandler, FruityHal::AppErrorHandler appErrorHandler,
+		FruityHal::StackErrorHandler stackErrorHandler, FruityHal::HardfaultHandler hardfaultHandler);
+	void SetUartHandler(FruityHal::UartEventHandler uartEventHandler);
 
-		//#################### Event Buffer ###########################
-		//A global buffer for the current event, which must be 4-byte aligned
-		#pragma pack(push)
-		#pragma pack(4)
+//#################### Event Buffer ###########################
+//A global buffer for the current event, which must be 4-byte aligned
+#pragma pack(push)
+#pragma pack(4)
 #if defined(NRF51) || defined(SIM_ENABLED)
-		u32 currentEventBuffer[CEIL_DIV(BLE_STACK_EVT_MSG_BUF_SIZE, sizeof(uint32_t))];
+	u32 currentEventBuffer[CEIL_DIV(BLE_STACK_EVT_MSG_BUF_SIZE, sizeof(uint32_t))];
 #else
-		uint8_t currentEventBuffer[BLE_EVT_LEN_MAX(MAX_MTU_SIZE)];
+	uint8_t currentEventBuffer[BLE_EVT_LEN_MAX(MAX_MTU_SIZE)];
 #endif
-		static constexpr u16 SIZE_OF_EVENT_BUFFER = sizeof(currentEventBuffer);
-		#pragma pack(pop)
+	static constexpr u16 SIZE_OF_EVENT_BUFFER = sizeof(currentEventBuffer);
+#pragma pack(pop)
 
-		//#################### App timer ###########################
-		//To keep track of timer ticks
-		u32 previousRtcTicks = 0;
+	//#################### App timer ###########################
+	//To keep track of timer ticks
+	u32 previousRtcTicks = 0;
 
-		//App timer uses deciseconds because milliseconds will overflow a u32 too fast
-		u32 tickRemainderTimesTen = 0;
-		u16 passsedTimeSinceLastTimerHandlerDs = 0;
-		u16 appTimerRandomOffsetDs = 0;
-		u32 appTimerDs = 0; //The app timer is used for all mesh and module timings and keeps track of the time in ds since bootup
+	//App timer uses deciseconds because milliseconds will overflow a u32 too fast
+	u32 tickRemainderTimesTen = 0;
+	u16 passsedTimeSinceLastTimerHandlerDs = 0;
+	u16 appTimerRandomOffsetDs = 0;
+	u32 appTimerDs = 0; //The app timer is used for all mesh and module timings and keeps track of the time in ds since bootup
 
-		TimeManager timeManager;
+	TimeManager timeManager;
 
-		//########## Singletons ###############
-		//Base
-		ScanController scanController;
-		AdvertisingController advertisingController;
-		GAPController gapController;
-		GATTController gattController;
+	//########## Singletons ###############
+	//Base
+	ScanController scanController;
+	AdvertisingController advertisingController;
+	GAPController gapController;
+	GATTController gattController;
 
-		//Reference to Node
-		Node node;
-		Conf config;
-		Boardconf boardconf;
-		ConnectionManager cm;
-		Logger logger;
-		Terminal terminal;
-		FlashStorage flashStorage;
-		RecordStorage recordStorage;
+	//Reference to Node
+	Node node;
+	Conf config;
+	Boardconf boardconf;
+	ConnectionManager cm;
+	Logger logger;
+	Terminal terminal;
+	FlashStorage flashStorage;
+	RecordStorage recordStorage;
 
-		LedWrapper ledRed;
-		LedWrapper ledGreen;
-		LedWrapper ledBlue;
-		//########## END Singletons ###############
+	LedWrapper ledRed;
+	LedWrapper ledGreen;
+	LedWrapper ledBlue;
+	//########## END Singletons ###############
 
-		//########## Modules ###############
-		u32 amountOfModules = 0;
-		Module* activeModules[MAX_MODULE_COUNT] = { 0 };
-		template<typename T>
-		u32 InitializeModule(bool createModule)
+	//########## Modules ###############
+	u32 amountOfModules = 0;
+	Module *activeModules[MAX_MODULE_COUNT] = {0};
+	template <typename T>
+	u32 InitializeModule(bool createModule)
+	{
+		static_assert(alignof(T) == 4, "This code assumes that the alignment of all modules is the same, which happens to be 4 (continue reading in comment)");
+		// If this assumption would be false, we could not simply sum up the size of all modules and allocate
+		// as much memory as the sum tells us. We'd have to allocate more. How much more is very hard to tell
+		// thus we don't allow different alignments of modules.
+
+		if (createModule)
 		{
-			static_assert(alignof(T) == 4, "This code assumes that the alignment of all modules is the same, which happens to be 4 (continue reading in comment)");
-			// If this assumption would be false, we could not simply sum up the size of all modules and allocate
-			// as much memory as the sum tells us. We'd have to allocate more. How much more is very hard to tell
-			// thus we don't allow different alignments of modules.
-
-			if (createModule)
+			if (amountOfModules >= MAX_MODULE_COUNT)
 			{
-				if (amountOfModules >= MAX_MODULE_COUNT) {
-					SIMEXCEPTION(TooManyModulesException);
-				}
-				void *memoryBlock = moduleAllocator.allocateMemory(sizeof(T));
-				if (memoryBlock != nullptr)
-				{
-					activeModules[amountOfModules] = new (memoryBlock) T();
-					amountOfModules++;
-				}
+				SIMEXCEPTION(TooManyModulesException);
 			}
-			return sizeof(T);
+			void *memoryBlock = moduleAllocator.allocateMemory(sizeof(T));
+			if (memoryBlock != nullptr)
+			{
+				activeModules[amountOfModules] = new (memoryBlock) T();
+				amountOfModules++;
+			}
 		}
+		return sizeof(T);
+	}
 
-		ConnectionAllocator connectionAllocator;
-		ModuleAllocator moduleAllocator;
+	ConnectionAllocator connectionAllocator;
+	ModuleAllocator moduleAllocator;
 
-		//Time when the button 1 was pressed down and how long it was held
-		u32 button1PressTimeDs = 0;
-		u32 button1HoldTimeDs = 0;
+	//Time when the button 1 was pressed down and how long it was held
+	u32 button1PressTimeDs = 0;
+	u32 button1HoldTimeDs = 0;
+	u32 pendingSysEvent = 0;
+	ButtonState button1State = ButtonState::INITAL;
 
-		u32 pendingSysEvent = 0;
+	RamRetainStruct *ramRetainStructPtr;
+	u32 *rebootMagicNumberPtr; //Used to save a magic number for rebooting in safe mode
 
-		RamRetainStruct* ramRetainStructPtr;
-		u32* rebootMagicNumberPtr; //Used to save a magic number for rebooting in safe mode
-
-		u8 scanBuffer[BLE_GAP_SCAN_PACKET_BUFFER_SIZE];
+	u8 scanBuffer[BLE_GAP_SCAN_PACKET_BUFFER_SIZE];
 
 #ifdef SIM_ENABLED
-		RamRetainStruct ramRetainStruct;
-		u32 rebootMagicNumber;
+	RamRetainStruct ramRetainStruct;
+	u32 rebootMagicNumber;
 #endif
-		RamRetainStruct ramRetainStructPreviousBoot;
+	RamRetainStruct ramRetainStructPreviousBoot;
 
-		FruityHal::SystemEventHandler systemEventHandler = nullptr;
-		FruityHal::TimerEventHandler  timerEventHandler = nullptr;
-		FruityHal::UartEventHandler   uartEventHandler = nullptr;
-		FruityHal::ButtonEventHandler buttonEventHandler = nullptr;
-		FruityHal::AppErrorHandler    appErrorHandler = nullptr;
-		FruityHal::StackErrorHandler  stackErrorHandler = nullptr;
-		FruityHal::HardfaultHandler   hardfaultHandler = nullptr;
+	FruityHal::SystemEventHandler systemEventHandler = nullptr;
+	FruityHal::TimerEventHandler timerEventHandler = nullptr;
+	FruityHal::UartEventHandler uartEventHandler = nullptr;
+	FruityHal::ButtonEventHandler buttonEventHandler = nullptr;
+	FruityHal::AppErrorHandler appErrorHandler = nullptr;
+	FruityHal::StackErrorHandler stackErrorHandler = nullptr;
+	FruityHal::HardfaultHandler hardfaultHandler = nullptr;
 #ifdef SIM_ENABLED
-		FruityHal::DBDiscoveryHandler dbDiscoveryHandler = nullptr;
+	FruityHal::DBDiscoveryHandler dbDiscoveryHandler = nullptr;
 #endif
-		u32 amountOfEventLooperHandlers = 0;
-		SimpleArray<FruityHal::EventLooperHandler, 16> eventLooperHandlers;
-		void RegisterEventLooperHandler(FruityHal::EventLooperHandler handler
-		);
+	u32 amountOfEventLooperHandlers = 0;
+	SimpleArray<FruityHal::EventLooperHandler, 16> eventLooperHandlers;
+	void RegisterEventLooperHandler(FruityHal::EventLooperHandler handler);
 };
 
 #endif /* SRC_GLOBALSTATE_H_ */

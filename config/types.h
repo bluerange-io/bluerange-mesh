@@ -430,6 +430,14 @@ typedef u32 RoutingDecision;
 #define ROUTING_DECISION_BLOCK_TO_MESH 0x1
 #define ROUTING_DECISION_BLOCK_TO_MESH_ACCESS 0x2
 
+// Used to represent the button states
+enum class ButtonState : u8
+{
+	INITAL = 0,  // no-change
+	PRESSED = 1, // button was pressed
+	RELEASED = 2 // button was released
+};
+
 /*## BoardConfiguration #############################################################*/
 // The BoardConfiguration must contain the correct settings for the board that the firmware
 // is flashed on. The featureset must contain all board configurations that the featureset
