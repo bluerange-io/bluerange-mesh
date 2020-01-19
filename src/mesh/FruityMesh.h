@@ -46,7 +46,7 @@ void StartFruityMesh();
 //Event dispatchers
 void DispatchSystemEvents(u32 sys_evt);
 #if IS_ACTIVE(BUTTONS)
-void DispatchButtonEvents(u8 buttonId, u32 buttonHoldTime);
+void DispatchButtonEvents(u8 buttonId, ButtonState buttonState, u32 buttonHoldTime);
 #endif
 void DispatchRadioEvents(bool radioActive);
 void DispatchTimerEvents(u16 passedTimeDs);

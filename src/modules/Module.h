@@ -184,7 +184,7 @@ protected:
 #if FEATURE_AVAILABLE(DEVICE_CAPABILITIES)
 		//Queries a single capability of a module. If no capability with the given index is available the value INVALID must be returned.
 		//After the first invalid index, no valid indices must follow. To limit the amount of virtual methods, this method is called once
-		//for every capability per capability in the module, thus leading to a time complexity of O(n²). This means that this method
+		//for every capability per capability in the module, thus leading to a time complexity of O(nï¿½). This means that this method
 		//should not do complex tasks! The firstCall parameter tells the callee if this is the firstCall to the method for the current
 		//Capability retrieval run. This can be used for initialization tasks. Note that testing for "index == 0" is not sufficient as it
 		//is possible that the CapabilityEntryType is NOT_READY, which then later would call the function again with index == 0 but with
@@ -216,7 +216,7 @@ protected:
 #endif
 
 #if IS_ACTIVE(BUTTONS)
-		virtual void ButtonHandler(u8 buttonId, u32 holdTime) {};
+		virtual void ButtonHandler(u8 buttonId, ButtonState buttonState, u32 holdTime) {};
 #endif
 
 

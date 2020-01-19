@@ -49,7 +49,7 @@ namespace FruityHal
 {
 typedef void(*SystemEventHandler) (u32 systemEvent);
 typedef void(*TimerEventHandler) (u16 passedTimeDs);
-typedef void(*ButtonEventHandler) (u8 buttonId, u32 buttonHoldTime);
+typedef void(*ButtonEventHandler) (u8 buttonId, ButtonState buttonState, u32 buttonHoldTime);
 typedef void(*UartEventHandler) (void);
 typedef void(*AppErrorHandler) (u32 error_code);
 typedef void(*StackErrorHandler) (u32 id, u32 pc, u32 info);

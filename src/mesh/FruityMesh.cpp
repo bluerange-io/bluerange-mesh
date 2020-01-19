@@ -305,12 +305,12 @@ void DispatchSystemEvents(u32 sys_evt)
 
 //This function dispatches once a Button was pressed for some time
 #if IS_ACTIVE(BUTTONS)
-void DispatchButtonEvents(u8 buttonId, u32 buttonHoldTime)
+void DispatchButtonEvents(u8 buttonId, ButtonState buttonState, u32 buttonHoldTime)
 {
 	logt("WARN", "Button %u pressed %u", buttonId, buttonHoldTime);
 	for(u32 i=0; i<GS->amountOfModules; i++){
 		if(GS->activeModules[i]->configurationPointer->moduleActive){
-			GS->activeModules[i]->ButtonHandler(buttonId, buttonHoldTime);
+			GS->activeModules[i]->ButtonHandler(buttonId, buttonState, buttonHoldTime);
 		}
 	}
 }

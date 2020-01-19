@@ -955,7 +955,7 @@ void EnrollmentModule::SendEnrollmentResponse(EnrollmentModuleActionResponseMess
 #define _____________HANDLERS_____________
 
 #if IS_ACTIVE(BUTTONS)
-void EnrollmentModule::ButtonHandler(u8 buttonId, u32 holdTimeDs)
+void EnrollmentModule::ButtonHandler(u8 buttonId, ButtonState buttonState, u32 holdTimeDs)
 {
 	//Remove beacon enrollment and set to default
 	if(SHOULD_BUTTON_EVT_EXEC(configuration.buttonRemoveEnrollmentDs)){

@@ -253,7 +253,7 @@ class DebugModule: public Module
 		void SendStatistics(NodeId receiver) const;
 
 #if IS_ACTIVE(BUTTONS)
-		void ButtonHandler(u8 buttonId, u32 holdTimeDs) override;
+		void ButtonHandler(u8 buttonId, ButtonState buttonState, u32 holdTimeDs) override;
 #endif
 
 		#ifdef TERMINAL_ENABLED

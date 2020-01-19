@@ -243,7 +243,7 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
 u8 modeCounter = 0;
 
 #if IS_ACTIVE(BUTTONS)
-void DebugModule::ButtonHandler(u8 buttonId, u32 holdTimeDs)
+void DebugModule::ButtonHandler(u8 buttonId, ButtonState buttonState, u32 holdTimeDs)
 {
 //	//Advertise each 100ms
 //	if(modeCounter == 0){
