@@ -37,6 +37,16 @@
  * records, update records and delete records
  */
 
+ /*## RecordIds #############################################################*/
+ // The modules use their moduleId as a recordId, records outside this range can be used
+ // for other types of storage
+
+ //Specific Record Ids
+#define RECORD_STORAGE_RECORD_ID_UPDATE_STATUS 1000 //Stores the done status of an update
+#define RECORD_STORAGE_RECORD_ID_UICR_REPLACEMENT 1001 //Can be used, if UICR can not be flashed, e.g. when updating another beacon with different firmware
+#define RECORD_STORAGE_RECORD_ID_DEPRECATED 1002 //Was used to store fake positions for nodes to modify the incoming events
+
+
 constexpr u16 RECORD_STORAGE_ACTIVE_PAGE_MAGIC_NUMBER = 0xAC71;
 
 constexpr int RECORD_STORAGE_INVALIDATION_MASK = 0xFFFF0000;

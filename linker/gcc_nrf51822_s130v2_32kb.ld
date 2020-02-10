@@ -14,6 +14,3 @@ MEMORY
   FLASH (rx) : ORIGIN = 0x1b000, LENGTH = 0x20000
   RAM (rwx) :  ORIGIN = 0x200030F0, LENGTH = 0x4F10
 }
-
-INCLUDE "nrf5x_common.ld"
-

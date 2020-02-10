@@ -34,8 +34,6 @@
 #include <GAPController.h>
 #include <ConnectionManager.h>
 #include <GlobalState.h>
-
-#include <AppConnection.h>
 #include <MeshConnection.h>
 
 
@@ -258,11 +256,11 @@ void BaseConnection::FillTransmitBuffers()
 			//FIXME: This is not using the preprocessed data (sentData)
 			PacketSuccessfullyQueuedWithSoftdevice(activeQueue, sendDataPacked, data, &sentData);
 		}
-		else if(err == NRF_ERROR_BUSY)
+		else if(err == (u32)ErrorType::BUSY)
 		{
 			return;
 		}
-		else if(err == NRF_ERROR_RESOURCES){
+		else if(err == (u32)ErrorType::RESOURCES){
 			//No free buffers in the softdevice, so packet could not be queued, go to next connection
 			//Also set the bufferFull variable
 			bufferFull = true;
@@ -405,11 +403,10 @@ void BaseConnection::HandlePacketQueuingFail(PacketQueue& activeQueue, BaseConne
 	activeQueue.packetFailedToQueueCounter++;
 
 	if (
-		err != NRF_ERROR_DATA_SIZE && 
-		err != NRF_ERROR_TIMEOUT && 
-		err != NRF_ERROR_INVALID_ADDR && 
-		err != NRF_ERROR_INVALID_PARAM && 
-		err != NRF_ERROR_DATA_SIZE) {
+		err != (u32)ErrorType::DATA_SIZE && 
+		err != (u32)ErrorType::TIMEOUT && 
+		err != (u32)ErrorType::INVALID_ADDR && 
+		err != (u32)ErrorType::INVALID_PARAM) {
 		//The remaining errors can happen if the gap connection is temporarily lost during reestablishing
 		return;
 	}
@@ -632,7 +629,7 @@ void BaseConnection::ConnectionMtuUpgradedHandler(u16 gattPayloadSize)
 	this->connectionPayloadSize = gattPayloadSize;
 }
 
-void BaseConnection::GATTServiceDiscoveredHandler(ble_db_discovery_evt_t &evt)
+void BaseConnection::GATTServiceDiscoveredHandler(FruityHal::BleGattDBDiscoveryEvent &evt)
 {
 
 }

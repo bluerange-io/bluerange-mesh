@@ -29,7 +29,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <Config.h>
-#include <Boardconfig.h>
 #include <GlobalState.h>
 #include <Logger.h>
 #include <RecordStorage.h>
@@ -58,7 +57,6 @@ Conf::Conf()
 	CheckedMemset(defaultNetworkKey, 0, sizeof(defaultNetworkKey));
 	CheckedMemset(defaultUserBaseKey, 0, sizeof(defaultUserBaseKey));
 	CheckedMemset(&staticAccessAddress, 0, sizeof(staticAccessAddress));
-	CheckedMemset(fwGroupIds, 0x00, sizeof(fwGroupIds));
 
 	terminalMode = TerminalMode::DISABLED;
 }
@@ -94,7 +92,7 @@ void Conf::Initialize(bool safeBootEnabled)
 	LoadDefaults();
 
 	//If there is UICR data available, we use it to fill uninitialized parts of the config
-	LoadUicr();
+	LoadDeviceConfiguration();
 
 	//Overwrite with settings from the settings page if they exist
 	if (!safeBootEnabled) {
@@ -116,13 +114,7 @@ void Conf::LoadDefaults(){
 	configuration.preferredConnectionMode = PreferredConnectionMode::PENALTY;
 	configuration.amountOfPreferredPartnerIds = 0;
 
-	if (Boardconfig->boardType == 7) {	//jstodo remove if build bug is fixed. (Linker gives random errors if removed currently, see 7d0838770043e1d8d00c9ec8bdd149c93810828c)
-		terminalMode = TerminalMode::DISABLED;
-	}
-	else {
-		terminalMode = TerminalMode::JSON;
-	}
-
+	terminalMode = TerminalMode::JSON;
 	defaultLedMode = LedMode::CONNECTIONS;
 
 	enableSinkRouting = false;
@@ -161,55 +153,40 @@ void Conf::LoadDefaults(){
 	highToLowDiscoveryTimeSec = 0;
 }
 
-void Conf::LoadUicr(){
-	u32* uicrData = FruityHal::getUicrDataPtr();
+void Conf::LoadDeviceConfiguration(){
+	DeviceConfiguration config;
+	ErrorType err = FruityHal::getDeviceConfiguration(config);
 
-	//If UICR data is available, we fill various variables with the data
-	if(uicrData != nullptr){
-		/* If we write data to NRF_UICR->CUSTOMER, it will be used by fruitymesh
-		 * [0] MAGIC_NUMBER, must be set to 0xF07700 when UICR data is available
-		 * [1] BOARD_TYPE, accepts an integer that defines the hardware board that fruitymesh should be running on
-		 * [2] SERIAL_NUMBER, the given serial number (2 words)
-		 * [4] NODE_KEY, randomly generated (4 words)
-		 * [8] MANUFACTURER_ID, set to manufacturer id according to the BLE company identifiers: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
-		 * [9] DEFAULT_NETWORK_ID, network id if preenrollment should be used
-		 * [10] DEFAULT_NODE_ID, node id to be used if not enrolled
-		 * [11] DEVICE_TYPE, type of device (sink, mobile, etc,..)
-		 * [12] SERIAL_NUMBER_INDEX, unique index that represents the serial number
-		 * [13] NETWORK_KEY, default network key if preenrollment should be used (4 words)
-		 * [17] ...
-		 */
-
+	//If Deviceconfiguration data is available, we fill various variables with the data
+	if (err == ErrorType::SUCCESS) {
 		//If magic number exists, fill Config with valid data from UICR
 		deviceConfigOrigin = DeviceConfigOrigins::UICR_CONFIG;
 
-		//=> uicrData[1] was already read in the BoardConfig class
-
-		if(!isEmpty((u8*)(uicrData + 4), 16)){
-			CheckedMemcpy(configuration.nodeKey, (u8*)(uicrData + 4), 16);
+		if(!isEmpty((u8*)config.nodeKey, 16)){
+			CheckedMemcpy(configuration.nodeKey, (u8*)config.nodeKey, 16);
 		}
-		if(uicrData[8] != EMPTY_WORD) manufacturerId = (u16)uicrData[8];
-		if(uicrData[9] != EMPTY_WORD) defaultNetworkId = (u16)uicrData[9];
-		if(uicrData[10] != EMPTY_WORD) defaultNodeId = (u16)uicrData[10];
-		// if(uicrData[11] != EMPTY_WORD) deviceType = (deviceTypes)uicrData[11]; //deprectated as of 02.07.2019
-		if(uicrData[12] != EMPTY_WORD) serialNumberIndex = (u32)uicrData[12];
-		else if (uicrData[2] != EMPTY_WORD) {
+		if(config.manufacturerId != EMPTY_WORD) manufacturerId = (u16)config.manufacturerId;
+		if(config.defaultNetworkId != EMPTY_WORD) defaultNetworkId = (u16)config.defaultNetworkId;
+		if(config.defualtNodeId != EMPTY_WORD) defaultNodeId = (u16)config.defualtNodeId;
+		// if(config.deviceType != EMPTY_WORD) deviceType = (deviceTypes)config.deviceType; //deprectated as of 02.07.2019
+		if(config.serialNumberIndex != EMPTY_WORD) serialNumberIndex = (u32)config.serialNumberIndex;
+		else if (config.serialNumber[0] != EMPTY_WORD) {
 			//Legacy uicr serial number support. Might be removed some day.
 			//If you want to remove it, check if any flashed device exist 
-			//and is still in use, that was not flashed with uicrData[12].
+			//and is still in use, that was not flashed with DeviceConfiguration.serialNumberIndex.
 			//If AND ONLY IF this is not the case, you can savely remove it.
 			char serialNumber[6];
-			CheckedMemcpy((u8*)serialNumber, (u8*)(uicrData + 2), 5);
+			CheckedMemcpy((u8*)serialNumber, (u8*)config.serialNumber, 5);
 			serialNumber[5] = '\0';
 			serialNumberIndex = Utility::GetIndexForSerial(serialNumber);
 		}
 
 		//If no network key is present in UICR but a node key is present, use the node key for both (to migrate settings for old nodes)
-		if(isEmpty((u8*)(uicrData + 13), 16) && !isEmpty(configuration.nodeKey, 16)){
+		if(isEmpty((u8*)config.networkKey, 16) && !isEmpty(configuration.nodeKey, 16)){
 			CheckedMemcpy(defaultNetworkKey, configuration.nodeKey, 16);
 		} else {
 			//Otherwise, we use the default network key
-			CheckedMemcpy(defaultNetworkKey, (u8*)(uicrData + 13), 16);
+			CheckedMemcpy(defaultNetworkKey, (u8*)config.networkKey, 16);
 		}
 	}
 }
@@ -282,7 +259,7 @@ void Conf::generateRandomSerialAndNodeId(){
 	//in tests, 10k serial numbers had 4 duplicates
 	u32 index = 0;
 	for(int i=0; i<NODE_SERIAL_NUMBER_LENGTH; i++){
-		u8 fiveBitChunk = (NRF_FICR->DEVICEID[0] & (0x1F << (i*5))) >> (i*5);
+		u8 fiveBitChunk = (FruityHal::GetDeviceId() & (0x1F << (i*5))) >> (i*5);
 		index += uint_pow(30, i)*(fiveBitChunk % 30);
 	}
 	serialNumberIndex = index;

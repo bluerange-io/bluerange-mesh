@@ -53,6 +53,7 @@
 #include <types.h>
 #include <FlashStorage.h>
 
+#ifndef GITHUB_RELEASE
 #if IS_ACTIVE(ASSET_MODULE)
 #include <AssetModule.h>
 #endif
@@ -65,18 +66,23 @@
 #include <ClcModule.h>
 #include <ClcComm.h>
 #endif
+#endif //GITHUB_RELEASE
 
 #if IS_ACTIVE(VS_MODULE)
+#ifndef GITHUB_RELEASE
 #include <VsModule.h>
 #include <VsComm.h>
+#endif //GITHUB_RELEASE
 #endif
 
 #if IS_ACTIVE(STACK_UNWINDING)
 #include <unwind.h>
 #endif
 
-#ifdef ACTIVATE_WM_MODULE
+#if IS_ACTIVE(WM_MODULE)
+#ifndef GITHUB_RELEASE
 #include <WmModule.h>
+#endif //GITHUB_RELEASE
 #endif
 
 #ifdef SIM_ENABLED
@@ -92,10 +98,12 @@ void BootFruityMesh()
 	//If reboot reason is empty (clean power bootup) or
 	bool safeBootEnabled = false;
 #if IS_ACTIVE(WATCHDOG_SAFE_BOOT_MODE)
-	if(GS->ramRetainStructPtr->rebootReason == RebootReason::UNKNOWN || *GS->rebootMagicNumberPtr == REBOOT_MAGIC_NUMBER){
+	if (Utility::IsUnknownRebootReason(GS->ramRetainStructPtr->rebootReason)
+		|| *GS->rebootMagicNumberPtr == REBOOT_MAGIC_NUMBER) {
 		safeBootEnabled = false;
 		*GS->rebootMagicNumberPtr = 0;
-	} else {
+	}
+	else {
 		safeBootEnabled = true;
 		*GS->rebootMagicNumberPtr = REBOOT_MAGIC_NUMBER;
 		SIMEXCEPTION(SafeBootTriggeredException);
@@ -115,9 +123,9 @@ void BootFruityMesh()
 	Boardconf::getInstance().Initialize();
 
 	//Configure LED pins as output
-	GS->ledRed  .Init(Boardconfig->led1Pin, Boardconfig->ledActiveHigh);
+	GS->ledRed.Init(Boardconfig->led1Pin, Boardconfig->ledActiveHigh);
 	GS->ledGreen.Init(Boardconfig->led2Pin, Boardconfig->ledActiveHigh);
-	GS->ledBlue .Init(Boardconfig->led3Pin, Boardconfig->ledActiveHigh);
+	GS->ledBlue.Init(Boardconfig->led3Pin, Boardconfig->ledActiveHigh);
 
 	//Blink LEDs once during boot as a signal for the user
 	GS->ledRed.On();
@@ -134,7 +142,7 @@ void BootFruityMesh()
 
 	//Initialize the UART Terminal
 	Terminal::getInstance().Init();
-	Logger::getInstance().Init(); 
+	Logger::getInstance().Init();
 
 	//Initialize ConnectionManager
 	ConnectionManager::getInstance();
@@ -211,11 +219,11 @@ void BootFruityMesh()
 		SIMEXCEPTION(IllegalStateException);
 	}
 
-	logjson("MAIN", "{\"type\":\"reboot\",\"reason\":%u,\"code1\":%u,\"stack\":%u,\"version\":%u,\"blversion\":%u}" SEP, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1, GS->ramRetainStructPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion());
+	Utility::LogRebootJson();
 
 	//Stacktrace can be evaluated using addr2line -e FruityMesh.out 1D3FF
 	//Note: Convert to hex first!
-	if(BOOTLOADER_UICR_ADDRESS != 0xFFFFFFFF) logt("MAIN", "UICR boot address is %x, bootloader v%u", (u32)BOOTLOADER_UICR_ADDRESS, FruityHal::GetBootloaderVersion());
+	if(FruityHal::GetBootloaderAddress() != 0xFFFFFFFF) logt("MAIN", "UICR boot address is %x, bootloader v%u", (u32)FruityHal::GetBootloaderAddress(), FruityHal::GetBootloaderVersion());
 	logt("MAIN", "Reboot reason was %u, SafeBootEnabled:%u, stacktrace %u", (u32)GS->ramRetainStructPtr->rebootReason, safeBootEnabled, GS->ramRetainStructPtr->stacktrace[0]);
 
 	//Start Watchdog and feed it
@@ -231,13 +239,22 @@ void BootFruityMesh()
 	FruityHal::ButtonEventHandler buttonHandler = nullptr;
 #endif
 
-	//Initialialize the SoftDevice and the BLE stack
+	//Register error and event handlers
 	GS->SetEventHandlers(
 			DispatchSystemEvents, DispatchTimerEvents,
 			buttonHandler, FruityMeshErrorHandler,
 			BleStackErrorHandler, HardFaultErrorHandler);
 
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+	FruityHal::VirtualComInitBeforeStack();
+#endif
+
+	//Initialize the BLE Stack
 	ErrorType err = FruityHal::BleStackInit();
+
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+	FruityHal::VirtualComInitAfterStack(Terminal::VirtualComPortEventHandler);
+#endif
 
 #ifdef SIM_ENABLED
 	if(err == ErrorType::SUCCESS) cherrySimInstance->currentNode->state.initialized = true; //TODO: Remove or move to FruityHal
@@ -274,12 +291,15 @@ void BootModules()
 
 	//Configure a periodic timer that will call the TimerEventHandlers
 #ifndef SIM_ENABLED
+	logt("ERROR", "Timer start");
 	FruityHal::StartTimers();
 #endif
 
 	GS->ramRetainStructPreviousBoot = *GS->ramRetainStructPtr;
 	FruityHal::ClearRebootReason();
 	CheckedMemset(GS->ramRetainStructPtr, 0, sizeof(RamRetainStruct));
+	GS->ramRetainStructPtr->rebootReason = RebootReason::UNKNOWN_BUT_BOOTED;
+	GS->ramRetainStructPtr->crc32 = Utility::CalculateCrc32((u8*)GS->ramRetainStructPtr, sizeof(RamRetainStruct) - 4);
 }
 
 void StartFruityMesh()            //LCOV_EXCL_LINE Simulated in a different way
@@ -297,7 +317,7 @@ The Event Dispatchers will distribute events to all necessary parts of FruityMes
 #define ___________EVENT_DISPATCHERS____________________
 
 //System Events such as e.g. flash operation success or failure are dispatched with this function
-void DispatchSystemEvents(u32 sys_evt)
+void DispatchSystemEvents(FruityHal::SystemEvents sys_evt)
 {
 	//Hand system events to new storage class
 	FlashStorage::getInstance().SystemEventHandler(sys_evt);
@@ -341,6 +361,89 @@ void DispatchTimerEvents(u16 passedTimeDs)
 	}
 }
 
+void DispatchEvent(const FruityHal::GapRssiChangedEvent & e)
+{
+	GS->cm.GapRssiChangedEventHandler(e);
+}
+
+void DispatchEvent(const FruityHal::GapAdvertisementReportEvent & e)
+{
+	ScanController::getInstance().ScanEventHandler(e);
+	for (u32 i = 0; i < GS->amountOfModules; i++) {
+		if (GS->activeModules[i]->configurationPointer->moduleActive) {
+			GS->activeModules[i]->GapAdvertisementReportEventHandler(e);
+		}
+	}
+}
+
+void DispatchEvent(const FruityHal::GapConnectedEvent & e)
+{
+	GAPController::getInstance().GapConnectedEventHandler(e);
+	AdvertisingController::getInstance().GapConnectedEventHandler(e);
+	for (u32 i = 0; i < GS->amountOfModules; i++) {
+		if (GS->activeModules[i]->configurationPointer->moduleActive) {
+			GS->activeModules[i]->GapConnectedEventHandler(e);
+		}
+	}
+}
+
+void DispatchEvent(const FruityHal::GapDisconnectedEvent & e)
+{
+	GAPController::getInstance().GapDisconnectedEventHandler(e);
+	AdvertisingController::getInstance().GapDisconnectedEventHandler(e);
+	for (u32 i = 0; i < GS->amountOfModules; i++) {
+		if (GS->activeModules[i]->configurationPointer->moduleActive) {
+			GS->activeModules[i]->GapDisconnectedEventHandler(e);
+		}
+	}
+}
+
+void DispatchEvent(const FruityHal::GapTimeoutEvent & e)
+{
+	GAPController::getInstance().GapTimeoutEventHandler(e);
+}
+
+void DispatchEvent(const FruityHal::GapSecurityInfoRequestEvent & e)
+{
+	GAPController::getInstance().GapSecurityInfoRequestEvenetHandler(e);
+}
+
+void DispatchEvent(const FruityHal::GapConnectionSecurityUpdateEvent & e)
+{
+	GAPController::getInstance().GapConnectionSecurityUpdateEventHandler(e);
+}
+
+void DispatchEvent(const FruityHal::GattcWriteResponseEvent & e)
+{
+	ConnectionManager::getInstance().GattcWriteResponseEventHandler(e);
+}
+
+void DispatchEvent(const FruityHal::GattcTimeoutEvent & e)
+{
+	ConnectionManager::getInstance().GattcTimeoutEventHandler(e);
+}
+
+void DispatchEvent(const FruityHal::GattsWriteEvent & e)
+{
+	ConnectionManager::getInstance().GattsWriteEventHandler(e);
+}
+
+void DispatchEvent(const FruityHal::GattcHandleValueEvent & e)
+{
+	ConnectionManager::getInstance().GattcHandleValueEventHandler(e);
+}
+
+void DispatchEvent(const FruityHal::GattDataTransmittedEvent & e)
+{
+	ConnectionManager::getInstance().GattDataTransmittedEventHandler(e);
+	for (int i = 0; i < MAX_MODULE_COUNT; i++) {
+		if (GS->activeModules[i] != nullptr
+			&& GS->activeModules[i]->configurationPointer->moduleActive) {
+			GS->activeModules[i]->GattDataTransmittedEventHandler(e);
+		}
+	}
+}
+
 //################################################
 #define ______________ERROR_HANDLERS______________
 
@@ -368,7 +471,7 @@ void FruityMeshErrorHandler(u32 err)
 	FruityHal::DelayMs(1000);
 
 	//Protect against saving the fault if another fault was the case for this fault
-	if(GS->ramRetainStructPtr->rebootReason != RebootReason::UNKNOWN){
+	if(!Utility::IsUnknownRebootReason(GS->ramRetainStructPtr->rebootReason)){
 		NVIC_SystemReset();
 	}
 
@@ -404,7 +507,7 @@ void BleStackErrorHandler(u32 id, u32 pc, u32 info)
 	FruityHal::DelayMs(1000);
 
 	//Protect against saving the fault if another fault was the case for this fault
-	if(GS->ramRetainStructPtr->rebootReason != RebootReason::UNKNOWN){
+	if(!Utility::IsUnknownRebootReason(GS->ramRetainStructPtr->rebootReason)){
 		NVIC_SystemReset();
 	}
 
@@ -483,8 +586,12 @@ void checkRamRetainStruct(){
 		}
 	}
 	//If we did not save the reboot reason before rebooting, check if the HAL knows something
-	if(GS->ramRetainStructPtr->rebootReason == RebootReason::UNKNOWN){
-		CheckedMemset(GS->ramRetainStructPtr, 0x00, sizeof(RamRetainStruct));
-		GS->ramRetainStructPtr->rebootReason = FruityHal::GetRebootReason();
+	if(Utility::IsUnknownRebootReason(GS->ramRetainStructPtr->rebootReason)){
+		RebootReason halReason = FruityHal::GetRebootReason();
+		if (!Utility::IsUnknownRebootReason(halReason))
+		{
+			CheckedMemset(GS->ramRetainStructPtr, 0x00, sizeof(RamRetainStruct));
+			GS->ramRetainStructPtr->rebootReason = halReason;
+		}
 	}
 }

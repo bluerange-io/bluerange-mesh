@@ -52,6 +52,7 @@
 #include "app_config.h"
 #endif
 
+//We include our boardConfiguration as we need these settings
 
 //######################## Missing from SDK config??
 #ifndef BLE_DB_DISCOVERY_ENABLED
@@ -2659,7 +2660,7 @@
 // <7=> 7 
 
 #ifndef SPI_DEFAULT_CONFIG_IRQ_PRIORITY
-#define SPI_DEFAULT_CONFIG_IRQ_PRIORITY 7
+#define SPI_DEFAULT_CONFIG_IRQ_PRIORITY 3
 #endif
 
 // <e> SPI0_ENABLED - Enable SPI0 instance
@@ -3132,7 +3133,7 @@
 // <7=> 7 
 
 #ifndef USBD_CONFIG_IRQ_PRIORITY
-#define USBD_CONFIG_IRQ_PRIORITY 7
+#define USBD_CONFIG_IRQ_PRIORITY 6
 #endif
 
 // <o> NRF_DRV_USBD_DMASCHEDULER_MODE  - USBD SMA scheduler working scheme
@@ -8209,7 +8210,7 @@
 
 // <o> NRF_SDH_BLE_GATT_MAX_MTU_SIZE - Static maximum MTU size. 
 #ifndef NRF_SDH_BLE_GATT_MAX_MTU_SIZE
-#define NRF_SDH_BLE_GATT_MAX_MTU_SIZE 23
+#define NRF_SDH_BLE_GATT_MAX_MTU_SIZE 63
 #endif
 
 // <o> NRF_SDH_BLE_GATTS_ATTR_TAB_SIZE - Attribute Table size in bytes. The size must be a multiple of 4. 
@@ -8549,6 +8550,9 @@
 
 // <h> Clock - SoftDevice clock configuration
 
+// These settings are given through the Boardconfig
+// This was defined as *** to throw a warning once this is used somewhere
+
 //==========================================================
 // <o> NRF_SDH_CLOCK_LF_SRC  - SoftDevice clock source.
  
@@ -8557,12 +8561,12 @@
 // <2=> NRF_CLOCK_LF_SRC_SYNTH 
 
 #ifndef NRF_SDH_CLOCK_LF_SRC
-#define NRF_SDH_CLOCK_LF_SRC 1
+#define NRF_SDH_CLOCK_LF_SRC ***
 #endif
 
 // <o> NRF_SDH_CLOCK_LF_RC_CTIV - SoftDevice calibration timer interval. 
 #ifndef NRF_SDH_CLOCK_LF_RC_CTIV
-#define NRF_SDH_CLOCK_LF_RC_CTIV 0
+#define NRF_SDH_CLOCK_LF_RC_CTIV ***
 #endif
 
 // <o> NRF_SDH_CLOCK_LF_RC_TEMP_CTIV - SoftDevice calibration timer interval under constant temperature. 
@@ -8570,7 +8574,7 @@
 // <i>  if the temperature has not changed.
 
 #ifndef NRF_SDH_CLOCK_LF_RC_TEMP_CTIV
-#define NRF_SDH_CLOCK_LF_RC_TEMP_CTIV 0
+#define NRF_SDH_CLOCK_LF_RC_TEMP_CTIV ***
 #endif
 
 // <o> NRF_SDH_CLOCK_LF_XTAL_ACCURACY  - External crystal clock accuracy used in the LL to compute timing windows.
@@ -8585,7 +8589,7 @@
 // <7=> NRF_CLOCK_LF_XTAL_ACCURACY_20_PPM 
 
 #ifndef NRF_SDH_CLOCK_LF_XTAL_ACCURACY
-#define NRF_SDH_CLOCK_LF_XTAL_ACCURACY 7
+#define NRF_SDH_CLOCK_LF_XTAL_ACCURACY ***
 #endif
 
 // </h> 
@@ -8688,7 +8692,7 @@
 // <e> NRF_SDH_SOC_ENABLED - nrf_sdh_soc - SoftDevice SoC event handler
 //==========================================================
 #ifndef NRF_SDH_SOC_ENABLED
-#define NRF_SDH_SOC_ENABLED 0
+#define NRF_SDH_SOC_ENABLED 1
 #endif
 // <h> SoC Observers - Observers and priority levels
 

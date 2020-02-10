@@ -35,6 +35,7 @@ It is clearly meant as a work in progress.
 */
 
 #pragma once
+#include "types.h"
 
 namespace FruityHal
 {

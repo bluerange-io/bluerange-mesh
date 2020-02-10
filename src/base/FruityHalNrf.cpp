@@ -35,6 +35,7 @@
 
 
 #include "FruityHal.h"
+#include "FruityMesh.h"
 #include <FruityHalNrf.h>
 #include <types.h>
 #include <GlobalState.h>
@@ -45,6 +46,7 @@
 #ifdef SIM_ENABLED
 #include <CherrySim.h>
 #endif
+#ifndef GITHUB_RELEASE
 #if IS_ACTIVE(CLC_MODULE)
 #include <ClcComm.h>
 #endif
@@ -54,21 +56,40 @@
 #if IS_ACTIVE(WM_MODULE)
 #include <WmComm.h>
 #endif
+#endif //GITHUB_RELEASE
 
 extern "C" {
-#ifdef NRF52
-#include <nrf_power.h>
-#endif
 #ifndef SIM_ENABLED
 #include <app_util_platform.h>
 #include <nrf_uart.h>
 #include <nrf_mbr.h>
 #ifdef NRF52
+#include <nrf_power.h>
 #include <nrf_drv_twi.h>
 #include <nrf_drv_spi.h>
+#include <nrf_drv_saadc.h>
+#include <nrf_sdh.h>
+#include <nrf_sdh_ble.h>
+#include <nrf_sdh_soc.h>
+#else
+#include <nrf_drv_adc.h>
+#endif
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+#include <virtual_com_port.h>
 #endif
 #endif
 }
+
+#define APP_SOC_OBSERVER_PRIO           1
+#define APP_BLE_OBSERVER_PRIO           2
+
+#if defined(NRF51)
+#define BOOTLOADER_UICR_ADDRESS           (NRF_UICR->BOOTLOADERADDR)
+#elif defined(NRF52) || defined(NRF52840)
+#define BOOTLOADER_UICR_ADDRESS           (NRF_UICR->NRFFW[0])
+#elif defined(SIM_ENABLED)
+#define BOOTLOADER_UICR_ADDRESS           (FLASH_REGION_START_ADDRESS + NRF_UICR->BOOTLOADERADDR)
+#endif
 
 #define APP_TIMER_PRESCALER     0 // Value of the RTC1 PRESCALER register
 #define APP_TIMER_OP_QUEUE_SIZE 1 //Size of timer operation queues
@@ -77,6 +98,7 @@ extern "C" {
 
 #ifndef SIM_ENABLED
 static SimpleArray <app_timer_t, APP_TIMER_MAX_TIMERS> swTimers;
+static ble_db_discovery_t discoveredServices;
 #endif 
 
 //This tag is used to set the SoftDevice configuration and must be used when advertising or creating connections
@@ -84,10 +106,19 @@ constexpr int BLE_CONN_CFG_TAG_FM = 1;
 
 constexpr int BLE_CONN_CFG_GAP_PACKET_BUFFERS = 7;
 
+//Bootloader constants
+constexpr int BOOTLOADER_DFU_START  = (0xB1);      /**< Value to set in GPREGRET to boot to DFU mode. */
+constexpr int BOOTLOADER_DFU_START2 = (0xB2);      /**< Value to set in GPREGRET2 to boot to DFU mode. */
+
 #include <string.h>
 
-#define __________________BLE_STACK_EVT_HANDLING____________________
-// ############### BLE Stack and Event Handling ########################
+//Forward declarations
+static ErrorType nrfErrToGeneric(u32 code);
+static FruityHal::BleGattEror nrfErrToGenericGatt(u32 code);
+
+
+#define __________________BLE_STACK_INIT____________________
+// ############### BLE Stack Initialization ########################
 
 static u32 getramend(void)
 {
@@ -95,9 +126,9 @@ static u32 getramend(void)
 
 #if defined(NRF51) || defined(SIM_ENABLED)
 	u32 block_size = NRF_FICR->SIZERAMBLOCKS;
-	ram_total_size      = block_size * NRF_FICR->NUMRAMBLOCK;
+	ram_total_size = block_size * NRF_FICR->NUMRAMBLOCK;
 #else
-	ram_total_size      = NRF_FICR->INFO.RAM * 1024;
+	ram_total_size = NRF_FICR->INFO.RAM * 1024;
 #endif
 
 	return 0x20000000 + ram_total_size;
@@ -123,8 +154,50 @@ static inline ErrorType nrfErrToGeneric(u32 code)
 {
 	//right now generic error has the same meaning and numering
 	//FIXME: This is not true
-	return (ErrorType)code;
+	if (code <= NRF_ERROR_RESOURCES) return (ErrorType)code;
+	else{
+		switch(code)
+		{
+			case BLE_ERROR_INVALID_CONN_HANDLE:
+				return ErrorType::BLE_INVALID_CONN_HANDLE;
+			case BLE_ERROR_INVALID_ATTR_HANDLE:
+				return ErrorType::BLE_INVALID_ATTR_HANDLE;
+#ifdef NRF51
+			case BLE_ERROR_NO_TX_PACKETS:
+				return ErrorType::BLE_NO_TX_PACKETS;
+#endif
+			default:
+				return ErrorType::UNKNOWN;
+		}
+	}
 }
+
+static inline nrf_gpio_pin_pull_t GenericPullModeToNrf(FruityHal::GpioPullMode mode)
+{
+	if (mode == FruityHal::GpioPullMode::GPIO_PIN_PULLUP) return NRF_GPIO_PIN_PULLUP;
+	else if (mode == FruityHal::GpioPullMode::GPIO_PIN_PULLDOWN) return NRF_GPIO_PIN_PULLDOWN;
+	else return NRF_GPIO_PIN_NOPULL;
+}
+
+static inline nrf_gpiote_polarity_t GenericPolarityToNrf(FruityHal::GpioTransistion transition)
+{
+	if (transition == FruityHal::GpioTransistion::GPIO_TRANSITION_TOGGLE) return NRF_GPIOTE_POLARITY_TOGGLE;
+	else if (transition == FruityHal::GpioTransistion::GPIO_TRANSITION_LOW_TO_HIGH) return NRF_GPIOTE_POLARITY_LOTOHI;
+	else return NRF_GPIOTE_POLARITY_HITOLO;
+}
+
+static inline FruityHal::GpioTransistion NrfPolarityToGeneric(nrf_gpiote_polarity_t polarity)
+{
+	if (polarity == NRF_GPIOTE_POLARITY_TOGGLE) return FruityHal::GpioTransistion::GPIO_TRANSITION_TOGGLE;
+	else if (polarity == NRF_GPIOTE_POLARITY_LOTOHI) return FruityHal::GpioTransistion::GPIO_TRANSITION_LOW_TO_HIGH;
+	else return FruityHal::GpioTransistion::GPIO_TRANSITION_HIGH_TO_LOW;
+}
+
+#ifdef NRF52
+static void ble_evt_handler(ble_evt_t * p_ble_evt, void * p_context);
+static void soc_evt_handler(uint32_t evt_id, void * p_context);
+
+#endif
 
 ErrorType FruityHal::BleStackInit()
 {
@@ -241,29 +314,15 @@ ErrorType FruityHal::BleStackInit()
 	//######### Enables the Softdevice
 	u32 finalErr = 0;
 
-	// Configure the clock source
-    nrf_clock_lf_cfg_t clock_lf_cfg;
-    if(Boardconfig->lfClockSource == NRF_CLOCK_LF_SRC_XTAL || Boardconfig->lfClockSource == NRF_CLOCK_LF_SRC_SYNTH){
-        clock_lf_cfg.source = Boardconfig->lfClockSource;
-        clock_lf_cfg.rc_ctiv = 0; //Must be 0 for this clock source
-        clock_lf_cfg.rc_temp_ctiv = 0; //Must be 0 for this clock source
-        clock_lf_cfg.accuracy = Boardconfig->lfClockAccuracy;
-    } else {
-    	//Use the internal clock of the nrf52 with recommended settings
-        clock_lf_cfg.source = NRF_CLOCK_LF_SRC_RC;
-        clock_lf_cfg.rc_ctiv = 16; //recommended setting for nrf52
-        clock_lf_cfg.rc_temp_ctiv = 2; //recommended setting for nrf52
-        clock_lf_cfg.accuracy = NRF_CLOCK_LF_ACCURACY_500_PPM; //ppm of the internal clock source for all nrf52 (due to chip errata
-    }
+	err = nrf_sdh_enable_request();
+	APP_ERROR_CHECK(err);
 
-    //Enable SoftDevice using given clock source
-    err = sd_softdevice_enable(&clock_lf_cfg, app_error_fault_handler);
-	if(err){
-		if(finalErr == 0) finalErr = err;
-		logt("ERROR", "%u", err);
-	}
+	//Use IRQ Priority 7 for SOC and BLE events instead of 6
+	//This allows us to use IRQ Prio 6 for UART and other peripherals
+	err = sd_nvic_SetPriority(SD_EVT_IRQn, 7);
+	APP_ERROR_CHECK(err);
 
-	logt("ERROR", "SD Enable %u", err);
+	logt("ERROR", "ENReq %u", err);
 
 	uint32_t ram_start = (u32)__application_ram_start_address;
 
@@ -311,7 +370,7 @@ ErrorType FruityHal::BleStackInit()
 	// Configure the maximum ATT MTU.
 	CheckedMemset(&ble_cfg, 0x00, sizeof(ble_cfg));
 	ble_cfg.conn_cfg.conn_cfg_tag                 = BLE_CONN_CFG_TAG_FM;
-	ble_cfg.conn_cfg.params.gatt_conn_cfg.att_mtu = MAX_MTU_SIZE;
+	ble_cfg.conn_cfg.params.gatt_conn_cfg.att_mtu = NRF_SDH_BLE_GATT_MAX_MTU_SIZE;
 
 	err = sd_ble_cfg_set(BLE_CONN_CFG_GATT, &ble_cfg, ram_start);
 	APP_ERROR_CHECK(err);
@@ -347,11 +406,17 @@ ErrorType FruityHal::BleStackInit()
 	}
 
 	//######### Enables the BLE stack
-	err = sd_ble_enable(&ram_start);
+	err = nrf_sdh_ble_enable(&ram_start);
 	logt("ERROR", "Err %u, Linker Ram section should be at %x, len %x", err, (u32)ram_start, (u32)(getramend() - ram_start));
 	APP_ERROR_CHECK(finalErr);
 	APP_ERROR_CHECK(err);
 
+	// Register a handler for BLE events.
+	NRF_SDH_BLE_OBSERVER(m_ble_observer, APP_BLE_OBSERVER_PRIO, ble_evt_handler, NULL);
+	NRF_SDH_SOC_OBSERVER(m_soc_observer, APP_SOC_OBSERVER_PRIO, soc_evt_handler, NULL);
+
+
+	//######### Other configuration
 
 	//We also configure connection event length extension to increase the throughput
 	ble_opt_t opt;
@@ -383,20 +448,67 @@ ErrorType FruityHal::BleStackInit()
 void FruityHal::BleStackDeinit()
 {
 #ifndef SIM_ENABLED
+#ifdef NRF51
 	sd_softdevice_disable();
+#else
+	nrf_sdh_disable_request();
 #endif
+#endif // SIM_ENABLED
 }
 
+#define __________________BLE_STACK_EVT_FETCHING____________________
+// ############### BLE Stack and Event Handling ########################
+
 /*
-	########################
-	###                  ###
-	###      EVENTS      ###
-	###                  ###
-	########################
-*/
+	EventHandling for NRF51:
+		Events are fetched from the BLE Stack using polling and a sleep function that will block until
+		another event is generated. This ensures that all event handling code is executed in order.
+		Low latency functionality such as Timer and UART events are implemented interrupt based.
 
+	EventHandling for NRF52:
+		The SoftDevice Handler library is used to fetch events interrupt based.
+		The SoftDevice Interrupt is defined as SD_EVT_IRQn, which is SWI2_IRQn and is set to IRQ_PRIO 7.
+		All high level functionality must be called from IRQ PRIO 7 so that it cannot interrupt the other handlers.
+		Events such as Timer, UART RX, SPI RX, etc,... can be handeled on IRQ PRIO 6 but should only perform very
+		little processing (mostly buffering). They can then set the SWI2 pending using the SetPendingEventIRQ method.
+		IRQ PRIO 6 tasks should not modify any data except their own variables.
+		The main() thread can be used as well but care must be taken as this will be interrupted by IRQ PRIO 7.
+ */
 
-void FruityHal::EventLooper()
+static FruityHal::SystemEvents nrfSystemEventToGeneric(u32 event)
+{
+	switch (event)
+	{
+		case NRF_EVT_HFCLKSTARTED:
+			return FruityHal::SystemEvents::HIGH_FREQUENCY_CLOCK_STARTED;
+		case NRF_EVT_POWER_FAILURE_WARNING:
+			return FruityHal::SystemEvents::POWER_FAILURE_WARNING;
+		case NRF_EVT_FLASH_OPERATION_SUCCESS:
+			return FruityHal::SystemEvents::FLASH_OPERATION_SUCCESS;
+		case NRF_EVT_FLASH_OPERATION_ERROR:
+			return FruityHal::SystemEvents::FLASH_OPERATION_ERROR;
+		case NRF_EVT_RADIO_BLOCKED:
+			return FruityHal::SystemEvents::RADIO_BLOCKED;
+		case NRF_EVT_RADIO_CANCELED:
+			return FruityHal::SystemEvents::RADIO_CANCELED;
+		case NRF_EVT_RADIO_SIGNAL_CALLBACK_INVALID_RETURN:
+			return FruityHal::SystemEvents::RADIO_SIGNAL_CALLBACK_INVALID_RETURN;
+		case NRF_EVT_RADIO_SESSION_IDLE:
+			return FruityHal::SystemEvents::RADIO_SESSION_IDLE;
+		case NRF_EVT_RADIO_SESSION_CLOSED:
+			return FruityHal::SystemEvents::RADIO_SESSION_CLOSED;
+		case NRF_EVT_NUMBER_OF_EVTS:
+			return FruityHal::SystemEvents::NUMBER_OF_EVTS;
+		default:
+			return FruityHal::SystemEvents::UNKOWN_EVENT;
+
+	}
+}
+
+static ble_evt_t* currentEvent = nullptr;
+
+//Checks for high level application events generated e.g. by low level interrupt events
+void ProcessAppEvents()
 {
 	for (u32 i = 0; i < GS->amountOfEventLooperHandlers; i++)
 	{
@@ -410,12 +522,43 @@ void FruityHal::EventLooper()
 	}
 #endif
 
+	//Check if there is input on uart
+	GS->terminal.CheckAndProcessLine();
+
+#if IS_ACTIVE(BUTTONS)
+	//Handle waiting button event
+	if(GS->button1HoldTimeDs != 0){
+		u32 holdTimeDs = GS->button1HoldTimeDs;
+		GS->button1HoldTimeDs = 0;
+
+		GS->buttonEventHandler(0, holdTimeDs);
+	}
+#endif
+
+	//Handle Timer event that was waiting
+	if (GS->passsedTimeSinceLastTimerHandlerDs > 0)
+	{
+		u16 timerDs = GS->passsedTimeSinceLastTimerHandlerDs;
+
+		//Dispatch timer to all other modules
+		GS->timerEventHandler(timerDs);
+
+		//FIXME: Should protect this with a semaphore
+		//because the timerInterrupt works asynchronously
+		GS->passsedTimeSinceLastTimerHandlerDs -= timerDs;
+	}
+}
+
+#if defined(NRF51) || defined(SIM_ENABLED)
+void FruityHal::EventLooper()
+{
+	//Check for waiting events from the application
+	ProcessAppEvents();
+
+
 	while (true)
 	{
-		//Check if there is input on uart
-		GS->terminal.CheckAndProcessLine();
-
-		//Fetch the event
+		//Fetch BLE events
 		u16 eventSize = GlobalState::SIZE_OF_EVENT_BUFFER;
 		u32 err = sd_ble_evt_get((u8*)GS->currentEventBuffer, &eventSize);
 
@@ -431,32 +574,9 @@ void FruityHal::EventLooper()
 		}
 		else
 		{
-			APP_ERROR_CHECK(err); //FIXME: NRF_ERROR_DATA_SIZE not handeled //LCOV_EXCL_LINE assertion
+			APP_ERROR_CHECK(err); //LCOV_EXCL_LINE assertion
 			break;
 		}
-	}
-#if IS_ACTIVE(BUTTONS)
-	//Handle waiting button event
-	if(GS->button1HoldTimeDs != 0){
-		u32 holdTimeDs = GS->button1HoldTimeDs;
-		GS->button1HoldTimeDs = 0;
-
-		GS->buttonEventHandler(0, holdTimeDs);
-	}
-#endif
-
-
-	//Handle Timer event that was waiting
-	if (GS->passsedTimeSinceLastTimerHandlerDs > 0)
-	{
-		u16 timerDs = GS->passsedTimeSinceLastTimerHandlerDs;
-
-		//Dispatch timer to all other modules
-		GS->timerEventHandler(timerDs);
-
-		//FIXME: Should protect this with a semaphore
-		//because the timerInterrupt works asynchronously
-		GS->passsedTimeSinceLastTimerHandlerDs -= timerDs;
 	}
 
 	// Pull event from soc
@@ -467,7 +587,7 @@ void FruityHal::EventLooper()
 		if (err == NRF_ERROR_NOT_FOUND){
 			break;
 		} else {
-			GS->systemEventHandler((u32)evt_id); // Call handler
+			GS->systemEventHandler(nrfSystemEventToGeneric(evt_id)); // Call handler
 		}
 	}
 
@@ -476,6 +596,58 @@ void FruityHal::EventLooper()
 	err = sd_nvic_ClearPendingIRQ(SD_EVT_IRQn);
 	APP_ERROR_CHECK(err);  // OK
 }
+
+
+
+#else
+
+//This will get called for all events on the ble stack and also for all other interrupts
+static void nrf_sdh_fruitymesh_evt_handler(void * p_context)
+{
+	ProcessAppEvents();
+}
+
+//This is called for all BLE related events
+static void ble_evt_handler(ble_evt_t * p_ble_evt, void * p_context)
+{
+	FruityHal::DispatchBleEvents(p_ble_evt);
+}
+
+//This is called for all SoC related events
+static void soc_evt_handler(uint32_t evt_id, void * p_context)
+{
+	GS->systemEventHandler(nrfSystemEventToGeneric(evt_id));
+}
+
+//Register an Event handler for all stack events
+NRF_SDH_STACK_OBSERVER(m_nrf_sdh_fruitymesh_evt_handler, NRF_SDH_BLE_STACK_OBSERVER_PRIO) =
+{
+    .handler   = nrf_sdh_fruitymesh_evt_handler,
+    .p_context = NULL,
+};
+
+//This is our main() after the stack was initialized and is called in a while loop
+void FruityHal::EventLooper()
+{
+	FruityHal::VirtualComProcessEvents();
+
+	u32 err = sd_app_evt_wait();
+	APP_ERROR_CHECK(err); // OK
+}
+
+#endif
+
+//Sets the SWI2 IRQ for events so that we can immediately process our main event handler
+//This not used for NRF51
+void FruityHal::SetPendingEventIRQ()
+{
+#ifndef SIM_ENABLED
+	sd_nvic_SetPendingIRQ(SD_EVT_IRQn);
+#endif
+}
+
+#define __________________EVENT_HANDLERS____________________
+// ############### Methods to be called on events ########################
 
 void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 {
@@ -491,9 +663,9 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 	
 	//Calls the Db Discovery modules event handler
 #ifdef NRF51
-	ble_db_discovery_on_ble_evt(&GATTController::getInstance().discoveredServices, &bleEvent);
+	ble_db_discovery_on_ble_evt(&discoveredServices, &bleEvent);
 #elif defined(NRF52)
-	ble_db_discovery_on_ble_evt(&bleEvent, &GATTController::getInstance().discoveredServices);
+	ble_db_discovery_on_ble_evt(&bleEvent, &discoveredServices);
 #endif
 
 	switch (bleEvent.header.evt_id)
@@ -501,12 +673,11 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 	case BLE_GAP_EVT_RSSI_CHANGED:
 		{
 			GapRssiChangedEvent rce(&bleEvent);
-			GS->cm.GapRssiChangedEventHandler(rce);
+			DispatchEvent(rce);
 		}
 		break;
 	case BLE_GAP_EVT_ADV_REPORT:
 		{
-			GapAdvertisementReportEvent are(&bleEvent);
 #if (SDK == 15)
 			//In the later version of the SDK, we need to call sd_ble_gap_scan_start again with a nullpointer to continue to receive scan data
 			if (bleEvent.evt.gap_evt.params.adv_report.type.status != BLE_GAP_ADV_DATA_STATUS_INCOMPLETE_MORE_DATA)
@@ -515,57 +686,42 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 				scan_data.len = BLE_GAP_SCAN_BUFFER_MAX;
 				scan_data.p_data = GS->scanBuffer;
 				err = sd_ble_gap_scan_start(NULL, &scan_data);
-				APP_ERROR_CHECK(err);
+				if ((err != NRF_ERROR_INVALID_STATE) &&
+				    (err != NRF_ERROR_RESOURCES)) APP_ERROR_CHECK(err);
 			}
 #endif
-			ScanController::getInstance().ScanEventHandler(are);
-			for (u32 i = 0; i < GS->amountOfModules; i++) {
-				if (GS->activeModules[i]->configurationPointer->moduleActive) {
-					GS->activeModules[i]->GapAdvertisementReportEventHandler(are);
-				}
-			}
+			GapAdvertisementReportEvent are(&bleEvent);
+			DispatchEvent(are);
 		}
 		break;
 	case BLE_GAP_EVT_CONNECTED:
 		{
 			FruityHal::GapConnectedEvent ce(&bleEvent);
-			GAPController::getInstance().GapConnectedEventHandler(ce);
-			AdvertisingController::getInstance().GapConnectedEventHandler(ce);
-			for (u32 i = 0; i < GS->amountOfModules; i++) {
-				if (GS->activeModules[i]->configurationPointer->moduleActive) {
-					GS->activeModules[i]->GapConnectedEventHandler(ce);
-				}
-			}
+			DispatchEvent(ce);
 		}
 		break;
 	case BLE_GAP_EVT_DISCONNECTED:
 		{
 			FruityHal::GapDisconnectedEvent de(&bleEvent);
-			GAPController::getInstance().GapDisconnectedEventHandler(de);
-			AdvertisingController::getInstance().GapDisconnectedEventHandler(de);
-			for (u32 i = 0; i < GS->amountOfModules; i++) {
-				if (GS->activeModules[i]->configurationPointer->moduleActive) {
-					GS->activeModules[i]->GapDisconnectedEventHandler(de);
-				}
-			}
+			DispatchEvent(de);
 		}
 		break;
 	case BLE_GAP_EVT_TIMEOUT:
 		{
 			FruityHal::GapTimeoutEvent gte(&bleEvent);
-			GAPController::getInstance().GapTimeoutEventHandler(gte);
+			DispatchEvent(gte);
 		}
 		break;
 	case BLE_GAP_EVT_SEC_INFO_REQUEST:
 		{
 			FruityHal::GapSecurityInfoRequestEvent sire(&bleEvent);
-			GAPController::getInstance().GapSecurityInfoRequestEvenetHandler(sire);
+			DispatchEvent(sire);
 		}
 		break;
 	case BLE_GAP_EVT_CONN_SEC_UPDATE:
 		{
 			FruityHal::GapConnectionSecurityUpdateEvent csue(&bleEvent);
-			GAPController::getInstance().GapConnectionSecurityUpdateEventHandler(csue);
+			DispatchEvent(csue);
 		}
 		break;
 	case BLE_GATTC_EVT_WRITE_RSP:
@@ -574,25 +730,25 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 			//if(cherrySimInstance->currentNode->id == 37 && bleEvent.evt.gattc_evt.conn_handle == 680) printf("%04u Q@NODE %u EVT_WRITE_RSP received" EOL, cherrySimInstance->globalBreakCounter++, cherrySimInstance->currentNode->id);
 #endif
 			FruityHal::GattcWriteResponseEvent wre(&bleEvent);
-			ConnectionManager::getInstance().GattcWriteResponseEventHandler(wre);
+			DispatchEvent(wre);
 		}
 		break;
 	case BLE_GATTC_EVT_TIMEOUT: //jstodo untested event
 		{
 			FruityHal::GattcTimeoutEvent gte(&bleEvent);
-			ConnectionManager::getInstance().GattcTimeoutEventHandler(gte);
+			DispatchEvent(gte);
 		}
 		break;
 	case BLE_GATTS_EVT_WRITE:
 		{
 			FruityHal::GattsWriteEvent gwe(&bleEvent);
-			ConnectionManager::getInstance().GattsWriteEventHandler(gwe);
+			DispatchEvent(gwe);
 		}
 		break;
 	case BLE_GATTC_EVT_HVX:
 		{
-			FruityHal::GattcHandleValueEvent hve(&bleEvent);	
-			ConnectionManager::getInstance().GattcHandleValueEventHandler(hve);
+			FruityHal::GattcHandleValueEvent hve(&bleEvent);
+			DispatchEvent(hve);
 		}
 		break;
 #if defined(NRF51) || defined(SIM_ENABLED)
@@ -606,13 +762,7 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 			//if (cherrySimInstance->currentNode->id == 37 && bleEvent.evt.common_evt.conn_handle == 680) printf("%04u Q@NODE %u WRITE_CMD_TX_COMPLETE %u received" EOL, cherrySimInstance->globalBreakCounter++, cherrySimInstance->currentNode->id, bleEvent.evt.common_evt.params.tx_complete.count);
 #endif
 			FruityHal::GattDataTransmittedEvent gdte(&bleEvent);
-			ConnectionManager::getInstance().GattDataTransmittedEventHandler(gdte);
-			for (int i = 0; i < MAX_MODULE_COUNT; i++) {
-				if (GS->activeModules[i] != nullptr
-					&& GS->activeModules[i]->configurationPointer->moduleActive) {
-					GS->activeModules[i]->GattDataTransmittedEventHandler(gdte);
-				}
-			}
+			DispatchEvent(gdte);
 		}
 		break;
 
@@ -628,7 +778,7 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 	case BLE_GAP_EVT_DATA_LENGTH_UPDATE_REQUEST:
 	{
 		//We automatically answer all data length update requests
-		//The softdevice will chose the parameters so that our configured MAX_MTU_SIZE fits into a link layer packet
+		//The softdevice will chose the parameters so that our configured NRF_SDH_BLE_GATT_MAX_MTU_SIZE fits into a link layer packet
 		sd_ble_gap_data_length_update(bleEvent.evt.gap_evt.conn_handle, nullptr, nullptr);
 	}
 	break;
@@ -651,10 +801,10 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 	case BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST:
 	{
 		//We answer all MTU update requests with our max mtu that was configured
-		u32 err = sd_ble_gatts_exchange_mtu_reply(bleEvent.evt.gatts_evt.conn_handle, MAX_MTU_SIZE);
+		u32 err = sd_ble_gatts_exchange_mtu_reply(bleEvent.evt.gatts_evt.conn_handle, NRF_SDH_BLE_GATT_MAX_MTU_SIZE);
 
 		u16 partnerMtu = bleEvent.evt.gatts_evt.params.exchange_mtu_request.client_rx_mtu;
-		u16 effectiveMtu = MAX_MTU_SIZE < partnerMtu ? MAX_MTU_SIZE : partnerMtu;
+		u16 effectiveMtu = NRF_SDH_BLE_GATT_MAX_MTU_SIZE < partnerMtu ? NRF_SDH_BLE_GATT_MAX_MTU_SIZE : partnerMtu;
 
 		logt("FH", "Reply MTU Exchange (%u) on conn %u with %u", err, bleEvent.evt.gatts_evt.conn_handle, effectiveMtu);
 
@@ -666,7 +816,7 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 	case BLE_GATTC_EVT_EXCHANGE_MTU_RSP:
 	{
 		u16 partnerMtu = bleEvent.evt.gattc_evt.params.exchange_mtu_rsp.server_rx_mtu;
-		u16 effectiveMtu = MAX_MTU_SIZE < partnerMtu ? MAX_MTU_SIZE : partnerMtu;
+		u16 effectiveMtu = NRF_SDH_BLE_GATT_MAX_MTU_SIZE < partnerMtu ? NRF_SDH_BLE_GATT_MAX_MTU_SIZE : partnerMtu;
 
 		logt("FH", "MTU for hnd %u updated to %u", bleEvent.evt.gattc_evt.conn_handle, effectiveMtu);
 
@@ -705,8 +855,6 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 		logt("EVENTS", "End of event");
 	}
 }
-
-static ble_evt_t* currentEvent = nullptr;
 
 FruityHal::GapConnParamUpdateEvent::GapConnParamUpdateEvent(void* _evt)
 	:GapEvent(_evt)
@@ -1363,10 +1511,10 @@ ble_gap_conn_params_t translate(FruityHal::BleGapConnParams const & params)
 	return gapConnectionParams;
 }
 
-u32 FruityHal::BleGapConnectionParamsUpdate(u16 conn_handle, BleGapConnParams const & params)
+ErrorType FruityHal::BleGapConnectionParamsUpdate(u16 conn_handle, BleGapConnParams const & params)
 {
 	ble_gap_conn_params_t gapConnectionParams = translate(params);
-	return sd_ble_gap_conn_param_update(conn_handle, &gapConnectionParams);
+	return nrfErrToGeneric(sd_ble_gap_conn_param_update(conn_handle, &gapConnectionParams));
 }
 
 u32 FruityHal::BleGapConnectionPreferredParamsSet(BleGapConnParams const & params)
@@ -1419,17 +1567,60 @@ u32 FruityHal::BleGapRssiStop(u16 conn_handle)
 	return sd_ble_gap_rssi_stop(conn_handle);
 }
 
+
+
+/*
+	#####################
+	###               ###
+	###      GATT     ###
+	###               ###
+	#####################
+*/
+
+
+#define __________________GATT____________________
+
+
+#ifndef SIM_ENABLED
+FruityHal::DBDiscoveryHandler dbDiscoveryHandler = nullptr;
+
+static void DatabaseDiscoveryHandler(ble_db_discovery_evt_t * p_evt)
+{
+	// other events are not supported
+	if (!(p_evt->evt_type == BLE_DB_DISCOVERY_SRV_NOT_FOUND ||
+	      p_evt->evt_type == BLE_DB_DISCOVERY_COMPLETE)) return;
+
+	FruityHal::BleGattDBDiscoveryEvent bleDbEvent;
+	CheckedMemset(&bleDbEvent, 0x00, sizeof(bleDbEvent));
+	bleDbEvent.connHandle = p_evt->conn_handle;
+	bleDbEvent.type = p_evt->evt_type == BLE_DB_DISCOVERY_COMPLETE ? FruityHal::BleGattDBDiscoveryEventType::COMPLETE : FruityHal::BleGattDBDiscoveryEventType::SERVICE_NOT_FOUND;
+	bleDbEvent.serviceUUID.uuid = p_evt->params.discovered_db.srv_uuid.uuid;
+	bleDbEvent.serviceUUID.type = p_evt->params.discovered_db.srv_uuid.type;
+	bleDbEvent.charateristicsCount = p_evt->params.discovered_db.char_count;
+	for (u8 i = 0; i < bleDbEvent.charateristicsCount; i++)
+	{
+	  bleDbEvent.dbChar[i].handleValue = p_evt->params.discovered_db.charateristics[i].characteristic.handle_value;
+	  bleDbEvent.dbChar[i].charUUID.uuid = p_evt->params.discovered_db.charateristics[i].characteristic.uuid.uuid;
+	  bleDbEvent.dbChar[i].charUUID.type = p_evt->params.discovered_db.charateristics[i].characteristic.uuid.type;
+	  bleDbEvent.dbChar[i].cccdHandle = p_evt->params.discovered_db.charateristics[i].cccd_handle;
+	}
+	logt("ERROR", "########################BLE DB EVENT");
+	dbDiscoveryHandler(&bleDbEvent);
+}
+#endif //SIM_ENABLED
+
 u32 FruityHal::DiscovereServiceInit(DBDiscoveryHandler dbEventHandler)
 {
 #ifndef  SIM_ENABLED
-	return ble_db_discovery_init(dbEventHandler);
-#else // ! SIM_ENABLED
+	dbDiscoveryHandler = dbEventHandler;
+	return ble_db_discovery_init(DatabaseDiscoveryHandler);
+#else
 	GS->dbDiscoveryHandler = dbEventHandler;
 #endif
 	return 0;
 }
 
-u32 FruityHal::DiscoverService(u16 connHandle, const BleGattUuid &p_uuid, ble_db_discovery_t * p_discoveredServices)
+u32 FruityHal::DiscoverService(u16 connHandle, const BleGattUuid &p_uuid)
 {
 	uint32_t err = 0;
 	ble_uuid_t uuid;
@@ -1437,14 +1628,14 @@ u32 FruityHal::DiscoverService(u16 connHandle, const BleGattUuid &p_uuid, ble_db
 	uuid.uuid = p_uuid.uuid;
 	uuid.type = p_uuid.type;
 #ifndef SIM_ENABLED
-	CheckedMemset(p_discoveredServices, 0x00, sizeof(*p_discoveredServices));
+	CheckedMemset(&discoveredServices, 0x00, sizeof(discoveredServices));
 	err = ble_db_discovery_evt_register(&uuid);
 	if (err) {
 		logt("ERROR", "err %u", (u32)err);
 		return err;
 	}
 
-	err = ble_db_discovery_start(p_discoveredServices, connHandle);
+	err = ble_db_discovery_start(&discoveredServices, connHandle);
 	if (err) {
 		logt("ERROR", "err %u", (u32)err);
 		return err;
@@ -1453,6 +1644,15 @@ u32 FruityHal::DiscoverService(u16 connHandle, const BleGattUuid &p_uuid, ble_db
 	cherrySimInstance->StartServiceDiscovery(connHandle, uuid, 1000);
 #endif
 	return err;
+}
+
+bool FruityHal::DiscoveryIsInProgress()
+{
+#ifndef SIM_ENABLED
+	return discoveredServices.discovery_in_progress;
+#else
+	return false;
+#endif
 }
 
 u32 FruityHal::BleGattSendNotification(u16 connHandle, BleGattWriteParams & params)
@@ -1519,7 +1719,7 @@ u32 FruityHal::BleGattCharAdd(u16 service_handle, BleGattCharMd const & char_md,
 u32 FruityHal::BleGapDataLengthExtensionRequest(u16 connHandle)
 {
 #ifdef NRF52
-	//We let the SoftDevice decide the maximum according to the MAX_MTU_SIZE and connection configuration
+	//We let the SoftDevice decide the maximum according to the NRF_SDH_BLE_GATT_MAX_MTU_SIZE and connection configuration
 	u32 err = sd_ble_gap_data_length_update(connHandle, nullptr, nullptr);
 	logt("FH", "Start DLE Update (%u) on conn %u", err, connHandle);
 
@@ -1528,6 +1728,17 @@ u32 FruityHal::BleGapDataLengthExtensionRequest(u16 connHandle)
 	//TODO: We should implement DLE in the Simulator as soon as it is based on the NRF52
 
 	return NRF_ERROR_NOT_SUPPORTED;
+#endif
+}
+
+u32 FruityHal::BleGattGetMaxMtu()
+{
+#ifdef SIM_ENABLED
+	return 63;
+#elif NRF51
+	return 23; //NRF51 does not support a higher MTU
+#else
+	return NRF_SDH_BLE_GATT_MAX_MTU_SIZE; //MTU for nRF52 is defined through sdk_config.h
 #endif
 }
 
@@ -1652,28 +1863,6 @@ ErrorType FruityHal::GetRandomBytes(u8 * p_data, u8 len)
 	return nrfErrToGeneric(sd_rand_application_vector_get(p_data, len));
 }
 
-u32 FruityHal::ClearGeneralPurposeRegister(u32 gpregId, u32 mask)
-{
-#ifdef NRF52
-	return sd_power_gpregret_clr(gpregId, mask);
-#elif NRF51
-	return sd_power_gpregret_clr(gpregId);
-#else
-	return NRF_SUCCESS;
-#endif
-}
-
-u32 FruityHal::WriteGeneralPurposeRegister(u32 gpregId, u32 mask)
-{
-#ifdef NRF52
-	return sd_power_gpregret_set(gpregId, mask);
-#elif NRF51
-	return sd_power_gpregret_set(gpregId);
-#else
-	return NRF_SUCCESS;
-#endif
-}
-
 //################################################
 #define _________________UART_____________________
 
@@ -1694,6 +1883,42 @@ extern "C"{
 
 
 //################################################
+#define _________________VIRTUAL_COM_PORT_____________________
+
+void FruityHal::VirtualComInitBeforeStack()
+{
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+	virtualComInit();
+#endif
+}
+void FruityHal::VirtualComInitAfterStack(void (*portEventHandler)(bool))
+{
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+	virtualComStart(portEventHandler);
+#endif
+}
+void FruityHal::VirtualComProcessEvents()
+{
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+	virtualComCheck();
+#endif
+}
+u32 FruityHal::VirtualComCheckAndProcessLine(u8* buffer, u16 bufferLength)
+{
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+	return virtualComCheckAndProcessLine(buffer, bufferLength);
+#else
+	return 0;
+#endif
+}
+void FruityHal::VirtualComWriteData(const u8* data, u16 dataLength)
+{
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+	virtualComWriteData(data, dataLength);
+#endif
+}
+
+//################################################
 #define _________________TIMERS___________________
 
 extern "C"{
@@ -1709,7 +1934,10 @@ extern "C"{
 		GS->tickRemainderTimesTen -= passedDs * TICKS_PER_DS_TIMES_TEN;
 		GS->passsedTimeSinceLastTimerHandlerDs += passedDs;
 
+		FruityHal::SetPendingEventIRQ();
+
 		GS->timeManager.AddTicks(MAIN_TIMER_TICK);
+
 	}
 }
 
@@ -1876,6 +2104,44 @@ extern "C"
 }
 
 //################################################
+#define __________________BOOTLOADER____________________
+
+u32 FruityHal::GetBootloaderVersion()
+{
+	if(BOOTLOADER_UICR_ADDRESS != 0xFFFFFFFF){
+		return *(u32*)(BOOTLOADER_UICR_ADDRESS + 1024);
+	} else {
+		return 0;
+	}
+}
+
+u32 FruityHal::GetBootloaderAddress()
+{
+	return BOOTLOADER_UICR_ADDRESS;
+}
+
+ErrorType FruityHal::ActivateBootloaderOnReset()
+{
+#ifdef NRF52
+	logt("DFUMOD", "Setting flags for nRF Secure DFU Bootloader");
+
+	//Write a magic number into the retained register that will persists over reboots
+	FruityHal::ClearGeneralPurposeRegister(0, 0xffffffff);
+	FruityHal::WriteGeneralPurposeRegister(0, BOOTLOADER_DFU_START);
+
+	FruityHal::ClearGeneralPurposeRegister(1, 0xffffffff);
+	FruityHal::WriteGeneralPurposeRegister(1, BOOTLOADER_DFU_START2);
+
+	// => After rebooting, the bootloader will check this register and will start the DFU process
+
+	return ErrorType::SUCCESS;
+#else
+	return ErrorType::NOT_SUPPORTED;
+#endif
+
+}
+
+//################################################
 #define __________________MISC____________________
 
 
@@ -1904,13 +2170,45 @@ RebootReason FruityHal::GetRebootReason()
 #endif
 }
 
-
-
 //Clears the Reboot reason because the RESETREAS register is cumulative
 u32 FruityHal::ClearRebootReason()
 {
 	sd_power_reset_reason_clr(0xFFFFFFFFUL);
 	return 0;
+}
+
+
+
+u32 FruityHal::ClearGeneralPurposeRegister(u32 gpregId, u32 mask)
+{
+#ifdef NRF52
+	return sd_power_gpregret_clr(gpregId, mask);
+#elif NRF51
+	return sd_power_gpregret_clr(gpregId);
+#else
+	return NRF_SUCCESS;
+#endif
+}
+
+u32 FruityHal::WriteGeneralPurposeRegister(u32 gpregId, u32 mask)
+{
+#ifdef NRF52
+	return sd_power_gpregret_set(gpregId, mask);
+#elif NRF51
+	return sd_power_gpregret_set(gpregId);
+#else
+	return NRF_SUCCESS;
+#endif
+}
+
+bool FruityHal::setRetentionRegisterTwo(u8 val)
+{
+#ifdef NRF52
+	nrf_power_gpregret2_set(val);
+	return true;
+#else
+	return false;
+#endif
 }
 
 //Starts the Watchdog with a static interval so that changing a config can do no harm
@@ -1946,15 +2244,6 @@ void FruityHal::FeedWatchdog()
 #endif
 }
 
-u32 FruityHal::GetBootloaderVersion()
-{
-	if(BOOTLOADER_UICR_ADDRESS != 0xFFFFFFFF){
-		return *(u32*)(BOOTLOADER_UICR_ADDRESS + 1024);
-	} else {
-		return 0;
-	}
-}
-
 void FruityHal::DelayUs(u32 delayMicroSeconds)
 {
 #ifndef SIM_ENABLED
@@ -1964,12 +2253,14 @@ void FruityHal::DelayUs(u32 delayMicroSeconds)
 
 void FruityHal::DelayMs(u32 delayMs)
 {
-#ifndef SIM_ENABLED
-    while(delayMs != 0)
-    {
-    	delayMs--;
-        nrf_delay_us(999);
-    }
+#ifdef NRF51
+	while(delayMs != 0)
+	{
+		delayMs--;
+		nrf_delay_us(999);
+	}
+#else
+	nrf_delay_ms(delayMs);
 #endif
 }
 
@@ -2036,6 +2327,337 @@ extern "C"{
 }
 #endif
 
+
+// ######################### GPIO ############################
+void FruityHal::GpioConfigureOutput(u32 pin)
+{
+	nrf_gpio_cfg_output(pin);
+}
+
+void FruityHal::GpioConfigureInput(u32 pin, GpioPullMode mode)
+{
+	nrf_gpio_cfg_input(pin, GenericPullModeToNrf(mode));
+}
+
+void FruityHal::GpioConfigureDefault(u32 pin)
+{
+	nrf_gpio_cfg_default(pin);
+}
+
+void FruityHal::GpioPinSet(u32 pin)
+{
+	nrf_gpio_pin_set(pin);
+}
+
+void FruityHal::GpioPinClear(u32 pin)
+{
+	nrf_gpio_pin_clear(pin);
+}
+
+void FruityHal::GpioPinToggle(u32 pin)
+{
+	nrf_gpio_pin_toggle(pin);
+}
+
+FruityHal::GpioInterruptHandler GpioHandler = nullptr;
+static void GpioteHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
+{
+	if (GpioHandler == nullptr) return;
+	GpioHandler((u32)pin, NrfPolarityToGeneric(action));
+}
+
+ErrorType FruityHal::GpioConfigureInterrupt(u32 pin, FruityHal::GpioPullMode mode, FruityHal::GpioTransistion trigger, FruityHal::GpioInterruptHandler handler)
+{
+	if (handler == nullptr) return ErrorType::INVALID_PARAM;
+
+	GpioHandler = handler;
+	ErrorType err = ErrorType::SUCCESS;
+	nrf_drv_gpiote_in_config_t in_config;
+	in_config.is_watcher = false;
+	in_config.hi_accuracy = false;
+	in_config.pull = GenericPullModeToNrf(mode);
+	in_config.sense = GenericPolarityToNrf(trigger);
+#if SDK == 15
+	in_config.skip_gpio_setup = 0;
+#endif
+
+	err = nrfErrToGeneric(nrf_drv_gpiote_in_init(pin, &in_config, GpioteHandler));
+	nrf_drv_gpiote_in_event_enable(pin, true);
+
+	return err;
+}
+
+// ######################### ADC ############################
+
+#ifndef SIM_ENABLED
+FruityHal::AdcEventHandler AdcHandler;
+
+#if defined(NRF52)
+void SaadcCallback(nrf_drv_saadc_evt_t const * p_event)
+{
+	if (p_event->type == NRF_DRV_SAADC_EVT_DONE)
+	{
+		AdcHandler();
+	}
+}
+#else
+void AdcCallback(nrf_drv_adc_evt_t const * p_event)
+{
+	if (p_event->type == NRF_DRV_ADC_EVT_DONE)
+	{
+		AdcHandler();
+	}
+}
+#endif
+#endif //SIM_ENABLED
+
+ErrorType FruityHal::AdcInit(AdcEventHandler handler)
+{
+#ifndef SIM_ENABLED
+	if (handler == nullptr) return ErrorType::INVALID_PARAM;
+	AdcHandler = handler;
+
+#if defined(NRF51)
+	ret_code_t err_code;
+	err_code = nrf_drv_adc_init(nullptr,AdcCallback);
+	APP_ERROR_CHECK(err_code);
+#else
+	ret_code_t err_code;
+	err_code = nrf_drv_saadc_init(nullptr,SaadcCallback);
+	APP_ERROR_CHECK(err_code);
+#endif
+#endif //SIM_ENABLED
+	return ErrorType::SUCCESS;
+}
+
+void FruityHal::AdcUninit()
+{
+#ifndef SIM_ENABLED
+#if defined(NRF51)
+	nrf_drv_adc_uninit();
+#else
+	nrf_drv_saadc_uninit();
+#endif
+#endif //SIM_ENABLED
+}
+
+#ifndef SIM_ENABLED
+#ifdef NRF52
+static nrf_saadc_input_t NrfPinToAnalogInput(u32 pin)
+{
+	switch (pin)
+	{
+		case 2:
+			return NRF_SAADC_INPUT_AIN0;
+		case 3:
+			return NRF_SAADC_INPUT_AIN1;
+		case 4:
+			return NRF_SAADC_INPUT_AIN2;
+		case 5:
+			return NRF_SAADC_INPUT_AIN3;
+		case 28:
+			return NRF_SAADC_INPUT_AIN4;
+		case 29:
+			return NRF_SAADC_INPUT_AIN5;
+		case 30:
+			return NRF_SAADC_INPUT_AIN6;
+		case 31:
+			return NRF_SAADC_INPUT_AIN7;
+		case 0xFF:
+			return NRF_SAADC_INPUT_VDD;
+		default:
+			return NRF_SAADC_INPUT_DISABLED;
+	}
+}
+#else
+static nrf_adc_config_input_t NrfPinToAnalogInput(u32 pin)
+{
+	switch (pin)
+	{
+		case 26:
+			return NRF_ADC_CONFIG_INPUT_0;
+		case 27:
+			return NRF_ADC_CONFIG_INPUT_1;
+		case 1:
+			return NRF_ADC_CONFIG_INPUT_2;
+		case 2:
+			return NRF_ADC_CONFIG_INPUT_3;
+		case 3:
+			return NRF_ADC_CONFIG_INPUT_4;
+		case 4:
+			return NRF_ADC_CONFIG_INPUT_5;
+		case 5:
+			return NRF_ADC_CONFIG_INPUT_6;
+		case 6:
+			return NRF_ADC_CONFIG_INPUT_7;
+		default:
+			return NRF_ADC_CONFIG_INPUT_DISABLED;
+	}
+}
+#endif
+#endif //SIM_ENABLED
+
+ErrorType FruityHal::AdcConfigureChannel(u32 pin, AdcReference reference, AdcResoultion resolution, AdcGain gain)
+{
+#ifndef SIM_ENABLED
+#if defined(NRF51)
+	u32 nrfResolution = resolution == FruityHal::AdcResoultion::ADC_8_BIT ? NRF_ADC_CONFIG_RES_8BIT : NRF_ADC_CONFIG_RES_10BIT;
+	u32 nrfGain = NRF_ADC_CONFIG_SCALING_INPUT_FULL_SCALE;
+	u32 nrfReference = NRF_ADC_CONFIG_REF_VBG;
+	switch (reference)
+	{
+		case FruityHal::AdcReference::ADC_REFERENCE_1_2V:
+			nrfReference = NRF_ADC_CONFIG_REF_VBG;
+			break;
+		case FruityHal::AdcReference::ADC_REFERENCE_1_2_POWER_SUPPLY:
+			nrfReference = NRF_ADC_CONFIG_REF_SUPPLY_ONE_HALF;
+			break;
+		case FruityHal::AdcReference::ADC_REFERENCE_1_3_POWER_SUPPLY:
+			nrfReference = NRF_ADC_CONFIG_REF_SUPPLY_ONE_THIRD;
+			break;
+		case FruityHal::AdcReference::ADC_REFERENCE_0_6V:
+		case FruityHal::AdcReference::ADC_REFERENCE_1_4_POWER_SUPPLY:
+			return ErrorType::INVALID_PARAM;
+	}
+	switch (gain)
+	{
+		case FruityHal::AdcGain::ADC_GAIN_1:
+			nrfGain = NRF_ADC_CONFIG_SCALING_INPUT_FULL_SCALE;
+			break;
+		case FruityHal::AdcGain::ADC_GAIN_2_3:
+			nrfGain = NRF_ADC_CONFIG_SCALING_INPUT_TWO_THIRDS;
+			break;
+		case FruityHal::AdcGain::ADC_GAIN_1_3:
+			nrfGain = NRF_ADC_CONFIG_SCALING_INPUT_ONE_THIRD;
+			break;
+		case FruityHal::AdcGain::ADC_GAIN_1_6:
+		case FruityHal::AdcGain::ADC_GAIN_1_5:
+		case FruityHal::AdcGain::ADC_GAIN_1_4:
+		case FruityHal::AdcGain::ADC_GAIN_1_2:
+		case FruityHal::AdcGain::ADC_GAIN_2:
+		case FruityHal::AdcGain::ADC_GAIN_4:
+			return ErrorType::INVALID_PARAM;
+	}
+	nrf_drv_adc_channel_t adc_channel_config;
+	nrf_drv_adc_channel_config_t cct;
+	cct.resolution = nrfResolution;
+	cct.input = nrfGain ;
+	cct.reference = nrfReference;
+	cct.ain = NrfPinToAnalogInput(pin);
+	adc_channel_config.config.config = cct;
+	adc_channel_config.p_next = nullptr;
+	nrf_drv_adc_config_t adc_config;
+	adc_config.interrupt_priority = ADC_CONFIG_IRQ_PRIORITY;             //Get default ADC configuration
+	nrf_drv_adc_channel_enable(&adc_channel_config);                          //Configure and enable an ADC channel
+#endif
+
+//#define NRF52
+#if defined(NRF52)
+	nrf_saadc_resolution_t nrfResolution = resolution == FruityHal::AdcResoultion::ADC_8_BIT ? NRF_SAADC_RESOLUTION_8BIT : NRF_SAADC_RESOLUTION_10BIT;
+	nrf_saadc_gain_t nrfGain = NRF_SAADC_GAIN1_6;
+	nrf_saadc_reference_t nrfReference = NRF_SAADC_REFERENCE_VDD4;
+	switch (reference)
+	{
+		case FruityHal::AdcReference::ADC_REFERENCE_0_6V:
+			nrfReference = NRF_SAADC_REFERENCE_INTERNAL;
+			break;
+		case FruityHal::AdcReference::ADC_REFERENCE_1_4_POWER_SUPPLY:
+			nrfReference = NRF_SAADC_REFERENCE_VDD4;
+			break;
+		case FruityHal::AdcReference::ADC_REFERENCE_1_2V:
+		case FruityHal::AdcReference::ADC_REFERENCE_1_2_POWER_SUPPLY:
+		case FruityHal::AdcReference::ADC_REFERENCE_1_3_POWER_SUPPLY:
+			return ErrorType::INVALID_PARAM;
+	}
+	switch (gain)
+	{
+		case FruityHal::AdcGain::ADC_GAIN_1_6:
+			nrfGain = NRF_SAADC_GAIN1_6;
+			break;
+		case FruityHal::AdcGain::ADC_GAIN_1_5:
+			nrfGain = NRF_SAADC_GAIN1_5;
+			break;
+		case FruityHal::AdcGain::ADC_GAIN_1_4:
+			nrfGain = NRF_SAADC_GAIN1_4;
+			break;
+		case FruityHal::AdcGain::ADC_GAIN_1_3:
+			nrfGain = NRF_SAADC_GAIN1_3;
+			break;
+		case FruityHal::AdcGain::ADC_GAIN_1_2:
+			nrfGain = NRF_SAADC_GAIN1_2;
+			break;
+		case FruityHal::AdcGain::ADC_GAIN_1:
+			nrfGain = NRF_SAADC_GAIN1;
+			break;
+		case FruityHal::AdcGain::ADC_GAIN_2:
+			nrfGain = NRF_SAADC_GAIN2;
+			break;
+		case FruityHal::AdcGain::ADC_GAIN_4:
+			nrfGain = NRF_SAADC_GAIN4;
+			break;
+		case FruityHal::AdcGain::ADC_GAIN_2_3:
+			return ErrorType::INVALID_PARAM;
+	}
+	ret_code_t err_code;
+	nrf_saadc_channel_config_t channel_config;
+
+	channel_config = NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NrfPinToAnalogInput(pin));
+	channel_config.gain = nrfGain;
+	channel_config.reference = nrfReference;
+	err_code = nrf_drv_saadc_channel_init(0, &channel_config);
+	APP_ERROR_CHECK(err_code);
+	nrf_saadc_resolution_set(nrfResolution);
+#endif
+#endif //SIM_ENABLED
+	return ErrorType::SUCCESS;
+}
+
+ErrorType FruityHal::AdcSample(i16 & buffer, u8 len)
+{
+	u32 err = NRF_SUCCESS;
+#ifndef SIM_ENABLED
+#if defined(NRF51)
+	err = nrf_drv_adc_buffer_convert(&buffer, len);
+	if (err == NRF_SUCCESS) nrf_drv_adc_sample();
+#endif
+
+#if defined(NRF52)
+	err = nrf_drv_saadc_buffer_convert(&buffer, len);
+	if (err == NRF_SUCCESS)
+	{
+		err = nrf_drv_saadc_sample(); // Non-blocking triggering of SAADC Sampling
+	} 
+#endif
+#endif //SIM_ENABLED
+	return nrfErrToGeneric(err);
+}
+
+u8 FruityHal::AdcConvertSampleToDeciVoltage(u32 sample)
+{
+#if defined(NRF52)
+constexpr double REF_VOLTAGE_INTERNAL_IN_MILLI_VOLTS = 600; // Maximum Internal Reference Voltage
+constexpr double VOLTAGE_DIVIDER_INTERNAL_IN_MILLI_VOLTS = 166; //Internal voltage divider
+constexpr double ADC_RESOLUTION_10BIT = 1023;
+return sample * REF_VOLTAGE_INTERNAL_IN_MILLI_VOLTS / (VOLTAGE_DIVIDER_INTERNAL_IN_MILLI_VOLTS*ADC_RESOLUTION_10BIT)*10;
+#else
+constexpr int REF_VOLTAGE_IN_MILLIVOLTS = 1200;
+return sample * REF_VOLTAGE_IN_MILLIVOLTS / 1024;
+#endif
+}
+
+u8 FruityHal::AdcConvertSampleToDeciVoltage(u32 sample, u16 voltageDivider)
+{
+#if defined(NRF52)
+constexpr double REF_VOLTAGE_EXTERNAL_IN_MILLI_VOLTS = 825; // Maximum Internal Reference Voltage
+constexpr double VOLTAGE_GAIN_IN_MILLI_VOLTS = 200; //Internal voltage divider
+constexpr double ADC_RESOLUTION_10BIT = 1023;
+double result = sample * (REF_VOLTAGE_EXTERNAL_IN_MILLI_VOLTS/VOLTAGE_GAIN_IN_MILLI_VOLTS) * (1/ADC_RESOLUTION_10BIT) * (voltageDivider);
+return (u8)result;
+#else
+return 0;
+#endif
+}
+
 #define __________________CONVERT____________________
 
 ble_gap_addr_t FruityHal::Convert(const FruityHal::BleGapAddr* address)
@@ -2059,21 +2681,22 @@ FruityHal::BleGapAddr FruityHal::Convert(const ble_gap_addr_t* p_addr)
 	return address;
 }
 
-bool FruityHal::setRetentionRegisterTwo(u8 val)
+u8 FruityHal::ConvertPortToGpio(u8 port, u8 pin)
 {
 #ifdef NRF52
-	nrf_power_gpregret2_set(val);
-	return true;
+	return NRF_GPIO_PIN_MAP(port, pin);
+#elif defined NRF51 || defined SIM_ENABLED
+	return pin;
 #else
-	return false;
+	static_assert(false,"Convertion is not yet defined for this board");
 #endif
 }
 
 void FruityHal::disableHardwareDfuBootloader()
 {
 #ifndef SIM_ENABLED
-	bool bootloaderAvailable = (BOOTLOADER_UICR_ADDRESS != 0xFFFFFFFF);
-	u32 bootloaderAddress = BOOTLOADER_UICR_ADDRESS;
+	bool bootloaderAvailable = (FruityHal::GetBootloaderAddress() != 0xFFFFFFFF);
+	u32 bootloaderAddress = FruityHal::GetBootloaderAddress();
 
 	//Check if a bootloader exists
 	if (bootloaderAddress != 0xFFFFFFFFUL) {
@@ -2290,14 +2913,15 @@ const char* FruityHal::getBleEventNameString(u16 bleEventId)
 #endif
 }
 
-u32 * FruityHal::getUicrDataPtr()
+ErrorType FruityHal::getDeviceConfiguration(DeviceConfiguration & config)
 {
 	//We are using a magic number to determine if the UICR data present was put there by fruitydeploy
 	if (NRF_UICR->CUSTOMER[0] == UICR_SETTINGS_MAGIC_WORD) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-qual"
 		// The following casts away volatile, which is intended behavior and is okay, as the CUSTOMER data won't change during runtime.
-		return (u32*)NRF_UICR->CUSTOMER;
+		CheckedMemcpy(&config, (u32*)NRF_UICR->CUSTOMER, sizeof(DeviceConfiguration));
+		return ErrorType::SUCCESS;
 #pragma GCC diagnostic pop
 	}
 	else if(GS->recordStorage.IsInit()){
@@ -2306,11 +2930,46 @@ u32 * FruityHal::getUicrDataPtr()
 		//which is used the same as if the data were stored in UICR
 		SizedData data = GS->recordStorage.GetRecordData(RECORD_STORAGE_RECORD_ID_UICR_REPLACEMENT);
 		if (data.length >= 16 * 4 && ((u32*)data.data)[0] == UICR_SETTINGS_MAGIC_WORD) {
-			return (u32*)data.data;
+			CheckedMemcpy(&config, (u32*)data.data, sizeof(DeviceConfiguration));
+			return ErrorType::SUCCESS;
 		}
 	}
 
-	return nullptr;
+	return ErrorType::INVALID_STATE;
+}
+
+u32 * FruityHal::GetUserMemoryAddress()
+{
+	return (u32 *)NRF_UICR;
+}
+
+u32 * FruityHal::GetDeviceMemoryAddress()
+{
+	return (u32 *)NRF_FICR;
+}
+
+u32 FruityHal::GetCodePageSize()
+{
+	return NRF_FICR->CODEPAGESIZE;
+}
+
+u32 FruityHal::GetCodeSize()
+{
+	return NRF_FICR->CODESIZE;
+}
+
+u32 FruityHal::GetDeviceId()
+{
+	return NRF_FICR->DEVICEID[0];
+}
+
+void FruityHal::GetDeviceAddress(u8 * p_address)
+{
+	for (u32 i = 0; i < 8; i++)
+	{
+		// Not CheckedMemcpy, as DEVICEADDR is volatile.
+		p_address[i] = ((const volatile u8*)NRF_FICR->DEVICEADDR)[i];
+	}
 }
 
 void FruityHal::disableUart()
@@ -2576,7 +3235,7 @@ static void twi_handler(nrf_drv_twi_evt_t const * pEvent, void * pContext)
 }
 #endif
 
-ErrorType FruityHal::twi_init(u32 sclPin, u32 sdaPin)
+ErrorType FruityHal::twi_init(i32 sclPin, i32 sdaPin)
 {
 	u32 errCode = NRF_SUCCESS;
 #ifndef SIM_ENABLED
@@ -2585,8 +3244,8 @@ ErrorType FruityHal::twi_init(u32 sclPin, u32 sdaPin)
 	// twi.use_easy_dma = TWI_USE_EASY_DMA(TWI_INSTANCE_ID);
 
 	const nrf_drv_twi_config_t twiConfig = {
-			.scl                = sclPin,
-			.sda                = sdaPin,
+			.scl                = (u32)sclPin,
+			.sda                = (u32)sdaPin,
 #if SDK == 15
 			.frequency          = NRF_DRV_TWI_FREQ_250K,
 #else
@@ -2617,33 +3276,33 @@ ErrorType FruityHal::twi_init(u32 sclPin, u32 sdaPin)
 	return nrfErrToGeneric(errCode);
 }
 
-void FruityHal::twi_uninit(u32 sclPin, u32 sdaPin)
+void FruityHal::twi_uninit(i32 sclPin, i32 sdaPin)
 {
 #ifndef SIM_ENABLED
 	nrf_drv_twi_disable(&twi);
 	nrf_drv_twi_uninit(&twi);
-	nrf_gpio_cfg_default(sclPin);
-	nrf_gpio_cfg_default(sdaPin);
+	nrf_gpio_cfg_default((u32)sclPin);
+	nrf_gpio_cfg_default((u32)sdaPin);
 	NRF_TWI1->ENABLE = 0;
 
 	twiInitDone = false;
 #endif
 }
 
-void FruityHal::twi_gpio_address_pin_set_and_wait(bool high, u8 sdaPin)
+void FruityHal::twi_gpio_address_pin_set_and_wait(bool high, i32 sdaPin)
 {
 #ifndef SIM_ENABLED
-	nrf_gpio_cfg_output(sdaPin);
+	nrf_gpio_cfg_output((u32)sdaPin);
 	if (high) {
-		nrf_gpio_pin_set(sdaPin);
+		nrf_gpio_pin_set((u32)sdaPin);
 		nrf_delay_us(200);
 	}
 	else {
-		nrf_gpio_pin_clear(sdaPin);
+		nrf_gpio_pin_clear((u32)sdaPin);
 		nrf_delay_us(200);
 	}
 
-	nrf_gpio_pin_set(sdaPin);
+	nrf_gpio_pin_set((u32)sdaPin);
 #endif
 }
 
@@ -2744,14 +3403,14 @@ void spi_event_handler(nrf_drv_spi_evt_t const * p_event, void* p_context)
 }
 #endif
 
-void FruityHal::spi_init(u8 sckPin, u8 misoPin, u8 mosiPin)
+void FruityHal::spi_init(i32 sckPin, i32 misoPin, i32 mosiPin)
 {
 #ifndef SIM_ENABLED
 	/* Conigure SPI Interface */
 	nrf_drv_spi_config_t spi_config = NRF_DRV_SPI_DEFAULT_CONFIG;
-	spi_config.sck_pin = sckPin;
-	spi_config.miso_pin = misoPin;
-	spi_config.mosi_pin = mosiPin;
+	spi_config.sck_pin = (u32)sckPin;
+	spi_config.miso_pin = (u32)misoPin;
+	spi_config.mosi_pin = (u32)mosiPin;
 	spi_config.frequency = NRF_DRV_SPI_FREQ_4M;
 
 	APP_ERROR_CHECK(nrf_drv_spi_init(&spi, &spi_config, spi_event_handler,NULL));
@@ -2779,7 +3438,7 @@ bool FruityHal::spi_isInitialized(void)
 #endif
 }
 
-ErrorType FruityHal::spi_transfer(u8* const p_toWrite, u8 count, u8* const p_toRead, u8 slaveSelectPin)
+ErrorType FruityHal::spi_transfer(u8* const p_toWrite, u8 count, u8* const p_toRead, i32 slaveSelectPin)
 {
 
 	u32 retVal = NRF_SUCCESS;
@@ -2797,14 +3456,14 @@ ErrorType FruityHal::spi_transfer(u8* const p_toWrite, u8 count, u8* const p_toR
 	{
 		spiXferDone = false;
 
-		nrf_gpio_pin_clear(slaveSelectPin);
+		nrf_gpio_pin_clear((u32)slaveSelectPin);
 		APP_ERROR_CHECK(nrf_drv_spi_transfer(&spi, p_toWrite, count, p_toRead, count));
 		//Locks if run in interrupt context
 		while (!spiXferDone)
 		{
 			sd_app_evt_wait();
 		}
-		nrf_gpio_pin_set(slaveSelectPin);
+		nrf_gpio_pin_set((u32)slaveSelectPin);
 		retVal = NRF_SUCCESS;
 	}
 	else
@@ -2815,12 +3474,12 @@ ErrorType FruityHal::spi_transfer(u8* const p_toWrite, u8 count, u8* const p_toR
 	return nrfErrToGeneric(retVal);
 }
 
-void FruityHal::spi_configureSlaveSelectPin(u32 pin)
+void FruityHal::spi_configureSlaveSelectPin(i32 pin)
 {
 #ifndef SIM_ENABLED
-	nrf_gpio_pin_dir_set(pin, NRF_GPIO_PIN_DIR_OUTPUT);
-	nrf_gpio_cfg_output(pin);
-	nrf_gpio_pin_set(pin);
+	nrf_gpio_pin_dir_set((u32)pin, NRF_GPIO_PIN_DIR_OUTPUT);
+	nrf_gpio_cfg_output((u32)pin);
+	nrf_gpio_pin_set((u32)pin);
 #endif
 }
 #endif // ifndef NRF51

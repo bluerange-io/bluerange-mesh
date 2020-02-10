@@ -188,6 +188,9 @@ void Terminal::PutString(const char* buffer)
 #if IS_ACTIVE(STDIO)
 	Terminal::StdioPutString(buffer);
 #endif
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+	FruityHal::VirtualComWriteData((const u8*)buffer, strlen(buffer));
+#endif
 }
 
 void Terminal::PutChar(const char character)
@@ -262,6 +265,9 @@ void Terminal::CheckAndProcessLine()
 #if IS_ACTIVE(STDIO)
 	StdioCheckAndProcessLine();
 #endif
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+	VirtualComCheckAndProcessLine();
+#endif
 }
 
 //Processes a line (give to all handlers and print response)
@@ -298,6 +304,10 @@ void Terminal::ProcessLine(char* line)
 			handled = currentHandled;
 		}
 	}
+
+#ifdef NRF51
+	if (handled == TerminalCommandHandlerReturnType::WARN_DEPRECATED) handled = TerminalCommandHandlerReturnType::SUCCESS;
+#endif
 
 
 
@@ -349,6 +359,20 @@ void Terminal::ProcessLine(char* line)
 		SIMEXCEPTION(TooFewParameterException);
 #endif
 	}
+
+#if IS_INACTIVE(SAVE_SPACE)
+	else if (handled == TerminalCommandHandlerReturnType::WARN_DEPRECATED)
+	{
+		if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
+		{
+			log_transport_putstring("Warning: Command is marked deprecated!" EOL);
+		}
+		else
+		{
+			logjson_error(Logger::UartErrorType::WARN_DEPRECATED);
+		}
+	}
+#endif
 #endif
 }
 
@@ -500,11 +524,15 @@ void Terminal::UartReadLineBlocking()
 			//Display entered character in terminal
 			UartPutCharBlockingWithTimeout(byteBuffer);
 
-			if (byteBuffer == '\r' || readBufferOffset >= READ_BUFFER_LENGTH - 1)
+			if (byteBuffer == '\r' || readBufferOffset >= TERMINAL_READ_BUFFER_LENGTH - 1)
 			{
 				readBuffer[readBufferOffset] = '\0';
 				UartPutStringBlockingWithTimeout(EOL);
-				if(readBufferOffset > 0) lineToReadAvailable = true;
+				if(readBufferOffset > 0){
+					FruityHal::SetPendingEventIRQ();
+					lineToReadAvailable = true;
+					// => Will then be processed in the main event handler
+				}
 				break;
 			}
 			else
@@ -562,8 +590,6 @@ void Terminal::UartInterruptHandler()
 	{
 		readBufferOffset = 0;
 	}
-
-	//SeggerRttPrintf("> Intrpt, ");
 }
 
 void Terminal::UartHandleInterruptRX(char byte)
@@ -576,10 +602,12 @@ void Terminal::UartHandleInterruptRX(char byte)
 	readBufferOffset++;
 
 	//If the line is finished, it should be processed before additional data is read
-	if(byte == '\r' || readBufferOffset >= READ_BUFFER_LENGTH - 1)
+	if(byte == '\r' || readBufferOffset >= TERMINAL_READ_BUFFER_LENGTH - 1)
 	{
 		readBuffer[readBufferOffset-1] = '\0';
 		lineToReadAvailable = true; //Should be the last statement
+
+		FruityHal::SetPendingEventIRQ();
 		// => next, the main event loop will process the line from the main context
 	}
 	//Otherwise, we keep reading more bytes
@@ -602,7 +630,7 @@ void Terminal::SeggerRttCheckAndProcessLine()
 {
 	if(SEGGER_RTT_HasKey()){
 		int seggerKey = 0;
-		while(seggerKey != '\r' && seggerKey != '\n' && seggerKey != '#' && readBufferOffset < READ_BUFFER_LENGTH - 1){
+		while(seggerKey != '\r' && seggerKey != '\n' && seggerKey != '#' && readBufferOffset < TERMINAL_READ_BUFFER_LENGTH - 1){
 			seggerKey = SEGGER_RTT_GetKey();
 			if(seggerKey < 0) continue;
 			readBuffer[readBufferOffset] = (char)seggerKey;
@@ -619,18 +647,23 @@ void Terminal::SeggerRttCheckAndProcessLine()
 	}
 }
 
-void Terminal::SeggerRttPrintf(const char* message, ...)
-{
-	char tmp[250];
-	CheckedMemset(tmp, 0, 250);
+extern "C" {
+	//This is useful if we need to debug some functionality from c code (define it as extern in your code)
+	void SeggerRttPrintf_c(const char* message, ...)
+	{
+#if (ACTIVATE_SEGGER_RTT == 1)
+		char tmp[250];
+		CheckedMemset(tmp, 0, 250);
 
-	//Variable argument list must be passed to vnsprintf
-	va_list aptr;
-	va_start(aptr, message);
-	vsnprintf(tmp, 250, message, aptr);
-	va_end(aptr);
+		//Variable argument list must be passed to vnsprintf
+		va_list aptr;
+		va_start(aptr, message);
+		vsnprintf(tmp, 250, message, aptr);
+		va_end(aptr);
 
-	SeggerRttPutString(tmp);
+		SEGGER_RTT_WriteString(0, (const char*) tmp);
+#endif
+	}
 }
 
 void Terminal::SeggerRttPutString(const char*message)
@@ -674,7 +707,7 @@ void Terminal::WriteStdioLineToReadBuffer() {
 #ifdef __unix
 	nodelay(stdscr, FALSE);
 #endif
-	for (i = 0; i < READ_BUFFER_LENGTH - 1; i++) {
+	for (i = 0; i < TERMINAL_READ_BUFFER_LENGTH - 1; i++) {
 		int c = fgetc(stdin);
 		if(c == EOF) break;
 
@@ -712,7 +745,7 @@ bool Terminal::PutIntoReadBuffer(const char* message)
 		SIMEXCEPTION(CommandbufferAlreadyInUseException);
 		return false;
 	}
-	if (len >= READ_BUFFER_LENGTH)
+	if (len >= TERMINAL_READ_BUFFER_LENGTH)
 	{
 		SIMEXCEPTION(CommandTooLongException);
 		return false;
@@ -755,3 +788,35 @@ void Terminal::StdioPutString(const char*message)
 }
 
 #endif
+
+//############################ VIRTUAL COM PORT
+#define ________________VIRTUAL_COM_PORT___________________
+
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+
+void Terminal::VirtualComCheckAndProcessLine()
+{
+	//We process up to 5 Lines in the buffer to not starve the rest of the logic
+	for(u32 i = 0; i < 5; i++){
+		//We are using the same buffer that UART is using as we only have to support one of the two at the same time
+		u32 err = FruityHal::VirtualComCheckAndProcessLine((u8*)readBuffer, TERMINAL_READ_BUFFER_LENGTH);
+
+		if(err == NRF_SUCCESS){
+			ProcessLine(readBuffer);
+			readBufferOffset = 0;
+		} else {
+			break;
+		}
+	};
+}
+
+void Terminal::VirtualComPortEventHandler(bool portOpened)
+{
+	//Once the Virtual Com Port is opened by another device, we send the reboot message
+	if(portOpened){
+		Utility::LogRebootJson();
+	}
+}
+#endif
+
+

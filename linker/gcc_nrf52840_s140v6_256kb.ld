@@ -10,5 +10,3 @@ MEMORY
   /* Length was chosen arbitrarily */
   RAM (rwx) :  ORIGIN = 0x20005d98, LENGTH = 0x3a268
 }
-
-INCLUDE "nrf5x_common.ld"

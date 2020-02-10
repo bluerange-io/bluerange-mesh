@@ -28,7 +28,7 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include <FruityHalNrf.h>
-
+#include <Boardconfig.h>
 //PCA10056 - nRF82840 Devkit
 void setBoard_18(BoardConfiguration* c)
 {
@@ -47,7 +47,7 @@ void setBoard_18(BoardConfiguration* c)
 		c->uartBaudRate = UART_BAUDRATE_BAUDRATE_Baud1M;
 		c->dBmRX = -90;
 		c->calibratedTX =  -63;
-		c->lfClockSource = NRF_CLOCK_LF_SRC_XTAL;
+		c->lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_XTAL;
 		c->lfClockSource = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_20_PPM;
 		c->dcDcEnabled = true;
 	}

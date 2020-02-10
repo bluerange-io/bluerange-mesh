@@ -211,7 +211,7 @@ class BaseConnection
 		virtual void ConnectionSuccessfulHandler(u16 connectionHandle);
 		virtual void GapReconnectionSuccessfulHandler(const FruityHal::GapConnectedEvent& connectedEvent);
 		virtual bool GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason);
-		virtual void GATTServiceDiscoveredHandler(ble_db_discovery_evt_t& evt);
+		virtual void GATTServiceDiscoveredHandler(FruityHal::BleGattDBDiscoveryEvent& evt);
 		//Called, once the MTU of the connection was upgraded. The connection can then increase the packet splitting size
 		virtual void ConnectionMtuUpgradedHandler(u16 gattPayloadSize);
 		//Called when data from a connection is received

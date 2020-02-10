@@ -215,7 +215,7 @@ void GAPController::startEncryptingConnection(u16 connectionHandle) const
 
 void GAPController::RequestConnectionParameterUpdate(u16 connectionHandle, u16 minConnectionInterval, u16 maxConnectionInterval, u16 slaveLatency, u16 supervisionTimeout) const
 {
-	u32 err = 0;
+	ErrorType err = ErrorType::SUCCESS;
 
 	FruityHal::BleGapConnParams connParams;
 	CheckedMemset(&connParams, 0x00, sizeof(connParams));
@@ -226,8 +226,8 @@ void GAPController::RequestConnectionParameterUpdate(u16 connectionHandle, u16 m
 
 	//TODO: Check against compatibility with gap connection parameters limits
 	err = FruityHal::BleGapConnectionParamsUpdate(connectionHandle, connParams);
-	if (err != NRF_ERROR_BUSY) {
-		APP_ERROR_CHECK(err);
+	if (err != ErrorType::BUSY) {
+		APP_ERROR_CHECK((u32)err);
 	}
 
 	//TODO: error handling: What if it doesn't work, what if the other side does not agree, etc....

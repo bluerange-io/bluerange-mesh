@@ -1,12 +1,12 @@
 {	
 	"additionalArgs":{
-		"settings":"github",
-		"make":"github",
+		"settings":"github_nrf52",
+		"make":"github_nrf52",
 		"flash":""
 	},
 	"buildSettings":{
 		"environmentVariables":{
-			"FEATURESET":"github"
+			"FEATURESET":"github_nrf52"
 		}
 	},
 	"moduleConfigs":[

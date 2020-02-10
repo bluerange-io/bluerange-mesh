@@ -53,32 +53,32 @@ void LedWrapper::Init(i8 io_num, bool active_high)
 		return;
 	}
 	active = true;
-    m_active_high = active_high;
-    m_io_msk = 1 << io_num;
-    NRF_GPIO->DIRSET = m_io_msk;
 
-    //Initially disable LED
-    Off();
+	m_io_pin = io_num;
+	m_active_high = active_high;
+	FruityHal::GpioConfigureOutput(io_num);
+	//Initially disable LED
+	Off();
 }
 
 void LedWrapper::On(void)
 {
 	if(!active) return;
-    if(m_active_high) NRF_GPIO->OUTSET = m_io_msk;
-    else NRF_GPIO->OUTCLR = m_io_msk;
+		if(m_active_high) FruityHal::GpioPinSet(m_io_pin);
+		else FruityHal::GpioPinClear(m_io_pin);
 }
 
 void LedWrapper::Off(void)
 {
 	if(!active) return;
-    if(m_active_high) NRF_GPIO->OUTCLR = m_io_msk;
-    else NRF_GPIO->OUTSET = m_io_msk;
+		if(m_active_high) FruityHal::GpioPinClear(m_io_pin);
+		else FruityHal::GpioPinSet(m_io_pin);
 }
 
 void LedWrapper::Toggle(void)
 {
 	if(!active) return;
-    NRF_GPIO->OUT ^= m_io_msk;
+		FruityHal::GpioPinToggle(m_io_pin);
 }
 
 /* EOF */

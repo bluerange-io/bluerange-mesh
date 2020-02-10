@@ -11,7 +11,7 @@
 // ** Licensees holding valid commercial Bluerange licenses may use this file in
 // ** accordance with the commercial license agreement provided with the
 // ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
+// ** a written agreement between them and M-Way Solutions GmbH.
 // ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
 // ** information use the contact form at https://www.bluerange.io/contact.
 // **
@@ -27,43 +27,24 @@
 // **
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
+#pragma once
 
+#include "types.h"
 
-#include <AppConnection.h>
-#include <Logger.h>
-
-/**
- * App Connection is the base class for all Connections with Smartphones, etc,..
- * The BaseConnection should provide some generic serialCommunication methods for communicating with
- * rx/tx Characteristics, either via notifications or via write commands / requests
- *
- * @param id
- * @param direction
- */
-
-AppConnection::AppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress)
-	: BaseConnection(id, direction, partnerAddress)
+/*
+* Generates indices for working with arrays in a ring like fashion.
+* Currently only a single pass through the array is supported.
+*/
+class RingIndexGenerator
 {
+private:
+	u32 localIndex = 0;
+	const u32 startIndex;
+	const u32 arrayLength;
 
-}
+public:
+	RingIndexGenerator(u32 startIndex, u32 arrayLength);
 
-//This is the generic method for sending data
-bool AppConnection::SendData(const BaseConnectionSendData &sendData, u8* data)
-{
-	//Print packet as hex
-	char stringBuffer[100];
-	Logger::convertBufferToHexString(data, sendData.dataLength, stringBuffer, sizeof(stringBuffer));
-
-	logt("APP_CONN", "PUT_PACKET:%s", stringBuffer);
-
-	//Put packet in the queue for sending
-	return QueueData(sendData, data);
-}
-
-void AppConnection::PrintStatus()
-{
-	const char* directionString = (direction == ConnectionDirection::DIRECTION_IN) ? "IN " : "OUT";
-
-	trace("%s APP state:%u, Queue:%u-%u(%u), hnd:%u" EOL, directionString, (u32)this->connectionState, (packetSendQueue.readPointer - packetSendQueue.bufferStart), (packetSendQueue.writePointer - packetSendQueue.bufferStart), packetSendQueue._numElements, connectionHandle);
-}
-
+	u32 Next();
+	bool HasNext() const;
+};

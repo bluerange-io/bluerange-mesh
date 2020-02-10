@@ -69,7 +69,7 @@ uint32_t meshAccessConnTypeResolver __attribute__((section(".ConnTypeResolvers")
 #endif
 
 MeshAccessConnection::MeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType)
-	: AppConnection(id, direction, partnerAddress)
+	: BaseConnection(id, direction, partnerAddress)
 {
 	logt("MACONN", "New MeshAccessConnection");
 
@@ -368,6 +368,8 @@ void MeshAccessConnection::HandshakeSNonce(connPacketEncryptCustomANonce* inPack
 	SendClusterState();
 
 	NotifyConnectionStateSubscriber(ConnectionState::HANDSHAKE_DONE);
+
+	logt("MACONN", "Handshake done as Central");
 }
 
 //This method is called by the Peripheral after the SNonce was received
@@ -420,6 +422,8 @@ void MeshAccessConnection::HandshakeDone(connPacketEncryptCustomSNonce* inPacket
 	SendClusterState();
 
 	NotifyConnectionStateSubscriber(ConnectionState::HANDSHAKE_DONE);
+
+	logt("MACONN", "Handshake done as Peripheral");
 }
 
 void MeshAccessConnection::SendClusterState()
@@ -794,7 +798,9 @@ bool MeshAccessConnection::ShouldSendDataToNodeId(NodeId nodeId) const
 		//The range of APP_BASE nodeIds is reserved for smartphones etc. that always connect via MeshAccessConnections
 		|| (nodeId >= NODE_ID_APP_BASE           && nodeId < (NODE_ID_APP_BASE           + NODE_ID_APP_BASE_SIZE ))
 		//Organization wide NodeIds. These are commonly used for assets that connect via MeshAccessConnections
-		|| (nodeId >= NODE_ID_GLOBAL_DEVICE_BASE && nodeId < (NODE_ID_GLOBAL_DEVICE_BASE + NODE_ID_GLOBAL_DEVICE_BASE_SIZE));
+		|| (nodeId >= NODE_ID_GLOBAL_DEVICE_BASE && nodeId < (NODE_ID_GLOBAL_DEVICE_BASE + NODE_ID_GLOBAL_DEVICE_BASE_SIZE))
+		//DFU messages are typically sent to group ids. They must be allowed.
+		|| (nodeId >= NODE_ID_GROUP_BASE && nodeId < (NODE_ID_GROUP_BASE + NODE_ID_GROUP_BASE_SIZE));
 }
 
 
@@ -1048,35 +1054,35 @@ void MeshAccessConnection::ConnectionSuccessfulHandler(u16 connectionHandle)
 
 bool MeshAccessConnection::GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason)
 {
-	bool result = AppConnection::GapDisconnectionHandler(hciDisconnectReason);
+	bool result = BaseConnection::GapDisconnectionHandler(hciDisconnectReason);
 
 	NotifyConnectionStateSubscriber(ConnectionState::DISCONNECTED);
 
 	return result;
 }
 
-void MeshAccessConnection::GATTServiceDiscoveredHandler(ble_db_discovery_evt_t& evt)
+void MeshAccessConnection::GATTServiceDiscoveredHandler(FruityHal::BleGattDBDiscoveryEvent& evt)
 {
-	logt("MACONN", "Service discovered %x", evt.params.discovered_db.srv_uuid.uuid);
+	logt("MACONN", "Service discovered %x", evt.serviceUUID.uuid);
 
 
 	//Once the remote service was discovered, we must register for notifications
-	if(evt.params.discovered_db.srv_uuid.uuid == meshAccessService->serviceUuid.uuid
-		&& evt.params.discovered_db.srv_uuid.type == meshAccessService->serviceUuid.type){
-		for(u32 j=0; j<evt.params.discovered_db.char_count; j++)
+	if(evt.serviceUUID.uuid == meshAccessService->serviceUuid.uuid
+		&& evt.serviceUUID.type == meshAccessService->serviceUuid.type){
+		for(u32 j = 0; j < evt.charateristicsCount; j++)
 		{
 			logt("MACONN", "Found service");
 			//Save a reference to the rx handle of our partner
-			if(evt.params.discovered_db.charateristics[j].characteristic.uuid.uuid == MA_SERVICE_RX_CHARACTERISTIC_UUID)
+			if(evt.dbChar[j].charUUID.uuid == MA_SERVICE_RX_CHARACTERISTIC_UUID)
 			{
-				partnerRxCharacteristicHandle = evt.params.discovered_db.charateristics[j].characteristic.handle_value;
+				partnerRxCharacteristicHandle = evt.dbChar[j].handleValue;
 				logt("MACONN", "Found rx char %u", partnerRxCharacteristicHandle);
 			}
 			//Save a reference to the rx handle of our partner and its CCCD Handle which is needed to enable notifications
-			if(evt.params.discovered_db.charateristics[j].characteristic.uuid.uuid == MA_SERVICE_TX_CHARACTERISTIC_UUID)
+			if(evt.dbChar[j].charUUID.uuid == MA_SERVICE_TX_CHARACTERISTIC_UUID)
 			{
-				partnerTxCharacteristicHandle = evt.params.discovered_db.charateristics[j].characteristic.handle_value;
-				partnerTxCharacteristicCccdHandle = evt.params.discovered_db.charateristics[j].cccd_handle;
+				partnerTxCharacteristicHandle = evt.dbChar[j].handleValue;
+				partnerTxCharacteristicCccdHandle = evt.dbChar[j].cccdHandle;
 				logt("MACONN", "Found tx char %u with cccd %u", partnerTxCharacteristicHandle, partnerTxCharacteristicCccdHandle);
 			}
 		}

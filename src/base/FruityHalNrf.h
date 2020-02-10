@@ -30,7 +30,6 @@
 #pragma once
 
 #include <FruityHal.h>
-
 extern "C"{
 #include <ble.h>
 #include <ble_gap.h>
@@ -55,5 +54,4 @@ extern "C"{
 #if defined(NRF51) || defined(SIM_ENABLED)
 #include <softdevice_handler.h>
 #endif
-
 }

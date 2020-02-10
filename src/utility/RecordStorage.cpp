@@ -70,7 +70,9 @@
 #include <Utility.h>
 #include <Logger.h>
 #include <GlobalState.h>
+#include <FruityHal.h>
 
+#define TO_PAGE(addr) (u32)(((((u32)(addr)) - FLASH_REGION_START_ADDRESS)/FruityHal::GetCodePageSize()))
 
 RecordStorage::RecordStorage()
 	: opQueue(opBuffer, RECORD_STORAGE_QUEUE_SIZE)
@@ -255,7 +257,7 @@ void RecordStorage::SaveRecordInternal(SaveRecordOperation& op)
 			for (u32 i = 0; i < RECORD_STORAGE_NUM_PAGES; i++) {
 				RecordStoragePage& page = getPage(i);
 				u16 freeSpaceAfterDefragment = GetFreeSpaceWhenDefragmented(page);
-				logt("ERROR", "freeSpace in page %u: %u", ((u32)&page - (u32)FLASH_REGION_START_ADDRESS) / (u32)PAGE_SIZE, freeSpaceAfterDefragment);
+				logt("ERROR", "freeSpace in page %u: %u", ((u32)&page - (u32)FLASH_REGION_START_ADDRESS) / (u32)FruityHal::GetCodePageSize(), freeSpaceAfterDefragment);
 			}
 
 			return RecordOperationFinished(op.op, RecordStorageResultCode::NO_SPACE);
@@ -358,7 +360,7 @@ void RecordStorage::RepairPages()
 			RecordStoragePageState pageState = GetPageState(page);
 
 			if (pageState == RecordStoragePageState::CORRUPT) {
-				GS->flashStorage.ErasePage(((u32)&page - FLASH_REGION_START_ADDRESS) / PAGE_SIZE, nullptr, (u32)FlashUserTypes::DEFAULT);
+				GS->flashStorage.ErasePage(((u32)&page - FLASH_REGION_START_ADDRESS) / FruityHal::GetCodePageSize(), nullptr, (u32)FlashUserTypes::DEFAULT);
 				return;
 			}
 		}
@@ -385,7 +387,7 @@ void RecordStorage::RepairPages()
 			}
 
 			//Clear the swap page
-			GS->flashStorage.ErasePage(((u32)swapPage - FLASH_REGION_START_ADDRESS) / PAGE_SIZE, nullptr, (u32)FlashUserTypes::DEFAULT);
+			GS->flashStorage.ErasePage(((u32)swapPage - FLASH_REGION_START_ADDRESS) / FruityHal::GetCodePageSize(), nullptr, (u32)FlashUserTypes::DEFAULT);
 			return;
 		}
 
@@ -443,7 +445,7 @@ void RecordStorage::RepairPages()
 				//Now, we must check that the rest of the page is clean
 				u32* pageData = (u32*)&page;
 				u32 freeSpaceOffset = ((u32)record) - ((u32)pageData);
-				for(u32 j=freeSpaceOffset; j<PAGE_SIZE; j+=sizeof(u32)){
+				for(u32 j=freeSpaceOffset; j<FruityHal::GetCodePageSize(); j+=sizeof(u32)){
 					if(pageData[j/4] != 0xFFFFFFFF){
 						repairStage = RepairStage::FINALIZE;
 						logt("RS", "Corruption after record detected, defragmenting");
@@ -507,7 +509,7 @@ void RecordStorage::DefragmentPage(RecordStoragePage& pageToDefragment, bool for
 			return;
 		}
 
-		logt("RS", "Defragmenting Page %u (free %u, after %u)", ((u32)defragmentPage - (u32)FLASH_REGION_START_ADDRESS) / (u32)PAGE_SIZE, GetFreeSpaceOnPage(*defragmentPage), GetFreeSpaceWhenDefragmented(*defragmentPage));
+		logt("RS", "Defragmenting Page %u (free %u, after %u)", ((u32)defragmentPage - (u32)FLASH_REGION_START_ADDRESS) / (u32)FruityHal::GetCodePageSize(), GetFreeSpaceOnPage(*defragmentPage), GetFreeSpaceWhenDefragmented(*defragmentPage));
 	}
 
 	//If there are items in the flashStorage queue, we wait until we get called after the queue is empty
@@ -590,7 +592,7 @@ void RecordStorage::DefragmentPage(RecordStoragePage& pageToDefragment, bool for
 	else if (defragmentationStage == DefragmentationStage::ERASE_OLD_PAGE)
 	{
 		//Finally, erase the page that we just swapped
-		GS->flashStorage.ErasePage(((u32)defragmentPage - FLASH_REGION_START_ADDRESS) / PAGE_SIZE, this, (u32)FlashUserTypes::DEFAULT);
+		GS->flashStorage.ErasePage(((u32)defragmentPage - FLASH_REGION_START_ADDRESS) / FruityHal::GetCodePageSize(), this, (u32)FlashUserTypes::DEFAULT);
 
 		defragmentationStage = DefragmentationStage::FINALIZE;
 	}
@@ -669,7 +671,7 @@ RecordStoragePage& RecordStorage::getPage(u32 index) const
 	{
 		SIMEXCEPTION(IllegalStateException);
 	}
-	return *(RecordStoragePage*)(startPage + PAGE_SIZE * index);
+	return *(RecordStoragePage*)(startPage + FruityHal::GetCodePageSize() * index);
 }
 
 //Will return only the data of the record and will return nullptr if record has been deactivated
@@ -748,7 +750,7 @@ u8* RecordStorage::GetFreeRecordSpace(u16 dataLength) const
 		}
 
 		//Check if we have enough space left till the end of the page
-		if((u32)record - (u32)&page + dataLength <= PAGE_SIZE){
+		if((u32)record - (u32)&page + dataLength <= FruityHal::GetCodePageSize()){
 			return (u8*)record;
 		}
 	}
@@ -767,7 +769,7 @@ u16 RecordStorage::GetFreeSpaceOnPage(const RecordStoragePage& page) const
 		record = (const RecordStorageRecord*)((const u8*)record + record->recordLength);
 	}
 
-	return (PAGE_SIZE - ((u32)record - (u32)&page));
+	return (FruityHal::GetCodePageSize() - ((u32)record - (u32)&page));
 }
 
 //Calculates the free storage that would be available when defragmenting the page
@@ -792,7 +794,7 @@ u16 RecordStorage::GetFreeSpaceWhenDefragmented(const RecordStoragePage& page) c
 		record = (const RecordStorageRecord*)((const u8*)record + record->recordLength);
 	}
 
-	return (PAGE_SIZE - usedSpace);
+	return (FruityHal::GetCodePageSize() - usedSpace);
 }
 
 RecordStoragePage* RecordStorage::GetSwapPage() const
@@ -813,7 +815,7 @@ RecordStoragePage* RecordStorage::GetSwapPage() const
 bool RecordStorage::IsRecordValid(const RecordStoragePage& page, RecordStorageRecord const * record) const
 {
 	//Check if length is within page boundaries
-	if(record == nullptr || ((u32)record - (u32)&page) + record->recordLength > PAGE_SIZE){
+	if(record == nullptr || ((u32)record - (u32)&page) + record->recordLength > FruityHal::GetCodePageSize()){
 		return false;
 	}
 
@@ -834,7 +836,7 @@ RecordStoragePageState RecordStorage::GetPageState(const RecordStoragePage& page
 		return RecordStoragePageState::ACTIVE;
 	}
 
-	for(u32 i=0; i<PAGE_SIZE/sizeof(u32); i++){
+	for(u32 i=0; i<FruityHal::GetCodePageSize()/sizeof(u32); i++){
 		if(((const u32*)&page)[i] != 0xFFFFFFFF){
 			return RecordStoragePageState::CORRUPT;
 		}

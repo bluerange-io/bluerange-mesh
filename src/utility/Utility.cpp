@@ -36,12 +36,13 @@
 #include <cctype>
 #include <limits>
 #include "GlobalState.h"
+#include <FruityHal.h>
 
 u32 Utility::GetSettingsPageBaseAddress()
 {
-	const bool bootloaderAvailable = (BOOTLOADER_UICR_ADDRESS != 0xFFFFFFFF);
-	const u32 bootloaderAddress = bootloaderAvailable ? BOOTLOADER_UICR_ADDRESS : FLASH_SIZE;
-	const u32 appSettingsAddress = bootloaderAddress - (RECORD_STORAGE_NUM_PAGES)* PAGE_SIZE;
+	const bool bootloaderAvailable = (FruityHal::GetBootloaderAddress() != 0xFFFFFFFF);
+	const u32 bootloaderAddress = bootloaderAvailable ? FruityHal::GetBootloaderAddress() : FruityHal::GetCodeSize()*FruityHal::GetCodePageSize();
+	const u32 appSettingsAddress = bootloaderAddress - (RECORD_STORAGE_NUM_PAGES)* FruityHal::GetCodePageSize();
 
 	return (appSettingsAddress);
 }
@@ -169,6 +170,11 @@ u32 Utility::ByteFromAsciiHex(char* asciiHex, u8 numChars){
 	return result;
 }
 
+void Utility::LogRebootJson()
+{
+	logjson("MAIN", "{\"type\":\"reboot\",\"reason\":%u,\"code1\":%u,\"stack\":%u,\"version\":%u,\"blversion\":%u}" SEP, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1, GS->ramRetainStructPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion());
+}
+
 bool Utility::Contains(const u8 * data, const u32 length, const u8 searchValue)
 {
 	return memchr(data, searchValue, length) != nullptr;
@@ -189,12 +195,21 @@ NodeId Utility::TerminalArgumentToNodeId(const char * arg)
 	}
 
 	// Special target values
-	if (strcmp(arg, "this") == 0) return GS->node.configuration.nodeId;
+	if (strcmp(arg, "this")     == 0) return GS->node.configuration.nodeId;
+	if (strcmp(arg, "max_hops") == 0) return NODE_ID_HOPS_BASE + NODE_ID_HOPS_BASE_SIZE - 1;
 
 	bool didError = false;
 	NodeId retVal = Utility::StringToU16(arg, &didError);
 	if (didError) return NODE_ID_INVALID;
 	return retVal;
+}
+
+bool Utility::IsUnknownRebootReason(RebootReason rebootReason)
+{
+	return (
+		   rebootReason == RebootReason::UNKNOWN 
+		|| rebootReason == RebootReason::UNKNOWN_BUT_BOOTED
+		);
 }
 
 long Utility::StringToLong(const char *str, bool *outDidError)

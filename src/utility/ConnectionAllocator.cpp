@@ -84,12 +84,14 @@ MeshAccessConnection * ConnectionAllocator::allocateMeshAccessConnection(u8 id, 
 	return retVal;
 }
 #if IS_ACTIVE(CLC_CONN)
+#ifndef GITHUB_RELEASE
 ClcAppConnection * ConnectionAllocator::allocateClcAppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr * partnerAddress)
 {
 	ClcAppConnection* retVal = reinterpret_cast<ClcAppConnection*>(allocateMemory());
 	new (retVal) ClcAppConnection(id, direction, partnerAddress);
 	return retVal;
 }
+#endif //GITHUB_RELEASE
 #endif
 
 void ConnectionAllocator::deallocate(BaseConnection * bc)

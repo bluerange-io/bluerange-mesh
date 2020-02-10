@@ -36,6 +36,7 @@
 #pragma once
 
 #include <types.h>
+#include <Config.h>
 #include <FruityHal.h>
 #include "SimpleArray.h"
 
@@ -74,9 +75,6 @@ struct AdvData {
 	u8 scanData[31];
 	u8 scanDataLength;
 };
-
-
-constexpr int ADVERTISING_CONTROLLER_MAX_NUM_JOBS = 4;
 
 class AdvertisingController
 {

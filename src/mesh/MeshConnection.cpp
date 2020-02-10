@@ -533,7 +533,7 @@ void MeshConnection::StartHandshake()
 	u32 err = GS->cm.RequestDataLengthExtensionAndMtuExchange(this);
 
 	//If we could not upgrade the MTU, we continue with our handshake
-	if(err != NRF_SUCCESS){
+	if(err != (u32)ErrorType::SUCCESS){
 		GS->logger.logCustomError(CustomErrorTypes::WARN_MTU_UPGRADE_FAILED, err);
 
 		ConnectionMtuUpgradedHandler(MAX_DATA_SIZE_PER_WRITE);
@@ -802,7 +802,7 @@ void MeshConnection::SendReconnectionHandshakePacket()
 	u32 err = GS->cm.RequestDataLengthExtensionAndMtuExchange(this);
 
 	//If we could not upgrade the MTU, we continue with our handshake
-	if(err != NRF_SUCCESS){
+	if(err != (u32)ErrorType::SUCCESS){
 		GS->logger.logCustomError(CustomErrorTypes::WARN_MTU_UPGRADE_FAILED, err);
 
 		ConnectionMtuUpgradedHandler(MAX_DATA_SIZE_PER_WRITE);

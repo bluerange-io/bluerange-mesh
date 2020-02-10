@@ -37,6 +37,9 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+
+// ##### This file was modified from its original SDK version, changes are marked as MODIFIED in the code ############
+
 /** @file
  * @brief Utilities for verifying program logic
  */
@@ -108,9 +111,10 @@ if (NRF_ASSERT_PRESENT)                                                       \
     }                                                                         \
     else                                                                      \
     {                                                                         \
-        assert_nrf_callback((uint16_t)__LINE__, (uint8_t *)__FILE__);         \
+        assert_nrf_callback((uint16_t)__LINE__, (const uint8_t *)__FILE__);         \
     }                                                                         \
 }
+//MODIFICATION: const was added above to be const correct
 
 #endif
 

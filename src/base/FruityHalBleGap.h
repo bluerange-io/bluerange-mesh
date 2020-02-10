@@ -32,8 +32,7 @@
 
 
 //TODO: types.h should not include references to nrf sdk
-#include <types.h>
-
+#include "types.h"
 
 #define _________________GAP_DEFINITIONS______________________
 

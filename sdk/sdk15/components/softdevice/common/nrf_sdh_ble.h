@@ -131,7 +131,8 @@ NRF_SECTION_SET_ITEM_REGISTER(sdh_ble_observers, _prio, static nrf_sdh_ble_evt_o
 
 
 /**@brief   BLE stack event handler. */
-typedef void (*nrf_sdh_ble_evt_handler_t)(ble_evt_t const * p_ble_evt, void * p_context);
+//FIXME: IOT-3225: add const and add const correctness to all places in Fruitymesh, then revert this change
+typedef void (*nrf_sdh_ble_evt_handler_t)(ble_evt_t /*const*/ * p_ble_evt, void * p_context);
 
 /**@brief   BLE event observer. */
 typedef struct

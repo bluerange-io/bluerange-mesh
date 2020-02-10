@@ -31,7 +31,7 @@
 #pragma once
 
 #include <types.h>
-#include <AppConnection.h>
+#include <BaseConnection.h>
 
 class MeshAccessModule;
 struct MeshAccessServiceStruct;
@@ -61,7 +61,7 @@ STATIC_ASSERT_SIZE(DeadDataMessage, 13);
 #pragma pack(pop)
 
 class MeshAccessConnection
-		: public AppConnection
+		: public BaseConnection
 {
 
 private:
@@ -159,7 +159,7 @@ public:
 	/*############### Handler ##################*/
 	void ConnectionSuccessfulHandler(u16 connectionHandle) override;
 	bool GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason) override;
-	void GATTServiceDiscoveredHandler(ble_db_discovery_evt_t &evt) override;
+	void GATTServiceDiscoveredHandler(FruityHal::BleGattDBDiscoveryEvent &evt) override;
 
 	void PrintStatus() override;
 

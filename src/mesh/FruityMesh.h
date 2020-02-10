@@ -37,6 +37,7 @@
 
 #include <types.h>
 #include <Config.h>
+#include <FruityHal.h>
 
 //FruityMesh
 void BootFruityMesh();
@@ -44,13 +45,24 @@ void BootModules();
 void StartFruityMesh();
 
 //Event dispatchers
-void DispatchSystemEvents(u32 sys_evt);
+void DispatchSystemEvents(FruityHal::SystemEvents sys_evt);
 #if IS_ACTIVE(BUTTONS)
 void DispatchButtonEvents(u8 buttonId, u32 buttonHoldTime);
 #endif
-void DispatchRadioEvents(bool radioActive);
 void DispatchTimerEvents(u16 passedTimeDs);
-void DispatchUartInterrupt();
+
+void DispatchEvent(const FruityHal::GapRssiChangedEvent& e);
+void DispatchEvent(const FruityHal::GapAdvertisementReportEvent& e);
+void DispatchEvent(const FruityHal::GapConnectedEvent& e);
+void DispatchEvent(const FruityHal::GapDisconnectedEvent& e);
+void DispatchEvent(const FruityHal::GapTimeoutEvent& e);
+void DispatchEvent(const FruityHal::GapSecurityInfoRequestEvent& e);
+void DispatchEvent(const FruityHal::GapConnectionSecurityUpdateEvent& e);
+void DispatchEvent(const FruityHal::GattcWriteResponseEvent& e);
+void DispatchEvent(const FruityHal::GattcTimeoutEvent& e);
+void DispatchEvent(const FruityHal::GattsWriteEvent& e);
+void DispatchEvent(const FruityHal::GattcHandleValueEvent& e);
+void DispatchEvent(const FruityHal::GattDataTransmittedEvent& e);
 
 //Error handlers
 void FruityMeshErrorHandler(u32 err);

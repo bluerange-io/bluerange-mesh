@@ -24,13 +24,7 @@ The tools come with a bundled installation of the Segger Utilities, which are ne
 You should add the *bin/* folder of the installation to your operating system PATH variable to make development easier.
 
 === Flash SoftDevice & Application
-Plug in your nrf51 or nrf52 development board via USB, then open a command prompt in the FruityMesh folder and type in the following command for flashing the nrf51 version:
-
-----
-C:/<path_to_nrfjprog>/nrfjprog.exe --chiperase --program binary/fruitymesh_nrf51_s130.hex --reset
-----
-
-or the following for nrf52:
+Plug in your nrf52 development board via USB, then open a command prompt in the FruityMesh folder and type in the following command for flashing:
 
 ----
 C:/<path_to_nrfjprog>/nrfjprog.exe --chiperase --program binary/fruitymesh_nrf52_s132.hex --reset
@@ -58,6 +52,12 @@ Unzip the downloaded package into a folder of your choice.
 
 WARNING: Do not choose a newer version, as this might fail to compile.
 
+==== Installing CMake
+
+Download and install the latest Version of CMake:
+
+https://cmake.org/download/
+
 ==== Tools Installation (Windows Only)
 Next, if you are working on windows, you have to download and install some unix utilities, the GNU ARM Eclipse Build Tools. This includes _make_, _sh_, _rm_ and some others. Version 2.4 has been tested successfully and the executable installer can be downloaded from here:
 
@@ -76,40 +76,37 @@ http://gnuwin32.sourceforge.net/downlinks/coreutils-dep-zip.php
 Finally, you should add the bin folders of the gnu buildtools and the `bin` folder of `gcc-arm-embedded` to your PATH variable under System Environment. This will make sure that you can access these tools from anywhere.
 
 ==== Project Configuration
-The last step, before you can build the project is to duplicate `Makefile.local.template` and name it `Makefile.local`.
+Create a new sibling directory next to FruityMesh and navigate your Command Line in this newly created directory. Execute the following command within that directory:
 
-Open Makefile.local and give the correct path to your _gcc_ installation:
+`cmake ../fruitymesh -DBUILD_FEATURESETS=ON -DGCC_PATH="C:/path/to/gcc-arm-none-eabi-4_9" -G "Unix Makefiles"`
 
-----
-FRUITYMESH_GNU_INSTALL_ROOT := C:/<path_to_gcc-arm-embedded-4.9>
-----
+WARNING: The GCC_PATH must be specified using forward slashes ("/"), not backward slashes ("\").
 
-You can also specify the PLATFORM (NRF51 or NRF52) and give a different xref:Features.adoc[Featureset] for the build.
+Replace the GCC_PATH according to the location where you installed GCC 4.9. This will generate a Makefile which is possible to be used for building.
 
-Next, open a command prompt in the FruityMesh folder and type:
+You could directly interact with the Makefile, but the preferred way is to use CMake for this step as well:
 
-----
-make
-----
+`cmake --build . --target github_nrf52`
 
-If everything was set up correctly and the location of make was correctly entered in the `PATH` variable of your operating system, everything should build.
+For the target, any other xref:Features.adoc[Featureset] may be used as well.
 
 If you installed the nRF Command Line Tools and properly configured the `PATH`, you can now type:
 
 ----
-make flash
+`cmake --build . --target github_nrf52_flash`
 ----
 
-to flash the firmware on a device.
+to flash the firmware on a device. This also works with any other xref:Features.adoc[Featureset] by appending "_flash" to the name.
 
 TIP: The safest and most straight forward setup for flashing is to only have a single board connected to the computer while flashing.
 
 ==== Using Eclipse For Development
 image:eclipsescreen.png[eclipsescreenshot]
 
-Eclipse is a good development IDE for FruityMesh. The project settings are already included and all you have to do is download GNU MCU Eclipse, which already contains the necessary plugins for Embedded Development from here:
+Eclipse is a good development IDE for FruityMesh. To generate the project settings, execute the following command in a sibling directory: 
 
-https://github.com/gnu-mcu-eclipse/org.eclipse.epp.packages/releases
+`cmake ../fruitymesh -DBUILD_FEATURESETS=ON -DGCC_PATH="C:/path/to/gcc-arm-none-eabi-4_9" -G "Eclipse CDT4 - Unix Makefiles"`
+
 
 After starting Eclipse, all you have to do is to import the FruityMesh project. You can then develop, flash and debug in a comfortable way.
 

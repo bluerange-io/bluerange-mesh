@@ -62,9 +62,9 @@ class IoModule: public Module
 		static constexpr int SIZEOF_GPIO_PIN_CONFIG = 2;
 		struct gpioPinConfig{
 			u8 pinNumber : 5;
-			u8 direction : 1; //configure pin as either input or output (nrf_gpio_pin_dir_t)
+			u8 direction : 1; //configure pin as either input (0) or output (1) 
 			u8 inputBufferConnected : 1; //disconnect input buffer when port not used to save energy
-			u8 pull : 2; //pull down (1) or up (3) or disable pull (0) on pin (nrf_gpio_pin_pull_t)
+			u8 pull : 2; //pull down (1) or up (2) or disable pull (0) on pin (GpioPullMode)
 			u8 driveStrength : 3; // GPIO_PIN_CNF_DRIVE_*
 			u8 sense : 2; // if configured as input sense either high or low level
 			u8 set : 1; // set pin or unset it

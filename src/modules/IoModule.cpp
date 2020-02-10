@@ -246,15 +246,11 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
 				{
 					gpioPinConfig* pinConfig = (gpioPinConfig*)(packet->data + i);
 
-					NRF_GPIO->PIN_CNF[pinConfig->pinNumber] =
-							  (pinConfig->sense << GPIO_PIN_CNF_SENSE_Pos)
-					        | (pinConfig->driveStrength << GPIO_PIN_CNF_DRIVE_Pos)
-					        | (pinConfig->pull << GPIO_PIN_CNF_PULL_Pos)
-					        | (pinConfig->inputBufferConnected << GPIO_PIN_CNF_INPUT_Pos)
-					        | (pinConfig->direction << GPIO_PIN_CNF_DIR_Pos);
+					if (pinConfig->direction == 0) FruityHal::GpioConfigureInput(pinConfig->pinNumber, (FruityHal::GpioPullMode)pinConfig->pull);
+					else FruityHal::GpioConfigureOutput(pinConfig->pinNumber);
 
-					if(pinConfig->set) NRF_GPIO->OUTSET = (1UL << pinConfig->pinNumber);
-					else NRF_GPIO->OUTCLR = (1UL << pinConfig->pinNumber);
+					if(pinConfig->set) FruityHal::GpioPinSet(pinConfig->pinNumber);
+					else FruityHal::GpioPinClear(pinConfig->pinNumber);
 				}
 
 				//Confirmation

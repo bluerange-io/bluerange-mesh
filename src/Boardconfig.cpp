@@ -28,6 +28,7 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
+#include <types.h>
 #include <Boardconfig.h>
 #include <Config.h>
 #include <GlobalState.h>
@@ -41,20 +42,21 @@ extern void setBoard_19(BoardConfiguration* c);
 
 void* fmBoardConfigPtr;
 
+Boardconf::Boardconf()
+{
+	CheckedMemset(&configuration, 0x00, sizeof(configuration));
+}
+
 void Boardconf::ResetToDefaultConfiguration()
 {
-	configuration.moduleId = ModuleId::BOARD_CONFIG;
-	configuration.moduleVersion = 1;
-	configuration.moduleActive = true;
-
 	//Set a default boardType for all different platforms in case we do not have the boardType in UICR
 	configuration.boardType = BOARD_TYPE;
 
-
-	//If there is data in the UICR, we use the boardType from there
-	u32* uicrData = FruityHal::getUicrDataPtr();
-	if (uicrData != nullptr) {
-		if (uicrData[1] != EMPTY_WORD) configuration.boardType = uicrData[1];
+	DeviceConfiguration config;
+	//If there is data in the DeviceConfiguration, we use the boardType from there
+	ErrorType err = FruityHal::getDeviceConfiguration(config);
+	if (err == ErrorType::SUCCESS) {
+		if (config.boardType != EMPTY_WORD) configuration.boardType = config.boardType;
 	}
 
 	//Set everything else to safe defaults
@@ -71,20 +73,10 @@ void Boardconf::ResetToDefaultConfiguration()
 	configuration.uartBaudRate = UART_BAUDRATE_BAUDRATE_Baud1M;
 	configuration.dBmRX = -90;
 	configuration.calibratedTX = -60;
-	configuration.lfClockSource = NRF_CLOCK_LF_SRC_RC;
+	configuration.lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_RC;
 	configuration.lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_500_PPM; //Use a safe default if this is not given
 	configuration.batteryAdcInputPin = -1;
 	configuration.batteryMeasurementEnablePin = -1;
-	configuration.spiM0SckPin = -1;
-	configuration.spiM0MosiPin = -1;
-	configuration.spiM0MisoPin = -1;
-	configuration.spiM0SSAccPin = -1;
-	configuration.spiM0SSBmePin = -1;
-	configuration.twiM1SCLAccPin = -1;
-	configuration.twiM1SDAAccPin = -1;
-	configuration.twiM1SCLPin = -1;
-	configuration.twiM1SDAPin = -1;
-	configuration.lis2dh12Interrupt1Pin = -1;
 	configuration.voltageDividerR1 = 0;
 	configuration.voltageDividerR2 = 0;
 	configuration.dcDcEnabled = false;
@@ -96,12 +88,14 @@ void Boardconf::ResetToDefaultConfiguration()
 	setBoard_18(&configuration);
 
 #ifdef SIM_ENABLED
+#ifndef GITHUB_RELEASE
 	setBoard_19(&configuration);
+#endif //GITHUB_RELEASE
 #endif
 
 	//We call our featureset to check if additional boards are available and if they should be set
 	//Each featureset can include a number of boards that it can run on
-	SET_FEATURESET_CONFIGURATION(&configuration, this);
+	SET_BOARD_CONFIGURATION(&configuration);
 }
 
 Boardconf & Boardconf::getInstance()

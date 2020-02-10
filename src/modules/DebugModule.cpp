@@ -43,11 +43,15 @@
 constexpr u8 DEBUG_MODULE_CONFIG_VERSION = 2;
 
 #if IS_ACTIVE(EINK_MODULE)
+#ifndef GITHUB_RELEASE
 #include "EinkModule.h"
+#endif //GITHUB_RELEASE
 #endif
 
 #if IS_ACTIVE(ASSET_MODULE)
+#ifndef GITHUB_RELEASE
 #include <AssetModule.h>
+#endif //GITHUB_RELEASE
 #endif
 
 #include <climits>
@@ -563,8 +567,8 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 		u16 blockSize = 1024;
 
 		u32 offset = FLASH_REGION_START_ADDRESS;
-		if(TERMARGS(1, "uicr")) offset = (u32)NRF_UICR;
-		if(TERMARGS(1, "ficr")) offset = (u32)NRF_FICR;
+		if(TERMARGS(1, "uicr")) offset = (u32)FruityHal::GetUserMemoryAddress();
+		if(TERMARGS(1, "ficr")) offset = (u32)FruityHal::GetDeviceMemoryAddress();
 		if(TERMARGS(1, "ram")) offset = (u32)0x20000000;
 
 		u16 numBlocks = 1;
@@ -594,7 +598,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 	{
 		u32 offset = FLASH_REGION_START_ADDRESS;
 		u16 blockSize = 1024; //Size of a memory block to check
-		u16 numBlocks = NRF_FICR->CODESIZE * NRF_FICR->CODEPAGESIZE / blockSize;
+		u16 numBlocks = FruityHal::GetCodeSize() * FruityHal::GetCodePageSize() / blockSize;
 
 		for(u32 j=0; j<numBlocks; j++){
 			u32 buffer = 0xFFFFFFFF;

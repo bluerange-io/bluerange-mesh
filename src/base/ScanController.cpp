@@ -199,6 +199,18 @@ void ScanController::ScanningHasStopped()
 	scanStateOk = false;
 }
 
+#ifdef SIM_ENABLED
+int ScanController::GetAmountOfJobs()
+{
+	return jobs.length;
+}
+
+ScanJob * ScanController::GetJob(int index)
+{
+	return jobs.getRaw() + index;
+}
+#endif //SIM_ENABLED
+
 //If a BLE event occurs, this handler will be called to do the work
 bool ScanController::ScanEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) const
 {

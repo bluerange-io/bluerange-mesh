@@ -59,10 +59,8 @@ public:
 
 	u32 DiscoverService(u16 connHandle, const FruityHal::BleGattUuid &p_uuid);
 
-	ble_db_discovery_t discoveredServices;
-
 private:
 
-	static void ServiceDiscoveryDoneDispatcher(ble_db_discovery_evt_t *p_evt);
+	static void ServiceDiscoveryDoneDispatcher(FruityHal::BleGattDBDiscoveryEvent *p_evt);
 
 };

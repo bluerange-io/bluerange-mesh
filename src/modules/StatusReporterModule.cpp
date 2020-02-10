@@ -151,6 +151,7 @@ void StatusReporterModule::SendDeviceInfoV2(NodeId toNode, u8 requestHandle, Mes
 
 	data.manufacturerId = RamConfig->manufacturerId;
 	data.deviceType = GET_DEVICE_TYPE();
+	FruityHal::GetDeviceAddress(data.chipId);
 	for (u32 i = 0; i < sizeof(data.chipId); i++)
 	{
 		// Not CheckedMemcpy, as DEVICEADDR is volatile.
@@ -322,13 +323,9 @@ void StatusReporterModule::StartConnectionRSSIMeasurement(MeshConnection& connec
 		connection.lastReportedRssi = 0;
 		connection.rssiAverageTimes1000 = 0;
 
-		err = FruityHal::BleGapRssiStart(connection.connectionHandle, 2, 7);
-		if(err == NRF_ERROR_INVALID_STATE || err == BLE_ERROR_INVALID_CONN_HANDLE){
-			//Both errors are due to a disconnect and we can simply ignore them
-		} else {
-			APP_ERROR_CHECK(err); //OK
-		}
-
+		//Both possible errors are due to a disconnect and we can simply ignore them
+		FruityHal::BleGapRssiStart(connection.connectionHandle, 2, 7);
+		
 		logt("STATUSMOD", "RSSI measurement started for connection %u with code %u", connection.connectionId, err);
 	}
 }
@@ -338,12 +335,8 @@ void StatusReporterModule::StopConnectionRSSIMeasurement(const MeshConnection& c
 
 	if (connection.isConnected())
 	{
-		err = FruityHal::BleGapRssiStop(connection.connectionHandle);
-		if(err == NRF_ERROR_INVALID_STATE || err == BLE_ERROR_INVALID_CONN_HANDLE){
-			//Both errors are due to a disconnect and we can simply ignore them
-		} else {
-			APP_ERROR_CHECK(err); //OK
-		}
+		//Both possible errors are due to a disconnect and we can simply ignore them
+		FruityHal::BleGapRssiStop(connection.connectionHandle);
 
 		logt("STATUSMOD", "RSSI measurement stopped for connection %u with code %u", connection.connectionId, err);
 	}
@@ -768,17 +761,13 @@ void StatusReporterModule::MeshConnectionChangedHandler(MeshConnection& connecti
 
 #define _____________BATTERY_MEASUREMENT_________________
 
-#if defined(NRF52)
-/* FIXME: since std::bind and std::placeholders depend on cpp-11 or higher, I don't know any other way. */
-void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
+void StatusReporterModule::AdcEventHandler()
 {
-	if (p_event->type == NRF_DRV_SAADC_EVT_DONE)
-	    {
-	        ret_code_t err_code = nrf_drv_saadc_buffer_convert(p_event->data.done.p_buffer, 1);
-	        APP_ERROR_CHECK(err_code);
-	    }
+	StatusReporterModule * p_statusReporterModule = (StatusReporterModule *)GS->node.GetModuleById(ModuleId::STATUS_REPORTER_MODULE);
+	if (p_statusReporterModule == nullptr) return;
+	p_statusReporterModule->convertADCtoVoltage();
+	FruityHal::AdcUninit();
 }
-#endif
 
 void StatusReporterModule::initBatteryVoltageADC() {
 #if IS_ACTIVE(BATTERY_MEASUREMENT)
@@ -786,47 +775,35 @@ void StatusReporterModule::initBatteryVoltageADC() {
 	if(Boardconfig->batteryAdcInputPin == -1 || isADCInitialized){
 		return;
 	}
-#if defined(NRF51)
-	ret_code_t err_code;
-	err_code = nrf_drv_adc_init(nullptr,nullptr);
-	APP_ERROR_CHECK(err_code);
-    nrf_drv_adc_channel_config_t cct;
-    cct.resolution = NRF_ADC_CONFIG_RES_8BIT;
-    cct.input = NRF_ADC_CONFIG_SCALING_INPUT_FULL_SCALE ;
-    cct.reference = NRF_ADC_CONFIG_REF_VBG;
-    cct.ain = Boardconfig->batteryAdcInputPin;
-	adc_channel_config.config.config = cct;
-	adc_channel_config.p_next = nullptr;
-	nrf_drv_adc_config_t adc_config;
-	adc_config.interrupt_priority = ADC_CONFIG_IRQ_PRIORITY;             //Get default ADC configuration
-	nrf_drv_adc_channel_enable(&adc_channel_config);                          //Configure and enable an ADC channel
-#endif
+	ErrorType error = FruityHal::AdcInit(AdcEventHandler);
+	APP_ERROR_CHECK((u32)error);
 
-//#define NRF52
-#if defined(NRF52)
-	ret_code_t err_code;
-	err_code = nrf_drv_saadc_init(nullptr,saadc_callback);
-	APP_ERROR_CHECK(err_code);
-	nrf_saadc_channel_config_t channel_config;
-
-	// // batteryAdcInput -2 is used if we want to measure battery on MCU and that is only possible if Vbatt_max < 3.6V
+	u32 pin = Boardconfig->batteryAdcInputPin;
+	if(Boardconfig->batteryAdcInputPin == -2) 
+	{
+		// Battery input
+		pin = 0xFF;
+	}
+#if FEATURE_AVAILABLE(ADC_INTERNAL_MEASUREMENT)
 	if(Boardconfig->batteryAdcInputPin == -2) {
-		channel_config = NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_VDD);
+		FruityHal::AdcConfigureChannel(pin, 
+		                               FruityHal::AdcReference::ADC_REFERENCE_0_6V, 
+		                               FruityHal::AdcResoultion::ADC_10_BIT, 
+		                               FruityHal::AdcGain::ADC_GAIN_1_6);
 	}
-
-	else {
-		//In ADC Input enum (nrf_saadc_input_t), AIN0 = 1, AIN1 = 2 etc
-		channel_config = NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(Boardconfig->batteryAdcInputPin+1);
-		channel_config.gain = NRF_SAADC_GAIN1_5;
-		channel_config.reference = NRF_SAADC_REFERENCE_VDD4;
-		nrf_saadc_resolution_set(NRF_SAADC_RESOLUTION_10BIT);
+	else
+	{
+		FruityHal::AdcConfigureChannel(pin, 
+		                               FruityHal::AdcReference::ADC_REFERENCE_1_4_POWER_SUPPLY, 
+		                               FruityHal::AdcResoultion::ADC_10_BIT, 
+		                               FruityHal::AdcGain::ADC_GAIN_1_5);
 	}
-	err_code = nrf_drv_saadc_channel_init(0, &channel_config);
-	APP_ERROR_CHECK(err_code);
-	err_code = nrf_drv_saadc_buffer_convert(m_buffer, 1);
-	APP_ERROR_CHECK(err_code);
-#endif
-
+#else
+	FruityHal::AdcConfigureChannel(pin, 
+	                               FruityHal::AdcReference::ADC_REFERENCE_1_2V, 
+	                               FruityHal::AdcResoultion::ADC_8_BIT, 
+	                               FruityHal::AdcGain::ADC_GAIN_1);
+#endif // FEATURE_AVAILABLE(ADC_INTERNAL_MEASUREMENT)
 	isADCInitialized = true;
 #endif
 }
@@ -838,62 +815,38 @@ void StatusReporterModule::BatteryVoltageADC(){
 
 #ifndef SIM_ENABLED
 	if (Boardconfig->batteryAdcInputPin >= 0) {
-		nrf_gpio_cfg_output(Boardconfig->batteryMeasurementEnablePin);
-		nrf_gpio_pin_set(Boardconfig->batteryMeasurementEnablePin);
+		FruityHal::GpioConfigureOutput(Boardconfig->batteryMeasurementEnablePin);
+		FruityHal::GpioPinSet(Boardconfig->batteryMeasurementEnablePin);
 	}
+	
+	ErrorType err = FruityHal::AdcSample(*m_buffer, 1);
+	APP_ERROR_CHECK((u32)err);
 
-#if defined(NRF51)
-	if (!nrf_drv_adc_is_busy()) {
-		ret_code_t err_code = nrf_drv_adc_sample_convert(&adc_channel_config,
-				m_buffer);
-		APP_ERROR_CHECK(err_code);
-	}
-	convertADCtoVoltage(m_buffer, BATTERY_SAMPLES_IN_BUFFER);
-	nrf_drv_adc_uninit();
 	isADCInitialized = false;
-#endif
-
-#if defined(NRF52)
-	nrf_gpio_cfg_output (Boardconfig->batteryMeasurementEnablePin);
-	nrf_gpio_pin_set(Boardconfig->batteryMeasurementEnablePin);
-	nrf_delay_ms(5);
-	ret_code_t err_code = nrf_drv_saadc_sample(); // Non-blocking triggering of SAADC Sampling
-	APP_ERROR_CHECK(err_code);
-	convertADCtoVoltage(m_buffer, BATTERY_SAMPLES_IN_BUFFER);
-
-	nrf_drv_saadc_uninit();
-	isADCInitialized = false;
-#endif
-
-	if (Boardconfig->batteryAdcInputPin >= 0) {
-		nrf_gpio_pin_clear(Boardconfig->batteryMeasurementEnablePin);
-	}
 #endif
 #endif
 }
 
-void StatusReporterModule::convertADCtoVoltage(i16 * buffer, u16 size)
+void StatusReporterModule::convertADCtoVoltage()
 {
 #if IS_ACTIVE(BATTERY_MEASUREMENT)
 	u32 adc_sum_value = 0;
-	for (u16 i = 0; i < size; i++) {
+	for (u16 i = 0; i < BATTERY_SAMPLES_IN_BUFFER; i++) {
 		//Buffer implemented for future use
-		adc_sum_value += buffer[i];               //Sum all values in ADC buffer
+		adc_sum_value += m_buffer[i];               //Sum all values in ADC buffer
 	}
 
-#if defined(NRF52)
+#if FEATURE_AVAILABLE(ADC_INTERNAL_MEASUREMENT)
 	if (Boardconfig->batteryAdcInputPin >= 0 && Boardconfig->voltageDividerR1,Boardconfig->voltageDividerR2 > 0){
 		u16 voltageDividerDv = ExternalVoltageDividerDv(Boardconfig->voltageDividerR1, Boardconfig->voltageDividerR2);
-		batteryVoltageDv = RESULT_IN_DECI_VOLTS_VOLTAGE_DIV(adc_sum_value / size, voltageDividerDv);
+		batteryVoltageDv = FruityHal::AdcConvertSampleToDeciVoltage(adc_sum_value / BATTERY_SAMPLES_IN_BUFFER, voltageDividerDv);
 	}
 	else {
-		batteryVoltageDv = RESULT_IN_DECI_VOLTS(adc_sum_value / size); //Transform the average ADC value into decivolts value
+		batteryVoltageDv = FruityHal::AdcConvertSampleToDeciVoltage(adc_sum_value / BATTERY_SAMPLES_IN_BUFFER); //Transform the average ADC value into decivolts value
 	}
-#endif
-
-#if defined(NRF51)
-	batteryVoltageDv = RESULT_IN_DECI_VOLTS(adc_sum_value / size);
-#endif
+#else
+	batteryVoltageDv = FruityHal::AdcConvertSampleToDeciVoltage(adc_sum_value / BATTERY_SAMPLES_IN_BUFFER);
+#endif // FEATURE_AVAILABLE(ADC_INTERNAL_MEASUREMENT)
 
 #endif
 }

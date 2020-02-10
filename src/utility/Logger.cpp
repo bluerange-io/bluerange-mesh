@@ -154,6 +154,11 @@ void Logger::uart_error_f(UartErrorType type) const
 		case UartErrorType::TOO_FEW_ARGUMENTS:
 			logjson("ERROR", "{\"type\":\"error\",\"code\":4,\"text\":\"Too few arguments\"}" SEP);
 			break;
+#if IS_INACTIVE(SAVE_SPACE)
+		case UartErrorType::WARN_DEPRECATED:
+			logjson("ERROR", "{\"type\":\"error\",\"code\":5,\"text\":\"Warning: Command is marked deprecated!\"}" SEP);
+			break;
+#endif
 		default:
 			logjson("ERROR", "{\"type\":\"error\",\"code\":%u,\"text\":\"Unknown Error\"}" SEP, (u32)type);
 			break;
@@ -475,6 +480,8 @@ const char* Logger::getErrorLogCustomError(CustomErrorTypes type)
 		return "WARN_ENROLLMENT_LOCK_DOWN_FAILED";
 	case CustomErrorTypes::WARN_CONNECTION_SUSTAIN_FAILED:
 		return "WARN_CONNECTION_SUSTAIN_FAILED";
+	case CustomErrorTypes::FATAL_SENSOR_PINS_NOT_DEFINED_IN_BOARD_ID:
+		return "FATAL_SENSOR_PINS_NOT_DEFINED_IN_BOARD_ID";
 	default:
 		SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
 		return "UNKNOWN_ERROR";
@@ -556,57 +563,55 @@ const char* Logger::getGattStatusErrorString(FruityHal::BleGattEror gattStatusCo
 #endif
 }
 
-const char* Logger::getGeneralErrorString(ErrorType nrfErrorCode)
+const char* Logger::getGeneralErrorString(ErrorType ErrorCode)
 {
 #if defined(TERMINAL_ENABLED)
-	switch ((u32)nrfErrorCode)
+	switch ((u32)ErrorCode)
 	{
 	case (u32)ErrorType::SUCCESS:
-		return "NRF_SUCCESS";
+		return "SUCCESS";
 	case (u32)ErrorType::SVC_HANDLER_MISSING:
-		return "NRF_ERROR_SVC_HANDLER_MISSING";
+		return "ERROR_SVC_HANDLER_MISSING";
 	case (u32)ErrorType::BLE_STACK_NOT_ENABLED:
-		return "NRF_ERROR_SOFTDEVICE_NOT_ENABLED";
+		return "ERROR_SOFTDEVICE_NOT_ENABLED";
 	case (u32)ErrorType::INTERNAL:
-		return "NRF_ERROR_INTERNAL";
+		return "ERROR_INTERNAL";
 	case (u32)ErrorType::NO_MEM:
-		return "NRF_ERROR_NO_MEM";
+		return "ERROR_NO_MEM";
 	case (u32)ErrorType::NOT_FOUND:
-		return "NRF_ERROR_NOT_FOUND";
+		return "ERROR_NOT_FOUND";
 	case (u32)ErrorType::NOT_SUPPORTED:
-		return "NRF_ERROR_NOT_SUPPORTED";
+		return "ERROR_NOT_SUPPORTED";
 	case (u32)ErrorType::INVALID_PARAM:
-		return "NRF_ERROR_INVALID_PARAM";
+		return "ERROR_INVALID_PARAM";
 	case (u32)ErrorType::INVALID_STATE:
-		return "NRF_ERROR_INVALID_STATE";
+		return "ERROR_INVALID_STATE";
 	case (u32)ErrorType::INVALID_LENGTH:
-		return "NRF_ERROR_INVALID_LENGTH";
+		return "ERROR_INVALID_LENGTH";
 	case (u32)ErrorType::INVALID_FLAGS:
-		return "NRF_ERROR_INVALID_FLAGS";
+		return "ERROR_INVALID_FLAGS";
 	case (u32)ErrorType::INVALID_DATA:
-		return "NRF_ERROR_INVALID_DATA";
+		return "ERROR_INVALID_DATA";
 	case (u32)ErrorType::DATA_SIZE:
-		return "NRF_ERROR_DATA_SIZE";
+		return "ERROR_DATA_SIZE";
 	case (u32)ErrorType::TIMEOUT:
-		return "NRF_ERROR_TIMEOUT";
+		return "ERROR_TIMEOUT";
 	case (u32)ErrorType::NULL_ERROR:
-		return "NRF_ERROR_NULL";
+		return "ERROR_NULL";
 	case (u32)ErrorType::FORBIDDEN:
-		return "NRF_ERROR_FORBIDDEN";
+		return "ERROR_FORBIDDEN";
 	case (u32)ErrorType::INVALID_ADDR:
-		return "NRF_ERROR_INVALID_ADDR";
+		return "ERROR_INVALID_ADDR";
 	case (u32)ErrorType::BUSY:
-		return "NRF_ERROR_BUSY";
+		return "ERROR_BUSY";
 	case (u32)ErrorType::CONN_COUNT:
 		return "CONN_COUNT";
-	case BLE_ERROR_INVALID_CONN_HANDLE:
+	case (u32)ErrorType::BLE_INVALID_CONN_HANDLE:
 		return "BLE_ERROR_INVALID_CONN_HANDLE";
-	case BLE_ERROR_INVALID_ATTR_HANDLE:
+	case (u32)ErrorType::BLE_INVALID_ATTR_HANDLE:
 		return "BLE_ERROR_INVALID_ATTR_HANDLE";
-#if defined(NRF51)
-	case BLE_ERROR_NO_TX_PACKETS:
+	case (u32)ErrorType::BLE_NO_TX_PACKETS:
 		return "BLE_ERROR_NO_TX_PACKETS";
-#endif
 	case 0xDEADBEEF:
 		return "DEADBEEF";
 	default:

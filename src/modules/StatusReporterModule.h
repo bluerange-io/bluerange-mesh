@@ -40,36 +40,7 @@
 
 #include <Terminal.h>
 
-#if defined(NRF51)
-extern "C"{
-#include <nrf_drv_adc.h>
-}
-#endif
-#if defined(NRF52)
-#include <nrf_drv_saadc.h>
-#endif
-
 #define BATTERY_SAMPLES_IN_BUFFER 					1//Number of SAADC samples in RAM before returning a SAADC event. For low power SAADC set this constant to 1. Otherwise the EasyDMA will be enabled for an extended time which consumes high current.
-
-#if defined(NRF51) || defined(SIM_ENABLED)
-constexpr int REF_VOLTAGE_IN_MILLIVOLTS            = 1200;
-#define RESULT_IN_DECI_VOLTS(ADC_VALUE)    			((((ADC_VALUE) * REF_VOLTAGE_IN_MILLIVOLTS) / 1024))
-#endif
-
-
-#if defined(NRF52)
-constexpr double REF_VOLTAGE_INTERNAL_IN_MILLI_VOLTS			= 600; // Maximum Internal Reference Voltage
-constexpr double VOLTAGE_DIVIDER_INTERNAL_IN_MILLI_VOLTS		= 166; //Internal voltage divider
-constexpr double ADC_RESOLUTION_8BIT							= 256;
-
-#define RESULT_IN_DECI_VOLTS(ADC_VALUE)     		((ADC_VALUE*REF_VOLTAGE_INTERNAL_IN_MILLI_VOLTS)/(VOLTAGE_DIVIDER_INTERNAL_IN_MILLI_VOLTS*ADC_RESOLUTION_8BIT))*10
-
-constexpr double REF_VOLTAGE_EXTERNAL_IN_MILLI_VOLTS		= 825; // Maximum Internal Reference Voltage
-constexpr double VOLTAGE_GAIN_IN_MILLI_VOLTS				= 200; //Internal voltage divider
-constexpr double ADC_RESOLUTION_10BIT						= 1023;
-
-#define RESULT_IN_DECI_VOLTS_VOLTAGE_DIV(ADC_VALUE, VOLTAGE_DIV)   ( (ADC_VALUE)* (REF_VOLTAGE_EXTERNAL_IN_MILLI_VOLTS/VOLTAGE_GAIN_IN_MILLI_VOLTS) * (1/ADC_RESOLUTION_10BIT) * (VOLTAGE_DIV))
-#endif
 
 enum class RSSISamplingModes : u8 {
 	NONE = 0,
@@ -230,15 +201,7 @@ private:
 		u8 batteryVoltageDv; //in decivolts
 		bool isADCInitialized;
 		u8 number_of_adc_channels;
-#if defined(NRF51)
-		nrf_drv_adc_channel_t adc_channel_config;
-		nrf_adc_value_t m_buffer[BATTERY_SAMPLES_IN_BUFFER];
-#endif
-#if defined(NRF52)
-		nrf_drv_saadc_config_t saadc_config;
-		nrf_saadc_channel_config_t channel_config;
-		nrf_saadc_value_t m_buffer[BATTERY_SAMPLES_IN_BUFFER];
-#endif
+		i16 m_buffer[BATTERY_SAMPLES_IN_BUFFER];
 
 		void SendStatus(NodeId toNode, u8 requestHandle, MessageType messageType) const;
 		void SendDeviceInfoV2(NodeId toNode, u8 requestHandle, MessageType messageType) const;
@@ -250,10 +213,11 @@ private:
 		void StartConnectionRSSIMeasurement(MeshConnection& connection) const;
 		void StopConnectionRSSIMeasurement(const MeshConnection& connection) const;
 
+		static void AdcEventHandler();
 		void initBatteryVoltageADC();
 		void BatteryVoltageADC();
 
-		void convertADCtoVoltage(i16 * buffer, u16 size);
+		void convertADCtoVoltage();
 
 	public:
 

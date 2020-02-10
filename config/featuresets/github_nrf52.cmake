@@ -1,0 +1,2 @@
+set(FRUITY_SDK 14)
+set(FAIL_ON_SIZE_TOO_BIG 0)

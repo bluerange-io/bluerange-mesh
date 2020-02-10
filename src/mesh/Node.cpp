@@ -2460,7 +2460,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
 		packet.connHeader.messageType = MessageType::MODULE_RAW_DATA_LIGHT;
 		packet.connHeader.sender = configuration.nodeId;
-		packet.connHeader.receiver = Utility::StringToU16(commandArgs[1]);
+		packet.connHeader.receiver = Utility::TerminalArgumentToNodeId(commandArgs[1]);
 
 		packet.moduleId = (ModuleId)Utility::StringToU8(commandArgs[2]);
 		packet.protocolId = static_cast<RawDataProtocol>(Utility::StringToU8(commandArgs[3]));
@@ -2514,7 +2514,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 		
 		bool didError = false;
 
-		NodeId                  receiver                =                          Utility::StringToU16(commandArgs[1], &didError);
+		NodeId                  receiver                =                          Utility::TerminalArgumentToNodeId(commandArgs[1]);
 		ModuleId                moduleId                = (ModuleId)               Utility::StringToU8 (commandArgs[2], &didError);
 		RawDataErrorType        rawDataErrorType        = (RawDataErrorType)       Utility::StringToU8 (commandArgs[3], &didError);
 		RawDataErrorDestination rawDataErrorDestination = (RawDataErrorDestination)Utility::StringToU8 (commandArgs[4], &didError);
@@ -2525,7 +2525,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 			requestHandle = Utility::StringToU8(commandArgs[5], &didError);
 		}
 
-		if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+		if (didError || receiver == NODE_ID_INVALID) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
 
 		SendRawError(receiver, moduleId, rawDataErrorType, rawDataErrorDestination,	requestHandle);
 
@@ -2993,7 +2993,7 @@ bool Node::CreateRawHeader(RawDataHeader* outVal, RawDataActionType type, const 
 
 	outVal->connHeader.messageType = MessageType::MODULE_RAW_DATA;
 	outVal->connHeader.sender = configuration.nodeId;
-	outVal->connHeader.receiver = Utility::StringToU16(commandArgs[1]);
+	outVal->connHeader.receiver = Utility::TerminalArgumentToNodeId(commandArgs[1]);
 
 	outVal->moduleId = (ModuleId)Utility::StringToU8(commandArgs[2]);
 	outVal->actionType = type;

@@ -52,7 +52,7 @@
 
 constexpr int MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS = 20;
 constexpr int MAX_TERMINAL_JSON_LISTENER_CALLBACKS = 1;
-constexpr int READ_BUFFER_LENGTH = 250;
+constexpr int TERMINAL_READ_BUFFER_LENGTH = 250;
 constexpr int MAX_NUM_TERM_ARGS = 15;
 
 enum class TerminalCommandHandlerReturnType : u8
@@ -62,6 +62,7 @@ enum class TerminalCommandHandlerReturnType : u8
 	SUCCESS              = 1, //...was successfully interpreted and executed
 	WRONG_ARGUMENT       = 2, //...exists but the given arguments were malformed
 	NOT_ENOUGH_ARGUMENTS = 3, //...exists but the amount of arguments was too low
+	WARN_DEPRECATED      = 4, //...was successfully interpreted and executed but is marked deprecated and will potentially be removed in the future.
 };
 
 class TerminalCommandListener
@@ -109,7 +110,7 @@ private:
 	bool currentlyExecutingJsonCallbacks = false;	//Avoids endless recursion, where outputCallbacks themselves want to print something.
 
 	u8 readBufferOffset = 0;
-	char readBuffer[READ_BUFFER_LENGTH];
+	char readBuffer[TERMINAL_READ_BUFFER_LENGTH];
 
 	void WriteStdioLineToReadBuffer();
 
@@ -175,7 +176,6 @@ private:
 	void SeggerRttInit();
 	void SeggerRttCheckAndProcessLine();
 public:
-	void SeggerRttPrintf(const char* message, ...);
 	void SeggerRttPutString(const char* message);
 	void SeggerRttPutChar(const char character);
 
@@ -191,8 +191,20 @@ public:
 	void StdioPutString(const char* message);
 
 #endif
+
+	//###### Virtual Com Port ######
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+public:
+	void VirtualComCheckAndProcessLine();
+	static void VirtualComPortEventHandler(bool portOpened);
+#endif
 };
 
+//#if IS_ACTIVE(SEGGER_RTT)
+//void SeggerRttPrintf_c(const char* message, ...);
+//#endif
+
+	//###### Other ######
 #ifdef TERMINAL_ENABLED
 	//Some sort of logging is used
 	#define log_transport_init() Terminal::getInstance().Init(Terminal::promptAndEchoMode);

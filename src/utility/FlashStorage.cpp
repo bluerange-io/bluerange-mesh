@@ -57,7 +57,7 @@ void FlashStorage::TimerEventHandler(u16 passedTimeDs)
 		retryCallingSoftdevice = false;
 
 		//Simulate flash error, as the softdevice was not ok with our call the last time, e.g. busy
-		SystemEventHandler(NRF_EVT_FLASH_OPERATION_ERROR);
+		SystemEventHandler(FruityHal::SystemEvents::FLASH_OPERATION_ERROR);
 	}
 }
 
@@ -212,8 +212,8 @@ void FlashStorage::ProcessQueue(bool continueCurrentTask)
 			//Erasing a flash page takes 22ms, reading a flash page takes 140 us, we will therefore do a read first
 			//To see if we really must erase the page
 			u32 buffer = 0xFFFFFFFF;
-			for(u32 i=0; i<NRF_FICR->CODEPAGESIZE; i+=sizeof(u32)){
-				buffer = buffer & *(u32*)(FLASH_REGION_START_ADDRESS + pageNum * NRF_FICR->CODEPAGESIZE + i);
+			for(u32 i=0; i< FruityHal::GetCodePageSize(); i+=sizeof(u32)){
+				buffer = buffer & *(u32*)(FLASH_REGION_START_ADDRESS + pageNum * FruityHal::GetCodePageSize() + i);
 			}
 
 			//Flash page is already empty
@@ -223,7 +223,7 @@ void FlashStorage::ProcessQueue(bool continueCurrentTask)
 				// => We continue with the loop and check the next page
 				if(currentTask->params.erasePages.numPages == 0){
 					//Call systemEventHandler when we are done so that the task is cleaned up
-					SystemEventHandler(NRF_EVT_FLASH_OPERATION_SUCCESS);
+					SystemEventHandler(FruityHal::SystemEvents::FLASH_OPERATION_SUCCESS);
 					return;
 				}
 			} else {
@@ -263,7 +263,7 @@ void FlashStorage::ProcessQueue(bool continueCurrentTask)
 	}
 }
 
-void FlashStorage::SystemEventHandler(u32 systemEvent)
+void FlashStorage::SystemEventHandler(FruityHal::SystemEvents systemEvent)
 {
 	//This happens if another class requested a flash operation => Avoid that!
 	if (currentTask == nullptr)
@@ -274,7 +274,7 @@ void FlashStorage::SystemEventHandler(u32 systemEvent)
 		return;
 	}
 
-	if(systemEvent == NRF_EVT_FLASH_OPERATION_ERROR)
+	if(systemEvent == FruityHal::SystemEvents::FLASH_OPERATION_ERROR)
 	{
 		logt("ERROR", "Flash operation error");
 		GS->logger.logCustomCount(CustomErrorTypes::COUNT_FLASH_OPERATION_ERROR);
@@ -295,7 +295,7 @@ void FlashStorage::SystemEventHandler(u32 systemEvent)
 			AbortTransactionInProgress(FlashStorageError::FLASH_OPERATION_TIMED_OUT);
 		}
 	}
-	else if(systemEvent == NRF_EVT_FLASH_OPERATION_SUCCESS)
+	else if(systemEvent == FruityHal::SystemEvents::FLASH_OPERATION_SUCCESS)
 	{
 		//Reset retryCount if something succeeded
 		retryCount = FLASH_STORAGE_RETRY_COUNT;

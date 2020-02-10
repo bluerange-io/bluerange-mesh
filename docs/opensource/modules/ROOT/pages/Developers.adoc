@@ -39,7 +39,7 @@ Most settings are found in the `fruitymesh/config/` folder in `Config.h`. Module
 
 [#Featuresets]
 == Feature Sets
-FruityMesh uses so called featuresets for creating different distributions for different use-cases. A featureset defines the compile time and run time configuration for a node. The make process can be configured differently for a featureset, a number of different defines or macros can be used during compile time and different code is used during runtime. This allows us to tailor the firmware functionality and size to each use-case and also allows FruityMesh to compile for different chipsets from the same source. You can specify the featureset by e.g. calling make with `make FEATURESET=featureset_name` or by creating a `Makefile.local`.
+FruityMesh uses so called featuresets for creating different distributions for different use-cases. A featureset defines the compile time and run time configuration for a node. The cmake build process can be configured differently for a featureset, a number of different defines or macros can be used during compile time and different code is used during runtime. This allows us to tailor the firmware functionality and size to each use-case and also allows FruityMesh to compile for different chipsets from the same source. You can specify the featureset by calling cmake with `cmake --build . --target featureset_name`.
 
 A featureset can contain a number of xref:BoardConfig.adoc[Board Configurations] which allows you to flash and run the binary of the featureset on a number of different boards.
 

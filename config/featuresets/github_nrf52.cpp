@@ -39,15 +39,16 @@
 #include "MeshAccessModule.h"
 #include "GlobalState.h"
 
-void setFeaturesetConfiguration_github(ModuleConfiguration* config, void* module)
+void setBoardConfiguration_github_nrf52(BoardConfiguration* c)
 {
-	if(config->moduleId == ModuleId::BOARD_CONFIG)
-	{
-		//Additional boards can be put in here to be selected at runtime
-		//BoardConfiguration* c = (BoardConfiguration*)config;
-		//e.g. setBoard_123(c);
-	}
-	else if (config->moduleId == ModuleId::CONFIG)
+	//Additional boards can be put in here to be selected at runtime
+	//BoardConfiguration* c = (BoardConfiguration*)config;
+	//e.g. setBoard_123(c);
+}
+
+void setFeaturesetConfiguration_github_nrf52(ModuleConfiguration* config, void* module)
+{
+	if (config->moduleId == ModuleId::CONFIG)
 	{
 		Conf::getInstance().defaultLedMode = LedMode::CONNECTIONS;
 		Conf::getInstance().terminalMode = TerminalMode::PROMPT;
@@ -63,7 +64,7 @@ void setFeaturesetConfiguration_github(ModuleConfiguration* config, void* module
 	}
 }
 
-u32 initializeModules_github(bool createModule)
+u32 initializeModules_github_nrf52(bool createModule)
 {
 	u32 size = 0;
 	size += GS->InitializeModule<DebugModule>(createModule);
@@ -76,17 +77,17 @@ u32 initializeModules_github(bool createModule)
 	return size;
 }
 
-DeviceType getDeviceType_github()
+DeviceType getDeviceType_github_nrf52()
 {
 	return DeviceType::STATIC;
 }
 
-Chipset getChipset_github()
+Chipset getChipset_github_nrf52()
 {
 	return Chipset::CHIP_NRF52;
 }
 
-FeatureSetGroup getFeatureSetGroup_github()
+FeatureSetGroup getFeatureSetGroup_github_nrf52()
 {
 	return FeatureSetGroup::NRF52_MESH;
 }

@@ -41,7 +41,9 @@
 constexpr u8 SCAN_MODULE_CONFIG_VERSION = 2;
 
 #if IS_ACTIVE(ASSET_MODULE)
+#ifndef GITHUB_RELEASE
 #include <AssetModule.h>
+#endif //GITHUB_RELEASE
 #endif
 
 #define SCANNING_MODULE_AVERAGE_RSSI(COUNT, RSSI, NEW_RSSI) (((u32)((RSSI) * (COUNT)) + (NEW_RSSI))/((COUNT) + 1))

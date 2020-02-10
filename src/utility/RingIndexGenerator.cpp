@@ -28,23 +28,25 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "RingIndexGenerator.h"
 
-#include <types.h>
-#include <BaseConnection.h>
-
-
-class AppConnection
-		: public BaseConnection
+RingIndexGenerator::RingIndexGenerator(u32 startIndex, u32 arrayLength)
+	:startIndex(startIndex % arrayLength), arrayLength(arrayLength)
 {
-private:
-public:
-	AppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress);
+}
 
-	bool SendData(const BaseConnectionSendData& sendData, u8* data);
+u32 RingIndexGenerator::Next()
+{
+	if (!HasNext()) {
+		SIMEXCEPTION(IllegalStateException);
+		return 0;
+	}
+	const u32 retVal = (startIndex + localIndex) % arrayLength;
+	localIndex++;
+	return retVal;
+}
 
-	void PrintStatus() override;
-
-};
-
-
+bool RingIndexGenerator::HasNext() const
+{
+	return localIndex < arrayLength;
+}

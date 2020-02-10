@@ -91,6 +91,9 @@ public:
 	//Must be called if scanning was stopped by any external procedure
 	void ScanningHasStopped();
 
-
+#ifdef SIM_ENABLED
+	int GetAmountOfJobs();
+	ScanJob* GetJob(int index);
+#endif //SIM_ENABLED
 };
 

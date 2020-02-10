@@ -34,7 +34,9 @@
 #include "MeshAccessConnection.h"
 
 #if IS_ACTIVE(CLC_CONN)
+#ifndef GITHUB_RELEASE
 #include "ClcAppConnection.h"
+#endif //GITHUB_RELEASE
 #endif
 #include "Utility.h"
 #include "SimpleArray.h"
@@ -53,12 +55,14 @@ private:
 		MeshConnection meshConnection;
 		ResolverConnection resolverConnection;
 		MeshAccessConnection meshAccessConnection;
+#ifndef GITHUB_RELEASE
 #if IS_ACTIVE(CLC_CONN)
 		ClcAppConnection clcAppConnection;
 #endif
-		AnyConnection(){ /*do nothing*/ }
-		~AnyConnection(){/*do nothing*/ } //LCOV_EXCL_LINE C++ deletes a destructor by default. MSVC issues a warning for it.
-		                                  //This surpresses it. However, it is never executed.
+#endif //GITHUB_RELEASE
+		AnyConnection() { /*do nothing*/ }
+		~AnyConnection() {/*do nothing*/ } //LCOV_EXCL_LINE C++ deletes a destructor by default. MSVC issues a warning for it.
+										  //This surpresses it. However, it is never executed.
 	};
 
 	static constexpr AnyConnection* NO_NEXT_CONNECTION = nullptr;
@@ -77,7 +81,9 @@ public:
 	ResolverConnection*   allocateResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress);
 	MeshAccessConnection* allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType);
 #if IS_ACTIVE(CLC_CONN)
+#ifndef GITHUB_RELEASE
 	ClcAppConnection*     allocateClcAppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress);
+#endif //GITHUB_RELEASE
 #endif
 
 	void deallocate(BaseConnection* bc);

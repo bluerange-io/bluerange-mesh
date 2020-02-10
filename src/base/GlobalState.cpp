@@ -52,7 +52,9 @@ GlobalState::GlobalState()
 	ramRetainStructPtr = &ramRetainStruct;
 	rebootMagicNumberPtr = &rebootMagicNumber;
 	eventLooperHandlers.zeroData();
+#if defined(NRF51) || defined(SIM_ENABLED)
 	CheckedMemset(currentEventBuffer, 0, sizeof(currentEventBuffer));
+#endif
 	CheckedMemset(&ramRetainStructPreviousBoot, 0, sizeof(ramRetainStructPreviousBoot)); //Safe to set to 0 as its written to only after the boot process is done.
 	CheckedMemset(scanBuffer, 0, sizeof(scanBuffer));
 }

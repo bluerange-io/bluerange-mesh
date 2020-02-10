@@ -203,7 +203,7 @@ void ConnectionManager::SetMeshConnectionInterval(u16 connectionInterval) const
 	}
 }
 
-void ConnectionManager::GATTServiceDiscoveredHandler(u16 connHandle, ble_db_discovery_evt_t& evt)
+void ConnectionManager::GATTServiceDiscoveredHandler(u16 connHandle, FruityHal::BleGattDBDiscoveryEvent& evt)
 {
 	//Find the connection that was discovering services and inform it
 	BaseConnection* conn = GetConnectionFromHandle(connHandle);
@@ -381,19 +381,9 @@ void ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, Delive
 
 void ConnectionManager::DispatchMeshMessage(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packet, bool checkReceiver) const
 {
-	//Check if we are part of the firmware group that should receive this image
-	bool fwGroupIdMatches = false;
-	for(u32 i=0; i<MAX_NUM_FW_GROUP_IDS; i++){
-		if(GS->config.fwGroupIds != 0 && GS->config.fwGroupIds[i] == packet->receiver) fwGroupIdMatches = true;
-	}
-
 	if(
 		!checkReceiver
-		|| packet->receiver == GS->node.configuration.nodeId //Directly addressed at us
-		|| packet->receiver == NODE_ID_BROADCAST //broadcast packet for all nodes
-		|| (packet->receiver >= NODE_ID_HOPS_BASE && packet->receiver < NODE_ID_HOPS_BASE + 1000) //Broadcasted for a number of hops
-		|| (packet->receiver == NODE_ID_SHORTEST_SINK && GET_DEVICE_TYPE() == DeviceType::SINK)
-		|| fwGroupIdMatches
+		|| IsReceiverOfNodeId(packet->receiver)
 	){
 		//Fix local loopback id and replace with out nodeId
 		if(packet->receiver == NODE_ID_LOCAL_LOOPBACK) packet->receiver = GS->node.configuration.nodeId;
@@ -658,6 +648,21 @@ void ConnectionManager::BroadcastMeshData(const BaseConnection* ignoreConnection
 	}
 }
 
+bool ConnectionManager::IsReceiverOfNodeId(NodeId nodeId) const
+{
+	//Check if we are part of the firmware group that should receive this image
+	for (u32 i = 0; i < MAX_NUM_FW_GROUP_IDS; i++) {
+		if (GS->config.fwGroupIds[i] == nodeId) return true;
+	}
+
+	if (nodeId == GS->node.configuration.nodeId)                                            return true;
+	if (nodeId == NODE_ID_BROADCAST)                                                        return true;
+	if (nodeId >= NODE_ID_HOPS_BASE && nodeId < NODE_ID_HOPS_BASE + NODE_ID_HOPS_BASE_SIZE) return true;
+	if (nodeId == NODE_ID_SHORTEST_SINK && GET_DEVICE_TYPE() == DeviceType::SINK)           return true;
+
+	return false;
+}
+
 #define _________________CONNECTIONS____________
 
 //Called as soon as a new connection is made, either as central or peripheral
@@ -847,10 +852,10 @@ u32 ConnectionManager::RequestDataLengthExtensionAndMtuExchange(BaseConnection* 
 	u32 err;
 
 	//Request a higher MTU for the GATT Layer, errors are ignored as there are non that need to be handeled
-	err = FruityHal::BleGattMtuExchangeRequest(c->connectionHandle, MAX_MTU_SIZE);
+	err = FruityHal::BleGattMtuExchangeRequest(c->connectionHandle, FruityHal::BleGattGetMaxMtu());
 
 	//Request Data Length Extension (DLE) for the Link Layer packets, errors are ignored as there are non that need to be handeled
-	if (err == NRF_SUCCESS) {
+	if (err == (u32)ErrorType::SUCCESS) {
 		err = FruityHal::BleGapDataLengthExtensionRequest(c->connectionHandle);
 	}
 
@@ -1050,6 +1055,27 @@ BaseConnection* ConnectionManager::IsConnectionReestablishment(const FruityHal::
 		}
 	}
 	return nullptr;
+}
+
+BaseConnections ConnectionManager::GetConnectionsByUniqueId(u32 uniqueConnectionId) const
+{
+	BaseConnections fc;
+	CheckedMemset(&fc, 0x00, sizeof(BaseConnections));
+	for (u32 i = 0; i < TOTAL_NUM_CONNECTIONS; i++) {
+		if (allConnections[i] != nullptr) {
+			if (allConnections[i]->uniqueConnectionId == uniqueConnectionId) {
+				fc.connectionIndizes[fc.count] = i;
+				fc.count++;
+			}
+		}
+	}
+	if (fc.count > 1)
+	{
+		// This function must not return more than one connection,
+		// as a >UNIQUE<ConnectionId must not be used twice.
+		SIMEXCEPTION(IllegalStateException);
+	}
+	return fc;
 }
 
 //TODO: Only return mesh connections, check

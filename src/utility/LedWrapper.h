@@ -41,7 +41,7 @@
 class LedWrapper
 {
 private: 
-    u32 m_io_msk;
+    u32 m_io_pin;
     bool m_active_high;
     bool active;
 

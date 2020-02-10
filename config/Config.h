@@ -37,6 +37,7 @@
 
 #include <types.h>
 #include "RecordStorage.h"
+#include "Boardconfig.h"
 
 #ifdef __cplusplus
 #include <LedWrapper.h>
@@ -52,7 +53,7 @@ class RecordStorageEventListener;
 #define FM_VERSION_MINOR 8
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 1350
+#define FM_VERSION_PATCH 1700
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -72,6 +73,8 @@ static_assert(FM_VERSION_PATCH >= 0 && FM_VERSION_PATCH <= 9999, "Malformed Patc
 
 #ifdef FEATURESET
 struct ModuleConfiguration;
+#define SET_BOARD_CONFIGURATION XCONCAT(setBoardConfiguration_,FEATURESET)
+extern void SET_BOARD_CONFIGURATION(BoardConfiguration* config);
 #define SET_FEATURESET_CONFIGURATION XCONCAT(setFeaturesetConfiguration_,FEATURESET)
 extern void SET_FEATURESET_CONFIGURATION(ModuleConfiguration* config, void* module);
 #define INITIALIZE_MODULES XCONCAT(initializeModules_,FEATURESET)
@@ -83,6 +86,7 @@ extern Chipset GET_CHIPSET();
 #define GET_FEATURE_SET_GROUP XCONCAT(getFeatureSetGroup_,FEATURESET)
 extern FeatureSetGroup GET_FEATURE_SET_GROUP();
 #elif SIM_ENABLED
+#define SET_BOARD_CONFIGURATION(configuration) setBoardConfiguration_CherrySim(configuration);
 #define SET_FEATURESET_CONFIGURATION(configuration, module) setFeaturesetConfiguration_CherrySim(configuration, module);
 #define INITIALIZE_MODULES(createModule) initializeModules_CherrySim((createModule));
 extern DeviceType getDeviceType_CherrySim();
@@ -156,12 +160,11 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 // enormously as it will consume multiple buffers per connection. Linker script needs to be changed
 // This should be a multiple of 20 bytes + 3 as the ATT header adds 3 bytes, this will make it easier to
 // optimize the application packets in 20 byte chunks. Default and minimum MTU according to BLE is 23 byte
-#ifndef MAX_MTU_SIZE
-#ifdef NRF51
-#define MAX_MTU_SIZE 23
-#else
-#define MAX_MTU_SIZE 63
-#endif
+// => look for the platform specific configuration for the max MTU to change this (for Nordic e.g. the sdk_config.h)
+
+//The maximum number of advertising jobs that can be managed by the AdvertisingController
+#ifndef ADVERTISING_CONTROLLER_MAX_NUM_JOBS
+#define ADVERTISING_CONTROLLER_MAX_NUM_JOBS 4
 #endif
 
 // ########### Flash Settings ##########################################
@@ -321,6 +324,7 @@ class Conf
 		void SetSerialNumberIndex(u32 serialNumber);
 
 		const u8* GetNodeKey() const;
+
 		void GetRestrainedKey(u8* buffer) const;
 
 		static constexpr const char* RESTRAINED_KEY_CLEAR_TEXT = "RESTRAINED_KEY00";
@@ -330,24 +334,24 @@ class Conf
 		//requested. First id should be reserved for hardware type (e.g. nrf51/nrf52)
 		NodeId fwGroupIds[MAX_NUM_FW_GROUP_IDS];
 
-		//################ The following data is can use defaults from the code but is
-		//################ overwritten if it exists in the UICR
-		//Not loaded from UICR but set to the place id that the config was loaded from
+		//################ The following data can use defaults from the code but is
+		//################ overwritten if it exists in the DeviceConfiguration
+		//Not loaded from DeviceConfiguration but set to the place id that the config was loaded from
 		DeviceConfigOrigins deviceConfigOrigin = DeviceConfigOrigins::RANDOM_CONFIG;
 		//According to the BLE company identifiers: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
-		// (loaded from UICR if 0)
+		// (loaded from DeviceConfiguration if 0)
 		u16 manufacturerId = 0;
 		//Allows a number of mesh networks to coexist in the same physical space without collision
 		//Allowed range is 0x0000 - 0xFF00 (0 - 65280), others are reserved for special purpose
-		// (loaded from UICR if 0)
+		// (loaded from DeviceConfiguration if 0)
 		NetworkId defaultNetworkId = 0;
-		//Default network key if preenrollment should be used  (loaded from UICR if 0)
+		//Default network key if preenrollment should be used  (loaded from DeviceConfiguration if 0)
 		u8 defaultNetworkKey[16];
 		//Default user base key
 		u8 defaultUserBaseKey[16];
-		//The default nodeId after flashing (loaded from UICR if 0)
+		//The default nodeId after flashing (loaded from DeviceConfiguration if 0)
 		NodeId defaultNodeId = 0;
-		//Used to set a static random BLE address (loaded from UICR if type set to 0xFF)
+		//Used to set a static random BLE address (loaded from DeviceConfiguration if type set to 0xFF)
 		FruityHal::BleGapAddr staticAccessAddress;
 		//##################
 
@@ -357,7 +361,7 @@ class Conf
 
 
 		void LoadDefaults();
-		void LoadUicr();
+		void LoadDeviceConfiguration();
 		void LoadTestDevices() const;
 
 		//If in debug mode, the node will run in endless loops when errors occur

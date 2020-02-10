@@ -39,7 +39,6 @@
 
 GATTController::GATTController()
 {
-	CheckedMemset(&discoveredServices, 0x00, sizeof(ble_db_discovery_t));
 }
 
 void GATTController::Init()
@@ -54,21 +53,21 @@ u32 GATTController::DiscoverService(u16 connHandle, const FruityHal::BleGattUuid
 
 	u32 err;
 	//Discovery only works for one connection at a time
-	if(discoveredServices.discovery_in_progress) return NRF_ERROR_BUSY;
+	if (FruityHal::DiscoveryIsInProgress()) return (u32)ErrorType::BUSY;
 
-	err = FruityHal::DiscoverService(connHandle, p_uuid, &discoveredServices);
+	err = FruityHal::DiscoverService(connHandle, p_uuid);
 
 	return err;
 }
 
 
 
-void GATTController::ServiceDiscoveryDoneDispatcher(ble_db_discovery_evt_t *p_evt)
+void GATTController::ServiceDiscoveryDoneDispatcher(FruityHal::BleGattDBDiscoveryEvent *p_evt)
 {
 	logt("GATTCTRL", "DB Discovery Event");
 
-	if(p_evt->evt_type == BLE_DB_DISCOVERY_COMPLETE){
-		ConnectionManager::getInstance().GATTServiceDiscoveredHandler(p_evt->conn_handle, *p_evt);
+	if(p_evt->type == FruityHal::BleGattDBDiscoveryEventType::COMPLETE){
+		ConnectionManager::getInstance().GATTServiceDiscoveredHandler(p_evt->connHandle, *p_evt);
 	}
 }
 

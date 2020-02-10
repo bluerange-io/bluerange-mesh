@@ -84,15 +84,14 @@ class GlobalState
 
 		//#################### Event Buffer ###########################
 		//A global buffer for the current event, which must be 4-byte aligned
+
+#if defined(NRF51) || defined(SIM_ENABLED)
 		#pragma pack(push)
 		#pragma pack(4)
-#if defined(NRF51) || defined(SIM_ENABLED)
 		u32 currentEventBuffer[CEIL_DIV(BLE_STACK_EVT_MSG_BUF_SIZE, sizeof(uint32_t))];
-#else
-		uint8_t currentEventBuffer[BLE_EVT_LEN_MAX(MAX_MTU_SIZE)];
-#endif
 		static constexpr u16 SIZE_OF_EVENT_BUFFER = sizeof(currentEventBuffer);
 		#pragma pack(pop)
+#endif
 
 		//#################### App timer ###########################
 		//To keep track of timer ticks

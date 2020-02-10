@@ -28,7 +28,7 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include <FruityHalNrf.h>
-
+#include <Boardconfig.h>
 //PCA10040 - nRF52 DK
 void setBoard_4(BoardConfiguration* c)
 {
@@ -48,9 +48,11 @@ void setBoard_4(BoardConfiguration* c)
 		c->uartBaudRate = UART_BAUDRATE_BAUDRATE_Baud1M;
 		c->dBmRX = -96;
 		c->calibratedTX =  -60;
-		c->lfClockSource = NRF_CLOCK_LF_SRC_XTAL;
+		c->lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_XTAL;
 		c->lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_20_PPM;
 		c->dcDcEnabled = true;
+// #warning remove this
+		c->batteryAdcInputPin = 29;
 	}
 #endif
 }

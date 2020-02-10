@@ -138,4 +138,15 @@
 	#error "No defined chipset"
 #endif
 
+// adc internal measurement
+#if defined(NRF52)
+	#define ADC_INTERNAL_MEASUREMENT_AVAILABLE 1
+#elif defined(NRF51)
+	#define ADC_INTERNAL_MEASUREMENT_AVAILABLE 0
+#elif defined(SIM_ENABLED)
+	#define ADC_INTERNAL_MEASUREMENT_AVAILABLE 0
+#else
+	#error "No defined chipset"
+#endif
+
 static_assert((FEATURE_AVAILABLE(INS)) ? (FEATURE_AVAILABLE(ACCELEROMETER) && FEATURE_AVAILABLE(GYROSCOPE)) : true, "INS feature requires Accelerometer and Gyroscope to be available.");

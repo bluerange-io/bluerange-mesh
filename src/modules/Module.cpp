@@ -78,11 +78,10 @@ TerminalCommandHandlerReturnType Module::TerminalCommandHandler(const char* comm
 	//First, check if our module is meant
 	if(commandArgsSize >= 3 && TERMARGS(2, moduleName))
 	{
-		NodeId receiver = (TERMARGS(1,"this")) ? GS->node.configuration.nodeId : Utility::StringToU16(commandArgs[1]);
-
 		//E.g. UART_MODULE_SET_CONFIG 0 STATUS 00:FF:A0 => command, nodeId (this for current node), moduleId, hex-string
 		if(TERMARGS(0, "set_config"))
 		{
+			NodeId receiver = (TERMARGS(1,"this")) ? GS->node.configuration.nodeId : Utility::StringToU16(commandArgs[1]);
 			if (commandArgsSize < 4) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 			//calculate configuration size
 			const char* configString = commandArgs[3];
@@ -105,10 +104,11 @@ TerminalCommandHandlerReturnType Module::TerminalCommandHandler(const char* comm
 
 			GS->cm.SendMeshMessage(packetBuffer, configLength + SIZEOF_CONN_PACKET_MODULE, DeliveryPriority::LOW);
 
-			return TerminalCommandHandlerReturnType::SUCCESS;
+			return TerminalCommandHandlerReturnType::WARN_DEPRECATED; //Deprecated as of 17.01.2020
 		}
 		else if(TERMARGS(0,"get_config"))
 		{
+			NodeId receiver = (TERMARGS(1, "this")) ? GS->node.configuration.nodeId : Utility::StringToU16(commandArgs[1]);
 			connPacketModule packet;
 			packet.header.messageType = MessageType::MODULE_CONFIG;
 			packet.header.sender = GS->node.configuration.nodeId;
@@ -119,10 +119,11 @@ TerminalCommandHandlerReturnType Module::TerminalCommandHandler(const char* comm
 
 			GS->cm.SendMeshMessage((u8*)&packet, SIZEOF_CONN_PACKET_MODULE, DeliveryPriority::LOW);
 
-			return TerminalCommandHandlerReturnType::SUCCESS;
+			return TerminalCommandHandlerReturnType::WARN_DEPRECATED; //Deprecated as of 17.01.2020
 		}
 		else if(TERMARGS(0,"set_active"))
 		{
+			NodeId receiver = (TERMARGS(1, "this")) ? GS->node.configuration.nodeId : Utility::StringToU16(commandArgs[1]);
 			if(commandArgsSize <= 3) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
 			u8 moduleState = TERMARGS(3,"on") ? 1: 0;

@@ -120,12 +120,15 @@ namespace Utility
 	//Other
 	u16 ByteToAsciiHex(u8 b);
 	u32 ByteFromAsciiHex(char* asciiHex, u8 numChars);
+	void LogRebootJson();
 
 	bool Contains(const u8* data, const u32 length, const u8 searchValue);
 
 	bool IsPowerOfTwo(u32 val);
 
 	NodeId TerminalArgumentToNodeId(const char* arg);
+
+	bool IsUnknownRebootReason(RebootReason rebootReason);
 
 	//The outDidError varaible can be nullptr, in which case it is ignored.
 	//If it's not set to nullptr, the underlying value must be initialized

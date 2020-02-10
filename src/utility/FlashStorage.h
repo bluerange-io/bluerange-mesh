@@ -35,6 +35,7 @@
 #pragma once
 
 #include <PacketQueue.h>
+#include <FruityHal.h>
 
 class FlashStorageEventListener;
 
@@ -166,7 +167,7 @@ class FlashStorage
 		u16 GetNumberOfActiveTasks() const;
 
 		//This system event handler must be called by the implementation
-		void SystemEventHandler(u32 sys_evt);
+		void SystemEventHandler(FruityHal::SystemEvents sys_evt);
 };
 
 class FlashStorageEventListener

@@ -138,4 +138,26 @@ struct BleGattCharHandles
 	u16    sccdHandle;
 };
 
+enum class BleGattDBDiscoveryEventType
+{
+	COMPLETE,
+	SERVICE_NOT_FOUND,
+};
+
+struct BleGattDBDiscoveryCharacteristic
+{
+	BleGattUuid charUUID;
+	u16         handleValue;
+	u16         cccdHandle;
+};
+
+struct BleGattDBDiscoveryEvent
+{
+	u16                              connHandle;
+	BleGattDBDiscoveryEventType      type;
+	BleGattUuid                      serviceUUID;
+	u8                               charateristicsCount;
+	BleGattDBDiscoveryCharacteristic dbChar[6];
+};
+
 }

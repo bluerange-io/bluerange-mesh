@@ -48,7 +48,7 @@ some other variables. Use the search function and look for the string
 ==== Step 2
 
 Activate your module by instantiating it in the featureset
-`config/featuresets/github.cpp` where all the other modules are instantiated.
+`config/featuresets/github_nrf52.cpp` where all the other modules are instantiated.
 You might need to increase the MAX_MODULE_COUNT in `config/Config.h`.
 Your PingModule Constructor needs a ModuleId for instantiation. All
 Module IDs are specified in types.h (enum ModuleId) as well. An
