@@ -1,26 +1,101 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
 = CherrySim
 
-____
-CherrySim is not yet open source. It is being worked on, stay tuned for updates.
-____
+== General
+CherrySim uses the codebase of FruityMesh and provides a SoftDevice abstraction layer that simulates Bluetooth connections, advertising, flash access and much more. It gives the possibility to debug, develop and simulate multiple FruityMesh nodes on a development PC.
 
-CherrySim is the new simulator that is based on our FruityMesh code. It is written entirely in C and C++. You will notice a few `#ifdef` statements in the FruityMesh codebase that perform a check whether the simulator is enabled.
+NOTE: Nordic allowed us in their forums to use their headers in our simulator as long as it
+is used to simulate a Nordic Integrated Circuit.
+See: https://devzone.nordicsemi.com/f/nordic-q-a/57615/legal-issue-using-nordic-sdk-code
 
 image:cherrysim.png[cherrysim]
 
-== Functionality & Features
-The new simulator abstracts the SoftDevice and creates a communication layer between the nodes. It simulates all nodes in a short period of time and can even visualize the mesh.
+== Functionality
 
-It supports terminal input and output for all nodes, pipe communication for exchanging data efficiently with other applications, pseudo-randomness to deterministically debug a problem, battery usage estimation, Google test integration, random configurations or user defined positions, etc.
+* Simulates nodes in a time step based simulation
+* Allows easy debugging of mesh-behaviour
+* Includes CherrySimRunner for manual testing and simulation and CherrySimTester for automatic mesh tests using the google test framework
+* Deterministic meshing using a pseude random number generator
+* Mesh state visualization on http://localhost:5555/
 
-Use cases for the simulator are:
+== How It Works
+CherrySim uses a header file _SystemTest.h_ that is force-included before all other header files to be able to abstract the SoftDevice. All SoftDevice calls are implemented in a way to closely mock the funcationality of a real SoftDevice. For everything that uses the radio, such as advertising or connections, a simplified simulation is used that calculates the distances between nodes and simulates packet loss.
 
-- Unit and system testing
-- Estimate battery usage
-- Implement new features
-- Evaluate and improve mesh behavior
-- Debug implementation problems
+== Visualization
+Open http://localhost:5555/ in a webbrowser while the simulator is running and simulating.
 
-=== Instances
+The Webserver serves the FruityMap for visualization and has some endpoints that serve dynamic JSONs that reflect the current mesh state. Be aware that the visualization shows the GAP connections and not the MeshConnections. This is an important difference. If all MeshConnections are handshaked, in a stable state and if there are no implementation errors, these visualizations match.
+
+The connections are presented using arrows which originate from the central and point to the peripheral. The black dots represent the connection master bits. *RSSI / globalConnectionId* is shown for each connection while the nodes show "nodeId / clusterSize".
+
+The LEDs are also visualized but all LED changes are mapped to a single one.
+
+== Node Properties In Simulator
+The serial numbers are counting upwards, starting at BBBBB. Every forth byte of the node key, starting with the first byte is equal to the serial number index + 1. So for example, BBBBB has the node key 01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00, BBBBC has the node key 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 and so on.
+
+== Docker Environment
+The simulator inside the docker environment has 10 nodes that take part in the mesh and additionally two assets.
+
+== Instances
 CherrySim works with only one instance and is able to simulate many instances of FruityMesh. Hence FruityMesh must be written in a way that the code itself has no state variables. No global or functional static variables are allowed. Every variable that needs to be saved from function call to another needs to be a part of class since CherrySim creates instances of classes for every node.
+
+== Debugging
+=== Globally Available Variables
+*simGlobalStatePtr* always references the GlobalState of the current node that is simulated. Only one node is simulated at a time and the GlobalState object contains the full state of a FruityMesh node.
+
+*cherrySimInstance* points to the simulator and can be used to access all other information
+
+*cherrySimInstance->currentNode* can be used to see the complete state of the current node including SoftDevice and FruityMesh state.
+
+*cherrySimInstance->currentNode->currentEvent* points to the event that is being processed. This can contain additional information under _additionalInfo_ such as the globalPacketId for all write events.
+
+*cherrySimInstance->nodes* provides access to all nodes in the simulation.
+
+*simFicrPtr*, *simUicrPtr*, *simGpioPtr*, *simFlashPtr* point to the simulated hardware peripherals of the currently simulated node.
+
+=== Debugging With Conditional Breakpoints
+If some event, connection or packet is causing trouble it might be useful to break the simulator once the event/connection/packet is created. To do this, a globally unique Id is assigned to each of these. Using a conditional breakpoints for debugging this can be very useful. Because of the PSRNG, the same situation can be reproduced as often as desired and logs and more can added or modified (as long as the meshing behaviour is not changed). Conditional Breakpoints can be used for:
+
+* *globalEventIdCounter*: A different ID is given to each event so that breakpoints can be set for specific events.
+* *globalConnHandleCounter*: Each connection is given a globally unique id so they can be tracked easily (After a long simulation, these will wrap and a warning will be printed)
+* *globalPacketIdCounter*: Each packet is assigned a global ID so that the creation of the packet can be debugged. This is usefuly as packet creation and processing of the packet happen asynchronously and are not directly linked. Check the _additionalInfo_ of the _currentEvent_ during debugging and break in the _sd_ble_gattc_write_ when this is assigned.
+
+To break in the debugger before some error happens, use:
+
+[source,c++]
+----
+static int counter = 0;
+counter++;
+----
+Then check the value of the counter in the debugger, set a conditional breakpoint some lines before the error happened and compare the counter value against the count from the previous run.
+
+== Terminal Commands
+The simulator has a terminal that allows to input all commands that can be used with FruityMesh nodes. Depending on the simulator configuration, either no terminal is enabled (-1), all terminals are active (0) or the terminal of a specific node is active, e.g. 1.
+
+The active terminals can be switched at runtime by using the term command, e.g.:
+[source,c++]
+----
+term 1
+----
+The simulator provides a set of terminal commands as well that you can input via the terminal. The most important one is:
+[source,c++]
+----
+simstat
+----
+It gives an overview of all available commands. Also, a number of _SIMSTATCOUNT_ and _SIMSTATAVG_ macros are spread throughout the code that are used to collect statistics. The results are also shown by this command.
+
+[source,c++]
+----
+sim set_position BBBBD 0.5 0.21 1.7
+----
+
+Sets the position in the virtual environment of the node with the serial number BBBBD to (0.5 / 0.21 / 1.7). Note: The third axis is the height axis.
+
+[source,c++]
+----
+sim add_position BBBBD -0.17 0.23 12
+----
+
+Adds (-0.17 / 0.23 / 12) to the position in the virtual environment of the node with the serial number BBBBD. Note: The third axis is the height axis.
+
+Using commands such as *nodes 20*, *width 40*, *height 50* allows to modify the simulation scenario. Scenarios can also be imported as JSON files by first giving the paths and then enabling JSON import (*json 1*). Each simulation is always run deterministically with a preset seed. This seed can be modified using e.g. *seed 123*, which will result in a new simulation.

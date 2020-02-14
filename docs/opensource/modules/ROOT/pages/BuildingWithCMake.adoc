@@ -1,0 +1,37 @@
+= Building with CMake
+
+https://cmake.org/[CMake] is a system that manages the build process. It is cross-platform system but designed to be used in conjunction with the native build environment.
+
+== Prerequisites
+
+1. https://cmake.org/download/[Download] and install CMake. You can find the minimum required CMake version in the first line of ./CMakeLists.txt in the root of this repository. On windows, make sure that the installation wizard adds CMake to the PATH variable.
+2. Make sure a C++17 32 bit compatible compiler is installed (e.g. Visual Studio 2017 or GCC 8)
+3. Some build steps also require https://www.python.org/downloads/[python 3]. Make sure that some python 3 version is installed (e.g. Python 3.8.1).
+
+== Creating native build files for the simulator
+
+As is always the case with CMake, an "out-of-source build" should be preferred. This means that you create the project files in a directory that is separate from the rest of the repository. While it is possible to create such an "out-of-source build" in a directory within the repository, a sibling directory is preferred as some build configurations might not work properly with in-repo directories.
+
+1. Create a sibling directory next to the repository
+2. Open the Command Line / Terminal in this directory
+3. Execute the following: `cmake ../fruitymesh` (assuming the repository has the default "fruitymesh" name).
+
+The necessary build files are created inside the sibling directory. To make sure that everything worked as intended try to compile and run the cherrySim_runner and cherrySim_tester projects. In case you are using visual studio, open the Solution file (.sln), right click the projects on the left side and select "start up project".
+
+== Creating native build files for the feature sets
+
+Building the feature sets is mostly the same as with the simulator. The only difference is that some extra parameters need to be passed to cmake:
+
+`cmake ../fruitymesh -DBUILD_FEATURESETS=ON -DGCC_PATH="C:/path/to/gcc-arm-none-eabi-4_9" -G "Unix Makefiles"`
+
+WARNING: The GCC_PATH must be specified using forward slashes ("/"), not backward slashes ("\").
+
+== Executing the compiler
+
+Once the native build files are created, it is possible to create all the executables without interacting with the native compiler directly. To do this, while being in the directory where you created the native build files, execute `cmake --build .`. If you are using visual studio, the .exe files are then located inside the `Debug` directory.
+
+=== Trouble shooting
+
+1. 32 bit compilation must be available. On some systems this is not the case by default. If you are using Visual Studio, the flag `-A Win32` forces cmake to generate a 32 bit compatible solution.
+2. If several visual studio versions are installed (e.g. 2017 + 2019), make sure that you are starting the solution file with the correct visual studio version.
+3. "Invalid character escape": If you pass any paths with white spaces you have to put them into quotation marks. If cmake still complains about wrong escape chars you have to remove all the cache files.
