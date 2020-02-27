@@ -171,10 +171,10 @@ protected:
 		//This can be used to get access to all routed messages and modify their content, block them or re-route them
 		//A routing decision must be returned and all the routing decisions are ORed together so that a block from one module
 		//will definitely block the message
-		virtual RoutingDecision MessageRoutingInterceptor(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) { return 0; };
+		virtual RoutingDecision MessageRoutingInterceptor(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) { return 0; };
 
 		//This handler receives all connection packets addressed to this node
-		virtual void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader);
+		virtual void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader);
 
 		//This handler is called before the node is enrolled, it can return PRE_ENROLLMENT_ codes
 		virtual PreEnrollmentReturnCode PreEnrollmentHandler(connPacketModule* packet, u16 packetLength);
@@ -199,12 +199,12 @@ protected:
 		//MeshAccessConnections should only allow authorized packets to be sent into the mesh
 		//This function is called once a packet was received through a meshAccessConnection to
 		//query if the packet can be sent through. It can also be modified by this handler
-		virtual MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, FmKeyId fmKeyId, DataDirection direction){ return MeshAccessAuthorization::UNDETERMINED; };
+		virtual MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction){ return MeshAccessAuthorization::UNDETERMINED; };
 
 		//This method must be implemented by modules that support component updates
 		//The module must answer weather it wants to accept the update (0) or not (negative result)
 		//If the request is handled asynchronously, the module must return dfu start response QUERY_WAITING and must then manually call ContinueDfuStart
-		virtual DfuStartDfuResponseCode CheckComponentUpdateRequest(connPacketModule* inPacket, u32 version, ImageType imageType, u8 componentId){ return DfuStartDfuResponseCode::MODULE_NOT_UPDATABLE; };
+		virtual DfuStartDfuResponseCode CheckComponentUpdateRequest(connPacketModule const * inPacket, u32 version, ImageType imageType, u8 componentId){ return DfuStartDfuResponseCode::MODULE_NOT_UPDATABLE; };
 
 		//This method allows a module to update its component
 		//The module must ensure that subsequent calls to this method do not interfere with the update process

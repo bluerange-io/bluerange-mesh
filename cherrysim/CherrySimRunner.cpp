@@ -90,8 +90,10 @@ int main(int argc, char** argv) {
 	printf("Current Working Directory: %s" EOL, currentWorkingDir.string().c_str());
 #endif
 
-	//ErrorCodeUnknownExceptions are correctly handled by FruityMesh, they don't require us to terminate the simulator.
+	//The following exceptions are correctly handled by FruityMesh, they don't require us to terminate the simulator.
 	Exceptions::ExceptionDisabler<ErrorCodeUnknownException> ecue;
+	Exceptions::ExceptionDisabler<CRCMissingException> crcme;
+	Exceptions::ExceptionDisabler<CRCInvalidException> crcie;
 
 	CherrySimRunner* runner = new CherrySimRunner(runnerConfig, simConfig, meshGwCommunication);
 	printf("Launching Runner..." EOL);

@@ -45,7 +45,7 @@ TEST(TestRawData, TestRawDataLight) {
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.Start();
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	tester.SendTerminalCommand(1, "raw_data_light 2 0 1 abcdeQ==");
 	tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_light\",\"module\":0,\"protocol\":1,\"payload\":\"abcdeQ==\",\"requestHandle\":0}");
@@ -75,7 +75,7 @@ TEST(TestRawData, TestSimpleTransmissions) {
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.Start();
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	tester.SendTerminalCommand(1, "raw_data_start 2 0 128 2");
 	tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_start\",\"module\":0,\"numChunks\":128,\"protocol\":2,\"fmKeyId\":0,\"requestHandle\":0}");
@@ -194,7 +194,7 @@ TEST(TestRawData, TestTransmissionsOfAllPossibleSizes) {
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.Start();
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	{
 		std::string buffer = "";
@@ -222,7 +222,7 @@ TEST(TestRawData, TestRandomTransmissions) {
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 		tester.Start();
-		tester.SimulateUntilClusteringDone(0);
+		tester.SimulateUntilClusteringDone(100 * 1000);
 		u8 payloadBuffer[120];
 
 		for (int transmission = 0; transmission < 50; transmission++) {

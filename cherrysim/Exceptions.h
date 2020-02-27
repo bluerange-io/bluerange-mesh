@@ -44,6 +44,8 @@ struct FruityMeshException : public std::exception {};
 
 CREATEEXCEPTION(IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(CommandNotFoundException                                  , IllegalArgumentException);
+CREATEEXCEPTIONINHERITING(CRCMissingException                                       , IllegalArgumentException);
+CREATEEXCEPTIONINHERITING(CRCInvalidException                                       , IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(WrongCommandParameterException                            , IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(TooFewParameterException                                  , IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(MessageTooLongException                                   , IllegalArgumentException);
@@ -72,6 +74,7 @@ CREATEEXCEPTIONINHERITING(TooManyTerminalJsonListenersException   , BufferExcept
 CREATEEXCEPTIONINHERITING(TooManyModulesException                 , BufferException);
 CREATEEXCEPTIONINHERITING(RequiredFlashTooBigException            , BufferException);
 CREATEEXCEPTIONINHERITING(DataToCacheTooBigException              , BufferException);
+CREATEEXCEPTIONINHERITING(PacketStatBufferSizeNotEnough, BufferException);
 
 CREATEEXCEPTION(PaketException);
 CREATEEXCEPTIONINHERITING(PaketTooSmallException           , PaketException);
@@ -97,6 +100,7 @@ CREATEEXCEPTION(IllegalAdvertismentStateException);
 CREATEEXCEPTION(MalformedPaketException);
 CREATEEXCEPTION(NotImplementedException);
 CREATEEXCEPTION(CorruptOrOutdatedSavefile);
+CREATEEXCEPTION(ZeroTimeoutNotSupportedException);
 //LCOV_EXCL_STOP debug code
 
 #undef CREATEEXCEPTION //Exceptions must be created above!

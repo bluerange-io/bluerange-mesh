@@ -77,7 +77,7 @@ namespace FruityHal
 	class BleEvent
 	{
 	protected:
-		explicit BleEvent(void* evt);
+		explicit BleEvent(void const * evt);
 	#ifdef SIM_ENABLED //Unfortunatly a virtual destructor is too expensive for the real firmware.
 		virtual ~BleEvent();
 	#endif
@@ -86,7 +86,7 @@ namespace FruityHal
 	class GapEvent : public BleEvent 
 	{
 	protected:
-		explicit GapEvent(void* evt);
+		explicit GapEvent(void const * evt);
 	public:
 		u16 getConnectionHandle() const;
 	};
@@ -94,21 +94,21 @@ namespace FruityHal
 	class GapConnParamUpdateEvent : public GapEvent 
 	{
 	public:
-		explicit GapConnParamUpdateEvent(void* evt);
+		explicit GapConnParamUpdateEvent(void const * evt);
 		u16 getMaxConnectionInterval() const;
 	};
 
 	class GapRssiChangedEvent : public GapEvent
 	{
 	public:
-		explicit GapRssiChangedEvent(void* evt);
+		explicit GapRssiChangedEvent(void const * evt);
 		i8 getRssi() const;
 	};
 
 	class GapAdvertisementReportEvent : public GapEvent
 	{
 	public:
-		explicit GapAdvertisementReportEvent(void* evt);
+		explicit GapAdvertisementReportEvent(void const * evt);
 		i8 getRssi() const;
 		const u8* getData() const;
 		u32 getDataLength() const;
@@ -126,7 +126,7 @@ namespace FruityHal
 	class GapConnectedEvent : public GapEvent
 	{
 	public:
-		explicit GapConnectedEvent(void* evt);
+		explicit GapConnectedEvent(void const * evt);
 		GapRole getRole() const;
 		const u8* getPeerAddr() const;
 		u8 getPeerAddrType() const;
@@ -136,7 +136,7 @@ namespace FruityHal
 	class GapDisconnectedEvent : public GapEvent
 	{
 	public:
-		explicit GapDisconnectedEvent(void* evt);
+		explicit GapDisconnectedEvent(void const * evt);
 		FruityHal::BleHciError getReason() const;
 	};
 
@@ -153,14 +153,14 @@ namespace FruityHal
 	class GapTimeoutEvent : public GapEvent
 	{
 	public:
-		explicit GapTimeoutEvent(void* evt);
+		explicit GapTimeoutEvent(void const * evt);
 		GapTimeoutSource getSource() const;
 	};
 
 	class GapSecurityInfoRequestEvent : public GapEvent
 	{
 	public:
-		explicit GapSecurityInfoRequestEvent(void* evt);
+		explicit GapSecurityInfoRequestEvent(void const * evt);
 	};
 
 	enum class SecurityMode : u8
@@ -183,7 +183,7 @@ namespace FruityHal
 	class GapConnectionSecurityUpdateEvent : public GapEvent
 	{
 	public:
-		explicit GapConnectionSecurityUpdateEvent(void* evt);
+		explicit GapConnectionSecurityUpdateEvent(void const * evt);
 		u8 getKeySize() const;
 		SecurityLevel getSecurityLevel() const;
 		SecurityMode getSecurityMode() const;
@@ -192,7 +192,7 @@ namespace FruityHal
 	class GattcEvent : public BleEvent
 	{
 	public:
-		explicit GattcEvent(void* evt);
+		explicit GattcEvent(void const * evt);
 		u16 getConnectionHandle() const;
 		FruityHal::BleGattEror getGattStatus() const;
 	};
@@ -200,19 +200,19 @@ namespace FruityHal
 	class GattcWriteResponseEvent : public GattcEvent
 	{
 	public:
-		explicit GattcWriteResponseEvent(void* evt);
+		explicit GattcWriteResponseEvent(void const * evt);
 	};
 
 	class GattcTimeoutEvent : public GattcEvent
 	{
 	public:
-		explicit GattcTimeoutEvent(void* evt);
+		explicit GattcTimeoutEvent(void const * evt);
 	};
 
 	class GattDataTransmittedEvent : public BleEvent /* Note: This is not a Gatt event because of implementation changes in the Nordic SDK. */
 	{
 	public:
-		explicit GattDataTransmittedEvent(void* evt);
+		explicit GattDataTransmittedEvent(void const * evt);
 
 		u16 getConnectionHandle() const;
 		bool isConnectionHandleValid() const;
@@ -222,23 +222,23 @@ namespace FruityHal
 	class GattsWriteEvent : public BleEvent
 	{
 	public:
-		explicit GattsWriteEvent(void* evt);
+		explicit GattsWriteEvent(void const * evt);
 
 		u16 getAttributeHandle() const;
 		bool isWriteRequest() const;
 		u16 getLength() const;
 		u16 getConnectionHandle() const;
-		u8* getData() const;
+		u8 const * getData() const;
 	};
 
 	class GattcHandleValueEvent : public GattcEvent
 	{
 	public:
-		explicit GattcHandleValueEvent(void* evt);
+		explicit GattcHandleValueEvent(void const * evt);
 
 		u16 getHandle() const;
 		u16 getLength() const;
-		u8* getData() const;
+		u8 const * getData() const;
 
 	};
 
@@ -322,7 +322,7 @@ namespace FruityHal
 	ErrorType BleStackInit();
 	void BleStackDeinit();
 	void EventLooper();
-	void DispatchBleEvents(void* evt);
+	void DispatchBleEvents(void const * evt);
 	void SetPendingEventIRQ();
 
 	// ######################### GAP ############################
@@ -508,6 +508,8 @@ namespace FruityHal
 	u32 GetCodeSize();
 	u32 GetDeviceId();
 	void GetDeviceAddress(u8 * p_address);
+
+	u32 GetHalMemorySize();
 }
 
 extern "C" {

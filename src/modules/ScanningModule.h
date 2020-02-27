@@ -109,8 +109,11 @@ private:
 		u32 serialNumberIndex;
 		NodeId nodeId;
 		u8 speed;
-		u8 direction;
 		u16 pressure;
+		u8 hasFreeInConnection : 1;
+		u8 interestedInConnection : 1;
+		u8 hasSameNetworkId : 1;
+		u8 reservedBits : 5;
 	};
 
 	SimpleArray<ScannedAssetTrackingStorage, ASSET_PACKET_BUFFER_SIZE> assetPackets;
@@ -161,7 +164,10 @@ private:
 		i8 rssi38;
 		i8 rssi39;
 		u8 speed : 4;
-		u8 direction : 4;
+		u8 hasFreeInConnection : 1;
+		u8 interestedInConnection : 1;
+		u8 hasSameNetworkId : 1;
+		u8 reservedBits : 1;
 		u8 pressure;
 	} trackedAssetV2;
 	STATIC_ASSERT_SIZE(trackedAssetV2, 8);
@@ -183,7 +189,10 @@ private:
 		u16 absolutePositionY;
 		u8 pressure;
 		u8 moving : 1;
-		u8 reservedBits : 7;
+		u8 hasFreeInConnection : 1;
+		u8 interestedInConnection : 1;
+		u8 hasSameNetworkId : 1;
+		u8 reservedBits : 4;
 	};
 	STATIC_ASSERT_SIZE(TrackedAssetInsMessage, 12);
 
@@ -197,6 +206,10 @@ private:
 		u16 absolutePositionY;
 		u16 pressure;
 		u8 moving : 1;
+		u8 hasFreeInConnection : 1;
+		u8 interestedInConnection : 1;
+		u8 hasSameNetworkId : 1;
+		u8 reservedBits : 5;
 	};
 
 	SimpleArray<ScannedAssetInsTrackingStorage, ASSET_INS_PACKET_BUFFER_SIZE> assetInsPackets;
@@ -210,8 +223,8 @@ private:
 	void HandleAssetInsPackets(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent);
 	bool addTrackedAsset(const advPacketAssetServiceData* packet, i8 rssi);
 	bool addTrackedAssetIns(const advPacketAssetInsServiceData* packet, i8 rssi);
-	void ReceiveTrackedAssets(BaseConnectionSendData* sendData, ScanModuleTrackedAssetsV2Message* packet) const;
-	void ReceiveTrackedAssetsIns(TrackedAssetInsMessage *msg, u32 amount, NodeId sender) const;
+	void ReceiveTrackedAssets(BaseConnectionSendData* sendData, ScanModuleTrackedAssetsV2Message const * packet) const;
+	void ReceiveTrackedAssetsIns(TrackedAssetInsMessage const * msg, u32 amount, NodeId sender) const;
 	void RssiRunningAverageCalculationInPlace(RssiContainer &container, u8 advertisingChannel, i8 rssi);
 
 	//Byte muss gesetzt sein, byte darf nicht gesetzt sein, byte ist egal
@@ -260,7 +273,7 @@ public:
 
 	virtual void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override;
 
-	void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) override;
+	void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
 
 #ifdef TERMINAL_ENABLED
 	TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;

@@ -250,6 +250,16 @@ char * Terminal::getReadBuffer()
 	return readBuffer;
 }
 
+void Terminal::EnableCrcChecks()
+{
+	crcChecksEnabled = true;
+}
+
+bool Terminal::IsCrcChecksEnabled()
+{
+	return crcChecksEnabled;
+}
+
 // Checks all transports if a line is available (or retrieves a line)
 // Then processes it
 void Terminal::CheckAndProcessLine()
@@ -274,6 +284,41 @@ void Terminal::CheckAndProcessLine()
 void Terminal::ProcessLine(char* line)
 {
 #ifdef TERMINAL_ENABLED
+	if (crcChecksEnabled)
+	{
+		char* crcLocation = Utility::FindLast(line, " CRC: ");
+		if (crcLocation != nullptr)
+		{
+			crcLocation[0] = '\0'; // Cut off the CRC part from the rest of the message.
+			crcLocation += 6; // The length of " CRC: "
+			bool didError = false;
+			const u32 passedCrc   = Utility::StringToU32(crcLocation, &didError);
+			const u32 expectedCrc = Utility::CalculateCrc32String(line);
+			if (didError || passedCrc != expectedCrc)
+			{
+				if (Conf::getInstance().terminalMode == TerminalMode::PROMPT) {
+					log_transport_putstring("CRC invalid!" EOL);
+				}
+				else {
+					logjson_error(Logger::UartErrorType::CRC_INVALID);
+				}
+				SIMEXCEPTION(CRCInvalidException);
+				return;
+			}
+		}
+		else
+		{
+			if (Conf::getInstance().terminalMode == TerminalMode::PROMPT) {
+				log_transport_putstring("CRC missing!" EOL);
+			}
+			else {
+				logjson_error(Logger::UartErrorType::CRC_MISSING);
+			}
+			SIMEXCEPTION(CRCMissingException);
+			return;
+		}
+	}
+
 	//Tokenize input string into vector
 	u16 size = (u16)strlen(line);
 	i32 commandArgsSize = TokenizeLine(line, size);
@@ -316,10 +361,21 @@ void Terminal::ProcessLine(char* line)
 	{
 		if(Conf::getInstance().terminalMode == TerminalMode::PROMPT)
 		{
-			log_transport_putstring("Command not found" EOL);
+			log_transport_putstring("Command not found:" );
+			for (u32 i = 0; i < (u8)commandArgsSize; i++) 
+			{
+				log_transport_putstring(" ");
+				log_transport_putstring(commandArgsPtr[i]);
+			}
+			log_transport_putstring(EOL);
 		} else
 		{
-			logjson_error(Logger::UartErrorType::COMMAND_NOT_FOUND);
+			logjson_partial("ERROR", "{\"type\":\"error\",\"code\":1,\"text\":\"Command not found:");
+			for (u32 i = 0; i < (u8)commandArgsSize; i++) 
+			{
+				logjson_partial("ERROR", " %s", commandArgsPtr[i]);
+			}
+			logjson("ERROR", "\"}" SEP);
 		}
 #ifdef CHERRYSIM_TESTER_ENABLED
 		SIMEXCEPTION(CommandNotFoundException);
@@ -764,7 +820,7 @@ void Terminal::StdioCheckAndProcessLine()
 #endif
 	if (cherrySimInstance->simConfig.terminalId != cherrySimInstance->currentNode->id && cherrySimInstance->simConfig.terminalId != 0) return;
 
-#if (defined(__unix) && !defined(CHERRYSIM_TESTER_ENABLED)) || defined(_WIN32)
+#if ((defined(__unix) || defined(_WIN32)) && !defined(CHERRYSIM_TESTER_ENABLED))
 	if(!meshGwCommunication && _kbhit() != 0){ //FIXME: Not supported by eclipse console
 		printf("mhTerm: ");
 		WriteStdioLineToReadBuffer();

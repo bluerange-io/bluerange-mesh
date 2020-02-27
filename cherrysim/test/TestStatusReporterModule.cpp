@@ -46,7 +46,7 @@ TEST(TestStatusReporterModule, TestCommands) {
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	tester.sim->findNodeById(1)->gs.logger.enableTag("DEBUGMOD");
 	tester.sim->findNodeById(2)->gs.logger.enableTag("DEBUGMOD");
@@ -91,7 +91,7 @@ TEST(TestStatusReporterModule, TestHopsToSinkFixing) {
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	for (int i = 1; i <= 6; i++) tester.sim->findNodeById(i)->gs.logger.enableTag("DEBUGMOD");
 
@@ -121,8 +121,7 @@ TEST(TestStatusReporterModule, TestHopsToSinkFixing) {
 
 	// get_erros will collect errors from the node but will also clear them
 	tester.SendTerminalCommand(1, "action 2 status get_errors");
-	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,");
-	tester.SimulateUntilMessageReceived(10 * 1000, 1, "\"errType\":%u,\"code\":%u,\"extra\":%u", LoggingError::CUSTOM, CustomErrorTypes::FATAL_INCORRECT_HOPS_TO_SINK, (validHops << 16) | invalidHops);
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":2,\"code\":44,\"extra\":%u", invalidHops);
 
 
 	tester.SendTerminalCommand(1, "action max_hops status keep_alive");

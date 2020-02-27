@@ -65,19 +65,19 @@ ConnectionAllocator::AnyConnection * ConnectionAllocator::allocateMemory()
 	return oldHead;
 }
 
-MeshConnection * ConnectionAllocator::allocateMeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, u16 partnerWriteCharacteristicHandle)
+MeshConnection * ConnectionAllocator::allocateMeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, u16 partnerWriteCharacteristicHandle)
 {
 	MeshConnection* retVal = reinterpret_cast<MeshConnection*>(allocateMemory());
 	new (retVal) MeshConnection(id, direction, partnerAddress, partnerWriteCharacteristicHandle);
 	return retVal;
 }
-ResolverConnection * ConnectionAllocator::allocateResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr * partnerAddress)
+ResolverConnection * ConnectionAllocator::allocateResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress)
 {
 	ResolverConnection* retVal = reinterpret_cast<ResolverConnection*>(allocateMemory());
 	new (retVal) ResolverConnection(id, direction, partnerAddress);
 	return retVal;
 }
-MeshAccessConnection * ConnectionAllocator::allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType)
+MeshAccessConnection * ConnectionAllocator::allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType)
 {
 	MeshAccessConnection* retVal = reinterpret_cast<MeshAccessConnection*>(allocateMemory());
 	new (retVal) MeshAccessConnection(id, direction, partnerAddress, fmKeyId, tunnelType);
@@ -85,7 +85,7 @@ MeshAccessConnection * ConnectionAllocator::allocateMeshAccessConnection(u8 id, 
 }
 #if IS_ACTIVE(CLC_CONN)
 #ifndef GITHUB_RELEASE
-ClcAppConnection * ConnectionAllocator::allocateClcAppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr * partnerAddress)
+ClcAppConnection * ConnectionAllocator::allocateClcAppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress)
 {
 	ClcAppConnection* retVal = reinterpret_cast<ClcAppConnection*>(allocateMemory());
 	new (retVal) ClcAppConnection(id, direction, partnerAddress);

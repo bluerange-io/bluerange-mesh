@@ -554,7 +554,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 	{
 		u8 checkvar = 1;
 		logjson("NODE", "{\"stack\":%u}" SEP, (u32)(&checkvar - 0x20000000));
-		logjson("NODE", "Module usage: %u" SEP, GS->moduleAllocator.getMemorySize());
+		logt("NODE", "Module usage: %u" SEP, GS->moduleAllocator.getMemorySize());
 
 		return TerminalCommandHandlerReturnType::SUCCESS;
 
@@ -885,14 +885,14 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 }
 #endif
 
-void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
+void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
 {
 	//Must call superclass for handling
 	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
 	//Check if this request is meant for modules in general
 	if (packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION) {
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 		DebugModuleTriggerActionMessages actionType = (DebugModuleTriggerActionMessages)packet->actionType;
 
 		//Check if our module is meant and we should trigger an action
@@ -901,7 +901,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 			if (actionType == DebugModuleTriggerActionMessages::SET_FLOOD_MODE)
 			{
 #if IS_INACTIVE(SAVE_SPACE)
-				DebugModuleSetFloodModeMessage* data = (DebugModuleSetFloodModeMessage*)packet->data;
+				DebugModuleSetFloodModeMessage const * data = (DebugModuleSetFloodModeMessage const *)packet->data;
 				floodMode = (FloodMode)data->floodMode;
 				floodFrameSkip = true;
 				floodDestinationId = data->floodDestinationId;
@@ -925,7 +925,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 			}
 			if (actionType == DebugModuleTriggerActionMessages::START_COUNTER)
 			{
-				DebugModuleStartCounterMessage* data = (DebugModuleStartCounterMessage*)packet->data;
+				DebugModuleStartCounterMessage const * data = (DebugModuleStartCounterMessage const *)packet->data;
 				counterDestinationId = data->counterDestinationId;
 				counterMessagesPer10Sec = data->packetsPer10Sec;
 				counterMaxCount = data->maxCount;
@@ -933,7 +933,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 			}
 			if (actionType == DebugModuleTriggerActionMessages::COUNTER)
 			{
-				DebugModuleCounterMessage* data = (DebugModuleCounterMessage*)packet->data;
+				DebugModuleCounterMessage const * data = (DebugModuleCounterMessage const *)packet->data;
 
 				logjson("DEBUGMOD", "{\"type\":\"counter\",\"nodeId\":%u,\"value\":%u}" SEP, packet->header.sender, data->counter);
 
@@ -952,7 +952,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 			}
 			else if (actionType == DebugModuleTriggerActionMessages::FLOOD_MESSAGE)
 			{
-				DebugModuleFloodMessage* data = (DebugModuleFloodMessage*)packet->data;
+				DebugModuleFloodMessage const * data = (DebugModuleFloodMessage const *)packet->data;
 
 				if (floodMode == FloodMode::LISTEN) {
 					if (packet->header.sender == floodDestinationId) {
@@ -974,7 +974,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 			//contents can be read back. This is only for analyzing bugs
 			else if (actionType == DebugModuleTriggerActionMessages::READ_MEMORY)
 			{
-				DebugModuleReadMemoryMessage* data = (DebugModuleReadMemoryMessage*)packet->data;
+				DebugModuleReadMemoryMessage const * data = (DebugModuleReadMemoryMessage const *)packet->data;
 
 				if (data->length > readMemMaxLength) return;
 
@@ -1098,9 +1098,9 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 				}
 
 				//Insert our nodeId into the packet
-				DebugModuleLpingMessage* lpingData = (DebugModuleLpingMessage*)packet->data;
-				lpingData->hops = 500 - (packetHeader->receiver - NODE_ID_HOPS_BASE);
-				lpingData->leafNodeId = GS->node.configuration.nodeId;
+				DebugModuleLpingMessage reply = *(DebugModuleLpingMessage const *)packet->data;
+				reply.hops = 500 - (packetHeader->receiver - NODE_ID_HOPS_BASE);
+				reply.leafNodeId = GS->node.configuration.nodeId;
 
 				//We respond to the ping
 				SendModuleActionMessage(
@@ -1108,7 +1108,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 					packet->header.sender,
 					(u8)DebugModuleActionResponseMessages::LPING_RESPONSE,
 					packet->requestHandle,
-					(u8*)lpingData,
+					(u8*)&reply,
 					SIZEOF_DEBUG_MODULE_LPING_MESSAGE,
 					sendData->deliveryOption == DeliveryOption::WRITE_REQ
 				);
@@ -1116,18 +1116,19 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 			}
 			else if (actionType == DebugModuleTriggerActionMessages::PINGPONG) {
 
-				DebugModulePingpongMessage* data = (DebugModulePingpongMessage*)packet->data;
+				DebugModulePingpongMessage const * data = (DebugModulePingpongMessage const *)packet->data;
 
 				//Ping should still pong, return it
 				if (data->ttl > 0) {
-					data->ttl--;
+					DebugModulePingpongMessage reply = *data;
+					reply.ttl = data->ttl - 1;
 
 					SendModuleActionMessage(
 						MessageType::MODULE_TRIGGER_ACTION,
 						packet->header.sender,
 						(u8)DebugModuleTriggerActionMessages::PINGPONG,
 						packet->requestHandle,
-						(u8*)data,
+						(u8*)&reply,
 						SIZEOF_DEBUG_MODULE_PINGPONG_MESSAGE,
 						sendData->deliveryOption == DeliveryOption::WRITE_REQ
 					);
@@ -1149,24 +1150,24 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 	else if (packetHeader->messageType == MessageType::DATA_1) {
 		if (sendData->dataLength >= SIZEOF_CONN_PACKET_HEADER + 3) //We do not need the full data paket, just the bytes that we read
 		{
-			connPacketData1* packet = (connPacketData1*)packetHeader;
+			connPacketData1 const * packet = (connPacketData1 const *)packetHeader;
 			NodeId partnerId = connection == nullptr ? 0 : connection->partnerId;
 
 			logt("DATA", "IN <= %d ################## Got Data packet %d:%d:%d (len:%d,%s) ##################", partnerId, packet->payload.data[0], packet->payload.data[1], packet->payload.data[2], sendData->dataLength, sendData->deliveryOption == DeliveryOption::WRITE_REQ ? "r" : "u");
 		}
 	}
 	else if (packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE) {
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 		DebugModuleActionResponseMessages actionType = (DebugModuleActionResponseMessages)packet->actionType;
 
 		//Check if our module is meant
 		if(packet->moduleId == moduleId){
 #if IS_INACTIVE(SAVE_SPACE)
 			if (actionType == DebugModuleActionResponseMessages::STATS_MESSAGE){
-				DebugModuleInfoMessage* infoMessage = (DebugModuleInfoMessage*) packet->data;
+				DebugModuleInfoMessage const * infoMessage = (DebugModuleInfoMessage const *) packet->data;
 
-				logjson("DEBUGMOD", "{\"nodeId\":%u,\"type\":\"debug_stats\", \"conLoss\":%u,", packet->header.sender, infoMessage->connectionLossCounter);
-				logjson("DEBUGMOD", "\"dropped\":%u,", infoMessage->droppedPackets);
+				logjson_partial("DEBUGMOD", "{\"nodeId\":%u,\"type\":\"debug_stats\", \"conLoss\":%u,", packet->header.sender, infoMessage->connectionLossCounter);
+				logjson_partial("DEBUGMOD", "\"dropped\":%u,", infoMessage->droppedPackets);
 				logjson("DEBUGMOD", "\"sentRel\":%u,\"sentUnr\":%u}" SEP, infoMessage->sentPacketsReliable, infoMessage->sentPacketsUnreliable);
 			}
 			else if(actionType == DebugModuleActionResponseMessages::PING_RESPONSE){
@@ -1181,7 +1182,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 				//logjson("DEBUGMOD", "{\"type\":\"ping_response\",\"passedTime\":%u}" SEP, timePassedMs);
 			}
 			else if (actionType == DebugModuleActionResponseMessages::SEND_MAX_MESSAGE_RESPONSE) {
-				DebugModuleSendMaxMessageResponse* message = (DebugModuleSendMaxMessageResponse*)packet->data;
+				DebugModuleSendMaxMessageResponse const * message = (DebugModuleSendMaxMessageResponse const *)packet->data;
 				u32 i;
 				for (i = 0; i < sizeof(message->data); i++){
 					u8 expectedValue = (i % 50) + 100;
@@ -1195,7 +1196,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 			else if (actionType == DebugModuleActionResponseMessages::MEMORY) {
 				if (sendData->dataLength < SIZEOF_CONN_PACKET_MODULE + SIZEOF_DEBUG_MODULE_MEMORY_MESSAGE_HEADER) return;
 
-				DebugModuleMemoryMessage* message = (DebugModuleMemoryMessage*)packet->data;
+				DebugModuleMemoryMessage const * message = (DebugModuleMemoryMessage const *)packet->data;
 				
 				u16 memoryLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE - SIZEOF_DEBUG_MODULE_MEMORY_MESSAGE_HEADER;
 
@@ -1214,7 +1215,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 			else if(actionType == DebugModuleActionResponseMessages::LPING_RESPONSE){
 				//Calculate the time it took to ping the other node
 
-				DebugModuleLpingMessage* lpingData = (DebugModuleLpingMessage*)packet->data;
+				DebugModuleLpingMessage const * lpingData = (DebugModuleLpingMessage const *)packet->data;
 
 				u32 nowTimeMs;
 				u32 timePassedMs;

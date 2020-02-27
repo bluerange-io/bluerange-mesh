@@ -77,12 +77,12 @@ public:
 	static ConnectionAllocator& getInstance();
 
 
-	MeshConnection*       allocateMeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, u16 partnerWriteCharacteristicHandle);
-	ResolverConnection*   allocateResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress);
-	MeshAccessConnection* allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType);
+	MeshConnection*       allocateMeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, u16 partnerWriteCharacteristicHandle);
+	ResolverConnection*   allocateResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
+	MeshAccessConnection* allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType);
 #if IS_ACTIVE(CLC_CONN)
 #ifndef GITHUB_RELEASE
-	ClcAppConnection*     allocateClcAppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress);
+	ClcAppConnection*     allocateClcAppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
 #endif //GITHUB_RELEASE
 #endif
 

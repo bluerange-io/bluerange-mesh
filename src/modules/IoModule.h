@@ -103,7 +103,7 @@ class IoModule: public Module
 
 		void TimerEventHandler(u16 passedTimeDs) override;
 
-		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) override;
+		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
 
 		#ifdef TERMINAL_ENABLED
 		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;

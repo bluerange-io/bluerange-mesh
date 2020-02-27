@@ -112,15 +112,15 @@ public:
 	NodeId connectionStateSubscriberId = 0;
 
 
-	MeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType);
+	MeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType);
 	virtual ~MeshAccessConnection();
-	static BaseConnection* ConnTypeResolver(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8* data);
+	static BaseConnection* ConnTypeResolver(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8 const * data);
 
-	void SetCustomKey(u8* key);
+	void SetCustomKey(u8 const * key);
 
 	/*############### Connect ##################*/
 	//Returns the unique connection id that was created
-	static u32 ConnectAsMaster(FruityHal::BleGapAddr* address, u16 connIntervalMs, u16 connectionTimeoutSec, FmKeyId fmKeyId, u8* customKey, MeshAccessTunnelType tunnelType);
+	static u32 ConnectAsMaster(FruityHal::BleGapAddr const * address, u16 connIntervalMs, u16 connectionTimeoutSec, FmKeyId fmKeyId, u8 const * customKey, MeshAccessTunnelType tunnelType);
 
 	//Will create a connection that collects potential candidates and connects to them
 	static u16 SearchAndConnectAsMaster(NetworkId networkId, u32 serialNumberIndex, u16 searchTimeDs, u16 connIntervalMs, u16 connectionTimeoutSec);
@@ -129,9 +129,9 @@ public:
 
 	/*############### Handshake ##################*/
 	void StartHandshake(FmKeyId fmKeyId);
-	void HandshakeANonce(connPacketEncryptCustomStart* inPacket);
-	void HandshakeSNonce(connPacketEncryptCustomANonce* inPacket);
-	void HandshakeDone(connPacketEncryptCustomSNonce* inPacket);
+	void HandshakeANonce(connPacketEncryptCustomStart const * inPacket);
+	void HandshakeSNonce(connPacketEncryptCustomANonce const * inPacket);
+	void HandshakeDone(connPacketEncryptCustomSNonce const * inPacket);
 
 	void SendClusterState();
 	void NotifyConnectionStateSubscriber(ConnectionState state) const;
@@ -142,19 +142,19 @@ public:
 	void EncryptPacket(u8* data, u16 dataLength);
 
 	//Decrypts the data in place (dataLength includes MIC) with the session key
-	bool DecryptPacket(u8* data, u16 dataLength);
+	bool DecryptPacket(u8 const * data, u8 * decryptedOut, u16 dataLength);
 
 
 	/*############### Sending ##################*/
 	SizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer) override;
-	bool SendData(BaseConnectionSendData* sendData, u8* data);
-	bool SendData(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable) override;
+	bool SendData(BaseConnectionSendData* sendData, u8 const * data);
+	bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable) override;
 	bool ShouldSendDataToNodeId(NodeId nodeId) const;
 	void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData) override;
 
 	/*############### Receiving ##################*/
-	void ReceiveDataHandler(BaseConnectionSendData* sendData, u8* data) override;
-	void ReceiveMeshAccessMessageHandler(BaseConnectionSendData* sendData, u8* data);
+	void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) override;
+	void ReceiveMeshAccessMessageHandler(BaseConnectionSendData* sendData, u8 const * data);
 
 	/*############### Handler ##################*/
 	void ConnectionSuccessfulHandler(u16 connectionHandle) override;

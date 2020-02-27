@@ -401,7 +401,7 @@ TEST(TestClustering, TestMeshingUnderLoad) {
 	for (u32 i = 0; i < simConfig.numNodes; i++) {
 		tester.SendTerminalCommand(i+1, "action this debug flood 0 4 200");
 	}
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	printf("Clustering under load took %u seconds", tester.sim->simState.simTimeMs / 1000);
 }
@@ -416,7 +416,7 @@ TEST(TestClustering, SimulateLongevity_long) {
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	for (u32 i = 0; i < numIterations; i++) {
 		tester.SimulateForGivenTime(20 * 1000);
@@ -540,10 +540,6 @@ TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
 				FAIL() << "Wrong hop amount to sink for node " << node->id;
 			}
 		}
-
-		//For testing
-		//tester.sim->simConfig.terminalId = 1;
-		//tester.SimulateForever();
 	}
 }
 
@@ -644,8 +640,6 @@ TEST(TestClustering, TestEmergencyDisconnect) {
 	{
 		tester.SimulateUntilMessageReceived(200 * 1000, 1, "Emergency disconnect");
 	}
-
-	//tester.SimulateForever();
 }
 
 

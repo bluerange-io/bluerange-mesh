@@ -110,13 +110,13 @@ TerminalCommandHandlerReturnType TemplateModule::TerminalCommandHandler(const ch
 #endif
 
 
-void TemplateModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
+void TemplateModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
 {
 	//Must call superclass for handling
 	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
 	if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId){
@@ -128,7 +128,7 @@ void TemplateModule::MeshMessageReceivedHandler(BaseConnection* connection, Base
 
 	//Parse Module responses
 	if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId)

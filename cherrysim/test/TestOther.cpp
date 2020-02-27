@@ -206,7 +206,7 @@ TEST(TestOther, ConfigurationTest)
 	tester.Start();
 
 
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 }
 
 //This test should check if two different configurations can be applied to two nodes using the simulator
@@ -224,7 +224,7 @@ TEST(TestOther, SinkInMesh)
 
 	tester.Start();
 
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	//TODO: check that configurations were used
 }

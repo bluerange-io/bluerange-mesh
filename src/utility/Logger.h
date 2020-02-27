@@ -40,6 +40,9 @@
 #include <Config.h>
 #include <Boardconfig.h>
 #include <Terminal.h>
+#ifdef SIM_ENABLED
+#include <string>
+#endif
 #include "SimpleArray.h"
 
 constexpr int MAX_ACTIVATE_LOG_TAG_NUM = 40;
@@ -140,6 +143,12 @@ private:
 
 	SimpleArray<char, MAX_ACTIVATE_LOG_TAG_NUM * MAX_LOG_TAG_LENGTH> activeLogTags;
 
+	u32 currentJsonCrc = 0;
+
+#ifdef SIM_ENABLED
+	std::string currentString = "";
+#endif
+
 public:
 	Logger();
 	static Logger& getInstance();
@@ -173,6 +182,8 @@ public:
 		TOO_MANY_ARGUMENTS = 3,
 		TOO_FEW_ARGUMENTS  = 4,
 		WARN_DEPRECATED    = 5,
+		CRC_INVALID        = 6,
+		CRC_MISSING        = 7,
 	};
 
 #ifdef __GNUC__
@@ -180,7 +191,7 @@ public:
 #else
 #define CheckPrintfFormating(...) /*do nothing*/
 #endif
-	void log_f(bool printLine, bool isJson, const char* file, i32 line, const char* message, ...) const CheckPrintfFormating(6, 7);
+	void log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJsonEvent, const char* file, i32 line, const char* message, ...) CheckPrintfFormating(8, 9);
 	void logTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...) const CheckPrintfFormating(6, 7);
 #undef CheckPrintfFormating
 
@@ -199,6 +210,8 @@ public:
 	bool IsTagEnabled(const char* tag) const;
 	void disableTag(const char* tag);
 	void toggleTag(const char* tag);
+
+	u32 getAmountOfEnabledTags();
 
 	//The print function provides an overview over the active debug tags
 	void printEnabledTags() const;
@@ -233,22 +246,30 @@ private:
 
 //Used for UART communication between node and attached pc
 #if IS_ACTIVE(JSON_LOGGING)
-#define logjson(tag, message, ...) Logger::getInstance().log_f(false, true, "", 0, message, ##__VA_ARGS__)
+//TODO: The skip_event macros are currently a workaround that should be removed once a proper solution to avoid
+//endless recursions with JSONHandlers has been found. The same applies to the skipJsonEvent parameter of log_f
+#define logjson(tag, message, ...) Logger::getInstance().log_f(false, true, true, false, "", 0, message, ##__VA_ARGS__)
+#define logjson_skip_event(tag, message, ...) Logger::getInstance().log_f(false, true, true, true, "", 0, message, ##__VA_ARGS__)
+#define logjson_partial(tag, message, ...) Logger::getInstance().log_f(false, true, false, false, "", 0, message, ##__VA_ARGS__)
+#define logjson_partial_skip_event(tag, message, ...) Logger::getInstance().log_f(false, true, false, true, "", 0, message, ##__VA_ARGS__)
 #define logjson_error(type) Logger::getInstance().uart_error_f(type)
 #else
 #define logjson(tag, message, ...) do{}while(0)
+#define logjson_skip_event(tag, message, ...) do{}while(0)
+#define logjson_partial(tag, message, ...) do{}while(0)
+#define logjson_partial_skip_event(tag, message, ...) do{}while(0)
 #define logjson_error(...)         do{}while(0)
 #endif
 
 //Currently, tracing is always enabled if we have a terminal
 #if defined(TERMINAL_ENABLED) && IS_ACTIVE(TRACE)
-#define trace(message, ...) Logger::getInstance().log_f(false, false, "", 0, message, ##__VA_ARGS__)
+#define trace(message, ...) Logger::getInstance().log_f(false, false, true, false, "", 0, message, ##__VA_ARGS__)
 #else
 #define trace(message, ...) do{}while(0)
 #endif
 
 #if IS_ACTIVE(LOGGING)
-#define logs(message, ...) Logger::getInstance().log_f(true, false, __FILE_S__, __LINE__, message, ##__VA_ARGS__)
+#define logs(message, ...) Logger::getInstance().log_f(true, false, true, false, __FILE_S__, __LINE__, message, ##__VA_ARGS__)
 #define logt(tag, message, ...) Logger::getInstance().logTag_f(Logger::LogType::LOG_LINE, __FILE_S__, __LINE__, tag, message, ##__VA_ARGS__)
 #define TO_BASE64(data, dataSize) DYNAMIC_ARRAY(data##Hex, (dataSize)*3+1); Logger::convertBufferToBase64String(data, (dataSize), (char*)data##Hex, (dataSize)*3+1)
 #define TO_BASE64_2(data, dataSize) Logger::convertBufferToBase64String(data, (dataSize), (char*)data##Hex, (dataSize)*3+1)

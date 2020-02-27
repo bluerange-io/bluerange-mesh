@@ -118,6 +118,7 @@ private:
 	//Will be false after a timeout and true after input is received
 	bool uartActive = false;
 
+	bool crcChecksEnabled = false;
 
 public:
 	static Terminal& getInstance();
@@ -151,6 +152,9 @@ public:
 	TerminalCommandListener** getRegisteredCommandListeners();
 	u8 getReadBufferOffset();
 	char* getReadBuffer();
+
+	void EnableCrcChecks();
+	bool IsCrcChecksEnabled();
 
 	//##### UART ######
 #if IS_ACTIVE(UART)

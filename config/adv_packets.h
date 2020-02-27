@@ -178,7 +178,9 @@ struct advPacketAssetInsServiceData
 	u8 gyroscopeAvailable : 1;
 	u8 magnetometerAvailable : 1;
 	u8 moving : 1;
-	u8 reservedBits : 5;
+	u8 hasFreeInConnection : 1;
+	u8 interestedInConnection : 1;
+	u8 reservedBits : 3;
 
 	//9 byte assetData
 	u16 assetNodeId;
@@ -186,9 +188,10 @@ struct advPacketAssetInsServiceData
 	u16 absolutePositionX; //0xFFFF = not available
 	u16 absolutePositionY; //0xFFFF = not available
 	u16 pressure; //0xFFFF = not available
-
+	
+	NetworkId networkId;
 	//8 bytes reserved
-	u8 reserved[8]; //Must be set to 0
+	u8 reserved[6]; //Must be set to 0
 };
 STATIC_ASSERT_SIZE(advPacketAssetInsServiceData, SIZEOF_ADV_STRUCTURE_ASSET_INS_SERVICE_DATA);
 
@@ -202,20 +205,23 @@ struct advPacketAssetServiceData
 	u8 advertisingChannel : 2; // 0 = not available, 1=37, 2=38, 3=39
 	u8 gyroscopeAvailable : 1;
 	u8 magnetometerAvailable : 1;
-	u8 reservedBit : 4;
+	u8 hasFreeInConnection : 1;
+	u8 interestedInConnection : 1;
+	u8 reservedBit : 2;
 
 	//11 byte assetData
 	u32 serialNumberIndex;
 	u8 batteryPower; //0xFF = not available
 	u8 speed; //0xFF = not available
-	u8 direction; //0xFF = not available
+	u8 reserved;
 	u16 pressure; //0xFFFF = not available
 	i8 temperature; //0xFF = not available
 	u8 humidity; //0xFF = not available
 
 	NodeId nodeId;
+	NetworkId networkId;
 
-	u8 reserved[4];
+	u8 reserved2[2];
 };
 STATIC_ASSERT_SIZE(advPacketAssetServiceData, SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA);
 

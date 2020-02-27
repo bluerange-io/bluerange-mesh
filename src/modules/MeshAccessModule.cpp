@@ -317,13 +317,13 @@ void MeshAccessModule::AddModuleIdToAdvertise(ModuleId moduleId)
 #define ________________________MESSAGES_________________________
 
 
-void MeshAccessModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
+void MeshAccessModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
 {
 	//Must call superclass for handling
 	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
 	if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 		u16 dataFieldLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE;
 
 		//Check if our module is meant and we should trigger an action
@@ -337,7 +337,7 @@ void MeshAccessModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 		}
 	}
 	else if(packetHeader->messageType == MessageType::MODULE_GENERAL){
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 		u16 dataFieldLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE;
 
 		//Check if our module is meant and we should trigger an action
@@ -354,7 +354,7 @@ void MeshAccessModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 		packetHeader->messageType == MessageType::CLUSTER_INFO_UPDATE
 		&& sendData->dataLength >= sizeof(connPacketClusterInfoUpdate)
 	) {
-		connPacketClusterInfoUpdate* data = (connPacketClusterInfoUpdate*)packetHeader;
+		connPacketClusterInfoUpdate const * data = (connPacketClusterInfoUpdate const *)packetHeader;
 
 		logt("MAMOD", "ClusterInfo for mamod size:%u, sink:%d", data->payload.clusterSizeChange, data->payload.hopsToSink);
 	}
@@ -365,10 +365,10 @@ void MeshAccessModule::MeshAccessMessageReceivedHandler(MeshAccessConnection* co
 
 }
 
-void MeshAccessModule::ReceivedMeshAccessConnectMessage(connPacketModule* packet, u16 packetLength) const
+void MeshAccessModule::ReceivedMeshAccessConnectMessage(connPacketModule const * packet, u16 packetLength) const
 {
 	logt("MAMOD", "Received connect task");
-	MeshAccessModuleConnectMessage* message = (MeshAccessModuleConnectMessage*) packet->data;
+	MeshAccessModuleConnectMessage const * message = (MeshAccessModuleConnectMessage const *) packet->data;
 
 	u32 uniqueConnId = MeshAccessConnection::ConnectAsMaster(&message->targetAddress, 10, 4, message->fmKeyId, message->key.getRaw(), (MeshAccessTunnelType)message->tunnelType);
 
@@ -379,10 +379,10 @@ void MeshAccessModule::ReceivedMeshAccessConnectMessage(connPacketModule* packet
 	}
 }
 
-void MeshAccessModule::ReceivedMeshAccessDisconnectMessage(connPacketModule* packet, u16 packetLength) const
+void MeshAccessModule::ReceivedMeshAccessDisconnectMessage(connPacketModule const * packet, u16 packetLength) const
 {
 	logt("MAMOD", "Received disconnect task");
-	MeshAccessModuleDisconnectMessage* message = (MeshAccessModuleDisconnectMessage*) packet->data;
+	MeshAccessModuleDisconnectMessage const * message = (MeshAccessModuleDisconnectMessage const *) packet->data;
 
 	BaseConnections conns = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
 
@@ -397,17 +397,17 @@ void MeshAccessModule::ReceivedMeshAccessDisconnectMessage(connPacketModule* pac
 	}
 }
 
-void MeshAccessModule::ReceivedMeshAccessConnectionStateMessage(connPacketModule* packet, u16 packetLength) const
+void MeshAccessModule::ReceivedMeshAccessConnectionStateMessage(connPacketModule const * packet, u16 packetLength) const
 {
-	MeshAccessModuleConnectionStateMessage* message = (MeshAccessModuleConnectionStateMessage*) packet->data;
+	MeshAccessModuleConnectionStateMessage const * message = (MeshAccessModuleConnectionStateMessage const *) packet->data;
 
-	logjson("MAMOD", "{\"nodeId\":%u,\"type\":\"ma_conn_state\",\"module\":%u,", packet->header.sender, (u32)packet->moduleId);
+	logjson_partial("MAMOD", "{\"nodeId\":%u,\"type\":\"ma_conn_state\",\"module\":%u,", packet->header.sender, (u32)packet->moduleId);
 	logjson("MAMOD",  "\"requestHandle\":%u,\"vPartnerId\":%u,\"state\":%u}" SEP, packet->requestHandle, message->vPartnerId, message->state);
 }
 
-MeshAccessAuthorization MeshAccessModule::CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, FmKeyId fmKeyId, DataDirection direction)
+MeshAccessAuthorization MeshAccessModule::CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction)
 {
-	connPacketHeader* packet = (connPacketHeader*)data;
+	connPacketHeader const * packet = (connPacketHeader const *)data;
 
 	//We must always whitelist handshake packets for the MeshAccess Connection
 	if(packet->messageType >= MessageType::ENCRYPT_CUSTOM_START
@@ -443,7 +443,7 @@ MeshAccessAuthorization MeshAccessModule::CheckMeshAccessPacketAuthorization(Bas
 	}
 }
 
-MeshAccessAuthorization MeshAccessModule::CheckAuthorizationForAll(BaseConnectionSendData* sendData, u8* data, FmKeyId fmKeyId, DataDirection direction) const
+MeshAccessAuthorization MeshAccessModule::CheckAuthorizationForAll(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) const
 {
 	//Check if our partner is authorized to send this packet, so we ask
 	//all of our modules if this message is whitelisted or not

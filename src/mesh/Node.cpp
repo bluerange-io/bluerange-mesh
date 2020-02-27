@@ -351,9 +351,9 @@ void Node::HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinn
 	HandOverMasterBitIfNecessary();
 }
 
-MeshAccessAuthorization Node::CheckMeshAccessPacketAuthorization(BaseConnectionSendData * sendData, u8 * data, FmKeyId fmKeyId, DataDirection direction)
+MeshAccessAuthorization Node::CheckMeshAccessPacketAuthorization(BaseConnectionSendData * sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction)
 {
-	connPacketHeader* packet = (connPacketHeader*)data;
+	connPacketHeader const * packet = (connPacketHeader const *)data;
 	
 	if (   packet->messageType == MessageType::MODULE_RAW_DATA
 		|| packet->messageType == MessageType::MODULE_RAW_DATA_LIGHT)
@@ -494,7 +494,7 @@ void Node::MeshConnectionDisconnectedHandler(AppDisconnectReason appDisconnectRe
 }
 
 //Handles incoming cluster info update
-void Node::ReceiveClusterInfoUpdate(MeshConnection* connection, connPacketClusterInfoUpdate* packet)
+void Node::ReceiveClusterInfoUpdate(MeshConnection* connection, connPacketClusterInfoUpdate const * packet)
 {
 	//Check if next expected counter matches, if not, this clusterUpdate was a duplicate and we ignore it (might happen during reconnection)
 	if (connection->nextExpectedClusterUpdateCounter == packet->payload.counter) {
@@ -634,7 +634,7 @@ void Node::SendClusterInfoUpdate(MeshConnection* ignoreConnection, connPacketClu
 	GS->cm.fillTransmitBuffers();
 }
 
-void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
+void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
 {
 	//Must call superclass for handling
 	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
@@ -649,7 +649,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 					&& connection->connectionType == ConnectionType::FRUITYMESH
 					&& sendData->dataLength >= SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE)
 			{
-				connPacketClusterInfoUpdate* packet = (connPacketClusterInfoUpdate*) packetHeader;
+				connPacketClusterInfoUpdate const * packet = (connPacketClusterInfoUpdate const *) packetHeader;
 				logt("HANDSHAKE", "IN <= %d CLUSTER_INFO_UPDATE sizeChange:%d, hop:%d", connection->partnerId, packet->payload.clusterSizeChange, packet->payload.hopsToSink);
 				ReceiveClusterInfoUpdate((MeshConnection*)connection, packet);
 
@@ -659,7 +659,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 		case MessageType::UPDATE_CONNECTION_INTERVAL:
 			if(sendData->dataLength == SIZEOF_CONN_PACKET_UPDATE_CONNECTION_INTERVAL)
 			{
-				connPacketUpdateConnectionInterval* packet = (connPacketUpdateConnectionInterval*) packetHeader;
+				connPacketUpdateConnectionInterval const * packet = (connPacketUpdateConnectionInterval const *) packetHeader;
 
 				GS->cm.SetMeshConnectionInterval(packet->newInterval);
 			}
@@ -672,7 +672,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 
 	if(packetHeader->messageType == MessageType::MODULE_CONFIG)
 	{
-		connPacketModule* packet = (connPacketModule*) packetHeader;
+		connPacketModule const * packet = (connPacketModule const *) packetHeader;
 
 		if(packet->actionType == (u8)Module::ModuleConfigMessages::GET_MODULE_LIST)
 		{
@@ -682,7 +682,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 #if IS_INACTIVE(SAVE_SPACE)
 		else if(packet->actionType == (u8)Module::ModuleConfigMessages::MODULE_LIST)
 		{
-			logjson("MODULE", "{\"nodeId\":%u,\"type\":\"module_list\",\"modules\":[", packet->header.sender);
+			logjson_partial("MODULE", "{\"nodeId\":%u,\"type\":\"module_list\",\"modules\":[", packet->header.sender);
 
 			u16 moduleCount = (sendData->dataLength - SIZEOF_CONN_PACKET_MODULE) / 4;
 			for(int i=0; i<moduleCount; i++){
@@ -693,9 +693,9 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 				CheckedMemcpy(&active, packet->data + i*4+3, 1);
 
 				if(i > 0){
-					logjson("MODULE", ",");
+					logjson_partial("MODULE", ",");
 				}
-				logjson("MODULE", "{\"id\":%u,\"version\":%u,\"active\":%u}", (u32)moduleId, version, active);
+				logjson_partial("MODULE", "{\"id\":%u,\"version\":%u,\"active\":%u}", (u32)moduleId, version, active);
 			}
 			logjson("MODULE", "]}" SEP);
 		}
@@ -704,7 +704,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 
 
 	if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == ModuleId::NODE){
@@ -744,7 +744,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 			}
 
 			else if (packet->actionType == (u8)NodeModuleTriggerActionMessages::START_GENERATE_LOAD) {
-				GenerateLoadTriggerMessage* message = (GenerateLoadTriggerMessage*)packet->data;
+				GenerateLoadTriggerMessage const * message = (GenerateLoadTriggerMessage const *)packet->data;
 				generateLoadTarget = message->target;
 				generateLoadPayloadSize = message->size;
 				generateLoadMessagesLeft = message->amount;
@@ -770,7 +770,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 			}
 
 			else if (packet->actionType == (u8)NodeModuleTriggerActionMessages::GENERATE_LOAD_CHUNK) {
-				u8* payload = packet->data;
+				u8 const * payload = packet->data;
 				bool payloadCorrect = true;
 				const u8 payloadLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE;
 				for (u32 i = 0; i < payloadLength; i++)
@@ -787,7 +787,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 
 			else if (packet->actionType == (u8)NodeModuleTriggerActionMessages::RESET_NODE)
 			{
-				NodeModuleResetMessage* message = (NodeModuleResetMessage*)packet->data;
+				NodeModuleResetMessage const * message = (NodeModuleResetMessage const *)packet->data;
 				logt("NODE", "Scheduled reboot in %u seconds", message->resetSeconds);
 				Reboot(message->resetSeconds*10, RebootReason::REMOTE_RESET);
 			}
@@ -868,7 +868,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 #if FEATURE_AVAILABLE(PREFERRED_CONNECTIONS)
 			else if (packet->actionType == (u8)NodeModuleTriggerActionMessages::SET_PREFERRED_CONNECTIONS)
 			{
-				PreferredConnectionMessage* message = (PreferredConnectionMessage*)packet->data;
+				PreferredConnectionMessage const * message = (PreferredConnectionMessage const *)packet->data;
 				if (message->amountOfPreferredPartnerIds > Conf::MAX_AMOUNT_PREFERRED_PARTNER_IDS)
 				{
 					//Packet seems to be malformed!
@@ -902,7 +902,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 	}
 
 	if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == ModuleId::NODE){
 
@@ -920,7 +920,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 			}
 			else if (packet->actionType == (u8)NodeModuleActionResponseMessages::EMERGENCY_DISCONNECT_RESULT)
 			{
-				EmergencyDisconnectResponseMessage* msg = (EmergencyDisconnectResponseMessage*)packet->data;
+				EmergencyDisconnectResponseMessage const * msg = (EmergencyDisconnectResponseMessage const *)packet->data;
 				if (msg->code == EmergencyDisconnectErrorCode::SUCCESS || msg->code == EmergencyDisconnectErrorCode::NOT_ALL_CONNECTIONS_USED_UP)
 				{
 					//All fine, we are now able to connect to the partner via a MeshConnection
@@ -941,10 +941,10 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 	}
 
 	if (packetHeader->messageType == MessageType::TIME_SYNC) {
-		const TimeSyncHeader* packet = (TimeSyncHeader*)packetHeader;
+		TimeSyncHeader const * packet = (TimeSyncHeader const *)packetHeader;
 		if (packet->type == TimeSyncType::INITIAL)
 		{
-			const TimeSyncInitial* packet = (TimeSyncInitial*)packetHeader;
+			TimeSyncInitial const * packet = (TimeSyncInitial const *)packetHeader;
 			logt("TSYNC", "Received initial! NodeId: %u, Partner: %u", (u32)GS->node.configuration.nodeId, (u32)packet->header.header.sender);
 			GS->timeManager.SetTime(*packet);
 
@@ -963,13 +963,13 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 		}
 		if (packet->type == TimeSyncType::INITIAL_REPLY)
 		{
-			const TimeSyncInitialReply* packet = (TimeSyncInitialReply*)packetHeader;
+			TimeSyncInitialReply const * packet = (TimeSyncInitialReply const *)packetHeader;
 			logt("TSYNC", "Received initial reply! NodeId: %u, Partner: %u", (u32)GS->node.configuration.nodeId, (u32)packet->header.header.sender);
 			GS->cm.TimeSyncInitialReplyReceivedHandler(*packet);
 		}
 		if (packet->type == TimeSyncType::CORRECTION)
 		{
-			const TimeSyncCorrection* packet = (TimeSyncCorrection*)packetHeader;
+			TimeSyncCorrection const * packet = (TimeSyncCorrection const *)packetHeader;
 			logt("TSYNC", "Received correction! NodeId: %u, Partner: %u", (u32)GS->node.configuration.nodeId, (u32)packet->header.header.sender);
 			GS->timeManager.AddCorrection(packet->correctionTicks);
 
@@ -988,20 +988,20 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 		}
 		if (packet->type == TimeSyncType::CORRECTION_REPLY)
 		{
-			const TimeSyncCorrectionReply* packet = (TimeSyncCorrectionReply*)packetHeader;
+			TimeSyncCorrectionReply const * packet = (TimeSyncCorrectionReply const *)packetHeader;
 			logt("TSYNC", "Received correction reply! NodeId: %u, Partner: %u", (u32)GS->node.configuration.nodeId, (u32)packet->header.header.sender);
 			GS->cm.TimeSyncCorrectionReplyReceivedHandler(*packet);
 		}
 	}
 
 	if (packetHeader->messageType == MessageType::MODULE_RAW_DATA) {
-		const RawDataHeader* packet = (RawDataHeader*)packetHeader;
+		RawDataHeader const * packet = (RawDataHeader const *)packetHeader;
 		//Check if our module is meant
 		if (packet->moduleId == moduleId) {
 			const RawDataActionType actionType = (const RawDataActionType)packet->actionType;
 			if (actionType == RawDataActionType::START && sendData->dataLength >= sizeof(RawDataStart))
 			{
-				RawDataStart packet = *(const RawDataStart*)packetHeader;
+				RawDataStart packet = *(RawDataStart const *)packetHeader;
 
 				logjson("DEBUG",
 					"{"
@@ -1023,7 +1023,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 			}
 			else if (actionType == RawDataActionType::START_RECEIVED && sendData->dataLength >= sizeof(RawDataStartReceived))
 			{
-				RawDataStartReceived packet = *(const RawDataStartReceived*)packetHeader;
+				RawDataStartReceived packet = *(RawDataStartReceived const *)packetHeader;
 
 				logjson("DEBUG",
 					"{"
@@ -1039,7 +1039,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 			}
 			else if (actionType == RawDataActionType::ERROR_T && sendData->dataLength >= sizeof(RawDataError))
 			{
-				const RawDataError* packet = (const RawDataError*)packetHeader;
+				const RawDataError* packet = (RawDataError const *)packetHeader;
 				logjson("DEBUG",
 					"{"
 						"\"nodeId\":%u,"
@@ -1058,7 +1058,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 			}
 			else if (actionType == RawDataActionType::CHUNK)
 			{
-				const RawDataChunk* packet = (const RawDataChunk*)packetHeader;
+				RawDataChunk const * packet = (RawDataChunk const *)packetHeader;
 				if (CHECK_MSG_SIZE(packet, packet->payload, 1, sendData->dataLength))
 				{
 					const u32 payloadLength = sendData->dataLength - sizeof(RawDataChunk) + 1;
@@ -1091,7 +1091,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 			}
 			else if (actionType == RawDataActionType::REPORT && sendData->dataLength >= sizeof(RawDataReport))
 			{
-				const RawDataReport* packet = (const RawDataReport*)packetHeader;
+				RawDataReport const * packet = (RawDataReport const *)packetHeader;
 
 				char missingsBuffer[200] = "[";
 				bool successfulTransmission = true;
@@ -1137,7 +1137,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 	}
 	else if (packetHeader->messageType == MessageType::MODULE_RAW_DATA_LIGHT)
 	{
-		const RawDataLight* packet = (const RawDataLight*)packetHeader;
+		RawDataLight const * packet = (RawDataLight const *)packetHeader;
 		if (CHECK_MSG_SIZE(packet, packet->payload, 1, sendData->dataLength))
 		{
 			const u32 payloadLength = sendData->dataLength - sizeof(RawDataLight) + 1;
@@ -1170,7 +1170,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 	{
 		if (sendData->dataLength >= sizeof(CapabilityHeader)) 
 		{
-			const CapabilityHeader* header = (const CapabilityHeader*)packetHeader;
+			CapabilityHeader const * header = (CapabilityHeader const *)packetHeader;
 			if (header->actionType == CapabilityActionType::REQUESTED)
 			{
 				isSendingCapabilities = true;
@@ -1186,25 +1186,25 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 			{
 				if (sendData->dataLength >= sizeof(CapabilityEntryMessage))
 				{
-					const CapabilityEntryMessage* message = (const CapabilityEntryMessage*)packetHeader;
+					CapabilityEntryMessage const * message = (CapabilityEntryMessage const *)packetHeader;
 
 					char buffer[sizeof(message->entry.modelName) + 1]; //Buffer to make sure we have a terminating zero.
 
 					//Several logjson calls to go easy on stack size
-					logjson("NODE", "{");
-					logjson("NODE",		"\"nodeId\":%u,", message->header.header.sender);
-					logjson("NODE",		"\"type\":\"capability_entry\",");
-					logjson("NODE",		"\"index\":%u,", message->index);
-					logjson("NODE",		"\"capabilityType\":%u,", (u32)message->entry.type);
+					logjson_partial("NODE", "{");
+					logjson_partial("NODE",		"\"nodeId\":%u,", message->header.header.sender);
+					logjson_partial("NODE",		"\"type\":\"capability_entry\",");
+					logjson_partial("NODE",		"\"index\":%u,", message->index);
+					logjson_partial("NODE",		"\"capabilityType\":%u,", (u32)message->entry.type);
 					CheckedMemcpy(buffer, message->entry.manufacturer, sizeof(message->entry.manufacturer));
 					buffer[sizeof(message->entry.manufacturer)] = '\0';
-					logjson("NODE",		"\"manufacturer\":\"%s\",", buffer);
+					logjson_partial("NODE",		"\"manufacturer\":\"%s\",", buffer);
 					CheckedMemcpy(buffer, message->entry.modelName, sizeof(message->entry.modelName));
 					buffer[sizeof(message->entry.modelName)] = '\0';
-					logjson("NODE",		"\"model\":\"%s\",", buffer);
+					logjson_partial("NODE",		"\"model\":\"%s\",", buffer);
 					CheckedMemcpy(buffer, message->entry.revision, sizeof(message->entry.revision));
 					buffer[sizeof(message->entry.revision)] = '\0';
-					logjson("NODE",		"\"revision\":\"%s\"", buffer);
+					logjson_partial("NODE",		"\"revision\":\"%s\"", buffer);
 					logjson("NODE", "}" SEP);
 				}
 				else
@@ -1216,7 +1216,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 			{
 				if (sendData->dataLength >= sizeof(CapabilityEndMessage))
 				{
-					const CapabilityEndMessage* message = (const CapabilityEndMessage*)packetHeader;
+					CapabilityEndMessage const * message = (CapabilityEndMessage const *)packetHeader;
 					logjson("NODE", 
 						"{"
 							"\"nodeId\":%u,"
@@ -1242,7 +1242,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 
 	else if (packetHeader->messageType == MessageType::COMPONENT_SENSE)
 	{
-		connPacketComponentMessage* packet = (connPacketComponentMessage*)packetHeader;
+		connPacketComponentMessage const * packet = (connPacketComponentMessage const *)packetHeader;
 
 		char payload[50];
 		u8 payloadLength = sendData->dataLength - sizeof(packet->componentHeader);
@@ -1270,7 +1270,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 
 	else if (packetHeader->messageType == MessageType::COMPONENT_ACT)
 	{
-		connPacketComponentMessage* packet = (connPacketComponentMessage*)packetHeader;
+		connPacketComponentMessage const * packet = (connPacketComponentMessage const *)packetHeader;
 
 		char payload[50];
 		u8 payloadLength = sendData->dataLength - sizeof(packet->componentHeader);
@@ -2862,7 +2862,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 	//Get the status information of this node
 	else if(TERMARGS(0, "get_plugged_in"))
 	{
-		logjson("NODE", "{\"type\":\"plugged_in\",\"nodeId\":%u,\"serialNumber\":\"%s\"}" SEP, configuration.nodeId, RamConfig->GetSerialNumber());
+		logjson("NODE", "{\"type\":\"plugged_in\",\"nodeId\":%u,\"serialNumber\":\"%s\",\"fmVersion\":%u}" SEP, configuration.nodeId, RamConfig->GetSerialNumber(), FM_VERSION);
 		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 #if IS_INACTIVE(SAVE_SPACE)
@@ -2899,6 +2899,12 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 #endif
+	else if (TERMARGS(0, "enable_corruption_check"))
+	{
+		logjson("NODE", "{\"type\":\"enable_corruption_check_response\",\"err\":0,\"check\":\"crc32\"}" SEP);
+		GS->terminal.EnableCrcChecks();
+		return TerminalCommandHandlerReturnType::SUCCESS;
+	}
 
 	//Must be called to allow the module to get and set the config
 	return Module::TerminalCommandHandler(commandArgs, commandArgsSize);

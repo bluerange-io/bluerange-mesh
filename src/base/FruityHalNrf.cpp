@@ -96,10 +96,31 @@ extern "C" {
 
 #define APP_TIMER_MAX_TIMERS    5 //Maximum number of simultaneously created timers (2 + BSP_APP_TIMERS_NUMBER)
 
+constexpr u8 MAX_GPIOTE_HANDLERS = 4;
+struct GpioteHandlerValues
+{
+	FruityHal::GpioInterruptHandler handler;
+	u32 pin;
+};
+
+struct NrfHalMemory
+{
 #ifndef SIM_ENABLED
-static SimpleArray <app_timer_t, APP_TIMER_MAX_TIMERS> swTimers;
-static ble_db_discovery_t discoveredServices;
-#endif 
+	SimpleArray <app_timer_t, APP_TIMER_MAX_TIMERS> swTimers;
+	ble_db_discovery_t discoveredServices;
+	volatile bool twiXferDone;
+	bool twiInitDone;
+	volatile bool spiXferDone;
+	bool spiInitDone;
+#endif
+	GpioteHandlerValues GpioHandler[MAX_GPIOTE_HANDLERS];
+	u8 gpioteHandlersCreated;
+	ble_evt_t const * currentEvent;
+	u8 timersCreated;
+};
+
+
+
 
 //This tag is used to set the SoftDevice configuration and must be used when advertising or creating connections
 constexpr int BLE_CONN_CFG_TAG_FM = 1;
@@ -194,7 +215,7 @@ static inline FruityHal::GpioTransistion NrfPolarityToGeneric(nrf_gpiote_polarit
 }
 
 #ifdef NRF52
-static void ble_evt_handler(ble_evt_t * p_ble_evt, void * p_context);
+static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context);
 static void soc_evt_handler(uint32_t evt_id, void * p_context);
 
 #endif
@@ -505,8 +526,6 @@ static FruityHal::SystemEvents nrfSystemEventToGeneric(u32 event)
 	}
 }
 
-static ble_evt_t* currentEvent = nullptr;
-
 //Checks for high level application events generated e.g. by low level interrupt events
 void ProcessAppEvents()
 {
@@ -608,7 +627,7 @@ static void nrf_sdh_fruitymesh_evt_handler(void * p_context)
 }
 
 //This is called for all BLE related events
-static void ble_evt_handler(ble_evt_t * p_ble_evt, void * p_context)
+static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 {
 	FruityHal::DispatchBleEvents(p_ble_evt);
 }
@@ -649,9 +668,10 @@ void FruityHal::SetPendingEventIRQ()
 #define __________________EVENT_HANDLERS____________________
 // ############### Methods to be called on events ########################
 
-void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
+void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
 {
-	ble_evt_t& bleEvent = *((ble_evt_t*)eventVirtualPointer);
+	const ble_evt_t& bleEvent = *((ble_evt_t const *)eventVirtualPointer);
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
 	u16 eventId = bleEvent.header.evt_id;
 	u32 err;
 	if (eventId == BLE_GAP_EVT_ADV_REPORT || eventId == BLE_GAP_EVT_RSSI_CHANGED) {
@@ -663,9 +683,9 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 	
 	//Calls the Db Discovery modules event handler
 #ifdef NRF51
-	ble_db_discovery_on_ble_evt(&discoveredServices, &bleEvent);
+	ble_db_discovery_on_ble_evt(&halMemory->discoveredServices, &bleEvent);
 #elif defined(NRF52)
-	ble_db_discovery_on_ble_evt(&bleEvent, &discoveredServices);
+	ble_db_discovery_on_ble_evt(&bleEvent, &halMemory->discoveredServices);
 #endif
 
 	switch (bleEvent.header.evt_id)
@@ -785,7 +805,7 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 
 	case BLE_GAP_EVT_DATA_LENGTH_UPDATE:
 	{
-		ble_gap_evt_data_length_update_t* params = (ble_gap_evt_data_length_update_t*) &bleEvent.evt.gap_evt.params.data_length_update;
+		ble_gap_evt_data_length_update_t const * params = (ble_gap_evt_data_length_update_t const *) &bleEvent.evt.gap_evt.params.data_length_update;
 
 		logt("FH", "DLE Result: rx %u/%u, tx %u/%u",
 				params->effective_params.max_rx_octets,
@@ -856,34 +876,34 @@ void FruityHal::DispatchBleEvents(void* eventVirtualPointer)
 	}
 }
 
-FruityHal::GapConnParamUpdateEvent::GapConnParamUpdateEvent(void* _evt)
+FruityHal::GapConnParamUpdateEvent::GapConnParamUpdateEvent(void const * _evt)
 	:GapEvent(_evt)
 {
-	if (currentEvent->header.evt_id != BLE_GAP_EVT_CONN_PARAM_UPDATE)
+	if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id != BLE_GAP_EVT_CONN_PARAM_UPDATE)
 	{
 		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
 	}
 }
 
-FruityHal::GapEvent::GapEvent(void* _evt)
+FruityHal::GapEvent::GapEvent(void const * _evt)
 	: BleEvent(_evt)
 {
 }
 
 u16 FruityHal::GapEvent::getConnectionHandle() const
 {
-	return currentEvent->evt.gap_evt.conn_handle;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.conn_handle;
 }
 
 u16 FruityHal::GapConnParamUpdateEvent::getMaxConnectionInterval() const
 {
-	return currentEvent->evt.gap_evt.params.conn_param_update.conn_params.max_conn_interval;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.max_conn_interval;
 }
 
-FruityHal::GapRssiChangedEvent::GapRssiChangedEvent(void* _evt)
+FruityHal::GapRssiChangedEvent::GapRssiChangedEvent(void const * _evt)
 	:GapEvent(_evt)
 {
-	if (currentEvent->header.evt_id != BLE_GAP_EVT_RSSI_CHANGED)
+	if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id != BLE_GAP_EVT_RSSI_CHANGED)
 	{
 		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
 	}
@@ -891,13 +911,13 @@ FruityHal::GapRssiChangedEvent::GapRssiChangedEvent(void* _evt)
 
 i8 FruityHal::GapRssiChangedEvent::getRssi() const
 {
-	return currentEvent->evt.gap_evt.params.rssi_changed.rssi;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.rssi_changed.rssi;
 }
 
-FruityHal::GapAdvertisementReportEvent::GapAdvertisementReportEvent(void* _evt)
+FruityHal::GapAdvertisementReportEvent::GapAdvertisementReportEvent(void const * _evt)
 	:GapEvent(_evt)
 {
-	if (currentEvent->header.evt_id != BLE_GAP_EVT_ADV_REPORT)
+	if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id != BLE_GAP_EVT_ADV_REPORT)
 	{
 		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
 	}
@@ -905,66 +925,66 @@ FruityHal::GapAdvertisementReportEvent::GapAdvertisementReportEvent(void* _evt)
 
 i8 FruityHal::GapAdvertisementReportEvent::getRssi() const
 {
-	return currentEvent->evt.gap_evt.params.adv_report.rssi;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.rssi;
 }
 
 const u8 * FruityHal::GapAdvertisementReportEvent::getData() const
 {
 #if (SDK == 15)
-	return currentEvent->evt.gap_evt.params.adv_report.data.p_data;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.data.p_data;
 #else
-	return currentEvent->evt.gap_evt.params.adv_report.data;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.data;
 #endif
 }
 
 u32 FruityHal::GapAdvertisementReportEvent::getDataLength() const
 {
 #if (SDK == 15)
-	return currentEvent->evt.gap_evt.params.adv_report.data.len;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.data.len;
 #else
-	return currentEvent->evt.gap_evt.params.adv_report.dlen;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.dlen;
 #endif
 }
 
 const u8 * FruityHal::GapAdvertisementReportEvent::getPeerAddr() const
 {
-	return currentEvent->evt.gap_evt.params.adv_report.peer_addr.addr;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.peer_addr.addr;
 }
 
 FruityHal::BleGapAddrType FruityHal::GapAdvertisementReportEvent::getPeerAddrType() const
 {
-	return (BleGapAddrType)currentEvent->evt.gap_evt.params.adv_report.peer_addr.addr_type;
+	return (BleGapAddrType)((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.peer_addr.addr_type;
 }
 
 bool FruityHal::GapAdvertisementReportEvent::isConnectable() const
 {
 #if (SDK == 15)
-	return currentEvent->evt.gap_evt.params.adv_report.type.connectable == 0x01;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.type.connectable == 0x01;
 #else
-	return currentEvent->evt.gap_evt.params.adv_report.type == BLE_GAP_ADV_TYPE_ADV_IND;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.type == BLE_GAP_ADV_TYPE_ADV_IND;
 #endif
 }
 
-FruityHal::BleEvent::BleEvent(void *_evt)
+FruityHal::BleEvent::BleEvent(void const *_evt)
 {
-	if (currentEvent != nullptr) {
+	if (((NrfHalMemory*)GS->halMemory)->currentEvent != nullptr) {
 		//This is thrown if two events are processed at the same time, which is illegal.
 		SIMEXCEPTION(IllegalStateException); //LCOV_EXCL_LINE assertion
 	}
-	currentEvent = (ble_evt_t*)_evt;
+	((NrfHalMemory*)GS->halMemory)->currentEvent = (ble_evt_t const *)_evt;
 }
 
 #ifdef SIM_ENABLED
 FruityHal::BleEvent::~BleEvent()
 {
-	currentEvent = nullptr;
+	((NrfHalMemory*)GS->halMemory)->currentEvent = nullptr;
 }
 #endif
 
-FruityHal::GapConnectedEvent::GapConnectedEvent(void* _evt)
+FruityHal::GapConnectedEvent::GapConnectedEvent(void const * _evt)
 	:GapEvent(_evt)
 {
-	if (currentEvent->header.evt_id != BLE_GAP_EVT_CONNECTED)
+	if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id != BLE_GAP_EVT_CONNECTED)
 	{
 		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
 	}
@@ -972,28 +992,28 @@ FruityHal::GapConnectedEvent::GapConnectedEvent(void* _evt)
 
 FruityHal::GapRole FruityHal::GapConnectedEvent::getRole() const
 {
-	return (GapRole)(currentEvent->evt.gap_evt.params.connected.role);
+	return (GapRole)(((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.connected.role);
 }
 
 u8 FruityHal::GapConnectedEvent::getPeerAddrType() const
 {
-	return (currentEvent->evt.gap_evt.params.connected.peer_addr.addr_type);
+	return (((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.connected.peer_addr.addr_type);
 }
 
 u16 FruityHal::GapConnectedEvent::getMinConnectionInterval() const
 {
-	return currentEvent->evt.gap_evt.params.connected.conn_params.min_conn_interval;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.connected.conn_params.min_conn_interval;
 }
 
 const u8 * FruityHal::GapConnectedEvent::getPeerAddr() const
 {
-	return (currentEvent->evt.gap_evt.params.connected.peer_addr.addr);
+	return (((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.connected.peer_addr.addr);
 }
 
-FruityHal::GapDisconnectedEvent::GapDisconnectedEvent(void* _evt)
+FruityHal::GapDisconnectedEvent::GapDisconnectedEvent(void const * _evt)
 	: GapEvent(_evt)
 {
-	if (currentEvent->header.evt_id != BLE_GAP_EVT_DISCONNECTED)
+	if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id != BLE_GAP_EVT_DISCONNECTED)
 	{
 		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
 	}
@@ -1001,13 +1021,13 @@ FruityHal::GapDisconnectedEvent::GapDisconnectedEvent(void* _evt)
 
 FruityHal::BleHciError FruityHal::GapDisconnectedEvent::getReason() const
 {
-	return (FruityHal::BleHciError)currentEvent->evt.gap_evt.params.disconnected.reason;
+	return (FruityHal::BleHciError)((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.disconnected.reason;
 }
 
-FruityHal::GapTimeoutEvent::GapTimeoutEvent(void* _evt)
+FruityHal::GapTimeoutEvent::GapTimeoutEvent(void const * _evt)
 	: GapEvent(_evt)
 {
-	if (currentEvent->header.evt_id != BLE_GAP_EVT_TIMEOUT)
+	if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id != BLE_GAP_EVT_TIMEOUT)
 	{
 		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
 	}
@@ -1016,7 +1036,7 @@ FruityHal::GapTimeoutEvent::GapTimeoutEvent(void* _evt)
 FruityHal::GapTimeoutSource FruityHal::GapTimeoutEvent::getSource() const
 {
 #if defined(NRF51) || defined(SIM_ENABLED)
-	switch (currentEvent->evt.gap_evt.params.timeout.src)
+	switch (((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.timeout.src)
 	{
 	case BLE_GAP_TIMEOUT_SRC_ADVERTISING:
 		return GapTimeoutSource::ADVERTISING;
@@ -1030,7 +1050,7 @@ FruityHal::GapTimeoutSource FruityHal::GapTimeoutEvent::getSource() const
 		return GapTimeoutSource::INVALID;
 	}
 #elif defined(NRF52)
-	switch (currentEvent->evt.gap_evt.params.timeout.src)
+	switch (((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.timeout.src)
 	{
 #if (SDK != 15)
 	case BLE_GAP_TIMEOUT_SRC_ADVERTISING:
@@ -1048,19 +1068,19 @@ FruityHal::GapTimeoutSource FruityHal::GapTimeoutEvent::getSource() const
 #endif
 }
 
-FruityHal::GapSecurityInfoRequestEvent::GapSecurityInfoRequestEvent(void* _evt)
+FruityHal::GapSecurityInfoRequestEvent::GapSecurityInfoRequestEvent(void const * _evt)
 	: GapEvent(_evt)
 {
-	if (currentEvent->header.evt_id != BLE_GAP_EVT_SEC_INFO_REQUEST)
+	if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id != BLE_GAP_EVT_SEC_INFO_REQUEST)
 	{
 		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
 	}
 }
 
-FruityHal::GapConnectionSecurityUpdateEvent::GapConnectionSecurityUpdateEvent(void* _evt)
+FruityHal::GapConnectionSecurityUpdateEvent::GapConnectionSecurityUpdateEvent(void const * _evt)
 	: GapEvent(_evt)
 {
-	if (currentEvent->header.evt_id != BLE_GAP_EVT_CONN_SEC_UPDATE)
+	if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id != BLE_GAP_EVT_CONN_SEC_UPDATE)
 	{
 		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
 	}
@@ -1068,57 +1088,57 @@ FruityHal::GapConnectionSecurityUpdateEvent::GapConnectionSecurityUpdateEvent(vo
 
 u8 FruityHal::GapConnectionSecurityUpdateEvent::getKeySize() const
 {
-	return currentEvent->evt.gap_evt.params.conn_sec_update.conn_sec.encr_key_size;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_sec_update.conn_sec.encr_key_size;
 }
 
 FruityHal::SecurityLevel FruityHal::GapConnectionSecurityUpdateEvent::getSecurityLevel() const
 {
-	return (FruityHal::SecurityLevel)(currentEvent->evt.gap_evt.params.conn_sec_update.conn_sec.sec_mode.lv);
+	return (FruityHal::SecurityLevel)(((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_sec_update.conn_sec.sec_mode.lv);
 }
 
 FruityHal::SecurityMode FruityHal::GapConnectionSecurityUpdateEvent::getSecurityMode() const
 {
-	return (FruityHal::SecurityMode)(currentEvent->evt.gap_evt.params.conn_sec_update.conn_sec.sec_mode.sm);
+	return (FruityHal::SecurityMode)(((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_sec_update.conn_sec.sec_mode.sm);
 }
 
-FruityHal::GattcEvent::GattcEvent(void* _evt)
+FruityHal::GattcEvent::GattcEvent(void const * _evt)
 	: BleEvent(_evt)
 {
 }
 
 u16 FruityHal::GattcEvent::getConnectionHandle() const
 {
-	return currentEvent->evt.gattc_evt.conn_handle;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gattc_evt.conn_handle;
 }
 
 FruityHal::BleGattEror FruityHal::GattcEvent::getGattStatus() const
 {
-	return nrfErrToGenericGatt(currentEvent->evt.gattc_evt.gatt_status);
+	return nrfErrToGenericGatt(((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gattc_evt.gatt_status);
 }
 
-FruityHal::GattcWriteResponseEvent::GattcWriteResponseEvent(void* _evt)
+FruityHal::GattcWriteResponseEvent::GattcWriteResponseEvent(void const * _evt)
 	: GattcEvent(_evt)
 {
-	if (currentEvent->header.evt_id != BLE_GATTC_EVT_WRITE_RSP)
+	if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id != BLE_GATTC_EVT_WRITE_RSP)
 	{
 		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
 	}
 }
 
-FruityHal::GattcTimeoutEvent::GattcTimeoutEvent(void* _evt)
+FruityHal::GattcTimeoutEvent::GattcTimeoutEvent(void const * _evt)
 	: GattcEvent(_evt)
 {
-	if (currentEvent->header.evt_id != BLE_GATTC_EVT_TIMEOUT)
+	if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id != BLE_GATTC_EVT_TIMEOUT)
 	{
 		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
 	}
 }
 
-FruityHal::GattDataTransmittedEvent::GattDataTransmittedEvent(void* _evt)
+FruityHal::GattDataTransmittedEvent::GattDataTransmittedEvent(void const * _evt)
 	:BleEvent(_evt)
 {
 #if defined(NRF51) || defined(SIM_ENABLED)
-	if (currentEvent->header.evt_id != BLE_EVT_TX_COMPLETE)
+	if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id != BLE_EVT_TX_COMPLETE)
 	{
 		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
 	}
@@ -1128,13 +1148,13 @@ FruityHal::GattDataTransmittedEvent::GattDataTransmittedEvent(void* _evt)
 u16 FruityHal::GattDataTransmittedEvent::getConnectionHandle() const
 {
 #if defined(NRF51) || defined(SIM_ENABLED)
-	return currentEvent->evt.common_evt.conn_handle;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.common_evt.conn_handle;
 #elif defined(NRF52)
-	if (currentEvent->header.evt_id == BLE_GATTC_EVT_WRITE_CMD_TX_COMPLETE) {
-		return currentEvent->evt.gattc_evt.conn_handle;
+	if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id == BLE_GATTC_EVT_WRITE_CMD_TX_COMPLETE) {
+		return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gattc_evt.conn_handle;
 	}
-	else if (currentEvent->header.evt_id == BLE_GATTS_EVT_HVN_TX_COMPLETE) {
-		return currentEvent->evt.gatts_evt.conn_handle;
+	else if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id == BLE_GATTS_EVT_HVN_TX_COMPLETE) {
+		return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gatts_evt.conn_handle;
 	}
 	SIMEXCEPTION(InvalidStateException);
 	return -1; //This must never be executed!
@@ -1149,23 +1169,23 @@ bool FruityHal::GattDataTransmittedEvent::isConnectionHandleValid() const
 u32 FruityHal::GattDataTransmittedEvent::getCompleteCount() const
 {
 #if defined(NRF51) || defined(SIM_ENABLED)
-	return currentEvent->evt.common_evt.params.tx_complete.count;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.common_evt.params.tx_complete.count;
 #elif defined(NRF52)
-	if (currentEvent->header.evt_id == BLE_GATTC_EVT_WRITE_CMD_TX_COMPLETE) {
-		return currentEvent->evt.gattc_evt.params.write_cmd_tx_complete.count;
+	if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id == BLE_GATTC_EVT_WRITE_CMD_TX_COMPLETE) {
+		return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gattc_evt.params.write_cmd_tx_complete.count;
 	}
-	else if (currentEvent->header.evt_id == BLE_GATTS_EVT_HVN_TX_COMPLETE) {
-		return currentEvent->evt.gatts_evt.params.hvn_tx_complete.count;
+	else if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id == BLE_GATTS_EVT_HVN_TX_COMPLETE) {
+		return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gatts_evt.params.hvn_tx_complete.count;
 	}
 	SIMEXCEPTION(InvalidStateException);
 	return -1; //This must never be executed!
 #endif
 }
 
-FruityHal::GattsWriteEvent::GattsWriteEvent(void* _evt)
+FruityHal::GattsWriteEvent::GattsWriteEvent(void const * _evt)
 	: BleEvent(_evt)
 {
-	if (currentEvent->header.evt_id != BLE_GATTS_EVT_WRITE)
+	if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id != BLE_GATTS_EVT_WRITE)
 	{
 		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
 	}
@@ -1173,33 +1193,33 @@ FruityHal::GattsWriteEvent::GattsWriteEvent(void* _evt)
 
 u16 FruityHal::GattsWriteEvent::getAttributeHandle() const
 {
-	return currentEvent->evt.gatts_evt.params.write.handle;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gatts_evt.params.write.handle;
 }
 
 bool FruityHal::GattsWriteEvent::isWriteRequest() const
 {
-	return currentEvent->evt.gatts_evt.params.write.op == BLE_GATTS_OP_WRITE_REQ;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gatts_evt.params.write.op == BLE_GATTS_OP_WRITE_REQ;
 }
 
 u16 FruityHal::GattsWriteEvent::getLength() const
 {
-	return currentEvent->evt.gatts_evt.params.write.len;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gatts_evt.params.write.len;
 }
 
 u16 FruityHal::GattsWriteEvent::getConnectionHandle() const
 {
-	return currentEvent->evt.gatts_evt.conn_handle;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gatts_evt.conn_handle;
 }
 
-u8 * FruityHal::GattsWriteEvent::getData() const
+u8 const * FruityHal::GattsWriteEvent::getData() const
 {
-	return (u8*)currentEvent->evt.gatts_evt.params.write.data;
+	return (u8 const *)((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gatts_evt.params.write.data;
 }
 
-FruityHal::GattcHandleValueEvent::GattcHandleValueEvent(void* _evt)
+FruityHal::GattcHandleValueEvent::GattcHandleValueEvent(void const * _evt)
 	:GattcEvent(_evt)
 {
-	if (currentEvent->header.evt_id != BLE_GATTC_EVT_HVX)
+	if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id != BLE_GATTC_EVT_HVX)
 	{
 		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
 	}
@@ -1207,17 +1227,17 @@ FruityHal::GattcHandleValueEvent::GattcHandleValueEvent(void* _evt)
 
 u16 FruityHal::GattcHandleValueEvent::getHandle() const
 {
-	return currentEvent->evt.gattc_evt.params.hvx.handle;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gattc_evt.params.hvx.handle;
 }
 
 u16 FruityHal::GattcHandleValueEvent::getLength() const
 {
-	return currentEvent->evt.gattc_evt.params.hvx.len;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gattc_evt.params.hvx.len;
 }
 
-u8 * FruityHal::GattcHandleValueEvent::getData() const
+u8 const * FruityHal::GattcHandleValueEvent::getData() const
 {
-	return currentEvent->evt.gattc_evt.params.hvx.data;
+	return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gattc_evt.params.hvx.data;
 }
 
 /*
@@ -1628,14 +1648,15 @@ u32 FruityHal::DiscoverService(u16 connHandle, const BleGattUuid &p_uuid)
 	uuid.uuid = p_uuid.uuid;
 	uuid.type = p_uuid.type;
 #ifndef SIM_ENABLED
-	CheckedMemset(&discoveredServices, 0x00, sizeof(discoveredServices));
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
+	CheckedMemset(&halMemory->discoveredServices, 0x00, sizeof(halMemory->discoveredServices));
 	err = ble_db_discovery_evt_register(&uuid);
 	if (err) {
 		logt("ERROR", "err %u", (u32)err);
 		return err;
 	}
 
-	err = ble_db_discovery_start(&discoveredServices, connHandle);
+	err = ble_db_discovery_start(&halMemory->discoveredServices, connHandle);
 	if (err) {
 		logt("ERROR", "err %u", (u32)err);
 		return err;
@@ -1649,7 +1670,8 @@ u32 FruityHal::DiscoverService(u16 connHandle, const BleGattUuid &p_uuid)
 bool FruityHal::DiscoveryIsInProgress()
 {
 #ifndef SIM_ENABLED
-	return discoveredServices.discovery_in_progress;
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
+	return halMemory->discoveredServices.discovery_in_progress;
 #else
 	return false;
 #endif
@@ -1974,9 +1996,9 @@ ErrorType FruityHal::CreateTimer(FruityHal::swTimer &timer, bool repeated, Timer
 	SIMEXCEPTION(NotImplementedException);
 	u32 err;
 #ifndef SIM_ENABLED
-	static u8 timersCreated = 0;
 
-	timer = (u32 *)&swTimers[timersCreated];
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
+	timer = (u32 *)&halMemory->swTimers[halMemory->timersCreated];
 	CheckedMemset(timer, 0x00, sizeof(app_timer_t));
 
 	app_timer_mode_t mode = repeated ? APP_TIMER_MODE_REPEATED : APP_TIMER_MODE_SINGLE_SHOT;
@@ -1984,7 +2006,7 @@ ErrorType FruityHal::CreateTimer(FruityHal::swTimer &timer, bool repeated, Timer
 	err = app_timer_create((app_timer_id_t *)(&timer), mode, handler);
 	if (err != NRF_SUCCESS) return nrfErrToGeneric(err);
 
-	timersCreated++;
+	halMemory->timersCreated++;
 #endif
 	return ErrorType::SUCCESS;
 }
@@ -2359,18 +2381,23 @@ void FruityHal::GpioPinToggle(u32 pin)
 	nrf_gpio_pin_toggle(pin);
 }
 
-FruityHal::GpioInterruptHandler GpioHandler = nullptr;
 static void GpioteHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
 {
-	if (GpioHandler == nullptr) return;
-	GpioHandler((u32)pin, NrfPolarityToGeneric(action));
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
+	for (u8 i = 0; i < MAX_GPIOTE_HANDLERS; i++)
+	{
+		if (((u32)pin == halMemory->GpioHandler[i].pin) && (halMemory->GpioHandler[i].handler != nullptr))
+			halMemory->GpioHandler[i].handler((u32)pin, NrfPolarityToGeneric(action));
+	}
 }
 
 ErrorType FruityHal::GpioConfigureInterrupt(u32 pin, FruityHal::GpioPullMode mode, FruityHal::GpioTransistion trigger, FruityHal::GpioInterruptHandler handler)
 {
-	if (handler == nullptr) return ErrorType::INVALID_PARAM;
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
+	if ((handler == nullptr) || (halMemory->gpioteHandlersCreated == MAX_GPIOTE_HANDLERS)) return ErrorType::INVALID_PARAM;
 
-	GpioHandler = handler;
+	halMemory->GpioHandler[halMemory->gpioteHandlersCreated].handler = handler;
+	halMemory->GpioHandler[halMemory->gpioteHandlersCreated++].pin = pin;
 	ErrorType err = ErrorType::SUCCESS;
 	nrf_drv_gpiote_in_config_t in_config;
 	in_config.is_watcher = false;
@@ -3207,18 +3234,17 @@ u32 FruityHal::checkAndHandleUartError()
 #if !defined(NRF51) && defined(ACTIVATE_ASSET_MODULE)
 #ifndef SIM_ENABLED
 #define TWI_INSTANCE_ID     1
-static const nrf_drv_twi_t twi = NRF_DRV_TWI_INSTANCE(TWI_INSTANCE_ID);
-static volatile bool twiXferDone = false;
-static bool twiInitDone = false;
+static constexpr nrf_drv_twi_t twi = NRF_DRV_TWI_INSTANCE(TWI_INSTANCE_ID);
 #endif
 
 #ifndef SIM_ENABLED
 static void twi_handler(nrf_drv_twi_evt_t const * pEvent, void * pContext)
 {
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
 	switch (pEvent->type) {
 	// Transfer completed event.
 	case NRF_DRV_TWI_EVT_DONE:
-		twiXferDone = true;
+		halMemory->twiXferDone = true;
 		break;
 
 	// NACK received after sending the address
@@ -3238,6 +3264,7 @@ static void twi_handler(nrf_drv_twi_evt_t const * pEvent, void * pContext)
 ErrorType FruityHal::twi_init(i32 sclPin, i32 sdaPin)
 {
 	u32 errCode = NRF_SUCCESS;
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
 #ifndef SIM_ENABLED
 	// twi.reg          = {NRF_DRV_TWI_PERIPHERAL(TWI_INSTANCE_ID)};
 	// twi.drv_inst_idx = CONCAT_3(TWI, TWI_INSTANCE_ID, _INSTANCE_INDEX);
@@ -3263,7 +3290,7 @@ ErrorType FruityHal::twi_init(i32 sclPin, i32 sdaPin)
 
 	nrf_drv_twi_enable(&twi);
 
-	twiInitDone = true;
+	halMemory->twiInitDone = true;
 #else
 	errCode = cherrySimInstance->currentNode->twiWasInit ? NRF_ERROR_INVALID_STATE : NRF_SUCCESS;
 	if (cherrySimInstance->currentNode->twiWasInit)
@@ -3279,13 +3306,14 @@ ErrorType FruityHal::twi_init(i32 sclPin, i32 sdaPin)
 void FruityHal::twi_uninit(i32 sclPin, i32 sdaPin)
 {
 #ifndef SIM_ENABLED
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
 	nrf_drv_twi_disable(&twi);
 	nrf_drv_twi_uninit(&twi);
 	nrf_gpio_cfg_default((u32)sclPin);
 	nrf_gpio_cfg_default((u32)sdaPin);
 	NRF_TWI1->ENABLE = 0;
 
-	twiInitDone = false;
+	halMemory->twiInitDone = false;
 #endif
 }
 
@@ -3311,8 +3339,9 @@ ErrorType FruityHal::twi_registerWrite(u8 slaveAddress, u8 const * pTransferData
 	// Slave Address (Command) (7 Bit) + WriteBit (1 Bit) + register Byte (1 Byte) + Data (n Bytes)
 
 	u32 errCode = NRF_SUCCESS;
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
 #ifndef SIM_ENABLED
-	twiXferDone = false;
+	halMemory->twiXferDone = false;
 
 	errCode =  nrf_drv_twi_tx(&twi, slaveAddress, pTransferData, length, false);
 
@@ -3321,8 +3350,8 @@ ErrorType FruityHal::twi_registerWrite(u8 slaveAddress, u8 const * pTransferData
 		return nrfErrToGeneric(errCode);
 	}
 	// wait for transmission complete
-	while(twiXferDone == false);
-	twiXferDone = false;
+	while(halMemory->twiXferDone == false);
+	halMemory->twiXferDone = false;
 #endif
 	return nrfErrToGeneric(errCode);
 }
@@ -3331,8 +3360,9 @@ ErrorType FruityHal::twi_registerRead(u8 slaveAddress, u8 reg, u8 * pReceiveData
 {
 	// Slave Address (7 Bit) (Command) + WriteBit (1 Bit) + register Byte (1 Byte) + Repeated Start + Slave Address + ReadBit + Data.... + nAck
 	u32 errCode = NRF_SUCCESS;
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
 #ifndef SIM_ENABLED
-	twiXferDone = false;
+	halMemory->twiXferDone = false;
 
 	nrf_drv_twi_xfer_desc_t xfer = NRF_DRV_TWI_XFER_DESC_TXRX(slaveAddress, &reg, 1, pReceiveData, length);
 
@@ -3344,8 +3374,8 @@ ErrorType FruityHal::twi_registerRead(u8 slaveAddress, u8 reg, u8 * pReceiveData
 	}
 
 	// wait for transmission and read complete
-	while(twiXferDone == false);
-	twiXferDone = false;
+	while(halMemory->twiXferDone == false);
+	halMemory->twiXferDone = false;
 #endif
 	return nrfErrToGeneric(errCode);
 }
@@ -3353,7 +3383,8 @@ ErrorType FruityHal::twi_registerRead(u8 slaveAddress, u8 reg, u8 * pReceiveData
 bool FruityHal::twi_isInitialized(void)
 {
 #ifndef SIM_ENABLED
-	return twiInitDone;
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
+	return halMemory->twiInitDone;
 #else
 	return cherrySimInstance->currentNode->twiWasInit;
 #endif
@@ -3364,8 +3395,9 @@ ErrorType FruityHal::twi_read(u8 slaveAddress, u8 * pReceiveData, u8 length)
 	// Slave Address (7 Bit) (Command) + ReadBit (1 Bit) + Data.... + nAck
 
 	u32 errCode = NRF_SUCCESS;
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
 #ifndef SIM_ENABLED
-	twiXferDone = false;
+	halMemory->twiXferDone = false;
 
 	nrf_drv_twi_xfer_desc_t xfer;// = NRF_DRV_TWI_XFER_DESC_RX(slaveAddress, pReceiveData, length);
 	CheckedMemset(&xfer, 0x00, sizeof(xfer));
@@ -3382,23 +3414,22 @@ ErrorType FruityHal::twi_read(u8 slaveAddress, u8 * pReceiveData, u8 length)
 	}
 
 	// wait for transmission and read complete
-	while(twiXferDone == false);
-	twiXferDone = false;
+	while(halMemory->twiXferDone == false);
+	halMemory->twiXferDone = false;
 #endif
 	return nrfErrToGeneric(errCode);
 }
 
 #ifndef SIM_ENABLED
 #define SPI_INSTANCE  0
-static const nrf_drv_spi_t spi = NRF_DRV_SPI_INSTANCE(SPI_INSTANCE);  
-volatile bool spiXferDone;
-static bool spiInitDone = false;
+static constexpr nrf_drv_spi_t spi = NRF_DRV_SPI_INSTANCE(SPI_INSTANCE);
 #endif
 
 #ifndef SIM_ENABLED
 void spi_event_handler(nrf_drv_spi_evt_t const * p_event, void* p_context)
 {
-	spiXferDone = true;
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
+	halMemory->spiXferDone = true;
 	logt("FH", "SPI Xfer done");
 }
 #endif
@@ -3415,8 +3446,9 @@ void FruityHal::spi_init(i32 sckPin, i32 misoPin, i32 mosiPin)
 
 	APP_ERROR_CHECK(nrf_drv_spi_init(&spi, &spi_config, spi_event_handler,NULL));
 
-	spiXferDone = true;
-	spiInitDone = true;
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
+	halMemory->spiXferDone = true;
+	halMemory->spiInitDone = true;
 #else
 	if (cherrySimInstance->currentNode->spiWasInit)
 	{
@@ -3432,7 +3464,8 @@ void FruityHal::spi_init(i32 sckPin, i32 misoPin, i32 mosiPin)
 bool FruityHal::spi_isInitialized(void)
 {
 #ifndef SIM_ENABLED
-	return spiInitDone;
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
+	return halMemory->spiInitDone;
 #else
 	return cherrySimInstance->currentNode->spiWasInit;
 #endif
@@ -3440,9 +3473,9 @@ bool FruityHal::spi_isInitialized(void)
 
 ErrorType FruityHal::spi_transfer(u8* const p_toWrite, u8 count, u8* const p_toRead, i32 slaveSelectPin)
 {
-
 	u32 retVal = NRF_SUCCESS;
 #ifndef SIM_ENABLED
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
 	logt("FH", "Transferring to BME");
 
 	if ((NULL == p_toWrite) || (NULL == p_toRead))
@@ -3450,16 +3483,16 @@ ErrorType FruityHal::spi_transfer(u8* const p_toWrite, u8 count, u8* const p_toR
 		retVal = NRF_ERROR_INTERNAL;
 	}
 
-	
+
 	/* check if an other SPI transfer is running */
-	if ((true == spiXferDone) && (NRF_SUCCESS == retVal))
+	if ((true == halMemory->spiXferDone) && (NRF_SUCCESS == retVal))
 	{
-		spiXferDone = false;
+		halMemory->spiXferDone = false;
 
 		nrf_gpio_pin_clear((u32)slaveSelectPin);
 		APP_ERROR_CHECK(nrf_drv_spi_transfer(&spi, p_toWrite, count, p_toRead, count));
 		//Locks if run in interrupt context
-		while (!spiXferDone)
+		while (!halMemory->spiXferDone)
 		{
 			sd_app_evt_wait();
 		}
@@ -3483,3 +3516,8 @@ void FruityHal::spi_configureSlaveSelectPin(i32 pin)
 #endif
 }
 #endif // ifndef NRF51
+
+u32 FruityHal::GetHalMemorySize()
+{
+	return sizeof(NrfHalMemory);
+}

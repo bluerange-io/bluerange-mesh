@@ -216,9 +216,9 @@ class EnrollmentModule: public Module
 		static constexpr u32 SCAN_TIME_DS = SEC_TO_DS(60);
 		void RefreshScanJob();
 
-		void Enroll(connPacketModule* packet, u16 packetLength);
+		void Enroll(connPacketModule const * packet, u16 packetLength);
 
-		void EnrollOverMesh(connPacketModule* packet, u16 packetLength, BaseConnection* connection);
+		void EnrollOverMesh(connPacketModule const * packet, u16 packetLength, BaseConnection* connection);
 
 		void SaveEnrollment(connPacketModule* packet, u16 packetLength);
 
@@ -230,7 +230,7 @@ class EnrollmentModule: public Module
 
 		void SendEnrollmentResponse(EnrollmentModuleActionResponseMessages responseType, EnrollmentResponseCode result, u8 requestHandle) const;
 
-		void Unenroll(connPacketModule* packet, u16 packetLength);
+		void Unenroll(connPacketModule const * packet, u16 packetLength);
 
 		void NotifyNewStableSerialIndexScanned(u32 serialIndex);
 
@@ -251,11 +251,11 @@ class EnrollmentModule: public Module
 
 		void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override;
 
-		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) override;
+		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
 
 		//PreEnrollment
 
-		void StoreTemporaryEnrollmentDataAndDispatch(connPacketModule* packet, u16 packetLength);
+		void StoreTemporaryEnrollmentDataAndDispatch(connPacketModule const * packet, u16 packetLength);
 
 		void PreEnrollmentFailed();
 
@@ -270,5 +270,5 @@ class EnrollmentModule: public Module
 
 		void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
 
-		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, FmKeyId fmKeyId, DataDirection direction) override;
+		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) override;
 };

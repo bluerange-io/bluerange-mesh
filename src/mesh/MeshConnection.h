@@ -96,10 +96,10 @@ class MeshConnection
 
 	public:
 		//Init + Destroy
-		MeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, u16 partnerWriteCharacteristicHandle);
+		MeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, u16 partnerWriteCharacteristicHandle);
 
 		virtual ~MeshConnection();
-		static BaseConnection* ConnTypeResolver(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8* data);
+		static BaseConnection* ConnTypeResolver(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8 const * data);
 
 		void SaveClusteringSnapshot();
 		void DisconnectAndRemove(AppDisconnectReason reason) override;
@@ -108,10 +108,10 @@ class MeshConnection
 		void StartHandshake() override;
 		void StartHandshakeAfterMtuExchange();
 		void ConnectionMtuUpgradedHandler(u16 gattPayloadSize) override;
-		void ReceiveHandshakePacketHandler(BaseConnectionSendData* sendData, u8* data);
+		void ReceiveHandshakePacketHandler(BaseConnectionSendData* sendData, u8 const * data);
 		void SendReconnectionHandshakePacket();
 		ErrorType SendReconnectionHandshakePacketAfterMtuExchange(); //Pay attention as this might disconnect the connection
-		void ReceiveReconnectionHandshakePacket(connPacketReconnect* packet);
+		void ReceiveReconnectionHandshakePacket(connPacketReconnect const * packet);
 
 		bool SendHandshakeMessage(u8* data, u16 dataLength, bool reliable);
 
@@ -124,13 +124,13 @@ class MeshConnection
 		void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData) override;
 		void DataSentHandler(const u8* data, u16 length) override;
 
-		bool SendData(BaseConnectionSendData* sendData, u8* data);
-		bool SendData(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable) override;
+		bool SendData(BaseConnectionSendData* sendData, u8 const * data);
+		bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable) override;
 
 		//Receiving Data
-		void ReceiveDataHandler(BaseConnectionSendData* sendData, u8* data) override;
+		void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) override;
 		//Called for received mesh messages after data has been processed
-		void ReceiveMeshMessageHandler(BaseConnectionSendData* sendData, u8* data);
+		void ReceiveMeshMessageHandler(BaseConnectionSendData* sendData, u8 const * data);
 
 		//Handler
 		bool GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason) override;

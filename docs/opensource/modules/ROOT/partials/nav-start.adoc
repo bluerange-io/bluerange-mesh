@@ -20,6 +20,7 @@ endif::[]
 ** xref:fruitymesh::Class-Structure.adoc[Class Structure]
 ** xref:fruitymesh::Debugging.adoc[Debugging]
 ** xref:fruitymesh::DocumentationTemplate.adoc[Documentation Template]
+** xref:fruitymesh::BuildingWithCMake.adoc[Building with CMake]
 
 * Mesh
 ** xref:fruitymesh::Node.adoc[Node]

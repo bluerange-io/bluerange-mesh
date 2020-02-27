@@ -61,7 +61,7 @@ TEST(TestDebugModule, TestCommands) {
 	tester.sim->findNodeById(2)->gs.logger.enableTag("DEBUGMOD");
 	tester.sim->findNodeById(2)->gs.logger.enableTag("DEBUG");
 
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	tester.SendTerminalCommand(1, "action 2 debug get_buffer");
 	tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"buf\":\"advT \\d+,rssi \\d+,time \\d+,last \\d+,node 2,cid \\d+,csiz \\d+, in \\d+, out \\d+, devT \\d+, ack \\d+\"\\}");

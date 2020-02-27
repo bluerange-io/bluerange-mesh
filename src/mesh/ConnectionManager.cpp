@@ -218,7 +218,7 @@ void ConnectionManager::GATTServiceDiscoveredHandler(u16 connHandle, FruityHal::
 //connection to its real type
 
 //Upgrade a connection to another connection type after it has been determined
-void ConnectionManager::ResolveConnection(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8* data)
+void ConnectionManager::ResolveConnection(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8 const * data)
 {
 	//ConnectionTypeResolvers are collected in a special linker section
 	u8 numConnTypeResolvers = (((u32)__stop_conn_type_resolvers) - ((u32)__start_conn_type_resolvers)) / sizeof(u32);
@@ -379,14 +379,21 @@ void ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, Delive
 	}
 }
 
-void ConnectionManager::DispatchMeshMessage(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packet, bool checkReceiver) const
+void ConnectionManager::DispatchMeshMessage(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packet, bool checkReceiver) const
 {
 	if(
 		!checkReceiver
 		|| IsReceiverOfNodeId(packet->receiver)
 	){
 		//Fix local loopback id and replace with out nodeId
-		if(packet->receiver == NODE_ID_LOCAL_LOOPBACK) packet->receiver = GS->node.configuration.nodeId;
+		DYNAMIC_ARRAY(modifiedBuffer, sendData->dataLength);
+		if (packet->receiver == NODE_ID_LOCAL_LOOPBACK)
+		{
+			CheckedMemcpy(modifiedBuffer, packet, sendData->dataLength);
+			connPacketHeader * modifiedPacket = (connPacketHeader*)modifiedBuffer;
+			modifiedPacket->receiver = GS->node.configuration.nodeId;
+			packet = modifiedPacket;
+		}
 
 		//Now we must pass the message to all of our modules for further processing
 		for(u32 i=0; i<GS->amountOfModules; i++){
@@ -520,7 +527,7 @@ void ConnectionManager::GattcWriteResponseEventHandler(const FruityHal::GattcWri
 
 #define _________________RECEIVING____________
 
-void ConnectionManager::ForwardReceivedDataToConnection(u16 connectionHandle, BaseConnectionSendData & sendData, u8 * data)
+void ConnectionManager::ForwardReceivedDataToConnection(u16 connectionHandle, BaseConnectionSendData & sendData, u8 const * data)
 {
 	logt("CM", "RX Data size is: %d, handles(%d, %d), delivery %d", sendData.dataLength, connectionHandle, sendData.characteristicHandle, (u32)sendData.deliveryOption);
 
@@ -561,9 +568,9 @@ void ConnectionManager::GattcHandleValueEventHandler(const FruityHal::GattcHandl
 }
 
 //This method accepts connPackets and distributes it to all other mesh connections
-void ConnectionManager::RouteMeshData(BaseConnection* connection, BaseConnectionSendData* sendData, u8* data) const
+void ConnectionManager::RouteMeshData(BaseConnection* connection, BaseConnectionSendData* sendData, u8 const * data) const
 {
-	connPacketHeader* packetHeader = (connPacketHeader*) data;
+	connPacketHeader const * packetHeader = (connPacketHeader const *) data;
 
 
 	/*#################### Modification ############################*/
@@ -604,9 +611,13 @@ void ConnectionManager::RouteMeshData(BaseConnection* connection, BaseConnection
 	else
 	{
 		//If the packet should travel a number of hops, we decrement that part
+		DYNAMIC_ARRAY(modifiedMessage, sendData->dataLength);
 		if(packetHeader->receiver > NODE_ID_HOPS_BASE && packetHeader->receiver < NODE_ID_HOPS_BASE + 1000)
 		{
-			packetHeader->receiver--;
+			CheckedMemcpy(modifiedMessage, data, sendData->dataLength);
+			connPacketHeader* modifiedPacketHeader = (connPacketHeader*)modifiedMessage;
+			modifiedPacketHeader->receiver--;
+			packetHeader = modifiedPacketHeader;
 		}
 
 		//TODO: We can refactor this to use the new MessageRoutingInterceptor
@@ -622,7 +633,7 @@ void ConnectionManager::RouteMeshData(BaseConnection* connection, BaseConnection
 	}
 }
 
-void ConnectionManager::BroadcastMeshData(const BaseConnection* ignoreConnection, BaseConnectionSendData* sendData, u8* data, RoutingDecision routingDecision) const
+void ConnectionManager::BroadcastMeshData(const BaseConnection* ignoreConnection, BaseConnectionSendData* sendData, u8 const * data, RoutingDecision routingDecision) const
 {
 	//Iterate through all mesh connections except the ignored one and send the packet
 	if (!(routingDecision & ROUTING_DECISION_BLOCK_TO_MESH)) {
@@ -928,6 +939,19 @@ i8 ConnectionManager::getFreeConnectionSpot() const
 			return i;
 	}
 	return -1;
+}
+
+bool ConnectionManager::HasFreeConnection(ConnectionDirection direction) const
+{
+	switch (direction)
+	{
+	case ConnectionDirection::DIRECTION_IN:
+		return freeMeshInConnections > 0;
+	case ConnectionDirection::DIRECTION_OUT:
+		return freeMeshOutConnections > 0;
+	default:
+		return false;
+	}
 }
 
 

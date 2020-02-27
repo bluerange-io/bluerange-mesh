@@ -35,6 +35,10 @@
 #include <Utility.h>
 #include <mini-printf.h>
 
+#ifdef SIM_ENABLED
+#include "json.hpp"
+#endif
+
 // Size for tracing messages to the log transport, if it is too short, messages will get truncated
 #define TRACE_BUFFER_SIZE 500
 
@@ -55,7 +59,7 @@ void Logger::Init()
 	GS->terminal.AddTerminalCommandListener(this);
 }
 
-void Logger::log_f(bool printLine, bool isJson, const char* file, i32 line, const char* message, ...) const
+void Logger::log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJsonEvent, const char* file, i32 line, const char* message, ...)
 {
 	char mhTraceBuffer[TRACE_BUFFER_SIZE] = { 0 };
 
@@ -73,14 +77,55 @@ void Logger::log_f(bool printLine, bool isJson, const char* file, i32 line, cons
 		log_transport_putstring(mhTraceBuffer);
 		log_transport_putstring(EOL);
 	}
-	else
+	else if(!isJson)
 	{
 		log_transport_putstring(mhTraceBuffer);
 	}
 
 	if (isJson)
 	{
-		GS->terminal.OnJsonLogged(mhTraceBuffer);
+		if (GS->terminal.IsCrcChecksEnabled())
+		{
+			if (isEndOfMessage)
+			{
+				if (strchr(mhTraceBuffer, '}') == nullptr && strstr(mhTraceBuffer, "CRC:") == nullptr)
+				{
+					//Found end of json message that didn't contain a "}", which is
+					//probably a  bug. Did you mean to split a json message accross
+					//several lines? If so, use logjson_partial for all of the logs
+					//except the last one (that should still be logjson!)
+					SIMEXCEPTION(IllegalArgumentException);
+				}
+				char* sepLoc = strstr(mhTraceBuffer, SEP);
+				if (sepLoc != nullptr)
+				{
+					sepLoc[0] = '\0';
+				}
+			}
+			currentJsonCrc = Utility::CalculateCrc32String(mhTraceBuffer, currentJsonCrc);
+		}
+
+#ifdef SIM_ENABLED
+		currentString += mhTraceBuffer;
+#endif
+		log_transport_putstring(mhTraceBuffer);
+
+		if (isEndOfMessage)
+		{
+			if (GS->terminal.IsCrcChecksEnabled())
+			{
+				Logger::getInstance().log_f(false, false, false, false, "", 0, " CRC: %u" SEP, currentJsonCrc);
+				currentJsonCrc = 0;
+			}
+#ifdef SIM_ENABLED
+			nlohmann::json j = nlohmann::json::parse(currentString);
+			currentString = "";
+#endif
+		}
+
+		if (!skipJsonEvent) {
+			GS->terminal.OnJsonLogged(mhTraceBuffer);
+		}
 	}
 }
 
@@ -125,11 +170,8 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
 				log_transport_putstring(mhTraceBuffer);
 			}
 		} else {
-			char tmp[150];
-			snprintf(tmp, 150, "{\"type\":\"log\",\"tag\":\"%s\",\"file\":\"%s\",\"line\":%d,\"message\":\"", tag, file, line);
-			log_transport_putstring(tmp);
-			log_transport_putstring(mhTraceBuffer);
-			log_transport_putstring("\"}" SEP);
+			logjson_partial_skip_event("LOG", "{\"type\":\"log\",\"tag\":\"%s\",\"file\":\"%s\",\"line\":%d,\"message\":\"", tag, file, line);
+			logjson_skip_event("LOG", "%s\"}" SEP, mhTraceBuffer);
 		}
 	}
 #endif
@@ -159,6 +201,12 @@ void Logger::uart_error_f(UartErrorType type) const
 			logjson("ERROR", "{\"type\":\"error\",\"code\":5,\"text\":\"Warning: Command is marked deprecated!\"}" SEP);
 			break;
 #endif
+		case UartErrorType::CRC_INVALID:
+			logjson("ERROR", "{\"type\":\"error\",\"code\":6,\"text\":\"crc invalid\"}" SEP);
+			break;
+		case UartErrorType::CRC_MISSING:
+			logjson("ERROR", "{\"type\":\"error\",\"code\":7,\"text\":\"crc missing\"}" SEP);
+			break;
 		default:
 			logjson("ERROR", "{\"type\":\"error\",\"code\":%u,\"text\":\"Unknown Error\"}" SEP, (u32)type);
 			break;
@@ -277,6 +325,19 @@ void Logger::toggleTag(const char* tag)
 	}
 
 #endif
+}
+
+u32 Logger::getAmountOfEnabledTags()
+{
+#if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
+	u32 amount = 0;
+	for (i32 i = 0; i < MAX_ACTIVATE_LOG_TAG_NUM; i++) {
+		if (activeLogTags[i * MAX_LOG_TAG_LENGTH] != '\0') amount++;
+	}
+	return amount;
+#else
+	return 0;
+#endif // IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
 }
 
 void Logger::printEnabledTags() const

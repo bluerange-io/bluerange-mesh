@@ -109,14 +109,14 @@ TerminalCommandHandlerReturnType PingModule::TerminalCommandHandler(const char* 
 }
 #endif
 
-void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
+void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
 {
 	//Must call superclass for handling
 	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
 	//Filter trigger_action messages
 	if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId){
@@ -147,7 +147,7 @@ void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConn
 	//Parse Module action_response messages
 	if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
 
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId)

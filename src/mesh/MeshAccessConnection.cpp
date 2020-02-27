@@ -68,7 +68,7 @@
 uint32_t meshAccessConnTypeResolver __attribute__((section(".ConnTypeResolvers"), used)) = (u32)MeshAccessConnection::ConnTypeResolver;
 #endif
 
-MeshAccessConnection::MeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType)
+MeshAccessConnection::MeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType)
 	: BaseConnection(id, direction, partnerAddress)
 {
 	logt("MACONN", "New MeshAccessConnection");
@@ -103,7 +103,7 @@ MeshAccessConnection::MeshAccessConnection(u8 id, ConnectionDirection direction,
 //Can be used to use a custom key for connecting to a partner,
 //should be called directly after constructing and before connecting
 //Will not work if the partner starts the encryption handshake
-void MeshAccessConnection::SetCustomKey(u8* key)
+void MeshAccessConnection::SetCustomKey(u8 const * key)
 {
 	CheckedMemcpy(this->key, key, 16);
 	useCustomKey = true;
@@ -113,7 +113,7 @@ MeshAccessConnection::~MeshAccessConnection(){
 	logt("MACONN", "Deleted MeshAccessConnection, discR: %u, appDiscR: %u", (u32)this->disconnectionReason, (u32)this->appDisconnectionReason);
 }
 
-BaseConnection* MeshAccessConnection::ConnTypeResolver(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8* data)
+BaseConnection* MeshAccessConnection::ConnTypeResolver(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8 const * data)
 {
 	//Check if data was written to our service rx characteristic
 	MeshAccessModule* meshAccessMod = (MeshAccessModule*)GS->node.GetModuleById(ModuleId::MESH_ACCESS_MODULE);
@@ -137,7 +137,7 @@ BaseConnection* MeshAccessConnection::ConnTypeResolver(BaseConnection* oldConnec
 
 #define ________________________CONNECTION_________________________
 
-u32 MeshAccessConnection::ConnectAsMaster(FruityHal::BleGapAddr* address, u16 connIntervalMs, u16 connectionTimeoutSec, FmKeyId fmKeyId, u8* customKey, MeshAccessTunnelType tunnelType)
+u32 MeshAccessConnection::ConnectAsMaster(FruityHal::BleGapAddr const * address, u16 connIntervalMs, u16 connectionTimeoutSec, FmKeyId fmKeyId, u8 const * customKey, MeshAccessTunnelType tunnelType)
 {
 	//Only connect when not currently in another connection and when there are free connections
 	if (GS->cm.pendingConnection != nullptr) return 0;
@@ -246,7 +246,7 @@ void MeshAccessConnection::StartHandshake(FmKeyId fmKeyId)
 }
 
 //This method is called by the peripheral after the Encryption Start Handshake packet was received
-void MeshAccessConnection::HandshakeANonce(connPacketEncryptCustomStart* inPacket){
+void MeshAccessConnection::HandshakeANonce(connPacketEncryptCustomStart const * inPacket){
 	//Process Starthandshake packet
 	//P=>C: Type=ANouce (Will stay the same random number until attempt was made), supportedKeyIds=1,2,345,56,...,supportsAuthenticate(true/false)
 
@@ -308,7 +308,7 @@ void MeshAccessConnection::HandshakeANonce(connPacketEncryptCustomStart* inPacke
 }
 
 //This method is called by the Central after the ANonce was received
-void MeshAccessConnection::HandshakeSNonce(connPacketEncryptCustomANonce* inPacket)
+void MeshAccessConnection::HandshakeSNonce(connPacketEncryptCustomANonce const * inPacket)
 {
 	logt("MACONN", "-- TX SNonce, anonce %u", inPacket->anonce[1]);
 
@@ -373,7 +373,7 @@ void MeshAccessConnection::HandshakeSNonce(connPacketEncryptCustomANonce* inPack
 }
 
 //This method is called by the Peripheral after the SNonce was received
-void MeshAccessConnection::HandshakeDone(connPacketEncryptCustomSNonce* inPacket)
+void MeshAccessConnection::HandshakeDone(connPacketEncryptCustomSNonce const * inPacket)
 {
 
 	logt("MACONN", "-- TX Handshake Done, snonce %u", encryptionNonce[1]);
@@ -658,7 +658,7 @@ void MeshAccessConnection::EncryptPacket(u8* data, u16 dataLength)
 	logt("MACONN", "Encrypted as %s (%u)", data2Hex, dataLength + MESH_ACCESS_MIC_LENGTH);
 }
 
-bool MeshAccessConnection::DecryptPacket(u8* data, u16 dataLength)
+bool MeshAccessConnection::DecryptPacket(u8 const * data, u8 * decryptedOut, u16 dataLength)
 {
 	if(dataLength < 4) return false;
 
@@ -691,7 +691,7 @@ bool MeshAccessConnection::DecryptPacket(u8* data, u16 dataLength)
 			(Aes128Block*)keystream);
 
 	//Check if the two MICs match
-	u8* micPtr = data + (dataLength - MESH_ACCESS_MIC_LENGTH);
+	u8 const * micPtr = data + (dataLength - MESH_ACCESS_MIC_LENGTH);
 	u32 micCheck = memcmp(keystream, micPtr, MESH_ACCESS_MIC_LENGTH);
 
 	//Reset decryptionNonce for decrypting the message
@@ -709,7 +709,7 @@ bool MeshAccessConnection::DecryptPacket(u8* data, u16 dataLength)
 //	logt("ERROR", "Keystream %s", keystreamHex);
 
 	//Xor keystream with ciphertext to retrieve original message
-	Utility::XorBytes(keystream, data, dataLength - MESH_ACCESS_MIC_LENGTH, data);
+	Utility::XorBytes(keystream, data, dataLength - MESH_ACCESS_MIC_LENGTH, decryptedOut);
 
 	//Increment nonce being used as a counter
 	decryptionNonce[1] += 2;
@@ -752,7 +752,7 @@ SizedData MeshAccessConnection::ProcessDataBeforeTransmission(BaseConnectionSend
 	return splitData;
 }
 
-bool MeshAccessConnection::SendData(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable)
+bool MeshAccessConnection::SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable)
 {
 	if (dataLength > MAX_MESH_PACKET_SIZE) {
 		SIMEXCEPTION(PaketTooBigException);
@@ -805,9 +805,9 @@ bool MeshAccessConnection::ShouldSendDataToNodeId(NodeId nodeId) const
 
 
 //This is the generic method for sending data
-bool MeshAccessConnection::SendData(BaseConnectionSendData* sendData, u8* data)
+bool MeshAccessConnection::SendData(BaseConnectionSendData* sendData, u8 const * data)
 {
-	connPacketHeader* packetHeader = (connPacketHeader*)data;
+	connPacketHeader const * packetHeader = (connPacketHeader const *)data;
 
 	logt("MACONN", "MA SendData from %u to %u", packetHeader->sender, packetHeader->receiver);
 
@@ -846,8 +846,12 @@ bool MeshAccessConnection::SendData(BaseConnectionSendData* sendData, u8* data)
 
 		//Before sending it to our partner, we change the virtual receiver id
 		//that was used in our mesh to his normal nodeId
+		DYNAMIC_ARRAY(modifiedData, sendData->dataLength);
 		if(packetHeader->receiver == this->virtualPartnerId){
-			packetHeader->receiver = this->partnerId; //FIXME: Must not modify id here, copy packet first to queue
+			CheckedMemcpy(modifiedData, data, sendData->dataLength);
+			connPacketHeader * modifiedPacketHeader = (connPacketHeader*)modifiedData;
+			modifiedPacketHeader->receiver = this->partnerId; //FIXME: Must not modify id here, copy packet first to queue
+			data = modifiedData;
 		}
 
 		//Put packet in the queue for sending
@@ -906,7 +910,7 @@ void MeshAccessConnection::PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* q
 
 //Check if encryption was started, and if yes, decrypt all packets before passing them to
 //other functions, deal with the handshake packets as well
-void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8* data)
+void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data)
 {
 	if(
 		meshAccessMod == nullptr
@@ -918,9 +922,11 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
 	}
 
 	//Check if packet must be decrypted first
+	DYNAMIC_ARRAY(decryptedData, sendData->dataLength);
 	if(encryptionState == EncryptionState::ENCRYPTED){
-		bool valid = DecryptPacket(data, sendData->dataLength);
+		bool valid = DecryptPacket(data, decryptedData, sendData->dataLength);
 		sendData->dataLength -= MESH_ACCESS_MIC_LENGTH;
+		data = decryptedData;
 
 		if(!valid){
 			logt("ERROR", "Invalid packet");
@@ -929,12 +935,12 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
 		}
 	}
 
-	connPacketHeader* packetHeader = (connPacketHeader*)data;
+	connPacketHeader const * packetHeader = (connPacketHeader const *)data;
 
 	if(connectionState == ConnectionState::CONNECTED)
 	{
 		if(sendData->dataLength == SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_START && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_START){
-			HandshakeANonce((connPacketEncryptCustomStart*) data);
+			HandshakeANonce((connPacketEncryptCustomStart const *) data);
 		} else if(!allowCorruptedEncryptionStart) {
 			logt("ERROR", "Wrong handshake packet");
 			DisconnectAndRemove(AppDisconnectReason::INVALID_HANDSHAKE_PACKET);
@@ -943,10 +949,10 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
 	else if(connectionState == ConnectionState::HANDSHAKING)
 	{
 		if(sendData->dataLength == SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_ANONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_ANONCE){
-			HandshakeSNonce((connPacketEncryptCustomANonce*) data);
+			HandshakeSNonce((connPacketEncryptCustomANonce const *) data);
 		}
 		else if(sendData->dataLength == SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_SNONCE){
-			HandshakeDone((connPacketEncryptCustomSNonce*) data);
+			HandshakeDone((connPacketEncryptCustomSNonce const *) data);
 		} else {
 			logt("ERROR", "Wrong handshake packet");
 			DisconnectAndRemove(AppDisconnectReason::INVALID_HANDSHAKE_PACKET);
@@ -964,10 +970,10 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
 	}
 }
 
-void MeshAccessConnection::ReceiveMeshAccessMessageHandler(BaseConnectionSendData* sendData, u8* data)
+void MeshAccessConnection::ReceiveMeshAccessMessageHandler(BaseConnectionSendData* sendData, u8 const * data)
 {
 	//We must change the sender because our partner might have a nodeId clash within our network
-	connPacketHeader* packetHeader = (connPacketHeader*)data;
+	connPacketHeader const * packetHeader = (connPacketHeader const *)data;
 
 	//Some special handling for timestamp updates
 	GS->timeManager.HandleUpdateTimestampMessages(packetHeader, sendData->dataLength);
@@ -975,15 +981,19 @@ void MeshAccessConnection::ReceiveMeshAccessMessageHandler(BaseConnectionSendDat
 	//For component_sense message sent from asset, the virtual partner id should not change
 	bool replaceSenderId = true;
 	if (packetHeader->messageType == MessageType::COMPONENT_SENSE) {
-		connPacketComponentMessage*packet = (connPacketComponentMessage*)data;
+		connPacketComponentMessage const *packet = (connPacketComponentMessage const *)data;
 		if (packet->componentHeader.moduleId == ModuleId::ASSET_MODULE) {
 			replaceSenderId = false;
 		}
 	}
 
 	//Replace the sender id with our virtual partner id
+	DYNAMIC_ARRAY(changedBuffer, sendData->dataLength);
 	if(packetHeader->sender == partnerId && replaceSenderId){
-		packetHeader->sender = virtualPartnerId;
+		CheckedMemcpy(changedBuffer, data, sendData->dataLength);
+		connPacketHeader *changedPacketHeader = (connPacketHeader*)changedBuffer;
+		changedPacketHeader->sender = virtualPartnerId;
+		packetHeader = changedPacketHeader;
 	}
 
 	MeshAccessAuthorization auth = meshAccessMod->CheckAuthorizationForAll(sendData, data, fmKeyId, DataDirection::DIRECTION_IN);

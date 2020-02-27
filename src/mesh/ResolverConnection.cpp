@@ -41,7 +41,7 @@
  * @param direction
  */
 
-ResolverConnection::ResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress)
+ResolverConnection::ResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress)
 	: BaseConnection(id, direction, partnerAddress)
 {
 	logt("RCONN", "New Resolver Connection");
@@ -56,7 +56,7 @@ void ResolverConnection::ConnectionSuccessfulHandler(u16 connectionHandle)
 	connectionState = ConnectionState::HANDSHAKING;
 }
 
-void ResolverConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8* data)
+void ResolverConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data)
 {
 	logt("RCONN", "Resolving Connection with received data");
 
@@ -64,7 +64,7 @@ void ResolverConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8
 	GS->cm.ResolveConnection(this, sendData, data);
 }
 
-bool ResolverConnection::SendData(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable)
+bool ResolverConnection::SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable)
 {
 	return false;
 };

@@ -101,7 +101,8 @@ namespace Utility
 	//CRC calculation
 	uint8_t CalculateCrc8(const u8* data, u16 dataLength);
 	uint16_t CalculateCrc16(const uint8_t * p_data, const uint32_t size, const uint16_t * p_crc);
-	u32 CalculateCrc32(const u8* message, const i32 messageLength);
+	u32 CalculateCrc32(const u8* message, const u32 messageLength, u32 previousCrc = 0);
+	u32 CalculateCrc32String(const char* message, u32 previousCrc = 0);
 
 	//Encryption Functionality
 	void Aes128BlockEncrypt(const Aes128Block* messageBlock, const Aes128Block* key, Aes128Block* encryptedMessage);
@@ -129,6 +130,8 @@ namespace Utility
 	NodeId TerminalArgumentToNodeId(const char* arg);
 
 	bool IsUnknownRebootReason(RebootReason rebootReason);
+
+	char* FindLast(char* str, const char* search);
 
 	//The outDidError varaible can be nullptr, in which case it is ignored.
 	//If it's not set to nullptr, the underlying value must be initialized

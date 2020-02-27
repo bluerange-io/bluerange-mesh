@@ -262,13 +262,14 @@ void CherrySimTester::Start()
 
 void CherrySimTester::SimulateUntilClusteringDone(int timeoutMs)
 {
+	if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
 	int startTimeMs = sim->simState.simTimeMs;
 
 	while (!sim->IsClusteringDone()) {
 		sim->SimulateStepForAllNodes();
 
 		//Watch if a timeout occurs
-		if (timeoutMs != 0 && startTimeMs + timeoutMs < (i32)sim->simState.simTimeMs) {
+		if (startTimeMs + timeoutMs < (i32)sim->simState.simTimeMs) {
 			SIMEXCEPTION(TimeoutException); //Timeout waiting for clustering
 		}
 	}
@@ -276,13 +277,14 @@ void CherrySimTester::SimulateUntilClusteringDone(int timeoutMs)
 
 void CherrySimTester::SimulateUntilClusteringDoneWithDifferentNetworkIds(int timeoutMs)
 {
+	if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
 	int startTimeMs = sim->simState.simTimeMs;
 
 	while (!sim->IsClusteringDoneWithDifferentNetworkIds()) {
 		sim->SimulateStepForAllNodes();
 
 		//Watch if a timeout occurs
-		if (timeoutMs != 0 && startTimeMs + timeoutMs < (i32)sim->simState.simTimeMs) {
+		if (startTimeMs + timeoutMs < (i32)sim->simState.simTimeMs) {
 			SIMEXCEPTION(TimeoutException); //Timeout waiting for clustering
 		}
 	}
@@ -322,13 +324,14 @@ void CherrySimTester::SimulateBroadcastMessage(double x, double y, ble_gap_evt_a
 }
 void CherrySimTester::SimulateUntilClusteringDoneWithExpectedNumberOfClusters(int timeoutMs, int clusters)
 {
+	if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
 	int startTimeMs = sim->simState.simTimeMs;
 
 	while (!sim->IsClusteringDoneWithExpectedNumberOfClusters(clusters)) {
 		sim->SimulateStepForAllNodes();
 
 		//Watch if a timeout occurs
-		if (timeoutMs != 0 && startTimeMs + timeoutMs < (i32)sim->simState.simTimeMs) {
+		if (startTimeMs + timeoutMs < (i32)sim->simState.simTimeMs) {
 			SIMEXCEPTION(TimeoutException); //Timeout waiting for clustering
 		}
 	}
@@ -352,6 +355,7 @@ void CherrySimTester::SimulateForGivenTime(int numMilliseconds)
 
 void CherrySimTester::SimulateUntilMessageReceived(int timeoutMs, NodeId nodeId, const char* messagePart, ...)
 {
+	if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
 	char buffer[2048];
 	va_list aptr;
 	va_start(aptr, messagePart);
@@ -365,6 +369,7 @@ void CherrySimTester::SimulateUntilMessageReceived(int timeoutMs, NodeId nodeId,
 
 void CherrySimTester::SimulateUntilMessagesReceived(int timeoutMs, std::vector<SimulationMessage>& messages)
 {
+	if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
 	useRegex = false;
 	awaitedTerminalOutputs = &messages;
 
@@ -373,6 +378,7 @@ void CherrySimTester::SimulateUntilMessagesReceived(int timeoutMs, std::vector<S
 
 void CherrySimTester::SimulateUntilRegexMessageReceived(int timeoutMs, NodeId nodeId, const char * messagePart, ...)
 {
+	if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
 	char buffer[2048];
 	va_list aptr;
 	va_start(aptr, messagePart);
@@ -385,6 +391,7 @@ void CherrySimTester::SimulateUntilRegexMessageReceived(int timeoutMs, NodeId no
 
 void CherrySimTester::SimulateUntilRegexMessagesReceived(int timeoutMs, std::vector<SimulationMessage>& messages)
 {
+	if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
 	useRegex = true;
 	awaitedTerminalOutputs = &messages;
 
@@ -393,6 +400,7 @@ void CherrySimTester::SimulateUntilRegexMessagesReceived(int timeoutMs, std::vec
 
 void CherrySimTester::_SimulateUntilMessageReceived(int timeoutMs)
 {
+	if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
 	int startTimeMs = sim->simState.simTimeMs;
 	awaitedMessagesFound = false;
 
@@ -400,7 +408,7 @@ void CherrySimTester::_SimulateUntilMessageReceived(int timeoutMs)
 		sim->SimulateStepForAllNodes();
 
 		//Watch if a timeout occurs
-		if (timeoutMs != 0 && startTimeMs + timeoutMs < (i32)sim->simState.simTimeMs) {
+		if (startTimeMs + timeoutMs < (i32)sim->simState.simTimeMs) {
 			SIMEXCEPTION(TimeoutException); //Timeout waiting for message
 		}
 	}
@@ -410,6 +418,7 @@ void CherrySimTester::_SimulateUntilMessageReceived(int timeoutMs)
 //Simulates until an event with a specific eventId is received that contains the binary data if given (binary data can be a part of the event)
 void CherrySimTester::SimulateUntilBleEventReceived(int timeoutMs, NodeId nodeId, u16 eventId, const u8* eventDataPart, u16 eventDataPartLength)
 {
+	if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
 	int startTimeMs = sim->simState.simTimeMs;
 
 	awaitedBleEventNodeId = nodeId;
@@ -431,12 +440,14 @@ void CherrySimTester::SimulateUntilBleEventReceived(int timeoutMs, NodeId nodeId
 }
 
 //Just simulates, probably never used in tests, but only while developing
+#ifndef CI_PIPELINE
 void CherrySimTester::SimulateForever()
 {
 	while (true) {
 		sim->SimulateStepForAllNodes();
 	}
 }
+#endif //!CI_PIPELINE
 
 //Sends a TerminalCommand to the currentNode as part of the current time step, use nodeId = 0 to send to all nodes
 void CherrySimTester::SendTerminalCommand(NodeId nodeId, const char* message, ...)

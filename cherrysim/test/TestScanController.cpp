@@ -94,7 +94,7 @@ TEST(TestScanController, TestIfScannerGetsEnabled) {
 	strcpy(tester.sim->nodes[0].nodeConfiguration, "prod_sink_nrf52");
 	tester.Start();
 
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	ScanJob job;
 	job.timeMode = ScanJobTimeMode::ENDLESS;
@@ -118,7 +118,7 @@ TEST(TestScanController, TestScannerStopsAfterTimeoutTime) {
 	strcpy(tester.sim->nodes[0].nodeConfiguration, "prod_sink_nrf52");
 	tester.Start();
 
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 	ForceStopAllScanJobs(tester);
 
 	ScanJob job;
@@ -146,7 +146,7 @@ TEST(TestScanController, TestScannerChooseJobWithHighestDutyCycle) {
 	strcpy(tester.sim->nodes[0].nodeConfiguration, "prod_sink_nrf52");
 	tester.Start();
 
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 	ForceStopAllScanJobs(tester);
 
 	ScanJob job;
@@ -192,7 +192,7 @@ TEST(TestScanController, TestScannerWillStopOnceAllJobsTimeout) {
 	strcpy(tester.sim->nodes[0].nodeConfiguration, "prod_sink_nrf52");
 	tester.Start();
 
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 	ForceStopAllScanJobs(tester);
 
 	ScanJob job;
@@ -225,7 +225,7 @@ TEST(TestScanController, TestScannerWillStopOnceAllJobsAreDeleted) {
 	strcpy(tester.sim->nodes[0].nodeConfiguration, "prod_sink_nrf52");
 	tester.Start();
 
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 	ForceStopAllScanJobs(tester);
 
 	ScanJob job;

@@ -210,6 +210,29 @@ And ends the transaction:
 }
 ----
 
+=== Enabling CRC checks on Terminal Communication
+
+It is possible to add a CRCs check to all communications that go through the terminal. To do this, execute the following command:
+
+[source,C++]
+----
+enable_corruption_check
+----
+
+After this command is sent, the firmware only accepts terminal commands that have a correct CRC32 appended at the end. For example, a terminal command may look like this:
+
+[source,C++]
+----
+action this status get_status CRC: 3968018817
+----
+
+In addition, all JSON messages from the firmware have a CRC32 appended:
+
+[source,Javascript]
+----
+{"nodeId":1,"type":"status","module":3,"batteryInfo":0,"clusterSize":2,"connectionLossCounter":0,"freeIn":2,"freeOut":2,"inConnectionPartner":0,"inConnectionRSSI":0, "initialized":0} CRC: 3703755059
+----
+
 === Sensor Values
 
 [source, C++]

@@ -40,15 +40,15 @@ class ResolverConnection
 {
 private:
 public:
-	ResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress);
+	ResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
 
 	void ConnectionSuccessfulHandler(u16 connectionHandle) override;
 
-	void ReceiveDataHandler(BaseConnectionSendData* sendData, u8* data) override;
+	void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) override;
 
 	void PrintStatus() override;
 
-	bool SendData(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable) override;
+	bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable) override;
 
 };
 

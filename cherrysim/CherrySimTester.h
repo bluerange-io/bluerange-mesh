@@ -105,7 +105,9 @@ public:
 	void SimulateUntilRegexMessageReceived(int timeoutMs, NodeId nodeId, const char* messagePart, ...);
 	void SimulateUntilRegexMessagesReceived(int timeoutMs, std::vector<SimulationMessage>& messages);
 	void SimulateUntilBleEventReceived(int timeoutMs, NodeId nodeId, u16 eventId, const u8* eventDataPart, u16 eventDataPartLength);
+#ifndef CI_PIPELINE
 	void SimulateForever();
+#endif //!CI_PIPELINE
 	void SimulateBroadcastMessage(double x, double y, ble_gap_evt_adv_report_t& advReport, bool ignoreDropProb);
 	void SendTerminalCommand(NodeId nodeId, const char* message, ...);
 	void SendButtonPress(NodeId nodeId, u8 buttonId, u32 holdTimeDs);

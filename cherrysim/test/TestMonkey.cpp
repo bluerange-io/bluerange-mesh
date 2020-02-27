@@ -364,7 +364,7 @@ void ExecuteCommands(std::vector<CommandWithTarget> &commands, u32 seed, u32 amo
 	tester.Start();
 
 	if (seed % 2 == 0) {
-		tester.SimulateUntilClusteringDone(0);
+		tester.SimulateUntilClusteringDone(100 * 1000);
 	}
 
 	for (u32 i = 0; i < commands.size(); i++)

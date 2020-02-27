@@ -224,13 +224,13 @@ TerminalCommandHandlerReturnType IoModule::TerminalCommandHandler(const char* co
 //void IoModule::ParseTerminalInputList(string commandName, vector<string> commandArgs)
 
 
-void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
+void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
 {
 	//Must call superclass for handling
 	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
 	if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 		u16 dataFieldLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE;
 
 		//Check if our module is meant and we should trigger an action
@@ -244,7 +244,7 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
 				//Parse the data and set the gpio ports to the requested
 				for(int i=0; i<dataFieldLength; i+=SIZEOF_GPIO_PIN_CONFIG)
 				{
-					gpioPinConfig* pinConfig = (gpioPinConfig*)(packet->data + i);
+					gpioPinConfig const * pinConfig = (gpioPinConfig const *)(packet->data + i);
 
 					if (pinConfig->direction == 0) FruityHal::GpioConfigureInput(pinConfig->pinNumber, (FruityHal::GpioPullMode)pinConfig->pull);
 					else FruityHal::GpioConfigureOutput(pinConfig->pinNumber);
@@ -267,7 +267,7 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
 			//A message to switch on the LEDs
 			else if(actionType == IoModuleTriggerActionMessages::SET_LED){
 
-				IoModuleSetLedMessage* data = (IoModuleSetLedMessage*)packet->data;
+				IoModuleSetLedMessage const * data = (IoModuleSetLedMessage const *)packet->data;
 
 				configuration.ledMode = data->ledMode;
 				currentLedMode = data->ledMode;
@@ -298,7 +298,7 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
 
 	//Parse Module responses
 	if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId)
@@ -306,12 +306,12 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
 			IoModuleActionResponseMessages actionType = (IoModuleActionResponseMessages)packet->actionType;
 			if(actionType == IoModuleActionResponseMessages::SET_PIN_CONFIG_RESULT)
 			{
-				logjson("MODULE", "{\"nodeId\":%u,\"type\":\"set_pin_config_result\",\"module\":%u,", packet->header.sender, (u32)packet->moduleId);
+				logjson_partial("MODULE", "{\"nodeId\":%u,\"type\":\"set_pin_config_result\",\"module\":%u,", packet->header.sender, (u32)packet->moduleId);
 				logjson("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, 0);
 			}
 			else if(actionType == IoModuleActionResponseMessages::SET_LED_RESPONSE)
 			{
-				logjson("MODULE", "{\"nodeId\":%u,\"type\":\"set_led_result\",\"module\":%u,", packet->header.sender, (u32)packet->moduleId);
+				logjson_partial("MODULE", "{\"nodeId\":%u,\"type\":\"set_led_result\",\"module\":%u,", packet->header.sender, (u32)packet->moduleId);
 				logjson("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, 0);
 			}
 		}

@@ -7,6 +7,7 @@ cmake_policy(SET CMP0079 NEW) # For link_library accross directories (required f
 SET(visual_studio_source_list "${visual_studio_source_list}" CACHE INTERNAL "")
 
 option(BUILD_FEATURESETS "Compile featuresets instead of simulator code." OFF)
+option(GI_PIPELINE "Can be set by the CI Pipeline to do some code manipulation." OFF)
 
 if(WIN32)
   set(exe_suffix ".exe")
@@ -228,6 +229,10 @@ else(BUILD_FEATURESETS)
   target_compile_definitions(cherrySim_tester PRIVATE "SDK=11")
   target_compile_definitions(cherrySim_tester PRIVATE "CHERRYSIM_TESTER_ENABLED")
   target_compile_definitions(cherrySim_tester PRIVATE "SIM_SERVER_PRESENT")
+  if(CI_PIPELINE)
+    target_compile_definitions(cherrySim_runner PRIVATE "CI_PIPELINE")
+    target_compile_definitions(cherrySim_tester PRIVATE "CI_PIPELINE")
+  endif()
   add_subdirectory(cherrysim)
   add_subdirectory(src)
   

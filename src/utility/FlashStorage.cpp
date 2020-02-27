@@ -119,7 +119,7 @@ FlashStorageError FlashStorage::WriteData(u32* source, u32* destination, u16 len
 	return FlashStorageError::SUCCESS;
 }
 
-FlashStorageError FlashStorage::CacheAndWriteData(u32* source, u32* destination, u16 length, FlashStorageEventListener* callback, u32 userType, u32 extraInfo)
+FlashStorageError FlashStorage::CacheAndWriteData(u32 const * source, u32* destination, u16 length, FlashStorageEventListener* callback, u32 userType, u32 extraInfo)
 {
 	logt("FLASH", "Queue CachedWrite %u to %u (%u)", (u32)source, (u32)destination, length);
 

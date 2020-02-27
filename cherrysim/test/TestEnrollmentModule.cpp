@@ -48,7 +48,7 @@ TEST(TestEnrollmentModule, TestCommands) {
 	strcpy(tester.sim->nodes[1].nodeConfiguration, "prod_clc_mesh_nrf52");
 	tester.Start();
 
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	//First, enroll the mesh node into a different network
 	tester.SendTerminalCommand(0, "action 0 enroll basic %s 123 456 11:22:33:44:55:66:77:88:11:22:33:44:55:66:77:88", tester.sim->nodes[1].gs.config.GetSerialNumber());

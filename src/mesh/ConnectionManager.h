@@ -49,7 +49,7 @@ typedef struct MeshConnections {
 	MeshConnection* connections[TOTAL_NUM_CONNECTIONS];
 } MeshConnections;
 
-typedef BaseConnection* (*ConnTypeResolver)(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8* data);
+typedef BaseConnection* (*ConnTypeResolver)(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8 const * data);
 
 class ConnectionManager
 {
@@ -83,7 +83,7 @@ public:
 	u16 sentMeshPacketsReliable = 0;
 
 	//ConnectionType Resolving
-	void ResolveConnection(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8* data);
+	void ResolveConnection(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8 const * data);
 
 	void NotifyNewConnection();
 	void NotifyDeleteConnection();
@@ -95,6 +95,8 @@ public:
 	BaseConnection* allConnections[TOTAL_NUM_CONNECTIONS];
 
 	i8 getFreeConnectionSpot() const;
+
+	bool HasFreeConnection(ConnectionDirection direction) const;
 
 	//Returns the connection that is currently doing a handshake or nullptr
 	MeshConnection* GetConnectionInHandshakeState() const;
@@ -114,15 +116,15 @@ public:
 
 	void BroadcastMeshPacket(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable) const;
 
-	void RouteMeshData(BaseConnection* connection, BaseConnectionSendData* sendData, u8* data) const;
-	void BroadcastMeshData(const BaseConnection* ignoreConnection, BaseConnectionSendData* sendData, u8* data, RoutingDecision routingDecision) const;
+	void RouteMeshData(BaseConnection* connection, BaseConnectionSendData* sendData, u8 const * data) const;
+	void BroadcastMeshData(const BaseConnection* ignoreConnection, BaseConnectionSendData* sendData, u8 const * data, RoutingDecision routingDecision) const;
 
 	//Whether or not the node should receive and dispatch messages that are sent to the given nodeId
 	bool IsReceiverOfNodeId(NodeId nodeId) const;
 
 	//Call this to dispatch a message to the node and all modules, this method will perform some basic
 	//checks first, e.g. if the receiver matches
-	void DispatchMeshMessage(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packet, bool checkReceiver) const;
+	void DispatchMeshMessage(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packet, bool checkReceiver) const;
 
 	//Internal use only, do not use
 	//Can send packets as WRITE_REQ (required for some internal functionality) but can lead to problems with the SoftDevice
@@ -163,7 +165,7 @@ public:
 	void GapConnectionDisconnectedHandler(const FruityHal::GapDisconnectedEvent& disconnectedEvent);
 
 	//GATTController Handlers
-	void ForwardReceivedDataToConnection(u16 connectionHandle, BaseConnectionSendData &sendData, u8* data);
+	void ForwardReceivedDataToConnection(u16 connectionHandle, BaseConnectionSendData &sendData, u8 const * data);
 	void GattsWriteEventHandler(const FruityHal::GattsWriteEvent& gattsWriteEvent);
 	void GattcHandleValueEventHandler(const FruityHal::GattcHandleValueEvent& handleValueEvent);
 	void GattDataTransmittedEventHandler(const FruityHal::GattDataTransmittedEvent& gattDataTransmitted);

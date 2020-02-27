@@ -119,14 +119,28 @@ TEST(TestUtility, TestGetRandomInteger) {
 
 TEST(TestUtility, TestCRC) {
 	char data[] = "This is my data and I shall check if its valid or not. Deep-sea fishes are scary!";
-	ASSERT_EQ(Utility::CalculateCrc8 ((u8*)data, sizeof(data)), 74);
-	ASSERT_EQ(Utility::CalculateCrc16((u8*)data, sizeof(data), nullptr), 4204);
-	ASSERT_EQ(Utility::CalculateCrc32((u8*)data, sizeof(data)), 2059838545);
+	const u32 len = strlen(data);
+	ASSERT_EQ(Utility::CalculateCrc8 ((u8*)data, len), 37);
+	ASSERT_EQ(Utility::CalculateCrc16((u8*)data, len, nullptr), 58061);
+	constexpr u32 expectedCrc32 = 2744420781;
+	ASSERT_EQ(Utility::CalculateCrc32((u8*)data, len), expectedCrc32);
+
+	//Calculate the crc32 of only half the data...
+	u32 partialCrc32 = Utility::CalculateCrc32((u8*)data, len / 2);
+	ASSERT_EQ(partialCrc32, 3310278043);
+	//...and then use the partial Crc32 to calculate the full expectedCrc32 with the second half of the data.
+	ASSERT_EQ(Utility::CalculateCrc32((u8*)data + len / 2, len / 2 + 1, partialCrc32), expectedCrc32);
 
 	data[40] = 'A'; //Just change something.
-	ASSERT_EQ(Utility::CalculateCrc8 ((u8*)data, sizeof(data)), 140);
-	ASSERT_EQ(Utility::CalculateCrc16((u8*)data, sizeof(data), nullptr), 3412);
-	ASSERT_EQ(Utility::CalculateCrc32((u8*)data, sizeof(data)), 2974439387);
+	ASSERT_EQ(Utility::CalculateCrc8 ((u8*)data, len), 70);
+	ASSERT_EQ(Utility::CalculateCrc16((u8*)data, len, nullptr), 55639);
+	ASSERT_EQ(Utility::CalculateCrc32((u8*)data, len), 1322553117);
+}
+
+TEST(TestUtility, TestFindLast) {
+	char data[] = "This string has many sheeps! The reason for this is that sheeps are cool. sheeps? sheeps! And apples.";
+	ASSERT_STREQ(Utility::FindLast(data, "sheep"), "sheeps! And apples.");
+	ASSERT_EQ(Utility::FindLast(data, "wolf"), nullptr);
 }
 
 TEST(TestUtility, TestAes128BlockEncrypt) {

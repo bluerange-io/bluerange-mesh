@@ -149,13 +149,13 @@ TerminalCommandHandlerReturnType Module::TerminalCommandHandler(const char* comm
 }
 #endif
 
-void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
+void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
 {
 	//We want to handle incoming packets that change the module configuration
 	if(
 			packetHeader->messageType == MessageType::MODULE_CONFIG
 	){
-		connPacketModule* packet = (connPacketModule*) packetHeader;
+		connPacketModule const * packet = (connPacketModule const *) packetHeader;
 		if(packet->moduleId == moduleId)
 		{
 
@@ -164,7 +164,7 @@ void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnecti
 			if(actionType == ModuleConfigMessages::SET_CONFIG)
 			{
 				//Check if this config seems right
-				ModuleConfiguration* newConfig = (ModuleConfiguration*)packet->data;
+				ModuleConfiguration const * newConfig = (ModuleConfiguration const *)packet->data;
 				if(
 						newConfig->moduleVersion == configurationPointer->moduleVersion
 						&& dataFieldLength == configurationLength
@@ -250,12 +250,12 @@ void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnecti
 			 * */
 			if(actionType == ModuleConfigMessages::SET_CONFIG_RESULT)
 			{
-				logjson("MODULE", "{\"nodeId\":%u,\"type\":\"set_config_result\",\"module\":%u,", packet->header.sender, (u32)packet->moduleId);
+				logjson_partial("MODULE", "{\"nodeId\":%u,\"type\":\"set_config_result\",\"module\":%u,", packet->header.sender, (u32)packet->moduleId);
 				logjson("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, packet->data[0]);
 			}
 			else if(actionType == ModuleConfigMessages::SET_ACTIVE_RESULT)
 			{
-				logjson("MODULE", "{\"nodeId\":%u,\"type\":\"set_active_result\",\"module\":%u,", packet->header.sender, (u32)packet->moduleId);
+				logjson_partial("MODULE", "{\"nodeId\":%u,\"type\":\"set_active_result\",\"module\":%u,", packet->header.sender, (u32)packet->moduleId);
 				logjson("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, packet->data[0]);
 			}
 			else if(actionType == ModuleConfigMessages::CONFIG)

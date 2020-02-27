@@ -44,7 +44,7 @@ constexpr int BASE_CONNECTION_MAX_SEND_FAIL  = 10;
 //discovery or encryption are handeled by the Connectionmanager so that we can control
 //The parallel flow of multiple connections
 
-BaseConnection::BaseConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress)
+BaseConnection::BaseConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress)
 	: connectionId(id),
 	uniqueConnectionId(GS->cm.GenerateUniqueConnectionId()),
 	direction(direction),
@@ -101,11 +101,11 @@ void BaseConnection::DisconnectAndRemove(AppDisconnectReason reason)
 #define __________________SENDING__________________
 
 
-bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8* data){
+bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8 const * data){
 	return QueueData(sendData, data, true);
 }
 
-bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8* data, bool fillTxBuffers)
+bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8 const * data, bool fillTxBuffers)
 {
 	//Reserve space in our sendQueue for the metadata and our data
 	u8* buffer;
@@ -508,9 +508,9 @@ SizedData BaseConnection::GetSplitData(const BaseConnectionSendData &sendData, u
 
 //A reassembly function that can reassemble split packets, can be used from subclasses
 //Must use connPacketHeader for all packets
-u8* BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8* data)
+u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 const * data)
 {
-	connPacketSplitHeader* packetHeader = (connPacketSplitHeader*)data;
+	connPacketSplitHeader const * packetHeader = (connPacketSplitHeader const *)data;
 
 	//If reassembly is not needed, return packet without modifying
 	if(packetHeader->splitMessageType != MessageType::SPLIT_WRITE_CMD && packetHeader->splitMessageType != MessageType::SPLIT_WRITE_CMD_END){

@@ -212,6 +212,17 @@ bool Utility::IsUnknownRebootReason(RebootReason rebootReason)
 		);
 }
 
+char * Utility::FindLast(char * str, const char * search)
+{
+	char* retVal = nullptr;
+	while ((str = strstr(str, search)) != nullptr)
+	{
+		retVal = str;
+		str++;
+	}
+	return retVal;
+}
+
 long Utility::StringToLong(const char *str, bool *outDidError)
 {
 	static_assert(sizeof(long) >= sizeof(i32), "This function is used to parse strings to variables of size i32. Thus long must be at least as big.");
@@ -359,23 +370,23 @@ uint16_t Utility::CalculateCrc16(const uint8_t * p_data, const uint32_t size, co
 	return crc;
 }
 
-//Taken from http://www.hackersdelight.org/hdcodetxt/crc.c.txt
-u32 Utility::CalculateCrc32(const u8* message, const i32 messageLength) {
-   i32 i, j;
-   unsigned int byte, crc, mask;
+u32 Utility::CalculateCrc32(const u8* message, const u32 messageLength, u32 previousCrc) {
+	u32 crc = ~previousCrc;
+	for(u32 i = 0; i < messageLength; i++) {
+		u32 byte = message[i];
+		crc = crc ^ byte;
+		for (u32 j = 0; j < 8; j++) {
+			u32 mask = -(crc & 1);
+			crc = (crc >> 1) ^ (0xEDB88320 & mask);
+		}
+	}
+	return ~crc;
+}
 
-   i = 0;
-   crc = 0xFFFFFFFF;
-   while (i < messageLength) {
-	  byte = message[i];            // Get next byte.
-	  crc = crc ^ byte;
-	  for (j = 7; j >= 0; j--) {    // Do eight times.
-		 mask = -(crc & 1);
-		 crc = (crc >> 1) ^ (0xEDB88320 & mask);
-	  }
-	  i = i + 1;
-   }
-   return ~crc;
+u32 Utility::CalculateCrc32String(const char * message, u32 previousCrc)
+{
+	u32 length = strlen(message);
+	return CalculateCrc32((u8 const *)message, length, previousCrc);
 }
 
 //Encrypts a message

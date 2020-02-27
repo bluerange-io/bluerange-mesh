@@ -276,7 +276,7 @@ TerminalCommandHandlerReturnType EnrollmentModule::TerminalCommandHandler(const 
 }
 #endif
 
-void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
+void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
 {
 	//Must call superclass for handling
 	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
@@ -288,7 +288,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 	}
 
 	if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId)
@@ -299,7 +299,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 				&& sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE_MIN)
 			{
 				GS->node.KeepHighDiscoveryActive();
-				EnrollmentModuleSetEnrollmentBySerialMessage* data = (EnrollmentModuleSetEnrollmentBySerialMessage*)packet->data;
+				EnrollmentModuleSetEnrollmentBySerialMessage const * data = (EnrollmentModuleSetEnrollmentBySerialMessage const *)packet->data;
 
 				//Local enrollment
 				if(data->serialNumberIndex == RamConfig->GetSerialNumberIndex())
@@ -313,7 +313,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 			//Unenrollment request
 			} else if(actionType == EnrollmentModuleTriggerActionMessages::REMOVE_ENROLLMENT)
 			{
-				EnrollmentModuleRemoveEnrollmentMessage* data = (EnrollmentModuleRemoveEnrollmentMessage*)packet->data;
+				EnrollmentModuleRemoveEnrollmentMessage const * data = (EnrollmentModuleRemoveEnrollmentMessage const *)packet->data;
 				if(data->serialNumberIndex == RamConfig->GetSerialNumberIndex())
 				{
 					Unenroll(packet, sendData->dataLength);
@@ -321,7 +321,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 			}
 			else if (actionType == EnrollmentModuleTriggerActionMessages::SET_NETWORK)
 			{
-				EnrollmentModuleSetNetworkMessage* data = (EnrollmentModuleSetNetworkMessage*)packet->data;
+				EnrollmentModuleSetNetworkMessage const * data = (EnrollmentModuleSetNetworkMessage const *)packet->data;
 
 				EnrollmentModuleSetNetworkResponseMessage response;
 				CheckedMemset(&response, 0, sizeof(response));
@@ -353,7 +353,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 			}
 			else if (actionType == EnrollmentModuleTriggerActionMessages::REQUEST_PROPOSALS)
 			{
-				EnrollmentModuleRequestProposalMessage* data = (EnrollmentModuleRequestProposalMessage*)packet->data;
+				EnrollmentModuleRequestProposalMessage const * data = (EnrollmentModuleRequestProposalMessage const *)packet->data;
 				const u32 payloadLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE;
 				
 				if (payloadLength % sizeof(u32) != 0)
@@ -389,16 +389,16 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 				//We do not stop the scanner as the node also needs it
 				RefreshScanJob();
 
-				logjson("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"request_proposals\",\"serialNumbers\":[", packet->header.sender);
+				logjson_partial("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"request_proposals\",\"serialNumbers\":[", packet->header.sender);
 				for (u32 i = 0; i < amountOfProposals; i++)
 				{
 					requestProposalIndices[i] = data->serialNumberIndices[i];
 					char serialBuffer[NODE_SERIAL_NUMBER_LENGTH + 1];
 					Utility::GenerateBeaconSerialForIndex(requestProposalIndices[i], serialBuffer);
-					logjson("ENROLLMOD", "\"%s\"", serialBuffer);
+					logjson_partial("ENROLLMOD", "\"%s\"", serialBuffer);
 					if (i != amountOfProposals - 1)
 					{
-						logjson("ENROLLMOD", ", ");
+						logjson_partial("ENROLLMOD", ", ");
 					}
 				}
 				logjson("ENROLLMOD", "], \"module\":%d,\"requestHandle\":%d}" SEP, (u32)packet->moduleId, (u32)packet->requestHandle);
@@ -408,7 +408,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 
 	//Parse Module responses
 	if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId)
@@ -419,7 +419,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 				|| actionType == EnrollmentModuleActionResponseMessages::REMOVE_ENROLLMENT_RESPONSE)
 				&& sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE + sizeof(EnrollmentModuleEnrollmentResponse)
 			){
-				EnrollmentModuleEnrollmentResponse* data = (EnrollmentModuleEnrollmentResponse*)packet->data;
+				EnrollmentModuleEnrollmentResponse const * data = (EnrollmentModuleEnrollmentResponse const *)packet->data;
 
 				//Add null terminator to string
 				char serialNumber[NODE_SERIAL_NUMBER_LENGTH+1];
@@ -441,7 +441,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 						NODE_ID_BROADCAST,
 						(u8)packet->actionType,
 						packet->requestHandle,
-						(u8*)data,
+						(u8 const *)data,
 						sizeof(EnrollmentModuleEnrollmentResponse),
 						false
 					);
@@ -449,25 +449,25 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 
 				const char* cmdName = packet->actionType == (u8)EnrollmentModuleActionResponseMessages::ENROLLMENT_RESPONSE ? "enroll_response_serial" : "remove_enroll_response_serial";
 
-				logjson("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"%s\",\"module\":%d,", packet->header.sender, cmdName, (u32)moduleId);
+				logjson_partial("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"%s\",\"module\":%d,", packet->header.sender, cmdName, (u32)moduleId);
 				logjson("ENROLLMOD", "\"requestId\":%u,\"serialNumber\":\"%s\",\"code\":%u}" SEP,  packet->requestHandle, serialNumber, (u32)data->result);
 			}
 			else if(actionType == EnrollmentModuleActionResponseMessages::ENROLLMENT_PROPOSAL)
 			{
-				EnrollmentModuleEnrollmentProposalMessage* data = (EnrollmentModuleEnrollmentProposalMessage*)packet->data;
+				EnrollmentModuleEnrollmentProposalMessage const * data = (EnrollmentModuleEnrollmentProposalMessage const *)packet->data;
 
-				logjson("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"enroll_proposal\",\"module\":%d,", packet->header.sender, (u32)moduleId);
+				logjson_partial("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"enroll_proposal\",\"module\":%d,", packet->header.sender, (u32)moduleId);
 				logjson("ENROLLMOD", "\"proposals\":[%u,%u,%u]}" SEP, data->serialNumberIndex[0], data->serialNumberIndex[1], data->serialNumberIndex[2]);
 			}
 			else if (actionType == EnrollmentModuleActionResponseMessages::SET_NETWORK_RESPONSE)
 			{
-				EnrollmentModuleSetNetworkResponseMessage* data = (EnrollmentModuleSetNetworkResponseMessage*)packet->data;
+				EnrollmentModuleSetNetworkResponseMessage const * data = (EnrollmentModuleSetNetworkResponseMessage const *)packet->data;
 
 				logjson("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"set_network_response\",\"code\":%d,\"module\":%d,\"requestHandle\":%d}" SEP, packet->header.sender, (u32)data->response, (u32)packet->moduleId, (u32)packet->requestHandle);
 			}
 			else if (actionType == EnrollmentModuleActionResponseMessages::REQUEST_PROPOSALS_RESPONSE)
 			{
-				EnrollmentModuleRequestProposalResponse* data = (EnrollmentModuleRequestProposalResponse*)packet->data;
+				EnrollmentModuleRequestProposalResponse const * data = (EnrollmentModuleRequestProposalResponse const *)packet->data;
 				char serialBuffer[NODE_SERIAL_NUMBER_LENGTH + 1];
 				Utility::GenerateBeaconSerialForIndex(data->serialNumberIndex, serialBuffer);
 
@@ -490,9 +490,9 @@ void EnrollmentModule::RefreshScanJob()
 	}
 }
 
-void EnrollmentModule::Enroll(connPacketModule* packet, u16 packetLength)
+void EnrollmentModule::Enroll(connPacketModule const * packet, u16 packetLength)
 {
-	EnrollmentModuleSetEnrollmentBySerialMessage* data = (EnrollmentModuleSetEnrollmentBySerialMessage*)packet->data;
+	EnrollmentModuleSetEnrollmentBySerialMessage const * data = (EnrollmentModuleSetEnrollmentBySerialMessage const *)packet->data;
 
 
 	logt("WARNING", "Enrollment (by serial) received nodeId:%u, networkid:%u, key[0]=%u, key[1]=%u, key[14]=%u, key[15]=%u", data->newNodeId, data->newNetworkId, data->newNetworkKey[0], data->newNetworkKey[1], data->newNetworkKey[14], data->newNetworkKey[15]);
@@ -587,7 +587,7 @@ void EnrollmentModule::SaveEnrollment(connPacketModule* packet, u16 packetLength
 		moduleId);
 }
 
-void EnrollmentModule::Unenroll(connPacketModule* packet, u16 packetLength)
+void EnrollmentModule::Unenroll(connPacketModule const * packet, u16 packetLength)
 {
 	logt("ENROLLMOD", "Unenrolling");
 
@@ -698,7 +698,7 @@ void EnrollmentModule::SaveUnenrollment(connPacketModule* packet, u16 packetLeng
 
 #define _____________PRE_ENROLLMENT_____________
 
-void EnrollmentModule::StoreTemporaryEnrollmentDataAndDispatch(connPacketModule* packet, u16 packetLength)
+void EnrollmentModule::StoreTemporaryEnrollmentDataAndDispatch(connPacketModule const * packet, u16 packetLength)
 {
 	//Before we can call other modules to tell them that we want to enroll the node,
 	//we have to temporarily save the enrollment data until the other module has answered
@@ -780,11 +780,11 @@ void EnrollmentModule::PreEnrollmentFailed()
 
 #define _____________ENROLLMENT_OVER_MESH_____________
 
-void EnrollmentModule::EnrollOverMesh(connPacketModule* packet, u16 packetLength, BaseConnection* connection)
+void EnrollmentModule::EnrollOverMesh(connPacketModule const * packet, u16 packetLength, BaseConnection* connection)
 {
 	logt("ENROLLMOD", "Received Enrollment over the mesh request");
 
-	EnrollmentModuleSetEnrollmentBySerialMessage* data = (EnrollmentModuleSetEnrollmentBySerialMessage*)packet->data;
+	EnrollmentModuleSetEnrollmentBySerialMessage const * data = (EnrollmentModuleSetEnrollmentBySerialMessage const *)packet->data;
 
 
 	u32 rand = Utility::GetRandomInteger();
@@ -1097,9 +1097,9 @@ void EnrollmentModule::RecordStorageEventHandler(u16 recordId, RecordStorageResu
 	}
 }
 
-MeshAccessAuthorization EnrollmentModule::CheckMeshAccessPacketAuthorization(BaseConnectionSendData * sendData, u8 * data, FmKeyId fmKeyId, DataDirection direction)
+MeshAccessAuthorization EnrollmentModule::CheckMeshAccessPacketAuthorization(BaseConnectionSendData * sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction)
 {
-	connPacketHeader* packet = (connPacketHeader*)data;
+	connPacketHeader const * packet = (connPacketHeader const *)data;
 
 	//This check has to be done twice. The first check makes sure that we
 	//are allowed to cast to connPacketModule, the second separates between
@@ -1107,7 +1107,7 @@ MeshAccessAuthorization EnrollmentModule::CheckMeshAccessPacketAuthorization(Bas
 	if (   packet->messageType == MessageType::MODULE_TRIGGER_ACTION
 		|| packet->messageType == MessageType::MODULE_ACTION_RESPONSE)
 	{
-		connPacketModule* mod = (connPacketModule*)data;
+		connPacketModule const * mod = (connPacketModule const *)data;
 		if (mod->moduleId == moduleId)
 		{
 			if (packet->messageType == MessageType::MODULE_ACTION_RESPONSE)

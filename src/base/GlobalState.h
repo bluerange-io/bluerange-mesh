@@ -156,6 +156,8 @@ class GlobalState
 		ConnectionAllocator connectionAllocator;
 		ModuleAllocator moduleAllocator;
 
+		void* halMemory = nullptr;
+
 		//Time when the button 1 was pressed down and how long it was held
 		u32 button1PressTimeDs = 0;
 		u32 button1HoldTimeDs = 0;

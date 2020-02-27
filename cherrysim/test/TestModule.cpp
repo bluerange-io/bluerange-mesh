@@ -43,7 +43,7 @@ TEST(TestModule, TestCommands) {
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	tester.sim->findNodeById(1)->gs.logger.enableTag("MODULE");
 	tester.sim->findNodeById(2)->gs.logger.enableTag("MODULE");

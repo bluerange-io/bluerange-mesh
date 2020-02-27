@@ -177,9 +177,9 @@ class MeshAccessModule: public Module
 
 
 
-		void ReceivedMeshAccessConnectMessage(connPacketModule* packet, u16 packetLength) const;
-		void ReceivedMeshAccessDisconnectMessage(connPacketModule* packet, u16 packetLength) const;
-		void ReceivedMeshAccessConnectionStateMessage(connPacketModule* packet, u16 packetLength) const;
+		void ReceivedMeshAccessConnectMessage(connPacketModule const * packet, u16 packetLength) const;
+		void ReceivedMeshAccessDisconnectMessage(connPacketModule const * packet, u16 packetLength) const;
+		void ReceivedMeshAccessConnectionStateMessage(connPacketModule const * packet, u16 packetLength) const;
 
 
 	public:
@@ -201,11 +201,11 @@ class MeshAccessModule: public Module
 		void DisableBroadcast();
 
 		//Authorization
-		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, FmKeyId fmKeyId, DataDirection direction) override;
-		MeshAccessAuthorization CheckAuthorizationForAll(BaseConnectionSendData* sendData, u8* data, FmKeyId fmKeyId, DataDirection direction) const;
+		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) override;
+		MeshAccessAuthorization CheckAuthorizationForAll(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) const;
 
 		//Messages
-		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) override;
+		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
 		void MeshAccessMessageReceivedHandler(MeshAccessConnection* connection, BaseConnectionSendData* sendData, u8* data) const;
 
 		#ifdef TERMINAL_ENABLED

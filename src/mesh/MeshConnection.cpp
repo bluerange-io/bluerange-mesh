@@ -40,7 +40,7 @@
 uint32_t meshConnTypeResolver __attribute__((section(".ConnTypeResolvers"), used)) = (u32)MeshConnection::ConnTypeResolver;
 #endif
 
-MeshConnection::MeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress, u16 partnerWriteCharacteristicHandle)
+MeshConnection::MeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, u16 partnerWriteCharacteristicHandle)
 	: BaseConnection(id, direction, partnerAddress)
 {
 	logt("CONN", "New MeshConnection");
@@ -78,7 +78,7 @@ MeshConnection::~MeshConnection(){
 	}
 }
 
-BaseConnection* MeshConnection::ConnTypeResolver(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8* data)
+BaseConnection* MeshConnection::ConnTypeResolver(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8 const * data)
 {
 	logt("MACONN", "MeshConnResolver");
 
@@ -285,7 +285,7 @@ bool MeshConnection::SendHandshakeMessage(u8* data, u16 dataLength, bool reliabl
 }
 
 //This is a small wrapper for the SendData method
-bool MeshConnection::SendData(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable)
+bool MeshConnection::SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable)
 {
 	if (dataLength > MAX_MESH_PACKET_SIZE) {
 		SIMEXCEPTION(PaketTooBigException);
@@ -303,12 +303,12 @@ bool MeshConnection::SendData(u8* data, u16 dataLength, DeliveryPriority priorit
 }
 
 //This is the generic method for sending data
-bool MeshConnection::SendData(BaseConnectionSendData* sendData, u8* data)
+bool MeshConnection::SendData(BaseConnectionSendData* sendData, u8 const * data)
 {
 	if(!handshakeDone()) return false; //Do not allow data being sent when Handshake has not finished yet
 
 	//Print packet as hex
-	connPacketHeader* packetHeader = (connPacketHeader*)data;
+	connPacketHeader const * packetHeader = (connPacketHeader const *)data;
 	char stringBuffer[100];
 	Logger::convertBufferToHexString(data, sendData->dataLength, stringBuffer, sizeof(stringBuffer));
 
@@ -450,7 +450,7 @@ void MeshConnection::DataSentHandler(const u8 * data, u16 length)
 
 #define __________________RECEIVING_________________
 
-void MeshConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8* data)
+void MeshConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data)
 {
 	//Only accept packets to our mesh write handle, TODO: could disconnect if other data is received
 	if(
@@ -460,7 +460,7 @@ void MeshConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8* da
 		return;
 	}
 
-	connPacketHeader* packetHeader = (connPacketHeader*)data;
+	connPacketHeader const * packetHeader = (connPacketHeader const *)data;
 
 	char stringBuffer[200];
 	Logger::convertBufferToHexString(data, sendData->dataLength, stringBuffer, sizeof(stringBuffer));
@@ -478,9 +478,9 @@ void MeshConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8* da
 	}
 }
 
-void MeshConnection::ReceiveMeshMessageHandler(BaseConnectionSendData* sendData, u8* data)
+void MeshConnection::ReceiveMeshMessageHandler(BaseConnectionSendData* sendData, u8 const * data)
 {
-	connPacketHeader* packetHeader = (connPacketHeader*) data;
+	connPacketHeader const * packetHeader = (connPacketHeader const *) data;
 
 	//Some special handling for timestamp updates
 	GS->timeManager.HandleUpdateTimestampMessages(packetHeader, sendData->dataLength);
@@ -503,7 +503,7 @@ void MeshConnection::ReceiveMeshMessageHandler(BaseConnectionSendData* sendData,
 		ReceiveHandshakePacketHandler(sendData, data);
 	} else {
 		//Dispatch message to node and modules
-		GS->cm.DispatchMeshMessage(this, sendData, (connPacketHeader*) data, true);
+		GS->cm.DispatchMeshMessage(this, sendData, (connPacketHeader const *) data, true);
 	}
 }
 
@@ -586,17 +586,17 @@ void MeshConnection::StartHandshakeAfterMtuExchange()
 	SendHandshakeMessage((u8*) &packet, SIZEOF_CONN_PACKET_CLUSTER_WELCOME_WITH_NETWORK_ID, true);
 }
 
-void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendData, u8* data)
+void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendData, u8 const * data)
 {
 	NodeId tempPartnerId = partnerId; //Temp storage in case we delete this.
-	connPacketHeader* packetHeader = (connPacketHeader*) data;
+	connPacketHeader const * packetHeader = (connPacketHeader const *) data;
 
 	LiveReportHandshakeFailCode handshakeFailCode = LiveReportHandshakeFailCode::SUCCESS;
 
 	/*#################### RECONNETING_HANDSHAKE ############################*/
 	if(packetHeader->messageType == MessageType::RECONNECT)
 	{
-		ReceiveReconnectionHandshakePacket((connPacketReconnect*) data);
+		ReceiveReconnectionHandshakePacket((connPacketReconnect const *) data);
 	}
 
 	/*#################### HANDSHAKE ############################*/
@@ -606,7 +606,7 @@ void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendD
 		if (sendData->dataLength >= SIZEOF_CONN_PACKET_CLUSTER_WELCOME)
 		{
 			//Now, compare that packet with our data and see if he should join our cluster
-			connPacketClusterWelcome* packet = (connPacketClusterWelcome*) data;
+			connPacketClusterWelcome const * packet = (connPacketClusterWelcome const *) data;
 
 			//Save mesh write handle
 			partnerWriteCharacteristicHandle = packet->payload.meshWriteHandle;
@@ -852,7 +852,7 @@ ErrorType MeshConnection::SendReconnectionHandshakePacketAfterMtuExchange()
 	return ErrorType::SUCCESS;
 }
 
-void MeshConnection::ReceiveReconnectionHandshakePacket(connPacketReconnect* packet)
+void MeshConnection::ReceiveReconnectionHandshakePacket(connPacketReconnect const * packet)
 {
 	logt("HANDSHAKE", "IN <= partner %u RECONNECT", partnerId);
 	if(

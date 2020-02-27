@@ -42,16 +42,16 @@ TEST(TestAdvertisingModule, TestIfMessageIsBroadcasted) {
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	//Tell node 1 to broadcast an iBeacon Message
 	tester.SendTerminalCommand(1, "set_config this adv 01:01:01:00:64:00:01:04:01:F0:02:01:06:1A:FF:4C:00:02:15:F0:01:8B:9B:75:09:4C:31:A9:05:1A:27:D3:9C:00:3C:EA:60:00:32:81:00 0");
 
-	tester.SimulateUntilMessageReceived(0, 1, "set_config_result");
+	tester.SimulateUntilMessageReceived(1000, 1, "set_config_result");
 
 	//The data of the above iBeacon message
 	u8 data[] = { 0x02, 0x01, 0x06, 0x1A, 0xFF, 0x4C, 0x00, 0x02, 0x15, 0xF0, 0x01, 0x8B, 0x9B, 0x75, 0x09, 0x4C, 0x31, 0xA9, 0x05, 0x1A, 0x27, 0xD3, 0x9C, 0x00, 0x3C, 0xEA, 0x60, 0x00, 0x32, 0x81 };
 
 	//Wait until node 2 receives an advertising message that contains this iBeacon message
-	tester.SimulateUntilBleEventReceived(0, 2, BLE_GAP_EVT_ADV_REPORT, data, sizeof(data));
+	tester.SimulateUntilBleEventReceived(100 * 1000, 2, BLE_GAP_EVT_ADV_REPORT, data, sizeof(data));
 }

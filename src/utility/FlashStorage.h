@@ -161,7 +161,7 @@ class FlashStorage
 		FlashStorageError WriteData(u32* source, u32* destination, u16 length, FlashStorageEventListener* callback, u32 userType, u32 extraInfo = 0);
 
 		//Caches the data in an internal buffer before saving (destination page must be empty)
-		FlashStorageError CacheAndWriteData(u32* source, u32* destination, u16 length, FlashStorageEventListener* callback, u32 userType, u32 extraInfo = 0);
+		FlashStorageError CacheAndWriteData(u32 const * source, u32* destination, u16 length, FlashStorageEventListener* callback, u32 userType, u32 extraInfo = 0);
 
 		//Return the number of tasks
 		u16 GetNumberOfActiveTasks() const;

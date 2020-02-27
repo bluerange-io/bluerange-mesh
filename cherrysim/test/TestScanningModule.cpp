@@ -49,7 +49,7 @@ TEST(TestScanningModule, TestCommands) {
 
 
 
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	//Creates a asset ble event and later checks if this asset is now tracked by the scanning module.
 	alignas(ble_evt_t) u8 buffer[1024];

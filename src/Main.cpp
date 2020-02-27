@@ -27,11 +27,16 @@
 // **
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
-#include <FruityMesh.h>
-#include <GlobalState.h>
+#include "FruityMesh.h"
+#include "GlobalState.h"
+#include "FruityHal.h"
 
 int main(void)
 {
+	DYNAMIC_ARRAY(halMemory, FruityHal::GetHalMemorySize());
+	CheckedMemset(halMemory, 0, FruityHal::GetHalMemorySize());
+	GS->halMemory = halMemory;
+	
 	BootFruityMesh();
 	
 	const u32 moduleMemoryBlockSize = INITIALIZE_MODULES(false);

@@ -46,7 +46,7 @@ TEST(TestNode, TestCommands) {
 
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	tester.sim->findNodeById(1)->gs.logger.enableTag("CM");
 	tester.sim->findNodeById(2)->gs.logger.enableTag("CM");
@@ -60,7 +60,7 @@ TEST(TestNode, TestCommands) {
 	tester.SimulateUntilMessageReceived(10 * 1000, 1, "Cleaning up conn ");
 	std::string command = "connect 2 00:00:00:02:00:00";
 	tester.SendTerminalCommand(1, command.c_str());
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	tester.SendTerminalCommand(1, "action 2 node discovery off");
 	tester.SimulateUntilMessageReceived(10 * 1000, 2, "-- DISCOVERY OFF --");
@@ -68,8 +68,8 @@ TEST(TestNode, TestCommands) {
 	tester.SimulateUntilMessageReceived(10 * 1000, 2, "-- DISCOVERY HIGH --");
 
 	tester.SendTerminalCommand(1, "reset");
-	tester.SimulateGivenNumberOfSteps(10);
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateForGivenTime(10 * 1000);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	ASSERT_EQ(tester.sim->nodes[0].restartCounter, 2);
 
@@ -105,7 +105,7 @@ TEST(TestNode, TestCommands) {
 
 	//tester.SendTerminalCommand(1, "update_iv 2 20");
 	//tester.SimulateUntilMessageReceived(10 * 1000, 2, "New cluster id generated ");
-	//tester.SimulateUntilClusteringDone(0);
+	//tester.SimulateUntilClusteringDone(100 * 1000);
 
 	tester.SimulateUntilClusteringDone(10 * 1000);
 
@@ -204,6 +204,55 @@ TEST(TestNode, TestCommands) {
 	ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[7], 108);
 }
 
+TEST(TestNode, TestCRCValidation)
+{
+	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+	simConfig.numNodes = 2;
+	//testerConfig.verbose = true;
+
+	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+	tester.Start();
+	tester.SimulateUntilClusteringDone(100 * 1000);
+
+	//Make sure that the commands are working without CRC...
+	tester.SendTerminalCommand(1, "action this status get_status");
+	tester.SimulateUntilMessageReceived(1 * 1000, 1, "\"type\":\"status\",\"");
+	//...and don't return any CRC.
+	tester.SendTerminalCommand(1, "action this status get_status");
+	{
+		Exceptions::DisableDebugBreakOnException disable;
+		ASSERT_THROW(tester.SimulateUntilMessageReceived(1 * 1000, 1, "CRC:"), TimeoutException);
+	}
+
+	//Enable CRC checks
+	tester.SendTerminalCommand(1, "enable_corruption_check");
+	tester.SimulateUntilMessageReceived(1 * 1000, 1, "{\"type\":\"enable_corruption_check_response\",\"err\":0,\"check\":\"crc32\"}");
+
+	//Once crc is enabled, commands require a CRC at the end.
+	tester.SendTerminalCommand(1, "action this status get_status CRC: 3968018817");
+	tester.SimulateUntilRegexMessageReceived(1 * 1000, 1, "\"initialized\":0\\} CRC: \\d+");
+
+	//Missing CRC is no longer accepted
+	{
+		Exceptions::DisableDebugBreakOnException disable;
+		tester.SendTerminalCommand(1, "action this status get_status");
+		ASSERT_THROW(tester.SimulateGivenNumberOfSteps(1), CRCMissingException);
+
+		//Empty the Command Buffer
+		Exceptions::ExceptionDisabler<CRCMissingException> crcme;
+		tester.SimulateGivenNumberOfSteps(1);
+	}
+
+
+	//Invalid CRC is not accepted
+	{
+		Exceptions::DisableDebugBreakOnException disable;
+		tester.SendTerminalCommand(1, "action this status get_status CRC: 12345");
+		ASSERT_THROW(tester.SimulateGivenNumberOfSteps(1), CRCInvalidException);
+	}
+}
+
 TEST(TestNode, TestGenerateLoad) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
@@ -212,7 +261,7 @@ TEST(TestNode, TestGenerateLoad) {
 
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
-	tester.SimulateUntilClusteringDone(0);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	//Without request handle
 	tester.SendTerminalCommand(1, "action 2 node generate_load 3 10 1 13");
@@ -329,7 +378,7 @@ TEST(TestNode, DISABLED_TestDiscoveryStates) {
 	//Switch to High discovery when receive enrollment
 	tester.SendTerminalCommand(1, "action 2 enroll basic BBBBF 2 200");
 
-	tester.SimulateUntilMessageReceived(0, 2, "-- DISCOVERY HIGH --");
+	tester.SimulateUntilMessageReceived(1000, 2, "-- DISCOVERY HIGH --");
 
 	//Send change to high discovery message after given time
 	tester.SendTerminalCommand(1, "gap_disconnect 0");

@@ -162,8 +162,8 @@ class BaseConnection
 		bool currentMessageIsMissingASplit = false;
 	protected:
 		//Will Queue the data in the packet queue of the connection
-		bool QueueData(const BaseConnectionSendData& sendData, u8* data);
-		bool QueueData(const BaseConnectionSendData& sendData, u8* data, bool fillTxBuffers); // Can be used to avoid infinite recursion in queue and fillTxBuffers
+		bool QueueData(const BaseConnectionSendData& sendData, u8 const * data);
+		bool QueueData(const BaseConnectionSendData& sendData, u8 const * data, bool fillTxBuffers); // Can be used to avoid infinite recursion in queue and fillTxBuffers
 
 		bool PrepareBaseConnection(FruityHal::BleGapAddr* address, ConnectionType connectionType) const;
 
@@ -184,7 +184,7 @@ class BaseConnection
 		//################### Connection creation ######################
 
 		//Initializes connection but does not connect
-		BaseConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr* partnerAddress);
+		BaseConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
 		virtual ~BaseConnection();
 
 		//Custom handshake
@@ -195,7 +195,7 @@ class BaseConnection
 
 		//################### Sending ######################
 		//Must be implemented in super class
-		virtual bool SendData(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable) = 0;
+		virtual bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable) = 0;
 		//Allow a subclass to transmit data before the writeQueue is processed
 		virtual bool TransmitHighPrioData() { return false; };
 		//Allows a subclass to process data closely before sending it
@@ -215,9 +215,9 @@ class BaseConnection
 		//Called, once the MTU of the connection was upgraded. The connection can then increase the packet splitting size
 		virtual void ConnectionMtuUpgradedHandler(u16 gattPayloadSize);
 		//Called when data from a connection is received
-		virtual void ReceiveDataHandler(BaseConnectionSendData* sendData, u8* data) = 0;
+		virtual void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) = 0;
 		//Can be called by subclasses to use the connPacketHeader reassembly
-		u8* ReassembleData(BaseConnectionSendData* sendData, u8* data);
+		u8 const * ReassembleData(BaseConnectionSendData* sendData, u8 const * data);
 		SizedData GetSplitData(const BaseConnectionSendData &sendData, u8* data, u8* packetBuffer) const;
 
 		//Helpers

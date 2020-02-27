@@ -1020,6 +1020,12 @@ void CherrySim::bootCurrentNode()
 	currentNode->state.~SoftdeviceState();
 	new (&currentNode->state) SoftdeviceState();
 
+	//Allocate halMemory
+	const u32 halMemorySize = FruityHal::GetHalMemorySize() / sizeof(u32) + 1;
+	u32* halMemory = new u32[halMemorySize];
+	CheckedMemset(halMemory, 0, halMemorySize * sizeof(u32));
+	GS->halMemory = halMemory;
+
 	//############## Boot the node using the FruityMesh boot routine
 	BootFruityMesh();
 
@@ -1077,6 +1083,10 @@ void CherrySim::resetCurrentNode(RebootReason rebootReason, bool throwException)
 
 void CherrySim::shutdownCurrentNode() {
 	delete[] currentNode->moduleMemoryBlock;
+	//Cast is needed because the following passage from the C++ Standard:
+	//"This implies that an object cannot be deleted using a pointer of type void* because there are no objects of type void"
+	u32* halMemory = (u32*)GS->halMemory;
+	delete[] halMemory;
 }
 
 //################################## Flash Simulation #####################################
@@ -2483,7 +2493,7 @@ void CherrySim::AddPacketToStats(PacketStat* statArray, PacketStat* packet)
 
 	//If we did not yet return, we have not found an empty slot
 	//If we do not have an empty slot for logging, we should increase our PacketStat array size or check if sth. went wrong
-	if (!emptySlot) SIMEXCEPTION(IllegalStateException);
+	if (!emptySlot) SIMEXCEPTION(PacketStatBufferSizeNotEnough);
 
 	*emptySlot = *packet;
 }

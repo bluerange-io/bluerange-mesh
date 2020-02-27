@@ -536,13 +536,13 @@ TerminalCommandHandlerReturnType StatusReporterModule::TerminalCommandHandler(co
 }
 #endif
 
-void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
+void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
 {
 	//Must call superclass for handling
 	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
 	if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId){
@@ -629,7 +629,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 	//Parse Module responses
 	if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
 
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId)
@@ -638,45 +638,45 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 			//Somebody reported its connections back
 			if(actionType == StatusModuleActionResponseMessages::ALL_CONNECTIONS)
 			{
-				StatusReporterModuleConnectionsMessage* packetData = (StatusReporterModuleConnectionsMessage*) (packet->data);
+				StatusReporterModuleConnectionsMessage const * packetData = (StatusReporterModuleConnectionsMessage const *) (packet->data);
 				logjson("STATUSMOD", "{\"type\":\"connections\",\"nodeId\":%d,\"module\":%d,\"partners\":[%d,%d,%d,%d],\"rssiValues\":[%d,%d,%d,%d]}" SEP, packet->header.sender, (u32)moduleId, packetData->partner1, packetData->partner2, packetData->partner3, packetData->partner4, packetData->rssi1, packetData->rssi2, packetData->rssi3, packetData->rssi4);
 			}
 			else if(actionType == StatusModuleActionResponseMessages::DEVICE_INFO_V2)
 			{
 				//Print packet to console
-				StatusReporterModuleDeviceInfoV2Message* data = (StatusReporterModuleDeviceInfoV2Message*) (packet->data);
+				StatusReporterModuleDeviceInfoV2Message const * data = (StatusReporterModuleDeviceInfoV2Message const *) (packet->data);
 
-				u8* addr = data->accessAddress.addr;
+				u8 const * addr = data->accessAddress.addr;
 
 				char serialBuffer[NODE_SERIAL_NUMBER_LENGTH + 1];
 				Utility::GenerateBeaconSerialForIndex(data->serialNumberIndex, serialBuffer);
 
-				logjson("STATUSMOD", "{\"nodeId\":%u,\"type\":\"device_info\",\"module\":%d,", packet->header.sender, (u32)moduleId);
-				logjson("STATUSMOD", "\"dBmRX\":%d,\"dBmTX\":%d,\"calibratedTX\":%d,", data->dBmRX, data->dBmTX, data->calibratedTX);
-				logjson("STATUSMOD", "\"deviceType\":%u,\"manufacturerId\":%u,", (u32)data->deviceType, data->manufacturerId);
-				logjson("STATUSMOD", "\"networkId\":%u,\"nodeVersion\":%u,", data->networkId, data->nodeVersion);
-				logjson("STATUSMOD", "\"chipId\":\"%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\",", data->chipId[0], data->chipId[1], data->chipId[2], data->chipId[3], data->chipId[4], data->chipId[5], data->chipId[6], data->chipId[7]);
-				logjson("STATUSMOD", "\"serialNumber\":\"%s\",\"accessAddress\":\"%02X:%02X:%02X:%02X:%02X:%02X\",", serialBuffer, addr[5], addr[4], addr[3], addr[2], addr[1], addr[0]);
-				logjson("STATUSMOD", "\"groupIds\":[%u,%u],\"blVersion\":%u", data->chipGroupId, data->featuresetGroupId, data->bootloaderVersion);
+				logjson_partial("STATUSMOD", "{\"nodeId\":%u,\"type\":\"device_info\",\"module\":%d,", packet->header.sender, (u32)moduleId);
+				logjson_partial("STATUSMOD", "\"dBmRX\":%d,\"dBmTX\":%d,\"calibratedTX\":%d,", data->dBmRX, data->dBmTX, data->calibratedTX);
+				logjson_partial("STATUSMOD", "\"deviceType\":%u,\"manufacturerId\":%u,", (u32)data->deviceType, data->manufacturerId);
+				logjson_partial("STATUSMOD", "\"networkId\":%u,\"nodeVersion\":%u,", data->networkId, data->nodeVersion);
+				logjson_partial("STATUSMOD", "\"chipId\":\"%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\",", data->chipId[0], data->chipId[1], data->chipId[2], data->chipId[3], data->chipId[4], data->chipId[5], data->chipId[6], data->chipId[7]);
+				logjson_partial("STATUSMOD", "\"serialNumber\":\"%s\",\"accessAddress\":\"%02X:%02X:%02X:%02X:%02X:%02X\",", serialBuffer, addr[5], addr[4], addr[3], addr[2], addr[1], addr[0]);
+				logjson_partial("STATUSMOD", "\"groupIds\":[%u,%u],\"blVersion\":%u", data->chipGroupId, data->featuresetGroupId, data->bootloaderVersion);
 				logjson("STATUSMOD", "}" SEP);
 
 			}
 			else if(actionType == StatusModuleActionResponseMessages::STATUS)
 			{
 				//Print packet to console
-				StatusReporterModuleStatusMessage* data = (StatusReporterModuleStatusMessage*) (packet->data);
+				StatusReporterModuleStatusMessage const * data = (StatusReporterModuleStatusMessage const *) (packet->data);
 
-				logjson("STATUSMOD", "{\"nodeId\":%u,\"type\":\"status\",\"module\":%d,", packet->header.sender, (u32)moduleId);
-				logjson("STATUSMOD", "\"batteryInfo\":%u,\"clusterSize\":%u,", data->batteryInfo, data->clusterSize);
-				logjson("STATUSMOD", "\"connectionLossCounter\":%u,\"freeIn\":%u,", data->connectionLossCounter, data->freeIn);
-				logjson("STATUSMOD", "\"freeOut\":%u,\"inConnectionPartner\":%u,", data->freeOut, data->inConnectionPartner);
-				logjson("STATUSMOD", "\"inConnectionRSSI\":%d, \"initialized\":%u", data->inConnectionRSSI, data->initializedByGateway);
+				logjson_partial("STATUSMOD", "{\"nodeId\":%u,\"type\":\"status\",\"module\":%d,", packet->header.sender, (u32)moduleId);
+				logjson_partial("STATUSMOD", "\"batteryInfo\":%u,\"clusterSize\":%u,", data->batteryInfo, data->clusterSize);
+				logjson_partial("STATUSMOD", "\"connectionLossCounter\":%u,\"freeIn\":%u,", data->connectionLossCounter, data->freeIn);
+				logjson_partial("STATUSMOD", "\"freeOut\":%u,\"inConnectionPartner\":%u,", data->freeOut, data->inConnectionPartner);
+				logjson_partial("STATUSMOD", "\"inConnectionRSSI\":%d, \"initialized\":%u", data->inConnectionRSSI, data->initializedByGateway);
 				logjson("STATUSMOD", "}" SEP);
 			}
 			else if(actionType == StatusModuleActionResponseMessages::NEARBY_NODES)
 			{
 				//Print packet to console
-				logjson("STATUSMOD", "{\"nodeId\":%u,\"type\":\"nearby_nodes\",\"module\":%u,\"nodes\":[", packet->header.sender, (u32)moduleId);
+				logjson_partial("STATUSMOD", "{\"nodeId\":%u,\"type\":\"nearby_nodes\",\"module\":%u,\"nodes\":[", packet->header.sender, (u32)moduleId);
 
 				u16 nodeCount = (sendData->dataLength - SIZEOF_CONN_PACKET_MODULE) / 3;
 				bool first = true;
@@ -687,9 +687,9 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 					CheckedMemcpy(&nodeId, packet->data + i*3+0, 2);
 					CheckedMemcpy(&rssi, packet->data + i*3+2, 1);
 					if(!first){
-						logjson("STATUSMOD", ",");
+						logjson_partial("STATUSMOD", ",");
 					}
-					logjson("STATUSMOD", "{\"nodeId\":%u,\"rssi\":%d}", nodeId, rssi);
+					logjson_partial("STATUSMOD", "{\"nodeId\":%u,\"rssi\":%d}", nodeId, rssi);
 					first = false;
 				}
 
@@ -701,25 +701,25 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 			}
 			else if(actionType == StatusModuleActionResponseMessages::ERROR_LOG_ENTRY)
 			{
-				StatusReporterModuleErrorLogEntryMessage* data = (StatusReporterModuleErrorLogEntryMessage*) (packet->data);
+				StatusReporterModuleErrorLogEntryMessage const * data = (StatusReporterModuleErrorLogEntryMessage const *) (packet->data);
 
-				logjson("STATUSMOD", "{\"type\":\"error_log_entry\",\"nodeId\":%u,\"module\":%u,", packet->header.sender, (u32)moduleId);
+				logjson_partial("STATUSMOD", "{\"type\":\"error_log_entry\",\"nodeId\":%u,\"module\":%u,", packet->header.sender, (u32)moduleId);
 
 				//As the time is currently only 3 byte, use this formula to get the current unix timestamp in UTC: now()  - (now() % (2^24)) + timestamp
-				logjson("STATUSMOD", "\"errType\":%u,\"code\":%u,\"extra\":%u,\"time\":%u", (u32)data->errorType, data->errorCode, data->extraInfo, data->timestamp);
+				logjson_partial("STATUSMOD", "\"errType\":%u,\"code\":%u,\"extra\":%u,\"time\":%u", (u32)data->errorType, data->errorCode, data->extraInfo, data->timestamp);
 #if IS_INACTIVE(GW_SAVE_SPACE)
-				logjson("STATUSMOD", ",\"typeStr\":\"%s\",\"codeStr\":\"%s\"", Logger::getErrorLogErrorType((LoggingError)data->errorType), Logger::getErrorLogError((LoggingError)data->errorType, data->errorCode));
+				logjson_partial("STATUSMOD", ",\"typeStr\":\"%s\",\"codeStr\":\"%s\"", Logger::getErrorLogErrorType((LoggingError)data->errorType), Logger::getErrorLogError((LoggingError)data->errorType, data->errorCode));
 #endif
 				logjson("STATUSMOD", "}" SEP);
 			}
 			else if(actionType == StatusModuleActionResponseMessages::REBOOT_REASON)
 			{
-				RamRetainStruct* data = (RamRetainStruct*) (packet->data);
+				RamRetainStruct const * data = (RamRetainStruct const *) (packet->data);
 
-				logjson("STATUSMOD", "{\"type\":\"reboot_reason\",\"nodeId\":%u,\"module\":%u,", packet->header.sender, (u32)moduleId);
-				logjson("STATUSMOD", "\"reason\":%u,\"code1\":%u,\"code2\":%u,\"code3\":%u,\"stack\":[", (u32)data->rebootReason, data->code1, data->code2, data->code3);
+				logjson_partial("STATUSMOD", "{\"type\":\"reboot_reason\",\"nodeId\":%u,\"module\":%u,", packet->header.sender, (u32)moduleId);
+				logjson_partial("STATUSMOD", "\"reason\":%u,\"code1\":%u,\"code2\":%u,\"code3\":%u,\"stack\":[", (u32)data->rebootReason, data->code1, data->code2, data->code3);
 				for(u8 i=0; i<data->stacktraceSize; i++){
-					logjson("STATUSMOD", (i < data->stacktraceSize-1) ? "%x," : "%x", data->stacktrace[i]);
+					logjson_partial("STATUSMOD", (i < data->stacktraceSize-1) ? "%x," : "%x", data->stacktrace[i]);
 				}
 				logjson("STATUSMOD", "]}" SEP);
 			}
@@ -729,7 +729,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 	//Parse Module general messages
 	if(packetHeader->messageType == MessageType::MODULE_GENERAL){
 
-		connPacketModule* packet = (connPacketModule*)packetHeader;
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId)
@@ -738,7 +738,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 			//Somebody reported its connections back
 			if(actionType == StatusModuleGeneralMessages::LIVE_REPORT)
 			{
-				StatusReporterModuleLiveReportMessage* packetData = (StatusReporterModuleLiveReportMessage*) (packet->data);
+				StatusReporterModuleLiveReportMessage const * packetData = (StatusReporterModuleLiveReportMessage const *) (packet->data);
 				logjson("STATUSMOD", "{\"type\":\"live_report\",\"nodeId\":%d,\"module\":%d,\"code\":%u,\"extra\":%u,\"extra2\":%u}" SEP, packet->header.sender, (u32)moduleId, packetData->reportType, packetData->extra, packetData->extra2);
 			}
 		}

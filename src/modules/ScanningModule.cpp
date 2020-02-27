@@ -148,23 +148,23 @@ void ScanningModule::TimerEventHandler(u16 passedTimeDs)
 	}
 }
 
-void ScanningModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
+void ScanningModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
 {
 	//Must call superclass for handling
 	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
 	if(packetHeader->messageType == MessageType::ASSET_V2)
 	{
-		ScanModuleTrackedAssetsV2Message* packet = (ScanModuleTrackedAssetsV2Message*) packetHeader;
+		ScanModuleTrackedAssetsV2Message const * packet = (ScanModuleTrackedAssetsV2Message const *) packetHeader;
 
 		ReceiveTrackedAssets(sendData, packet);
 	}
 	else if (packetHeader->messageType == MessageType::ASSET_GENERIC && sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE)
 	{
-		connPacketModule *connPacket = (connPacketModule*)packetHeader;
+		connPacketModule const * connPacket = (connPacketModule const *)packetHeader;
 		if (connPacket->actionType == (u8)ScanModuleMessages::ASSET_INS_TRACKING_PACKET)
 		{
-			TrackedAssetInsMessage* msg = (TrackedAssetInsMessage*)connPacket->data;
+			TrackedAssetInsMessage const * msg = (TrackedAssetInsMessage const *)connPacket->data;
 			u32 amount = (sendData->dataLength - SIZEOF_CONN_PACKET_MODULE) / sizeof(TrackedAssetInsMessage);
 			ReceiveTrackedAssetsIns(msg, amount, packetHeader->sender);
 		}
@@ -286,9 +286,12 @@ bool ScanningModule::addTrackedAsset(const advPacketAssetServiceData* packet, i8
 			slot->rssiContainer.rssi37 = slot->rssiContainer.rssi38 = slot->rssiContainer.rssi39 = UINT8_MAX;
 			slot->rssiContainer.channelCount[0] = slot->rssiContainer.channelCount[1] = slot->rssiContainer.channelCount[2] = 0;
 		}
-		slot->direction = packet->direction;
 		slot->pressure = packet->pressure;
 		slot->speed = packet->speed;
+
+		slot->hasFreeInConnection = packet->hasFreeInConnection;
+		slot->interestedInConnection = packet->interestedInConnection;
+		slot->hasSameNetworkId = packet->networkId == GS->node.configuration.networkId;
 
 		RssiRunningAverageCalculationInPlace(slot->rssiContainer, packet->advertisingChannel, rssi);
 
@@ -327,6 +330,10 @@ bool ScanningModule::addTrackedAssetIns(const advPacketAssetInsServiceData * pac
 		slot->pressure = packet->pressure;
 		slot->moving = packet->moving;
 
+		slot->hasFreeInConnection = packet->hasFreeInConnection;
+		slot->interestedInConnection = packet->interestedInConnection;
+		slot->hasSameNetworkId = packet->networkId == GS->node.configuration.networkId;
+
 		RssiRunningAverageCalculationInPlace(slot->rssiContainer, 0, rssi);
 
 		return true;
@@ -359,6 +366,7 @@ void ScanningModule::SendTrackedAssets()
 
 	//Allocate a buffer big enough and fill the packet
 	DYNAMIC_ARRAY(buffer, messageLength);
+	CheckedMemset(buffer, 0, messageLength);
 	ScanModuleTrackedAssetsV2Message* message = (ScanModuleTrackedAssetsV2Message*) buffer;
 
 	message->header.messageType = MessageType::ASSET_V2;
@@ -380,7 +388,10 @@ void ScanningModule::SendTrackedAssets()
 
 		message->trackedAssets[i].speed = ConvertServiceDataToMeshMessageSpeed(assetPackets[i].speed);
 
-		message->trackedAssets[i].direction = assetPackets[i].direction / 16; //TODO: convert meaningful
+		message->trackedAssets[i].hasFreeInConnection = assetPackets[i].hasFreeInConnection;
+		message->trackedAssets[i].interestedInConnection = assetPackets[i].interestedInConnection;
+		message->trackedAssets[i].hasSameNetworkId = assetPackets[i].hasSameNetworkId;
+
 		message->trackedAssets[i].pressure = ConvertServiceDataToMeshMessagePressure(assetPackets[i].pressure);
 	}
 
@@ -413,6 +424,7 @@ void ScanningModule::SendTrackedAssetsIns()
 
 	//Allocate a buffer big enough and fill the packet
 	DYNAMIC_ARRAY(buffer, messageLength);
+	CheckedMemset(buffer, 0, messageLength);
 	TrackedAssetInsMessage* trackedAssets = (TrackedAssetInsMessage*)buffer;
 
 	for (int i = 0; i < count; i++) {
@@ -426,6 +438,10 @@ void ScanningModule::SendTrackedAssetsIns()
 
 		trackedAssets[i].moving = assetInsPackets[i].moving;
 		trackedAssets[i].pressure = ConvertServiceDataToMeshMessagePressure(assetInsPackets[i].pressure);
+
+		trackedAssets[i].hasFreeInConnection = assetInsPackets[i].hasFreeInConnection;
+		trackedAssets[i].interestedInConnection = assetInsPackets[i].interestedInConnection;
+		trackedAssets[i].hasSameNetworkId = assetInsPackets[i].hasSameNetworkId;
 	}
 
 	SendModuleActionMessage(
@@ -443,28 +459,29 @@ void ScanningModule::SendTrackedAssetsIns()
 #endif
 }
 
-void ScanningModule::ReceiveTrackedAssets(BaseConnectionSendData* sendData, ScanModuleTrackedAssetsV2Message* packet) const
+void ScanningModule::ReceiveTrackedAssets(BaseConnectionSendData* sendData, ScanModuleTrackedAssetsV2Message const * packet) const
 {
 	u8 count = (sendData->dataLength - SIZEOF_CONN_PACKET_HEADER)  / SIZEOF_SCAN_MODULE_TRACKED_ASSET_V2;
 
-	logjson("SCANMOD", "{\"nodeId\":%d,\"type\":\"tracked_assets\",\"assets\":[", packet->header.sender);
+	logjson_partial("SCANMOD", "{\"nodeId\":%d,\"type\":\"tracked_assets\",\"assets\":[", packet->header.sender);
 
 	for(int i=0; i<count; i++){
-		trackedAssetV2* assetData = packet->trackedAssets + i;
+		trackedAssetV2 const * assetData = packet->trackedAssets + i;
 
 		i8 speed = assetData->speed == 0xF ? -1 : assetData->speed;
-		i8 direction = assetData->direction == 0xF ? -1 : assetData->direction;
 		i16 pressure = assetData->pressure == 0xFF ? -1 : assetData->pressure; //(taken %250 to exclude 0xFF)
 
-		if(i != 0) logjson("SCANMOD", ",");
-		logjson("SCANMOD", "{\"id\":%u,\"rssi1\":%d,\"rssi2\":%d,\"rssi3\":%d,\"speed\":%d,\"direction\":%d,\"pressure\":%d}",
+		if(i != 0) logjson_partial("SCANMOD", ",");
+		logjson_partial("SCANMOD", "{\"id\":%u,\"rssi1\":%d,\"rssi2\":%d,\"rssi3\":%d,\"speed\":%d,\"pressure\":%d,\"hasFreeInConnection\":%u,\"interestedInConnection\":%u,\"hasSameNetworkId\":%u}",
 				assetData->assetId,
 				assetData->rssi37,
 				assetData->rssi38,
 				assetData->rssi39,
 				speed,
-				direction,
-				pressure);
+				pressure,
+				assetData->hasFreeInConnection,
+				assetData->interestedInConnection,
+				assetData->hasSameNetworkId);
 
 		//logt("SCANMOD", "MESH RX id: %u, rssi %u, speed %u", assetData->assetId, assetData->rssi, assetData->speed);
 	}
@@ -472,16 +489,15 @@ void ScanningModule::ReceiveTrackedAssets(BaseConnectionSendData* sendData, Scan
 	logjson("SCANMOD", "]}" SEP);
 }
 
-void ScanningModule::ReceiveTrackedAssetsIns(TrackedAssetInsMessage *msg, u32 amount, NodeId sender) const
+void ScanningModule::ReceiveTrackedAssetsIns(TrackedAssetInsMessage const * msg, u32 amount, NodeId sender) const
 {
-	logjson("SCANMOD", "{\"nodeId\":%d,\"type\":\"tracked_assets_ins\",\"assets\":[", sender);
+	logjson_partial("SCANMOD", "{\"nodeId\":%d,\"type\":\"tracked_assets_ins\",\"assets\":[", sender);
 
 	for (u32 i = 0; i < amount; i++) {
 
 		i16 pressure = msg[i].pressure == 0xFF ? -1 : msg[i].pressure; //(taken %250 to exclude 0xFF)
-
-		if (i != 0) logjson("SCANMOD", ",");
-		logjson("SCANMOD", "{\"id\":%u,\"rssi1\":%d,\"rssi2\":%d,\"rssi3\":%d,\"batteryPower\":%u,\"absolutePositionX\":%u,\"absolutePositionY\":%u,\"moving\":%u,\"pressure\":%d}",
+		if (i != 0) logjson_partial("SCANMOD", ",");
+		logjson_partial("SCANMOD", "{\"id\":%u,\"rssi1\":%d,\"rssi2\":%d,\"rssi3\":%d,\"batteryPower\":%u,\"absolutePositionX\":%u,\"absolutePositionY\":%u,\"moving\":%u,\"pressure\":%d,\"hasFreeInConnection\":%u,\"interestedInConnection\":%u,\"hasSameNetworkId\":%u}",
 			msg[i].assetNodeId,
 			msg[i].rssi37,
 			msg[i].rssi38,
@@ -490,7 +506,10 @@ void ScanningModule::ReceiveTrackedAssetsIns(TrackedAssetInsMessage *msg, u32 am
 			msg[i].absolutePositionX,
 			msg[i].absolutePositionY,
 			(u32)msg[i].moving,
-			pressure);
+			pressure,
+			msg[i].hasFreeInConnection,
+			msg[i].interestedInConnection,
+			msg[i].hasSameNetworkId);
 
 	}
 

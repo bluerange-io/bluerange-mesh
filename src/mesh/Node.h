@@ -418,7 +418,7 @@ private:
 		//Connection
 		void HandshakeTimeoutHandler() const;
 		void HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinner); 
-		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8* data, FmKeyId fmKeyId, DataDirection direction) override;
+		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) override;
 
 		void SendComponentMessage(connPacketComponentMessage& message, u16 payloadSize);
 
@@ -447,7 +447,7 @@ private:
 		Module* GetModuleById(ModuleId id) const;
 
 		void SendClusterInfoUpdate(MeshConnection* ignoreConnection, connPacketClusterInfoUpdate* packet) const;
-		void ReceiveClusterInfoUpdate(MeshConnection* connection, connPacketClusterInfoUpdate* packet);
+		void ReceiveClusterInfoUpdate(MeshConnection* connection, connPacketClusterInfoUpdate const * packet);
 
 		void HandOverMasterBitIfNecessary() const;
 		
@@ -468,7 +468,7 @@ private:
 		bool IsRebootScheduled();
 
 		//Receiving
-		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader) override;
+		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
 
 		//Methods of TerminalCommandListener
 		#ifdef TERMINAL_ENABLED
