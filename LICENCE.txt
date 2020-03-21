@@ -9,12 +9,33 @@ commercial license you also have access to the official Bluerange
 Support and close strategic relationship with M-Way Solutions GmbH 
 to make sure your development goals are met. 
 
-FruityMesh Firmware is also available under GPL v3 open source licenses. 
-FruityMesh tools and some libraries are only available under GPL v3.
+FruityMesh Firmware is also available under a *modified* GPL v3 open 
+source licenses. The modification is provided in the form of an exception.
+
 The FruityMesh open source licensing is ideal for use cases such as 
 open source projects with open source distribution, student/academic 
 purposes, hobby projects, internal research projects without external 
-distribution, or other projects where all GPLv3 obligations can be met.
+distribution, or other projects where the GPLv3 obligations with the 
+exception can be met.
+
+NOTE: The modification to the GPL is included to allow you to distribute a
+combined work that includes Nordic SDK without being obliged to provide the
+source code for proprietary components outside of FruityMesh.
+
+----------------------------------------------------------------------------
+
+The FruityMesh GPL Exception Text:
+
+Additional permission under GNU GPL version 3 section 7
+
+If you modify this Program, or any covered work, by linking or combining it 
+with Nordic SDKs (or a modified version of that library package), containing 
+parts covered by the terms of nRF5 SDK license, the licensors of 
+this Program grant you additional permission to convey the resulting work. 
+
+----------------------------------------------------------------------------
+
+The standard GPL exception text:
 
 
                     GNU GENERAL PUBLIC LICENSE
