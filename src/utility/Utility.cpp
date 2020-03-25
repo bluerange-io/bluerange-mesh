@@ -61,7 +61,7 @@ RecordStorageResultCode Utility::SaveModuleSettingsToFlashWithId(ModuleId module
 u32 Utility::GetRandomInteger(void)
 {
 	ErrorType err = ErrorType::BUSY;
-	u32 randomNumber;
+	u32 randomNumber = 0;
 
 	while(err != ErrorType::SUCCESS){
 		//A busy loop is fine here because the nordic spec guarantees us, that we will, at some point, get a random number. If not, the node itself is broken.
@@ -107,7 +107,7 @@ void Utility::ToUpperCase(char * str)
 	while ((*str = toupper(*str))) str++;
 }
 
-u32 Utility::GetIndexForSerial(const char* serialNumber){
+u32 Utility::GetIndexForSerial(const char* serialNumber, bool *didError){
 	u32 index = 0;
 	for(int i=0; i<NODE_SERIAL_NUMBER_LENGTH; i++){
 		if(i == NODE_SERIAL_NUMBER_LENGTH-1 && serialNumber[0] == 'A') continue;
@@ -115,6 +115,7 @@ u32 Utility::GetIndexForSerial(const char* serialNumber){
 		const char* charPos = strchr(serialAlphabet, currentChar);
 		if (charPos == nullptr)
 		{
+			if (didError != nullptr) *didError = true;
 			SIMEXCEPTION(IllegalArgumentException);
 			return INVALID_SERIAL_NUMBER;
 		}
@@ -186,7 +187,7 @@ bool Utility::IsPowerOfTwo(u32 val)
 	else return ((val & (val - 1ul)) == 0ul);
 }
 
-NodeId Utility::TerminalArgumentToNodeId(const char * arg)
+NodeId Utility::TerminalArgumentToNodeId(const char * arg, bool* didErrorArg)
 {
 	if (arg == nullptr)
 	{
@@ -198,9 +199,13 @@ NodeId Utility::TerminalArgumentToNodeId(const char * arg)
 	if (strcmp(arg, "this")     == 0) return GS->node.configuration.nodeId;
 	if (strcmp(arg, "max_hops") == 0) return NODE_ID_HOPS_BASE + NODE_ID_HOPS_BASE_SIZE - 1;
 
-	bool didError = false;
-	NodeId retVal = Utility::StringToU16(arg, &didError);
-	if (didError) return NODE_ID_INVALID;
+	bool didErrorLocal = false;
+	NodeId retVal = Utility::StringToU16(arg, &didErrorLocal);
+	if (didErrorLocal)
+	{
+		if (didErrorArg != nullptr) *didErrorArg = true;
+		return NODE_ID_INVALID;
+	}
 	return retVal;
 }
 
@@ -245,9 +250,10 @@ unsigned long Utility::StringToUnsignedLong(const char * str, bool *outDidError)
 	char *endPtr = nullptr;
 
 	const unsigned long retVal = strtoul(str, &endPtr, 0);
-	if (endPtr == str || *endPtr != '\0')
+	if (endPtr == str || (*endPtr != '\0' && *endPtr != '\r' && *endPtr != '\n'))
 	{
 		if (outDidError != nullptr) *outDidError = true;
+		logt("ERROR", "Tried to interpret the none number string \"%s\" as a number", str);
 		SIMEXCEPTION(NotANumberStringException);
 		return 0;
 	}

@@ -101,14 +101,21 @@ constexpr int MA_CHARACTERISTIC_MAX_LENGTH = 20;
 enum class MeshAccessModuleTriggerActionMessages : u8{
 	MA_CONNECT = 0,
 	MA_DISCONNECT = 1,
+	SERIAL_CONNECT = 2,
 };
 
 enum class MeshAccessModuleActionResponseMessages : u8{
-
+	SERIAL_CONNECT = 2,
 };
 
 enum class MeshAccessModuleGeneralMessages : u8{
 	MA_CONNECTION_STATE = 0,
+};
+
+enum class MeshAccessSerialConnectError : u8 {
+	SUCCESS                      = 0,
+	TIMEOUT_REACHED              = 1,
+	OVERWRITTEN_BY_OTHER_REQUEST = 2,
 };
 
 //####### Module messages (these need to be packed)
@@ -134,6 +141,27 @@ enum class MeshAccessModuleGeneralMessages : u8{
 
 	}MeshAccessModuleDisconnectMessage;
 	STATIC_ASSERT_SIZE(MeshAccessModuleDisconnectMessage, 7);
+
+	struct MeshAccessModuleSerialConnectMessage
+	{
+		u32 serialNumberIndexToConnectTo;
+		FmKeyId fmKeyId;
+		u8 key[16];
+		NodeId nodeIdAfterConnect;
+		u32 connectionInitialKeepAliveSeconds;
+
+		bool operator==(const MeshAccessModuleSerialConnectMessage& other) const;
+		bool operator!=(const MeshAccessModuleSerialConnectMessage& other) const;
+
+	};
+	STATIC_ASSERT_SIZE(MeshAccessModuleSerialConnectMessage, 30);
+
+	struct MeshAccessModuleSerialConnectResponse
+	{
+		MeshAccessSerialConnectError code;
+		NodeId partnerId;
+	};
+	STATIC_ASSERT_SIZE(MeshAccessModuleSerialConnectResponse, 3);
 
 	constexpr int SIZEOF_MA_MODULE_CONNECTION_STATE_MESSAGE = 3;
 	typedef struct
@@ -163,6 +191,9 @@ class MeshAccessModule: public Module
 		u8 enableAdvertising = true; //Advertise the meshaccessPacket connectable
 		u8 disableIfInMesh = false; //Once a mesh connection is active, disable advertising
 		bool allowUnenrolledUnsecureConnections = false; //whether or not unsecure connections should be allowed when unenrolled
+
+		static constexpr u32 meshAccessDfuSurvivalTimeDs = SEC_TO_DS(60);
+		static constexpr u32 meshAccessInterestedInConnectionInitialKeepAliveDs = SEC_TO_DS(10);
 	private:
 
 		SimpleArray<ModuleId, 3> moduleIdsToAdvertise;
@@ -175,13 +206,20 @@ class MeshAccessModule: public Module
 		bool logNearby;
 		char logWildcard[6];
 
-
+		MeshAccessModuleSerialConnectMessage meshAccessSerialConnectMessage;
+		u32 meshAccessSerialConnectMessageReceiveTimeDs = 0;
+		static constexpr u32 meshAccessSerialConnectMessageTimeoutDs = SEC_TO_DS(15);
+		NodeId meshAccessSerialConnectSender = 0;
+		u8 meshAccessSerialConnectRequestHandle = 0;
+		u32 meshAccessSerialConnectConnectionId = 0;
 
 		void ReceivedMeshAccessConnectMessage(connPacketModule const * packet, u16 packetLength) const;
 		void ReceivedMeshAccessDisconnectMessage(connPacketModule const * packet, u16 packetLength) const;
 		void ReceivedMeshAccessConnectionStateMessage(connPacketModule const * packet, u16 packetLength) const;
+		void ReceivedMeshAccessSerialConnectMessage(connPacketModule const * packet, u16 packetLength);
 
-
+		void ResetSerialConnectAttempt();
+		void SendMeshAccessSerialConnectResponse(MeshAccessSerialConnectError code, NodeId partnerId = 0);
 	public:
 		DECLARE_CONFIG_AND_PACKED_STRUCT(MeshAccessModuleConfiguration);
 
@@ -214,6 +252,5 @@ class MeshAccessModule: public Module
 		void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override;
 
 		bool IsZeroKeyConnectable(const ConnectionDirection direction);
-
 };
 

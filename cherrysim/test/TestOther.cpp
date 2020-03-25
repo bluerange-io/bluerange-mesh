@@ -334,7 +334,7 @@ TEST(TestOther, TestConnectionAllocator) {
 			}
 			else if (type == 1) 
 			{
-				conns.push_back(ConnectionAllocator::getInstance().allocateMeshAccessConnection(0, ConnectionDirection::DIRECTION_IN, &addr, FmKeyId::ZERO, MeshAccessTunnelType::INVALID));
+				conns.push_back(ConnectionAllocator::getInstance().allocateMeshAccessConnection(0, ConnectionDirection::DIRECTION_IN, &addr, FmKeyId::ZERO, MeshAccessTunnelType::INVALID, 0));
 			}
 			else if (type == 2) 
 			{

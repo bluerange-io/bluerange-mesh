@@ -63,7 +63,7 @@ STATIC_ASSERT_SIZE(DeadDataMessage, 13);
 class MeshAccessConnection
 		: public BaseConnection
 {
-
+	friend class MeshAccessModule;
 private:
 
 	MeshAccessServiceStruct* meshAccessService;
@@ -93,6 +93,11 @@ private:
 
 	void LogKeys();
 
+	// If set, the mesh access connection will be closed once GS->appTimerDs 
+	// reaches this value. Can e.g. be used to limit connection times to 
+	// devices with high battery importance like assets.
+	u32 scheduledConnectionRemovalTimeDs = 0;
+
 public:
 
 	//The tunnel type describes the direction in which the MeshAccess connection works
@@ -112,7 +117,7 @@ public:
 	NodeId connectionStateSubscriberId = 0;
 
 
-	MeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType);
+	MeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualPartnerId = 0);
 	virtual ~MeshAccessConnection();
 	static BaseConnection* ConnTypeResolver(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8 const * data);
 
@@ -120,7 +125,7 @@ public:
 
 	/*############### Connect ##################*/
 	//Returns the unique connection id that was created
-	static u32 ConnectAsMaster(FruityHal::BleGapAddr const * address, u16 connIntervalMs, u16 connectionTimeoutSec, FmKeyId fmKeyId, u8 const * customKey, MeshAccessTunnelType tunnelType);
+	static u32 ConnectAsMaster(FruityHal::BleGapAddr const * address, u16 connIntervalMs, u16 connectionTimeoutSec, FmKeyId fmKeyId, u8 const * customKey, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualId = 0);
 
 	//Will create a connection that collects potential candidates and connects to them
 	static u16 SearchAndConnectAsMaster(NetworkId networkId, u32 serialNumberIndex, u16 searchTimeDs, u16 connIntervalMs, u16 connectionTimeoutSec);
@@ -164,5 +169,15 @@ public:
 	void PrintStatus() override;
 
 	u32 getAmountOfCorruptedMessaged();
+
+	// Keeps this connection alive for at least timeDs. If no scheduled removal time is set yet, this
+	// it setting the scheduled removal time. If a scheduled removal time is already set, this method
+	// is only able to increase the time, it never decreases it. This guarantees that different calls
+	// to this function are guaranteed that the mesh access connection is alive for as long as they
+	// requested.
+	void KeepAliveFor(u32 timeDs);
+
+	// Like KeepAliveFor(u32) but only sets a scheduled removal if one has already been set.
+	void KeepAliveForIfSet(u32 timeDs);
 };
 

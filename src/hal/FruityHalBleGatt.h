@@ -35,6 +35,14 @@
 #include <types.h>
 #include <FruityHalBleGap.h>
 
+// Invalid Attribute Handle
+#define FH_BLE_GATT_HANDLE_INVALID            0x0000
+
+// define
+#define FH_BLE_GATTS_VALUE_LOCATION_INVALID       0x00
+#define FH_BLE_GATTS_VALUE_LOCATION_STACK         0x01
+#define FH_BLE_GATTS_VALUE_LOCATION_USER          0x02
+
 namespace FruityHal
 {
 

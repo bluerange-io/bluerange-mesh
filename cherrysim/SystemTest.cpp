@@ -421,6 +421,34 @@ extern "C"
 		return 0;
 	}
 
+	static FruityHal::BleGapAdvType AdvertisingTypeToGeneric(u8 type)
+	{
+		switch (type)
+		{
+#if SDK == 15
+			case BLE_GAP_ADV_TYPE_CONNECTABLE_SCANNABLE_UNDIRECTED:
+				return FruityHal::BleGapAdvType::ADV_IND;
+			case BLE_GAP_ADV_TYPE_CONNECTABLE_NONSCANNABLE_DIRECTED:
+				return FruityHal::BleGapAdvType::ADV_DIRECT_IND;
+			case BLE_GAP_ADV_TYPE_NONCONNECTABLE_SCANNABLE_UNDIRECTED:
+				return FruityHal::BleGapAdvType::ADV_SCAN_IND;
+			case BLE_GAP_ADV_TYPE_NONCONNECTABLE_NONSCANNABLE_UNDIRECTED:
+				return FruityHal::BleGapAdvType::ADV_NONCONN_IND;
+#else
+			case BLE_GAP_ADV_TYPE_ADV_IND:
+				return FruityHal::BleGapAdvType::ADV_IND;
+			case BLE_GAP_ADV_TYPE_ADV_DIRECT_IND:
+				return FruityHal::BleGapAdvType::ADV_DIRECT_IND;
+			case BLE_GAP_ADV_TYPE_ADV_SCAN_IND:
+				return FruityHal::BleGapAdvType::ADV_SCAN_IND;
+			case BLE_GAP_ADV_TYPE_ADV_NONCONN_IND:
+				return FruityHal::BleGapAdvType::ADV_NONCONN_IND;
+#endif
+			default:
+                return FruityHal::BleGapAdvType::ADV_IND;
+		}
+	}
+
 	uint32_t sd_ble_gap_adv_start(const ble_gap_adv_params_t* p_adv_params)
 	{
 		START_OF_FUNCTION();
@@ -436,7 +464,7 @@ extern "C"
 		}
 
 		//If the device wants to advertise connectable, we can only allow this if it has another free peripheral connection
-		if ((FruityHal::BleGapAdvType)p_adv_params->type == FruityHal::BleGapAdvType::ADV_IND) {
+		if (AdvertisingTypeToGeneric(p_adv_params->type) != FruityHal::BleGapAdvType::ADV_NONCONN_IND) {
 			if (activePeripheralConnCount >= cherrySimInstance->currentNode->state.configuredPeripheralConnectionCount) {
 				return NRF_ERROR_CONN_COUNT;
 			}
@@ -446,7 +474,7 @@ extern "C"
 
 		cherrySimInstance->currentNode->state.advertisingActive = true;
 		cherrySimInstance->currentNode->state.advertisingIntervalMs = UNITS_TO_MSEC(p_adv_params->interval, UNIT_0_625_MS);
-		cherrySimInstance->currentNode->state.advertisingType = (FruityHal::BleGapAdvType)p_adv_params->type;
+		cherrySimInstance->currentNode->state.advertisingType = AdvertisingTypeToGeneric(p_adv_params->type);
 
 		//TODO: could return invalid state
 
@@ -508,6 +536,19 @@ extern "C"
 	}
 	uint32_t nrf_drv_gpiote_in_init(nrf_drv_gpiote_pin_t pin, nrf_drv_gpiote_in_config_t const * p_config, nrf_drv_gpiote_evt_handler_t evt_handler) { return 0; }
 	uint32_t nrf_drv_gpiote_in_event_enable(nrf_drv_gpiote_pin_t pin, bool) { return 0; }
+
+	lis2dh12_ret_t lis2dh12_get_fifo_status(fifo_status* status)
+	{
+
+		START_OF_FUNCTION();
+		if (cherrySimInstance->currentNode->lis2dh12WasInit) 
+		{
+			status->number_of_fifo_sample = 0;
+			status->fifo_watermark_interrupt = 0;
+			status->fifo_is_empty = 1;
+		}
+		return LIS2DH12_RET_OK;
+	}
 
 	uint32_t bme280_init(int32_t slaveSelectPin)
 	{
@@ -652,7 +693,7 @@ extern "C"
 		s1.bleEvent.header.evt_id = BLE_GAP_EVT_SEC_INFO_REQUEST;
 		s1.bleEvent.header.evt_len = s1.globalId;
 		s1.bleEvent.evt.gap_evt.conn_handle = connection->connectionHandle;
-		ble_gap_addr_t address = FruityHal::Convert(&cherrySimInstance->currentNode->address);
+		ble_gap_addr_t address = CherrySim::Convert(&cherrySimInstance->currentNode->address);
 		CheckedMemcpy(&s1.bleEvent.evt.gap_evt.params.sec_info_request.peer_addr, &address, sizeof(ble_gap_addr_t));
 		s1.bleEvent.evt.gap_evt.params.sec_info_request.master_id = { 0 }; //TODO: incomplete information
 		s1.bleEvent.evt.gap_evt.params.sec_info_request.enc_info = 0; //TODO: incomplete information
@@ -765,17 +806,18 @@ extern "C"
 		}
 
 		//We just set it without any error detection
-		cherrySimInstance->currentNode->address = FruityHal::Convert(p_addr);
+		cherrySimInstance->currentNode->address = CherrySim::Convert(p_addr);
 
 		return 0;
 	}
 
 	uint32_t sd_ble_gap_address_get(ble_gap_addr_t* p_addr)
 	{
-		START_OF_FUNCTION();
+		START_OF_FUNCTION();		
 		FruityHal::BleGapAddr addr = cherrySimInstance->currentNode->address;
 		CheckedMemcpy(p_addr->addr, addr.addr, BLE_GAP_ADDR_LEN);
 		p_addr->addr_type = (u8)addr.addr_type;
+
 
 		return 0;
 	}
@@ -1111,14 +1153,14 @@ extern "C"
 			cherrySimInstance->currentNode->eventQueue.pop_front();
 
 			if (cherrySimInstance->simEventListener != nullptr) {
-				cherrySimInstance->simEventListener->CherrySimBleEventHandler(cherrySimInstance->currentNode, &bleEvent, GlobalState::SIZE_OF_EVENT_BUFFER);
+				cherrySimInstance->simEventListener->CherrySimBleEventHandler(cherrySimInstance->currentNode, &bleEvent, FruityHal::GetEventBufferSize());
 			}
 
 			//We copy the current event so that we can access it during debugging if we want to get more information
 			CheckedMemcpy(&cherrySimInstance->currentNode->currentEvent, &bleEvent, sizeof(simBleEvent));
 
-			CheckedMemcpy(p_dest, &bleEvent.bleEvent, GlobalState::SIZE_OF_EVENT_BUFFER);
-			*p_len = GlobalState::SIZE_OF_EVENT_BUFFER;
+			CheckedMemcpy(p_dest, &bleEvent.bleEvent, FruityHal::GetEventBufferSize());
+			*p_len = FruityHal::GetEventBufferSize();
 
 			return NRF_SUCCESS;
 		}

@@ -975,21 +975,22 @@ void Logger::convertBufferToHexString(const u8 * srcBuffer, u32 srcLength, char 
 	};
 }
 
-u32 Logger::parseEncodedStringToBuffer(const char * encodedString, u8 * dstBuffer, u16 dstBufferSize)
+u32 Logger::parseEncodedStringToBuffer(const char * encodedString, u8 * dstBuffer, u16 dstBufferSize, bool *didError)
 {
 	auto len = strlen(encodedString);
 	if (len >= 4 && encodedString[2] != ':') {
-		return parseBase64StringToBuffer(encodedString, len, dstBuffer, dstBufferSize);
+		return parseBase64StringToBuffer(encodedString, len, dstBuffer, dstBufferSize, didError);
 	}
 	else {
-		return parseHexStringToBuffer(encodedString, len, dstBuffer, dstBufferSize);
+		return parseHexStringToBuffer(encodedString, len, dstBuffer, dstBufferSize, didError);
 	}
 }
 
-u32 Logger::parseHexStringToBuffer(const char* hexString, u32 hexStringLength, u8* dstBuffer, u16 dstBufferSize)
+u32 Logger::parseHexStringToBuffer(const char* hexString, u32 hexStringLength, u8* dstBuffer, u16 dstBufferSize, bool *didError)
 {
 	u32 length = (hexStringLength + 1) / 3;
 	if(length > dstBufferSize){
+		if(didError != nullptr) *didError = true;
 		logt("ERROR", "too long for dstBuffer"); //LCOV_EXCL_LINE assertion
 		length = dstBufferSize;					 //LCOV_EXCL_LINE assertion
 		SIMEXCEPTION(BufferTooSmallException);	 //LCOV_EXCL_LINE assertion
@@ -1002,7 +1003,7 @@ u32 Logger::parseHexStringToBuffer(const char* hexString, u32 hexStringLength, u
 	return length;
 }
 
-u32 parseBase64Block(const char* base64Block, u8 * dstBuffer, u16 dstBufferSize)
+u32 parseBase64Block(const char* base64Block, u8 * dstBuffer, u16 dstBufferSize, bool *didError)
 {
 	const char* base64Ptr[4];
 	u32 base64Index[4];
@@ -1020,6 +1021,7 @@ u32 parseBase64Block(const char* base64Block, u8 * dstBuffer, u16 dstBufferSize)
 		length--;
 	if (base64Ptr[1] == nullptr || base64Ptr[0] == nullptr)
 	{
+		if (didError != nullptr) *didError = true;
 		SIMEXCEPTION(IllegalArgumentException);	 //LCOV_EXCL_LINE assertion
 		return 0;								 //LCOV_EXCL_LINE assertion
 	}
@@ -1030,16 +1032,18 @@ u32 parseBase64Block(const char* base64Block, u8 * dstBuffer, u16 dstBufferSize)
 
 	if (length > dstBufferSize) 
 	{
+		if (didError != nullptr) *didError = true;
 		SIMEXCEPTION(BufferTooSmallException);
 	}
 
 	return length;
 }
 
-u32 Logger::parseBase64StringToBuffer(const char * base64String, const u32 base64StringLength, u8 * dstBuffer, u16 dstBufferSize)
+u32 Logger::parseBase64StringToBuffer(const char * base64String, const u32 base64StringLength, u8 * dstBuffer, u16 dstBufferSize, bool *didError)
 {
 	if (base64StringLength % 4 != 0)
 	{
+		if (didError != nullptr) *didError = true;
 		SIMEXCEPTION(IllegalArgumentException); //The base64 string was not padded correctly.
 		return 0;
 	}
@@ -1049,7 +1053,7 @@ u32 Logger::parseBase64StringToBuffer(const char * base64String, const u32 base6
 	u32 amountOfBytes = 0;
 	for (u32 i = 0; i < amountOfBlocks; i++)
 	{
-		amountOfBytes += parseBase64Block(base64String, dstBuffer, (i32)dstBufferSize - (i32)amountOfBytes);
+		amountOfBytes += parseBase64Block(base64String, dstBuffer, (i32)dstBufferSize - (i32)amountOfBytes, didError);
 		base64String += 4;
 		dstBuffer += 3;
 	}

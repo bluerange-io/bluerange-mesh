@@ -27,30 +27,51 @@
 // **
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
-#include <FruityHal.h>
-#include <Boardconfig.h>
-//PCA10056 - nRF82840 Devkit
-void setBoard_18(BoardConfiguration* c)
-{
-#if BOARD_TYPE == 18
-	if(c->boardType == 18)
+#include "gtest/gtest.h"
+#include "CircularBuffer.h"
+#include "types.h"
+#include <Utility.h>
+TEST(CircularBuffer, TestLength) {
 	{
-		c->led1Pin =  13;
-		c->led2Pin =  14;
-		c->led3Pin =  15;
-		c->ledActiveHigh =  false;
-		c->button1Pin =  11;
-		c->buttonsActiveHigh =  false;
-		c->uartRXPin =  8;
-		c->uartTXPin =  6;
-		c->uartCTSPin =  7;
-		c->uartRTSPin =  5;
-		c->uartBaudRate = (u32)FruityHal::UartBaudrate::BAUDRATE_1M;
-		c->dBmRX = -90;
-		c->calibratedTX =  -63;
-		c->lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_XTAL;
-		c->lfClockSource = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_20_PPM;
-		c->dcDcEnabled = true;
+		CircularBuffer<u8, 42> arr;
+		ASSERT_EQ(arr.length, 42);
 	}
-#endif // BOARD_TYPE == 18
+
+	{
+		CircularBuffer<u16, 12> arr;
+		ASSERT_EQ(arr.length, 12);
+	}
+
 }
+
+TEST(TestCircularBuffer, TestCircularAccess) {
+	CircularBuffer<int, 10> arr;
+	int exceedIndex = 2;
+	for (int i = 0; i < arr.length + exceedIndex; i++)
+	{
+		arr[i] = i;
+	}
+
+	ASSERT_EQ(arr[0], 10);
+
+	ASSERT_EQ(arr[1], 11);
+
+
+}
+
+TEST(TestCircularBuffer, TestCircularAccessInRotation) {
+	CircularBuffer<int, 10> arr;
+	i32 rotation = 2;
+	arr.setRotation(rotation);
+
+	ASSERT_EQ(arr.getRotation(), rotation);
+
+	for (int i = 0; i < arr.length; i++)
+	{
+		arr[i] = i;
+	}
+	arr.setRotation(0);
+	ASSERT_EQ(arr[0], 8);
+	ASSERT_EQ(arr[1], 9);
+}
+

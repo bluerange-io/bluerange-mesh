@@ -52,7 +52,7 @@
 
 constexpr int MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS = 20;
 constexpr int MAX_TERMINAL_JSON_LISTENER_CALLBACKS = 1;
-constexpr int TERMINAL_READ_BUFFER_LENGTH = 250;
+constexpr int TERMINAL_READ_BUFFER_LENGTH = 300;
 constexpr int MAX_NUM_TERM_ARGS = 15;
 
 enum class TerminalCommandHandlerReturnType : u8
@@ -109,7 +109,7 @@ private:
 	TerminalJsonListener* registeredJsonCallbacks[MAX_TERMINAL_JSON_LISTENER_CALLBACKS] = { 0 };
 	bool currentlyExecutingJsonCallbacks = false;	//Avoids endless recursion, where outputCallbacks themselves want to print something.
 
-	u8 readBufferOffset = 0;
+	u32 readBufferOffset = 0;
 	char readBuffer[TERMINAL_READ_BUFFER_LENGTH];
 
 	void WriteStdioLineToReadBuffer();
@@ -119,6 +119,8 @@ private:
 	bool uartActive = false;
 
 	bool crcChecksEnabled = false;
+
+	bool receivedProcessableLine = false;
 
 public:
 	static Terminal& getInstance();
@@ -154,6 +156,9 @@ public:
 	char* getReadBuffer();
 
 	void EnableCrcChecks();
+#ifdef SIM_ENABLED
+	void DisableCrcChecks();
+#endif
 	bool IsCrcChecksEnabled();
 
 	//##### UART ######

@@ -41,7 +41,6 @@
 
 #ifdef __cplusplus
 #include <LedWrapper.h>
-#include <FruityHalNrf.h>
 
 class RecordStorageEventListener;
 #endif //__cplusplus
@@ -53,7 +52,7 @@ class RecordStorageEventListener;
 #define FM_VERSION_MINOR 8
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 2010
+#define FM_VERSION_PATCH 2210
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -280,8 +279,6 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 #define ACTIVATE_WATCHDOG_SAFE_BOOT_MODE 1
 #endif
 
-
-
 // ########### Config class ##########################################
 //This class holds the configuration and some bits are changeable at runtime
 
@@ -374,7 +371,7 @@ class Conf
 		static constexpr u16 meshPeripheralSlaveLatency = 0;
 
 		//(20-1024) (100-1024 for non connectable advertising!) Determines advertising interval in units of 0.625 millisecond.
-		static constexpr u16 meshAdvertisingIntervalLow = (u16)MSEC_TO_UNITS(200, UNIT_0_625_MS);
+		static constexpr u16 meshAdvertisingIntervalLow = (u16)MSEC_TO_UNITS(200, CONFIG_UNIT_0_625_MS);
 
 		//INITIATING
 		//(20-1024) in 0.625ms units
@@ -420,6 +417,10 @@ class Conf
 
 		LedMode defaultLedMode = LedMode::OFF;
 
+		//If set, the node won't send anything via UART if the reboot reason is unknown and it hasn't received anything yet.
+		//This is so because the meshGW bootloader thinks that incomming UART chars are keyboard inputs.
+		bool silentStart = false;
+
 		//Configures whether the terminal will start in interactive mode or not
 		TerminalMode terminalMode : 8;
 
@@ -432,12 +433,12 @@ class Conf
 		//(7.5-4000) Maximum acceptable connection interval
 		u16 meshMaxConnectionInterval = 0;
 		//(100-32000) Connection supervisory timeout
-		static constexpr u16 meshConnectionSupervisionTimeout = (u16)MSEC_TO_UNITS(1000, UNIT_10_MS);
+		static constexpr u16 meshConnectionSupervisionTimeout = (u16)MSEC_TO_UNITS(1000, CONFIG_UNIT_10_MS);
 
 		//Mesh discovery parameters
 		//DISCOVERY_HIGH
 		//(20-1024) (100-1024 for non connectable advertising!) Determines advertising interval in units of 0.625 millisecond.
-		static constexpr u16 meshAdvertisingIntervalHigh = (u16)MSEC_TO_UNITS(100, UNIT_0_625_MS);
+		static constexpr u16 meshAdvertisingIntervalHigh = (u16)MSEC_TO_UNITS(100, CONFIG_UNIT_0_625_MS);
 		//From 4 to 16384 (2.5ms to 10s) in 0.625ms Units
 		u16 meshScanIntervalHigh = 0;
 		//From 4 to 16384 (2.5ms to 10s) in 0.625ms Units
@@ -456,30 +457,31 @@ class Conf
 		//Transmit Power used as default for this node
 		static constexpr i8 defaultDBmTX = 4;
 
-		//Depending on NRF51 / NRF52 capabilities, we need to set a different amount of
+		//Depending on platform capabilities, we need to set a different amount of
 		//possible connnections, whereas the simulator will need to select that at runtime
 		//Having two meshInConnections allows us to perform clustering more easily and
 		//prevents most denial of service attacks
-#ifdef NRF51
+#ifndef SIM_ENABLED
+#if FEATURE_AVAILABLE(MULTIPILE_IN_CONNECTIONS)
+		static constexpr u8 totalInConnections = 3;
+		static constexpr u8 totalOutConnections = 3;
+		u8 meshMaxInConnections = 2;
+		static constexpr u8 meshMaxOutConnections = 3;
+#else
 		// Max amount of connections that the BLE stack will be configured with
 		static constexpr u8 totalInConnections = 1;
 		static constexpr u8 totalOutConnections = 3;
 		// Total connections for building the mesh, if more than one inConnection is configured,
 		// it will be used only temporarily but not for permanent connections
 		u8 meshMaxInConnections = 1;
-		static constexpr u8 meshMaxOutConnections = 3;
-#elif NRF52
-		static constexpr u8 totalInConnections = 3;
-		static constexpr u8 totalOutConnections = 3;
+		static constexpr u8 meshMaxOutConnections = 3;;
+#endif // FEATURE_AVAILABLE(MULTIPILE_IN_CONNECTIONS)
+#else
+		u8 totalInConnections = 3;
+		u8 totalOutConnections = 3;
 		u8 meshMaxInConnections = 2;
-		static constexpr u8 meshMaxOutConnections = 3;
-#elif SIM_ENABLED
-		//Use a default setting for the nrf52
-		inline static u8 totalInConnections = 3;
-		inline static u8 totalOutConnections = 3;
-		u8 meshMaxInConnections = 2;
-		inline static u8 meshMaxOutConnections = 3;
-#endif
+		u8 meshMaxOutConnections = 3;
+#endif // SIM_ENABLED
 
 #ifndef SIM_ENABLED
 		static_assert(totalOutConnections >= meshMaxOutConnections, "meshMaxOutConnections must not be bigger than totalOutConnections");

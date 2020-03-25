@@ -29,29 +29,58 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <FruityHal.h>
-extern "C"{
-#include <ble.h>
-#include <ble_gap.h>
-#include <ble_gatt.h>
-#include <ble_gatts.h>
-#include <nrf_soc.h>
-#include "app_timer.h"
-
-#ifndef SIM_ENABLED
-#include <nrf_sdm.h>
-#include <nrf_delay.h>
-#include <nrf_drv_gpiote.h>
-#include <nrf_nvic.h>
-#include <nrf_wdt.h>
-#include <ble_radio_notification.h>
-#include <ble_db_discovery.h>
-#else
-#include <nrf51_bitfields.h>
+#ifdef SIM_ENABLED
+#include <type_traits>
 #endif
+#include<Utility.h>
+#include <cstring>
+#include "types.h"
 
+template<typename T, int N>
+class CircularBuffer
+{
+private:
+	T data[N];
+	i32 rotation = 0;
 
-#if defined(NRF51) || defined(SIM_ENABLED)
-#include <softdevice_handler.h>
+public:
+	static constexpr int length = N;
+
+	T* getRaw()
+	{
+		return data;
+	}
+
+	const T* getRaw() const
+	{
+		return data;
+	}
+
+	T& operator[](int index) {
+#ifdef SIM_ENABLED
+		if (index < 0)
+		{
+			SIMEXCEPTION(IndexOutOfBoundsException); //LCOV_EXCL_LINE assertion
+		}
 #endif
-}
+		return data[(index+rotation) % N];
+	}
+
+	const T& operator[](int index) const {
+#ifdef SIM_ENABLED
+		if (index < 0)
+		{
+			SIMEXCEPTION(IndexOutOfBoundsException); //LCOV_EXCL_LINE assertion
+		}
+#endif
+		return data[(index + rotation) % N];
+	}
+
+	i32 getRotation() {
+		return rotation;
+	}
+
+	void setRotation(i32 rotation) {
+		this->rotation = rotation;
+	}
+};

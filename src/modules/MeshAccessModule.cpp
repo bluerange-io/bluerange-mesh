@@ -50,6 +50,7 @@ MeshAccessModule::MeshAccessModule()
 	discoveryJobHandle = nullptr;
 	logNearby = false;
 	gattRegistered = false;
+	CheckedMemset(&meshAccessSerialConnectMessage, 0, sizeof(meshAccessSerialConnectMessage));
 
 	//Set defaults
 	ResetToDefaultConfiguration();
@@ -82,6 +83,42 @@ void MeshAccessModule::ConfigurationLoadedHandler(ModuleConfiguration* migratabl
 
 void MeshAccessModule::TimerEventHandler(u16 passedTimeDs)
 {
+	if (meshAccessSerialConnectMessageReceiveTimeDs != 0)
+	{
+		if (GS->appTimerDs > meshAccessSerialConnectMessageReceiveTimeDs + meshAccessSerialConnectMessageTimeoutDs)
+		{
+			SendMeshAccessSerialConnectResponse(MeshAccessSerialConnectError::TIMEOUT_REACHED);
+			ResetSerialConnectAttempt();
+		}
+
+		if (meshAccessSerialConnectConnectionId != 0)
+		{
+			MeshAccessConnection *conn = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(meshAccessSerialConnectConnectionId);
+			if (conn != nullptr)
+			{
+				if (conn->connectionState == ConnectionState::HANDSHAKE_DONE)
+				{
+					conn->KeepAliveFor(SEC_TO_DS(meshAccessSerialConnectMessage.connectionInitialKeepAliveSeconds));
+					SendMeshAccessSerialConnectResponse(MeshAccessSerialConnectError::SUCCESS, conn->virtualPartnerId);
+					ResetSerialConnectAttempt();
+				}
+			}
+		}
+	}
+
+	BaseConnections meshAccessConnections = GS->cm.GetConnectionsOfType(ConnectionType::MESH_ACCESS, ConnectionDirection::INVALID);
+	for (u32 i = 0; i < meshAccessConnections.count; i++)
+	{
+		MeshAccessConnection* maConn = (MeshAccessConnection*)GS->cm.allConnections[meshAccessConnections.connectionIndizes[i]];
+		if (maConn != nullptr)
+		{
+			if (maConn->scheduledConnectionRemovalTimeDs != 0 && GS->appTimerDs >= maConn->scheduledConnectionRemovalTimeDs)
+			{
+				logt("MAMOD", "Removing ma conn due to SCHEDULED_REMOVE");
+				maConn->DisconnectAndRemove(AppDisconnectReason::SCHEDULED_REMOVE);
+			}
+		}
+	}
 }
 
 void MeshAccessModule::RegisterGattService()
@@ -97,13 +134,13 @@ void MeshAccessModule::RegisterGattService()
 	//########################## At first, we register our custom service ########################
 	//Add our Service UUID to the BLE stack for management
 	err = FruityHal::BleUuidVsAdd(MA_SERVICE_BASE_UUID, &meshAccessService.serviceUuid.type);
-	APP_ERROR_CHECK(err); //OK
+	FRUITYMESH_ERROR_CHECK(err); //OK
 
 	//Add the service
 	meshAccessService.serviceUuid.uuid = MA_SERVICE_SERVICE_CHARACTERISTIC_UUID;
 
 	err = FruityHal::BleGattServiceAdd(FruityHal::BleGattSrvcType::PRIMARY, meshAccessService.serviceUuid, &meshAccessService.serviceHandle);
-	APP_ERROR_CHECK(err); //OK
+	FRUITYMESH_ERROR_CHECK(err); //OK
 
 	//########################## Now we need to add a characteristic to that service ########################
 	//Read and write permissions, variable length, etc...
@@ -111,7 +148,7 @@ void MeshAccessModule::RegisterGattService()
 	CheckedMemset(&rxAttributeMetadata, 0, sizeof(rxAttributeMetadata));
 	FH_CONNECTION_SECURITY_MODE_SET_OPEN(&rxAttributeMetadata.readPerm);
 	FH_CONNECTION_SECURITY_MODE_SET_OPEN(&rxAttributeMetadata.writePerm);
-	rxAttributeMetadata.valueLocation = BLE_GATTS_VLOC_STACK; //We currently have the value on the SoftDevice stack, we might port that to the application space
+	rxAttributeMetadata.valueLocation = FH_BLE_GATTS_VALUE_LOCATION_STACK; //We currently have the value on the SoftDevice stack, we might port that to the application space
 	rxAttributeMetadata.readAuthorization = 0;
 	rxAttributeMetadata.writeAuthorization = 0;
 	rxAttributeMetadata.variableLength = 1; //Make it a variable length attribute
@@ -163,7 +200,7 @@ void MeshAccessModule::RegisterGattService()
 	CheckedMemset(&txAttributeMetadata, 0, sizeof(txAttributeMetadata));
 	FH_CONNECTION_SECURITY_MODE_SET_OPEN(&txAttributeMetadata.readPerm);
 	FH_CONNECTION_SECURITY_MODE_SET_OPEN(&txAttributeMetadata.writePerm);
-	txAttributeMetadata.valueLocation = BLE_GATTS_VLOC_STACK; //We currently have the value on the SoftDevice stack, we might port that to the application space
+	txAttributeMetadata.valueLocation = FH_BLE_GATTS_VALUE_LOCATION_STACK; //We currently have the value on the SoftDevice stack, we might port that to the application space
 	txAttributeMetadata.readAuthorization = 0;
 	txAttributeMetadata.writeAuthorization = 0;
 	txAttributeMetadata.variableLength = 1; //Make it a variable length attribute
@@ -244,21 +281,21 @@ void MeshAccessModule::UpdateMeshAccessBroadcastPacket(u16 advIntervalMs,bool in
 
 	u8* buffer = currentJob->advData;
 
-	currentJob->advertisingInterval = MSEC_TO_UNITS((GS->node.isInBulkMode ? 1000 : advIntervalMs), UNIT_0_625_MS);
+	currentJob->advertisingInterval = MSEC_TO_UNITS((GS->node.isInBulkMode ? 1000 : advIntervalMs), CONFIG_UNIT_0_625_MS);
 
 	advStructureFlags* flags = (advStructureFlags*)buffer;
 	flags->len = SIZEOF_ADV_STRUCTURE_FLAGS-1; //minus length field itself
-	flags->type = BLE_GAP_AD_TYPE_FLAGS;
-	flags->flags = BLE_GAP_ADV_FLAG_LE_GENERAL_DISC_MODE | BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED;
+	flags->type = (u8)BleGapAdType::TYPE_FLAGS;
+	flags->flags = FH_BLE_GAP_ADV_FLAG_LE_GENERAL_DISC_MODE | FH_BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED;
 
 	advStructureUUID16* serviceUuidList = (advStructureUUID16*)(buffer +SIZEOF_ADV_STRUCTURE_FLAGS);
 	serviceUuidList->len = SIZEOF_ADV_STRUCTURE_UUID16 - 1;
-	serviceUuidList->type = BLE_GAP_AD_TYPE_16BIT_SERVICE_UUID_COMPLETE;
+	serviceUuidList->type = (u8)BleGapAdType::TYPE_16BIT_SERVICE_UUID_COMPLETE;
 	serviceUuidList->uuid = SERVICE_DATA_SERVICE_UUID16;
 
 	advStructureMeshAccessServiceData* serviceData = (advStructureMeshAccessServiceData*)(buffer +SIZEOF_ADV_STRUCTURE_FLAGS+SIZEOF_ADV_STRUCTURE_UUID16);
 	serviceData->data.uuid.len = SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA - 1;
-	serviceData->data.uuid.type = BLE_GAP_AD_TYPE_SERVICE_DATA;
+	serviceData->data.uuid.type = (u8)BleGapAdType::TYPE_SERVICE_DATA;
 	serviceData->data.uuid.uuid = SERVICE_DATA_SERVICE_UUID16;
 	serviceData->data.messageType = ServiceDataMessageType::MESH_ACCESS;
 	serviceData->networkId = GS->node.configuration.networkId;
@@ -322,6 +359,42 @@ void MeshAccessModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 	//Must call superclass for handling
 	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
+	// Replenish scheduled removal time of mesh access connection through which DFU messages passed.
+	// This way we don't remove connections if we are in the middle of a DFU.
+	if (sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE
+		&&
+		(
+			packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE
+			|| packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION
+			)
+		&& connection != nullptr
+		&& connection->connectionType == ConnectionType::MESH_ACCESS
+		)
+	{
+		connPacketModule const * mod = (connPacketModule const *)packetHeader;
+		if (mod->moduleId == ModuleId::DFU_MODULE)
+		{
+			BaseConnections conns = GS->cm.GetConnectionsByUniqueId(connection->uniqueConnectionId);
+			if (conns.count == 1)
+			{
+				MeshAccessConnection* maConn = (MeshAccessConnection*)GS->cm.allConnections[conns.connectionIndizes[0]];
+				if (maConn != nullptr)
+				{
+					logt("MAMOD", "Received DFU message, replenishing scheduled removal time.");
+					maConn->KeepAliveForIfSet(meshAccessDfuSurvivalTimeDs);
+				}
+			}
+			else
+			{
+				// Something seems fishy! We received data through a connection with an uniqueConnectionId,
+				// which is unknown to the ConnectionManger. This must not happen.
+				SIMEXCEPTION(IllegalStateException);
+			}
+		}
+	}
+
+
+
 	if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
 		connPacketModule const * packet = (connPacketModule const *)packetHeader;
 		u16 dataFieldLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE;
@@ -329,10 +402,30 @@ void MeshAccessModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 		//Check if our module is meant and we should trigger an action
 		if(packet->moduleId == moduleId){
 			MeshAccessModuleTriggerActionMessages actionType = (MeshAccessModuleTriggerActionMessages)packet->actionType;
-			if(actionType == MeshAccessModuleTriggerActionMessages::MA_CONNECT){
+			if(actionType == MeshAccessModuleTriggerActionMessages::MA_CONNECT)
+			{
 				ReceivedMeshAccessConnectMessage(packet, sendData->dataLength);
-			} else if(actionType == MeshAccessModuleTriggerActionMessages::MA_DISCONNECT){
+			}
+			else if(actionType == MeshAccessModuleTriggerActionMessages::MA_DISCONNECT)
+			{
 				ReceivedMeshAccessDisconnectMessage(packet, sendData->dataLength);
+			}
+			else if (actionType == MeshAccessModuleTriggerActionMessages::SERIAL_CONNECT && sendData->dataLength >= sizeof(MeshAccessModuleSerialConnectMessage))
+			{
+				ReceivedMeshAccessSerialConnectMessage(packet, sendData->dataLength);
+			}
+		}
+	}
+	else if (packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE)
+	{
+		connPacketModule const * packet = (connPacketModule const *)packetHeader;
+		if (packet->moduleId == moduleId)
+		{
+			MeshAccessModuleActionResponseMessages actionType = (MeshAccessModuleActionResponseMessages)packet->actionType;
+			if (actionType == MeshAccessModuleActionResponseMessages::SERIAL_CONNECT)
+			{
+				MeshAccessModuleSerialConnectResponse const* response = (MeshAccessModuleSerialConnectResponse const*)packet->data;
+				logjson("MAMOD", "{\"type\":\"serial_connect_response\",\"module\":%u,\"nodeId\":%d,\"requestHandle\":%u,\"code\":%u,\"partnerId\":%u}" EOL, (u32)packet->moduleId, packet->header.sender, packet->requestHandle, (u32)response->code, (u32)response->partnerId);
 			}
 		}
 	}
@@ -402,7 +495,57 @@ void MeshAccessModule::ReceivedMeshAccessConnectionStateMessage(connPacketModule
 	MeshAccessModuleConnectionStateMessage const * message = (MeshAccessModuleConnectionStateMessage const *) packet->data;
 
 	logjson_partial("MAMOD", "{\"nodeId\":%u,\"type\":\"ma_conn_state\",\"module\":%u,", packet->header.sender, (u32)packet->moduleId);
-	logjson("MAMOD",  "\"requestHandle\":%u,\"vPartnerId\":%u,\"state\":%u}" SEP, packet->requestHandle, message->vPartnerId, message->state);
+	logjson("MAMOD",  "\"requestHandle\":%u,\"partnerId\":%u,\"state\":%u}" SEP, packet->requestHandle, message->vPartnerId, message->state);
+}
+
+void MeshAccessModule::ReceivedMeshAccessSerialConnectMessage(connPacketModule const * packet, u16 packetLength)
+{
+	MeshAccessModuleSerialConnectMessage const * message = (MeshAccessModuleSerialConnectMessage const *)packet->data;
+	if (meshAccessSerialConnectMessageReceiveTimeDs != 0 && 
+		(meshAccessSerialConnectMessage != *message
+			|| meshAccessSerialConnectSender != packet->header.sender
+			|| meshAccessSerialConnectRequestHandle != packet->requestHandle))
+	{
+		SendMeshAccessSerialConnectResponse(MeshAccessSerialConnectError::OVERWRITTEN_BY_OTHER_REQUEST);
+	}
+	ResetSerialConnectAttempt();
+	meshAccessSerialConnectMessage = *message;
+	if (Utility::CompareMem(0xFF, meshAccessSerialConnectMessage.key, sizeof(meshAccessSerialConnectMessage.key)) 
+		&& meshAccessSerialConnectMessage.fmKeyId != FmKeyId::NODE /*We shouldn't use our own node key as a key for an outgoing connection...*/)
+	{
+		//If no key is specified, we take our local key.
+		GS->node.GetKey(meshAccessSerialConnectMessage.fmKeyId, meshAccessSerialConnectMessage.key);
+	}
+	meshAccessSerialConnectMessageReceiveTimeDs = GS->appTimerDs;
+	meshAccessSerialConnectSender = packet->header.sender;
+	meshAccessSerialConnectRequestHandle = packet->requestHandle;
+}
+
+void MeshAccessModule::ResetSerialConnectAttempt()
+{
+	CheckedMemset(&meshAccessSerialConnectMessage, 0, sizeof(meshAccessSerialConnectMessage));
+	meshAccessSerialConnectMessageReceiveTimeDs = 0;
+	meshAccessSerialConnectSender = 0;
+	meshAccessSerialConnectRequestHandle = 0;
+}
+
+void MeshAccessModule::SendMeshAccessSerialConnectResponse(MeshAccessSerialConnectError code, NodeId partnerId)
+{
+	MeshAccessModuleSerialConnectResponse response;
+	CheckedMemset(&response, 0, sizeof(response));
+
+	response.code = code;
+	response.partnerId = partnerId;
+
+	SendModuleActionMessage(
+		MessageType::MODULE_ACTION_RESPONSE,
+		meshAccessSerialConnectSender,
+		(u8)MeshAccessModuleActionResponseMessages::SERIAL_CONNECT,
+		meshAccessSerialConnectRequestHandle,
+		(u8*)&response,
+		sizeof(response),
+		false
+	);
 }
 
 MeshAccessAuthorization MeshAccessModule::CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction)
@@ -421,6 +564,22 @@ MeshAccessAuthorization MeshAccessModule::CheckMeshAccessPacketAuthorization(Bas
 	if (packet->messageType == MessageType::DEAD_DATA)
 	{
 		return MeshAccessAuthorization::LOCAL_ONLY;
+	}
+
+	// Devices behind MeshAccessConnections are forced to specify the key for
+	// serial connect messages, as they are not fully trusted.
+	if (packet->messageType == MessageType::MODULE_TRIGGER_ACTION)
+	{
+		connPacketModule const * packetModule = (connPacketModule const *)packet;
+		MeshAccessModuleTriggerActionMessages actionType = (MeshAccessModuleTriggerActionMessages)packetModule->actionType;
+		if (packetModule->moduleId == moduleId && actionType == MeshAccessModuleTriggerActionMessages::SERIAL_CONNECT)
+		{
+			MeshAccessModuleSerialConnectMessage const * message = (MeshAccessModuleSerialConnectMessage const *)packetModule->data;
+			if (Utility::CompareMem(0xFF, message->key, sizeof(message->key)))
+			{
+				return MeshAccessAuthorization::BLACKLIST;
+			}
+		}
 	}
 
 	//Default authorization for different keys
@@ -585,6 +744,44 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
 
 			return TerminalCommandHandlerReturnType::SUCCESS;
 		}
+		else if (TERMARGS(3, "serial_connect"))
+		{
+			//   0       1    2        3            4          5        6            7                           8                       9
+			//action [nodeId] ma serial_connect [to serial] [fmKeyId] [key] {nodeId after connect} {connection initial keep alive} {requestHandle}
+
+			if (commandArgsSize < 9) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+
+			bool didError = false;
+			MeshAccessModuleSerialConnectMessage message;
+			CheckedMemset(&message, 0, sizeof(message));
+			//TODO CURRENT connection Initial keep alive
+			message.serialNumberIndexToConnectTo = Utility::GetIndexForSerial(commandArgs[4], &didError);
+			message.fmKeyId = (FmKeyId)Utility::StringToU32(commandArgs[5], &didError);
+			Logger::parseEncodedStringToBuffer(commandArgs[6], message.key, sizeof(message.key), &didError);
+			message.nodeIdAfterConnect = (commandArgsSize > 7) ? Utility::TerminalArgumentToNodeId(commandArgs[7], &didError) : 0;
+			message.connectionInitialKeepAliveSeconds = (commandArgsSize > 8) ? Utility::StringToU32(commandArgs[8], &didError) : 0;
+
+			u8 requestHandle = (commandArgsSize > 9) ? Utility::StringToU8(commandArgs[9], &didError) : 0;
+
+			if (didError
+				|| message.nodeIdAfterConnect < NODE_ID_GLOBAL_DEVICE_BASE
+				|| message.nodeIdAfterConnect >= NODE_ID_GLOBAL_DEVICE_BASE + NODE_ID_GLOBAL_DEVICE_BASE_SIZE)
+			{
+				return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+			}
+
+			SendModuleActionMessage(
+				MessageType::MODULE_TRIGGER_ACTION,
+				destinationNode,
+				(u8)MeshAccessModuleTriggerActionMessages::SERIAL_CONNECT,
+				requestHandle,
+				(u8*)&message,
+				sizeof(message),
+				false
+			);
+
+			return TerminalCommandHandlerReturnType::SUCCESS;
+		}
 	}
 
 	//Must be called to allow the module to get and set the config
@@ -603,7 +800,7 @@ void MeshAccessModule::GapAdvertisementReportEventHandler(const FruityHal::GapAd
 				advertisementReportEvent.getDataLength() >= SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA
 				&& packet->flags.len == SIZEOF_ADV_STRUCTURE_FLAGS-1
 				&& packet->uuid.len == SIZEOF_ADV_STRUCTURE_UUID16-1
-				&& packet->data.uuid.type == BLE_GAP_AD_TYPE_SERVICE_DATA
+				&& packet->data.uuid.type == (u8)BleGapAdType::TYPE_SERVICE_DATA
 				&& packet->data.uuid.uuid == SERVICE_DATA_SERVICE_UUID16
 				&& packet->data.messageType == ServiceDataMessageType::MESH_ACCESS
 		){
@@ -633,17 +830,45 @@ void MeshAccessModule::GapAdvertisementReportEventHandler(const FruityHal::GapAd
 	if (advertisementReportEvent.getDataLength() >= SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA
 		&& packet->flags.len == SIZEOF_ADV_STRUCTURE_FLAGS - 1
 		&& packet->uuid.len == SIZEOF_ADV_STRUCTURE_UUID16 - 1
-		&& packet->data.uuid.type == BLE_GAP_AD_TYPE_SERVICE_DATA
+		&& packet->data.uuid.type == (u8)BleGapAdType::TYPE_SERVICE_DATA
 		&& packet->data.uuid.uuid == SERVICE_DATA_SERVICE_UUID16
-		&& packet->data.messageType == ServiceDataMessageType::MESH_ACCESS
-		&& maPacket->interestedInConnetion == 1
-		&& (maPacket->networkId == GS->node.configuration.networkId
-			|| maPacket->networkId == 0)) {
-
+		&& packet->data.messageType == ServiceDataMessageType::MESH_ACCESS)
+	{
 		FruityHal::BleGapAddr addr;
 		addr.addr_type = advertisementReportEvent.getPeerAddrType();
-		CheckedMemcpy(addr.addr,advertisementReportEvent.getPeerAddr(),6);
-		u16 connectionId = MeshAccessConnection::ConnectAsMaster(&addr, 10, 4, FmKeyId::ORGANIZATION, GS->node.configuration.organizationKey, MeshAccessTunnelType::LOCAL_MESH);
+		CheckedMemcpy(addr.addr, advertisementReportEvent.getPeerAddr(), 6);
+		if (maPacket->interestedInConnetion == 1
+			&& maPacket->networkId == GS->node.configuration.networkId
+			&& maPacket->networkId != 0)
+		{
+			u16 connectionId = MeshAccessConnection::ConnectAsMaster(&addr, 10, 4, FmKeyId::ORGANIZATION, GS->node.configuration.organizationKey, MeshAccessTunnelType::LOCAL_MESH);
+			if (connectionId != 0)
+			{
+				MeshAccessConnection* maconn = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(connectionId);
+				if (maconn != nullptr)
+				{
+					maconn->KeepAliveFor(meshAccessInterestedInConnectionInitialKeepAliveDs);
+				}
+			}
+		}
+
+		if (meshAccessSerialConnectMessage.serialNumberIndexToConnectTo == maPacket->serialIndex &&
+			meshAccessSerialConnectMessage.serialNumberIndexToConnectTo != 0 && 
+				(
+					meshAccessSerialConnectConnectionId == 0
+					|| GS->cm.GetConnectionByUniqueId(meshAccessSerialConnectConnectionId) == nullptr
+				)
+			)
+		{
+			meshAccessSerialConnectConnectionId = MeshAccessConnection::ConnectAsMaster(&addr, 10, 4, meshAccessSerialConnectMessage.fmKeyId, meshAccessSerialConnectMessage.key, MeshAccessTunnelType::LOCAL_MESH, meshAccessSerialConnectMessage.nodeIdAfterConnect);
+
+			MeshAccessConnection* maconn = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(meshAccessSerialConnectConnectionId);
+			if (maconn != nullptr)
+			{
+				maconn->connectionStateSubscriberId = meshAccessSerialConnectSender;
+			}
+			//Register for changes in the connection state
+		}
 	}
 }
 
@@ -652,4 +877,20 @@ bool MeshAccessModule::IsZeroKeyConnectable(const ConnectionDirection direction)
 	return (GS->node.configuration.enrollmentState == EnrollmentState::NOT_ENROLLED
 		|| direction == ConnectionDirection::DIRECTION_OUT)
 		&& allowUnenrolledUnsecureConnections;
+}
+
+bool MeshAccessModuleSerialConnectMessage::operator==(const MeshAccessModuleSerialConnectMessage & other) const
+{
+	if (serialNumberIndexToConnectTo      != other.serialNumberIndexToConnectTo     ) return false;
+	if (fmKeyId                           != other.fmKeyId                          ) return false;
+	//if (memcmp(key, other.key, sizeof(key)) != 0                                  ) return false; //The key is ignored on purpose, as FF:FF:...:FF is replaced by the local key.
+	if (nodeIdAfterConnect                != other.nodeIdAfterConnect               ) return false;
+	if (connectionInitialKeepAliveSeconds != other.connectionInitialKeepAliveSeconds) return false;
+
+	return true;
+}
+
+bool MeshAccessModuleSerialConnectMessage::operator!=(const MeshAccessModuleSerialConnectMessage & other) const
+{
+	return !(*this == other);
 }

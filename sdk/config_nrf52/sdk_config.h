@@ -1,3 +1,4 @@
+
 /**
  * Copyright (c) 2017 - 2017, Nordic Semiconductor ASA
  * 
@@ -2660,7 +2661,7 @@
 // <7=> 7 
 
 #ifndef SPI_DEFAULT_CONFIG_IRQ_PRIORITY
-#define SPI_DEFAULT_CONFIG_IRQ_PRIORITY 3
+#define SPI_DEFAULT_CONFIG_IRQ_PRIORITY 6
 #endif
 
 // <e> SPI0_ENABLED - Enable SPI0 instance
@@ -2974,7 +2975,7 @@
 // <7=> 7 
 
 #ifndef TWI_DEFAULT_CONFIG_IRQ_PRIORITY
-#define TWI_DEFAULT_CONFIG_IRQ_PRIORITY 7
+#define TWI_DEFAULT_CONFIG_IRQ_PRIORITY 6
 #endif
 
 // <e> TWI0_ENABLED - Enable TWI0 instance

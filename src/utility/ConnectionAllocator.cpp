@@ -77,10 +77,10 @@ ResolverConnection * ConnectionAllocator::allocateResolverConnection(u8 id, Conn
 	new (retVal) ResolverConnection(id, direction, partnerAddress);
 	return retVal;
 }
-MeshAccessConnection * ConnectionAllocator::allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType)
+MeshAccessConnection * ConnectionAllocator::allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualPartnerId)
 {
 	MeshAccessConnection* retVal = reinterpret_cast<MeshAccessConnection*>(allocateMemory());
-	new (retVal) MeshAccessConnection(id, direction, partnerAddress, fmKeyId, tunnelType);
+	new (retVal) MeshAccessConnection(id, direction, partnerAddress, fmKeyId, tunnelType, overwriteVirtualPartnerId);
 	return retVal;
 }
 #if IS_ACTIVE(CLC_CONN)

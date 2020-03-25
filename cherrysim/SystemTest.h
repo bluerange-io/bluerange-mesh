@@ -117,6 +117,7 @@ extern "C" {
 #define ACTIVATE_ASSET_MODULE 1
 #define ACTIVATE_VS_MODULE 1
 #define ACTIVATE_WM_MODULE 0
+#define ACTIVATE_INS 1
 
 #define ACTIVATE_WATCHDOG 1
 
@@ -405,6 +406,13 @@ typedef struct{
 } bmg250_int_settg;
 
 
+typedef struct
+{
+	uint8_t number_of_fifo_sample;
+	bool fifo_is_empty;
+	bool fifo_watermark_interrupt;
+}fifo_status;
+
 
 int8_t bmg250_set_fifo_config(uint8_t config, uint8_t enable, const bmg250_dev *dev);
 int8_t bmg250_get_fifo_data(const bmg250_dev *dev);
@@ -501,6 +509,7 @@ void lis2dh12_read_samples(lis2dh12_sensor_buffer_t* buffer, uint32_t count);
 uint32_t nrf_drv_gpiote_in_init(nrf_drv_gpiote_pin_t pin, nrf_drv_gpiote_in_config_t const * p_config, nrf_drv_gpiote_evt_handler_t evt_handler);
 uint32_t nrf_drv_gpiote_in_event_enable(nrf_drv_gpiote_pin_t pin, bool);
 lis2dh12_ret_t lis2dh12_get_fifo_sample_number(size_t* count);
+lis2dh12_ret_t lis2dh12_get_fifo_status(fifo_status* status);
 
 #define BME280_RET_OK 0
 #define BME280_MODE_SLEEP 1

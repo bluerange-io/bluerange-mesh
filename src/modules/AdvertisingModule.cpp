@@ -89,7 +89,7 @@ void AdvertisingModule::ConfigurationLoadedHandler(ModuleConfiguration* migratab
 			AdvJobTypes::SCHEDULED,
 			3, //Slots
 			0, //Delay
-			MSEC_TO_UNITS(100, UNIT_0_625_MS), //AdvInterval
+			MSEC_TO_UNITS(100, CONFIG_UNIT_0_625_MS), //AdvInterval
 			0, //AdvChannel
 			0, //CurrentSlots
 			0, //CurrentDelay

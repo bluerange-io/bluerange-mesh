@@ -295,7 +295,7 @@ void BootModules()
 	FruityHal::StartTimers();
 #endif
 
-	GS->ramRetainStructPreviousBoot = *GS->ramRetainStructPtr;
+	*GS->ramRetainStructPreviousBootPtr = *GS->ramRetainStructPtr;
 	FruityHal::ClearRebootReason();
 	CheckedMemset(GS->ramRetainStructPtr, 0, sizeof(RamRetainStruct));
 	GS->ramRetainStructPtr->rebootReason = RebootReason::UNKNOWN_BUT_BOOTED;
@@ -472,7 +472,7 @@ void FruityMeshErrorHandler(u32 err)
 
 	//Protect against saving the fault if another fault was the case for this fault
 	if(!Utility::IsUnknownRebootReason(GS->ramRetainStructPtr->rebootReason)){
-		NVIC_SystemReset();
+		FruityHal::SystemReset(false);
 	}
 
 	//Save the crashdump to the ramRetain struct so that we can evaluate it when rebooting
@@ -508,7 +508,7 @@ void BleStackErrorHandler(u32 id, u32 pc, u32 info)
 
 	//Protect against saving the fault if another fault was the case for this fault
 	if(!Utility::IsUnknownRebootReason(GS->ramRetainStructPtr->rebootReason)){
-		NVIC_SystemReset();
+		FruityHal::SystemReset(false);
 	}
 
 	//Save the crashdump to the ramRetain struct so that we can evaluate it when rebooting
@@ -534,7 +534,7 @@ void BleStackErrorHandler(u32 id, u32 pc, u32 info)
 		GS->ledGreen.Toggle();
 		FruityHal::DelayMs(50);
 	}
-	else NVIC_SystemReset();
+	else FruityHal::SystemReset(false);
 }
 
 //Once a hardfault occurs, this handler is called with a pointer to a register dump
@@ -563,7 +563,7 @@ void HardFaultErrorHandler(stacked_regs_t* stack)
 			FruityHal::DelayMs(50);
 		}
 	}
-	else NVIC_SystemReset();
+	else FruityHal::SystemReset(false);
 }
 
 

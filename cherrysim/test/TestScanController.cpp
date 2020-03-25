@@ -98,8 +98,8 @@ TEST(TestScanController, TestIfScannerGetsEnabled) {
 
 	ScanJob job;
 	job.timeMode = ScanJobTimeMode::ENDLESS;
-	job.interval = MSEC_TO_UNITS(100, UNIT_0_625_MS);
-	job.window = MSEC_TO_UNITS(50, UNIT_0_625_MS);
+	job.interval = MSEC_TO_UNITS(100, CONFIG_UNIT_0_625_MS);
+	job.window = MSEC_TO_UNITS(50, CONFIG_UNIT_0_625_MS);
 	job.state = ScanJobState::ACTIVE;
 	job.type = ScanState::CUSTOM;
 	AddJob(job, tester);
@@ -124,8 +124,8 @@ TEST(TestScanController, TestScannerStopsAfterTimeoutTime) {
 	ScanJob job;
 	job.timeMode = ScanJobTimeMode::TIMED;
 	job.timeLeftDs = SEC_TO_DS(10);
-	job.interval = MSEC_TO_UNITS(50, UNIT_0_625_MS);
-	job.window = MSEC_TO_UNITS(50, UNIT_0_625_MS);
+	job.interval = MSEC_TO_UNITS(50, CONFIG_UNIT_0_625_MS);
+	job.window = MSEC_TO_UNITS(50, CONFIG_UNIT_0_625_MS);
 	job.state = ScanJobState::ACTIVE;
 	job.type = ScanState::CUSTOM;
 	AddJob(job, tester);
@@ -151,8 +151,8 @@ TEST(TestScanController, TestScannerChooseJobWithHighestDutyCycle) {
 
 	ScanJob job;
 	job.timeMode = ScanJobTimeMode::ENDLESS;
-	job.interval = MSEC_TO_UNITS(100, UNIT_0_625_MS);
-	job.window = MSEC_TO_UNITS(50, UNIT_0_625_MS);
+	job.interval = MSEC_TO_UNITS(100, CONFIG_UNIT_0_625_MS);
+	job.window = MSEC_TO_UNITS(50, CONFIG_UNIT_0_625_MS);
 	job.state = ScanJobState::ACTIVE;
 	job.type = ScanState::CUSTOM;
 	AddJob(job, tester);
@@ -160,19 +160,19 @@ TEST(TestScanController, TestScannerChooseJobWithHighestDutyCycle) {
 
 	simulateAndCheckWindow(1000, 50, tester);
 
-	job.window = MSEC_TO_UNITS(40, UNIT_0_625_MS);
+	job.window = MSEC_TO_UNITS(40, CONFIG_UNIT_0_625_MS);
 	AddJob(job, tester);
 
 	simulateAndCheckWindow(1000, 50, tester);
 
-	job.window = MSEC_TO_UNITS(60, UNIT_0_625_MS);
+	job.window = MSEC_TO_UNITS(60, CONFIG_UNIT_0_625_MS);
 	AddJob(job, tester);
 
 	simulateAndCheckWindow(1000, 60, tester);
 
 	job.timeMode = ScanJobTimeMode::TIMED;
 	job.timeLeftDs = SEC_TO_DS(3);
-	job.window = MSEC_TO_UNITS(70, UNIT_0_625_MS);
+	job.window = MSEC_TO_UNITS(70, CONFIG_UNIT_0_625_MS);
 	AddJob(job, tester);
 
 	simulateAndCheckWindow(1000, 70, tester);
@@ -198,8 +198,8 @@ TEST(TestScanController, TestScannerWillStopOnceAllJobsTimeout) {
 	ScanJob job;
 	job.timeMode = ScanJobTimeMode::TIMED;
 	job.timeLeftDs = SEC_TO_DS(10);
-	job.interval = MSEC_TO_UNITS(100, UNIT_0_625_MS);
-	job.window = MSEC_TO_UNITS(50, UNIT_0_625_MS);
+	job.interval = MSEC_TO_UNITS(100, CONFIG_UNIT_0_625_MS);
+	job.window = MSEC_TO_UNITS(50, CONFIG_UNIT_0_625_MS);
 	job.state = ScanJobState::ACTIVE;
 	job.type = ScanState::CUSTOM;
 	AddJob(job, tester);
@@ -230,8 +230,8 @@ TEST(TestScanController, TestScannerWillStopOnceAllJobsAreDeleted) {
 
 	ScanJob job;
 	job.timeMode = ScanJobTimeMode::ENDLESS;
-	job.interval = MSEC_TO_UNITS(100, UNIT_0_625_MS);
-	job.window = MSEC_TO_UNITS(50, UNIT_0_625_MS);
+	job.interval = MSEC_TO_UNITS(100, CONFIG_UNIT_0_625_MS);
+	job.window = MSEC_TO_UNITS(50, CONFIG_UNIT_0_625_MS);
 	job.state = ScanJobState::ACTIVE;
 	job.type = ScanState::CUSTOM;
 	ScanJob * p_job_1 = AddJob(job, tester);

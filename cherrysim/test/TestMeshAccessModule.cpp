@@ -193,3 +193,77 @@ TEST(TestMeshAccessModule, TestRestrainedAccess) {
 
 	tester.SimulateUntilMessageReceived(10 * 1000, 1, "Received remote mesh data");
 }
+
+#ifndef GITHUB_RELEASE
+TEST(TestMeshAccessModule, TestSerialConnect) {
+	constexpr u32 amountOfNodesInOtherNetwork = 7;
+	constexpr u32 amountOfNodesInOwnNetwork = 3 + amountOfNodesInOtherNetwork;
+
+	// This test builds up a mesh that roughly looks like this:
+	//
+	//       x    o
+	//       |    
+	// x-x-x-x    o
+	//       |    
+	//      ...  ...
+	//       |    
+	//       x    o
+	//
+	// Where xs nodes of a network, os are assets and - and | are connections.
+	// The left most x is the communication beacon, the distance makes sure that it can't
+	// directly communicate with the o network. For this it uses the xs of its network that
+	// are close to the o network.
+
+	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+	simConfig.numNodes = amountOfNodesInOtherNetwork + amountOfNodesInOwnNetwork;
+	simConfig.terminalId = 0;
+	//testerConfig.verbose = true;
+	simConfig.preDefinedPositions = { {0.1, 0.5}, {0.3, 0.55}, {0.5, 0.5} };
+	for (int i = 0; i < amountOfNodesInOtherNetwork; i++)
+	{
+		simConfig.preDefinedPositions.push_back({ 0.7, 0.0 + i * 0.2 });
+	}
+	for (int i = 0; i < amountOfNodesInOtherNetwork; i++)
+	{
+		simConfig.preDefinedPositions.push_back({ 0.9, 0.0 + i * 0.2 });
+	}
+
+	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+	for (int i = amountOfNodesInOwnNetwork; i < simConfig.numNodes; i++)
+	{
+		tester.sim->nodes[i].uicr.CUSTOMER[9] = 123; // Change default network id of node 4
+	}
+
+	for (int i = amountOfNodesInOwnNetwork; i < simConfig.numNodes; i++)
+	{
+		strcpy(tester.sim->nodes[i].nodeConfiguration, "prod_asset_nrf52");
+	}
+
+	tester.Start();
+	tester.SimulateUntilMessageReceived(100 * 1000, 1, "clusterSize\":%u", amountOfNodesInOwnNetwork); //Simulate a little to let the first 4 nodes connect to each other.
+	
+	// Make sure that the network key (2) works without specifying it (FF:...:FF)
+	// We don't need to specify it as by default in the simulator all nodes have
+	// the same network key.
+	tester.SendTerminalCommand(1, "action 4 ma serial_connect BBBBN 2 FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF 33010 20 12");
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"serial_connect_response\",\"module\":10,\"nodeId\":4,\"requestHandle\":12,\"code\":0,\"partnerId\":33010}");
+	//Test that messages are possible to be sent and received through the network key connection (others are mostly blacklisted at the moment)
+	tester.SendTerminalCommand(1, "action 33010 status get_status");
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":33010,\"type\":\"status\"");
+	tester.SimulateUntilMessageReceived(100 * 1000, 4, "Removing ma conn due to SCHEDULED_REMOVE");
+
+	// The same applies for the organization key (4).
+	tester.SendTerminalCommand(1, "action 5 ma serial_connect BBBBP 4 FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF 33011 20 13");
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"serial_connect_response\",\"module\":10,\"nodeId\":5,\"requestHandle\":13,\"code\":0,\"partnerId\":33011}");
+	tester.SimulateUntilMessageReceived(100 * 1000, 5, "Removing ma conn due to SCHEDULED_REMOVE");
+
+	// The node key (1) however must be given.
+	tester.SendTerminalCommand(1, "action 6 ma serial_connect BBBBQ 1 0D:00:00:00:0D:00:00:00:0D:00:00:00:0D:00:00:00 33012 20 13");
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"serial_connect_response\",\"module\":10,\"nodeId\":6,\"requestHandle\":13,\"code\":0,\"partnerId\":33012}");
+	tester.SimulateUntilMessageReceived(100 * 1000, 6, "Removing ma conn due to SCHEDULED_REMOVE");
+
+
+}
+#endif //!GITHUB_RELEASE

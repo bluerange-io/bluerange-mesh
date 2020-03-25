@@ -138,8 +138,8 @@ void Conf::LoadDefaults(){
 	meshScanIntervalHigh = 120; //FIXME_HAL: 120 units = 75ms (0.625ms steps)
 	meshScanWindowHigh = 12; //FIXME_HAL: 12 units = 7.5ms (0.625ms steps)
 
-	meshScanIntervalLow = (u16)MSEC_TO_UNITS(250, UNIT_0_625_MS);
-	meshScanWindowLow = (u16)MSEC_TO_UNITS(3, UNIT_0_625_MS);
+	meshScanIntervalLow = (u16)MSEC_TO_UNITS(250, CONFIG_UNIT_0_625_MS);
+	meshScanWindowLow = (u16)MSEC_TO_UNITS(3, CONFIG_UNIT_0_625_MS);
 
 	//Set defaults for stuff that is loaded from UICR in case that no UICR data is present
 	manufacturerId = MANUFACTURER_ID;

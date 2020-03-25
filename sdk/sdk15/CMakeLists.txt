@@ -8,6 +8,7 @@ target_compile_options_multi("${SDK_15_TARGETS}" "-mfpu=fpv4-sp-d16")
 target_link_options_multi("${SDK_15_TARGETS}" "-mfloat-abi=hard")
 target_link_options_multi("${SDK_15_TARGETS}" "-mfpu=fpv4-sp-d16")
 target_link_options_multi("${SDK_15_TARGETS}" "-T${PROJECT_SOURCE_DIR}/linker/gcc_nrf52840_s140v6_256kb.ld")
+target_link_options_multi("${SDK_15_TARGETS}" "-T${PROJECT_SOURCE_DIR}/linker/nrf5x_common.ld")
 
 target_sources_multi("${SDK_15_TARGETS}" "./modules/nrfx/mdk/gcc_startup_nrf52840.s")
 target_sources_multi("${SDK_15_TARGETS}" "./modules/nrfx/mdk/system_nrf52840.c")

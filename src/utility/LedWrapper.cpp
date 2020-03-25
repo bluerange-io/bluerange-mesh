@@ -31,10 +31,6 @@
 #include <Config.h>
 #include <LedWrapper.h>
 
-extern "C"{
-#include <nrf.h>
-}
-
 
 LedWrapper::LedWrapper(i8 io_num, bool active_high)
 {

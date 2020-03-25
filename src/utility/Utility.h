@@ -91,7 +91,7 @@ namespace Utility
 	RecordStorageResultCode SaveModuleSettingsToFlashWithId(ModuleId moduleId, ModuleConfiguration* configurationPointer, const u16 configurationLength, RecordStorageEventListener* listener, u32 userType, u8* userData, u16 userDataLength);
 
 	//Serial number and version utilities
-	u32 GetIndexForSerial(const char* serialNumber);
+	u32 GetIndexForSerial(const char* serialNumber, bool *didError = nullptr);
 	void GenerateBeaconSerialForIndex(u32 index, char* serialBuffer);
 	void GetVersionStringFromInt(const u32 version, char* outputBuffer);
 
@@ -127,7 +127,7 @@ namespace Utility
 
 	bool IsPowerOfTwo(u32 val);
 
-	NodeId TerminalArgumentToNodeId(const char* arg);
+	NodeId TerminalArgumentToNodeId(const char* arg, bool* didError = nullptr);
 
 	bool IsUnknownRebootReason(RebootReason rebootReason);
 

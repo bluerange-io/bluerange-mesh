@@ -39,10 +39,6 @@
 
 #include <Utility.h>
 
-extern "C"{
-#include <ble_hci.h>
-}
-
 GAPController & GAPController::getInstance()
 {
 	return GS->gapController;
@@ -67,11 +63,11 @@ void GAPController::bleConfigureGAP() const{
 	FH_CONNECTION_SECURITY_MODE_SET_NO_ACCESS(&secPermissionClosed);
 
 	err = FruityHal::BleGapNameSet(secPermissionClosed, (const u8*)DEVICE_NAME, (u16)strlen(DEVICE_NAME));
-	APP_ERROR_CHECK(err); //OK
+	FRUITYMESH_ERROR_CHECK(err); //OK
 
 	//Set the appearance of the device as defined in http://developer.nordicsemi.com/nRF51_SDK/doc/7.1.0/s110/html/a00837.html
 	err = FruityHal::BleGapAppearance(FruityHal::BleAppearance::GENERIC_COMPUTER);
-	APP_ERROR_CHECK(err); //OK
+	FRUITYMESH_ERROR_CHECK(err); //OK
 
 	//Set gap peripheral preferred connection parameters (not used by the mesh implementation)
 	FruityHal::BleGapConnParams gapConnectionParams;
@@ -82,7 +78,7 @@ void GAPController::bleConfigureGAP() const{
 	gapConnectionParams.slaveLatency = Conf::meshPeripheralSlaveLatency;
 	gapConnectionParams.connSupTimeout = Conf::meshConnectionSupervisionTimeout;
 	err = FruityHal::BleGapConnectionPreferredParamsSet(gapConnectionParams);
-	APP_ERROR_CHECK(err); //OK
+	FRUITYMESH_ERROR_CHECK(err); //OK
 }
 
 //Connect to a specific peripheral
@@ -196,14 +192,14 @@ void GAPController::startEncryptingConnection(u16 connectionHandle) const
 	FruityHal::BleGapMasterId keyId;
 	CheckedMemset(&keyId, 0x00, sizeof(keyId));
 	keyId.encryptionDiversifier = 0;
-	CheckedMemset(&keyId.rand, 0x00, BLE_GAP_SEC_RAND_LEN);
+	CheckedMemset(&keyId.rand, 0x00, sizeof(keyId.rand));
 
 	//Our mesh network key
 	FruityHal::BleGapEncInfo key;
 	CheckedMemset(&key, 0x00, sizeof(key));
 	key.isGeneratedUsingLeSecureConnections  = 0;
 	key.isAuthenticatedKey = 1;
-	CheckedMemcpy(&key.longTermKey, GS->node.configuration.networkKey, BLE_GAP_SEC_KEY_LEN);
+	CheckedMemcpy(&key.longTermKey, GS->node.configuration.networkKey, sizeof(key.longTermKey));
 	key.longTermKeyLength = 16;
 
 	//This starts the Central Encryption Establishment using stored keys
@@ -227,7 +223,7 @@ void GAPController::RequestConnectionParameterUpdate(u16 connectionHandle, u16 m
 	//TODO: Check against compatibility with gap connection parameters limits
 	err = FruityHal::BleGapConnectionParamsUpdate(connectionHandle, connParams);
 	if (err != ErrorType::BUSY) {
-		APP_ERROR_CHECK((u32)err);
+		FRUITYMESH_ERROR_CHECK((u32)err);
 	}
 
 	//TODO: error handling: What if it doesn't work, what if the other side does not agree, etc....

@@ -478,7 +478,6 @@ void CherrySim::SimulateStepForAllNodes()
 				simulateWatchDog();
 			}
 			catch (const NodeSystemResetException& e) {
-				UNUSED_PARAMETER(e);
 				//Node broke out of its current simulation and rebootet
 				if (simEventListener) simEventListener->CherrySimEventHandler("NODE_RESET");
 			}
@@ -1002,7 +1001,7 @@ void CherrySim::bootCurrentNode()
 	}
 
 	//Erase bootloader settings page
-	erasePage(REGION_BOOTLOADER_SETTINGS_START);
+	erasePage(FruityHal::GetBootloaderSettingsAddress());
 
 	simGlobalStatePtr = new (&currentNode->gs) GlobalState();
 
@@ -1046,9 +1045,6 @@ void CherrySim::bootCurrentNode()
 	//Lets us do some configuration after the boot
 	Conf::getInstance().terminalMode = TerminalMode::PROMPT;
 	Conf::getInstance().defaultLedMode = LedMode::OFF;
-
-	char cmd[] = "action this io led off" EOL;
-	GS->terminal.ProcessLine(cmd);
 }
 
 void CherrySim::resetCurrentNode(RebootReason rebootReason, bool throwException) {
@@ -1189,6 +1185,28 @@ void CherrySim::simulateBroadcast() {
 	}
 }
 
+ble_gap_addr_t CherrySim::Convert(const FruityHal::BleGapAddr* address)
+{
+	ble_gap_addr_t addr;
+	CheckedMemset(&addr, 0x00, sizeof(addr));
+	CheckedMemcpy(addr.addr, address->addr, FH_BLE_GAP_ADDR_LEN);
+	addr.addr_type = (u8)address->addr_type;
+#ifdef NRF52
+	addr.addr_id_peer = 0;
+#endif
+	return addr;
+}
+
+FruityHal::BleGapAddr CherrySim::Convert(const ble_gap_addr_t* p_addr)
+{
+	FruityHal::BleGapAddr address;
+	CheckedMemset(&address, 0x00, sizeof(address));
+	CheckedMemcpy(address.addr, p_addr->addr, FH_BLE_GAP_ADDR_LEN);
+	address.addr_type = (FruityHal::BleGapAddrType)p_addr->addr_type;
+
+	return address;
+}
+
 //Connects two nodes, the currentNode is the slave
 void CherrySim::ConnectMasterToSlave(nodeEntry* master, nodeEntry* slave)
 {
@@ -1245,7 +1263,7 @@ void CherrySim::ConnectMasterToSlave(nodeEntry* master, nodeEntry* slave)
 	freeInConnection->rssiMeasurementActive = false;
 	freeInConnection->connectionIndex = 0;
 	freeInConnection->connectionHandle = simState.globalConnHandleCounter;
-	freeInConnection->connectionInterval = UNITS_TO_MSEC(Conf::getInstance().meshMinConnectionInterval, UNIT_1_25_MS); //TODO: which node's params are used?
+	freeInConnection->connectionInterval = UNITS_TO_MSEC(Conf::getInstance().meshMinConnectionInterval, CONFIG_UNIT_1_25_MS); //TODO: which node's params are used?
 	freeInConnection->owningNode = slave;
 	freeInConnection->partner = master;
 	freeInConnection->connectionMtu = GATT_MTU_SIZE_DEFAULT;
@@ -1260,8 +1278,8 @@ void CherrySim::ConnectMasterToSlave(nodeEntry* master, nodeEntry* slave)
 
 	s2.bleEvent.evt.gap_evt.params.connected.conn_params.min_conn_interval = slave->state.connectingParamIntervalMs;
 	s2.bleEvent.evt.gap_evt.params.connected.conn_params.max_conn_interval = slave->state.connectingParamIntervalMs;
-	s2.bleEvent.evt.gap_evt.params.connected.own_addr = FruityHal::Convert(&slave->address);
-	s2.bleEvent.evt.gap_evt.params.connected.peer_addr = FruityHal::Convert(&master->address);
+	s2.bleEvent.evt.gap_evt.params.connected.own_addr = Convert(&slave->address);
+	s2.bleEvent.evt.gap_evt.params.connected.peer_addr = Convert(&master->address);
 	s2.bleEvent.evt.gap_evt.params.connected.role = BLE_GAP_ROLE_PERIPH;
 
 	slave->eventQueue.push_back(s2);
@@ -1296,7 +1314,7 @@ void CherrySim::ConnectMasterToSlave(nodeEntry* master, nodeEntry* slave)
 	freeOutConnection->connectionActive = true;
 	freeOutConnection->rssiMeasurementActive = false;
 	freeOutConnection->connectionHandle = simState.globalConnHandleCounter;
-	freeOutConnection->connectionInterval = UNITS_TO_MSEC(Conf::getInstance().meshMinConnectionInterval, UNIT_1_25_MS); //TODO: should take the proper interval
+	freeOutConnection->connectionInterval = UNITS_TO_MSEC(Conf::getInstance().meshMinConnectionInterval, CONFIG_UNIT_1_25_MS); //TODO: should take the proper interval
 	freeOutConnection->owningNode = master;
 	freeOutConnection->partner = slave;
 	freeOutConnection->connectionMtu = GATT_MTU_SIZE_DEFAULT;
@@ -1315,8 +1333,8 @@ void CherrySim::ConnectMasterToSlave(nodeEntry* master, nodeEntry* slave)
 
 	s.bleEvent.evt.gap_evt.params.connected.conn_params.min_conn_interval = slave->state.connectingParamIntervalMs;
 	s.bleEvent.evt.gap_evt.params.connected.conn_params.max_conn_interval = slave->state.connectingParamIntervalMs;
-	s.bleEvent.evt.gap_evt.params.connected.own_addr = FruityHal::Convert(&master->address);
-	s.bleEvent.evt.gap_evt.params.connected.peer_addr = FruityHal::Convert(&slave->address);
+	s.bleEvent.evt.gap_evt.params.connected.own_addr = Convert(&master->address);
+	s.bleEvent.evt.gap_evt.params.connected.peer_addr = Convert(&slave->address);
 	s.bleEvent.evt.gap_evt.params.connected.role = BLE_GAP_ROLE_CENTRAL;
 
 	master->eventQueue.push_back(s);

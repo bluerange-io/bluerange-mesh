@@ -260,7 +260,7 @@ void DebugModule::ButtonHandler(u8 buttonId, u32 holdTimeDs)
 //
 ////		BleGapAdvParams advparams;
 ////		CheckedMemset(&advparams, 0x00, sizeof(BleGapAdvParams));
-////		advparams.interval = MSEC_TO_UNITS(100, UNIT_0_625_MS);
+////		advparams.interval = MSEC_TO_UNITS(100, CONFIG_UNIT_0_625_MS);
 ////		advparams.type = BleGapAdvType::ADV_IND;
 ////		FruityHal::BleGapAdvStart(&advparams);
 //
@@ -715,7 +715,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 			AdvJobTypes::SCHEDULED,
 			slots,
 			delay,
-			MSEC_TO_UNITS(100, UNIT_0_625_MS),
+			MSEC_TO_UNITS(100, CONFIG_UNIT_0_625_MS),
 			0, //AdvChannel
 			0,
 			0,

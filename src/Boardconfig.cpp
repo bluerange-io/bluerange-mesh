@@ -70,7 +70,7 @@ void Boardconf::ResetToDefaultConfiguration()
 	configuration.uartTXPin = -1;
 	configuration.uartCTSPin = -1;
 	configuration.uartRTSPin = -1;
-	configuration.uartBaudRate = UART_BAUDRATE_BAUDRATE_Baud1M;
+	configuration.uartBaudRate = (u32)FruityHal::UartBaudrate::BAUDRATE_1M;
 	configuration.dBmRX = -90;
 	configuration.calibratedTX = -60;
 	configuration.lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_RC;
@@ -82,7 +82,6 @@ void Boardconf::ResetToDefaultConfiguration()
 	configuration.dcDcEnabled = false;
 
 	//Now, we load all Default boards (nRf Development kits)
-	setBoard_0(&configuration);
 	setBoard_1(&configuration);
 	setBoard_4(&configuration);
 	setBoard_18(&configuration);

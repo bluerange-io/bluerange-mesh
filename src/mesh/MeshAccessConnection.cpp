@@ -68,7 +68,7 @@
 uint32_t meshAccessConnTypeResolver __attribute__((section(".ConnTypeResolvers"), used)) = (u32)MeshAccessConnection::ConnTypeResolver;
 #endif
 
-MeshAccessConnection::MeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType)
+MeshAccessConnection::MeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualPartnerId)
 	: BaseConnection(id, direction, partnerAddress)
 {
 	logt("MACONN", "New MeshAccessConnection");
@@ -86,10 +86,20 @@ MeshAccessConnection::MeshAccessConnection(u8 id, ConnectionDirection direction,
 
 	this->tunnelType = tunnelType;
 
-	//The partner is assigned a unique nodeId in our mesh network that is not already taken
-	//This is only possible if less than NODE_ID_VIRTUAL_BASE nodes are in the network and if
-	//the enrollment ensures that successive nodeIds are used
-	this->virtualPartnerId = GS->node.configuration.nodeId + (this->connectionId+1) * NODE_ID_VIRTUAL_BASE;
+	if (overwriteVirtualPartnerId == 0)
+	{
+		//The partner is assigned a unique nodeId in our mesh network that is not already taken
+		//This is only possible if less than NODE_ID_VIRTUAL_BASE nodes are in the network and if
+		//the enrollment ensures that successive nodeIds are used
+		this->virtualPartnerId = GS->node.configuration.nodeId + (this->connectionId + 1) * NODE_ID_VIRTUAL_BASE;
+	}
+	else
+	{
+		//Alternatively the virtualPartnerId can be given as an argument. This is useful e.g.
+		//when the meshGw wants to communicate to a device that has an organization wide unique
+		//node Id (e.g. an asset).
+		this->virtualPartnerId = overwriteVirtualPartnerId;
+	}
 
 	//Fetch the MeshAccessModule reference
 	this->meshAccessMod = (MeshAccessModule*)GS->node.GetModuleById(ModuleId::MESH_ACCESS_MODULE);
@@ -127,7 +137,9 @@ BaseConnection* MeshAccessConnection::ConnTypeResolver(BaseConnection* oldConnec
 			        oldConnection->direction,
 			        &oldConnection->partnerAddress,
 			        FmKeyId::ZERO, //fmKeyId unknown at this point, partner must query
-			        MeshAccessTunnelType::INVALID); //TunnelType also unknown
+			        MeshAccessTunnelType::INVALID, //TunnelType also unknown
+			        0 //We don't want to overwrite the virtual nodeId for incomming connections.
+			    ); 
 		}
 	}
 
@@ -137,7 +149,7 @@ BaseConnection* MeshAccessConnection::ConnTypeResolver(BaseConnection* oldConnec
 
 #define ________________________CONNECTION_________________________
 
-u32 MeshAccessConnection::ConnectAsMaster(FruityHal::BleGapAddr const * address, u16 connIntervalMs, u16 connectionTimeoutSec, FmKeyId fmKeyId, u8 const * customKey, MeshAccessTunnelType tunnelType)
+u32 MeshAccessConnection::ConnectAsMaster(FruityHal::BleGapAddr const * address, u16 connIntervalMs, u16 connectionTimeoutSec, FmKeyId fmKeyId, u8 const * customKey, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualId)
 {
 	//Only connect when not currently in another connection and when there are free connections
 	if (GS->cm.pendingConnection != nullptr) return 0;
@@ -161,7 +173,7 @@ u32 MeshAccessConnection::ConnectAsMaster(FruityHal::BleGapAddr const * address,
 	//Create the connection and set it as pending, this is done before starting the GAP connect to avoid race conditions
 	for (u32 i = 0; i < TOTAL_NUM_CONNECTIONS; i++){
 		if (GS->cm.allConnections[i] == nullptr){
-			MeshAccessConnection* conn = ConnectionAllocator::getInstance().allocateMeshAccessConnection(i, ConnectionDirection::DIRECTION_OUT, address, fmKeyId, tunnelType);
+			MeshAccessConnection* conn = ConnectionAllocator::getInstance().allocateMeshAccessConnection(i, ConnectionDirection::DIRECTION_OUT, address, fmKeyId, tunnelType, overwriteVirtualId);
 			GS->cm.pendingConnection = GS->cm.allConnections[i] = conn;
 
 			//Set the timeout big enough so that it is not killed by the ConnectionManager
@@ -180,7 +192,7 @@ u32 MeshAccessConnection::ConnectAsMaster(FruityHal::BleGapAddr const * address,
 	}
 
 	//Tell the GAP Layer to connect, it will return if it is trying or if there was an error
-	ErrorType err = GS->gapController.connectToPeripheral(*address, MSEC_TO_UNITS(connIntervalMs, UNIT_1_25_MS), connectionTimeoutSec);
+	ErrorType err = GS->gapController.connectToPeripheral(*address, MSEC_TO_UNITS(connIntervalMs, CONFIG_UNIT_1_25_MS), connectionTimeoutSec);
 
 	if (err == ErrorType::SUCCESS)
 	{
@@ -752,6 +764,26 @@ SizedData MeshAccessConnection::ProcessDataBeforeTransmission(BaseConnectionSend
 	return splitData;
 }
 
+bool MeshAccessConnection::ShouldSendDataToNodeId(NodeId nodeId) const
+{
+	return
+		//The ID matches
+		nodeId == virtualPartnerId
+		//Broadcasts, by definition always go everywhere
+		|| nodeId == NODE_ID_BROADCAST
+		//NODE_ID_ANYCAST_THEN_BROADCAST is inteded to be sent through MeshAccessConnections
+		|| nodeId == NODE_ID_ANYCAST_THEN_BROADCAST
+		//A given hops count may also go through a MeshAccessConnection
+		|| (nodeId >= NODE_ID_HOPS_BASE && nodeId < (NODE_ID_HOPS_BASE + NODE_ID_HOPS_BASE_SIZE))
+		//The range of APP_BASE nodeIds is reserved for smartphones etc. that always connect via MeshAccessConnections
+		|| (nodeId >= NODE_ID_APP_BASE && nodeId < (NODE_ID_APP_BASE + NODE_ID_APP_BASE_SIZE))
+		//Organization wide NodeIds. These are commonly used for assets that connect via MeshAccessConnections
+		|| (nodeId >= NODE_ID_GLOBAL_DEVICE_BASE && nodeId < (NODE_ID_GLOBAL_DEVICE_BASE + NODE_ID_GLOBAL_DEVICE_BASE_SIZE))
+		//DFU messages are typically sent to group ids. They must be allowed.
+		|| (nodeId >= NODE_ID_GROUP_BASE && nodeId < (NODE_ID_GROUP_BASE + NODE_ID_GROUP_BASE_SIZE));
+}
+
+
 bool MeshAccessConnection::SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable)
 {
 	if (dataLength > MAX_MESH_PACKET_SIZE) {
@@ -783,26 +815,6 @@ bool MeshAccessConnection::SendData(u8 const * data, u16 dataLength, DeliveryPri
 
 	return SendData(&sendData, data);
 }
-
-bool MeshAccessConnection::ShouldSendDataToNodeId(NodeId nodeId) const
-{
-	return
-		//The ID matches
-		   nodeId == virtualPartnerId
-		//Broadcasts, by definition always go everywhere
-		|| nodeId == NODE_ID_BROADCAST
-		//NODE_ID_ANYCAST_THEN_BROADCAST is inteded to be sent through MeshAccessConnections
-		|| nodeId == NODE_ID_ANYCAST_THEN_BROADCAST
-		//A given hops count may also go through a MeshAccessConnection
-		|| (nodeId >= NODE_ID_HOPS_BASE          && nodeId < (NODE_ID_HOPS_BASE          + NODE_ID_HOPS_BASE_SIZE))
-		//The range of APP_BASE nodeIds is reserved for smartphones etc. that always connect via MeshAccessConnections
-		|| (nodeId >= NODE_ID_APP_BASE           && nodeId < (NODE_ID_APP_BASE           + NODE_ID_APP_BASE_SIZE ))
-		//Organization wide NodeIds. These are commonly used for assets that connect via MeshAccessConnections
-		|| (nodeId >= NODE_ID_GLOBAL_DEVICE_BASE && nodeId < (NODE_ID_GLOBAL_DEVICE_BASE + NODE_ID_GLOBAL_DEVICE_BASE_SIZE))
-		//DFU messages are typically sent to group ids. They must be allowed.
-		|| (nodeId >= NODE_ID_GROUP_BASE && nodeId < (NODE_ID_GROUP_BASE + NODE_ID_GROUP_BASE_SIZE));
-}
-
 
 //This is the generic method for sending data
 bool MeshAccessConnection::SendData(BaseConnectionSendData* sendData, u8 const * data)
@@ -996,7 +1008,7 @@ void MeshAccessConnection::ReceiveMeshAccessMessageHandler(BaseConnectionSendDat
 		packetHeader = changedPacketHeader;
 	}
 
-	MeshAccessAuthorization auth = meshAccessMod->CheckAuthorizationForAll(sendData, data, fmKeyId, DataDirection::DIRECTION_IN);
+	MeshAccessAuthorization auth = meshAccessMod->CheckAuthorizationForAll(sendData, (u8 const*)packetHeader, fmKeyId, DataDirection::DIRECTION_IN);
 
 	//Block unauthorized packets
 	if(
@@ -1023,7 +1035,7 @@ void MeshAccessConnection::ReceiveMeshAccessMessageHandler(BaseConnectionSendDat
 		logt("MACONN", "Received data for local mesh %s (%u) from %u aka %u", dataHex, sendData->dataLength, packetHeader->sender, virtualPartnerId);
 
 		//Send to other Mesh-like Connections
-		if(auth <= MeshAccessAuthorization::WHITELIST) GS->cm.RouteMeshData(this, sendData, data);
+		if(auth <= MeshAccessAuthorization::WHITELIST) GS->cm.RouteMeshData(this, sendData, (u8 const*)packetHeader);
 
 		//Dispatch Message throughout the implementation to all modules
 		if(auth <= MeshAccessAuthorization::LOCAL_ONLY) GS->cm.DispatchMeshMessage(this, sendData, packetHeader, true);
@@ -1125,4 +1137,18 @@ void MeshAccessConnection::PrintStatus()
 u32 MeshAccessConnection::getAmountOfCorruptedMessaged()
 {
 	return amountOfCorruptedMessages;
+}
+
+void MeshAccessConnection::KeepAliveFor(u32 timeDs)
+{
+	u32 newRemovalTimeDs = GS->appTimerDs + timeDs;
+	if (newRemovalTimeDs > scheduledConnectionRemovalTimeDs)
+	{
+		scheduledConnectionRemovalTimeDs = newRemovalTimeDs;
+	}
+}
+
+void MeshAccessConnection::KeepAliveForIfSet(u32 timeDs)
+{
+	if (scheduledConnectionRemovalTimeDs != 0) KeepAliveFor(timeDs);
 }

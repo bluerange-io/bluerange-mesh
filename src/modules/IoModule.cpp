@@ -168,11 +168,8 @@ TerminalCommandHandlerReturnType IoModule::TerminalCommandHandler(const char* co
 				for(int i=0; i<numPorts; i++){
 					gpioPinConfig* p = (gpioPinConfig*) (buffer + i*SIZEOF_GPIO_PIN_CONFIG);
 					p->pinNumber = (u8)strtoul(commandArgs[(i*2)+4], nullptr, 10);
-					p->direction = GPIO_PIN_CNF_DIR_Output;
-					p->inputBufferConnected = GPIO_PIN_CNF_INPUT_Disconnect; // config as output
-					p->pull = GPIO_PIN_CNF_PULL_Disabled;
-					p->driveStrength = GPIO_PIN_CNF_DRIVE_S0S1;
-					p->sense = GPIO_PIN_CNF_SENSE_Disabled;
+					p->direction = 1;
+					p->pull = (u8)FruityHal::GpioPullMode::GPIO_PIN_NOPULL;
 					p->set = TERMARGS((i*2)+5, "high") ? 1 : 0;
 				}
 

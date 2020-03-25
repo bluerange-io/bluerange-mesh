@@ -255,6 +255,13 @@ void Terminal::EnableCrcChecks()
 	crcChecksEnabled = true;
 }
 
+#ifdef SIM_ENABLED
+void Terminal::DisableCrcChecks()
+{
+	crcChecksEnabled = false;
+}
+#endif
+
 bool Terminal::IsCrcChecksEnabled()
 {
 	return crcChecksEnabled;
@@ -284,39 +291,39 @@ void Terminal::CheckAndProcessLine()
 void Terminal::ProcessLine(char* line)
 {
 #ifdef TERMINAL_ENABLED
-	if (crcChecksEnabled)
+	receivedProcessableLine = true;
+
+	char* crcLocation = Utility::FindLast(line, " CRC: ");
+	if (crcLocation != nullptr)
 	{
-		char* crcLocation = Utility::FindLast(line, " CRC: ");
-		if (crcLocation != nullptr)
-		{
-			crcLocation[0] = '\0'; // Cut off the CRC part from the rest of the message.
-			crcLocation += 6; // The length of " CRC: "
-			bool didError = false;
-			const u32 passedCrc   = Utility::StringToU32(crcLocation, &didError);
-			const u32 expectedCrc = Utility::CalculateCrc32String(line);
-			if (didError || passedCrc != expectedCrc)
-			{
-				if (Conf::getInstance().terminalMode == TerminalMode::PROMPT) {
-					log_transport_putstring("CRC invalid!" EOL);
-				}
-				else {
-					logjson_error(Logger::UartErrorType::CRC_INVALID);
-				}
-				SIMEXCEPTION(CRCInvalidException);
-				return;
-			}
-		}
-		else
+		crcChecksEnabled = true; // In case we restarted but our meshGw did not yet process the reboot message, we just enable crcChecks if we find some CRC.
+		crcLocation[0] = '\0'; // Cut off the CRC part from the rest of the message.
+		crcLocation += 6; // The length of " CRC: "
+		bool didError = false;
+		const u32 passedCrc   = Utility::StringToU32(crcLocation, &didError);
+		const u32 expectedCrc = Utility::CalculateCrc32String(line);
+		if (didError || passedCrc != expectedCrc)
 		{
 			if (Conf::getInstance().terminalMode == TerminalMode::PROMPT) {
-				log_transport_putstring("CRC missing!" EOL);
+				log_transport_putstring("CRC invalid!" EOL);
 			}
 			else {
-				logjson_error(Logger::UartErrorType::CRC_MISSING);
+				logjson_error(Logger::UartErrorType::CRC_INVALID);
 			}
-			SIMEXCEPTION(CRCMissingException);
+			SIMEXCEPTION(CRCInvalidException);
 			return;
 		}
+	}
+	else if (crcChecksEnabled)
+	{
+		if (Conf::getInstance().terminalMode == TerminalMode::PROMPT) {
+			log_transport_putstring("CRC missing!" EOL);
+		}
+		else {
+			logjson_error(Logger::UartErrorType::CRC_MISSING);
+		}
+		SIMEXCEPTION(CRCMissingException);
+		return;
 	}
 
 	//Tokenize input string into vector
@@ -350,7 +357,7 @@ void Terminal::ProcessLine(char* line)
 		}
 	}
 
-#ifdef NRF51
+#if IS_ACTIVE(SAVE_SPACE)
 	if (handled == TerminalCommandHandlerReturnType::WARN_DEPRECATED) handled = TerminalCommandHandlerReturnType::SUCCESS;
 #endif
 
@@ -435,7 +442,6 @@ void Terminal::ProcessLine(char* line)
 i32 Terminal::TokenizeLine(char* line, u16 lineLength)
 {
 	CheckedMemset(commandArgsPtr, 0, MAX_NUM_TERM_ARGS * sizeof(char*));
-
 	commandArgsPtr[0] = &(line[0]);
 	i32 commandArgsSize = 1;
 
@@ -608,6 +614,10 @@ void Terminal::UartReadLineBlocking()
 void Terminal::UartPutStringBlockingWithTimeout(const char* message)
 {
 	if(!uartActive) return;
+	if(Conf::getInstance().silentStart && 
+		!receivedProcessableLine && 
+		GS->ramRetainStructPreviousBootPtr->rebootReason == RebootReason::UNKNOWN &&
+		Utility::IsUnknownRebootReason(GS->ramRetainStructPtr->rebootReason)) return;
 
 	FruityHal::UartPutStringBlockingWithTimeout(message);
 }
@@ -855,9 +865,9 @@ void Terminal::VirtualComCheckAndProcessLine()
 	//We process up to 5 Lines in the buffer to not starve the rest of the logic
 	for(u32 i = 0; i < 5; i++){
 		//We are using the same buffer that UART is using as we only have to support one of the two at the same time
-		u32 err = FruityHal::VirtualComCheckAndProcessLine((u8*)readBuffer, TERMINAL_READ_BUFFER_LENGTH);
+		ErrorType err = FruityHal::VirtualComCheckAndProcessLine((u8*)readBuffer, TERMINAL_READ_BUFFER_LENGTH);
 
-		if(err == NRF_SUCCESS){
+		if(err == ErrorType::SUCCESS){
 			ProcessLine(readBuffer);
 			readBufferOffset = 0;
 		} else {

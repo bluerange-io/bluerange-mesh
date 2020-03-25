@@ -300,7 +300,7 @@ void ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, Delive
 	if(loopback){
 		//Build fake data for our loopback packet
 		BaseConnectionSendData sendData;
-		sendData.characteristicHandle = BLE_CONN_HANDLE_INVALID;
+		sendData.characteristicHandle = FruityHal::FH_BLE_INVALID_HANDLE;
 		sendData.dataLength = dataLength;
 		sendData.deliveryOption = reliable ? DeliveryOption::WRITE_REQ : DeliveryOption::WRITE_CMD;
 
@@ -315,7 +315,12 @@ void ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, Delive
 		BaseConnections maConn = GetConnectionsOfType(ConnectionType::MESH_ACCESS, ConnectionDirection::INVALID);
 		for (u32 i = 0; i < maConn.count; i++) {
 			MeshAccessConnection* c = (MeshAccessConnection*)allConnections[maConn.connectionIndizes[i]];
-			if (c == nullptr || !c->ShouldSendDataToNodeId(packetHeader->receiver)) {
+			if (c == nullptr 
+				|| 
+				(
+					GET_DEVICE_TYPE() != DeviceType::ASSET // Assets only have mesh access connections. They should not filter anything that they want to send through them.
+					&& !c->ShouldSendDataToNodeId(packetHeader->receiver)
+				)) {
 				continue;
 			}
 			if (packetHeader->receiver == NODE_ID_ANYCAST_THEN_BROADCAST) {
@@ -396,9 +401,18 @@ void ConnectionManager::DispatchMeshMessage(BaseConnection* connection, BaseConn
 		}
 
 		//Now we must pass the message to all of our modules for further processing
+		BaseConnection* connectionToSendToModules = connection; //In case one of the modules MeshMessageReceivedHandlers remove the connection, we pass nullptr to the other modules.
+		const u32 connectionToSendToModulesUniqueId = connectionToSendToModules != nullptr ? connectionToSendToModules->uniqueConnectionId : 0;
 		for(u32 i=0; i<GS->amountOfModules; i++){
 			if(GS->activeModules[i]->configurationPointer->moduleActive){
-				GS->activeModules[i]->MeshMessageReceivedHandler(connection, sendData, packet);
+				if (connectionToSendToModules != nullptr) {
+					if (GS->cm.GetConnectionByUniqueId(connectionToSendToModulesUniqueId) == nullptr)
+					{
+						//The connection was removed in a MeshMessageReceivedHandler from one of our modules.
+						connectionToSendToModules = nullptr;
+					}
+				}
+				GS->activeModules[i]->MeshMessageReceivedHandler(connectionToSendToModules, sendData, packet);
 			}
 		}
 	}
@@ -465,7 +479,7 @@ void ConnectionManager::GattDataTransmittedEventHandler(const FruityHal::GattDat
 	//A TX complete event frees a number of transmit buffers
 	//These are used for all connections
 
-	if (gattDataTransmitted.isConnectionHandleValid()/*txCompleteConnectionHandle != BLE_CONN_HANDLE_INVALID*/)
+	if (gattDataTransmitted.isConnectionHandleValid())
 	{
 		logt("CONN_DATA", "write_CMD complete (n=%d)", gattDataTransmitted.getCompleteCount());
 

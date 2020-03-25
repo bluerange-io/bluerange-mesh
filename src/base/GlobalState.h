@@ -83,14 +83,10 @@ class GlobalState
 		void SetUartHandler(FruityHal::UartEventHandler uartEventHandler);
 
 		//#################### Event Buffer ###########################
-		//A global buffer for the current event, which must be 4-byte aligned
-
-#if defined(NRF51) || defined(SIM_ENABLED)
-		#pragma pack(push)
-		#pragma pack(4)
-		u32 currentEventBuffer[CEIL_DIV(BLE_STACK_EVT_MSG_BUF_SIZE, sizeof(uint32_t))];
+#if defined(SIM_ENABLED)
+		static constexpr u16 BLE_STACK_EVT_MSG_BUF_SIZE = 18;
+		u32 currentEventBuffer[BLE_STACK_EVT_MSG_BUF_SIZE];
 		static constexpr u16 SIZE_OF_EVENT_BUFFER = sizeof(currentEventBuffer);
-		#pragma pack(pop)
 #endif
 
 		//#################### App timer ###########################
@@ -171,9 +167,10 @@ class GlobalState
 
 #ifdef SIM_ENABLED
 		RamRetainStruct ramRetainStruct;
+		RamRetainStruct ramRetainStructPreviousBoot;
 		u32 rebootMagicNumber;
 #endif
-		RamRetainStruct ramRetainStructPreviousBoot;
+		RamRetainStruct * ramRetainStructPreviousBootPtr;
 
 		FruityHal::SystemEventHandler systemEventHandler = nullptr;
 		FruityHal::TimerEventHandler  timerEventHandler = nullptr;

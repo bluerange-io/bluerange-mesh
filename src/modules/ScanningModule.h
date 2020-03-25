@@ -137,7 +137,7 @@ private:
 
 	// Addresses of active devices
 	//uint8_t addressPointer;
-	//SimpleArray<SimpleArray<u8, BLE_GAP_ADDR_LEN>, NUM_ADDRESSES_TRACKED> addresses;
+	//SimpleArray<SimpleArray<u8, FH_BLE_GAP_ADDR_LEN>, NUM_ADDRESSES_TRACKED> addresses;
 	//SimpleArray<u32, NUM_ADDRESSES_TRACKED> totalRSSIsPerAddress;
 	//SimpleArray<u32, NUM_ADDRESSES_TRACKED> totalMessagesPerAdress;
 

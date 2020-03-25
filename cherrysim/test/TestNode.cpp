@@ -216,6 +216,8 @@ TEST(TestNode, TestCRCValidation)
 	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	//Make sure that the commands are working without CRC...
+	tester.sim->setNode(0);
+	GS->terminal.DisableCrcChecks();
 	tester.SendTerminalCommand(1, "action this status get_status");
 	tester.SimulateUntilMessageReceived(1 * 1000, 1, "\"type\":\"status\",\"");
 	//...and don't return any CRC.
@@ -236,8 +238,10 @@ TEST(TestNode, TestCRCValidation)
 	//Missing CRC is no longer accepted
 	{
 		Exceptions::DisableDebugBreakOnException disable;
+		tester.appendCrcToMessages = false;
 		tester.SendTerminalCommand(1, "action this status get_status");
 		ASSERT_THROW(tester.SimulateGivenNumberOfSteps(1), CRCMissingException);
+		tester.appendCrcToMessages = true;
 
 		//Empty the Command Buffer
 		Exceptions::ExceptionDisabler<CRCMissingException> crcme;
@@ -373,7 +377,7 @@ TEST(TestNode, DISABLED_TestDiscoveryStates) {
 	//Scan duty when asset tracking job is enabled and cluster is in low discovery
 	tester.SimulateForGivenTime(30 * 1000);
 	u16 interval = Conf::getInstance().meshScanIntervalHigh;
-	ASSERT_EQ(MSEC_TO_UNITS(tester.sim->findNodeById(2)->state.scanIntervalMs, UNIT_0_625_MS), interval);
+	ASSERT_EQ(MSEC_TO_UNITS(tester.sim->findNodeById(2)->state.scanIntervalMs, CONFIG_UNIT_0_625_MS), interval);
 
 	//Switch to High discovery when receive enrollment
 	tester.SendTerminalCommand(1, "action 2 enroll basic BBBBF 2 200");

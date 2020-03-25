@@ -62,7 +62,7 @@ TEST(TestScanningModule, TestCommands) {
 	evt.evt.gap_evt.params.adv_report.rssi = -45;
 	packet->flags.len = SIZEOF_ADV_STRUCTURE_FLAGS - 1;
 	packet->uuid.len = SIZEOF_ADV_STRUCTURE_UUID16 - 1;
-	packet->data.uuid.type = BLE_GAP_AD_TYPE_SERVICE_DATA;
+	packet->data.uuid.type = (u8)BleGapAdType::TYPE_SERVICE_DATA;
 	packet->data.uuid.uuid = SERVICE_DATA_SERVICE_UUID16;
 	packet->data.messageType = ServiceDataMessageType::STANDARD_ASSET;
 	assetPacket->serialNumberIndex = 10;

@@ -105,7 +105,7 @@ void Node::ResetToDefaultConfiguration()
 	CheckedMemcpy(configuration.networkKey, RamConfig->defaultNetworkKey, 16);
 	CheckedMemcpy(configuration.userBaseKey, RamConfig->defaultUserBaseKey, 16);
 
-	CheckedMemcpy(&configuration.bleAddress, &RamConfig->staticAccessAddress, sizeof(ble_gap_addr_t));
+	CheckedMemcpy(&configuration.bleAddress, &RamConfig->staticAccessAddress, sizeof(FruityHal::BleGapAddr));
 
 	SET_FEATURESET_CONFIGURATION(&configuration, this);
 }
@@ -161,7 +161,7 @@ void Node::ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16
 			AdvJobTypes::SCHEDULED,
 			5, //Slots
 			0, //Delay
-			MSEC_TO_UNITS(100, UNIT_0_625_MS), //AdvInterval
+			MSEC_TO_UNITS(100, CONFIG_UNIT_0_625_MS), //AdvInterval
 			0, //AdvChannel
 			0, //CurrentSlots
 			0, //CurrentDelay
@@ -189,11 +189,11 @@ void Node::InitializeMeshGattService()
 	//Add our Service UUID to the BLE stack for management
 	constexpr u8 baseUUID128[] = { MESH_SERVICE_BASE_UUID128 };
 	err = FruityHal::BleUuidVsAdd(baseUUID128, &meshService.serviceUuid.type);
-	APP_ERROR_CHECK(err); //OK
+	FRUITYMESH_ERROR_CHECK(err); //OK
 
 	//Add the service
 	err = FruityHal::BleGattServiceAdd(FruityHal::BleGattSrvcType::PRIMARY, meshService.serviceUuid, &meshService.serviceHandle);
-	APP_ERROR_CHECK(err); //OK
+	FRUITYMESH_ERROR_CHECK(err); //OK
 
 	//##### Now we need to add a characteristic to that service
 
@@ -214,7 +214,7 @@ void Node::InitializeMeshGattService()
 		FH_CONNECTION_SECURITY_MODE_SET_OPEN(&attributeMetadata.writePerm);
 	}
 
-	attributeMetadata.valueLocation = BLE_GATTS_VLOC_STACK; //We currently have the value on the SoftDevice stack, we might port that to the application space
+	attributeMetadata.valueLocation = FH_BLE_GATTS_VALUE_LOCATION_STACK; //We currently have the value on the SoftDevice stack, we might port that to the application space
 	attributeMetadata.readAuthorization = 0;
 	attributeMetadata.writeAuthorization = 0;
 	attributeMetadata.variableLength = 1; //Make it a variable length attribute
@@ -246,7 +246,7 @@ void Node::InitializeMeshGattService()
 
 	//Finally, add the characteristic
 	err = FruityHal::BleGattCharAdd(meshService.serviceHandle, characteristicMetadata, attribute, meshService.sendMessageCharacteristicHandle);
-	APP_ERROR_CHECK(err); //OK
+	FRUITYMESH_ERROR_CHECK(err); //OK
 }
 
 
@@ -1300,11 +1300,11 @@ void Node::UpdateJoinMePacket() const
 
 	advPacketHeader* advPacket = (advPacketHeader*)buffer;
 	advPacket->flags.len = SIZEOF_ADV_STRUCTURE_FLAGS-1; //minus length field itself
-	advPacket->flags.type = BLE_GAP_AD_TYPE_FLAGS;
-	advPacket->flags.flags = BLE_GAP_ADV_FLAG_LE_GENERAL_DISC_MODE | BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED;
+	advPacket->flags.type = (u8)BleGapAdType::TYPE_FLAGS;
+	advPacket->flags.flags = FH_BLE_GAP_ADV_FLAG_LE_GENERAL_DISC_MODE | FH_BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED;
 
 	advPacket->manufacturer.len = (SIZEOF_ADV_STRUCTURE_MANUFACTURER + SIZEOF_ADV_PACKET_STUFF_AFTER_MANUFACTURER + SIZEOF_ADV_PACKET_PAYLOAD_JOIN_ME_V0) - 1;
-	advPacket->manufacturer.type = BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA;
+	advPacket->manufacturer.type = (u8)BleGapAdType::TYPE_MANUFACTURER_SPECIFIC_DATA;
 	advPacket->manufacturer.companyIdentifier = COMPANY_IDENTIFIER;
 
 	advPacket->meshIdentifier = MESH_IDENTIFIER;
@@ -1380,7 +1380,7 @@ void Node::StartFastJoinMeAdvertising()
 		AdvJobTypes::IMMEDIATE,
 		10, //10 Slot * timer interval
 		0, //Delay
-		MSEC_TO_UNITS(20, UNIT_0_625_MS), //AdvInterval
+		MSEC_TO_UNITS(20, CONFIG_UNIT_0_625_MS), //AdvInterval
 		0, //AdvChannel
 		0, //CurrentSlots
 		0, //CurrentDelay
@@ -1421,7 +1421,7 @@ Node::DecisionStruct Node::DetermineBestClusterAvailable(void)
 			//Choose a different connection interval for leaf nodes
 			u16 connectionIv = Conf::getInstance().meshMinConnectionInterval;
 			if(bestClusterAsMaster->payload.deviceType == DeviceType::LEAF){
-				connectionIv = MSEC_TO_UNITS(90, UNIT_1_25_MS);
+				connectionIv = MSEC_TO_UNITS(90, CONFIG_UNIT_1_25_MS);
 			}
 
 			ErrorType err = GS->cm.ConnectAsMaster(bestClusterAsMaster->payload.sender, &address, bestClusterAsMaster->payload.meshWriteHandle, connectionIv);
@@ -1668,7 +1668,7 @@ void Node::GapAdvertisementMessageHandler(const FruityHal::GapAdvertisementRepor
 				//Now, we have the space for our packet and we fill it with the latest information
 				if (targetBuffer != nullptr)
 				{
-					CheckedMemcpy(targetBuffer->addr.addr, advertisementReportEvent.getPeerAddr(), BLE_GAP_ADDR_LEN);
+					CheckedMemcpy(targetBuffer->addr.addr, advertisementReportEvent.getPeerAddr(), FH_BLE_GAP_ADDR_LEN);
 					targetBuffer->addr.addr_type = advertisementReportEvent.getPeerAddrType();
 					targetBuffer->advType = advertisementReportEvent.isConnectable() ? FruityHal::BleGapAdvType::ADV_IND : FruityHal::BleGapAdvType::ADV_NONCONN_IND;
 					targetBuffer->rssi = advertisementReportEvent.getRssi();
@@ -2809,7 +2809,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 		addr.addr[5] = buffer[0];
 
 		//Using the same GATT handle as our own will probably work if our partner has the same implementation
-		GS->cm.ConnectAsMaster(partnerId, &addr, meshService.sendMessageCharacteristicHandle.valueHandle, MSEC_TO_UNITS(10, UNIT_1_25_MS));
+		GS->cm.ConnectAsMaster(partnerId, &addr, meshService.sendMessageCharacteristicHandle.valueHandle, MSEC_TO_UNITS(10, CONFIG_UNIT_1_25_MS));
 
 		return TerminalCommandHandlerReturnType::SUCCESS;
 	}

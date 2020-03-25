@@ -52,8 +52,6 @@ public:
 
 	//FUNCTIONS
 
-	void bleDiscoverHandlesOld(u16 connectionHandle, ble_uuid_t* startUuid);
-
 	u32 bleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable) const;
 	u32 bleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength) const;
 

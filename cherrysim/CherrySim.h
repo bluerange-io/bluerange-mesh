@@ -142,6 +142,8 @@ public:
 
 	//GAP Simulation
 	void simulateBroadcast();
+	static ble_gap_addr_t Convert(const FruityHal::BleGapAddr* address);
+	static FruityHal::BleGapAddr Convert(const ble_gap_addr_t* p_addr);
 	void ConnectMasterToSlave(nodeEntry * master, nodeEntry* slave);
 	u32 DisconnectSimulatorConnection(SoftdeviceConnection * connection, u32 hciReason, u32 hciReasonPartner);
 	void simulateTimeouts();

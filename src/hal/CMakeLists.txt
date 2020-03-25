@@ -1,0 +1,4 @@
+add_subdirectory(nrf)
+add_subdirectory(template)
+
+add_all_files_to_targets("${ALL_TARGETS}")

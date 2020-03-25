@@ -262,7 +262,6 @@ bool CherrySimRunner::Simulate()
 						sim->resetCurrentNode(RebootReason::UNKNOWN);
 					}
 					catch (NodeSystemResetException& e) {
-						UNUSED_PARAMETER(e);
 						//Nothing to do
 					}
 				}
@@ -286,7 +285,6 @@ bool CherrySimRunner::Simulate()
 			}
 		}
 		catch (CherrySimQuitException& e) {
-			UNUSED_PARAMETER(e);
 			return false;
 		}
 	}

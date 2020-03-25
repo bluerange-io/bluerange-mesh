@@ -44,9 +44,22 @@ extern "C" {
 #include <stdlib.h>
 
 #include <string.h>
-#include "ble_db_discovery.h"
 }
 
+#if defined(DEBUG) && !defined(SIM_ENABLED)
+#define FRUITYMESH_ERROR_CHECK(ERR_CODE)                          \
+	if (ERR_CODE != 0)                                              \
+	{                                                               \
+		logt("ERROR", "App error code:%s(%u), file:%s, line:%u", Logger::getGeneralErrorString((ErrorType)ERR_CODE), (u32)ERR_CODE, p_file_name, (u32)line_num); \
+		GS->appErrorHandler((u32)ERR_CODE);                           \
+	}
+#else
+#define FRUITYMESH_ERROR_CHECK(ERR_CODE)                          \
+	if (ERR_CODE != 0)                                              \
+	{                                                               \
+		GS->appErrorHandler((u32)ERR_CODE);                           \
+	}
+#endif // defined(DEBUG) && !defined(SIM_ENABLED)
 
 #ifdef SIM_ENABLED
 #include "Exceptions.h"
@@ -137,6 +150,7 @@ enum class FeatureSetGroup : NodeId
 	//                              CHIP_NRF52840         = 20015,
 	/*FruityDeploy-FeatureSetGroup*/NRF52840_MESH         = 20016,
 	/*FruityDeploy-FeatureSetGroup*/NRF52840_SINK_USB     = 20017,
+	/*FruityDeploy-FeatureSetGroup*/NRF52840_MESH_USB     = 20018,
 };
 
 //Sets the maximum number of firmware group ids that can be compiled into the firmware
@@ -190,20 +204,9 @@ STATIC_ASSERT_SIZE(ModuleConfiguration, SIZEOF_MODULE_CONFIGURATION_HEADER);
 // Bitmask to store if a chunk has been stored in flash and was crc checked
 #define BOOTLOADER_BITMASK_SIZE 60
 
-// Location of the bootloader
-#if defined(NRF51)
-#define FLASH_REGION_START_ADDRESS			0x00000000
-#elif defined(NRF52) || defined(NRF52840)
+#ifndef SIM_ENABLED
+// Location of the flash start
 #define FLASH_REGION_START_ADDRESS			0x00000000UL
-#endif
-
-// Bootloader settings page where the app needs to store the update information
-#if defined(NRF51) || defined(SIM_ENABLED)
-#define REGION_BOOTLOADER_SETTINGS_START (FLASH_REGION_START_ADDRESS + 0x0003FC00) //Last page of flash
-#elif defined(NRF52840)
-#define REGION_BOOTLOADER_SETTINGS_START (FLASH_REGION_START_ADDRESS + 0x000FF000) //Last page of flash
-#elif defined(NRF52)
-#define REGION_BOOTLOADER_SETTINGS_START (FLASH_REGION_START_ADDRESS + 0x0007F000) //Last page of flash
 #endif
 
 // Image types supported by the bootloader or component if a 3rd party device should be updated
@@ -267,7 +270,13 @@ STATIC_ASSERT_SIZE(BootloaderSettings, (16 + BOOTLOADER_BITMASK_SIZE + BOOTLOADE
 #define DYNAMIC_ARRAY(arrayName, size) u8* arrayName = (u8*)alloca(size)
 #endif
 
-/*############ HELPFUL MACROS ################*/
+// ########### TIMER ############
+#define MSEC_TO_UNITS(TIME, RESOLUTION) (((TIME) * 1000) / (RESOLUTION))
+static const u32 CONFIG_UNIT_0_625_MS = 625;
+static const u32 CONFIG_UNIT_1_25_MS = 1250;
+static const u32 CONFIG_UNIT_10_MS = 10000
+
+/*############ HELPFUL MACROS ################*/;
 
 //Returns true if the timer should have trigered the interval in the passedTime
 #define SHOULD_IV_TRIGGER(timer, passedTime, interval) (interval != 0 && (((timer)-(passedTime)) % (interval) >= (timer) % (interval)))

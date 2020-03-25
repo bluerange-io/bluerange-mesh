@@ -37,7 +37,6 @@
 
 
 #include <types.h>
-#include <FruityHalNrf.h>
 
 #define SCAN_CONTROLLER_JOBS_MAX	4
 

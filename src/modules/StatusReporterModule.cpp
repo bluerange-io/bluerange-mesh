@@ -152,11 +152,6 @@ void StatusReporterModule::SendDeviceInfoV2(NodeId toNode, u8 requestHandle, Mes
 	data.manufacturerId = RamConfig->manufacturerId;
 	data.deviceType = GET_DEVICE_TYPE();
 	FruityHal::GetDeviceAddress(data.chipId);
-	for (u32 i = 0; i < sizeof(data.chipId); i++)
-	{
-		// Not CheckedMemcpy, as DEVICEADDR is volatile.
-		data.chipId[i] = ((const volatile u8*)NRF_FICR->DEVICEADDR)[i];
-	}
 	data.serialNumberIndex = RamConfig->GetSerialNumberIndex();
 	FruityHal::BleGapAddressGet(&data.accessAddress);
 	data.nodeVersion = GS->config.getFruityMeshVersion();
@@ -259,7 +254,7 @@ void StatusReporterModule::SendRebootReason(NodeId toNode, u8 requestHandle) con
 		toNode,
 		(u8)StatusModuleActionResponseMessages::REBOOT_REASON,
 		requestHandle,
-		(u8*)&(GS->ramRetainStructPreviousBoot),
+		(u8*)(GS->ramRetainStructPreviousBootPtr),
 		sizeof(RamRetainStruct) - sizeof(u32), //crc32 not needed
 		false
 	);
@@ -776,7 +771,7 @@ void StatusReporterModule::initBatteryVoltageADC() {
 		return;
 	}
 	ErrorType error = FruityHal::AdcInit(AdcEventHandler);
-	APP_ERROR_CHECK((u32)error);
+	FRUITYMESH_ERROR_CHECK((u32)error);
 
 	u32 pin = Boardconfig->batteryAdcInputPin;
 	if(Boardconfig->batteryAdcInputPin == -2) 
@@ -820,7 +815,7 @@ void StatusReporterModule::BatteryVoltageADC(){
 	}
 	
 	ErrorType err = FruityHal::AdcSample(*m_buffer, 1);
-	APP_ERROR_CHECK((u32)err);
+	FRUITYMESH_ERROR_CHECK((u32)err);
 
 	isADCInitialized = false;
 #endif

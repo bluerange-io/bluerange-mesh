@@ -234,10 +234,10 @@ public:
 	static void convertBufferToBase64String(const u8* srcBuffer, u32 srcLength, char* dstBuffer, u16 bufferLength);
 	static void convertBufferToHexString   (const u8* srcBuffer, u32 srcLength, char* dstBuffer, u16 bufferLength);
 public:
-	static u32 parseEncodedStringToBuffer(const char* encodedString, u8* dstBuffer, u16 dstBufferSize);
+	static u32 parseEncodedStringToBuffer(const char* encodedString, u8* dstBuffer, u16 dstBufferSize, bool *didError = nullptr);
 private:
-	static u32 parseHexStringToBuffer(const char* hexString, u32 hexStringLength, u8* dstBuffer, u16 dstBufferSize);
-	static u32 parseBase64StringToBuffer(const char* base64String, u32 base64StringLength, u8* dstBuffer, u16 dstBufferSize);
+	static u32 parseHexStringToBuffer(const char* hexString, u32 hexStringLength, u8* dstBuffer, u16 dstBufferSize, bool *didError);
+	static u32 parseBase64StringToBuffer(const char* base64String, u32 base64StringLength, u8* dstBuffer, u16 dstBufferSize, bool *didError);
 };
 
 /*

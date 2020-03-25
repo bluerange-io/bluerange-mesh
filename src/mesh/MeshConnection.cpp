@@ -98,7 +98,7 @@ BaseConnection* MeshConnection::ConnTypeResolver(BaseConnection* oldConnection, 
 				oldConnection->connectionId,
 				oldConnection->direction,
 				&oldConnection->partnerAddress,
-				BLE_GATT_HANDLE_INVALID);
+				FH_BLE_GATT_HANDLE_INVALID);
 
 			newConnection->handshakeStartedDs = oldConnection->handshakeStartedDs;
 			newConnection->connectionMtu = oldConnection->connectionMtu;

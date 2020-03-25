@@ -4,6 +4,7 @@ target_compile_definitions_multi("${SDK_11_TARGETS}" "NRF51422")
 target_compile_definitions_multi("${SDK_11_TARGETS}" "NRF51822")
 target_compile_definitions_multi("${SDK_11_TARGETS}" "SDK=11")
 target_link_options_multi("${SDK_11_TARGETS}" "-T${PROJECT_SOURCE_DIR}/linker/gcc_nrf51822_s130v2_32kb.ld")
+target_link_options_multi("${SDK_11_TARGETS}" "-T${PROJECT_SOURCE_DIR}/linker/nrf5x_common.ld")
 
 target_sources_multi("${SDK_11_TARGETS}" "./components/toolchain/gcc/gcc_startup_nrf51.s")
 target_sources_multi("${SDK_11_TARGETS}" "./components/toolchain/system_nrf51.c")

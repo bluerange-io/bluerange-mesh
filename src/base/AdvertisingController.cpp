@@ -60,7 +60,7 @@ void AdvertisingController::Initialize()
 {
 	CheckedMemset(&currentAdvertisingParams, 0x00, sizeof(currentAdvertisingParams));
 	currentAdvertisingParams.type = FruityHal::BleGapAdvType::ADV_IND;
-	currentAdvertisingParams.interval = MSEC_TO_UNITS(100, UNIT_0_625_MS); // Advertising interval between 0x0020 and 0x4000 in 0.625 ms units (20ms to 10.24s), see @ref BLE_GAP_ADV_INTERVALS
+	currentAdvertisingParams.interval = MSEC_TO_UNITS(100, CONFIG_UNIT_0_625_MS); // Advertising interval between 0x0020 and 0x4000 in 0.625 ms units (20ms to 10.24s), see @ref BLE_GAP_ADV_INTERVALS
 	currentAdvertisingParams.timeout = 0;
 	currentAdvertisingParams.channelMask.ch37Off = Conf::advertiseOnChannel37 ? 0 : 1;
 	currentAdvertisingParams.channelMask.ch38Off = Conf::advertiseOnChannel38 ? 0 : 1;
@@ -326,14 +326,9 @@ void AdvertisingController::SetAdvertisingData(AdvJob* job)
 	advData[currentSlotUsed].advDataLength = job->advDataLength;
 	CheckedMemcpy(advData[currentSlotUsed].scanData, job->scanData, job->scanDataLength);
 	advData[currentSlotUsed].scanDataLength = job->scanDataLength;
-	
-	FruityHal::BleGapAdvParams * p_advParams = nullptr;
-	if (advertisingState == AdvertisingState::DISABLED){
-		p_advParams = &currentAdvertisingParams;
-	}
+
 	err = FruityHal::BleGapAdvDataSet(
 			&handle,
-			p_advParams,
 			advData[currentSlotUsed].advData,
 			advData[currentSlotUsed].advDataLength,
 			advData[currentSlotUsed].scanData,
@@ -354,6 +349,16 @@ void AdvertisingController::SetAdvertisingData(AdvJob* job)
 void AdvertisingController::SetAdvertisingState(AdvJob* job)
 {
 	ErrorType err;
+
+	// If job has different advertising params we need to restart advertising
+	if(job != nullptr &&
+		((job->advertisingType != currentAdvertisingParams.type) ||
+		(job->advertisingInterval != currentAdvertisingParams.interval))){
+		err = FruityHal::BleGapAdvStop(handle);
+		if((err == ErrorType::SUCCESS) || (err == ErrorType::INVALID_STATE)){
+			advertisingState = AdvertisingState::DISABLED;
+		}
+	}
 
 	//Stop advertising if no job was given
 	if(job == nullptr && advertisingState != AdvertisingState::DISABLED){
@@ -402,12 +407,22 @@ void AdvertisingController::SetAdvertisingState(AdvJob* job)
 	}
 
 	if(connectedConnections < Conf::getInstance().totalInConnections){
-		currentAdvertisingParams.type = FruityHal::BleGapAdvType::ADV_IND;
+    // When number of connections is not at limit always set connectable advertising. By default set it
+    // to indirect, otherwise specific one.
+    if (job != nullptr)
+    {
+    	currentAdvertisingParams.type = job->advertisingType == FruityHal::BleGapAdvType::ADV_NONCONN_IND ? FruityHal::BleGapAdvType::ADV_IND : job->advertisingType;
+    }
+    else if (currentAdvertisingParams.type == FruityHal::BleGapAdvType::ADV_NONCONN_IND)
+    {
+    	currentAdvertisingParams.type = FruityHal::BleGapAdvType::ADV_IND;
+    }
+
 	} else {
 		currentAdvertisingParams.type = FruityHal::BleGapAdvType::ADV_NONCONN_IND; // Non-Connectable
 		//Non connectable advertising must not be faster than 100ms
-		if(currentAdvertisingParams.interval < MSEC_TO_UNITS(100, UNIT_0_625_MS)){
-			currentAdvertisingParams.interval = MSEC_TO_UNITS(100, UNIT_0_625_MS);
+		if(currentAdvertisingParams.interval < MSEC_TO_UNITS(100, CONFIG_UNIT_0_625_MS)){
+			currentAdvertisingParams.interval = MSEC_TO_UNITS(100, CONFIG_UNIT_0_625_MS);
 		}
 	}
 
@@ -440,7 +455,7 @@ void AdvertisingController::SetAdvertisingState(AdvJob* job)
 
 		//We can only restart advertising if stopping worked
 		if(advertisingState == AdvertisingState::DISABLED){
-			err = FruityHal::BleGapAdvStart(handle, &currentAdvertisingParams);
+			err = FruityHal::BleGapAdvStart(&handle, &currentAdvertisingParams);
 			if(err == ErrorType::SUCCESS){
 				logt("ADV", "Advertising enabled");
 				advertisingStateAction = AdvertisingStateAction::OK;

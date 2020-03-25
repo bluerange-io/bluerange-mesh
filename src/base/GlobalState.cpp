@@ -43,6 +43,7 @@
 #ifndef SIM_ENABLED
 GlobalState GlobalState::instance;
 __attribute__ ((section (".noinit"))) RamRetainStruct ramRetainStruct;
+__attribute__ ((section (".noinit"))) RamRetainStruct ramRetainStructPreviousBoot;
 __attribute__ ((section (".noinit"))) u32 rebootMagicNumber;
 #endif
 
@@ -50,12 +51,18 @@ GlobalState::GlobalState()
 {
 	//Some initialization
 	ramRetainStructPtr = &ramRetainStruct;
+	ramRetainStructPreviousBootPtr = &ramRetainStructPreviousBoot;
 	rebootMagicNumberPtr = &rebootMagicNumber;
 	eventLooperHandlers.zeroData();
-#if defined(NRF51) || defined(SIM_ENABLED)
+#if defined(SIM_ENABLED)
 	CheckedMemset(currentEventBuffer, 0, sizeof(currentEventBuffer));
 #endif
-	CheckedMemset(&ramRetainStructPreviousBoot, 0, sizeof(ramRetainStructPreviousBoot)); //Safe to set to 0 as its written to only after the boot process is done.
+	if(ramRetainStructPreviousBootPtr->rebootReason != RebootReason::UNKNOWN){
+		u32 crc = Utility::CalculateCrc32((u8*)ramRetainStructPreviousBootPtr, sizeof(RamRetainStruct) - 4);
+		if(crc != ramRetainStructPreviousBootPtr->crc32){
+			CheckedMemset(ramRetainStructPreviousBootPtr, 0x00, sizeof(RamRetainStruct));
+		}
+	}
 	CheckedMemset(scanBuffer, 0, sizeof(scanBuffer));
 }
 

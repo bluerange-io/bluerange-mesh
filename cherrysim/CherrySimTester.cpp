@@ -35,6 +35,7 @@
 #include "Node.h"
 #include <regex>
 #include <string>
+#include <cstdarg>
 #include <chrono>
 #include <iostream>
 #include "FruityHal.h"
@@ -91,7 +92,7 @@ int main(int argc, char **argv) {
 		::testing::GTEST_FLAG(break_on_failure) = true;
 
 		//If we only want to execute specific tests, we can specify them here
-		::testing::GTEST_FLAG(filter) = "*TestRebootReason*";
+		::testing::GTEST_FLAG(filter) = "**";
 
 		//Do not catch exceptions is useful for debugging (Automatically set to 1 if running on Gitlab)
 		::testing::GTEST_FLAG(catch_exceptions) = 0;
@@ -461,6 +462,10 @@ void CherrySimTester::SendTerminalCommand(NodeId nodeId, const char* message, ..
 	vsnprintf(buffer, 2048, message, aptr);
 	va_end(aptr);
 
+	const std::string originalCommand = buffer;
+	const u32 crc = Utility::CalculateCrc32String(originalCommand.c_str());
+	const std::string crcCommand = originalCommand + std::string(" CRC: ") + std::to_string(crc);
+
 	if (nodeId == 0) {
 		for (u32 i = 0; i < simConfig.numNodes; i++) {
 			sim->setNode(i);
@@ -468,9 +473,14 @@ void CherrySimTester::SendTerminalCommand(NodeId nodeId, const char* message, ..
 				//you have not activated the terminal of that node either through the config or through the sim config
 				SIMEXCEPTION(IllegalStateException); //Terminal of node is not active, cannot send message
 			}
-			GS->terminal.PutIntoReadBuffer(buffer);
+			std::string commandToSend = originalCommand;
+			if (GS->terminal.IsCrcChecksEnabled() && originalCommand.find(" CRC: ") == std::string::npos && appendCrcToMessages)
+			{
+				commandToSend = crcCommand;
+			}
+			GS->terminal.PutIntoReadBuffer(commandToSend.c_str());
 			if (config.verbose) {
-				printf("NODE %d TERM_IN: %s" EOL, sim->currentNode->id, buffer);
+				printf("NODE %d TERM_IN: %s" EOL, sim->currentNode->id, commandToSend.c_str());
 			}
 		}
 	} else if (nodeId > 0 && nodeId < simConfig.numNodes + 1) {
@@ -479,9 +489,14 @@ void CherrySimTester::SendTerminalCommand(NodeId nodeId, const char* message, ..
 			//you have not activated the terminal of that node either through the config or through the sim config
 			SIMEXCEPTION(IllegalStateException); //Terminal of node is not active, cannot send message
 		}
-		GS->terminal.PutIntoReadBuffer(buffer);
+		std::string commandToSend = originalCommand;
+		if (GS->terminal.IsCrcChecksEnabled() && originalCommand.find(" CRC: ") == std::string::npos && appendCrcToMessages)
+		{
+			commandToSend = crcCommand;
+		}
+		GS->terminal.PutIntoReadBuffer(commandToSend.c_str());
 		if (config.verbose) {
-			printf("NODE %d TERM_IN: %s" EOL, sim->currentNode->id, buffer);
+			printf("NODE %d TERM_IN: %s" EOL, sim->currentNode->id, commandToSend.c_str());
 		}
 	} else {
 		SIMEXCEPTION(IllegalStateException); //Wrong nodeId given for SendTerminalCommand
@@ -621,6 +636,11 @@ bool SimulationMessage::matches(const std::string & message)
 void SimulationMessage::makeFound(const std::string & messageComplete)
 {
 	this->messageComplete = messageComplete;
+	size_t crcLoc = this->messageComplete.find(" CRC: ");
+	if (crcLoc != std::string::npos)
+	{
+		this->messageComplete = this->messageComplete.substr(0, crcLoc);
+	}
 	found = true;
 }
 

@@ -36,12 +36,7 @@
 #include <PacketQueue.h>
 #include <Logger.h>
 #include "SimpleArray.h"
-
-extern "C"{
-	#include <ble.h>
-	#include <ble_gap.h>
-	#include <ble_db_discovery.h>
-}
+#include <FruityHal.h>
 
 #define PACKET_QUEUED_HANDLE_NOT_QUEUED_IN_SD 0
 #define PACKET_QUEUED_HANDLE_COUNTER_START 10
@@ -120,10 +115,11 @@ enum class AppDisconnectReason : u8 {
 	NEEDED_FOR_ENROLLMENT = 29,
 	WRONG_DIRECTION = 30,
 	GATTC_TIMEOUT = 31,
-	ASSET_SCHEDULE_REMOVE = 32,
+	//ASSET_SCHEDULE_REMOVE = 32, //Deprecated as of 03.03.2020
 	INVALID_HANDSHAKE_PACKET = 33,
 	REBOOT = 34,
 	EMERGENCY_DISCONNECT_RESET = 35,
+	SCHEDULED_REMOVE = 36,
 };
 
 
@@ -274,7 +270,7 @@ class BaseConnection
 
 		//Partner
 		NodeId partnerId = 0;
-		u16 connectionHandle = BLE_CONN_HANDLE_INVALID; //The handle that is given from the BLE stack to identify a connection
+		u16 connectionHandle = FruityHal::FH_BLE_INVALID_HANDLE; //The handle that is given from the BLE stack to identify a connection
 		FruityHal::BleGapAddr partnerAddress;
 
 		//Times

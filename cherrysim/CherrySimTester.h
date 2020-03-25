@@ -77,6 +77,9 @@ public:
 	u8 awaitedBleEventDataPart[1000];
 	u16 awaitedBleEventDataPartLength;
 	bool awaitedBleEventFound;
+
+	bool appendCrcToMessages = true;
+
 private:
 	CherrySimTesterConfig config;
 	SimConfiguration simConfig;

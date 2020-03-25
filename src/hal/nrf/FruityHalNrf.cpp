@@ -36,7 +36,6 @@
 
 #include "FruityHal.h"
 #include "FruityMesh.h"
-#include <FruityHalNrf.h>
 #include <types.h>
 #include <GlobalState.h>
 #include <Logger.h>
@@ -59,10 +58,16 @@
 #endif //GITHUB_RELEASE
 
 extern "C" {
+#include <app_timer.h>
 #ifndef SIM_ENABLED
 #include <app_util_platform.h>
 #include <nrf_uart.h>
 #include <nrf_mbr.h>
+#include <nrf_wdt.h>
+#include <nrf_drv_gpiote.h>
+#include <nrf_delay.h>
+#include <nrf_sdm.h>
+#include <ble_db_discovery.h>
 #ifdef NRF52
 #include <nrf_power.h>
 #include <nrf_drv_twi.h>
@@ -72,6 +77,8 @@ extern "C" {
 #include <nrf_sdh_ble.h>
 #include <nrf_sdh_soc.h>
 #else
+#include <softdevice_handler.h>
+#include <ble_stack_handler_types.h>
 #include <nrf_drv_adc.h>
 #endif
 #if IS_ACTIVE(VIRTUAL_COM_PORT)
@@ -117,10 +124,37 @@ struct NrfHalMemory
 	u8 gpioteHandlersCreated;
 	ble_evt_t const * currentEvent;
 	u8 timersCreated;
+#if SDK == 15
+	ble_gap_adv_data_t advData;
+#endif
 };
 
 
 
+
+//#################### Event Buffer ###########################
+//A global buffer for the current event, which must be 4-byte aligned
+#if defined(NRF51)
+#pragma pack(push)
+#pragma pack(4)
+u32 currentEventBuffer[CEIL_DIV(BLE_STACK_EVT_MSG_BUF_SIZE, sizeof(uint32_t))];
+#pragma pack(pop)
+#endif // defined(NRF51)
+
+#ifdef SIM_ENABLED
+static constexpr u16 SIZE_OF_EVENT_BUFFER = GlobalState::SIZE_OF_EVENT_BUFFER;
+#elif defined(NRF51)
+static constexpr u16 SIZE_OF_EVENT_BUFFER = sizeof(currentEventBuffer);
+#endif // SIM_ENABLED
+
+// Bootloader settings page where the app needs to store the update information
+#if defined(NRF51) || defined(SIM_ENABLED)
+#define REGION_BOOTLOADER_SETTINGS_START (FLASH_REGION_START_ADDRESS + 0x0003FC00) //Last page of flash
+#elif defined(NRF52840)
+#define REGION_BOOTLOADER_SETTINGS_START (FLASH_REGION_START_ADDRESS + 0x000FF000) //Last page of flash
+#elif defined(NRF52)
+#define REGION_BOOTLOADER_SETTINGS_START (FLASH_REGION_START_ADDRESS + 0x0007F000) //Last page of flash
+#endif
 
 //This tag is used to set the SoftDevice configuration and must be used when advertising or creating connections
 constexpr int BLE_CONN_CFG_TAG_FM = 1;
@@ -267,9 +301,9 @@ ErrorType FruityHal::BleStackInit()
 	}
 	clock_lf_cfg.rc_temp_ctiv = 0;
 	clock_lf_cfg.xtal_accuracy = NRF_CLOCK_LF_XTAL_ACCURACY_100_PPM;
-
-	err = softdevice_handler_init(&clock_lf_cfg, GS->currentEventBuffer, GlobalState::SIZE_OF_EVENT_BUFFER, nullptr);
-	APP_ERROR_CHECK(err);
+	logt("ERROR", "SIZE_OF_EVENT_BUFFER: %d", SIZE_OF_EVENT_BUFFER);
+	err = softdevice_handler_init(&clock_lf_cfg, currentEventBuffer, SIZE_OF_EVENT_BUFFER, nullptr);
+	FRUITYMESH_ERROR_CHECK(err);
 
 	logt("NODE", "Softdevice Init OK");
 
@@ -310,7 +344,7 @@ ErrorType FruityHal::BleStackInit()
 		/* Not enough memory for the SoftDevice. Use output value in linker script */
 		logt("ERROR", "Fatal: Not enough memory for the selected configuration. Required:0x%x", (u32)app_ram_base);
 	} else {
-		APP_ERROR_CHECK(err); //OK
+		FRUITYMESH_ERROR_CHECK(err); //OK
 	}
 
 	//After the SoftDevice was enabled, we need to specifiy that we want a high bandwidth configuration
@@ -336,12 +370,12 @@ ErrorType FruityHal::BleStackInit()
 	u32 finalErr = 0;
 
 	err = nrf_sdh_enable_request();
-	APP_ERROR_CHECK(err);
+	FRUITYMESH_ERROR_CHECK(err);
 
 	//Use IRQ Priority 7 for SOC and BLE events instead of 6
 	//This allows us to use IRQ Prio 6 for UART and other peripherals
 	err = sd_nvic_SetPriority(SD_EVT_IRQn, 7);
-	APP_ERROR_CHECK(err);
+	FRUITYMESH_ERROR_CHECK(err);
 
 	logt("ERROR", "ENReq %u", err);
 
@@ -394,7 +428,7 @@ ErrorType FruityHal::BleStackInit()
 	ble_cfg.conn_cfg.params.gatt_conn_cfg.att_mtu = NRF_SDH_BLE_GATT_MAX_MTU_SIZE;
 
 	err = sd_ble_cfg_set(BLE_CONN_CFG_GATT, &ble_cfg, ram_start);
-	APP_ERROR_CHECK(err);
+	FRUITYMESH_ERROR_CHECK(err);
 
 	// Configure number of custom UUIDS.
 	CheckedMemset(&ble_cfg, 0, sizeof(ble_cfg));
@@ -429,8 +463,8 @@ ErrorType FruityHal::BleStackInit()
 	//######### Enables the BLE stack
 	err = nrf_sdh_ble_enable(&ram_start);
 	logt("ERROR", "Err %u, Linker Ram section should be at %x, len %x", err, (u32)ram_start, (u32)(getramend() - ram_start));
-	APP_ERROR_CHECK(finalErr);
-	APP_ERROR_CHECK(err);
+	FRUITYMESH_ERROR_CHECK(finalErr);
+	FRUITYMESH_ERROR_CHECK(err);
 
 	// Register a handler for BLE events.
 	NRF_SDH_BLE_OBSERVER(m_ble_observer, APP_BLE_OBSERVER_PRIO, ble_evt_handler, NULL);
@@ -453,15 +487,15 @@ ErrorType FruityHal::BleStackInit()
 	//Enable DC/DC (needs external LC filter, cmp. nrf51 reference manual page 43)
 	err = sd_power_dcdc_mode_set(Boardconfig->dcDcEnabled ? NRF_POWER_DCDC_ENABLE : NRF_POWER_DCDC_DISABLE);
 	logt("ERROR", "sd_power_dcdc_mode_set %u", err);
-	APP_ERROR_CHECK(err); //OK
+	FRUITYMESH_ERROR_CHECK(err); //OK
 
 	// Set power mode
 	err = sd_power_mode_set(NRF_POWER_MODE_LOWPWR);
 	logt("ERROR", "sd_power_mode_set %u", err);
-	APP_ERROR_CHECK(err); //OK
+	FRUITYMESH_ERROR_CHECK(err); //OK
 
 	err = (u32)FruityHal::RadioSetTxPower(Conf::defaultDBmTX, FruityHal::TxRole::SCAN_INIT, 0);
-	APP_ERROR_CHECK(err); //OK
+	FRUITYMESH_ERROR_CHECK(err); //OK
 
 	return (ErrorType)err;
 }
@@ -578,13 +612,21 @@ void FruityHal::EventLooper()
 	while (true)
 	{
 		//Fetch BLE events
-		u16 eventSize = GlobalState::SIZE_OF_EVENT_BUFFER;
-		u32 err = sd_ble_evt_get((u8*)GS->currentEventBuffer, &eventSize);
+		u16 eventSize = SIZE_OF_EVENT_BUFFER;
+#ifndef SIM_ENABLED
+    u32 err = sd_ble_evt_get((u8*)currentEventBuffer, &eventSize);
+#else
+    u32 err = sd_ble_evt_get((u8*)GS->currentEventBuffer, &eventSize);
+#endif
 
 		//Handle ble event event
 		if (err == NRF_SUCCESS)
 		{
-			FruityHal::DispatchBleEvents((void*)GS->currentEventBuffer);
+#ifndef SIM_ENABLED
+      FruityHal::DispatchBleEvents((void*)currentEventBuffer);
+#else
+      FruityHal::DispatchBleEvents((void*)GS->currentEventBuffer);
+#endif
 		}
 		//No more events available
 		else if (err == NRF_ERROR_NOT_FOUND)
@@ -593,7 +635,7 @@ void FruityHal::EventLooper()
 		}
 		else
 		{
-			APP_ERROR_CHECK(err); //LCOV_EXCL_LINE assertion
+			FRUITYMESH_ERROR_CHECK(err); //LCOV_EXCL_LINE assertion
 			break;
 		}
 	}
@@ -611,9 +653,14 @@ void FruityHal::EventLooper()
 	}
 
 	u32 err = sd_app_evt_wait();
-	APP_ERROR_CHECK(err); // OK
+	FRUITYMESH_ERROR_CHECK(err); // OK
 	err = sd_nvic_ClearPendingIRQ(SD_EVT_IRQn);
-	APP_ERROR_CHECK(err);  // OK
+	FRUITYMESH_ERROR_CHECK(err);  // OK
+}
+
+u16 FruityHal::GetEventBufferSize()
+{
+	return SIZE_OF_EVENT_BUFFER;
 }
 
 
@@ -651,7 +698,7 @@ void FruityHal::EventLooper()
 	FruityHal::VirtualComProcessEvents();
 
 	u32 err = sd_app_evt_wait();
-	APP_ERROR_CHECK(err); // OK
+	FRUITYMESH_ERROR_CHECK(err); // OK
 }
 
 #endif
@@ -707,7 +754,7 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
 				scan_data.p_data = GS->scanBuffer;
 				err = sd_ble_gap_scan_start(NULL, &scan_data);
 				if ((err != NRF_ERROR_INVALID_STATE) &&
-				    (err != NRF_ERROR_RESOURCES)) APP_ERROR_CHECK(err);
+				    (err != NRF_ERROR_RESOURCES)) FRUITYMESH_ERROR_CHECK(err);
 			}
 #endif
 			GapAdvertisementReportEvent are(&bleEvent);
@@ -1163,7 +1210,7 @@ u16 FruityHal::GattDataTransmittedEvent::getConnectionHandle() const
 
 bool FruityHal::GattDataTransmittedEvent::isConnectionHandleValid() const
 {
-	return getConnectionHandle() != BLE_CONN_HANDLE_INVALID;
+	return getConnectionHandle() != FruityHal::FH_BLE_INVALID_HANDLE;
 }
 
 u32 FruityHal::GattDataTransmittedEvent::getCompleteCount() const
@@ -1336,11 +1383,59 @@ ErrorType FruityHal::BleGapScanStop()
 	return nrfErrToGeneric(err);
 }
 
-ErrorType FruityHal::BleGapAdvStart(u8 advHandle, BleGapAdvParams const *advParams)
+static u8 AdvertisingTypeToNrf(FruityHal::BleGapAdvType type)
+{
+	switch (type)
+	{
+#if SDK == 15
+		case FruityHal::BleGapAdvType::ADV_IND:
+			return BLE_GAP_ADV_TYPE_CONNECTABLE_SCANNABLE_UNDIRECTED;
+		case FruityHal::BleGapAdvType::ADV_DIRECT_IND:
+			return BLE_GAP_ADV_TYPE_CONNECTABLE_NONSCANNABLE_DIRECTED;
+		case FruityHal::BleGapAdvType::ADV_SCAN_IND:
+			return BLE_GAP_ADV_TYPE_NONCONNECTABLE_SCANNABLE_UNDIRECTED;
+		case FruityHal::BleGapAdvType::ADV_NONCONN_IND:
+			return BLE_GAP_ADV_TYPE_NONCONNECTABLE_NONSCANNABLE_UNDIRECTED;
+#else
+		case FruityHal::BleGapAdvType::ADV_IND:
+			return BLE_GAP_ADV_TYPE_ADV_IND;
+		case FruityHal::BleGapAdvType::ADV_DIRECT_IND:
+			return BLE_GAP_ADV_TYPE_ADV_DIRECT_IND;
+		case FruityHal::BleGapAdvType::ADV_SCAN_IND:
+			return BLE_GAP_ADV_TYPE_ADV_SCAN_IND;
+		case FruityHal::BleGapAdvType::ADV_NONCONN_IND:
+			return BLE_GAP_ADV_TYPE_ADV_NONCONN_IND;
+#endif
+		default:
+			return 0xFF;
+	}
+}
+
+ErrorType FruityHal::BleGapAdvStart(u8 * advHandle, BleGapAdvParams const *advParams)
 {
 	u32 err;
 #if (SDK == 15)
-	err = sd_ble_gap_adv_start(advHandle, BLE_CONN_CFG_TAG_FM);
+	// logt("FH", "adv used: %u", (u32)myData.used);
+	ble_gap_adv_params_t adv_params;
+	CheckedMemset(&adv_params, 0x00, sizeof(adv_params));
+	adv_params.channel_mask[4] |= (advParams->channelMask.ch37Off << 5);
+	adv_params.channel_mask[4] |= (advParams->channelMask.ch38Off << 6);
+	adv_params.channel_mask[4] |= (advParams->channelMask.ch39Off << 7);
+	adv_params.filter_policy = BLE_GAP_ADV_FP_ANY;
+	adv_params.interval = advParams->interval;
+	adv_params.p_peer_addr = nullptr;
+	adv_params.duration = advParams->timeout * 100;
+	adv_params.properties.type = AdvertisingTypeToNrf(advParams->type);
+
+	err = sd_ble_gap_adv_set_configure(
+				advHandle,
+				&((NrfHalMemory*)GS->halMemory)->advData,
+			  &adv_params
+			);
+	logt("FH", "Adv data set (%u) typ %u, iv %u, mask %u, handle %u", err, adv_params.properties.type, (u32)adv_params.interval, adv_params.channel_mask[4], *advHandle);
+	if (err != NRF_SUCCESS) return nrfErrToGeneric(err);
+
+	err = sd_ble_gap_adv_start(*advHandle, BLE_CONN_CFG_TAG_FM);
 	logt("FH", "Adv start (%u)", err);
 #else      
 	ble_gap_adv_params_t adv_params;
@@ -1351,56 +1446,35 @@ ErrorType FruityHal::BleGapAdvStart(u8 advHandle, BleGapAdvParams const *advPara
 	adv_params.interval = advParams->interval;
 	adv_params.p_peer_addr = nullptr;
 	adv_params.timeout = advParams->timeout;
-	adv_params.type = (u8)advParams->type;
+	adv_params.type = AdvertisingTypeToNrf(advParams->type);
 #if defined(NRF51) || defined(SIM_ENABLED)
 	err = sd_ble_gap_adv_start(&adv_params);
 #elif defined(NRF52)
 	err = sd_ble_gap_adv_start(&adv_params, BLE_CONN_CFG_TAG_FM);
 #endif
 	logt("FH", "Adv start (%u) typ %u, iv %u, mask %u", err, adv_params.type, adv_params.interval, *((u8*)&adv_params.channel_mask));
-#endif
+#endif // (SDK == 15)
 	return nrfErrToGeneric(err);
 }
 
-ErrorType FruityHal::BleGapAdvDataSet(u8 * p_advHandle, BleGapAdvParams const * p_advParams, u8 *advData, u8 advDataLength, u8 *scanData, u8 scanDataLength)
+ErrorType FruityHal::BleGapAdvDataSet(u8 * p_advHandle, u8 *advData, u8 advDataLength, u8 *scanData, u8 scanDataLength)
 {
 	u32 err = 0;
 #if (SDK == 15)
-	ble_gap_adv_params_t adv_params;
-	ble_gap_adv_data_t adv_data;
-	CheckedMemset(&adv_params, 0, sizeof(adv_params));
-	CheckedMemset(&adv_data, 0, sizeof(adv_data));
-	if (p_advParams != nullptr)	{
-		adv_params.channel_mask[4] |= (p_advParams->channelMask.ch37Off << 5);
-		adv_params.channel_mask[4] |= (p_advParams->channelMask.ch38Off << 6);
-		adv_params.channel_mask[4] |= (p_advParams->channelMask.ch39Off << 7);
-		adv_params.filter_policy = BLE_GAP_ADV_FP_ANY;
-		adv_params.interval = p_advParams->interval;
-		adv_params.p_peer_addr = nullptr;
-		adv_params.duration = p_advParams->timeout;
-		adv_params.properties.type = (u8)p_advParams->type;
-	}
-	adv_data.adv_data.p_data = (u8 *)advData;
-	adv_data.adv_data.len = advDataLength;
-	adv_data.scan_rsp_data.p_data = (u8 *)scanData;
-	adv_data.scan_rsp_data.len = scanDataLength;
-
-	if (p_advParams != nullptr){
+	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
+	halMemory->advData.adv_data.p_data = (u8 *)advData;
+	halMemory->advData.adv_data.len = advDataLength;
+	halMemory->advData.scan_rsp_data.p_data = (u8 *)scanData;
+	halMemory->advData.scan_rsp_data.len = scanDataLength;
+	if (*p_advHandle != BLE_GAP_ADV_SET_HANDLE_NOT_SET)
+	{
 		err = sd_ble_gap_adv_set_configure(
 					p_advHandle,
-					&adv_data,
-				  &adv_params
+					&halMemory->advData,
+					nullptr
 				);
+		logt("FH", "Adv data set (%u) handle %u", err, *p_advHandle);
 	}
-	else {
-		err = sd_ble_gap_adv_set_configure(
-					p_advHandle,
-					&adv_data,
-				  nullptr
-				);
-	}
-
-	logt("FH", "Adv data set (%u) typ %u, iv %lu, mask %u, handle %u", err, adv_params.properties.type, adv_params.interval, adv_params.channel_mask[4], *p_advHandle);
 #else
 	err = sd_ble_gap_adv_data_set(
 				advData,
@@ -1410,7 +1484,7 @@ ErrorType FruityHal::BleGapAdvDataSet(u8 * p_advHandle, BleGapAdvParams const * 
 			);
 
 	logt("FH", "Adv data set (%u)", err);
-#endif
+#endif // (SDK == 15)
 	return nrfErrToGeneric(err);
 }
 
@@ -1440,17 +1514,22 @@ ErrorType FruityHal::BleGapConnect(FruityHal::BleGapAddr const *peerAddress, Ble
 	p_scan_params.interval = scanParams->interval;
 	p_scan_params.timeout = scanParams->timeout;
 	p_scan_params.window = scanParams->window;
-#if defined(NRF51) || defined(SIM_ENABLED)
-	p_scan_params.p_whitelist = nullptr;
-	p_scan_params.selective = 0;
-#elif defined(NRF52) && (SDK == 14)
-	p_scan_params.adv_dir_report = 0;
-	p_scan_params.use_whitelist = 0;
-#else
+
+#if (SDK == 15)	
 	p_scan_params.report_incomplete_evts = 0;
 	p_scan_params.filter_policy = BLE_GAP_SCAN_FP_ACCEPT_ALL;
 	p_scan_params.extended = 0;
+	p_scan_params.scan_phys = BLE_GAP_PHY_1MBPS;
+	p_scan_params.timeout = scanParams->timeout * 100; //scanTimeout is now in ms since SDK15 instead of seconds
 	CheckedMemset(p_scan_params.channel_mask, 0, sizeof(p_scan_params.channel_mask));
+#else
+#if defined(NRF51) || defined(SIM_ENABLED)
+	p_scan_params.p_whitelist = nullptr;
+	p_scan_params.selective = 0;
+#elif defined(NRF52)
+	p_scan_params.adv_dir_report = 0;
+	p_scan_params.use_whitelist = 0;
+#endif
 #endif
 
 	ble_gap_conn_params_t p_conn_params;
@@ -1925,12 +2004,12 @@ void FruityHal::VirtualComProcessEvents()
 	virtualComCheck();
 #endif
 }
-u32 FruityHal::VirtualComCheckAndProcessLine(u8* buffer, u16 bufferLength)
+ErrorType FruityHal::VirtualComCheckAndProcessLine(u8* buffer, u16 bufferLength)
 {
 #if IS_ACTIVE(VIRTUAL_COM_PORT)
-	return virtualComCheckAndProcessLine(buffer, bufferLength);
+	return nrfErrToGeneric(virtualComCheckAndProcessLine(buffer, bufferLength));
 #else
-	return 0;
+	return ErrorType::SUCCESS;
 #endif
 }
 void FruityHal::VirtualComWriteData(const u8* data, u16 dataLength)
@@ -2077,13 +2156,13 @@ u32 FruityHal::GetRtcDifferenceMs(u32 nowTimeMs, u32 previousTimeMs)
 //Will be called if an error occurs somewhere in the code, but not if it's a hardfault
 extern "C"
 {
-	//The app_error handler_bare is called by all APP_ERROR_CHECK functions when DEBUG is undefined
+	//The app_error handler_bare is called by all FRUITYMESH_ERROR_CHECK functions when DEBUG is undefined
 	void app_error_handler_bare(uint32_t error_code)
 	{
 		GS->appErrorHandler((u32)error_code);
 	}
 
-	//The app_error handler is called by all APP_ERROR_CHECK functions when DEBUG is defined
+	//The app_error handler is called by all FRUITYMESH_ERROR_CHECK functions when DEBUG is defined
 	void app_error_handler(uint32_t error_code, uint32_t line_num, const u8 * p_file_name)
 	{
 		app_error_handler_bare(error_code);
@@ -2170,6 +2249,14 @@ ErrorType FruityHal::ActivateBootloaderOnReset()
 void FruityHal::SystemReset()
 {
 	sd_nvic_SystemReset();
+}
+
+void FruityHal::SystemReset(bool softdeviceEnabled)
+{
+	if (softdeviceEnabled) 
+		sd_nvic_SystemReset();
+	else
+		NVIC_SystemReset();
 }
 
 // Retrieves the reboot reason from the RESETREAS register
@@ -2344,7 +2431,7 @@ extern "C"{
 		// Must never be called.
 		logt("ERROR", "PVF call");
 		constexpr u32 pureVirtualFunctionCalledError = 0xF002;
-		APP_ERROR_CHECK(pureVirtualFunctionCalledError);
+		FRUITYMESH_ERROR_CHECK(pureVirtualFunctionCalledError);
 	}
 }
 #endif
@@ -2401,7 +2488,7 @@ ErrorType FruityHal::GpioConfigureInterrupt(u32 pin, FruityHal::GpioPullMode mod
 	ErrorType err = ErrorType::SUCCESS;
 	nrf_drv_gpiote_in_config_t in_config;
 	in_config.is_watcher = false;
-	in_config.hi_accuracy = false;
+	in_config.hi_accuracy = true;
 	in_config.pull = GenericPullModeToNrf(mode);
 	in_config.sense = GenericPolarityToNrf(trigger);
 #if SDK == 15
@@ -2447,11 +2534,11 @@ ErrorType FruityHal::AdcInit(AdcEventHandler handler)
 #if defined(NRF51)
 	ret_code_t err_code;
 	err_code = nrf_drv_adc_init(nullptr,AdcCallback);
-	APP_ERROR_CHECK(err_code);
+	FRUITYMESH_ERROR_CHECK(err_code);
 #else
 	ret_code_t err_code;
 	err_code = nrf_drv_saadc_init(nullptr,SaadcCallback);
-	APP_ERROR_CHECK(err_code);
+	FRUITYMESH_ERROR_CHECK(err_code);
 #endif
 #endif //SIM_ENABLED
 	return ErrorType::SUCCESS;
@@ -2632,7 +2719,7 @@ ErrorType FruityHal::AdcConfigureChannel(u32 pin, AdcReference reference, AdcRes
 	channel_config.gain = nrfGain;
 	channel_config.reference = nrfReference;
 	err_code = nrf_drv_saadc_channel_init(0, &channel_config);
-	APP_ERROR_CHECK(err_code);
+	FRUITYMESH_ERROR_CHECK(err_code);
 	nrf_saadc_resolution_set(nrfResolution);
 #endif
 #endif //SIM_ENABLED
@@ -2686,27 +2773,6 @@ return 0;
 }
 
 #define __________________CONVERT____________________
-
-ble_gap_addr_t FruityHal::Convert(const FruityHal::BleGapAddr* address)
-{
-	ble_gap_addr_t addr;
-	CheckedMemset(&addr, 0x00, sizeof(addr));
-	CheckedMemcpy(addr.addr, address->addr, FH_BLE_GAP_ADDR_LEN);
-	addr.addr_type = (u8)address->addr_type;
-#ifdef NRF52
-	addr.addr_id_peer = 0;
-#endif
-	return addr;
-}
-FruityHal::BleGapAddr FruityHal::Convert(const ble_gap_addr_t* p_addr)
-{
-	FruityHal::BleGapAddr address;
-	CheckedMemset(&address, 0x00, sizeof(address));
-	CheckedMemcpy(address.addr, p_addr->addr, FH_BLE_GAP_ADDR_LEN);
-	address.addr_type = (BleGapAddrType)p_addr->addr_type;
-
-	return address;
-}
 
 u8 FruityHal::ConvertPortToGpio(u8 port, u8 pin)
 {
@@ -2975,6 +3041,36 @@ u32 * FruityHal::GetDeviceMemoryAddress()
 	return (u32 *)NRF_FICR;
 }
 
+void FruityHal::GetCustomerData(u32 * p_data, u8 len)
+{
+	for (u8 i = 0; (i < len) && (i < 32); i++)
+	{
+		p_data[i] = NRF_UICR->CUSTOMER[i];
+	}
+}
+
+// BLE stack has to be disabled before executing this function
+void FruityHal::WriteCustomerData(u32 * p_data, u8 len)
+{
+#ifndef SIM_ENABLED
+	NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen << NVMC_CONFIG_WEN_Pos;
+	while (NRF_NVMC->READY == NVMC_READY_READY_Busy) {}
+#endif
+	for (u8 i = 0; (i < len) && (i < 32); i++)
+	{
+		NRF_UICR->CUSTOMER[i] = p_data[i];
+	}
+#ifndef SIM_ENABLED
+	NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos;
+	while (NRF_NVMC->READY == NVMC_READY_READY_Busy) {}
+#endif
+}
+
+u32 FruityHal::GetBootloaderSettingsAddress()
+{
+	return REGION_BOOTLOADER_SETTINGS_START;
+}
+
 u32 FruityHal::GetCodePageSize()
 {
 	return NRF_FICR->CODEPAGESIZE;
@@ -3148,6 +3244,25 @@ void FruityHal::UartEnableReadInterrupt()
 	nrf_uart_int_enable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
 }
 
+
+static nrf_uart_baudrate_t UartBaudRateToNordic(FruityHal::UartBaudrate baudRate)
+{
+#ifndef SIM_ENABLED
+	switch (baudRate)
+	{
+		case FruityHal::UartBaudrate::BAUDRATE_1M:
+			return (nrf_uart_baudrate_t)NRF_UART_BAUDRATE_1000000;
+		case FruityHal::UartBaudrate::BAUDRATE_115200:
+			return (nrf_uart_baudrate_t)NRF_UART_BAUDRATE_115200;
+		case FruityHal::UartBaudrate::BAUDRATE_57600:
+		default:
+			return (nrf_uart_baudrate_t)NRF_UART_BAUDRATE_57600;
+	}
+#else
+	return (nrf_uart_baudrate_t)0;
+#endif
+}
+
 void FruityHal::EnableUart(bool promptAndEchoMode)
 {
 	//Configure pins
@@ -3155,7 +3270,7 @@ void FruityHal::EnableUart(bool promptAndEchoMode)
 	nrf_gpio_cfg_output(Boardconfig->uartTXPin);
 	nrf_gpio_cfg_input(Boardconfig->uartRXPin, NRF_GPIO_PIN_NOPULL);
 
-	nrf_uart_baudrate_set(NRF_UART0, (nrf_uart_baudrate_t)Boardconfig->uartBaudRate);
+	nrf_uart_baudrate_set(NRF_UART0, UartBaudRateToNordic((FruityHal::UartBaudrate)Boardconfig->uartBaudRate));
 	nrf_uart_configure(NRF_UART0, NRF_UART_PARITY_EXCLUDED, Boardconfig->uartRTSPin != -1 ? NRF_UART_HWFC_ENABLED : NRF_UART_HWFC_DISABLED);
 	nrf_uart_txrx_pins_set(NRF_UART0, Boardconfig->uartTXPin, Boardconfig->uartRXPin);
 
@@ -3285,7 +3400,7 @@ ErrorType FruityHal::twi_init(i32 sclPin, i32 sdaPin)
 
 	errCode = nrf_drv_twi_init(&twi, &twiConfig, twi_handler, NULL);
 	if (errCode != NRF_ERROR_INVALID_STATE && errCode != NRF_SUCCESS) {
-		APP_ERROR_CHECK(errCode);
+		FRUITYMESH_ERROR_CHECK(errCode);
 	}
 
 	nrf_drv_twi_enable(&twi);
@@ -3444,7 +3559,7 @@ void FruityHal::spi_init(i32 sckPin, i32 misoPin, i32 mosiPin)
 	spi_config.mosi_pin = (u32)mosiPin;
 	spi_config.frequency = NRF_DRV_SPI_FREQ_4M;
 
-	APP_ERROR_CHECK(nrf_drv_spi_init(&spi, &spi_config, spi_event_handler,NULL));
+	FRUITYMESH_ERROR_CHECK(nrf_drv_spi_init(&spi, &spi_config, spi_event_handler,NULL));
 
 	NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
 	halMemory->spiXferDone = true;
@@ -3490,7 +3605,7 @@ ErrorType FruityHal::spi_transfer(u8* const p_toWrite, u8 count, u8* const p_toR
 		halMemory->spiXferDone = false;
 
 		nrf_gpio_pin_clear((u32)slaveSelectPin);
-		APP_ERROR_CHECK(nrf_drv_spi_transfer(&spi, p_toWrite, count, p_toRead, count));
+		FRUITYMESH_ERROR_CHECK(nrf_drv_spi_transfer(&spi, p_toWrite, count, p_toRead, count));
 		//Locks if run in interrupt context
 		while (!halMemory->spiXferDone)
 		{

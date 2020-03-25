@@ -27,12 +27,12 @@
 // **
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
-#include <FruityHalNrf.h>
+#include <FruityHal.h>
 #include <Boardconfig.h>
 //PCA10040 - nRF52 DK
 void setBoard_4(BoardConfiguration* c)
 {
-#ifdef NRF52
+#if BOARD_TYPE == 4
 	if(c->boardType == 4)
 	{
 		c->led1Pin =  17;
@@ -45,12 +45,12 @@ void setBoard_4(BoardConfiguration* c)
 		c->uartTXPin =  6;
 		c->uartCTSPin =  7;
 		c->uartRTSPin =  5;
-		c->uartBaudRate = UART_BAUDRATE_BAUDRATE_Baud1M;
+		c->uartBaudRate = (u32)FruityHal::UartBaudrate::BAUDRATE_1M;
 		c->dBmRX = -96;
 		c->calibratedTX =  -60;
 		c->lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_XTAL;
 		c->lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_20_PPM;
 		c->dcDcEnabled = true;
 	}
-#endif
+#endif // BOARD_TYPE == 4
 }

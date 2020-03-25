@@ -71,15 +71,21 @@ if(BUILD_FEATURESETS)
     target_compile_definitions_multi("${FEATURE_SET}" "FEATURESET=${FEATURE_SET}")
     target_compile_definitions_multi("${FEATURE_SET}" "FEATURESET_NAME=\"${FEATURE_SET}.h\"")
     target_sources(${FEATURE_SET} PRIVATE "./config/featuresets/${FEATURE_SET}.cpp")
-    unset(FRUITY_SDK)
+    unset(PLATFORM)
     unset(ALLOW_MALLOC)
     set(FAIL_ON_SIZE_TOO_BIG 1)
     
     include(${f})
     
-    if(NOT DEFINED FRUITY_SDK)
-       message(FATAL_ERROR "Featureset ${FEATURE_SET} failed to set mandatory variable: FRUITY_SDK")
+    if(NOT DEFINED PLATFORM)
+       message(FATAL_ERROR "Featureset ${FEATURE_SET} failed to set mandatory variable: PLATFORM")
     endif()
+
+    if (${PLATFORM} STREQUAL "NRF51" OR ${PLATFORM} STREQUAL "NRF52832" OR ${PLATFORM} STREQUAL "NRF52840")
+      set(CHIP NRF)
+    elseif(${PLATFORM} STREQUAL "ARM")
+      set(CHIP ARM)
+    endif (${PLATFORM} STREQUAL "NRF51" OR ${PLATFORM} STREQUAL "NRF52832" OR ${PLATFORM} STREQUAL "NRF52840")
     
     if(NOT DEFINED ALLOW_MALLOC)
       target_link_options_multi("${FEATURE_SET}" "LINKER:--wrap=malloc")
@@ -87,27 +93,33 @@ if(BUILD_FEATURESETS)
     endif()
     
     target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-x assembler-with-cpp>)
-    if (${FRUITY_SDK} STREQUAL "11")
+    if (${PLATFORM} STREQUAL "NRF51")
       target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__HEAP_SIZE=2048>)
       target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__STACK_SIZE=2048>)
       target_compile_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m0")
       target_link_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m0")
       list(APPEND SDK_11_TARGETS ${FEATURE_SET})
-    elseif (${FRUITY_SDK} STREQUAL "14")
+    elseif (${PLATFORM} STREQUAL "NRF52832")
       target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__HEAP_SIZE=4096>)
       target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__STACK_SIZE=4096>)
       target_compile_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m4")
       target_link_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m4")
       list(APPEND SDK_14_TARGETS ${FEATURE_SET})
-    elseif (${FRUITY_SDK} STREQUAL "15")
+    elseif (${PLATFORM} STREQUAL "NRF52840")
       target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__HEAP_SIZE=4096>)
       target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__STACK_SIZE=4096>)
       target_compile_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m4")
       target_link_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m4")
       list(APPEND SDK_15_TARGETS ${FEATURE_SET})
-    else(${FRUITY_SDK} STREQUAL "11")
-      message(FATAL_ERROR "Unknown FRUITY_SDK version: ${FRUITY_SDK}")
-    endif(${FRUITY_SDK} STREQUAL "11")
+    elseif (${PLATFORM} STREQUAL "ARM")
+      target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__HEAP_SIZE=4096>)
+      target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__STACK_SIZE=4096>)
+      target_compile_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m4")
+      target_link_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m4")
+      list(APPEND ARM_TARGETS ${FEATURE_SET})
+    else(${PLATFORM} STREQUAL "NRF51")
+      message(FATAL_ERROR "Unknown PLATFORM: ${PLATFORM}")
+    endif(${PLATFORM} STREQUAL "NRF51")
     
     target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
     target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-use-cxa-atexit>)
@@ -124,9 +136,9 @@ if(BUILD_FEATURESETS)
     target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-variable>)
     target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-vla>)
     target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>)
-	
+
     set_target_properties(${FEATURE_SET} PROPERTIES SUFFIX ".out")
-	
+
     add_custom_command(TARGET ${FEATURE_SET} POST_BUILD
       COMMAND ${GCC_PATH}/bin/arm-none-eabi-objcopy${exe_suffix} ARGS -O ihex ${CMAKE_CURRENT_BINARY_DIR}/${FEATURE_SET}.out ${CMAKE_CURRENT_BINARY_DIR}/${FEATURE_SET}.hex
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -134,15 +146,17 @@ if(BUILD_FEATURESETS)
       BYPRODUCTS "${CMAKE_CURRENT_BINARY_DIR}/${FEATURE_SET}.hex"
     )
     
-    if (${FRUITY_SDK} STREQUAL "11")
+    if (${PLATFORM} STREQUAL "NRF51")
       set(MAX_SIZE 71680) # max app size 1024 * 70
-    elseif (${FRUITY_SDK} STREQUAL "14")
+    elseif (${PLATFORM} STREQUAL "NRF52832")
       set(MAX_SIZE 167936) #max app size 4096 * 41
-    elseif (${FRUITY_SDK} STREQUAL "15")
+    elseif (${PLATFORM} STREQUAL "NRF52840")
       set(MAX_SIZE 167936) #max app size 4096 * 41
-    else(${FRUITY_SDK} STREQUAL "11")
-      message(FATAL_ERROR "Unknown FRUITY_SDK version: ${FRUITY_SDK}")
-    endif(${FRUITY_SDK} STREQUAL "11")
+    elseif (${PLATFORM} STREQUAL "ARM")
+      set(MAX_SIZE 167936) #use the same value as for NRF52832 - main chip
+    else(${PLATFORM} STREQUAL "NRF51")
+      message(FATAL_ERROR "Unknown PLATFORM: ${PLATFORM}")
+    endif(${PLATFORM} STREQUAL "NRF51")
     
     add_custom_command(TARGET ${FEATURE_SET} POST_BUILD
       COMMAND ${GCC_PATH}/bin/arm-none-eabi-size${exe_suffix} ARGS ${CMAKE_CURRENT_BINARY_DIR}/${FEATURE_SET}.out
@@ -152,33 +166,40 @@ if(BUILD_FEATURESETS)
       VERBATIM
     )
     
-	if (${FRUITY_SDK} STREQUAL "11")
-      set(SOFTDEVICE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/softdevice/s130_nrf51_2.0.1_softdevice.hex)
-      set(FAMILY NRF51)
-    elseif (${FRUITY_SDK} STREQUAL "14")
-      set(SOFTDEVICE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/softdevice/s132_nrf52_5.1.0_softdevice.hex)
-      set(FAMILY NRF52)
-    elseif (${FRUITY_SDK} STREQUAL "15")
-      set(SOFTDEVICE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/softdevice/s140_nrf52840_6.1.0_softdevice.hex)
-      set(FAMILY NRF52)
-    else(${FRUITY_SDK} STREQUAL "11")
-      message(FATAL_ERROR "Unknown FRUITY_SDK version: ${FRUITY_SDK}")
-    endif(${FRUITY_SDK} STREQUAL "11")
-    add_custom_command(TARGET ${FEATURE_SET} POST_BUILD
-      COMMAND mergehex -m ${SOFTDEVICE_PATH} ${CMAKE_CURRENT_BINARY_DIR}/${FEATURE_SET}.hex -o ${CMAKE_CURRENT_BINARY_DIR}/${FEATURE_SET}_merged.hex
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      COMMENT "Merging with Softdevice ${FEATURE_SET}"
-      VERBATIM
-    )
-    add_custom_target(${FEATURE_SET}_flash nrfjprog --program ${CMAKE_CURRENT_BINARY_DIR}/${FEATURE_SET}_merged.hex -f ${FAMILY} --chiperase
-                                   COMMAND nrfjprog --reset -f ${FAMILY})
-    add_dependencies(${FEATURE_SET}_flash ${FEATURE_SET})
-	
+
+    if (${CHIP} STREQUAL "NRF")
+      if (${PLATFORM} STREQUAL "NRF51")
+        set(SOFTDEVICE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/softdevice/s130_nrf51_2.0.1_softdevice.hex)
+        set(FAMILY NRF51)
+      elseif (${PLATFORM} STREQUAL "NRF52832")
+        set(SOFTDEVICE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/softdevice/s132_nrf52_5.1.0_softdevice.hex)
+        set(FAMILY NRF52)
+      elseif (${PLATFORM} STREQUAL "NRF52840")
+        set(SOFTDEVICE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/softdevice/s140_nrf52840_6.1.0_softdevice.hex)
+        set(FAMILY NRF52)
+      else(${PLATFORM} STREQUAL "NRF51")
+        message(FATAL_ERROR "Unknown PLATFORM version for softdevice: ${PLATFORM}")
+      endif(${PLATFORM} STREQUAL "NRF51")
+
+      add_custom_command(TARGET ${FEATURE_SET} POST_BUILD
+        COMMAND mergehex -m ${SOFTDEVICE_PATH} ${CMAKE_CURRENT_BINARY_DIR}/${FEATURE_SET}.hex -o ${CMAKE_CURRENT_BINARY_DIR}/${FEATURE_SET}_merged.hex
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Merging with Softdevice ${FEATURE_SET}"
+        VERBATIM
+      )
+      add_custom_target(${FEATURE_SET}_flash nrfjprog --program ${CMAKE_CURRENT_BINARY_DIR}/${FEATURE_SET}_merged.hex -f ${FAMILY} --chiperase
+                                     COMMAND nrfjprog --reset -f ${FAMILY})
+      add_dependencies(${FEATURE_SET}_flash ${FEATURE_SET})
+    endif (${CHIP} STREQUAL "NRF")
+
     list(APPEND ALL_TARGETS ${FEATURE_SET})
     list(APPEND NATIVE_TARGETS ${FEATURE_SET})
     message(STATUS "Added feature set: ${FEATURE_SET}")
   endforeach(f)
-  target_compile_definitions_multi("${NATIVE_TARGETS}" "SOFTDEVICE_PRESENT")
+
+  if (${CHIP} STREQUAL "NRF")
+    target_compile_definitions_multi("${NATIVE_TARGETS}" "SOFTDEVICE_PRESENT")
+  endif (${CHIP} STREQUAL "NRF")
   set_property_multi("${NATIVE_TARGETS}" "CXX_STANDARD" "11")
   set_property_multi("${NATIVE_TARGETS}" "C_STANDARD" "99")
   set_property_multi("${NATIVE_TARGETS}" "CMAKE_CXX_STANDARD_REQUIRED" "ON")
@@ -195,7 +216,9 @@ if(BUILD_FEATURESETS)
   target_compile_options_multi("${NATIVE_TARGETS}" "-fabi-version=0")
   target_compile_options_multi("${NATIVE_TARGETS}" "-fno-exceptions")
   target_compile_options_multi("${NATIVE_TARGETS}" "-D__need___va_list")
-  target_compile_options_multi("${NATIVE_TARGETS}" "-DBLE_STACK_SUPPORT_REQD")
+  if (${CHIP} STREQUAL "NRF")
+    target_compile_options_multi("${NATIVE_TARGETS}" "-DBLE_STACK_SUPPORT_REQD")
+  endif (${CHIP} STREQUAL "NRF")
   target_compile_options_multi("${NATIVE_TARGETS}" "-fno-strict-aliasing")
   target_compile_options_multi("${NATIVE_TARGETS}" "-DNDEBUG")
   target_compile_options_multi("${NATIVE_TARGETS}" "-Os")
@@ -210,7 +233,6 @@ if(BUILD_FEATURESETS)
   
   add_subdirectory(src)
   add_subdirectory(sdk)
-  target_link_options_multi("${NATIVE_TARGETS}" "-T${PROJECT_SOURCE_DIR}/linker/nrf5x_common.ld")
 else(BUILD_FEATURESETS)
   project(CherrySim C CXX)
   if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")

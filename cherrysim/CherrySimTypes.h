@@ -56,7 +56,7 @@ constexpr int SIM_NUM_UNRELIABLE_BUFFERS = 7;
 constexpr int SIM_NUM_SERVICES = 6;
 constexpr int SIM_NUM_CHARS    = 5;
 
-constexpr int PACKET_STAT_SIZE = 2*1024;
+constexpr int PACKET_STAT_SIZE = 10*1024;
 
 #define PSRNG() (cherrySimInstance->simState.rnd.nextDouble())
 #define PSRNGINT(min, max) ((u32)cherrySimInstance->simState.rnd.nextU32(min, max)) //Generates random int from min (inclusive) up to max (inclusive)

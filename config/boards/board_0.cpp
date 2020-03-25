@@ -27,12 +27,11 @@
 // **
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
-#include <FruityHalNrf.h>
+#include <FruityHal.h>
 #include <Boardconfig.h>
 //PCA10031 - nRF51 Dongle
 void setBoard_0(BoardConfiguration* c)
 {
-#ifdef NRF51
 	//Use this boardType for all nRF51 configurations with either boardId 0 or if no DeviceConfiguration data is set
 	if(c->boardType == 0)
 	{
@@ -46,12 +45,11 @@ void setBoard_0(BoardConfiguration* c)
 		c->uartTXPin =  9;
 		c->uartCTSPin =  10;
 		c->uartRTSPin =  8;
-		c->uartBaudRate = UART_BAUDRATE_BAUDRATE_Baud1M;
+		c->uartBaudRate = (u32)FruityHal::UartBaudrate::BAUDRATE_1M;
 		c->dBmRX = -90;
 		c->calibratedTX =  -63;
 		c->lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_XTAL;
 		c->lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_20_PPM;
 		c->dcDcEnabled = true;
 	}
-#endif
 }
