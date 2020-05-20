@@ -8,9 +8,13 @@ FruityMesh is the reference implementation of the **BlueRange** initiative. It w
 [cols="1,4", frame="none"]
 |===
 |image:documentation.png[]
-|Documentation is the key and therefore, you should have a look at the documentation to get you started. You can find it as part of the repository in the `docs` folder or here:
+|Documentation is the key and therefore, you should first have a look at the documentation to get you started.
 
-https://mwaylabs.github.io/fruitymesh/fruitymesh/index.html[Documentation]
+You can find the most up to date documentation here:
+
+https://www.bluerange.io/docs/fruitymesh/Quick-Start.html[Documentation]
+
+You can also have a look in the `docs` folder for a version of the documentation that matches a certain commit.
 |===
 
 
