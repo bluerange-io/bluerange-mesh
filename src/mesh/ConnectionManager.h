@@ -39,20 +39,40 @@
 #include <GATTController.h>
 #include <BaseConnection.h>
 #include <MeshConnection.h>
+#include <ConnectionHandle.h>
 
-typedef struct BaseConnections {
-	u8 count;
-	u32 connectionIndizes[TOTAL_NUM_CONNECTIONS];
-} BaseConnections;
-typedef struct MeshConnections {
-	u8 count;
-	MeshConnection* connections[TOTAL_NUM_CONNECTIONS];
-} MeshConnections;
+struct BaseConnections
+{
+	u8 count = 0;
+	BaseConnectionHandle handles[TOTAL_NUM_CONNECTIONS];
+};
+struct MeshConnections
+{
+	u8 count = 0;
+	MeshConnectionHandle handles[TOTAL_NUM_CONNECTIONS];
+};
+struct MeshAccessConnections
+{
+	u8 count = 0;
+	MeshAccessConnectionHandle handles[TOTAL_NUM_CONNECTIONS];
+};
+
 
 typedef BaseConnection* (*ConnTypeResolver)(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8 const * data);
 
+class MeshAccessConnection;
+class BaseConnectionHandle;
+class CherrySim;
+
+/*
+ * The ConnectionManager is the central place that manages the creation and deletion of all connections and also
+ * provides management functionality for tasks that cannot be done without having access to multiple connections.
+ */
 class ConnectionManager
 {
+	friend class MeshAccessConnection;
+	friend class BaseConnectionHandle;
+	friend class CherrySim;
 private:
 	//Used within the send methods to put data
 	void QueuePacket(BaseConnection* connection, u8* data, u16 dataLength, bool reliable) const;
@@ -64,6 +84,14 @@ private:
 	u16 timeSinceLastTimeSyncIntervalDs = 0;	//Let's not spam the connections with time syncs.
 
 	u32 uniqueConnectionIdCounter = 0; //Counts all created connections to assign "unique" ids
+
+	BaseConnection* GetRawConnectionByUniqueId(u32 uniqueConnectionId) const;
+	BaseConnection* GetRawConnectionFromHandle(u16 connectionHandle) const;
+
+TESTER_PUBLIC:
+	BaseConnection* allConnections[TOTAL_NUM_CONNECTIONS];
+
+
 
 public:
 	ConnectionManager();
@@ -88,18 +116,17 @@ public:
 	void NotifyNewConnection();
 	void NotifyDeleteConnection();
 
-	BaseConnections GetBaseConnections(ConnectionDirection direction) const;
-	MeshConnections GetMeshConnections(ConnectionDirection direction) const;
+	BaseConnections       GetBaseConnections(ConnectionDirection direction) const;
+	MeshConnections       GetMeshConnections(ConnectionDirection direction) const;
+	MeshAccessConnections GetMeshAccessConnections(ConnectionDirection direction) const;
 	BaseConnections GetConnectionsOfType(ConnectionType connectionType, ConnectionDirection direction) const;
-
-	BaseConnection* allConnections[TOTAL_NUM_CONNECTIONS];
 
 	i8 getFreeConnectionSpot() const;
 
 	bool HasFreeConnection(ConnectionDirection direction) const;
 
 	//Returns the connection that is currently doing a handshake or nullptr
-	MeshConnection* GetConnectionInHandshakeState() const;
+	MeshConnectionHandle GetConnectionInHandshakeState() const;
 
 	ErrorType ConnectAsMaster(NodeId partnerId, FruityHal::BleGapAddr* address, u16 writeCharacteristicHandle, u16 connectionIv);
 
@@ -112,7 +139,7 @@ public:
 	//Functions used for sending messages
 	void SendMeshMessage(u8* data, u16 dataLength, DeliveryPriority priority) const;
 
-	void SendModuleActionMessage(MessageType messageType, ModuleId moduleId, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool lookback) const;
+	ErrorTypeUnchecked SendModuleActionMessage(MessageType messageType, ModuleId moduleId, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool lookback) const;
 
 	void BroadcastMeshPacket(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable) const;
 
@@ -128,17 +155,15 @@ public:
 
 	//Internal use only, do not use
 	//Can send packets as WRITE_REQ (required for some internal functionality) but can lead to problems with the SoftDevice
-	void SendMeshMessageInternal(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable, bool loopback, bool toMeshAccess) const;
+	ErrorType SendMeshMessageInternal(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable, bool loopback, bool toMeshAccess) const;
 
 
-	BaseConnection* GetConnectionFromHandle(u16 connectionHandle) const;
-	BaseConnection* GetConnectionByUniqueId(u32 uniqueConnectionId) const;
-	MeshConnection* GetMeshConnectionToPartner(NodeId partnerId) const;
-	// By definition, this method will only return a maximum of one connection. Sometimes the Connection Index is interesting however.
-	// In such cases this function can be used instead of GetConnectionByUniqueId
-	BaseConnections GetConnectionsByUniqueId(u32 uniqueConnectionId) const; 
+	BaseConnectionHandle GetConnectionFromHandle(u16 connectionHandle) const;
+	BaseConnectionHandle GetConnectionByUniqueId(u32 uniqueConnectionId) const;
+	MeshAccessConnectionHandle GetMeshAccessConnectionByUniqueId(u32 uniqueConnectionId) const;
+	MeshConnectionHandle GetMeshConnectionToPartner(NodeId partnerId) const;
 
-	MeshConnection* GetMeshConnectionToShortestSink(const BaseConnection* excludeConnection) const;
+	MeshConnectionHandle GetMeshConnectionToShortestSink(const BaseConnection* excludeConnection) const;
 	ClusterSize GetMeshHopsToShortestSink(const BaseConnection* excludeConnection) const;
 
 	u16 GetPendingPackets() const;
@@ -151,7 +176,7 @@ public:
 	void MessageReceivedCallback(BaseConnectionSendData* sendData, u8* data) const;
 
 
-	u32 RequestDataLengthExtensionAndMtuExchange(BaseConnection* c);
+	ErrorType RequestDataLengthExtensionAndMtuExchange(BaseConnection* c);
 	void MtuUpdatedHandler(u16 connHandle, u16 mtu);
 
 	void GapConnectionReadyForHandshakeHandler(BaseConnection* c);

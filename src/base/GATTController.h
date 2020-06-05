@@ -28,19 +28,17 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
+#pragma once
+
+#include <types.h>
+#include <FruityHal.h>
+
 /*
  * The GATTController wraps SoftDevice calls that are needed to send messages
  * between devices. Data is transmitted through a single characteristic.
  * The handle of this characteristic is broadcasted with the discovery (JOIN_ME)
  * packets of the mesh. If a write to the mesh characteristic occurs, a handler is called.
  */
-
-
-#pragma once
-
-#include <types.h>
-#include <FruityHal.h>
-
 class GATTController
 {
 public:
@@ -52,10 +50,10 @@ public:
 
 	//FUNCTIONS
 
-	u32 bleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable) const;
-	u32 bleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength) const;
+	ErrorType bleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable) const;
+	ErrorType bleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength) const;
 
-	u32 DiscoverService(u16 connHandle, const FruityHal::BleGattUuid &p_uuid);
+	ErrorType DiscoverService(u16 connHandle, const FruityHal::BleGattUuid &p_uuid);
 
 private:
 

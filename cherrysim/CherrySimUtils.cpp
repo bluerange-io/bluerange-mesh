@@ -35,35 +35,6 @@
 #include <filesystem>
 #endif
 
-#if !defined(_MSC_BUILD) && !defined(_WIN32)
-static char *strrev(char *str)
-{
-      char *p1, *p2;
-
-      if (! str || ! *str)
-            return str;
-      for (p1 = str, p2 = str + strlen(str) - 1; p2 > p1; ++p1, --p2)
-      {
-            *p1 ^= *p2;
-            *p2 ^= *p1;
-            *p1 ^= *p2;
-      }
-      return str;
-}
-#endif // !defined(_MSC_BUILD) && !defined(_WIN32) 
-
-const char* ALPHABET = "BCDFGHJKLMNPQRSTVWXYZ123456789";
-void CherrySimUtils::generateBeaconSerialForIndex(u32 index, char* buffer) {
-	for (u32 i = 0; i < NODE_SERIAL_NUMBER_LENGTH; i++) {
-		int rest = (int)(index % strlen(ALPHABET));
-		buffer[i] = ALPHABET[rest];
-		index /= strlen(ALPHABET);
-	}
-	buffer[NODE_SERIAL_NUMBER_LENGTH] = '\0';
-
-	strrev(buffer);
-}
-
 std::set<int> CherrySimUtils::generateRandomNumbers(const int min, const int max, const unsigned int count)
 {
 	if (!(min < max) || ((int)count > max - min)) SIMEXCEPTION(IllegalArgumentException); //Wrong parameters

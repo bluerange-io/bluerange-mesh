@@ -32,6 +32,10 @@
 
 #include <Module.h>
 
+/*
+ * This is a template for a FruityMesh module.
+ * A comment should be here to provide a least a short description of its purpose.
+ */
 class TemplateModule: public Module
 {
 	private:

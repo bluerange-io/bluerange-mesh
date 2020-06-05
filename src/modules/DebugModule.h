@@ -44,7 +44,11 @@ enum class FloodMode : u8{
 	UNRELIABLE_SPLIT = 4
 };
 
-
+/**
+ * The DebugModule contains functionality for debugging a mesh at runtime, e.g.
+ * sending of flood messages, testing for throughput, ....
+ * The functionality might change at any time so it is not a specified api.
+ */
 class DebugModule: public Module
 {
 	private:
@@ -203,6 +207,7 @@ class DebugModule: public Module
 
 		void CauseHardfault() const;
 
+		void CauseStackOverflow() const;
 
 	public:
 		DECLARE_CONFIG_AND_PACKED_STRUCT(DebugModuleConfiguration);
@@ -244,23 +249,23 @@ class DebugModule: public Module
 
 		DebugModule();
 
-		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override;
+		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
 
-		void ResetToDefaultConfiguration() override;
+		void ResetToDefaultConfiguration() override final;
 
-		void TimerEventHandler(u16 passedTimeDs) override;
+		void TimerEventHandler(u16 passedTimeDs) override final;
 
 		void SendStatistics(NodeId receiver) const;
 
 #if IS_ACTIVE(BUTTONS)
-		void ButtonHandler(u8 buttonId, u32 holdTimeDs) override;
+		void ButtonHandler(u8 buttonId, u32 holdTimeDs) override final;
 #endif
 
 		#ifdef TERMINAL_ENABLED
-		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
+		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
 		#endif
 
-		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
+		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
 
 		u32 getPacketsIn();
 		u32 getPacketsOut();

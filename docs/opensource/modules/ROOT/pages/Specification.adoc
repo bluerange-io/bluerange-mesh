@@ -78,11 +78,10 @@ Another type of advertising packet used by FruityMesh uses the Service Data Adv 
 FruityMesh can be used to distribute all advertising packets that conform to the BLE specification. These can be Eddystone, iBeacon or any other kind of advertising messages. These are however not essential for FruityMesh itself and are therefore not documented here. Have a look at the <<AdvertisingModule.adoc#,AdvertisingModule>> for more information.
 
 == Connection Packets
-The mesh uses a number of packets that are sent
-over connections. Most packets that are sent over connections must have this header. There are some exceptions to this (e.g. split packets use a two byte message header for less overhead. The _messageType_ is used to identify if the _connPacketHeader_ is used or not.
+The mesh uses a number of packets that are sent over connections. Most packets that are sent over connections must have this header. There are some exceptions to this (e.g. split packets use a two byte message header for less overhead. The _messageType_ is used to identify if the _connPacketHeader_ is used or not.
 
+[#connPacketHeader]
 === Connection Packet Header
-
 .Format of a connPacketHeader
 [cols="1,1,2,3"]
 |===
@@ -93,10 +92,11 @@ over connections. Most packets that are sent over connections must have this hea
 |2| u16 | _receiverId_ | Node ID of the receiver
 |===
 
+[#connPacketModule]
 === Module Connection Packet Header
 Modules use an extended message header to guarantee that there are no collisions between different functionality. This extended header is used for the following messageTypes:
 
-.Messages in extended package header
+.Typical Message Types with extended package header
 [cols="1,2,2"]
 |===
 |MessageType|Name|Description
@@ -113,7 +113,7 @@ The following describes the format of the extended header:
 |===
 |Bytes| Type| Name| Description
 
-|5|connPacketHeader |_header_| The standard _connPacketHeader_ used for all messages.
+|5|xref:#connPacketHeader[connPacketHeader] |_header_| MessageType must be one e.g. of the above.
 |1|u8 |_moduleId_| The id of a module, a module provides different functionality for one specific task.
 |1|u8 |_requestHandle_| A handle that can be used e.g. like a counter. Responses will always be returned with the same handle given in the request.
 |1|u8 |_actionType_| This is the type of action that should be executed by the module. An individual list of _subCommands_ is available for each of the _messageTypes_ given above. E.g. there could be a `MODULE_TRIGGER_ACTION` message with the _actionType_ set to 1 (PING) to execute a ping. The response would be a `MODULE_ACTION_RESPONSE` message with the _actionType_ set to 1 (`PING_RESPONSE`).
@@ -132,27 +132,34 @@ There are different node ID ranges that are used for different purposes:
 |Node ID|Usage
 
 |0| Broadcast address to reach all nodes in a network
-|1...1999| Uniquely address devices (nodes, sinks, ...)
-|2000...19999| Virtual addresses to address smartphones connected to the mesh
-|20000...20999| Address groups
-|30000| Address for the current node itself
+|1...1999| Uniquely address devices (nodes, sinks, ...) given by enrollment
+|2000...19999| Virtual addresses to address smartphones connected to the mesh (dynamically assigned, aka. virtual partner id)
+|20000...20999| Address groups of devices (statically assigned at compile time)
+|30000| Address for the current node itself (similar to localhost)
 |30001...30999| Specify the number of hops that a packet can travel. (30 001 e.g. specifies that the packet must only reach the direct neighbours)
-|31000| Have a packet travel to the shortest sink
-possible (not yet implemented)
-|33000...39999| Assign nodeIds uniquely over multiple meshes for the same organization
+|31000| Used to send a packet to all sink nodes (see xref:#deviceTypes[Device Types])
+|32000| NodeId given to non-mesh devices that can connect via a MeshAccessConnection (e.g. a Smartphone). This is replaced by a virtual partner id during communication.
+|33000...39999| Assign nodeIds uniquely over multiple meshes for the same organization (used for assets that roam between different networks)
 |65535| Invalid node ID, which is used for internal errors
 |others| All other node IDs are currently reserved
 |===
 
+[#SerialNumbers]
 == Serial Numbers / SerialNumberIndex
-The serial numbers are assigned
-randomly using the _chipId_ when developing with the open source variant.
-They should however be uniquely assigned using the UICR once devices go
-into production. Contact M-Way Solutions GmbH before using serial numbers in production
-with the M-Way Solutions GmbH manufacturing ID. The serialNumberIndex is a 32 bit
-unsigned integer that can be uniquely mapped from and to a serial number
-using the _GenerateBeaconSerialForIndex_ and _GetIndexForSerial_ methods in
-the _Utility_ class.
+The serial numbers use a special alphabet of ASCII characters that is easily readable (`BCDFGHJKLMNPQRSTVWXYZ123456789`) and will not result in funny words because it does not contain vocals. Serial numbers are either 5 or 7 characters long. Each serial number can be converted to a serialNumberIndex which is represented as an unsigned 32 bit integer. If a serial number is human readable, it can be printed in its ASCII representation, but if sending a serialNumber over the network or using it in code, the serialNumberIndex should be used. Check out the appropriate methods (_GenerateBeaconSerialForIndex_ and _GetIndexForSerial_) in the _Utility_ class on how to convert the serial number. Also see the appropriate tests in the _TestUtility_ class.
+
+There are two types of serial number ranges. There is a range of two billion serial numbers that is exclusively managed by M-Way Solutions. This range contains serial numbers with 5 characters and also serial numbers with 7 characters. Parts of this range are licensed to partners. The second range can be used for projects working with the open source version of FruityMesh completely free of charge. This is always a 7 character serial number.
+
+=== M-Way Solutions Proprietary Serial Number Range
+The serialNumberIndex of this range starts with 0 for the serial number `BBBBB` and increments up to `0x7FFFFFFF` for the serial number `D8PJQ8K`. This range should not be used without consulting us beforehand because serial numbers will clash otherwise. We assign sub-ranges to our partners which allows them to use serial numbers with 5 characters.
+
+=== Open Source Testing Range
+To provide beginners with an easy method for testing FruityMesh, we decided to open source a part of our proprietary range that contains nicely readable serial numbers. This range starts from `2673000` (`FMBBB`) and ranges until `2699999` (`FM999`).By default, the serial number is generated randomly (from the unique deviceId stored in the chipset) within this testing range if there is no UICR data available (see _generateRandomSerialAndNodeId_ in the Config class). This makes it easier to start testing FruityMesh. You should not distribute products that use a serial number from this range as it will clash with others.
+
+=== Open Source Serial Number Range for Products
+The open sourced serial number range that you can use for final products uses serial numbers with 7 characters to avoid a clash between different vendors. A serial number is constructed by setting the most significant bit of the serialNumberIndex to 1. The next 16 bits must be set to a https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers/[two byte company identifier assigned by the Bluetooth SIG]. The remaining 15 bits are used to generate the individual serial numbers for this vendorId. This gives each vendor the possibility to generate around 32 thousand unique serial numbers. (See _VendorSerial_ type).
+
+If you do not have a Bluetooth SIG company identifier yet, you can use the manufacturer id from M-Way Solutions (`0x024D`). This range starts from `0x81268000` (`D9HCK3N`) and ranges until `0x8126FFFF` (`D9HDSHW`). You should not publicly distribute products that use this serial number range as it could clash with other serial numbers. If you want to distribute a product, you should register with the Bluetooth SIG to get a free company identifier that you can set as the MANUFACTURER_ID in the configuration.
 
 [#EncryptionKeys]
 == Encryption Keys
@@ -217,10 +224,11 @@ regenerated and distributed to users.
 TIP: A key that is filled with 0xFF is considered invalid and cannot be
 used.
 
+[#deviceTypes]
 == Device Types
 There are different device types that are given to nodes with specific functionality:
 
-.List of device types
+.List of Device Types
 [cols="1,2,4"]
 |===
 |DeviceType |Name |Description
@@ -237,6 +245,8 @@ presence so that it can be detected by a mesh.
 leaf but will not relay any data (Useful if its position changes but it
 needs a constant data connection)
 |===
+
+For more explanation, see xref:Concepts.adoc#deviceTypes[Device Types].
 
 [#UICR]
 == UICR
@@ -261,17 +271,16 @@ persistent across reboots as it is generated according to the internal chip id f
 
 |0|4|MAGIC_NUMBER|Must be set to 0xF07700 when UICR data is available
 |4|4|BOARD_TYPE|Accepts an integer that defines the hardware board that FruityMesh should be running on (_boardId_, a.k.a. _boardType_)
-|8|8|SERIAL_NUMBER|The given serial number as ASCII (zero terminated)
+|8|8|SERIAL_NUMBER|Deprecated: This contained the given serial number as ASCII (zero terminated) but is not used anymore (since 12.05.2020). Must now be set to FFFF....FFFF. The serial number is instead calculated from the SERIAL_NUMBER_INDEX
 |16|16|NODE_KEY|Should be securely and randomly generated
 |32|4|MANUFACTURER_ID|Set to manufacturer ID according to the
 https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers[BLE
 company identifiers]
-|36|4|DEFAULT_NETWORK_ID|0: unenrolled +
-1: using an enrollment network +
-other: default enrollment
-|40|4|DEFAULT_NODE_ID|Node ID to be used if not enrolled
-|44|4|DEVICE_TYPE|Type of device according to <<Device Types>> |48|4|SERIAL_NUMBER_INDEX|Unique index that represents the serial number
-|52|16|NETWORK_KEY|Default network key if preenrollment is used
+|36|4|DEFAULT_NETWORK_ID|0: unenrolled; 1: using an enrollment network; other: default enrollment
+|40|4|DEFAULT_NODE_ID|Node ID to be used while not enrolled
+|44|4|DEVICE_TYPE|Type of device according to <<Device Types>>
+|48|4|SERIAL_NUMBER_INDEX|Unique index that represents the serial number
+|52|16|NETWORK_KEY|Default network key if pre-enrollment is used
 |===
 
 == Heap usage

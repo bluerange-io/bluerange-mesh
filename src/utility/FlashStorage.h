@@ -28,10 +28,6 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
- * This Storage class should provide easy access to all storage functionality
- * */
-
 #pragma once
 
 #include <PacketQueue.h>
@@ -114,25 +110,24 @@ struct FlashStorageTaskItem
 
 
 constexpr int FLASH_STORAGE_RETRY_COUNT = 10;
-#if defined(NRF51)
-constexpr int FLASH_STORAGE_QUEUE_SIZE = 512;
-#else
 constexpr int FLASH_STORAGE_QUEUE_SIZE = 2048;
-#endif
 
+/*
+ * This Storage class provides easy access to all storage operations
+ * in persistent flash memory. It offers the possibilities to either store
+ * data from some memory location but can also buffer the data until it is
+ * stored for easier usage (asynchronously).
+ */
 class FlashStorage
 {
 	private:
 				
-		u32 taskBuffer[FLASH_STORAGE_QUEUE_SIZE / sizeof(u32)] = { 0 };
+		u32 taskBuffer[FLASH_STORAGE_QUEUE_SIZE / sizeof(u32)] = {};
 		PacketQueue taskQueue;
 
 		FlashStorageTaskItem* currentTask = nullptr;
 		i8 retryCount = 0;
-		u16 transactionCounter = 0;
 		bool retryCallingSoftdevice = false;
-
-		FlashStorageEventListener* emptyHandler = nullptr;
 
 		//Starts or continues to execute flash tasks
 		void ProcessQueue(bool continueCurrentTask);

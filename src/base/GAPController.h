@@ -28,16 +28,15 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
- * The GAP Controller wraps SoftDevice calls for initiating and accepting connections
- * It should also provide encryption in the future.
- */
-
 #pragma once
 
 #include "types.h"
 #include "FruityHal.h"
 
+/*
+ * The GAP Controller wraps SoftDevice calls for initiating and accepting connections
+ * It should also provide encryption in the future.
+ */
 class GAPController
 {
 public:

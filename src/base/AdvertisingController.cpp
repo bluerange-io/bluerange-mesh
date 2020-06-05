@@ -47,8 +47,6 @@ AdvertisingController::AdvertisingController()
 {
 	CheckedMemset(&currentAdvertisingParams, 0x00, sizeof(currentAdvertisingParams));
 	CheckedMemset(&baseGapAddress, 0, sizeof(baseGapAddress));
-	jobs.zeroData();
-	advData.zeroData();
 }
 
 AdvertisingController & AdvertisingController::getInstance()
@@ -67,13 +65,17 @@ void AdvertisingController::Initialize()
 	currentAdvertisingParams.channelMask.ch39Off = Conf::advertiseOnChannel39 ? 0 : 1;
 
 	//Read used GAP address, will always succeed
-	FruityHal::BleGapAddressGet(&baseGapAddress);
+	baseGapAddress = FruityHal::GetBleGapAddress();
 }
 
 void AdvertisingController::Deactivate()
 {
 	isActive = false;
-	FruityHal::BleGapAdvStop(handle);
+	const ErrorType err = FruityHal::BleGapAdvStop(handle);
+	if (err != ErrorType::SUCCESS)
+	{
+		GS->logger.logCustomError(CustomErrorTypes::WARN_ADVERTISING_CONTROLLER_DEACTIVATE_FAILED, (u32)err);
+	}
 }
 
 /**
@@ -87,7 +89,7 @@ void AdvertisingController::Deactivate()
 AdvJob* AdvertisingController::AddJob(const AdvJob& job){
 	if (job.type == AdvJobTypes::INVALID) return nullptr;
 
-	for(int i=0; i< jobs.length; i++){
+	for(u32 i=0; i< jobs.size(); i++){
 		if(jobs[i].type == AdvJobTypes::INVALID){
 			currentNumJobs++;
 			jobs[i] = job;
@@ -133,7 +135,7 @@ void AdvertisingController::RefreshJob(const AdvJob* jobHandle){
 u16 AdvertisingController::GetLowestAdvertisingInterval()
 {
 	u16 newInterval = UINT16_MAX;
-	for (int i = 0; i< jobs.length; i++) {
+	for (u32 i = 0; i< jobs.size(); i++) {
 		if (jobs[i].type == AdvJobTypes::SCHEDULED && jobs[i].advertisingInterval < newInterval) {
 			newInterval = jobs[i].advertisingInterval;
 		}
@@ -146,7 +148,7 @@ void AdvertisingController::RemoveJob(AdvJob* jobHandle)
 {
 	if(jobHandle == nullptr) return;
 
-	for (int i = 0; i < jobs.length; i++) {
+	for (u32 i = 0; i < jobs.size(); i++) {
 		if (&(jobs[i]) == jobHandle && jobs[i].type != AdvJobTypes::INVALID) {
 			logt("ADV", "Removing job %u", i);
 			currentNumJobs--;
@@ -204,7 +206,7 @@ void AdvertisingController::DetermineAndSetAdvertisingJob()
 void AdvertisingController::InitJobScheduling(){
 	logt("ADVS", "Resetting Scheduling" SEP);
 	sumSlots = 0;
-	for(int i=0; i< jobs.length; i++){
+	for(u32 i=0; i< jobs.size(); i++){
 		if (jobs[i].type == AdvJobTypes::SCHEDULED) {
 			//Refill slots, but only if there are none left (happens if a delay is set)
 			if (jobs[i].currentSlots == 0) {
@@ -224,7 +226,7 @@ AdvJob* AdvertisingController::DetermineCurrentAdvertisingJob()
 {
 	logt("ADVS", "###### DETERMINE ADV JOB");
 	//Some logging
-	for (int i = 0; i < jobs.length; i++) {
+	for (u32 i = 0; i < jobs.size(); i++) {
 		if (jobs[i].type != AdvJobTypes::INVALID) {
 			logt("ADVS", "job %u: slots: %u, currentSlots: %u", i, jobs[i].slots, jobs[i].currentSlots);
 		}
@@ -250,7 +252,7 @@ AdvJob* AdvertisingController::DetermineCurrentAdvertisingJob()
 
 	//Go through list to pick the right job by random
 	//This loop must run to the end to
-	for(int i=0; i< jobs.length; i++){
+	for(u32 i=0; i< jobs.size(); i++){
 		//If we have an immediate job, select it
 		if(jobs[i].type == AdvJobTypes::IMMEDIATE){
 			//An immediate job does not count against sumSlots and delay is not considered
@@ -394,12 +396,13 @@ void AdvertisingController::SetAdvertisingState(AdvJob* job)
 	BaseConnections connections = GS->cm.GetBaseConnections(ConnectionDirection::DIRECTION_IN);
 	u8 connectedConnections = 0;
 	for(int i=0; i<connections.count; i++){
-		BaseConnection* conn = GS->cm.allConnections[connections.connectionIndizes[i]];
-		if (conn != nullptr) {
+		BaseConnectionHandle handle = connections.handles[i];
+		if (handle) {
+			ConnectionState cs = handle.GetConnectionState();
 			if (
-				conn->connectionState == ConnectionState::CONNECTED
-				|| conn->connectionState == ConnectionState::HANDSHAKING
-				|| conn->connectionState == ConnectionState::HANDSHAKE_DONE
+				   cs == ConnectionState::CONNECTED
+				|| cs == ConnectionState::HANDSHAKING
+				|| cs == ConnectionState::HANDSHAKE_DONE
 				) {
 				connectedConnections++;
 			}
@@ -455,13 +458,13 @@ void AdvertisingController::SetAdvertisingState(AdvJob* job)
 
 		//We can only restart advertising if stopping worked
 		if(advertisingState == AdvertisingState::DISABLED){
-			err = FruityHal::BleGapAdvStart(&handle, &currentAdvertisingParams);
+			err = FruityHal::BleGapAdvStart(&handle, currentAdvertisingParams);
 			if(err == ErrorType::SUCCESS){
 				logt("ADV", "Advertising enabled");
 				advertisingStateAction = AdvertisingStateAction::OK;
 				advertisingState = AdvertisingState::ENABLED;
 			} else {
-				logt("ERROR", "Error restarting advertisement %u", (u32)err);
+				logt("WARNING", "Error restarting advertisement %u", (u32)err);
 				return;
 			}
 			err = FruityHal::RadioSetTxPower(Conf::defaultDBmTX, FruityHal::TxRole::ADVERTISING, handle);

@@ -89,7 +89,11 @@ BaseConnection* MeshConnection::ConnTypeResolver(BaseConnection* oldConnection, 
 		MeshConnections conn = GS->cm.GetMeshConnections(ConnectionDirection::DIRECTION_IN);
 		if(conn.count >= GS->config.meshMaxInConnections){
 			logt("CM", "Too many mesh in connections");
-			FruityHal::Disconnect(oldConnection->connectionHandle, FruityHal::BleHciError::REMOTE_USER_TERMINATED_CONNECTION);
+			const ErrorType err = FruityHal::Disconnect(oldConnection->connectionHandle, FruityHal::BleHciError::REMOTE_USER_TERMINATED_CONNECTION);
+			if (err != ErrorType::SUCCESS)
+			{
+				logt("CM", "Failed to disconnect because %u", (u32)err);
+			}
 			return nullptr;
 		}
 		else
@@ -179,8 +183,8 @@ bool MeshConnection::GapDisconnectionHandler(const FruityHal::BleHciError hciDis
 		GS->logger.logCustomError(CustomErrorTypes::INFO_IGNORING_CONNECTION_SUSTAIN_LEAF, partnerId);
 		return true;
 	}
-	//FIXME: Check if our partner is a leaf node, do not try to reconnect, probably out of range
-	//FIXME: We need to know the devicetype of our partner which we should send in the handshake message
+	//TODO: Check if our partner is a leaf node, do not try to reconnect, probably out of range
+	//TODO: We need to know the devicetype of our partner which we should send in the handshake message
 //	else if(direction == ConnectionDirection::OUT && partnerDeviceType == DeviceType::LEAF){
 //		return true;
 //	}
@@ -244,6 +248,21 @@ void MeshConnection::TryReestablishing()
 	mustRetryReestablishing = (err != ErrorType::SUCCESS);
 
 	logt("CONN", "reconnstatus %u", (u32)err);
+}
+
+void MeshConnection::HandoverMasterBit()
+{
+	//Remove the masterbit from this connection
+	connectionMasterBit = 0;
+	//Put the masterbit handover in the correct packet.
+	currentClusterInfoUpdatePacket.payload.connectionMasterBitHandover = 1;
+
+	logt("CONN", "SENDING MASTERBIT FROM NODE %u TO NODE %u", GS->node.configuration.nodeId, partnerId);
+}
+
+bool MeshConnection::HasConnectionMasterBit()
+{
+	return connectionMasterBit != 0;
 }
 
 void MeshConnection::GapReconnectionSuccessfulHandler(const FruityHal::GapConnectedEvent& connectedEvent)
@@ -376,7 +395,7 @@ bool MeshConnection::TransmitHighPrioData()
 		}
 		else {
 			SIMSTATCOUNT("highPrioQueueFull");
-			logt("ERROR", "Could not queue CLUSTER_UPDATE");
+			logt("WARNING", "Could not queue CLUSTER_UPDATE");
 
 			GS->logger.logCustomError(CustomErrorTypes::WARN_HIGH_PRIO_QUEUE_FULL, partnerId);
 
@@ -521,7 +540,11 @@ void MeshConnection::ConnectionMtuUpgradedHandler(u16 gattPayloadSize)
 			StartHandshakeAfterMtuExchange();
 		}
 		else {
-			SendReconnectionHandshakePacketAfterMtuExchange();
+			const ErrorType err = SendReconnectionHandshakePacketAfterMtuExchange();
+			if (err != ErrorType::SUCCESS)
+			{
+				logt("CM", "Failed to send reconnection handshake because %u", (u32)err);
+			}
 		}
 	}
 }
@@ -530,11 +553,11 @@ void MeshConnection::ConnectionMtuUpgradedHandler(u16 gattPayloadSize)
 void MeshConnection::StartHandshake()
 {
 	//Before starting our mesh handshake, we upgrade to a higher MTU if possible
-	u32 err = GS->cm.RequestDataLengthExtensionAndMtuExchange(this);
+	ErrorType err = GS->cm.RequestDataLengthExtensionAndMtuExchange(this);
 
 	//If we could not upgrade the MTU, we continue with our handshake
-	if(err != (u32)ErrorType::SUCCESS){
-		GS->logger.logCustomError(CustomErrorTypes::WARN_MTU_UPGRADE_FAILED, err);
+	if(err != ErrorType::SUCCESS){
+		GS->logger.logCustomError(CustomErrorTypes::WARN_MTU_UPGRADE_FAILED, (u32)err);
 
 		ConnectionMtuUpgradedHandler(MAX_DATA_SIZE_PER_WRITE);
 	}
@@ -713,7 +736,7 @@ void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendD
 		if (sendData->dataLength >= SIZEOF_CONN_PACKET_CLUSTER_ACK_1)
 		{
 			//Check if the other node does weird stuff
-			if(clusterAck1Packet.header.messageType != MessageType::INVALID || GS->cm.GetConnectionInHandshakeState() != this){
+			if(clusterAck1Packet.header.messageType != MessageType::INVALID || GS->cm.GetConnectionInHandshakeState().GetUniqueConnectionId() != uniqueConnectionId){
 				//TODO: disconnect? check this in sim
 				logt("ERROR", "HANDSHAKE ERROR ACK1 duplicate %u, %u", (u32)clusterAck1Packet.header.messageType, (u32)GS->node.currentDiscoveryState);
 
@@ -731,7 +754,7 @@ void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendD
 			this->partnerId = clusterAck1Packet.header.sender;
 			this->connectionMasterBit = 1;
 			this->hopsToSink = clusterAck1Packet.payload.hopsToSink;
-			logt("ERROR", "NODE %u CREATED MASTERBIT", GS->node.configuration.nodeId);
+			logt("HANDSHAKE", "NODE %u CREATED MASTERBIT", GS->node.configuration.nodeId);
 
 			//Confirm to the new node that it just joined our cluster => send ACK2
 			connPacketClusterAck2 outPacket2;
@@ -763,7 +786,7 @@ void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendD
 	{
 		if (sendData->dataLength >= SIZEOF_CONN_PACKET_CLUSTER_ACK_2)
 		{
-			if(clusterAck2Packet.header.messageType != MessageType::INVALID || GS->cm.GetConnectionInHandshakeState() != this){
+			if(clusterAck2Packet.header.messageType != MessageType::INVALID || GS->cm.GetConnectionInHandshakeState().GetUniqueConnectionId() != uniqueConnectionId){
 				//TODO: disconnect
 				logt("ERROR", "HANDSHAKE ERROR ACK2 duplicate %u, %u", (u32)clusterAck2Packet.header.messageType, (u32)GS->node.currentDiscoveryState);
 				GS->logger.logCustomCount(CustomErrorTypes::COUNT_HANDSHAKE_ACK2_DUPLICATE);
@@ -799,11 +822,11 @@ void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendD
 void MeshConnection::SendReconnectionHandshakePacket()
 {
 	//Before starting our mesh handshake, we upgrade to a higher MTU if possible
-	u32 err = GS->cm.RequestDataLengthExtensionAndMtuExchange(this);
+	ErrorType err = GS->cm.RequestDataLengthExtensionAndMtuExchange(this);
 
 	//If we could not upgrade the MTU, we continue with our handshake
-	if(err != (u32)ErrorType::SUCCESS){
-		GS->logger.logCustomError(CustomErrorTypes::WARN_MTU_UPGRADE_FAILED, err);
+	if(err != ErrorType::SUCCESS){
+		GS->logger.logCustomError(CustomErrorTypes::WARN_MTU_UPGRADE_FAILED, (u32)err);
 
 		ConnectionMtuUpgradedHandler(MAX_DATA_SIZE_PER_WRITE);
 	}
@@ -824,7 +847,7 @@ ErrorType MeshConnection::SendReconnectionHandshakePacketAfterMtuExchange()
 	//TODO: Add a check if the reliable buffer is free?
 
 	//We send the reconnect packet
-	u32 err = GS->gattController.bleWriteCharacteristic(
+	ErrorType err = GS->gattController.bleWriteCharacteristic(
 		connectionHandle,
 		partnerWriteCharacteristicHandle,
 		(u8*)&packet,
@@ -832,12 +855,12 @@ ErrorType MeshConnection::SendReconnectionHandshakePacketAfterMtuExchange()
 		false);
 
 
-	logt("HANDSHAKE", "writing to connHnd %u, partnerWriteHnd %u, err %u",connectionHandle, partnerWriteCharacteristicHandle, err);
+	logt("HANDSHAKE", "writing to connHnd %u, partnerWriteHnd %u, err %u",connectionHandle, partnerWriteCharacteristicHandle, (u32)err);
 
 	//TODO: If we notice that we have too many errors here, we can optimize this part and retry sending the reconnect packet
 
 	//We must account for buffers ourself if we do not use the queue
-	if (err == (u32)ErrorType::SUCCESS) {
+	if (err == ErrorType::SUCCESS) {
 		manualPacketsSent++;
 	}
 	else {

@@ -28,17 +28,11 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
- * The ScanController wraps SoftDevice calls around scanning/observing and
- * provides an interface to control this behaviour.
- */
-
 #pragma once
 
 
 #include <types.h>
-
-#define SCAN_CONTROLLER_JOBS_MAX	4
+#include <array>
 
 enum class ScanJobState : u8{
 	INVALID,
@@ -60,14 +54,17 @@ typedef struct ScanJob
 	ScanState		type;
 }ScanJob;
 
+/*
+ * The ScanController wraps SoftDevice calls around scanning/observing and
+ * provides an interface to control this behaviour.
+ * It also includes a job manager where all scan jobs are managed.
+ */
 class ScanController
 {
 private:
 	FruityHal::BleGapScanParams currentScanParams;
 	bool scanStateOk = true;
-	SimpleArray<ScanJob, SCAN_CONTROLLER_JOBS_MAX> jobs;
-	ScanJob* currentActiveJob = nullptr;
-
+	std::array<ScanJob, 4> jobs{};
 
 	void TryConfiguringScanState();
 

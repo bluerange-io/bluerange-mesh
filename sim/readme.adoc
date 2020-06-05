@@ -1,5 +1,0 @@
-= Old Simulator
-
-Take a look at <<../doc/Simulator.adoc#,the Simulator documentation>> for more information.
-
-You will need to open our old simulator in a browser that still supports loading flash content, or you might need to open the .swf file in a compatible player.

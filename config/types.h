@@ -32,6 +32,7 @@
  * This file contains custom types as well as values from the specification which must not be
  * changed.
  */
+
 #pragma once
 
  /*## General types for convenience #############################################################*/
@@ -48,16 +49,16 @@ extern "C" {
 
 #if defined(DEBUG) && !defined(SIM_ENABLED)
 #define FRUITYMESH_ERROR_CHECK(ERR_CODE)                          \
-	if (ERR_CODE != 0)                                              \
-	{                                                               \
+	if ((u32)ERR_CODE != 0)                                       \
+	{                                                             \
 		logt("ERROR", "App error code:%s(%u), file:%s, line:%u", Logger::getGeneralErrorString((ErrorType)ERR_CODE), (u32)ERR_CODE, p_file_name, (u32)line_num); \
-		GS->appErrorHandler((u32)ERR_CODE);                           \
+		GS->appErrorHandler((u32)ERR_CODE);                       \
 	}
 #else
 #define FRUITYMESH_ERROR_CHECK(ERR_CODE)                          \
-	if (ERR_CODE != 0)                                              \
-	{                                                               \
-		GS->appErrorHandler((u32)ERR_CODE);                           \
+	if ((u32)ERR_CODE != 0)                                       \
+	{                                                             \
+		GS->appErrorHandler((u32)ERR_CODE);                       \
 	}
 #endif // defined(DEBUG) && !defined(SIM_ENABLED)
 
@@ -71,7 +72,7 @@ extern "C" {
 
 #ifdef SIM_ENABLED
 #include "StackWatcher.h"
-#define START_OF_FUNCTION() StackWatcher sw;
+#define START_OF_FUNCTION() StackWatcher::check(); if(cherrySimInstance != nullptr) {cherrySimInstance->SimulateInterrupts();}
 #else
 #define START_OF_FUNCTION
 #endif
@@ -88,16 +89,22 @@ extern "C" {
 
 /*## General defines #############################################################*/
 
-// Mesh identifiers
-#define COMPANY_IDENTIFIER 0x024D // Company identifier for manufacturer specific data header (M-Way Solutions GmbH) - Should not be changed to ensure compatibility with the mesh protocol
-#define MESH_IDENTIFIER 0xF0 // Identifier that defines this as the fruitymesh protocol under the manufacturer specific data
-#define SERVICE_DATA_SERVICE_UUID16 0xFE12 // Service UUID (M-Way Solutions) to identify our custom mesh service, e.g. used for MeshAccessConnections
+// Mesh identifiers (DO NOT CHANGE!)
+// Do not change these if you want compatibility to other FruityMesh nodes!
+// In order to change the manufacturer, have a look for the MANUFACTURER_ID
+constexpr u16 MESH_COMPANY_IDENTIFIER = 0x024D; // Mesh Company identifier for manufacturer specific data header (M-Way Solutions GmbH)
+constexpr u8 MESH_IDENTIFIER = 0xF0; // Identifier that defines this as the fruitymesh protocol under the manufacturer specific data
+constexpr u16 MESH_SERVICE_DATA_SERVICE_UUID16 = 0xFE12; // Service UUID (M-Way Solutions) to identify our custom mesh service, e.g. used for MeshAccessConnections
 
-// Serial numbers in ASCII format are currently 5 bytes long and can be extended in the future
+// Serial numbers in ASCII format are currently 5 or 7 bytes long
 // A serial uses the alphabet "BCDFGHJKLMNPQRSTVWXYZ123456789".
-// This is good for readability (short, no inter-digit resemblance,
-// 25 million possible combinations, no funny words)
-#define NODE_SERIAL_NUMBER_LENGTH 5
+// This is good for readability (short, no inter-digit resemblance, 7-char range covers the whole serialNumberIndex, no funny words)
+// By default, a SerialNumber has 5 ASCII characters (plus 0 terminator), if the serialNumber index is bigger, it uses 7 characters (plus 0 terminator)
+constexpr size_t NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH = 8;
+//The open source serial number range for testing
+constexpr u32 SERIAL_NUMBER_FM_TESTING_RANGE_START = 2673000;
+constexpr u32 SERIAL_NUMBER_FM_TESTING_RANGE_END = 2699999;
+constexpr u32 INVALID_SERIAL_NUMBER_INDEX = 0xFFFFFFFFUL;
 
 // End of line seperators to use
 #define EOL "\r\n"
@@ -105,26 +112,25 @@ extern "C" {
 
 //Maximum data that can be transmitted with one write
 //Max value according to: http://developer.nordicsemi.com/nRF51_SDK/doc/7.1.0/s120/html/a00557.html
-#define MAX_DATA_SIZE_PER_WRITE 20
+constexpr size_t MAX_DATA_SIZE_PER_WRITE = 20;
 
-#define BLE_GAP_SCAN_PACKET_BUFFER_SIZE (31)
+constexpr size_t BLE_GAP_SCAN_PACKET_BUFFER_SIZE = 31;
 
 // An invalid entry or an empty word
-#define EMPTY_WORD 0xFFFFFFFFUL
-#define INVALID_SERIAL_NUMBER 0xFFFFFFFFUL
+constexpr u32 EMPTY_WORD = 0xFFFFFFFFUL;
 
 // Set in the first 4 bytes of UICR if factory settings are available
-#define UICR_SETTINGS_MAGIC_WORD 0xF07700
+constexpr u32 UICR_SETTINGS_MAGIC_WORD = 0xF07700;
 
 // Magic number for recognizing the app (saved at a fixed position)
-#define APP_ID_MAGIC_NUMBER 0xF012F134
+constexpr u32 APP_ID_MAGIC_NUMBER = 0xF012F134;
 
 // Magic numbers for enabling nordic secure dfu
 #define NORDIC_DFU_MAGIC_NUMBER_ADDRESS ((u8*)bootloaderAddress + (0x400 + sizeof(uint32_t) * 1))
-#define ENABLE_NORDIC_DFU_MAGIC_NUMBER 0xF012F117 //Magic number to enable the nordic dfu functionality in the bootloader
+constexpr u32 ENABLE_NORDIC_DFU_MAGIC_NUMBER = 0xF012F117; //Magic number to enable the nordic dfu functionality in the bootloader
 
 // Magic number that is used chose whether to reboot in safe mode or not
-#define REBOOT_MAGIC_NUMBER 0xE0F7213C
+constexpr u32 REBOOT_MAGIC_NUMBER = 0xE0F7213C;
 
 // Featureset group ids, these are used to determine if a firmware can be updated over the
 // air with a given firmware. For an update, the firmware group ids must match.
@@ -134,35 +140,49 @@ enum class FeatureSetGroup : NodeId
 	//These comments are used to parse values with FruityDeploy (do not remove)
 	//                              CHIP_NRF51            = 20000,
 	//                              CHIP_NRF52            = 20001,
-	/*FruityDeploy-FeatureSetGroup*/NRF51_SINK            = 20002,
+	//                              NRF51_SINK            = 20002, //Deprecated as of 09.04.2020
 	/*FruityDeploy-FeatureSetGroup*/NRF51_MESH            = 20003,
 	/*FruityDeploy-FeatureSetGroup*/NRF52_MESH            = 20004,
-	/*FruityDeploy-FeatureSetGroup*/NRF51_ASSET           = 20005,
+	//                              NRF51_ASSET           = 20005, //Deprecated as of 09.04.2020
 	/*FruityDeploy-FeatureSetGroup*/NRF52_ASSET           = 20006,
 	/*FruityDeploy-FeatureSetGroup*/NRF52_CLC_MESH        = 20007,
-	/*FruityDeploy-FeatureSetGroup*/NRF51_CLC_SINK        = 20008,
+	//                              NRF51_CLC_SINK        = 20008, //Deprecated as of 09.04.2020
 	/*FruityDeploy-FeatureSetGroup*/NRF52_VS_MESH         = 20009,
 	/*FruityDeploy-FeatureSetGroup*/NRF52_VS_SINK         = 20010,
 	/*FruityDeploy-FeatureSetGroup*/NRF52_SINK            = 20011,
-	/*FruityDeploy-FeatureSetGroup*/NRF51_EINK            = 20012,
+	//                              NRF51_EINK            = 20012, //Deprecated as of 09.04.2020
 	/*FruityDeploy-FeatureSetGroup*/NRF52840_WM_MESH      = 20013,
 	/*FruityDeploy-FeatureSetGroup*/NRF52_PC_BRIDGE       = 20014,
 	//                              CHIP_NRF52840         = 20015,
 	/*FruityDeploy-FeatureSetGroup*/NRF52840_MESH         = 20016,
 	/*FruityDeploy-FeatureSetGroup*/NRF52840_SINK_USB     = 20017,
 	/*FruityDeploy-FeatureSetGroup*/NRF52840_MESH_USB     = 20018,
+	/*FruityDeploy-FeatureSetGroup*/NRF52840_BP_MESH      = 20019,
 };
 
 //Sets the maximum number of firmware group ids that can be compiled into the firmware
-#define MAX_NUM_FW_GROUP_IDS 2
+constexpr u32 MAX_NUM_FW_GROUP_IDS = 2;
 
 /*## Types and enums #############################################################*/
 #define STATIC_ASSERT_SIZE(T, size) static_assert(sizeof(T) == (size), "STATIC_ASSERT_SIZE failed!")
 
+#pragma pack(push)
+#pragma pack(1)
+union VendorSerial {
+	struct {
+		u32 vendorSerialId : 15; //An incrementing range for each vendor
+		u32 vendorId : 16; //Must be set to the vendor id assigned by the Bluetooth SIG, can be set to 0x024D (Mway) for testing and small projects
+		u32 vendorFlag : 1; // Must be set to 1 to indicate a vendor serialNumber
+	} parts;
+	u32 serialIndex;
+};
+STATIC_ASSERT_SIZE(VendorSerial, 4);
+#pragma pack(pop)
+
 //This struct is used for saving information that is retained between reboots
 #pragma pack(push)
 #pragma pack(1)
-#define RAM_PERSIST_STACKSTRACE_SIZE 4
+constexpr i32 RAM_PERSIST_STACKSTRACE_SIZE = 4; //Has to be signed as the stacktrace_handler passes an int.
 struct RamRetainStruct {
 	RebootReason rebootReason; // e.g. hardfault, softdevice fault, app fault,...
 	u32 code1;
@@ -180,7 +200,7 @@ STATIC_ASSERT_SIZE(RamRetainStruct, RAM_PERSIST_STACKSTRACE_SIZE * 4 + 18);
 #pragma pack(1)
 //All module configs have to be packed with #pragma pack and their declarations
 //have to be aligned on a 4 byte boundary to be able to save them
-#define SIZEOF_MODULE_CONFIGURATION_HEADER 4
+constexpr size_t SIZEOF_MODULE_CONFIGURATION_HEADER = 4;
 typedef struct ModuleConfiguration{
 	ModuleId moduleId; //Id of the module, compared upon load and must match
 	u8 moduleVersion; //version of the configuration
@@ -199,10 +219,10 @@ STATIC_ASSERT_SIZE(ModuleConfiguration, SIZEOF_MODULE_CONFIGURATION_HEADER);
 //Uses word-sized variables to avoid padding problems. No need to save space in our bootloader flash-page
 
 // Magic number to check if a new firmware should be installed
-#define BOOTLOADER_MAGIC_NUMBER 0xF0771234
+constexpr u32 BOOTLOADER_MAGIC_NUMBER = 0xF0771234;
 
 // Bitmask to store if a chunk has been stored in flash and was crc checked
-#define BOOTLOADER_BITMASK_SIZE 60
+constexpr u32 BOOTLOADER_BITMASK_SIZE = 60;
 
 #ifndef SIM_ENABLED
 // Location of the flash start
@@ -266,15 +286,15 @@ STATIC_ASSERT_SIZE(BootloaderSettings, (16 + BOOTLOADER_BITMASK_SIZE + BOOTLOADE
 #endif
 #if defined(_MSC_VER)
 #include <malloc.h>
-#define DECLARE_CONFIG_AND_PACKED_STRUCT(structname) structname configuration
-#define DYNAMIC_ARRAY(arrayName, size) u8* arrayName = (u8*)alloca(size)
+#define DECLARE_CONFIG_AND_PACKED_STRUCT(structname) structname configuration = {}
+#define DYNAMIC_ARRAY(arrayName, size) std::vector<uint8_t> arrayName##Base(size); uint8_t* arrayName = arrayName##Base.data()
 #endif
 
 // ########### TIMER ############
 #define MSEC_TO_UNITS(TIME, RESOLUTION) (((TIME) * 1000) / (RESOLUTION))
-static const u32 CONFIG_UNIT_0_625_MS = 625;
-static const u32 CONFIG_UNIT_1_25_MS = 1250;
-static const u32 CONFIG_UNIT_10_MS = 10000
+constexpr u32 CONFIG_UNIT_0_625_MS = 625;
+constexpr u32 CONFIG_UNIT_1_25_MS = 1250;
+constexpr u32 CONFIG_UNIT_10_MS = 10000
 
 /*############ HELPFUL MACROS ################*/;
 

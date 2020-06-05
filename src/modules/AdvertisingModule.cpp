@@ -52,8 +52,6 @@ AdvertisingModule::AdvertisingModule()
 	configurationPointer = &configuration;
 	configurationLength = sizeof(AdvertisingModuleConfiguration);
 
-	advJobHandles.zeroData();
-
 	//Set defaults
 	ResetToDefaultConfiguration();
 }
@@ -75,11 +73,9 @@ void AdvertisingModule::ResetToDefaultConfiguration()
 void AdvertisingModule::ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength)
 {
 #if IS_INACTIVE(GW_SAVE_SPACE)
-	u32 err = 0;
-
 	//Start the Module...
 	//Delete previous jobs if they exist
-	for(u32 i=0; i<advJobHandles.length; i++){
+	for(u32 i=0; i<advJobHandles.size(); i++){
 		if(advJobHandles[i] != nullptr) GS->advertisingController.RemoveJob(advJobHandles[i]);
 	}
 
@@ -100,7 +96,7 @@ void AdvertisingModule::ConfigurationLoadedHandler(ModuleConfiguration* migratab
 			0 //ScanDataLength
 		};
 
-		CheckedMemcpy(&job.advData, configuration.messageData[i].messageData.getRaw(), configuration.messageData[i].messageLength);
+		CheckedMemcpy(&job.advData, configuration.messageData[i].messageData.data(), configuration.messageData[i].messageLength);
 		job.advDataLength = configuration.messageData[i].messageLength;
 
 		advJobHandles[i] = GS->advertisingController.AddJob(job);

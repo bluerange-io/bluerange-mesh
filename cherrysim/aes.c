@@ -86,7 +86,7 @@ static const uint8_t* Key;
 
 #if defined(CBC) && CBC
   // Initial Vector used only for CBC mode
-  static uint8_t* Iv;
+  static uint8_t const * Iv;
 #endif
 
 // The lookup-tables are marked const so they can be placed in read-only storage instead of RAM
@@ -532,7 +532,7 @@ void AES_CBC_encrypt_buffer(uint8_t* output, uint8_t* input, uint32_t length, co
 
   if (iv != 0)
   {
-    Iv = (uint8_t*)iv;
+    Iv = iv;
   }
 
   for (i = 0; i < length; i += BLOCKLEN)
@@ -570,7 +570,7 @@ void AES_CBC_decrypt_buffer(uint8_t* output, uint8_t* input, uint32_t length, co
   // If iv is passed as 0, we continue to encrypt without re-setting the Iv
   if (iv != 0)
   {
-    Iv = (uint8_t*)iv;
+    Iv = iv;
   }
 
   for (i = 0; i < length; i += BLOCKLEN)

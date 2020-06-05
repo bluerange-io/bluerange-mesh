@@ -101,7 +101,7 @@ u32 * aes_encrypt_init(const u8 *key, size_t len)
 		return NULL;
 	res = rijndaelKeySetupEnc(rk, key, len * 8);
 	if (res < 0) {
-		delete(rk);
+		delete[](rk);
 		return NULL;
 	}
 	rk[AES_PRIV_NR_POS] = res;

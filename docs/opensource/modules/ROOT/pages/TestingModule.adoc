@@ -236,7 +236,7 @@ actionType: `START_AUTOMATED_TEST`
 |===
 |Bytes|Type|Description
 
-|8    |connPacketModule|
+|8    |xref:Specification.adoc#connPacketModule[connPacketModule]|
 |1    |application     | Application ID
 |2    |advInterval     | Advertising Interval
 |1    |advTxPower      | Advertising TX Power
@@ -251,5 +251,5 @@ actionType: `START_AUTOMATED_TEST`
 actionType: `START_AUTOMATED_TEST_RESPONSE`
 |===
 |Bytes |Type |Description
-|8 |connPacketModule |
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule] |
 |===

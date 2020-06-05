@@ -67,10 +67,6 @@ ScanningModule::ScanningModule() :
 		scanFilters[i].active = 0;
 	}
 
-	//resetAssetTrackingTable();
-
-	assetInsPackets.zeroData();
-
 	//Set defaults
 	ResetToDefaultConfiguration();
 }
@@ -105,8 +101,6 @@ void ScanningModule::ConfigurationLoadedHandler(ModuleConfiguration* migratableC
 
 	totalMessages = 0;
 	totalRSSI = 0;
-
-	assetPackets.zeroData();
 
 #if IS_INACTIVE(GW_SAVE_SPACE)
 	if (configuration.moduleActive && assetReportingIntervalDs != 0) {
@@ -197,10 +191,10 @@ void ScanningModule::HandleAssetV2Packets(const FruityHal::GapAdvertisementRepor
 			&& packet->flags.len == SIZEOF_ADV_STRUCTURE_FLAGS-1
 			&& packet->uuid.len == SIZEOF_ADV_STRUCTURE_UUID16-1
 			&& packet->data.uuid.type == (u8)BleGapAdType::TYPE_SERVICE_DATA
-			&& packet->data.uuid.uuid == SERVICE_DATA_SERVICE_UUID16
+			&& packet->data.uuid.uuid == MESH_SERVICE_DATA_SERVICE_UUID16
 			&& packet->data.messageType == ServiceDataMessageType::STANDARD_ASSET
 	){
-		char serial[6];
+		char serial[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
 		Utility::GenerateBeaconSerialForIndex(assetPacket->serialNumberIndex, serial);
 		logt("SCANMOD", "RX ASSETV2 ADV: serial %s, pressure %u, speed %u, temp %u, humid %u, cn %u, rssi %d, nodeId %u",
 			serial,
@@ -237,7 +231,7 @@ void ScanningModule::HandleAssetInsPackets(const FruityHal::GapAdvertisementRepo
 		&& packet->flags.len == SIZEOF_ADV_STRUCTURE_FLAGS - 1
 		&& packet->uuid.len == SIZEOF_ADV_STRUCTURE_UUID16 - 1
 		&& packet->data.uuid.type == (u8)BleGapAdType::TYPE_SERVICE_DATA
-		&& packet->data.uuid.uuid == SERVICE_DATA_SERVICE_UUID16
+		&& packet->data.uuid.uuid == MESH_SERVICE_DATA_SERVICE_UUID16
 		&& packet->data.messageType == ServiceDataMessageType::INS_ASSET
 		) {
 		logt("SCANMOD", "RX ASSETV2 ADV: nodeId %u, batteryPower %u, absolutePositionX %u, absolutePositionY %u, pressure %u, rssi %d", 
@@ -275,7 +269,7 @@ bool ScanningModule::addTrackedAsset(const advPacketAssetServiceData* packet, i8
 
 	//If a slot was found, add the packet
 	if(slot != nullptr){
-		u16 slotNum = ((u32)slot - (u32)assetPackets.getRaw()) / sizeof(ScannedAssetTrackingStorage);
+		u16 slotNum = ((u32)slot - (u32)assetPackets.data()) / sizeof(ScannedAssetTrackingStorage);
 		logt("SCANMOD", "Tracked packet %u in slot %d", packet->serialNumberIndex, slotNum);
 
 		//Clean up first, if we overwrite another assetId
@@ -314,7 +308,7 @@ bool ScanningModule::addTrackedAssetIns(const advPacketAssetInsServiceData * pac
 
 	//If a slot was found, add the packet
 	if (slot != nullptr) {
-		u16 slotNum = ((u32)slot - (u32)assetInsPackets.getRaw()) / sizeof(ScannedAssetInsTrackingStorage);
+		u16 slotNum = ((u32)slot - (u32)assetInsPackets.data()) / sizeof(ScannedAssetInsTrackingStorage);
 		logt("SCANMOD", "Tracked packet %u in slot %d", packet->assetNodeId, slotNum);
 
 		//Clean up first, if we overwrite another assetId
@@ -403,7 +397,7 @@ void ScanningModule::SendTrackedAssets()
 			);
 
 	//Clear the buffer
-	assetPackets.zeroData();
+	assetPackets = {};
 #endif
 }
 
@@ -455,7 +449,7 @@ void ScanningModule::SendTrackedAssetsIns()
 	);
 
 	//Clear the buffer
-	assetInsPackets.zeroData();
+	assetInsPackets = {};
 #endif
 }
 

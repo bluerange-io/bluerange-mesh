@@ -40,26 +40,25 @@
 class TestRecordStorage : public ::testing::Test, public RecordStorageEventListener
 {
 private:
-	CherrySimTester* tester;
+	CherrySimTester* tester = nullptr;
 public:
 	u8* startPage;
 	static constexpr u16 numPages = RECORD_STORAGE_NUM_PAGES;
 
-	void SetUp()
+	void SetUp() override
 	{
 		//We have to boot up a simulator for this test because the PacketQueue uses the Logger
 		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-		simConfig.numNodes = 1;
+		simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
 		tester = new CherrySimTester(testerConfig, simConfig);
-		//TODO some of these tests hold assumptions that are only true for nrf51. Should be changed.
-		strcpy(tester->sim->nodes[0].nodeConfiguration, "prod_sink_nrf52");
+		tester->sim->nodes[0].nodeConfiguration = "prod_sink_nrf52";
 		tester->Start();
 
 		startPage = (u8*)Utility::GetSettingsPageBaseAddress();
 	}
 
-	void TearDown()
+	void TearDown() override
 	{
 		delete tester;
 	}
@@ -448,7 +447,7 @@ TEST_F(TestRecordStorage, TestAsyncQueuing) {
 	}
 
 	//Record 3 must be deactivated
-	if (GS->recordStorage.GetRecord(3)->recordActive != false) {
+	if (GS->recordStorage.GetRecord(3)->recordActive != 0) {
 		FAIL() << "Record 3 should be inactive"; //LCOV_EXCL_LINE assertion
 	}
 
@@ -462,8 +461,6 @@ u8 testBuffer[MULTI_RECORD_TEST_RECORD_MAX_SIZE * MULTI_RECORD_TEST_NUM_RECORD_I
 
 TEST_F(TestRecordStorage, TestRandomMultiRecordUpdates) {
 	logt("WARNING", "---- TEST RANDOM MULTI RECORD UPDATE ----");
-
-	u32 cmp = 0;
 
 	//Setup
 	CheckedMemset(startPage, 0xff, numPages*FruityHal::GetCodePageSize());
@@ -497,7 +494,6 @@ TEST_F(TestRecordStorage, TestRandomMultiRecordUpdates) {
 		for (int i = 0; i < MULTI_RECORD_TEST_NUM_RECORD_IDS; i++) {
 			u8* bufferedData = &(testBuffer[MULTI_RECORD_TEST_RECORD_MAX_SIZE * i]);
 			u8 storedRecordId = bufferedData[0];
-			u8 storedRecordRandomInt = bufferedData[1];
 			u8 storedRecordLength = bufferedData[2];
 			//If we have a non-zero value, this record had been stored in ram previously, try to read it back and compare
 			if (storedRecordId != 0) {

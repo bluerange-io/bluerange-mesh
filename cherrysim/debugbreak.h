@@ -23,12 +23,15 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef DEBUG_BREAK_H
-#define DEBUG_BREAK_H
+#pragma once
 
 #ifdef _MSC_VER
 
 #define debug_break __debugbreak
+
+#elif defined(__clang__)
+
+#define debug_break() asm("int $3");
 
 #elif defined(__GNUC__) && defined(_WIN32)
 
@@ -156,6 +159,6 @@ __inline__ static void __debugbreak(void)
 }
 #endif
 
-#endif /* ifdef _MSC_VER */
+#define debug_break __debugbreak
 
 #endif /* ifndef DEBUG_BREAK_H */

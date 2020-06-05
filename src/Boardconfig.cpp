@@ -34,8 +34,6 @@
 #include <GlobalState.h>
 #include <RecordStorage.h>
 
-extern void setBoard_0(BoardConfiguration* c);
-extern void setBoard_1(BoardConfiguration* c);
 extern void setBoard_4(BoardConfiguration* c);
 extern void setBoard_18(BoardConfiguration* c);
 extern void setBoard_19(BoardConfiguration* c);
@@ -54,7 +52,7 @@ void Boardconf::ResetToDefaultConfiguration()
 
 	DeviceConfiguration config;
 	//If there is data in the DeviceConfiguration, we use the boardType from there
-	ErrorType err = FruityHal::getDeviceConfiguration(config);
+	ErrorType err = FruityHal::GetDeviceConfiguration(config);
 	if (err == ErrorType::SUCCESS) {
 		if (config.boardType != EMPTY_WORD) configuration.boardType = config.boardType;
 	}
@@ -82,7 +80,6 @@ void Boardconf::ResetToDefaultConfiguration()
 	configuration.dcDcEnabled = false;
 
 	//Now, we load all Default boards (nRf Development kits)
-	setBoard_1(&configuration);
 	setBoard_4(&configuration);
 	setBoard_18(&configuration);
 

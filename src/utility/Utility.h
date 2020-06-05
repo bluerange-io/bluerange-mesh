@@ -28,15 +28,12 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
- * The Utility class holds a number of auxiliary functions
- */
-
 #pragma once
 
 #include <types.h>
 #include <Config.h>
 #include <Module.h>
+#include <type_traits>
 
 typedef struct Aes128Block {
 	uint8_t data[16];
@@ -45,8 +42,6 @@ typedef struct Aes128Block {
 class Module;
 class RecordStorageEventListener;
 
-#ifdef SIM_ENABLED
-#include <type_traits>
 //Regarding the following macro:
 //&((dst)[0])                                        makes sure that we have a pointer, even if an array was passed.
 //decltype(&((dst)[0]))                              gets the pointer type, for example T*
@@ -60,27 +55,16 @@ class RecordStorageEventListener;
 				|| std::is_union<std::remove_pointer<decltype(&((dst)[0]))>::type>::value, "Tried to call memset on non pod type!"); /*CODE_ANALYZER_IGNORE Just a string.*/ \
 	memset((dst), (val), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemset*/ \
 }
-#else
-#define CheckedMemset(dst, val, size) \
-{\
-	memset((dst), (val), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemset*/ \
-}
-#endif
-#ifdef SIM_ENABLED
-#include <type_traits>
 #define CheckedMemcpy(dst, src, size) \
 {\
 	static_assert( std::is_pod  <std::remove_pointer<decltype(&((dst)[0]))>::type>::value \
 				|| std::is_union<std::remove_pointer<decltype(&((dst)[0]))>::type>::value, "Tried to call memcpy on non pod type!"); /*CODE_ANALYZER_IGNORE Just a string.*/ \
 	memcpy((dst), (src), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemcpy*/ \
 }
-#else
-#define CheckedMemcpy(dst, src, size) \
-{\
-	memcpy((dst), (src), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemcpy*/ \
-}
-#endif
 
+/*
+ * The Utility class holds a number of auxiliary functions
+ */
 namespace Utility
 {
 	const char serialAlphabet[] = "BCDFGHJKLMNPQRSTVWXYZ123456789";
@@ -92,7 +76,7 @@ namespace Utility
 
 	//Serial number and version utilities
 	u32 GetIndexForSerial(const char* serialNumber, bool *didError = nullptr);
-	void GenerateBeaconSerialForIndex(u32 index, char* serialBuffer);
+	void GenerateBeaconSerialForIndex(u32 index, char* serialBuffer); //Attention: Serial buffer must be NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH big
 	void GetVersionStringFromInt(const u32 version, char* outputBuffer);
 
 	//Random functionality

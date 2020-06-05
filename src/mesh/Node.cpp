@@ -61,17 +61,12 @@ constexpr u8 connectAttemptsBeforeBlacklisting = 5;
 
 // The Service that is used for two nodes to communicate between each other
 // Fruity Mesh Service UUID 310bfe40-ed6b-11e3-a1be-0002a5d5c51b
-#define MESH_SERVICE_BASE_UUID128 0x23, 0xD1, 0xBC, 0xEA, 0x5F, 0x78, 0x23, 0x15, 0xDE, 0xEF, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00
-#define MESH_SERVICE_UUID 0x1523
-#define MESH_SERVICE_CHARACTERISTIC_UUID 0x1524
-#define MESH_SERVICE_INITIAL_CHARACTERISTIC_VALUE {1,2,3}
-#define MESH_SERVICE_CHARACTERISTIC_DESCRIPTOR_UUID  0x1525
+constexpr u8 MESH_SERVICE_BASE_UUID128[] = { 0x23, 0xD1, 0xBC, 0xEA, 0x5F, 0x78, 0x23, 0x15, 0xDE, 0xEF, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00 };
+constexpr u16 MESH_SERVICE_CHARACTERISTIC_UUID = 0x1524;
 
 Node::Node()
 	: Module(ModuleId::NODE, "node")
 {
-	joinMePackets.zeroData();
-
 	CheckedMemset(&meshService, 0, sizeof(meshService));
 
 	//Save configuration to base class variables
@@ -112,8 +107,6 @@ void Node::ResetToDefaultConfiguration()
 
 void Node::ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength)
 {
-	u32 err;
-
 	//We must now decide if we want to overwrite some unset persistent config values with defaults
 	if(configuration.nodeId == 0) configuration.nodeId = RamConfig->defaultNodeId;
 	if(configuration.networkId == 0) configuration.networkId = RamConfig->defaultNetworkId;
@@ -138,8 +131,8 @@ void Node::ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16
 
 	//Set the BLE address so that we have the same on every startup, mostly for debugging
 	if(configuration.bleAddress.addr_type != FruityHal::BleGapAddrType::INVALID){
-		err = FruityHal::BleGapAddressSet(&configuration.bleAddress);
-		if(err != (u32)ErrorType::SUCCESS){
+		ErrorType err = FruityHal::SetBleGapAddress(configuration.bleAddress);
+		if(err != ErrorType::SUCCESS){
 			//Can be ignored and will not happen
 		}
 	}
@@ -187,12 +180,11 @@ void Node::InitializeMeshGattService()
 
 	//##### At first, we register our custom service
 	//Add our Service UUID to the BLE stack for management
-	constexpr u8 baseUUID128[] = { MESH_SERVICE_BASE_UUID128 };
-	err = FruityHal::BleUuidVsAdd(baseUUID128, &meshService.serviceUuid.type);
+	err = (u32)FruityHal::BleUuidVsAdd(MESH_SERVICE_BASE_UUID128, &meshService.serviceUuid.type);
 	FRUITYMESH_ERROR_CHECK(err); //OK
 
 	//Add the service
-	err = FruityHal::BleGattServiceAdd(FruityHal::BleGattSrvcType::PRIMARY, meshService.serviceUuid, &meshService.serviceHandle);
+	err = (u32)FruityHal::BleGattServiceAdd(FruityHal::BleGattSrvcType::PRIMARY, meshService.serviceUuid, &meshService.serviceHandle);
 	FRUITYMESH_ERROR_CHECK(err); //OK
 
 	//##### Now we need to add a characteristic to that service
@@ -245,7 +237,7 @@ void Node::InitializeMeshGattService()
 	attribute.initOffset = 0;
 
 	//Finally, add the characteristic
-	err = FruityHal::BleGattCharAdd(meshService.serviceHandle, characteristicMetadata, attribute, meshService.sendMessageCharacteristicHandle);
+	err = (u32)FruityHal::BleGattCharAdd(meshService.serviceHandle, characteristicMetadata, attribute, meshService.sendMessageCharacteristicHandle);
 	FRUITYMESH_ERROR_CHECK(err); //OK
 }
 
@@ -270,7 +262,7 @@ void Node::HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinn
 	GS->logger.logCustomCount(CustomErrorTypes::COUNT_HANDSHAKE_DONE);
 
 	//We delete the joinMe packet of this node from the join me buffer
-	for (int i = 0; i < joinMePackets.length; i++)
+	for (u32 i = 0; i < joinMePackets.size(); i++)
 	{
 		joinMeBufferPacket* packet = &joinMePackets[i];
 		if (packet->payload.sender == connection->partnerId) {
@@ -330,7 +322,7 @@ void Node::HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinn
 
 	// Send ClusterInfo again as the amount of hops to the sink will have changed
 	// after this connection is in the handshake done state
-	//FIXME: This causes an increase in cluster info update packets. It is possible to combine this with
+	// TODO: This causes an increase in cluster info update packets. It is possible to combine this with
 	//the cluster update above, but that requires more debugging to get it correctly working
 	SendClusterInfoUpdate(connection, nullptr);
 
@@ -391,8 +383,11 @@ MeshAccessAuthorization Node::CheckMeshAccessPacketAuthorization(BaseConnectionS
 			return MeshAccessAuthorization::WHITELIST;
 		}
 	}
-	if (packet->messageType == MessageType::COMPONENT_SENSE) {
-		if (fmKeyId == FmKeyId::ORGANIZATION) {
+	if (   packet->messageType == MessageType::COMPONENT_SENSE
+	    || packet->messageType == MessageType::CAPABILITY)
+	{
+		if (fmKeyId == FmKeyId::ORGANIZATION)
+		{
 			return MeshAccessAuthorization::WHITELIST;
 		}
 	}
@@ -515,9 +510,6 @@ void Node::ReceiveClusterInfoUpdate(MeshConnection* connection, connPacketCluste
 	CheckedMemset((u8*)&outPacket, 0x00, sizeof(connPacketClusterInfoUpdate));
 	outPacket.payload.clusterSizeChange = packet->payload.clusterSizeChange;
 
-	//Update hops to sink
-	//Another sink may have joined or left the network, update this
-	//FIXME: race conditions can cause this to work incorrectly...
 
 	if(packet->payload.clusterSizeChange != 0){
 		logt("HANDSHAKE", "ClusterSize Change from %d to %d", this->clusterSize, this->clusterSize + packet->payload.clusterSizeChange);
@@ -525,11 +517,14 @@ void Node::ReceiveClusterInfoUpdate(MeshConnection* connection, connPacketCluste
 		connection->connectedClusterSize += packet->payload.clusterSizeChange;
 	}
 
+	//Update hops to sink
+	//Another sink may have joined or left the network, update this
+	//FIXME: race conditions can cause this to work incorrectly...
 	connection->hopsToSink = packet->payload.hopsToSink > -1 ? packet->payload.hopsToSink + 1 : -1;
 	
 	//Now look if our partner has passed over the connection master bit
 	if(packet->payload.connectionMasterBitHandover){
-		logt("ERROR", "NODE %u RECEIVED MASTERBIT FROM %u", configuration.nodeId, packet->header.sender);
+		logt("CONN", "NODE %u RECEIVED MASTERBIT FROM %u", configuration.nodeId, packet->header.sender);
 		connection->connectionMasterBit = 1;
 	}
 
@@ -567,14 +562,9 @@ void Node::HandOverMasterBitIfNecessary()  const{
 	if (hasAllMasterBits) {
 		MeshConnections conns = GS->cm.GetMeshConnections(ConnectionDirection::INVALID);
 		for (u32 i = 0; i < conns.count; i++) {
-			MeshConnection* conn = conns.connections[i];
-			if (conn->handshakeDone() && conn->connectedClusterSize > clusterSize - conn->connectedClusterSize) {
-				//Remove the masterbit from this connection
-				conn->connectionMasterBit = 0;
-				//Put the masterbit handover in the correct packet.
-				conn->currentClusterInfoUpdatePacket.payload.connectionMasterBitHandover = 1;
-
-				logt("ERROR", "SENDING MASTERBIT FROM NODE %u TO NODE %u", configuration.nodeId, conn->partnerId);
+			MeshConnectionHandle conn = conns.handles[i];
+			if (conn.IsHandshakeDone() && conn.GetConnectedClusterSize() > clusterSize - conn.GetConnectedClusterSize()) {
+				conn.HandoverMasterBit();
 			}
 		}
 	}
@@ -583,9 +573,9 @@ void Node::HandOverMasterBitIfNecessary()  const{
 bool Node::HasAllMasterBits() const {
 	MeshConnections conn = GS->cm.GetMeshConnections(ConnectionDirection::INVALID);
 	for (u32 i = 0; i < conn.count; i++) {
-		MeshConnection* connection = conn.connections[i];
+		MeshConnectionHandle connection = conn.handles[i];
 		//Connection must be handshaked, if yes check if we have its masterbit
-		if (connection->handshakeDone() && !connection->connectionMasterBit) {
+		if (connection.IsHandshakeDone() && !connection.HasConnectionMasterBit()) {
 			return false;
 		}
 	}
@@ -600,15 +590,17 @@ void Node::SendClusterInfoUpdate(MeshConnection* ignoreConnection, connPacketClu
 {
 	MeshConnections conn = GS->cm.GetMeshConnections(ConnectionDirection::INVALID);
 	for (u32 i = 0; i < conn.count; i++) {
-		//Get the current packet
-		connPacketClusterInfoUpdate* currentPacket = &(conn.connections[i]->currentClusterInfoUpdatePacket);
+		if (!conn.handles[i]) continue;
 
-		if(!conn.connections[i]->isConnected()) continue;
+		//Get the current packet
+		connPacketClusterInfoUpdate* currentPacket = &(conn.handles[i].GetConnection()->currentClusterInfoUpdatePacket);
+
+		if(!conn.handles[i].GetConnection()->isConnected()) continue;
 
 		//We currently update the hops to sink at all times
-		currentPacket->payload.hopsToSink = GS->cm.GetMeshHopsToShortestSink(conn.connections[i]);
+		currentPacket->payload.hopsToSink = GS->cm.GetMeshHopsToShortestSink(conn.handles[i].GetConnection());
 
-		if (conn.connections[i] == ignoreConnection) continue;
+		if (conn.handles[i].GetConnection() == ignoreConnection) continue;
 		
 		if (packet != nullptr) {
 			currentPacket->payload.clusterSizeChange += packet->payload.clusterSizeChange;
@@ -616,17 +608,17 @@ void Node::SendClusterInfoUpdate(MeshConnection* ignoreConnection, connPacketClu
 		
 		//=> The counter and maybe some other fields are set right before queuing the packet
 
-		logt("HANDSHAKE", "OUT => %u MESSAGE_TYPE_CLUSTER_INFO_UPDATE clustChange:%d, hops:%d", conn.connections[i]->partnerId, currentPacket->payload.clusterSizeChange, currentPacket->payload.hopsToSink);
+		logt("HANDSHAKE", "OUT => %u MESSAGE_TYPE_CLUSTER_INFO_UPDATE clustChange:%d, hops:%d", conn.handles[i].GetPartnerId(), currentPacket->payload.clusterSizeChange, currentPacket->payload.hopsToSink);
 	}
 
 	HandOverMasterBitIfNecessary();
 
 	//Send the current state of our cluster to all active MeshAccess connections
-	BaseConnections conns2 = GS->cm.GetConnectionsOfType(ConnectionType::MESH_ACCESS, ConnectionDirection::INVALID);
+	MeshAccessConnections conns2 = GS->cm.GetMeshAccessConnections(ConnectionDirection::INVALID);
 	for (u32 i = 0; i < conns2.count; i++) {
-		MeshAccessConnection* conn = (MeshAccessConnection*)GS->cm.allConnections[conns2.connectionIndizes[i]];
-		if (conn != nullptr && conn->handshakeDone()) {
-			conn->SendClusterState();
+		MeshAccessConnectionHandle conn = conns2.handles[i];
+		if (conn && conn.IsHandshakeDone()) {
+			conn.SendClusterState();
 		}
 	}
 
@@ -798,7 +790,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 
 				if (GS->cm.freeMeshOutConnections == 0)
 				{
-					MeshConnection* connToDisconnect = nullptr;
+					MeshConnectionHandle connToDisconnect;
 
 					//We want to disconnect connections with a low number of connected nodes
 					//Therefore we give these a higher chance to get disconnected
@@ -809,19 +801,19 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 
 					u16 handshakedConnections = 0;
 					for (u32 i = 0; i < conns.count; i++) {
-						if (conns.connections[i]->handshakeDone()) handshakedConnections++;
+						if (conns.handles[i].IsHandshakeDone()) handshakedConnections++;
 					}
 
 					//We try to find a connection that we should disconnect based on probability.
 					//Connections with less connectedClusterSize should be preferredly disconnected
 					for (u32 i = 0; i < conns.count; i++) {
-						MeshConnection* conn = (MeshConnection*)conns.connections[i];
-						if (!conn->handshakeDone()) continue;
+						MeshConnectionHandle conn = conns.handles[i];
+						if (!conn.IsHandshakeDone()) continue;
 
 						//The probability from 0 to UINT16_MAX that this connection will be removed
 						//Because our node counts against the clusterSize but is not included in the connectedClusterSizes, we substract 1
 						//We also check that we do not have a divide by 0 exception
-						u32 removalProbability = (handshakedConnections <= 1 || clusterSize <= 1) ? 1 : ((clusterSize - 1) - conn->connectedClusterSize) * UINT16_MAX / ((handshakedConnections - 1) * (clusterSize - 1));
+						u32 removalProbability = (handshakedConnections <= 1 || clusterSize <= 1) ? 1 : ((clusterSize - 1) - conn.GetConnectedClusterSize()) * UINT16_MAX / ((handshakedConnections - 1) * (clusterSize - 1));
 
 						sum += removalProbability;
 
@@ -834,20 +826,18 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 					}
 
 					if (connToDisconnect) {
-						logt("ERROR", "Emergency disconnect from %u", connToDisconnect->partnerId);
+						logt("WARNING", "Emergency disconnect from %u", connToDisconnect.GetPartnerId());
 						response.code = EmergencyDisconnectErrorCode::SUCCESS;
 
-						connToDisconnect->DisconnectAndRemove(AppDisconnectReason::EMERGENCY_DISCONNECT);
+						connToDisconnect.DisconnectAndRemove(AppDisconnectReason::EMERGENCY_DISCONNECT);
 						GS->logger.logCustomError(CustomErrorTypes::INFO_EMERGENCY_DISCONNECT_SUCCESSFUL, 0);
 
 						//TODO: Blacklist other node for a short time
-
-						//FIXME: Approach will not work if other node does not have a freeInConnection, the other node must also kill its connection
 					}
 					else {
 						response.code = EmergencyDisconnectErrorCode::CANT_DISCONNECT_ANYBODY;
 						GS->logger.logCustomCount(CustomErrorTypes::COUNT_EMERGENCY_CONNECTION_CANT_DISCONNECT_ANYBODY);
-						logt("ERROR", "WOULD DISCONNECT NOBODY");
+						logt("WARNING", "WOULD DISCONNECT NOBODY");
 					}
 				}
 				else
@@ -865,7 +855,6 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 					false
 				);
 			}
-#if FEATURE_AVAILABLE(PREFERRED_CONNECTIONS)
 			else if (packet->actionType == (u8)NodeModuleTriggerActionMessages::SET_PREFERRED_CONNECTIONS)
 			{
 				PreferredConnectionMessage const * message = (PreferredConnectionMessage const *)packet->data;
@@ -897,7 +886,6 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 					false
 				);
 			}
-#endif
 		}
 	}
 
@@ -931,12 +919,10 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 				}
 				ResetEmergencyDisconnect();
 			}
-#if FEATURE_AVAILABLE(PREFERRED_CONNECTIONS)
 			else if (packet->actionType == (u8)NodeModuleActionResponseMessages::SET_PREFERRED_CONNECTIONS_RESULT)
 			{
 				logjson("NODE", "{\"type\":\"set_preferred_connections_result\",\"nodeId\":%d,\"module\":%d}" SEP, packetHeader->sender, (u32)ModuleId::NODE);
 			}
-#endif
 		}
 	}
 
@@ -998,7 +984,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 		RawDataHeader const * packet = (RawDataHeader const *)packetHeader;
 		//Check if our module is meant
 		if (packet->moduleId == moduleId) {
-			const RawDataActionType actionType = (const RawDataActionType)packet->actionType;
+			const RawDataActionType actionType = (RawDataActionType)packet->actionType;
 			if (actionType == RawDataActionType::START && sendData->dataLength >= sizeof(RawDataStart))
 			{
 				RawDataStart packet = *(RawDataStart const *)packetHeader;
@@ -1165,7 +1151,6 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 			SIMEXCEPTION(PaketTooSmallException); //LCOV_EXCL_LINE assertion
 		}
 	}
-#if FEATURE_AVAILABLE(DEVICE_CAPABILITIES)
 	else if (packetHeader->messageType == MessageType::CAPABILITY)
 	{
 		if (sendData->dataLength >= sizeof(CapabilityHeader)) 
@@ -1238,7 +1223,6 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 			SIMEXCEPTION(PaketTooSmallException); //LCOV_EXCL_LINE assertion
 		}
 	}
-#endif
 
 	else if (packetHeader->messageType == MessageType::COMPONENT_SENSE)
 	{
@@ -1254,8 +1238,8 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 				"\"module\":%u,"
 				"\"requestHandle\":%u,"
 				"\"actionType\":%u,"
-				"\"component\":%u,"
-				"\"register\":%u,"
+				"\"component\":\"0x%04X\","
+				"\"register\":\"0x%04X\","
 				"\"payload\":\"%s\""
 			"}" SEP,
 		packet->componentHeader.header.sender,
@@ -1305,11 +1289,11 @@ void Node::UpdateJoinMePacket() const
 
 	advPacket->manufacturer.len = (SIZEOF_ADV_STRUCTURE_MANUFACTURER + SIZEOF_ADV_PACKET_STUFF_AFTER_MANUFACTURER + SIZEOF_ADV_PACKET_PAYLOAD_JOIN_ME_V0) - 1;
 	advPacket->manufacturer.type = (u8)BleGapAdType::TYPE_MANUFACTURER_SPECIFIC_DATA;
-	advPacket->manufacturer.companyIdentifier = COMPANY_IDENTIFIER;
+	advPacket->manufacturer.companyIdentifier = MESH_COMPANY_IDENTIFIER;
 
 	advPacket->meshIdentifier = MESH_IDENTIFIER;
 	advPacket->networkId = configuration.networkId;
-	advPacket->messageType = MESSAGE_TYPE_JOIN_ME_V0;
+	advPacket->messageType = ServiceDataMessageType::JOIN_ME_V0;
 
 	//Build a JOIN_ME packet and set it in the advertisement data
 	advPacketPayloadJoinMeV0* packet = (advPacketPayloadJoinMeV0*)(buffer+SIZEOF_ADV_PACKET_HEADER);
@@ -1350,11 +1334,6 @@ void Node::UpdateJoinMePacket() const
 		}
 	}
 
-//#if IS_ACTIVE(ASSET_MODULE)
-//	//FIXME: we need another field to do this. maybe add another advjob?
-//	packet->txPower = this->GetAccValue();
-//	meshAdvJobHandle->advertisingInterval = this->GetAccAdvInterval();
-//#endif
 	meshAdvJobHandle->advDataLength = SIZEOF_ADV_PACKET_HEADER + SIZEOF_ADV_PACKET_PAYLOAD_JOIN_ME_V0;
 
 	logt("JOIN", "JOIN_ME updated clusterId:%x, clusterSize:%d, freeIn:%u, freeOut:%u, handle:%u, ack:%u", packet->clusterId, packet->clusterSize, packet->freeMeshInConnections, packet->freeMeshOutConnections, packet->meshWriteHandle, packet->ackField);
@@ -1457,9 +1436,9 @@ Node::DecisionStruct Node::DetermineBestClusterAvailable(void)
 			bool freshConnectionAvailable = false;
 			BaseConnections conns = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
 			for (u32 i = 0; i < conns.count; i++) {
-				BaseConnection* conn = GS->cm.allConnections[conns.connectionIndizes[i]];
-				if (conn != nullptr) {
-					if (conn->creationTimeDs + Conf::meshHandshakeTimeoutDs > GS->appTimerDs) {
+				BaseConnectionHandle conn = conns.handles[i];
+				if (conn) {
+					if (conn.GetCreationTimeDs() + Conf::meshHandshakeTimeoutDs > GS->appTimerDs) {
 						freshConnectionAvailable = true;
 						break;
 					}
@@ -1496,7 +1475,6 @@ Node::DecisionStruct Node::DetermineBestClusterAvailable(void)
 
 u32 Node::ModifyScoreBasedOnPreferredPartners(u32 score, NodeId partner) const
 {
-#if FEATURE_AVAILABLE(PREFERRED_CONNECTIONS)
 	if (score > 0 && !IsPreferredConnection(partner))
 	{
 		if (GS->config.configuration.preferredConnectionMode == PreferredConnectionMode::PENALTY)
@@ -1514,17 +1492,16 @@ u32 Node::ModifyScoreBasedOnPreferredPartners(u32 score, NodeId partner) const
 			SIMEXCEPTION(IllegalStateException); //LCOV_EXCL_LINE assertion
 		}
 	}
-#endif
 
 	return score;
 }
 
-joinMeBufferPacket * Node::DetermineBestCluster(u32(Node::*clusterRatingFunction)(joinMeBufferPacket &packet) const)
+joinMeBufferPacket * Node::DetermineBestCluster(u32(Node::*clusterRatingFunction)(const joinMeBufferPacket &packet) const)
 {
 	u32 bestScore = 0;
 	joinMeBufferPacket* bestCluster = nullptr;
 
-	for (int i = 0; i < joinMePackets.length; i++)
+	for (u32 i = 0; i < joinMePackets.size(); i++)
 	{
 		joinMeBufferPacket* packet = &joinMePackets[i];
 		if (packet->payload.sender == 0) continue;
@@ -1551,7 +1528,7 @@ joinMeBufferPacket* Node::DetermineBestClusterAsMaster()
 
 //Calculates the score for a cluster
 //Connect to big clusters but big clusters must connect nodes that are not able 
-u32 Node::CalculateClusterScoreAsMaster(joinMeBufferPacket& packet) const
+u32 Node::CalculateClusterScoreAsMaster(const joinMeBufferPacket& packet) const
 {
 	//If the packet is too old, filter it out
 	if (GS->appTimerDs - packet.receivedTimeDs > MAX_JOIN_ME_PACKET_AGE_DS) return 0;
@@ -1579,7 +1556,7 @@ u32 Node::CalculateClusterScoreAsMaster(joinMeBufferPacket& packet) const
 	}
 
 	//Do not connect if we are already connected to that partner
-	if (GS->cm.GetMeshConnectionToPartner(packet.payload.sender) != nullptr) return 0;
+	if (GS->cm.GetMeshConnectionToPartner(packet.payload.sender)) return 0;
 
 	//Connection should have a minimum of stability
 	if(packet.rssi < STABLE_CONNECTION_RSSI_THRESHOLD) return 0;
@@ -1598,7 +1575,7 @@ u32 Node::CalculateClusterScoreAsMaster(joinMeBufferPacket& packet) const
 
 //If there are only bigger clusters around, we want to find the best
 //And set its id in our ack field
-u32 Node::CalculateClusterScoreAsSlave(joinMeBufferPacket& packet) const
+u32 Node::CalculateClusterScoreAsSlave(const joinMeBufferPacket& packet) const
 {
 	//If the packet is too old, filter it out
 	if (GS->appTimerDs - packet.receivedTimeDs > MAX_JOIN_ME_PACKET_AGE_DS) return 0;
@@ -1630,14 +1607,10 @@ bool Node::DoesBiggerKnownClusterExist()
 void Node::ResetEmergencyDisconnect()
 {
 	emergencyDisconnectTimerDs = 0;
-	if (emergencyDisconnectValidationConnectionUniqueId != 0)
+	if (emergencyDisconnectValidationConnectionUniqueId)
 	{
-		MeshAccessConnection* mac = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(emergencyDisconnectValidationConnectionUniqueId);
-		if (mac != nullptr)
-		{
-			mac->DisconnectAndRemove(AppDisconnectReason::EMERGENCY_DISCONNECT_RESET);
-		}
-		emergencyDisconnectValidationConnectionUniqueId = 0;
+		emergencyDisconnectValidationConnectionUniqueId.DisconnectAndRemove(AppDisconnectReason::EMERGENCY_DISCONNECT_RESET);
+		emergencyDisconnectValidationConnectionUniqueId = MeshAccessConnectionHandle();
 	}
 }
 
@@ -1651,33 +1624,31 @@ void Node::GapAdvertisementMessageHandler(const FruityHal::GapAdvertisementRepor
 
 	const advPacketHeader* packetHeader = (const advPacketHeader*) data;
 
-	switch (packetHeader->messageType)
+	if (packetHeader->messageType == ServiceDataMessageType::JOIN_ME_V0)
 	{
-		case MESSAGE_TYPE_JOIN_ME_V0:
-			if (dataLength == SIZEOF_ADV_PACKET_JOIN_ME)
+		if (dataLength == SIZEOF_ADV_PACKET_JOIN_ME)
+		{
+			GS->logger.logCustomCount(CustomErrorTypes::COUNT_JOIN_ME_RECEIVED);
+
+			const advPacketJoinMeV0* packet = (const advPacketJoinMeV0*) data;
+
+			logt("DISCOVERY", "JOIN_ME: sender:%u, clusterId:%x, clusterSize:%d, freeIn:%u, freeOut:%u, ack:%u", packet->payload.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.freeMeshInConnections, packet->payload.freeMeshOutConnections, packet->payload.ackField);
+
+			//Look through the buffer and determine a space where we can put the packet in
+			joinMeBufferPacket* targetBuffer = findTargetBuffer(packet);
+
+			//Now, we have the space for our packet and we fill it with the latest information
+			if (targetBuffer != nullptr)
 			{
-				GS->logger.logCustomCount(CustomErrorTypes::COUNT_JOIN_ME_RECEIVED);
+				CheckedMemcpy(targetBuffer->addr.addr, advertisementReportEvent.getPeerAddr(), FH_BLE_GAP_ADDR_LEN);
+				targetBuffer->addr.addr_type = advertisementReportEvent.getPeerAddrType();
+				targetBuffer->advType = advertisementReportEvent.isConnectable() ? FruityHal::BleGapAdvType::ADV_IND : FruityHal::BleGapAdvType::ADV_NONCONN_IND;
+				targetBuffer->rssi = advertisementReportEvent.getRssi();
+				targetBuffer->receivedTimeDs = GS->appTimerDs;
 
-				const advPacketJoinMeV0* packet = (const advPacketJoinMeV0*) data;
-
-				logt("DISCOVERY", "JOIN_ME: sender:%u, clusterId:%x, clusterSize:%d, freeIn:%u, freeOut:%u, ack:%u", packet->payload.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.freeMeshInConnections, packet->payload.freeMeshOutConnections, packet->payload.ackField);
-
-				//Look through the buffer and determine a space where we can put the packet in
-				joinMeBufferPacket* targetBuffer = findTargetBuffer(packet);
-
-				//Now, we have the space for our packet and we fill it with the latest information
-				if (targetBuffer != nullptr)
-				{
-					CheckedMemcpy(targetBuffer->addr.addr, advertisementReportEvent.getPeerAddr(), FH_BLE_GAP_ADDR_LEN);
-					targetBuffer->addr.addr_type = advertisementReportEvent.getPeerAddrType();
-					targetBuffer->advType = advertisementReportEvent.isConnectable() ? FruityHal::BleGapAdvType::ADV_IND : FruityHal::BleGapAdvType::ADV_NONCONN_IND;
-					targetBuffer->rssi = advertisementReportEvent.getRssi();
-					targetBuffer->receivedTimeDs = GS->appTimerDs;
-
-					targetBuffer->payload = packet->payload;
-				}
+				targetBuffer->payload = packet->payload;
 			}
-			break;
+		}
 	}
 
 }
@@ -1687,7 +1658,7 @@ joinMeBufferPacket* Node::findTargetBuffer(const advPacketJoinMeV0* packet)
 	joinMeBufferPacket* targetBuffer = nullptr;
 
 	//First, look if a packet from this node is already in the buffer, if yes, we use this space
-	for (int i = 0; i < joinMePackets.length; i++)
+	for (u32 i = 0; i < joinMePackets.size(); i++)
 	{
 		targetBuffer = &joinMePackets[i];
 
@@ -1700,7 +1671,7 @@ joinMeBufferPacket* Node::findTargetBuffer(const advPacketJoinMeV0* packet)
 	targetBuffer = nullptr;
 
 	//Next, we look if there's an empty space
-	for (int i = 0; i < joinMePackets.length; i++)
+	for (u32 i = 0; i < joinMePackets.size(); i++)
 	{
 		targetBuffer = &(joinMePackets[i]);
 
@@ -1715,7 +1686,7 @@ joinMeBufferPacket* Node::findTargetBuffer(const advPacketJoinMeV0* packet)
 
 	//Next, we can overwrite the oldest packet that we saved from our own cluster
 	u32 oldestTimestamp = UINT32_MAX;
-	for (int i = 0; i < joinMePackets.length; i++)
+	for (u32 i = 0; i < joinMePackets.size(); i++)
 	{
 		joinMeBufferPacket* tmpPacket = &joinMePackets[i];
 
@@ -1733,7 +1704,7 @@ joinMeBufferPacket* Node::findTargetBuffer(const advPacketJoinMeV0* packet)
 	//If there's still no space, we overwrite the oldest packet that we received, this will not fail
 	//TODO: maybe do not use oldest one but worst candidate?? Use clusterScore on all packets to find the least interesting
 	u32 minScore = UINT32_MAX;
-	for (int i = 0; i < joinMePackets.length; i++)
+	for (u32 i = 0; i < joinMePackets.size(); i++)
 	{
 		joinMeBufferPacket* tmpPacket = &joinMePackets[i];
 
@@ -1850,9 +1821,9 @@ void Node::TimerEventHandler(u16 passedTimeDs)
 			&& emergencyDisconnectTimerDs       >= emergencyDisconnectTimerTriggerDs)
 		{
 			joinMeBufferPacket* bestCluster = DetermineBestClusterAsSlave();
-			emergencyDisconnectValidationConnectionUniqueId = MeshAccessConnection::ConnectAsMaster(&bestCluster->addr, 10, 10, FmKeyId::NETWORK, nullptr, MeshAccessTunnelType::PEER_TO_PEER);
+			emergencyDisconnectValidationConnectionUniqueId = MeshAccessConnectionHandle(MeshAccessConnection::ConnectAsMaster(&bestCluster->addr, 10, 10, FmKeyId::NETWORK, nullptr, MeshAccessTunnelType::PEER_TO_PEER));
 			//If a connection wasn't possible to establish
-			if (emergencyDisconnectValidationConnectionUniqueId == 0)
+			if (!emergencyDisconnectValidationConnectionUniqueId.IsValid())
 			{
 				//We reset all the emergency disconnect values and try again after emergencyDisconnectTimerTriggerDs
 				ResetEmergencyDisconnect();
@@ -1861,14 +1832,13 @@ void Node::TimerEventHandler(u16 passedTimeDs)
 		}
 		else if (emergencyDisconnectTimerDs >= emergencyDisconnectTimerTriggerDs)
 		{
-			MeshAccessConnection* mac = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(emergencyDisconnectValidationConnectionUniqueId);
-			if (mac != nullptr)
+			if (emergencyDisconnectValidationConnectionUniqueId)
 			{
-				if (mac->connectionState == ConnectionState::HANDSHAKE_DONE)
+				if (emergencyDisconnectValidationConnectionUniqueId.GetConnectionState() == ConnectionState::HANDSHAKE_DONE)
 				{
 					SendModuleActionMessage(
 						MessageType::MODULE_TRIGGER_ACTION,
-						mac->virtualPartnerId,
+						emergencyDisconnectValidationConnectionUniqueId.GetVirtualPartnerId(),
 						(u8)NodeModuleTriggerActionMessages::EMERGENCY_DISCONNECT,
 						0,
 						nullptr,
@@ -1965,7 +1935,6 @@ void Node::TimerEventHandler(u16 passedTimeDs)
 	}
 
 
-#if FEATURE_AVAILABLE(DEVICE_CAPABILITIES)
 	if (isSendingCapabilities) {
 		timeSinceLastCapabilitySentDs += passedTimeDs;
 		if (timeSinceLastCapabilitySentDs >= TIME_BETWEEN_CAPABILITY_SENDINGS_DS)
@@ -1997,7 +1966,9 @@ void Node::TimerEventHandler(u16 passedTimeDs)
 			}
 			else if (messageEntry.entry.type == CapabilityEntryType::NOT_READY)
 			{
-				// Do nothing, we will try again shortly.
+				// If the module wasn't ready yet, we immediately
+				// retry it on the next TimerEventHandler call.
+				timeSinceLastCapabilitySentDs = TIME_BETWEEN_CAPABILITY_SENDINGS_DS;
 			}
 			else
 			{
@@ -2009,7 +1980,6 @@ void Node::TimerEventHandler(u16 passedTimeDs)
 			}
 		}
 	}
-#endif
 
 	/*************************/
 	/***                   ***/
@@ -2115,10 +2085,7 @@ Module* Node::GetModuleById(ModuleId id) const
 
 void Node::PrintStatus(void) const
 {
-	u32 err;
-
-	FruityHal::BleGapAddr p_addr;
-	err = FruityHal::BleGapAddressGet(&p_addr);
+	const FruityHal::BleGapAddr addr = FruityHal::GetBleGapAddress();
 
 	trace("**************" EOL);
 	trace("Node %s (nodeId: %u) vers: %u, NodeKey: %02X:%02X:....:%02X:%02X" EOL EOL, RamConfig->GetSerialNumber(), configuration.nodeId, GS->config.getFruityMeshVersion(),
@@ -2130,14 +2097,14 @@ void Node::PrintStatus(void) const
 			configuration.networkKey[0], configuration.networkKey[1], configuration.networkKey[14], configuration.networkKey[15],
 			configuration.userBaseKey[0], configuration.userBaseKey[1], configuration.userBaseKey[14], configuration.userBaseKey[15]);
 	trace("Addr:%02X:%02X:%02X:%02X:%02X:%02X, ConnLossCounter:%u, AckField:%u, State: %u" EOL EOL,
-			p_addr.addr[5], p_addr.addr[4], p_addr.addr[3], p_addr.addr[2], p_addr.addr[1], p_addr.addr[0],
+			addr.addr[5], addr.addr[4], addr.addr[3], addr.addr[2], addr.addr[1], addr.addr[0],
 			connectionLossCounter, currentAckId, (u32)currentDiscoveryState);
 
 	//Print connection info
 	BaseConnections conns = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
 	trace("CONNECTIONS %u (freeIn:%u, freeOut:%u, pendingPackets:%u" EOL, conns.count, GS->cm.freeMeshInConnections, GS->cm.freeMeshOutConnections, GS->cm.GetPendingPackets());
 	for (u32 i = 0; i < conns.count; i++) {
-		BaseConnection *conn = GS->cm.allConnections[conns.connectionIndizes[i]];
+		BaseConnection *conn = conns.handles[i].GetConnection();
 		conn->PrintStatus();
 	}
 	trace("**************" EOL);
@@ -2158,8 +2125,6 @@ void Node::SetTerminalTitle() const
 #endif
 }
 
-
-#if FEATURE_AVAILABLE(DEVICE_CAPABILITIES)
 CapabilityEntry Node::GetCapability(u32 index, bool firstCall)
 {
 	if (index == 0) 
@@ -2217,13 +2182,11 @@ CapabilityEntry Node::GetNextGlobalCapability()
 	return retVal;
 }
 
-#endif
-
 void Node::PrintBufferStatus(void) const
 {
 	//Print JOIN_ME buffer
 	trace("JOIN_ME Buffer:" EOL);
-	for (int i = 0; i < joinMePackets.length; i++)
+	for (u32 i = 0; i < joinMePackets.size(); i++)
 	{
 		const joinMeBufferPacket* packet = &joinMePackets[i];
 		trace("=> %d, clstId:%u, clstSize:%d, freeIn:%u, freeOut:%u, writeHndl:%u, ack:%u, rssi:%d, ageDs:%d", packet->payload.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.freeMeshInConnections, packet->payload.freeMeshOutConnections, packet->payload.meshWriteHandle, packet->payload.ackField, packet->rssi, GS->appTimerDs - packet->receivedTimeDs);
@@ -2333,7 +2296,6 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
 
-#if FEATURE_AVAILABLE(PREFERRED_CONNECTIONS)
 			if (
 				   commandArgsSize >= 5 
 				&& commandArgsSize <= 5 + Conf::MAX_AMOUNT_PREFERRED_PARTNER_IDS 
@@ -2383,7 +2345,6 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
 				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
-#endif
 		}
 	}
 
@@ -2426,7 +2387,8 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 		BaseConnections conns = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
 		for (u32 i = 0; i < conns.count; i++)
 		{
-			BaseConnection* conn = GS->cm.allConnections[conns.connectionIndizes[i]];
+			BaseConnection* conn = conns.handles[i].GetConnection();
+			if (!conn) continue;
 			
 			if (conn->connectionType == ConnectionType::FRUITYMESH) {
 				MeshConnection* mconn = (MeshConnection*)conn;
@@ -2619,7 +2581,6 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
 		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
-#if FEATURE_AVAILABLE(DEVICE_CAPABILITIES)
 	else if (commandArgsSize >= 2 && TERMARGS(0, "request_capability"))
 	{
 		CapabilityRequestedMessage message;
@@ -2643,7 +2604,6 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 		);
 		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
-#endif
 	//Set a timestamp for this node
 	else if (TERMARGS(0, "settime") && commandArgsSize >= 3)
 	{
@@ -2686,7 +2646,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 		if (strlen(commandArgs[1]) != 5) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
 
 		u32 serial = Utility::GetIndexForSerial(commandArgs[1]);
-		if (serial == INVALID_SERIAL_NUMBER) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+		if (serial == INVALID_SERIAL_NUMBER_INDEX) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
 
 		GS->config.SetSerialNumberIndex(serial);
 
@@ -2769,9 +2729,9 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 			_packet[i+5] = i+1;
 		}
 		
-		GS->cm.SendMeshMessageInternal(_packet, dataLength, DeliveryPriority::LOW, reliable, true, true);
-
-		return TerminalCommandHandlerReturnType::SUCCESS;
+		ErrorType err = GS->cm.SendMeshMessageInternal(_packet, dataLength, DeliveryPriority::LOW, reliable, true, true);
+		if (err == ErrorType::SUCCESS) return TerminalCommandHandlerReturnType::SUCCESS;
+		else return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
 	}
 #if IS_INACTIVE(GW_SAVE_SPACE)
 	//Stop the state machine
@@ -2796,9 +2756,10 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 		if(commandArgsSize <= 2) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
 		//Allows us to connect to any node when giving the GAP Address
-		NodeId partnerId = Utility::StringToU16(commandArgs[1]);
+		bool didError = false;
+		NodeId partnerId = Utility::StringToU16(commandArgs[1], &didError);
 		u8 buffer[6];
-		Logger::parseEncodedStringToBuffer(commandArgs[2], buffer, 6);
+		Logger::parseEncodedStringToBuffer(commandArgs[2], buffer, 6, &didError);
 		FruityHal::BleGapAddr addr;
 		addr.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
 		addr.addr[0] = buffer[5];
@@ -2808,8 +2769,23 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 		addr.addr[4] = buffer[1];
 		addr.addr[5] = buffer[0];
 
+		if (didError)
+		{
+			return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+		}
+
 		//Using the same GATT handle as our own will probably work if our partner has the same implementation
-		GS->cm.ConnectAsMaster(partnerId, &addr, meshService.sendMessageCharacteristicHandle.valueHandle, MSEC_TO_UNITS(10, CONFIG_UNIT_1_25_MS));
+		const ErrorType err = GS->cm.ConnectAsMaster(partnerId, &addr, meshService.sendMessageCharacteristicHandle.valueHandle, MSEC_TO_UNITS(10, CONFIG_UNIT_1_25_MS));
+
+		if (err != ErrorType::SUCCESS)
+		{
+			logt("NODE", "Failed to connect as master because %u", (u32)err);
+			if (err == ErrorType::INVALID_ADDR)
+			{
+				return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+			}
+			return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
+		}
 
 		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
@@ -2823,9 +2799,9 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 		if(TERMARGS(1 , "all")){
 			GS->cm.ForceDisconnectAllConnections(AppDisconnectReason::USER_REQUEST);
 		} else {
-			BaseConnection* conn = GS->cm.GetConnectionFromHandle(Utility::StringToU16(commandArgs[1]));
-			if(conn != nullptr){
-				conn->DisconnectAndRemove(AppDisconnectReason::USER_REQUEST);
+			BaseConnectionHandle conn = GS->cm.GetConnectionFromHandle(Utility::StringToU16(commandArgs[1]));
+			if(conn){
+				conn.DisconnectAndRemove(AppDisconnectReason::USER_REQUEST);
 			}
 		}
 
@@ -2836,7 +2812,13 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 	{
 		if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 		u16 connectionHandle = Utility::StringToU16(commandArgs[1]);
-		ErrorType err = FruityHal::Disconnect(connectionHandle, FruityHal::BleHciError::REMOTE_USER_TERMINATED_CONNECTION);
+		const ErrorType err = FruityHal::Disconnect(connectionHandle, FruityHal::BleHciError::REMOTE_USER_TERMINATED_CONNECTION);
+
+		if (err != ErrorType::SUCCESS)
+		{
+			if (err == ErrorType::BLE_INVALID_CONN_HANDLE) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+			return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
+		}
 
 		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
@@ -2853,9 +2835,9 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 		packet.header.receiver = nodeId;
 
 		packet.newInterval = newConnectionInterval;
-		GS->cm.SendMeshMessageInternal((u8*)&packet, SIZEOF_CONN_PACKET_UPDATE_CONNECTION_INTERVAL, DeliveryPriority::MESH_INTERNAL_HIGH, true, true, true);
-
-		return TerminalCommandHandlerReturnType::SUCCESS;
+		ErrorType err = GS->cm.SendMeshMessageInternal((u8*)&packet, SIZEOF_CONN_PACKET_UPDATE_CONNECTION_INTERVAL, DeliveryPriority::MESH_INTERNAL_HIGH, true, true, true);
+		if (err == ErrorType::SUCCESS) return TerminalCommandHandlerReturnType::SUCCESS;
+		else return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
 	}
 #endif
 	/************* UART COMMANDS ***************/
@@ -2942,7 +2924,6 @@ inline void Node::SendModuleList(NodeId toNode, u8 requestHandle) const
 
 bool Node::IsPreferredConnection(NodeId id) const
 {
-#if FEATURE_AVAILABLE(PREFERRED_CONNECTIONS)
 	//If we don't have preferred connections set, any connection is treated as a preferred connection (every connection is equal).
 	if (GS->config.configuration.amountOfPreferredPartnerIds == 0) return true;
 
@@ -2955,9 +2936,6 @@ bool Node::IsPreferredConnection(NodeId id) const
 		}
 	}
 	return false;
-#else
-	return true;
-#endif
 }
 
 void Node::SendRawError(NodeId receiver, ModuleId moduleId, RawDataErrorType type, RawDataErrorDestination destination, u8 requestHandle) const

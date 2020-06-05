@@ -117,19 +117,11 @@ void Conf::LoadDefaults(){
 	terminalMode = TerminalMode::JSON;
 	defaultLedMode = LedMode::CONNECTIONS;
 
-	enableSinkRouting = false;
+	enableSinkRouting = true;
 	//Check if the BLE stack supports the number of connections and correct if not
 #ifdef SIM_ENABLED
-	BleStackType stackType = FruityHal::GetBleStackType();
-	if (stackType == BleStackType::NRF_SD_130_ANY) {
-		//S130 only supports 1 peripheral connection
-		totalInConnections = 1;
-		meshMaxInConnections = 1;
-	}
-	else{
-		totalInConnections = 3;
-		meshMaxInConnections = 2;
-	}
+	totalInConnections = 3;
+	meshMaxInConnections = 2;
 #endif
 
 	meshMinConnectionInterval = 12; //FIXME_HAL: 12 units = 15ms (1.25ms steps)
@@ -155,7 +147,7 @@ void Conf::LoadDefaults(){
 
 void Conf::LoadDeviceConfiguration(){
 	DeviceConfiguration config;
-	ErrorType err = FruityHal::getDeviceConfiguration(config);
+	ErrorType err = FruityHal::GetDeviceConfiguration(config);
 
 	//If Deviceconfiguration data is available, we fill various variables with the data
 	if (err == ErrorType::SUCCESS) {
@@ -167,7 +159,7 @@ void Conf::LoadDeviceConfiguration(){
 		}
 		if(config.manufacturerId != EMPTY_WORD) manufacturerId = (u16)config.manufacturerId;
 		if(config.defaultNetworkId != EMPTY_WORD) defaultNetworkId = (u16)config.defaultNetworkId;
-		if(config.defualtNodeId != EMPTY_WORD) defaultNodeId = (u16)config.defualtNodeId;
+		if(config.defaultNodeId != EMPTY_WORD) defaultNodeId = (u16)config.defaultNodeId;
 		// if(config.deviceType != EMPTY_WORD) deviceType = (deviceTypes)config.deviceType; //deprectated as of 02.07.2019
 		if(config.serialNumberIndex != EMPTY_WORD) serialNumberIndex = (u32)config.serialNumberIndex;
 		else if (config.serialNumber[0] != EMPTY_WORD) {
@@ -175,6 +167,8 @@ void Conf::LoadDeviceConfiguration(){
 			//If you want to remove it, check if any flashed device exist 
 			//and is still in use, that was not flashed with DeviceConfiguration.serialNumberIndex.
 			//If AND ONLY IF this is not the case, you can savely remove it.
+			//WARNING: To not introduce any compatibility issues with older hardware, this does only support the old 5-character serial numbers
+			//The UICR must not contain a serialNumber (should be FFFFFF...) if the serialNumber has more than 5 characters
 			char serialNumber[6];
 			CheckedMemcpy((u8*)serialNumber, (u8*)config.serialNumber, 5);
 			serialNumber[5] = '\0';
@@ -254,16 +248,10 @@ uint32_t uint_pow(uint32_t base, uint32_t exponent){
 }
 
 void Conf::generateRandomSerialAndNodeId(){
-	//Generate a random serial number
-	//This takes 5bit wide chunks from the device id to generate a serial number
-	//in tests, 10k serial numbers had 4 duplicates
-	u32 index = 0;
-	for(int i=0; i<NODE_SERIAL_NUMBER_LENGTH; i++){
-		u8 fiveBitChunk = (FruityHal::GetDeviceId() & (0x1F << (i*5))) >> (i*5);
-		index += uint_pow(30, i)*(fiveBitChunk % 30);
-	}
-	serialNumberIndex = index;
-	defaultNodeId = (index + 50) % (NODE_ID_GROUP_BASE-1); //nodeId must stay within valid range
+	//Generate a random serial number for testing from the open source testing range (FMBBB - FM999)
+	serialNumberIndex = (FruityHal::GetDeviceId() % (SERIAL_NUMBER_FM_TESTING_RANGE_END - SERIAL_NUMBER_FM_TESTING_RANGE_START)) + SERIAL_NUMBER_FM_TESTING_RANGE_START;
+
+	defaultNodeId = serialNumberIndex % NODE_ID_DEVICE_BASE_SIZE; //nodeId must stay within valid range
 }
 
 //Tests if a memory region in flash storage is empty (0xFF)
@@ -292,7 +280,7 @@ const char * Conf::GetSerialNumber() const
 
 void Conf::SetSerialNumberIndex(u32 serialNumber)
 {
-	if (serialNumber == INVALID_SERIAL_NUMBER)
+	if (serialNumber == INVALID_SERIAL_NUMBER_INDEX)
 	{
 		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
 	}

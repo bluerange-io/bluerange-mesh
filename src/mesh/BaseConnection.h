@@ -35,11 +35,11 @@
 #include <Config.h>
 #include <PacketQueue.h>
 #include <Logger.h>
-#include "SimpleArray.h"
 #include <FruityHal.h>
+#include <array>
 
-#define PACKET_QUEUED_HANDLE_NOT_QUEUED_IN_SD 0
-#define PACKET_QUEUED_HANDLE_COUNTER_START 10
+constexpr u8 PACKET_QUEUED_HANDLE_NOT_QUEUED_IN_SD = 0;
+constexpr u8 PACKET_QUEUED_HANDLE_COUNTER_START = 10;
 
 
 enum class DeliveryOption : u8 {
@@ -65,7 +65,7 @@ typedef struct BaseConnectionSendData {
 	u16 dataLength;
 } BaseConnectionSendData;
 
-#define SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED 6
+constexpr size_t SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED = 6;
 #pragma pack(push)
 #pragma pack(1)
 typedef struct BaseConnectionSendDataPacked {
@@ -76,7 +76,7 @@ typedef struct BaseConnectionSendDataPacked {
 	u16 dataLength;
 } BaseConnectionSendDataPacked;
 #pragma pack(pop)
-STATIC_ASSERT_SIZE(BaseConnectionSendDataPacked, 6);
+STATIC_ASSERT_SIZE(BaseConnectionSendDataPacked, SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
 
 class Node;
 class ConnectionManager;
@@ -152,6 +152,11 @@ enum class EncryptionState : u8{
 	ENCRYPTED=2
 };
 
+/*
+ * The BaseConnection is the root class for all BLE connections used within FruityMesh.
+ * It includes some basic functionality for packet queuing, sending and receiving and also for state management.
+ * Subclasses can use some of this functionality or override it.
+ */
 class BaseConnection
 {
 	private: 
@@ -182,10 +187,6 @@ class BaseConnection
 		//Initializes connection but does not connect
 		BaseConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
 		virtual ~BaseConnection();
-
-		//Custom handshake
-		virtual void StartHandshake(){};
-
 
 		virtual void DisconnectAndRemove(AppDisconnectReason reason);
 
@@ -256,16 +257,16 @@ class BaseConnection
 		u8 manualPacketsSent = 0; //Used to count the packets manually sent to the softdevice using bleWriteCharacteristic, will be decremented first before packets from the queue are removed. Packets must not be sent while the queue is working
 
 		//Normal Prio Queue
-		u32 packetSendBuffer[PACKET_SEND_BUFFER_SIZE / sizeof(u32)] = { 0 };
+		u32 packetSendBuffer[PACKET_SEND_BUFFER_SIZE / sizeof(u32)] = {};
 		PacketQueue packetSendQueue;
 
 		//High Prio Queue
-		u32 packetSendBufferHighPrio[PACKET_SEND_BUFFER_HIGH_PRIO_SIZE / sizeof(u32)] = { 0 };
+		u32 packetSendBufferHighPrio[PACKET_SEND_BUFFER_HIGH_PRIO_SIZE / sizeof(u32)] = {};
 		PacketQueue packetSendQueueHighPrio;
 
 		u8 packetQueuedHandleCounter = PACKET_QUEUED_HANDLE_COUNTER_START; //Used to assign handles to queued packets
 
-		SimpleArray<u8, PACKET_REASSEMBLY_BUFFER_SIZE> packetReassemblyBuffer;
+		std::array<u8, PACKET_REASSEMBLY_BUFFER_SIZE> packetReassemblyBuffer{};
 		u8 packetReassemblyPosition = 0; //Set to 0 if no reassembly is in progress
 
 		//Partner
@@ -283,6 +284,8 @@ class BaseConnection
 		u16 droppedPackets = 0;
 		u16 sentReliable = 0;
 		u16 sentUnreliable = 0;
+
+		static u32 GetAmountOfRemovedConnections();
 
 #ifdef SIM_ENABLED
 		void PrintQueueInfo();

@@ -29,8 +29,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 /*
- * This file contains the mesh configuration, which is a singleton. Some of the
- * values can be changed at runtime to alter the meshing behaviour.
+ * Board configurations are used to have a firmware that can run with the same
+ * functionality on multiple boards. The decision which board configuration is
+ * used is done at runtime.
  */
 
 #ifndef BOARDCONFIG_H
@@ -103,7 +104,7 @@ typedef struct BoardConfiguration
 
 			void Initialize();
 			void ResetToDefaultConfiguration();
-			void (*getSensorPins)(SensorPins*) = nullptr;
+			void (*getCustomPinset)(CustomPins*) = nullptr;
 
 			BoardConfiguration configuration;
 

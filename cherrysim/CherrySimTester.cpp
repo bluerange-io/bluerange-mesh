@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
 		::testing::GTEST_FLAG(break_on_failure) = true;
 
 		//If we only want to execute specific tests, we can specify them here
-		::testing::GTEST_FLAG(filter) = "**";
+		::testing::GTEST_FLAG(filter) = "*:-*_scheduled*:*_long*";
 
 		//Do not catch exceptions is useful for debugging (Automatically set to 1 if running on Gitlab)
 		::testing::GTEST_FLAG(catch_exceptions) = 0;
@@ -176,17 +176,18 @@ SimConfiguration CherrySimTester::CreateDefaultSimConfiguration()
 {
 	SimConfiguration simConfig;
 
-	simConfig.numNodes = 10; //asset node ids are at the end e.g if we have numNode 2 and numAssetNode 1, the node id of asset node will be 3.
-	simConfig.numAssetNodes = 0;
 	simConfig.seed = 1;
 	simConfig.mapWidthInMeters = 60;
 	simConfig.mapHeightInMeters = 40;
+	simConfig.mapElevationInMeters = 1;
 	simConfig.simTickDurationMs = 50;
 	simConfig.terminalId = 0; //Terminal must be active in order for a test to trigger on the terminal output
 
 	simConfig.simOtherDelay = 1; // Enter 1 - 100000 to send sim_other message only each ... simulation steps, this increases the speed significantly
 	simConfig.playDelay = 0; //Allows us to view the simulation slower than simulated, is added after each step
 	
+	simConfig.interruptProbability = 0.1f;
+
 	simConfig.connectionTimeoutProbabilityPerSec = 0; //Every minute or so: 0.00001;
 	simConfig.sdBleGapAdvDataSetFailProbability = 0;// 0.0001; //Simulate fails on setting adv Data
 	simConfig.sdBusyProbability = 0.01;// 0.0001; //Simulates getting back busy errors from softdevice
@@ -194,11 +195,9 @@ SimConfiguration CherrySimTester::CreateDefaultSimConfiguration()
 	simConfig.asyncFlashCommitTimeProbability = 0.9;
 
 	simConfig.importFromJson = false;
-	strcpy(simConfig.siteJsonPath, "C:\\Users\\MariusHeil\\Desktop\\testsite.json");
-	strcpy(simConfig.devicesJsonPath, "C:\\Users\\MariusHeil\\Desktop\\testdevices.json");
+	simConfig.siteJsonPath = "C:\\Users\\MariusHeil\\Desktop\\testsite.json";
+	simConfig.devicesJsonPath = "C:\\Users\\MariusHeil\\Desktop\\testdevices.json";
 
-	strcpy(simConfig.defaultNodeConfigName, "prod_mesh_nrf52");
-	strcpy(simConfig.defaultSinkConfigName, "prod_sink_nrf52");
 
 	simConfig.defaultBleStackType = BleStackType::NRF_SD_132_ANY;
 
@@ -214,30 +213,39 @@ SimConfiguration CherrySimTester::CreateDefaultSimConfiguration()
 }
 
 CherrySimTester::CherrySimTester(CherrySimTesterConfig testerConfig, SimConfiguration simConfig)
-	: config(testerConfig), 
-	  simConfig(simConfig), 
-	  awaitedMessageResult("")
+	  : config(testerConfig),
+	  simConfig(simConfig) 
 {
-	awaitedMessagePointer = 0;
-	awaitedMessagesFound = false;
-	
-	awaitedBleEventNodeId = 0;
-	awaitedBleEventEventId = 0;
-	awaitedBleEventFound = false;
-	CheckedMemset(awaitedBleEventDataPart, 0x00, sizeof(awaitedBleEventDataPart));
-	
 	sim = new CherrySim(simConfig);
 	sim->SetCherrySimEventListener(this);
 	sim->Init();
 	sim->RegisterTerminalPrintListener(this);
 	
-	//Load the number of nodes from the sim in case a json or sth. was loaded with a different amount
-	CherrySimTester::simConfig.numNodes = sim->getNumNodes();
+}
+
+CherrySimTester::CherrySimTester(CherrySimTester && other)
+	: sim                        (std::move(other.sim)),
+	awaitedTerminalOutputs       (std::move(other.awaitedTerminalOutputs)),
+	useRegex                     (std::move(other.useRegex)),
+	awaitedMessagePointer        (std::move(other.awaitedMessagePointer)),
+	awaitedMessagesFound         (std::move(other.awaitedMessagesFound)),
+	awaitedBleEventNodeId        (std::move(other.awaitedBleEventNodeId)),
+	awaitedBleEventEventId       (std::move(other.awaitedBleEventEventId)),
+	awaitedBleEventDataPart      (std::move(other.awaitedBleEventDataPart)),
+	awaitedBleEventDataPartLength(std::move(other.awaitedBleEventDataPartLength)),
+	awaitedBleEventFound         (std::move(other.awaitedBleEventFound)),
+	appendCrcToMessages          (std::move(other.appendCrcToMessages)),
+	awaitedMessageResult         (std::move(other.awaitedMessageResult)),
+	config                       (std::move(other.config)),
+	simConfig                    (std::move(other.simConfig)),
+	started                      (std::move(other.started))
+{
+	other.sim = nullptr;
 }
 
 CherrySimTester::~CherrySimTester()
 {
-	if(sim != nullptr) delete sim;
+	delete sim;
 	sim = nullptr;
 }
 
@@ -250,9 +258,9 @@ void CherrySimTester::Start()
 	}
 
 	//Boot up all nodes
-	for (u32 i = 0; i < simConfig.numNodes; i++) {
+	for (u32 i = 0; i < sim->getTotalNodes(); i++) {
 #ifdef GITHUB_RELEASE
-		strcpy(sim->nodes[i].nodeConfiguration, "github_nrf52");
+		sim->nodes[i].nodeConfiguration = "github_nrf52";
 #endif //GITHUB_RELEASE
 		sim->setNode(i);
 		sim->bootCurrentNode();
@@ -297,8 +305,8 @@ void CherrySimTester::SimulateBroadcastMessage(double x, double y, ble_gap_evt_a
 
 	sim->currentNode->x = (float)x;
 	sim->currentNode->y = (float)y;
-
-	for (u32 i = 0; i < simConfig.numNodes; i++) {
+	u32 numNoneAssetNodes = sim->getTotalNodes() - sim->getAssetNodes();
+	for (u32 i = 0; i < numNoneAssetNodes; i++) {
 		//If the other node is scanning
 		if (sim->nodes[i].state.scanningActive) {
 			//If the random value hits the probability, the event is sent
@@ -323,7 +331,7 @@ void CherrySimTester::SimulateBroadcastMessage(double x, double y, ble_gap_evt_a
 	}
 	
 }
-void CherrySimTester::SimulateUntilClusteringDoneWithExpectedNumberOfClusters(int timeoutMs, int clusters)
+void CherrySimTester::SimulateUntilClusteringDoneWithExpectedNumberOfClusters(int timeoutMs, u32 clusters)
 {
 	if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
 	int startTimeMs = sim->simState.simTimeMs;
@@ -425,7 +433,7 @@ void CherrySimTester::SimulateUntilBleEventReceived(int timeoutMs, NodeId nodeId
 	awaitedBleEventNodeId = nodeId;
 	awaitedBleEventEventId = eventId;
 	awaitedBleEventDataPartLength = eventDataPartLength;
-	CheckedMemcpy(awaitedBleEventDataPart, eventDataPart, eventDataPartLength);
+	CheckedMemcpy(awaitedBleEventDataPart.data(), eventDataPart, eventDataPartLength);
 	awaitedBleEventFound = false;
 
 	while (!awaitedBleEventFound) {
@@ -465,9 +473,8 @@ void CherrySimTester::SendTerminalCommand(NodeId nodeId, const char* message, ..
 	const std::string originalCommand = buffer;
 	const u32 crc = Utility::CalculateCrc32String(originalCommand.c_str());
 	const std::string crcCommand = originalCommand + std::string(" CRC: ") + std::to_string(crc);
-
 	if (nodeId == 0) {
-		for (u32 i = 0; i < simConfig.numNodes; i++) {
+		for (u32 i = 0; i < sim->getTotalNodes(); i++) {
 			sim->setNode(i);
 			if (!GS->terminal.terminalIsInitialized) {
 				//you have not activated the terminal of that node either through the config or through the sim config
@@ -478,12 +485,12 @@ void CherrySimTester::SendTerminalCommand(NodeId nodeId, const char* message, ..
 			{
 				commandToSend = crcCommand;
 			}
-			GS->terminal.PutIntoReadBuffer(commandToSend.c_str());
+			GS->terminal.PutIntoTerminalCommandQueue(commandToSend, false);
 			if (config.verbose) {
 				printf("NODE %d TERM_IN: %s" EOL, sim->currentNode->id, commandToSend.c_str());
 			}
 		}
-	} else if (nodeId > 0 && nodeId < simConfig.numNodes + 1) {
+	} else if (nodeId > 0 && nodeId < sim->getTotalNodes() + 1) {
 		sim->setNode(nodeId - 1);
 		if (!GS->terminal.terminalIsInitialized) {
 			//you have not activated the terminal of that node either through the config or through the sim config
@@ -494,7 +501,7 @@ void CherrySimTester::SendTerminalCommand(NodeId nodeId, const char* message, ..
 		{
 			commandToSend = crcCommand;
 		}
-		GS->terminal.PutIntoReadBuffer(commandToSend.c_str());
+		GS->terminal.PutIntoTerminalCommandQueue(commandToSend, false);
 		if (config.verbose) {
 			printf("NODE %d TERM_IN: %s" EOL, sim->currentNode->id, commandToSend.c_str());
 		}
@@ -529,7 +536,7 @@ void CherrySimTester::TerminalPrintHandler(nodeEntry* currentNode, const char* m
 
 	//Concatenate all output into one message until an end of line is received
 	u16 messageLength = (u16)strlen(message);
-	CheckedMemcpy(awaitedMessageResult + awaitedMessagePointer, message, messageLength);
+	CheckedMemcpy(awaitedMessageResult.data() + awaitedMessagePointer, message, messageLength);
 	awaitedMessagePointer += messageLength;
 
 	if (awaitedMessageResult[awaitedMessagePointer - 1] == '\n') {
@@ -539,7 +546,7 @@ void CherrySimTester::TerminalPrintHandler(nodeEntry* currentNode, const char* m
 			if (!awaited[i].isFound()) {
 				if (sim->currentNode->id == awaited[i].getNodeId())
 				{
-					if (awaited[i].checkAndSet(awaitedMessageResult, useRegex))
+					if (awaited[i].checkAndSet(awaitedMessageResult.data(), useRegex))
 					{
 						break; //A received message should validate only one awaited message.
 					}
@@ -547,7 +554,7 @@ void CherrySimTester::TerminalPrintHandler(nodeEntry* currentNode, const char* m
 			}
 		}
 		
-		awaitedMessagesFound = std::all_of(awaited.begin(), awaited.end(), [](SimulationMessage& sm) {return sm.isFound(); });
+		awaitedMessagesFound = std::all_of(awaited.begin(), awaited.end(), [](const SimulationMessage& sm) {return sm.isFound(); });
 		
 		awaitedMessagePointer = 0;
 	}
@@ -558,7 +565,6 @@ void CherrySimTester::CherrySimBleEventHandler(nodeEntry* currentNode, simBleEve
 	if (
 		(awaitedBleEventNodeId == 0 || currentNode->gs.node.configuration.nodeId == awaitedBleEventNodeId)
 		&& awaitedBleEventEventId != 0
-		&& simBleEvent->bleEvent.header.evt_id == simBleEvent->bleEvent.header.evt_id
 	) {
 		if (awaitedBleEventDataPartLength > 0)
 		{

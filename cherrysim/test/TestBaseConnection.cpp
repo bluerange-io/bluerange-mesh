@@ -35,8 +35,10 @@
 TEST(TestBaseConnection, TestSimpleTransmissions) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
-	testerConfig.verbose = true;
+
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+	//testerConfig.verbose = true;
 
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
@@ -49,6 +51,9 @@ TEST(TestBaseConnection, TestSimpleTransmissions) {
 			tester.sim->nodes[0].state.connections[i].connectionMtu = 10;
 		}
 	}
+
+	// GATT WRITE ERROR is logged via ERROR tag, which is correct behavior.
+	Exceptions::ExceptionDisabler<ErrorLoggedException> ele;
 
 	//Send a message to node 2
 	tester.SendTerminalCommand(1, "action 2 status get_status");

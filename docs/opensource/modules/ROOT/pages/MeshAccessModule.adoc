@@ -169,7 +169,7 @@ Instructs a node to build a _MeshAccessConneciton_ to another node. The connecti
 [source,C++]
 ----
 //Establish a connection to another device using a MeshAccessConnection
-action [nodeId] ma serial_connect [serial number] [keyId] [key] {nodeId_of_partner_after_connect = 0} {initial_keep_alive = 0} {requestHandle=0}
+action [nodeId] ma serial_connect [serial number] [keyId] [key] [nodeId_of_partner_after_connect] [initial_keep_alive] {requestHandle=0}
 
 //E.g. Connect to device BBBBQ with node key 00:11:22:...
 action 6 ma serial_connect BBBBQ 1 00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF 33012 20 13
@@ -177,9 +177,9 @@ action 6 ma serial_connect BBBBQ 1 00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:
 
 The key can be set to FF:FF:...:FF in which case the receiving node replaces the key with the key of the corresponding keyId from its local storage. **NOTE**: This key replacement feature is not allowed for MeshAccessConnections as they are not fully trusted members of the mesh. For such connections, the key must be fully specified.
 
-If no `nodeId_of_partner_after_connect` is given or it is set to 0, a virtual partner id is assigned to the connection. If it is given, the nodeId must come of the range of organization wide unique nodeIds.
+`nodeId_of_partner_after_connect` must be inside the range of organization wide unique nodeIds [33000, 39999].
 
-If no `initial_keep_alive` is given or it is set to 0, the connection will stay open indefinitely. **NOTE** This variable is merely a suggestion to the node. There are a lot of cases where a connection can also be prematurely disconnected.
+`initial_keep_alive` is merely a suggestion to the node. There are a lot of cases where a connection can also be prematurely disconnected.
 
 Once the connection was established or cancelled, it is answered with the following JSON:
 

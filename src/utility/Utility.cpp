@@ -109,31 +109,35 @@ void Utility::ToUpperCase(char * str)
 
 u32 Utility::GetIndexForSerial(const char* serialNumber, bool *didError){
 	u32 index = 0;
-	for(int i=0; i<NODE_SERIAL_NUMBER_LENGTH; i++){
-		if(i == NODE_SERIAL_NUMBER_LENGTH-1 && serialNumber[0] == 'A') continue;
-		char currentChar = serialNumber[NODE_SERIAL_NUMBER_LENGTH-i-1];
+	u32 serialLength = strlen(serialNumber);
+	u32 charCounter = 0;
+	for(u32 i=0; i< serialLength; i++){
+		if(i == serialLength - 1 && serialNumber[0] == 'A') continue;
+		char currentChar = serialNumber[serialLength - i - 1];
+		if (currentChar == '\0') continue;
 		const char* charPos = strchr(serialAlphabet, currentChar);
 		if (charPos == nullptr)
 		{
 			if (didError != nullptr) *didError = true;
 			SIMEXCEPTION(IllegalArgumentException);
-			return INVALID_SERIAL_NUMBER;
+			return INVALID_SERIAL_NUMBER_INDEX;
 		}
 		u32 charValue = (u32)charPos - (u32)serialAlphabet;
-		index += ipow(sizeof(serialAlphabet)-1, i) * charValue;
+		index += ipow(sizeof(serialAlphabet)-1, charCounter) * charValue;
+		charCounter++;
 	}
 	return index;
 }
 
 void Utility::GenerateBeaconSerialForIndex(u32 index, char* serialBuffer)
 {
-	CheckedMemset(serialBuffer, 0x00, NODE_SERIAL_NUMBER_LENGTH+1);
-	for(u32 i=0; i<NODE_SERIAL_NUMBER_LENGTH; i++){
-		int rest = (int)(index % strlen(serialAlphabet));
-		serialBuffer[NODE_SERIAL_NUMBER_LENGTH-i-1] = serialAlphabet[rest];
+	CheckedMemset(serialBuffer, 0x00, NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH);
+	u32 numChars = index < 24300000UL ? 5 : 7; //Small serial numbers use 5 characters, the extended range uses 7 characters
+	for(u32 i=0; i< numChars; i++){
+		u32 rest = (u32)(index % strlen(serialAlphabet));
+		serialBuffer[numChars - i - 1] = serialAlphabet[rest];
 		index /= strlen(serialAlphabet);
 	}
-
 }
 
 u16 Utility::ByteToAsciiHex(u8 b) {

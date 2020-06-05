@@ -4,6 +4,44 @@
 BoardConfigurations provide a way to run the same firmware on multiple boards. This allows you to easily develop a firmware on a development kit, then flash the same firmware on different types of custom hardware PCBs.
 
 == How it works
-Each xref:Developers.adoc#FeatureSets[Featureset] can contain a number of board configurations. So if you develop your custom featureset, you can choose to include all the boards that you want to run this firmware on. The different Board Configurations can be found in the `config/boards/` folder. Each board has an ID that must be stored in the xref:Specification.adoc#UICR[UICR] while flashing the firmware on that board. During boot, FruityMesh will then load the correct board settings that include the pin configuration, clock source and everything else that is board specific. You only have to specify the settings that are necessary for your board as everything else is set to save defaults.
+Each xref:Developers.adoc#Featuresets[Featureset] can contain a number of board configurations. So if you develop your custom featureset, you can choose to include all the boards that you want to run this firmware on. The different Board Configurations can be found in the `config/boards/` folder. Each board has an ID that must be stored in the xref:Specification.adoc#UICR[UICR] while flashing the firmware on that board. During boot, FruityMesh will then load the correct board settings that include the pin configuration, clock source and everything else that is board specific. You only have to specify the settings that are necessary for your board as everything else is set to save defaults.
 
 Make sure to choose your board ids so that they start from 10000 to leave enough space for boardids that we might open source in the future.
+
+== Implementing a Custom Pinset
+In order to support custom pinset configuration for different use cases, a function pointer `void (*getCustomPinset)(CustomPinset*)` is used. The reason for having `getCustomPinset` function pointer besides BoardConfiguration struct is to define custom pins for special use cases while BoardConfiguration struct is only used for more generic pin configurations. Below an example is provided for adding _Lis2dh12 sensor pins_ to boardsettings of _board_4.cpp_
+
+* Add a function _extern void setCustomPinset_4(CustomPinset* pinsetConfig)_ to the boardsettings.
+
+* Define a function e.g an example implementation would be
+[source,C++]
+----
+void setCustomPinset_4(CustomPins* pinConfig){
+	if(pinConfig->pinsetIdentifier == PinsetIdentifier::LIS2DH12){
+		Lis2dh12Pins* pins = (Lis2dh12Pins*)pinConfig;
+		pins->misoPin = -1;
+		pins->mosiPin = -1;
+		pins->sckPin = -1;
+		pins->ssPin = -1;
+
+	}
+}
+----
+
+* Struct `CustomPins` consists of pinset identifier and the other struct e.g. `Lis2dh12Pins` inherits from this struct.
+
+* Finally, function  'setCustomPins_4' could be passed to `getCustomPinset` function pointer e.g. 
+[source,C++]
+----
+GS->boardconf.getCustomPinset= &setCustomPinset_4;
+----
+
+* One way of accessing these custom pin settings from source code would be
+[source,C++]
+----
+Lis2dh12Pins lis2dh12PinConfig;
+lis2dh12PinConfig.sensorIdentifier = SensorIdentifier::LIS2DH12;
+GS->boardconf.getCustomPinset(&lis2dh12PinConfig);
+----
+
+'NOTE: An example implementation of custom pin settings could be find in board_4.cpp in the source code'

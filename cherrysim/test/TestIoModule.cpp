@@ -34,7 +34,7 @@ TEST(TestIoModule, TestCommands) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 	testerConfig.verbose = false;
-
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9 });
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	//Could modify the default test or sim config here,...
 	tester.Start();

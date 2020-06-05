@@ -38,10 +38,9 @@
 TEST(TestDebugModule, TestCommands) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 2 } );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 	tester.SimulateUntilClusteringDone(10 * 1000);
@@ -153,10 +152,9 @@ TEST(TestDebugModule, TestCommands) {
 TEST(TestDebugModule, TestClearQueue) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 2 } );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 	tester.SimulateUntilClusteringDone(10 * 1000);
@@ -169,10 +167,9 @@ TEST(TestDebugModule, TestClearQueue) {
 TEST(TestDebugModule, TestReadMemory) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 2 } );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 

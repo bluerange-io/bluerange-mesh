@@ -42,12 +42,11 @@ typedef struct FeaturesetAndBleStack {
 
 class MultiStackFixture : public ::testing::TestWithParam<FeaturesetAndBleStack> {};
 
-FeaturesetAndBleStack prod_mesh_nrf51 = { BleStackType::NRF_SD_130_ANY, "prod_mesh_nrf51" };
 FeaturesetAndBleStack prod_mesh_nrf52 = { BleStackType::NRF_SD_132_ANY, "prod_mesh_nrf52" };
 
 
 
-void DoClusteringTestImportedFromJson(std::string site, std::string device, int clusteringIterations, int maxClusteringTimeSec, FeaturesetAndBleStack config)
+void DoClusteringTestImportedFromJson(const std::string &site, const std::string &device, u32 clusteringIterations, int maxClusteringTimeSec, FeaturesetAndBleStack config)
 {
 	int clusteringTimeTotalMs = 0;
 
@@ -59,12 +58,11 @@ void DoClusteringTestImportedFromJson(std::string site, std::string device, int 
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 		simConfig.seed = i;
 		simConfig.importFromJson = true;
-		strcpy(simConfig.siteJsonPath, site.c_str());
-		strcpy(simConfig.devicesJsonPath, device.c_str());
+		simConfig.siteJsonPath = site;
+		simConfig.devicesJsonPath = device;
 		//testerConfig.verbose = true;
 
 		simConfig.defaultBleStackType = config.bleStack;
-		strcpy(simConfig.defaultNodeConfigName, config.featuresetName.c_str());
 
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 		tester.Start();
@@ -72,12 +70,11 @@ void DoClusteringTestImportedFromJson(std::string site, std::string device, int 
 		clusteringTimeTotalMs += tester.sim->simState.simTimeMs;
 	}
 
-	printf("Average clustering time %d seconds" EOL, clusteringTimeTotalMs / clusteringIterations / 1000);
+	printf("Average clustering time %u seconds" EOL, clusteringTimeTotalMs / clusteringIterations / 1000);
 }
 
 TEST_P(MultiStackFixture, TestBasicClustering) {
 	const int maxClusteringTimeMs = 40 * 1000;
-	const int numNodes = 10;
 	const int clusteringIterations = 5;
 	int clusteringTimeTotalMs = 0;
 
@@ -89,12 +86,10 @@ TEST_P(MultiStackFixture, TestBasicClustering) {
 		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 		simConfig.seed = i;
-		simConfig.numNodes = numNodes;
 		//simConfig.verbose = true;
-
 		//Run with the parametrized config
+		simConfig.nodeConfigName.insert({ config.featuresetName.c_str(), 10 });
 		simConfig.defaultBleStackType = config.bleStack;
-		strcpy(simConfig.defaultNodeConfigName, config.featuresetName.c_str());
 
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 		tester.Start();
@@ -149,10 +144,7 @@ TEST_P(MultiStackFixture, TestSparseNetwork) {
 	std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/sparsenetwork/site.json";
 	std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/sparsenetwork/devices.json";
 
-	//We use a longer timeout for the s130/nrf51 as this one might run into an issue that two clusters with the same
-	//amount of nodes go back and forth while meshing. For Stacks that support 2 connections as a peripheral, this is easily resolved
 	u32 timeoutSec = 50;
-	if (GetParam().bleStack == BleStackType::NRF_SD_130_ANY) timeoutSec = 80;
 
 	DoClusteringTestImportedFromJson(site, device, 5, timeoutSec, GetParam());
 }
@@ -170,7 +162,6 @@ TEST_P(MultiStackFixture, TestSinglePointFailureNetwork) {
 TEST(TestClustering, TestClusteringWithManySdBusy) {
 	int clusteringTimeTotalMs = 0;
 	const int maxClusteringTimeMs = 200 * 1000;
-	const int numNodes = 10;
 	const int clusteringIterations = 5;
 
 	for (u32 i = 0; i < clusteringIterations; i++) {
@@ -178,7 +169,7 @@ TEST(TestClustering, TestClusteringWithManySdBusy) {
 		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 		simConfig.seed = i;
-		simConfig.numNodes = numNodes;
+		simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 10 } );
 		simConfig.sdBusyProbability = 0.5;
 		simConfig.connectionTimeoutProbabilityPerSec = 0;
 
@@ -193,7 +184,6 @@ TEST(TestClustering, TestClusteringWithManySdBusy) {
 
 TEST_P(MultiStackFixture, TestBasicClusteringWithNodeReset) {
 	const int maxClusteringTimeMs = 150 * 1000;
-	const int numNodes = 20;
 	const int clusteringIterations = 5;
 	const int resetTimesPerIteration = 3;
 
@@ -204,7 +194,6 @@ TEST_P(MultiStackFixture, TestBasicClusteringWithNodeReset) {
 		printf("ClusterTest Iteration %u" EOL, i);
 		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-		simConfig.numNodes = numNodes;
 		simConfig.connectionTimeoutProbabilityPerSec = 0; //TODO: do this test with and without timeouts
 		simConfig.seed = i;
 
@@ -212,7 +201,8 @@ TEST_P(MultiStackFixture, TestBasicClusteringWithNodeReset) {
 
 		//Run with the parametrized config
 		simConfig.defaultBleStackType = config.bleStack;
-		strcpy(simConfig.defaultNodeConfigName, config.featuresetName.c_str());
+
+		simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 20} );
 
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 		tester.Start();
@@ -221,9 +211,9 @@ TEST_P(MultiStackFixture, TestBasicClusteringWithNodeReset) {
 
 		for (u32 j = 0; j < resetTimesPerIteration; j++)
 		{
-			u32 numNodesToReset = (u32)((simConfig.numNodes / 5) * PSRNG() + 1);
+			u32 numNodesToReset = (u32)((tester.sim->getTotalNodes() / 5) * PSRNG() + 1);
 
-			auto nodeIdsToReset = CherrySimUtils::generateRandomNumbers(1, simConfig.numNodes, numNodesToReset);
+			auto nodeIdsToReset = CherrySimUtils::generateRandomNumbers(1, tester.sim->getTotalNodes(), numNodesToReset);
 
 			for (auto const nodeId : nodeIdsToReset) {
 				tester.SendTerminalCommand(nodeId, "reset");
@@ -236,7 +226,7 @@ TEST_P(MultiStackFixture, TestBasicClusteringWithNodeReset) {
 	}
 }
 
-//Tests different clustering scenarios, each for nrf51 and nrf52
+//Tests different clustering scenarios
 TEST(TestClustering, TestBasicClusteringWithNodeReset_scheduled) {
 	int maxClusteringTimeMs = 250 * 1000;
 	const int clusteringIterations = 30;
@@ -264,15 +254,15 @@ TEST(TestClustering, TestBasicClusteringWithNodeReset_scheduled) {
 
 		simConfig.mapWidthInMeters = 400;
 		simConfig.mapHeightInMeters = 300;
-		simConfig.numNodes = numNodes;
 		simConfig.seed = seed;
 		simConfig.simulateJittering = true;
 
 		
 		simConfig.defaultBleStackType = prod_mesh_nrf52.bleStack;
-		strcpy(simConfig.defaultNodeConfigName, prod_mesh_nrf52.featuresetName.c_str());
 
-		printf("%u: Starting clustering with %u nodes, seed %u, featureset %s" EOL, i, simConfig.numNodes, simConfig.seed, simConfig.defaultNodeConfigName);
+		printf("%u: Starting clustering with %u nodes, seed %u, featureset %s" EOL, i, numNodes, simConfig.seed, "prod_mesh_nrf52");
+		simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", numNodes } );
+
 
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 		tester.Start();
@@ -280,13 +270,13 @@ TEST(TestClustering, TestBasicClusteringWithNodeReset_scheduled) {
 		tester.SimulateUntilClusteringDone(maxClusteringTimeMs);
 		int lastClusterDoneTime = tester.sim->simState.simTimeMs;
 
-		printf("Clustering for %s done in %u seconds" EOL, simConfig.defaultNodeConfigName, tester.sim->simState.simTimeMs / 1000);
+		printf("Clustering for %s done in %u seconds" EOL, "prod_mesh_nrf52", tester.sim->simState.simTimeMs / 1000);
 
 		for (u32 j = 0; j < resetTimesPerIteration; j++)
 		{
-			u32 numNodesToReset = (u32)((simConfig.numNodes / 5) * PSRNG() + 1);
+			u32 numNodesToReset = (u32)((numNodes / 5) * PSRNG() + 1);
 
-			auto nodeIdsToReset = CherrySimUtils::generateRandomNumbers(1, simConfig.numNodes, numNodesToReset);
+			auto nodeIdsToReset = CherrySimUtils::generateRandomNumbers(1, numNodes, numNodesToReset);
 
 			for (auto const nodeId : nodeIdsToReset) {
 				tester.SendTerminalCommand(nodeId, "reset");
@@ -339,15 +329,15 @@ TEST(TestClustering, TestBasicClusteringWithNodeResetAndConnectionTimeouts_sched
 
 		simConfig.mapWidthInMeters = 400;
 		simConfig.mapHeightInMeters = 300;
-		simConfig.numNodes = numNodes;
 		simConfig.connectionTimeoutProbabilityPerSec = 0.0005;
 		simConfig.seed = seed;
 		simConfig.simulateJittering = true;
 
 		simConfig.defaultBleStackType = prod_mesh_nrf52.bleStack;
-		strcpy(simConfig.defaultNodeConfigName, prod_mesh_nrf52.featuresetName.c_str());
 
-		printf("Starting clustering with %u nodes, seed %u, featureset %s" EOL, simConfig.numNodes, simConfig.seed, simConfig.defaultNodeConfigName);
+		printf("Starting clustering with %u nodes, seed %u, featureset %s" EOL, numNodes, simConfig.seed, "prod_mesh_nrf52");
+
+		simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", numNodes } );
 
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 		tester.Start();
@@ -360,13 +350,13 @@ TEST(TestClustering, TestBasicClusteringWithNodeResetAndConnectionTimeouts_sched
 		tester.SimulateUntilClusteringDone(maxClusteringTimeMs);
 		int lastClusterDoneTime = tester.sim->simState.simTimeMs;
 
-		printf("Clustering for %s done in %u seconds" EOL, simConfig.defaultNodeConfigName, tester.sim->simState.simTimeMs / 1000);
+		printf("Clustering for %s done in %u seconds" EOL, "prod_mesh_nrf52", tester.sim->simState.simTimeMs / 1000);
 
 		for (u32 j = 0; j < resetTimesPerIteration; j++)
 		{
-			u32 numNodesToReset = (u32)(std::ceil(simConfig.numNodes / 5.0) * PSRNG() + 1);
+			u32 numNodesToReset = (u32)(std::ceil(numNodes / 5.0) * PSRNG() + 1);
 
-			auto nodeIdsToReset = CherrySimUtils::generateRandomNumbers(1, simConfig.numNodes, numNodesToReset);
+			auto nodeIdsToReset = CherrySimUtils::generateRandomNumbers(1, numNodes, numNodesToReset);
 
 			for (auto const nodeId : nodeIdsToReset) {
 				tester.SendTerminalCommand(nodeId, "reset");
@@ -393,12 +383,12 @@ TEST(TestClustering, TestMeshingUnderLoad) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	testerConfig.verbose = false;
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 50;
+	simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 50 } );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
 	//Instruct all nodes to flood the network using FLOOD_MODE_UNRELIABLE_SPLIT
-	for (u32 i = 0; i < simConfig.numNodes; i++) {
+	for (u32 i = 0; i < tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i+1, "action this debug flood 0 4 200");
 	}
 	tester.SimulateUntilClusteringDone(100 * 1000);
@@ -411,7 +401,7 @@ TEST(TestClustering, SimulateLongevity_long) {
 
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 50;
+	simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 50 } );
 	simConfig.connectionTimeoutProbabilityPerSec = 0.00001;
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
@@ -436,7 +426,7 @@ i32 determineHopsToSink(nodeEntry* node, nodeEntry* previousNode)
 	if (GET_DEVICE_TYPE() == DeviceType::SINK) {
 		return 0;
 	}
-	i32 hopsToSink = -1;
+
 	for (int i = 0; i < cherrySimInstance->currentNode->state.configuredTotalConnectionCount; i++) {
 		SoftdeviceConnection* c = &(node->state.connections[i]);
 		if (c->connectionActive && c->partner != previousNode) {
@@ -461,14 +451,14 @@ TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
 		//testerConfig.verbose = true;
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 		simConfig.terminalId = -1;
-		simConfig.numNodes = 20;
 		simConfig.seed = seed;
 
 		//Run with the parametrized config
 		simConfig.defaultBleStackType = config.bleStack;
-		strcpy(simConfig.defaultNodeConfigName, config.featuresetName.c_str());
 
-		//strcpy(simConfig.defaultNodeConfigName, "dev51"); //For testing so that we have logs and everything
+		simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+		simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 19 });
+
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 		tester.Start();
@@ -499,11 +489,12 @@ TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
 		tester.SimulateForGivenTime(5000);
 
 		//Check if all nodes have correctly calculated their hops to the sink
-		for (u32 i = 0; i < simConfig.numNodes; i++) {
+		for (u32 i = 0; i < tester.sim->getTotalNodes(); i++) {
 			nodeEntry* node = &(tester.sim->nodes[i]);
 
 			//Determine the number of hops to the sink according to the simulator connections
 			i32 hopsToSink = determineHopsToSink(node, nullptr);
+			tester.sim->setNode(i);
 
 			//printf("Node %u has %d hops to sink " EOL, node->id, hopsToSink);
 
@@ -511,7 +502,7 @@ TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
 			MeshConnections conns = node->gs.cm.GetMeshConnections(ConnectionDirection::INVALID);
 			bool hopsFound = false;
 			for (int j = 0; j < conns.count; j++) {
-				MeshConnection* conn = conns.connections[j];
+				MeshConnection* conn = conns.handles[j].GetConnection();
 
 				//printf("   %d" EOL, conn->hopsToSink);
 
@@ -550,8 +541,9 @@ TEST(TestClustering, TestHighPrioQueueFull) {
 		//testerConfig.verbose = true;
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 		simConfig.terminalId = 0;
-		simConfig.numNodes = 20;
 		simConfig.seed = seed;
+
+		simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 20 } );
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 		tester.Start();
@@ -575,12 +567,11 @@ TEST(TestClustering, TestInfluceOfNodeWithWrongNetworkKey) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 
-	simConfig.numNodes = 5;
 	simConfig.connectionTimeoutProbabilityPerSec = 0.001;
 
 	//testerConfig.verbose = true;
 	testerConfig.terminalFilter = 1;
-
+	simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 5 } );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -595,9 +586,9 @@ TEST(TestClustering, TestInfluceOfNodeWithWrongNetworkKey) {
 	while (tester.sim->simState.simTimeMs < 200 * 1000) {
 		tester.SimulateForGivenTime(10 * 1000);
 
-		u32 numNodesToReset = (u32)((simConfig.numNodes / 2) * PSRNG());
+		u32 numNodesToReset = (u32)((tester.sim->getTotalNodes() / 2) * PSRNG());
 
-		auto nodeIdsToReset = CherrySimUtils::generateRandomNumbers(1, simConfig.numNodes, numNodesToReset);
+		auto nodeIdsToReset = CherrySimUtils::generateRandomNumbers(1, tester.sim->getTotalNodes(), numNodesToReset);
 
 		for (auto const nodeId : nodeIdsToReset) {
 			tester.SendTerminalCommand(nodeId, "reset");
@@ -608,28 +599,28 @@ TEST(TestClustering, TestInfluceOfNodeWithWrongNetworkKey) {
 TEST(TestClustering, TestEmergencyDisconnect) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 10;
+	u32 numNodes = 10;
 	simConfig.terminalId = 0;
 	testerConfig.verbose = false;
 	
 	//Place Node 0 in the middle and the others in a circle around it.
 	simConfig.preDefinedPositions.push_back({ 0.5, 0.5 });
-	for (u32 i = 1; i < simConfig.numNodes; i++)
+	for (u32 i = 1; i < numNodes; i++)
 	{
-		double percentage = (double)i / (double)(simConfig.numNodes - 1);
+		double percentage = (double)i / (double)(numNodes - 1);
 		simConfig.preDefinedPositions.push_back({
 			std::sin(percentage * 3.14 * 2) * 0.1 + 0.5,
 			std::cos(percentage * 3.14 * 2) * 0.1 + 0.5,
 		});
 	}
-
+	simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", numNodes } );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
 	//All the nodes can connect to Node 0, but none of them can connect to each other.
-	for (u32 i = 1; i < simConfig.numNodes; i++)
+	for (u32 i = 1; i < numNodes; i++)
 	{
-		for (u32 k = 1; k < simConfig.numNodes; k++)
+		for (u32 k = 1; k < numNodes; k++)
 		{
 			tester.sim->nodes[i].impossibleConnection.push_back(k);
 		}
@@ -646,5 +637,5 @@ TEST(TestClustering, TestEmergencyDisconnect) {
 //TODO: Write a test that checks reestablishing while the mesh is flooded
 
 //This executes all MultiStackFixture Tests with the S130 and S132 stacks
-INSTANTIATE_TEST_CASE_P(TestClustering, MultiStackFixture,
-	::testing::Values(prod_mesh_nrf52, prod_mesh_nrf51));
+INSTANTIATE_TEST_SUITE_P(TestClustering, MultiStackFixture,
+	::testing::Values(prod_mesh_nrf52));

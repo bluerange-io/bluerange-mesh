@@ -28,13 +28,6 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
- * The Logger enables outputting debug data to UART.
- * Any log tag can be used with the logt() command. The message will be logged
- * only if the applicable logtag has been enabled previously.
- * It will also print strings for common error codes.
- */
-
 #pragma once
 
 #include <Config.h>
@@ -43,7 +36,7 @@
 #ifdef SIM_ENABLED
 #include <string>
 #endif
-#include "SimpleArray.h"
+#include <array>
 
 constexpr int MAX_ACTIVATE_LOG_TAG_NUM = 40;
 constexpr int MAX_LOG_TAG_LENGTH = 11;
@@ -128,6 +121,12 @@ enum class CustomErrorTypes : u8 {
 	WARN_REQUEST_PROPOSALS_UNEXPECTED_LENGTH = 61,
 	WARN_REQUEST_PROPOSALS_TOO_LONG = 62,
 	FATAL_SENSOR_PINS_NOT_DEFINED_IN_BOARD_ID = 63,
+	COUNT_ACCESS_TO_REMOVED_CONNECTION = 64,
+	WARN_ADVERTISING_CONTROLLER_DEACTIVATE_FAILED = 65,
+	WARN_GAP_SEC_INFO_REPLY_FAILED = 66,
+	WARN_GAP_SEC_DISCONNECT_FAILED = 67,
+	FATAL_FAILED_TO_REGISTER_APPLICATION_INTERRUPT_HANDLER = 68,
+	FATAL_FAILED_TO_REGISTER_MAIN_CONTEXT_HANDLER = 69,
 };
 
 #ifdef _MSC_VER
@@ -137,11 +136,17 @@ enum class CustomErrorTypes : u8 {
 #define __FILE_S__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #endif
 
-class Logger : public TerminalCommandListener
+/*
+ * The Logger enables outputting debug data to UART.
+ * Any log tag can be used with the logt() command. The message will be logged
+ * only if the applicable logtag has been enabled previously.
+ * It will also print strings for common error codes.
+ */
+class Logger
 {
 private:
 
-	SimpleArray<char, MAX_ACTIVATE_LOG_TAG_NUM * MAX_LOG_TAG_LENGTH> activeLogTags;
+	std::array<char, MAX_ACTIVATE_LOG_TAG_NUM * MAX_LOG_TAG_LENGTH> activeLogTags{};
 
 	u32 currentJsonCrc = 0;
 
@@ -153,8 +158,6 @@ public:
 	Logger();
 	static Logger& getInstance();
 
-	void Init();
-
 	//TODO: We could save ram if we pack this
 	struct errorLogEntry {
 		LoggingError errorType;
@@ -165,7 +168,7 @@ public:
 
 	static constexpr int NUM_ERROR_LOG_ENTRIES = 100;
 	errorLogEntry errorLog[NUM_ERROR_LOG_ENTRIES];
-	u8 errorLogPosition;
+	u8 errorLogPosition = 0;
 
 	bool logEverything = false;
 
@@ -184,6 +187,7 @@ public:
 		WARN_DEPRECATED    = 5,
 		CRC_INVALID        = 6,
 		CRC_MISSING        = 7,
+		INTERNAL_ERROR     = 8,
 	};
 
 #ifdef __GNUC__
@@ -216,9 +220,8 @@ public:
 	//The print function provides an overview over the active debug tags
 	void printEnabledTags() const;
 
-	//The Logger implements the Terminal Listener
 	#ifdef TERMINAL_ENABLED
-	TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
+	TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize);
 	#endif
 
 	static const char* getErrorLogErrorType(LoggingError type);

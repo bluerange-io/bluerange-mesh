@@ -40,12 +40,10 @@
 #endif
 
 // Size for tracing messages to the log transport, if it is too short, messages will get truncated
-#define TRACE_BUFFER_SIZE 500
+constexpr size_t TRACE_BUFFER_SIZE = 500;
 
 Logger::Logger()
 {
-	errorLogPosition = 0;
-	activeLogTags.zeroData();
 	CheckedMemset(errorLog, 0, sizeof(errorLog));
 }
 
@@ -54,14 +52,9 @@ Logger & Logger::getInstance()
 	return GS->logger;
 }
 
-void Logger::Init()
-{
-	GS->terminal.AddTerminalCommandListener(this);
-}
-
 void Logger::log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJsonEvent, const char* file, i32 line, const char* message, ...)
 {
-	char mhTraceBuffer[TRACE_BUFFER_SIZE] = { 0 };
+	char mhTraceBuffer[TRACE_BUFFER_SIZE] = {};
 
 	//Variable argument list must be passed to vnsprintf
 	va_list aptr;
@@ -132,6 +125,16 @@ void Logger::log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJs
 void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...) const
 {
 #if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
+#ifdef SIM_ENABLED
+	if (strcmp(tag, "ERROR") == 0)
+	{
+		//ERRORs are classified as severe enough that they should not happend
+		//during normal execution. If they are logged, something went wrong
+		//and must be analyzed.
+		SIMEXCEPTION(ErrorLoggedException);
+	}
+#endif
+
 	if (
 			//UART communication (json mode)
 			(
@@ -144,7 +147,7 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
 			)
 		)
 	{
-		char mhTraceBuffer[TRACE_BUFFER_SIZE] = { 0 };
+		char mhTraceBuffer[TRACE_BUFFER_SIZE] = {};
 
 		//Variable argument list must be passed to vsnprintf
 		va_list aptr;
@@ -207,6 +210,9 @@ void Logger::uart_error_f(UartErrorType type) const
 		case UartErrorType::CRC_MISSING:
 			logjson("ERROR", "{\"type\":\"error\",\"code\":7,\"text\":\"crc missing\"}" SEP);
 			break;
+		case UartErrorType::INTERNAL_ERROR:
+			logjson("ERROR", "{\"type\":\"error\",\"code\":8,\"text\":\"internal error\"}" SEP);
+			break;
 		default:
 			logjson("ERROR", "{\"type\":\"error\",\"code\":%u,\"text\":\"Unknown Error\"}" SEP, (u32)type);
 			break;
@@ -228,7 +234,6 @@ void Logger::enableTag(const char* tag)
 	Utility::ToUpperCase(tagUpper);
 
 	i32 emptySpot = -1;
-	i32 test = 0;
 	bool found = false;
 
 	for (i32 i = 0; i < MAX_ACTIVATE_LOG_TAG_NUM; i++) {
@@ -313,7 +318,7 @@ void Logger::toggleTag(const char* tag)
 	//If we haven't found it, we enable it by using the previously found empty spot
 	if (!found && emptySpot >= 0) {
 		strcpy(&activeLogTags[emptySpot * MAX_LOG_TAG_LENGTH], tagUpper);
-		logt("ERROR", "Tag enabled");
+		logt("WARNING", "Tag enabled");
 	}
 	else if (!found && emptySpot < 0) {
 		logt("ERROR", "Too many tags");
@@ -321,7 +326,7 @@ void Logger::toggleTag(const char* tag)
 	}
 	else if (found)
 	{
-		logt("ERROR", "Tag disabled");
+		logt("WARNING", "Tag disabled");
 	}
 
 #endif
@@ -1062,7 +1067,7 @@ u32 Logger::parseBase64StringToBuffer(const char * base64String, const u32 base6
 
 void Logger::disableAll()
 {
-	activeLogTags.zeroData();
+	activeLogTags = {};
 	logEverything = false;
 }
 

@@ -96,11 +96,10 @@ void IoModule::TimerEventHandler(u16 passedTimeDs)
 		BaseConnections conns = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
 		u8 countHandshakeDone = 0;
 		for(u32 i=0; i< conns.count; i++){
-			BaseConnection *conn = GS->cm.allConnections[conns.connectionIndizes[i]];
+			BaseConnection *conn = conns.handles[i].GetConnection();
 			if(conn != nullptr && conn->handshakeDone()) countHandshakeDone++;
 		}
-		u8 countConnected = conns.count - countHandshakeDone;
-
+		
 		u8 i = ledBlinkPosition / 2;
 		if(i < (Conf::getInstance().meshMaxInConnections + Conf::getInstance().meshMaxOutConnections)){
 			if(ledBlinkPosition % 2 == 0){

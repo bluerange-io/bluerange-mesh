@@ -56,19 +56,17 @@ void Module::LoadModuleConfigurationAndStart()
 	//Load the configuration and replace the default configuration if it exists
 
 	GS->config.LoadSettingsFromFlash(this, this->moduleId, this->configurationPointer, this->configurationLength);
-
-	GS->terminal.AddTerminalCommandListener(this);
 }
 
-void Module::SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable) const
+ErrorTypeUnchecked Module::SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable) const
 {
-	SendModuleActionMessage(messageType, toNode, actionType, requestHandle, additionalData, additionalDataSize, reliable, true);
+	return SendModuleActionMessage(messageType, toNode, actionType, requestHandle, additionalData, additionalDataSize, reliable, true);
 }
 
 //Constructs a simple trigger action message and can take aditional payload data
-void Module::SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool loopback) const
+ErrorTypeUnchecked Module::SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool loopback) const
 {
-	GS->cm.SendModuleActionMessage(messageType, moduleId, toNode, actionType, requestHandle, additionalData, additionalDataSize, reliable, loopback);
+	return GS->cm.SendModuleActionMessage(messageType, moduleId, toNode, actionType, requestHandle, additionalData, additionalDataSize, reliable, loopback);
 }
 
 #ifdef TERMINAL_ENABLED
@@ -218,6 +216,8 @@ void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnecti
 			}
 			else if(actionType == ModuleConfigMessages::SET_ACTIVE)
 			{
+				SetActiveReturnValues retVal = SetActiveReturnValues::NO_SUCH_MODULE;
+
 				//Look for the module and set it active or inactive
 				for(u32 i=0; i< GS->amountOfModules; i++){
 					if(GS->activeModules[i]->moduleId == packet->moduleId)
@@ -226,22 +226,40 @@ void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnecti
 						//Reinitialize the module
 						GS->activeModules[i]->ConfigurationLoadedHandler(nullptr, 0);
 
-						//Send confirmation that the modules activity state changed
-						connPacketModule outPacket;
-						outPacket.header.messageType = MessageType::MODULE_CONFIG;
-						outPacket.header.sender = GS->node.configuration.nodeId;
-						outPacket.header.receiver = packet->header.sender;
-
-						outPacket.moduleId = moduleId;
-						outPacket.requestHandle = packet->requestHandle;
-						outPacket.actionType = (u8)ModuleConfigMessages::SET_ACTIVE_RESULT;
-						outPacket.data[0] = (u8)ErrorType::SUCCESS; //Return ok
-
-						GS->cm.SendMeshMessage((u8*) &outPacket, SIZEOF_CONN_PACKET_MODULE + 1, DeliveryPriority::LOW);
+						if (configurationPointer == nullptr)
+						{
+							retVal = SetActiveReturnValues::NO_CONFIGURATION;
+						}
+						else
+						{
+							RecordStorageResultCode err = Utility::SaveModuleSettingsToFlashWithId(moduleId, configurationPointer, configurationLength, nullptr, 0, nullptr, 0);
+							if (err != RecordStorageResultCode::SUCCESS)
+							{
+								retVal = SetActiveReturnValues::RECORD_STORAGE_ERROR;
+							}
+							else
+							{
+								retVal = SetActiveReturnValues::SUCCESS;
+							}
+						}
 
 						break;
 					}
 				}
+
+				//Send confirmation that the modules activity state changed
+				connPacketModule outPacket;
+				CheckedMemset(&outPacket, 0, sizeof(outPacket));
+				outPacket.header.messageType = MessageType::MODULE_CONFIG;
+				outPacket.header.sender = GS->node.configuration.nodeId;
+				outPacket.header.receiver = packet->header.sender;
+
+				outPacket.moduleId = moduleId;
+				outPacket.requestHandle = packet->requestHandle;
+				outPacket.actionType = (u8)ModuleConfigMessages::SET_ACTIVE_RESULT;
+				outPacket.data[0] = (u8)retVal;
+
+				GS->cm.SendMeshMessage((u8*)&outPacket, SIZEOF_CONN_PACKET_MODULE + 1, DeliveryPriority::LOW);
 			}
 
 

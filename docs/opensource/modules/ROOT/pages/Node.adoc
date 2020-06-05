@@ -5,7 +5,7 @@ The _NodeModule_ has _ModuleId_ 0.
 
 == Purpose
 
-The _NodeModule_ is the central part of the FruityMesh algorithm. It is a mandatory module. It is responsible for clustering and other mesh related tasks and functionalities that are part of FruityMesh.
+The _NodeModule_ is the central part of the FruityMesh algorithm. It is a mandatory module. It is responsible for clustering and other mesh related tasks and functionalities that are part of FruityMesh. It also has additional core functionality implemented.
 
 == Functionality
 
@@ -17,7 +17,7 @@ TIP: There are a number of undocumented commands. These are mostly for debugging
 
 [#RebootMessage]
 == Reboot Message
-On reboot, the firmware sends a JSON to the connected device, providing more information about the reboot. The JSON has the following structure:
+On reboot, the firmware sends a JSON to a device that is connected to the terminal output, providing more information about the reboot. The JSON has the following structure:
 
 [source,Javascript]
 ----
@@ -54,6 +54,29 @@ The reboot reason is also stored in the error log
 
 == Terminal Commands
 
+=== Getting Basic Information (Local Command)
+
+`status`
+
+It is very convenient to get easily readable information about a node.
+The status command displays the currently active connections and their
+state. It also display device information and the clustering state.
+
+The following will be printed on the local terminal after the command
+was entered:
+
+....
+Node BBBBB (nodeId: 1) vers: 80000, NodeKey: 01:00:....:00:00
+
+Mesh clusterSize:10, clusterId:4201185286
+Enrolled 1: networkId:10, deviceType:0, NetKey 04:00:....:00:00, UserBaseKey 00:00:....:00:00
+Addr:00:00:00:01:00:00, ConnLossCounter:3, AckField:0, State: 1
+
+CONNECTIONS 2 (freeIn:0, freeOut:2, pendingPackets:0
+IN (0) FM 7, state:4, cluster:fa690006(8), sink:-1, Queue:0-0(0), Buf:1/7, mb:0, hnd:16
+OUT(1) FM 10, state:4, cluster:fa690006(1), sink:-1, Queue:0-0(0), Buf:1/7, mb:1, hnd:17
+....
+
 === Setting The Discovery State
 
 `action [nodeId] node discovery [on / off]`
@@ -82,33 +105,6 @@ The response acknowledges the receipt of the command.
 {"type":"set_discovery_result","nodeId":123,"module":0}
 ----
 
-=== Setting Preferred Connections
-
-`action [nodeId] node set_preferred_connections [ignored / penalty] {up to eight preferred nodeIDs}`
-
-Sets the given node IDs as preferred connection partners while meshing. Other partners will be either completely ignored or their cluster score gets a heavy penalty. Executing this command without any nodeID disables this feature. After saving the preferred connections, the node reboots after a delay of 10 seconds. The "ignored / penalty" parameter determines the behaviour regarding the unpreferred connection partners, meaning any node ID that is NOT in the associated list.
-
-TIP: For a connection to happen, both connection partners have to set each other as a preferred connection partner. This means to set the preferred connections of a mesh, it is best to start at the leaves of the mesh.
-
-WARNING: Using this command with the "ignored" parameter must be used with caution as using invalid or unreachable nodeIDs results in a state where the mesh can not be created. If this happened, there are two options: +
-1. Flash the beacon. This erases the set preferred connections. +
-2. Connect to the beacon via a mesh access connection and execute the command again with the correct parameters.
-
-Examples
-
-[source,C++]
-----
-//E.g. Sets the preferred connections of 123 to 17, 32 and 12. Other connections partners are ignored for meshing.
-action 123 node set_preferred_connections ignored 17 32 12
-----
-
-The response acknowledges the receipt of the command.
-
-[source,Javascript]
-----
-{"type":"set_preferred_connections_result","nodeId":123,"module":0}
-----
-
 === Ping a node
 
 `action [nodeId] node ping {requestHandle}`
@@ -120,18 +116,18 @@ Examples
 [source,C++]
 ----
 action 123 node ping
-action 123 node ping 100
+action 123 node ping 100 //Ping with request handle 100
 ----
 
 The response acknowledges the receipt of these commands.
 
 [source,Javascript]
 ----
-{"type":"ping","nodeId":123,"module":0,"requestHandle":0}"
-{"type":"ping","nodeId":123,"module":0,"requestHandle":100}"
+{"type":"ping","nodeId":123,"module":0,"requestHandle":0}
+{"type":"ping","nodeId":123,"module":0,"requestHandle":100}
 ----
 
-=== Generating load
+=== Generating Load
 
 `action [nodeId] node generate_load [target] [size] [amountOfMessages] [timeBetweenMessagesDs] {requestHandle}`
 
@@ -161,9 +157,9 @@ and starts sending generate_load_chunk messages to node 3. Node 3 then logs:
 
 === Querying Device Capabilities
 
-`request_capability [nodeId\\{0}]`
+`request_capability [nodeId]`
 
-Requests the capabilities of the node with _nodeId_. The receiver then answers with several messages, each representing a single capability. After all capabilities are sent, the receiver sends a last message indicating the end of the transaction.
+Requests the capabilities of the node with _nodeId_ (NodeId 0 cannot be used with this command). The receiver then answers with several messages, each representing a single capability. After all capabilities are sent, the receiver sends a last message indicating the end of the transaction.
 
 WARNING: A single capability message is a rather big message with 128 bytes in size. As such only a single node in the mesh should be queried for it's capabilities at a time, else the mesh would be put under heavy load. Broadcasting this command is not supported by the firmware for this reason. 
 
@@ -210,170 +206,35 @@ And ends the transaction:
 }
 ----
 
-=== Enabling CRC checks on Terminal Communication
+=== Setting Preferred Connections
 
-It is possible to add a CRCs check to all communications that go through the terminal. To do this, execute the following command:
+`action [nodeId] node set_preferred_connections [ignored / penalty] {up to eight preferred nodeIDs}`
+
+Sets the given node IDs as preferred connection partners while meshing. Other partners will be either completely ignored or their cluster score gets a heavy penalty. Executing this command without any nodeID disables this feature. After saving the preferred connections, the node reboots after a delay of 10 seconds. The "ignored / penalty" parameter determines the behaviour regarding the unpreferred connection partners, meaning any node ID that is NOT in the associated list.
+
+TIP: For a connection to happen, both connection partners have to set each other as a preferred connection partner. This means to set the preferred connections of a mesh, it is best to start at the leaves of the mesh.
+
+WARNING: Using this command with the "ignored" parameter must be used with caution as using invalid or unreachable nodeIDs results in a state where the mesh can not be created. If this happened, there are two options: +
+1. Flash the beacon. This erases the set preferred connections. +
+2. Connect to the beacon via a mesh access connection and execute the command again with the correct parameters.
+
+Examples
 
 [source,C++]
 ----
-enable_corruption_check
+//E.g. Sets the preferred connections of 123 to 17, 32 and 12. Other connections partners are ignored for meshing.
+action 123 node set_preferred_connections ignored 17 32 12
 ----
 
-After this command is sent, the firmware only accepts terminal commands that have a correct CRC32 appended at the end. For example, a terminal command may look like this:
-
-[source,C++]
-----
-action this status get_status CRC: 3968018817
-----
-
-In addition, all JSON messages from the firmware have a CRC32 appended:
+The response acknowledges the receipt of the command.
 
 [source,Javascript]
 ----
-{"nodeId":1,"type":"status","module":3,"batteryInfo":0,"clusterSize":2,"connectionLossCounter":0,"freeIn":2,"freeOut":2,"inConnectionPartner":0,"inConnectionRSSI":0, "initialized":0} CRC: 3703755059
+{"type":"set_preferred_connections_result","nodeId":123,"module":0}
 ----
 
-=== Sensor Values
-
-[source, C++]
-----
-// Generate a sensor event and send through mesh
-// (Only used for debugging)
-component_sense [nodeId] [moduleId] [actionType] [component] [registerAddress] [dataHex] {requestHandle=0}
-
-//E.g. broadcast sensor event for module 123 from component 7 and registerAddress 77
-component_sense 0 123 0 7 77 AA:BB
-----
-
-Following low-level data structure transports sensor measurement values across the mesh.
-
-[source, C++]
-----
-enum SensorMessageActionType {
-    UNSPECIFIED = 0, // E.g. Generated by sensor itself
-    ERROR_RSP = 1, // Error during READ/WRITE/...
-    READ_RSP = 2, // Response following a READ
-    WRITE_RSP = 3 // Response following a WRITE_ACK
-}
-----
-
-[cols="1,2,2,4"]
-|===
-|Bytes|Type|Name|Description
-
-|5|connPacketHeader|header|
-|1|u8|moduleId|The module that generated this value
-|1|u8|requestHandle|Optional request handle, otherwise 0
-|1|u8|actionType|One of the above actionTypes
-|2|u16|component|Some number identifying the source of the measurements such as a lamp head (*vendor specific*)
-|2|u16|registerAddress|An address used to differentiate data transported such as a hardware register number or a message profile id (*vendor specific*)
-|1-...|u8[]|payload|Actual binary data that represents a sensor reading or multiple.
-|===
-
-The packet header consumes 12 bytes, which allows for 8 bytes of payload in a single packet and should be enough for most sensor values. For bigger payloads, it will be split.
-
-The output on a sink is:
-[source,javascript]
-----
-{
-	"nodeId": 5,                // sender
-	"type": "component_sense",  // discriminator
-	"module": 123,              // moduleId
-	"requestHandle": 0,
-	"actionType" : 0,
-	"component" : 7,
-	"register" : 77,
-	"payload": "abcdeQ=="       // base64 encoded
-}
-----
-
-=== Actor Message
-
-[source, C++]
-----
-// Instruct device to write data into a register address
-component_act [nodeId] [moduleId] [actionType] [component] [registerAddress] [dataHex] {requestHandle=0}
-----
-
-The following message is used for transporting write or read requests through the mesh.
-
-[source, C++]
-----
-enum ActorMessageActionType {
-    RESERVED = 0, // Unused
-    WRITE = 1, // Write without acknowledgement
-    READ = 2, // Read a value
-    WRITE_ACK = 3 // Write with acknowledgement
-}
-----
-
-[cols="1,2,2,4"]
-|===
-|Bytes|Type|Name|Description
-
-|5|connPacketHeader|header|
-|1|u8|moduleId|The module that should act on the message
-|1|u8|requestHandle|Optional request handle, otherwise 0
-|1|u8|actionType|One of the above actionTypes
-|2|u16|component|Some number identifying the destination for the action (*vendor specific*)
-|2|u16|registerAddress|An address, e.g. hardware register number or a message profile id where the data should be written (*vendor specific*)
-|1-...|u8[]|payload|For READ, this must be a singly byte that represents the number of bytes to read. For WRITE and WRITE_ACK, the payload is the bytes that should be written.
-|===
-
-No JSON representation is necessary for the moment as the meshgateway will not react on _act_ messages.
-
-=== Getting Basic Information (Local Command)
-
-`status`
-
-It is very conveniant to get easily readable information about a node.
-The status command displays the currently active connections and their
-state. It also display device information and the clustering state.
-
-The following will be printed on the local terminal after the command
-was entered:
-
-....
-Node BBBBB (nodeId: 1) vers: 80000, NodeKey: 01:00:....:00:00
-
-Mesh clusterSize:10, clusterId:4201185286
-Enrolled 1: networkId:10, deviceType:0, NetKey 04:00:....:00:00, UserBaseKey 00:00:....:00:00
-Addr:00:00:00:01:00:00, ConnLossCounter:3, AckField:0, State: 1
-
-CONNECTIONS 2 (freeIn:0, freeOut:2, pendingPackets:0
-IN (0) FM 7, state:4, cluster:fa690006(8), sink:-1, Queue:0-0(0), Buf:1/7, mb:0, hnd:16
-OUT(1) FM 10, state:4, cluster:fa690006(1), sink:-1, Queue:0-0(0), Buf:1/7, mb:1, hnd:17
-....
-
-=== Setting Terminal Mode (Local Command)
-
-When working with UART (Terminal and UART must be enabled), FruityMesh
-supports a convenient blocking terminal mode with echo back
-functionality. For communication with another device such as a
-MeshGateway, an interrupt based input method and JSON output is used. To
-toggle between these two modes, there are two commands:
-
-`startterm`
-
-Using _startterm_ invokes a blocking mode where all functionality is
-halted and user input is received in a busy loop until a line feed '\r'
-is received. The command is then processed and other functionality
-is resumed. The input is echoed back on the terminal.
-Backspace is supported as well for most terminal programs. If the
-command isn't recognized, a warning is echoed.
-
-`stopterm`
-
-The _stopterm_ command switches the node into an interrupt based input
-mode where terminal input does not affect the functionality until a line
-feed '\r' is received. All output messages are in JSON format.
-
-== Rebooting (Local Command)
-
-`reset`
-
-To reset the node via the terminal, enter this command
-and a software reboot is performed.
+=== Sensor and Actor Messages
+The node includes functionality to send sensor messages and actor messages in a vendor specific manner using a generic packet. This is documented under xref:SensorsAndActors.adoc[Sensors and Actors].
 
 [#TimeSynchronization]
 == Time Synchronization
@@ -420,242 +281,25 @@ they are currently active.
         },
         // ...
     ]
-----
-
-== Sending Raw Data
-
-=== General Overview
-
-image::raw_data_flow.png[]
-
-Sending raw data can be used to send any arbitrary data, e.g. zip files. The data to be sent is split into chunks that are then sent through the mesh. The data to be sent is called the "payload".
-
-Every raw data transaction (except _raw_data_light_, which will be explained later) starts with a _raw_data_start_ message. This message includes the amount of chunks in the transaction and the protocol of the payload. Once the receiver receives this message, it answers with a _raw_data_start_received_ message, which indicates to the sender that the receiver is ready to receive the chunks.
-
-When the sender receives the _raw_data_start_received_ message, it starts sending all _raw_data_chunk_ objects. In addition of payload data, every _raw_data_chunk_ includes a chunk ID, which is a unique (regarding the current transaction) ascending number, starting at 1 for the first _raw_data_chunk_ object. chunk ID 0 is reserved for the _raw_data_start_. Using this chunk ID, and the information of the amount of chunks form the _raw_data_start_ message, the receiver is able to determine the last chunk in the transaction. Once it receives the last chunk, it reports back to the sender using a single _raw_data_report_. This message includes the chunk IDs of up to three missing chunks. If all chunks were received, the list of missing chunks is empty, which tells the sender that the transaction was successful. If however, the list of missing chunks is not empty, the sender must send the chunks with the corresponding chunk IDs again. The last chunk IDs of the previous _raw_data_report_ message acts as a last chunk, regarding the sending of additional _raw_data_report_. This sending of _raw_data_chunk_ and _raw_data_report_ is repeated until _raw_data_report_ has an empty list of missing chunk IDs.
-
-All devices involved in the communication (sender, receiver, and the mesh) are able to cancel the communication by sending a _raw_data_error_ message to the sender as well as the receiver. If the sender or the receiver is the device that hung up the transmission, it is allowed to not send the error to itself. The _raw_data_error_ message includes an error code, indicating the reason for the cancellation. It is possible to receive a _raw_data_error_ message without an open transmission. This can happen if the sender cancels the transmission using a _raw_data_error_, but this error is dropped during the transmission. The receiver then might send another _raw_data_error_ indicating a timeout while the sender already canceled the communication. Such messages without an open transmission may be discarded.
-
-=== Dropped Messages
-
-As any other message in the mesh, every message in the raw send protocol could be dropped. This section describes how an implementation must behave in such scenarios. It also describes the obligations of the sender and the receiver.
-
-[cols="1,2"]
-|===
-|Dropped message | Reaction
-
-|raw_data_start +
-raw_data_start_received | The sender must send the _raw_data_start_ again after a timeout of 10 seconds or stop the transmission. The receiver has to be able to handle several successive _raw_data_start_ messages with the same content (in case the _raw_data_start_received_ message is dropped) and close a dropped connection after a timeout of 15 seconds (in case the sender does not send another _raw_data_start_).
-|raw_data_chunk | Missing chunks are reported in _raw_data_report_ once the last chunk is received. These missing chunks must be resent.
-|Last raw_data_chunk or raw_data_report | Using the ChunkID, both sender and receiver are able to identify the last data chunk. If this message or the _raw_data_report_ are dropped, the sender must send the last chunk again. This means that the receiver is only allowed to save the last chunk ID once the first chunk after a _raw_data_report_ is received, not immediately after the _raw_data_report_ is sent.
-|raw_data_error | If a _raw_data_error_ message is dropped, the sender or receiver has already canceled the transmission, leading to the sending of another _raw_data_error_ upon receiving an invalid out-of-transmission message or a _raw_data_error_ indicating a timeout. In the rare cases where the origin of the _raw_data_error_ is the mesh itself, it could happen that both _raw_data_error_ messages are dropped. In such cases the connection is still up, but will probably create another _raw_data_error_ once the ill-formed chunk is sent again.
-|===
-
-=== Transmission Start
-`raw_data_start [receiverId] [destinationModuleId] [numChunks] [protocolId] {requestHandle = 0}`
-
-This command starts a raw data transmission. The payload shall be sent using _raw_data_chunk_ messages.
-
-[cols="2,1,4"]
-|===
-|Parameter | Type | Description
-
-|receiverId | u16 | The node ID that this message should be sent to
-|destinationModuleId | u8 | The module ID is used for giving context to this message. If the transmission should only be printed on the receiver and otherwise be ignored by the firmware, it must be set to 0.
-|numChunks | u24 | Number of Chunks for the total message. Must not be 0.
-|protocolId | u8 | One of the protocol IDs mentioned in the table below
-|requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions (Default: 0)
-|===
-
-[cols="1,1,3"]
-|===
-|Protocol ID| Name | Description
-
-|0 | Invalid | Invalid protocol ID
-|1 | HTTP | A raw HTTP request or response
-|2 | GZIPPED_JSON | A JSON that was gzipped
-|3 - 199 | Reserved | Not yet used
-|200 - 255 | User defined | May be different in each implementation
-|===
-
-If received by a JSON-capable device, the _raw_data_start_ is printed out like this:
-[source,javascript]
-----
-{
-	"nodeId":5,
-	"type":"raw_data_start",
-	"module":4,
-	"numChunks":3,
-	"protocol":1,
-	"fmKeyId":2,
-	"requestHandle":0
 }
 ----
 
-=== Accept Transmission
-`raw_data_start_received [receiverId] [destinationModuleId] {requestHandle = 0}`
+== Rawsend
 
-Once a _raw_data_start_ is received, the receiver shall send the sender a _raw_data_start_received_ message.
+`rawsend [dataHex]`
 
-[cols="2,1,4"]
-|===
-|Parameter | Type | Description
+Mostly used for debugging purpose, the rawsend command can be used to send any binary message through the mesh (as long as it is valid). The data can be given either base64 encoded or as a hex string with colons.
 
-|receiverId | u16 | The node ID that this message should be sent to
-|destinationModuleId | u8 | The module ID is used for giving context to this message. If the transmission should only be printed on the receiver and otherwise be ignored by the firmware, it must be set to 0.
-|requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions (Default: 0)
-|===
-
-
-If received by a JSON-capable device, the _raw_data_start_ is printed out like this:
-[source,javascript]
+.Examples
+[source,C++]
 ----
-{
-	"nodeId":5,
-	"type":"raw_data_start_received",
-	"module":4,
-	"requestHandle":0
-}
+//Can be entered on nodeId 1 to send a get_status request to all nodes
+//(messageType 0x33, senderId 0x0001, receiverId 0x0000, moduleId x03, requestHandle 0x00, actionType 0x01)
+rawsend 33:01:00:00:00:03:00:01
 ----
 
-=== Subsequent Chunk Messages
-`raw_data_chunk [receiverId] [destinationModuleId] [chunkId] [payloadHex] {requestHandle = 0}`
-
-Once a raw transmission has been started, the appropriate number of chunks should follow in the correct order. Once the last chunk is received by the receiver, it is possible to reassemble and parse the whole message. The _moduleId_ is present in all chunks so that they can be assigned to the correct stream and to avoid clashes between different modules. A module can send intermittent data streams if is uses different request handles.
-
-[cols="2,1,4"]
-|===
-|Parameter | Type | Description
-
-|receiverId | u16 | The NodeID that this message should be sent to
-|destinationModuleId | u8 | The ModuleId is used for giving context to this message. If the transmission should only be printed on the receiver and otherwise be ignored by the firmware, it must be set to 0.
-|chunkId | u24 | ID of this data chunk starting from 0.
-|payloadHex | HexString or Base64String | The binary data to send. E.g. AA:BB:CC. The maximum length is 60 bytes for HexStrings, 120 bytes for Base64Strings.
-|requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions (Default: 0)
-|===
-
-If received by a JSON-capable device, the _raw_data_start_ is printed out like this:
-[source,javascript]
-----
-{
-	"nodeId":5,
-	"type":"raw_data_chunk",
-	"module":4,
-	"chunkId":1,
-	"payload":"abcdeQ==",
-	"requestHandle":0
-}
-----
-
-=== Send Report
-`raw_data_report [receiverId] [destinationModuleId] [MissingChunkIds] {requestHandle = 0}`
-
-Once the last chunk is received, the receiver sends this message to the sender, indicating either a successful transmission (empty missing chunk IDs) or informs the sender about missing chunk IDs.
-
-[cols="2,2,4"]
-|===
-|Parameter | Type | Description
-
-|receiverId | u16 | The node ID that this message should be sent to
-|destinationModuleId | u8 | The module ID is used for giving context to this message. If the transmission should only be printed on the receiver and otherwise be ignored by the firmware, it must be set to 0.
-|MissingChunkIds | Comma-separated integers or the literal string "-" (without "") | Up to three chunk IDs of missing chunks. Must not contain spaces! E.g. 2,17,312
-|requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions (Default: 0)
-|===
-
-If received by a JSON-capable device, the _raw_data_start_ is printed out like this:
-[source,javascript]
-----
-{
-	"nodeId":5,
-	"type":"raw_data_report",
-	"module":4,
-	"missing":[2,17,312],
-	"requestHandle":0
-}
-----
-Or in cases where the transmission was successful:
-[source,javascript]
-----
-{
-	"nodeId":5,
-	"type":"raw_data_report",
-	"module":4,
-	"missing":[],
-	"requestHandle":0
-}
-----
-
-
-=== Send Error
-`raw_data_error [receiverId] [destinationModuleId] [errorCode] [destination] {requestHandle = 0}`
-
-This command indicates that some error occurred and the transmission must be closed. Will is sent to the receiver as well as the sender.
-
-[cols="1,2,4"]
-|===
-|Error Code | Name | Meaning
-
-| 1 | Unexpected end of transmission | Three timeouts happened without receiving a message from the transmission partner.
-| 2 | Not in a transmission | A _raw_data_chunk_ or _raw_data_report_ was received without an open transmission.
-| 3 | Malformed Message | A message was received which was malformed and did not fit any other error code.
-| 4 | Unsupported Protocol | The receiver is unable to interpret the given protocol.
-| 5 | Malformed GZIP | The receiver got all chunks but could could not unpack the GZIP.
-| 6 | Malformed Type | Thrown in case of a GZIP communication. The unpacking worked, but the provided type inside the GZIP JSIN was unknown.
-| 7 | Invalid Chunk ID | The given chunk ID was out of range.
-| 0, 4 - 199 | Reserved | Not yet used
-| 200 - 255 | User defined | May be different in each implementation.
-|===
-
-[cols="1,1,3"]
-|===
-|Destination Code | Name | Meaning
-
-| 1 | Sender | The error is sent to the sender.
-| 2 | Receiver | The error is sent to the receiver.
-| 3 | Both | The error is sent both to the sender and the receiver.
-|===
-
-If received by a JSON-capable device, the _raw_data_error_ is printed out like this:
-[source,javascript]
-----
-{
-	"nodeId":5,
-	"type":"raw_data_error",
-	"module":4,
-	"error":1,
-	"destination":1
-	"requestHandle":0
-}
-----
-
-=== Send Single Light Message Of Arbitrary Data
-`raw_data_light [receiverId] [destinationModuleId] [protocolId] [payload] {requestHandle = 0}`
-
-Sends a single, responseless chunk of arbitrary data to the receiver. There is no guarantee that the message is transmitted. The sender should provide some resending logic.
-
-[cols="2,1,4"]
-|===
-|Parameter | Type | Description
-
-|receiverId | u16 | The node ID that this message should be sent to
-|destinationModuleId | u8 | The module ID is used for giving context to this message. If the transmission should only be printed on the receiver and otherwise be ignored by the firmware, it must be set to 0.
-|protocolId | u8 | One of the protocol IDs mentioned in the table of raw_data_start
-|payloadHex | HexString or Base64String | The binary data to send. E.g. AA:BB:CC. The maximum length is 60 bytes for HexStrings, 120 bytes for Base64Strings.
-|requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions (Default: 0)
-|===
-
-If received by a JSON-capable device, the _raw_data_start_ is printed out like this:
-[source,javascript]
-----
-{
-	"nodeId":5,
-	"type":"raw_data_light",
-	"module":4,
-	"protocol":2,
-	"payload":"abcdeQ==",
-	"requestHandle":0
-}
-----
+== Raw Data
+The node offers functionality for sending custom data through the mesh using a lightweight wrapper for either big or small messages. This is documented at the xref:RawData.adoc[RawData] page.
 
 == Messages
 === Clustering Messages
@@ -667,7 +311,7 @@ The _ClusterWelcome_ Packet is sent be the node that thinks it has the bigger cl
 |===
 |Bytes|Type|Name|Description
 
-|5|<<Specification.adoc#,connPacketHeader>>|header|_messageType_: MESSAGE_TYPE_CLUSTER_WELCOME(20)
+|5|xref:Specification.adoc#connPacketHeader[connPacketHeader]|header|_messageType_: MESSAGE_TYPE_CLUSTER_WELCOME(20)
 |4|ClusterId|clusterId|ID of the cluster
 |4|ClusterSize|clusterSize|Size of the cluster
 |4|u16|meshWriteHandle|Write handle for RX characteristics of the mesh for data transmission. (Allows to skip service discovery)
@@ -683,7 +327,7 @@ Acknowledge packet sent by the smaller cluster to acknowledge that it is now par
 |===
 |Bytes |Type |Name |Description
 
-|5|<<Specification.adoc#,connPacketHeader>>|header|_messageType_: `MESSAGE_TYPE_CLUSTER_ACK_1` (21)
+|5|xref:Specification.adoc#connPacketHeader[connPacketHeader]|header|_messageType_: `MESSAGE_TYPE_CLUSTER_ACK_1` (21)
 |4|ClusterSize|hopsToSink|Hops to the shortest sink
 |1|u8|preferredConnectionInterval|Preferred interval for the _meshConnection_
 |===
@@ -695,7 +339,7 @@ Acknowledge packet sent by the bigger cluster after receiving ack1 from the smal
 |===
 |Bytes |Type |Name |Description
 
-|5|<<Specification.adoc#,connPacketHeader>>|header|messageType: `MESSAGE_TYPE_CLUSTER_ACK_2` (22)
+|5|xref:Specification.adoc#connPacketHeader[connPacketHeader]|header|messageType: `MESSAGE_TYPE_CLUSTER_ACK_2` (22)
 |4|ClusterId|clusterId|ID of the cluster
 |4|ClusterSize|clusterSize|Size of the cluster
 |4|ClusterSize|hopsToSink|The number of hops to sink if there is one, otherwise -1.
@@ -708,7 +352,7 @@ This packet informs a node about a change in the cluster size or structure. It c
 |===
 |Bytes|Type|Name|Description
 
-|5|<<Specification.adoc#,connPacketHeader>>|header|_messageType_: `MESSAGE_TYPE_CLUSTER_INFO_UPDATE` (23)
+|5|xref:Specification.adoc#connPacketHeader[connPacketHeader]|header|_messageType_: `MESSAGE_TYPE_CLUSTER_INFO_UPDATE` (23)
 |4|u32|reserved|_deprecated_
 |2|ClusterSize|clusterSize|Change in _clusterSize_ or absolute size
 |2|ClusterSize|hopsToSink|The number of hops to sink if there is one, otherwise -1.
@@ -723,7 +367,7 @@ This packet informs a node about a change in the cluster size or structure. It c
 |===
 |Bytes |Type| Name| Description
 
-|8 |<<Specification.adoc#,connPacketModule>>| Conn Packet Module | ModuleId = 0, Message Type = 51, Action Type = 3.
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule]| Conn Packet Module | ModuleId = 0, Message Type = 51, Action Type = 3.
 |===
 
 ==== ping response
@@ -732,7 +376,7 @@ This packet informs a node about a change in the cluster size or structure. It c
 |===
 |Bytes |Type| Name| Description
 
-|8 |<<Specification.adoc#,connPacketModule>>| Conn Packet Module | ModuleId = 0, Message Type = 52, Action Type = 3.
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule]| Conn Packet Module | ModuleId = 0, Message Type = 52, Action Type = 3.
 |===
 
 ==== start generate load
@@ -741,7 +385,7 @@ This packet informs a node about a change in the cluster size or structure. It c
 |===
 |Bytes |Type| Name| Description
 
-|8 |<<Specification.adoc#,connPacketModule>>| Conn Packet Module | ModuleId = 0, Message Type = 51, Action Type = 4.
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule]| Conn Packet Module | ModuleId = 0, Message Type = 51, Action Type = 4.
 |2 |NodeId| target | NodeId of the the target that should receive the chunks.
 |1 |u8| size | Size of the payload of each chunk.
 |1 |u8| amount | Amount of chunks to send.
@@ -754,7 +398,7 @@ This packet informs a node about a change in the cluster size or structure. It c
 |===
 |Bytes |Type| Name| Description
 
-|8 |<<Specification.adoc#,connPacketModule>>| Conn Packet Module | ModuleId = 0, Message Type = 52, Action Type = 4.
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule]| Conn Packet Module | ModuleId = 0, Message Type = 52, Action Type = 4.
 |===
 
 ==== generate load chunk
@@ -763,74 +407,6 @@ This packet informs a node about a change in the cluster size or structure. It c
 |===
 |Bytes |Type| Name| Description
 
-|8 |<<Specification.adoc#,connPacketModule>>| Conn Packet Module | ModuleId = 0, Message Type = 51, Action Type = 5.
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule]| Conn Packet Module | ModuleId = 0, Message Type = 51, Action Type = 5.
 |0-255|u8[0-255]| payload | The dummy payload, filled with the magic value 0x91.
-|===
-
-=== Raw Data Messages
-==== _raw_data_start_
-
-[cols="1,2,2,3"]
-|===
-|Bytes |Type| Name| Description
-
-|8 |<<Specification.adoc#,connPacketModule>>| Conn Packet Module | Message Type = 54, Action Type = 0.
-|3 |u24                                     | Number of Chunks   | The total amount of raw_data_chunk messages for this transmission.
-|1 |u8                                      | Protocol ID        | See above for a list of valid protocol IDs.
-|4 |u32                                     | fmKeyId            | <<Specification.adoc#,See EncryptionKeys Heading.>>
-|===
-
-==== _raw_data_start_received_
-
-[cols="1,2,2,3"]
-|===
-|Bytes |Type| Name| Description
-
-|8 |<<Specification.adoc#,connPacketModule>>| Conn Packet Module | Message Type = 54, Action Type = 1.
-|===
-
-==== _raw_data_error_
-
-[cols="1,2,2,3"]
-|===
-|Bytes |Type| Name| Description
-
-|8 |<<Specification.adoc#,connPacketModule>>| Conn Packet Module | Message Type = 54, Action Type = 4.
-|1 |u8                                      |Error Code          | See above for a list of possible error codes.
-|1 |u8                                      |Destination Code    | See above for a list of possible Destination Codes.
-|===
-
-==== _raw_data_chunk_
-
-[cols="1,2,2,3"]
-|===
-|Bytes |Type| Name| Description
-
-|8   |<<Specification.adoc#,connPacketModule>>| Conn Packet Module | Message Type = 54, Action Type = 2.
-|3   |u24                                     | Chunk ID           | The ID of this chunk. The first chunk has ID 1.
-|1   |u8                                      | reserved           | A reserved value that must be set to 0.
-|1-60|u8[1-60]                                | payload            | The payload.
-|===
-
-==== _raw_data_report_
-
-[cols="1,2,2,3"]
-|===
-|Bytes |Type| Name| Description
-
-|8 |<<Specification.adoc#,connPacketModule>>| Conn Packet Module | Message Type = 54, Action Type = 3.
-|12|u32[3]                                  | missings           | The IDs of the missing chunks.
-|===
-
-==== _raw_data_chunk_
-
-[cols="1,2,2,3"]
-|===
-|Bytes |Type| Name| Description
-
-|5   |<<Specification.adoc#,connPacketHeader>>| Conn Packet Header | Message Type = 55
-|1   |u8                                      |module ID           | The module ID which should receive this message. Must be 0 in most cases.
-|1   |u8                                      |request Handle      | The request Handle under which the receiver may (or may not) answer.
-|1   |u8                                      |Protocol ID         | See above for a list of all protocol IDs.
-|1-60|u8[1-60]                                |payload             | The payload.
 |===

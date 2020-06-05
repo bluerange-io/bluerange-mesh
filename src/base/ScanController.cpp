@@ -45,12 +45,11 @@
 ScanController::ScanController()
 {
 	CheckedMemset(&currentScanParams, 0, sizeof(currentScanParams));
-	jobs.zeroData();
 }
 
 void ScanController::TimerEventHandler(u16 passedTimeDs)
 {
-	for (u8 i = 0; i < jobs.length; i++)
+	for (u8 i = 0; i < jobs.size(); i++)
 	{
 		if ((jobs[i].state == ScanJobState::ACTIVE) &&
 			(jobs[i].timeMode == ScanJobTimeMode::TIMED))
@@ -100,7 +99,7 @@ ScanJob* ScanController::AddJob(ScanJob& job)
 		return nullptr;
 	}
 
-	for (u8 i = 0; i < jobs.length; i++)
+	for (u8 i = 0; i < jobs.size(); i++)
 	{
 		if (jobs[i].state != ScanJobState::INVALID) continue;
 		jobs[i] = job;
@@ -119,7 +118,7 @@ void ScanController::RefreshJobs()
 	u8 currentDutyCycle = currentScanParams.interval != 0 ? (currentScanParams.window * 100) / currentScanParams.interval : 0;
 	u8 newDutyCycle = 0;
 	ScanJob * p_job = nullptr;
-	for (u8 i = 0; i < jobs.length; i++)
+	for (u8 i = 0; i < jobs.size(); i++)
 	{
 		if (jobs[i].state == ScanJobState::ACTIVE)
 		{
@@ -153,7 +152,7 @@ void ScanController::RefreshJobs()
 
 void ScanController::RemoveJob(ScanJob * p_jobHandle)
 {
-	for (int i = 0; i < jobs.length; i++) {
+	for (u32 i = 0; i < jobs.size(); i++) {
 		if (&(jobs[i]) == p_jobHandle && jobs[i].state != ScanJobState::INVALID)
 		{
 			p_jobHandle->state = ScanJobState::INVALID;
@@ -189,7 +188,7 @@ void ScanController::TryConfiguringScanState()
 			return;
 		}
 		//Next, try starting
-		err = FruityHal::BleGapScanStart(&currentScanParams);
+		err = FruityHal::BleGapScanStart(currentScanParams);
 		if (err == ErrorType::SUCCESS) scanStateOk = true;
 	}
 }
@@ -202,12 +201,12 @@ void ScanController::ScanningHasStopped()
 #ifdef SIM_ENABLED
 int ScanController::GetAmountOfJobs()
 {
-	return jobs.length;
+	return jobs.size();
 }
 
 ScanJob * ScanController::GetJob(int index)
 {
-	return jobs.getRaw() + index;
+	return jobs.data() + index;
 }
 #endif //SIM_ENABLED
 
@@ -219,7 +218,7 @@ bool ScanController::ScanEventHandler(const FruityHal::GapAdvertisementReportEve
 
 	if (
 			advertisementReportEvent.getDataLength() >= SIZEOF_ADV_PACKET_HEADER
-			&& packetHeader->manufacturer.companyIdentifier == COMPANY_IDENTIFIER
+			&& packetHeader->manufacturer.companyIdentifier == MESH_COMPANY_IDENTIFIER
 			&& packetHeader->meshIdentifier == MESH_IDENTIFIER
 			&& packetHeader->networkId == GS->node.configuration.networkId
 		)

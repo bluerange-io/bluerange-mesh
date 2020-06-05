@@ -60,6 +60,11 @@ static_assert(sizeof(deadDataMagicNumber) == sizeof(DeadDataMessage::magicNumber
 STATIC_ASSERT_SIZE(DeadDataMessage, 13);
 #pragma pack(pop)
 
+/*
+ * The MeshAccessConnection is used by the MeshAccessModule and provides an encryption
+ * layer on top of unencrypted BLE connections as this is necessary to transparently
+ * connect non-mesh devices such as Smartphones with different operating systems to the mesh.
+ */
 class MeshAccessConnection
 		: public BaseConnection
 {
@@ -70,7 +75,7 @@ private:
 	MeshAccessModule* meshAccessMod;
 
 	bool useCustomKey = false;
-	u8 key[16] = { 0 };
+	u8 key[16] = {};
 
 	FmKeyId fmKeyId = FmKeyId::ZERO;
 
@@ -78,11 +83,11 @@ private:
 	u32 amountOfCorruptedMessages = 0;
 	bool allowCorruptedEncryptionStart = false;
 
-	u8 sessionEncryptionKey[16] = { 0 };
-	u8 sessionDecryptionKey[16] = { 0 };
+	u8 sessionEncryptionKey[16] = {};
+	u8 sessionDecryptionKey[16] = {};
 
-	u32 encryptionNonce[2] = { 0 };
-	u32 decryptionNonce[2] = { 0 };
+	u32 encryptionNonce[2] = {};
+	u32 decryptionNonce[2] = {};
 
 
 	MessageType lastProcessedMessageType;
@@ -112,6 +117,7 @@ public:
 	//Each MeshAccess connection is assigned a virtual partner id, that is used as a temporary NodeId in
 	//our own mesh network in order to participate
 	NodeId virtualPartnerId;
+	bool virtualPartnerIdWasOverwritten = false;
 
 	//If this is set to anything other than 0, the connectionState changes will be reported to this node
 	NodeId connectionStateSubscriberId = 0;
@@ -151,22 +157,22 @@ public:
 
 
 	/*############### Sending ##################*/
-	SizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer) override;
+	SizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer) override final;
 	bool SendData(BaseConnectionSendData* sendData, u8 const * data);
-	bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable) override;
+	bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable) override final;
 	bool ShouldSendDataToNodeId(NodeId nodeId) const;
-	void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData) override;
+	void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData) override final;
 
 	/*############### Receiving ##################*/
-	void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) override;
+	void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) override final;
 	void ReceiveMeshAccessMessageHandler(BaseConnectionSendData* sendData, u8 const * data);
 
 	/*############### Handler ##################*/
-	void ConnectionSuccessfulHandler(u16 connectionHandle) override;
-	bool GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason) override;
-	void GATTServiceDiscoveredHandler(FruityHal::BleGattDBDiscoveryEvent &evt) override;
+	void ConnectionSuccessfulHandler(u16 connectionHandle) override final;
+	bool GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason) override final;
+	void GATTServiceDiscoveredHandler(FruityHal::BleGattDBDiscoveryEvent &evt) override final;
 
-	void PrintStatus() override;
+	void PrintStatus() override final;
 
 	u32 getAmountOfCorruptedMessaged();
 

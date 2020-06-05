@@ -234,6 +234,9 @@ SECTIONS
 		__HeapLimit = .;
 	} > RAM
 
+	/* Not named __StackLimit as that might be used by Nordic. */
+	__FruityStackLimit = .;
+
 	/* .stack_dummy section doesn't contains any symbols. It is only
 	 * used for linker to calculate size of stack sections, and assign
 	 * values to stack symbols later */

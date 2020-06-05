@@ -40,10 +40,10 @@
 TEST(TestScanningModule, TestCommands) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -63,7 +63,7 @@ TEST(TestScanningModule, TestCommands) {
 	packet->flags.len = SIZEOF_ADV_STRUCTURE_FLAGS - 1;
 	packet->uuid.len = SIZEOF_ADV_STRUCTURE_UUID16 - 1;
 	packet->data.uuid.type = (u8)BleGapAdType::TYPE_SERVICE_DATA;
-	packet->data.uuid.uuid = SERVICE_DATA_SERVICE_UUID16;
+	packet->data.uuid.uuid = MESH_SERVICE_DATA_SERVICE_UUID16;
 	packet->data.messageType = ServiceDataMessageType::STANDARD_ASSET;
 	assetPacket->serialNumberIndex = 10;
 	assetPacket->nodeId = 1337;

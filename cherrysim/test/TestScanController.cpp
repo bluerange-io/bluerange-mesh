@@ -86,12 +86,11 @@ static void ForceStopAllScanJobs(CherrySimTester &tester)
 TEST(TestScanController, TestIfScannerGetsEnabled) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 1;
-	testerConfig.verbose = true;
-
+	//testerConfig.verbose = true;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-	strcpy(tester.sim->nodes[0].nodeConfiguration, "prod_sink_nrf52");
 	tester.Start();
 
 	tester.SimulateUntilClusteringDone(100 * 1000);
@@ -110,12 +109,12 @@ TEST(TestScanController, TestIfScannerGetsEnabled) {
 TEST(TestScanController, TestScannerStopsAfterTimeoutTime) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 1;
-	testerConfig.verbose = true;
-
+	//testerConfig.verbose = true;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-	strcpy(tester.sim->nodes[0].nodeConfiguration, "prod_sink_nrf52");
+	tester.sim->nodes[0].nodeConfiguration = "prod_sink_nrf52";
 	tester.Start();
 
 	tester.SimulateUntilClusteringDone(100 * 1000);
@@ -138,12 +137,11 @@ TEST(TestScanController, TestScannerStopsAfterTimeoutTime) {
 TEST(TestScanController, TestScannerChooseJobWithHighestDutyCycle) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 1;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-	strcpy(tester.sim->nodes[0].nodeConfiguration, "prod_sink_nrf52");
 	tester.Start();
 
 	tester.SimulateUntilClusteringDone(100 * 1000);
@@ -184,12 +182,11 @@ TEST(TestScanController, TestScannerChooseJobWithHighestDutyCycle) {
 TEST(TestScanController, TestScannerWillStopOnceAllJobsTimeout) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 1;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-	strcpy(tester.sim->nodes[0].nodeConfiguration, "prod_sink_nrf52");
 	tester.Start();
 
 	tester.SimulateUntilClusteringDone(100 * 1000);
@@ -217,12 +214,11 @@ TEST(TestScanController, TestScannerWillStopOnceAllJobsTimeout) {
 TEST(TestScanController, TestScannerWillStopOnceAllJobsAreDeleted) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 1;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-	strcpy(tester.sim->nodes[0].nodeConfiguration, "prod_sink_nrf52");
 	tester.Start();
 
 	tester.SimulateUntilClusteringDone(100 * 1000);

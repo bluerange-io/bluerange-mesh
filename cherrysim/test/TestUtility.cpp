@@ -34,6 +34,7 @@
 #include <set>
 
 TEST(TestUtility, TestGetIndexForSerial) {
+	//The original serial number range had 5 characters
 	ASSERT_EQ(Utility::GetIndexForSerial("BBBBB"), 0);
 	ASSERT_EQ(Utility::GetIndexForSerial("BBBBC"), 1);
 	ASSERT_EQ(Utility::GetIndexForSerial("BBBB9"), 29);
@@ -42,6 +43,72 @@ TEST(TestUtility, TestGetIndexForSerial) {
 	ASSERT_EQ(Utility::GetIndexForSerial("WPMNB"), 14075400);
 	ASSERT_EQ(Utility::GetIndexForSerial("12345"), 17625445);
 	ASSERT_EQ(Utility::GetIndexForSerial("99999"), 24299999);
+
+	//Old Asset serial numbers (A should be ignored and handled as a B)
+	ASSERT_EQ(Utility::GetIndexForSerial("ABBBB"), 0);
+	ASSERT_EQ(Utility::GetIndexForSerial("ABBBC"), 1);
+
+	//The open source range for testing
+	ASSERT_EQ(Utility::GetIndexForSerial("FMBBB"), 2673000);
+	ASSERT_EQ(Utility::GetIndexForSerial("FM999"), 2699999);
+
+	//The extended range has 7 characters, 5 character serial numbers can always be prefixed with BB if desired
+	ASSERT_EQ(Utility::GetIndexForSerial("BB99999"), 24299999);
+	ASSERT_EQ(Utility::GetIndexForSerial("BCBBBBB"), 24300000);
+	ASSERT_EQ(Utility::GetIndexForSerial("BCBBBBC"), 24300001);
+	ASSERT_EQ(Utility::GetIndexForSerial("H62Q56T"), UINT32_MAX);
+}
+
+TEST(TestUtility, TestGenerateBeaconSerialForIndex) {
+	char buffer[128];
+	Utility::GenerateBeaconSerialForIndex(0, buffer); ASSERT_STREQ(buffer, "BBBBB");
+	Utility::GenerateBeaconSerialForIndex(1, buffer); ASSERT_STREQ(buffer, "BBBBC");
+	Utility::GenerateBeaconSerialForIndex(29, buffer); ASSERT_STREQ(buffer, "BBBB9");
+	Utility::GenerateBeaconSerialForIndex(879859, buffer); ASSERT_STREQ(buffer, "CDWXY");
+	Utility::GenerateBeaconSerialForIndex(10084066, buffer); ASSERT_STREQ(buffer, "QRSTV");
+	Utility::GenerateBeaconSerialForIndex(14075400, buffer); ASSERT_STREQ(buffer, "WPMNB");
+	Utility::GenerateBeaconSerialForIndex(17625445, buffer); ASSERT_STREQ(buffer, "12345");
+	Utility::GenerateBeaconSerialForIndex(24299999, buffer); ASSERT_STREQ(buffer, "99999");
+
+	//The open source range used for testing
+	Utility::GenerateBeaconSerialForIndex(2673000, buffer); ASSERT_STREQ(buffer, "FMBBB");
+	Utility::GenerateBeaconSerialForIndex(2699999, buffer); ASSERT_STREQ(buffer, "FM999");
+
+	//The serial numbers of the extended range (7 chars instead of 5)
+	Utility::GenerateBeaconSerialForIndex(24300000, buffer); ASSERT_STREQ(buffer, "BCBBBBB"); //first
+	Utility::GenerateBeaconSerialForIndex(24300001, buffer); ASSERT_STREQ(buffer, "BCBBBBC"); //second
+	Utility::GenerateBeaconSerialForIndex(0x7FFFFFFFUL, buffer); ASSERT_STREQ(buffer, "D8PJQ8K"); //Last serial of the Mway range
+	Utility::GenerateBeaconSerialForIndex(UINT32_MAX, buffer); ASSERT_STREQ(buffer, "H62Q56T"); //last
+
+	//The following tests the Vendor range
+	VendorSerial serial = {};
+	serial.parts.vendorFlag = 1;
+	ASSERT_EQ(serial.serialIndex, 0x80000000UL); //Make sure that the bitfields are properly ordered
+
+	//Tests the serial numbers for vendor 0x0000
+	serial.parts.vendorId = 0x0000;
+
+	serial.parts.vendorSerialId = 0; //First serial number
+	Utility::GenerateBeaconSerialForIndex(serial.serialIndex, buffer); ASSERT_STREQ(buffer, "D8PJQ8L");
+	serial.parts.vendorSerialId = 1; //Second serial number
+	Utility::GenerateBeaconSerialForIndex(serial.serialIndex, buffer); ASSERT_STREQ(buffer, "D8PJQ8M");
+	serial.parts.vendorSerialId = 0x7FFF; //last serial number
+	Utility::GenerateBeaconSerialForIndex(serial.serialIndex, buffer); ASSERT_STREQ(buffer, "D8PKYNT");
+
+	//Tests the serial numbers for vendor 0x024D (Our M-Way range)
+	serial.parts.vendorId = 0x024D;
+
+	serial.parts.vendorSerialId = 0; //First serial number
+	Utility::GenerateBeaconSerialForIndex(serial.serialIndex, buffer); ASSERT_STREQ(buffer, "D9HCK3N");
+	serial.parts.vendorSerialId = 1; //Second serial number
+	Utility::GenerateBeaconSerialForIndex(serial.serialIndex, buffer); ASSERT_STREQ(buffer, "D9HCK3P");
+	serial.parts.vendorSerialId = 0x7FFF; //last serial number
+	Utility::GenerateBeaconSerialForIndex(serial.serialIndex, buffer); ASSERT_STREQ(buffer, "D9HDSHW");
+
+	//Make sure the bitfield is properly ordered
+	serial.parts.vendorId = 0x0002;
+	serial.parts.vendorSerialId = 3;
+	ASSERT_EQ(serial.serialIndex, (1 << 31) | (0x2 << 15) | (3));
 }
 
 TEST(TestUtility, TestIsPowerOfTwo) {
@@ -59,18 +126,6 @@ TEST(TestUtility, TestIsPowerOfTwo) {
 		ASSERT_FALSE(Utility::IsPowerOfTwo((1ul << i) - 1));
 		ASSERT_FALSE(Utility::IsPowerOfTwo((1ul << i) + 1));
 	}
-}
-
-TEST(TestUtility, TestGenerateBeaconSerialForIndex) {
-	char buffer[128];
-	Utility::GenerateBeaconSerialForIndex(0       , buffer); ASSERT_STREQ(buffer, "BBBBB");
-	Utility::GenerateBeaconSerialForIndex(1       , buffer); ASSERT_STREQ(buffer, "BBBBC");
-	Utility::GenerateBeaconSerialForIndex(29      , buffer); ASSERT_STREQ(buffer, "BBBB9");
-	Utility::GenerateBeaconSerialForIndex(879859  , buffer); ASSERT_STREQ(buffer, "CDWXY");
-	Utility::GenerateBeaconSerialForIndex(10084066, buffer); ASSERT_STREQ(buffer, "QRSTV");
-	Utility::GenerateBeaconSerialForIndex(14075400, buffer); ASSERT_STREQ(buffer, "WPMNB");
-	Utility::GenerateBeaconSerialForIndex(17625445, buffer); ASSERT_STREQ(buffer, "12345");
-	Utility::GenerateBeaconSerialForIndex(24299999, buffer); ASSERT_STREQ(buffer, "99999");
 }
 
 TEST(TestUtility, TestGetVersionStringFromInt) {
@@ -91,10 +146,10 @@ TEST(TestUtility, TestGetVersionStringFromInt) {
 TEST(TestUtility, TestGetRandomInteger) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -188,7 +243,7 @@ TEST(TestUtility, TestXorWords) {
 
 	Utility::XorWords(src1, src2, sizeof(src1) / sizeof(*src1), out);
 
-	for (int i = 0; i < sizeof(src1) / sizeof(*src1); i++)
+	for (size_t i = 0; i < sizeof(src1) / sizeof(*src1); i++)
 	{
 		ASSERT_EQ(correct[i], out[i]);
 	}
@@ -203,7 +258,7 @@ TEST(TestUtility, TestXorBytes) {
 
 	Utility::XorBytes(src1, src2, sizeof(src1) / sizeof(*src1), out);
 
-	for (int i = 0; i < sizeof(src1) / sizeof(*src1); i++)
+	for (size_t i = 0; i < sizeof(src1) / sizeof(*src1); i++)
 	{
 		ASSERT_EQ(correct[i], out[i]);
 	}
@@ -218,7 +273,7 @@ TEST(TestUtility, TestSwapBytes)
 
 		Utility::swapBytes(toSwap, 5);
 
-		for (int i = 0; i < 5; i++)
+		for (size_t i = 0; i < sizeof(toSwap) / sizeof(*toSwap); i++)
 		{
 			ASSERT_EQ(toSwap[i], swapped[i]);
 		}

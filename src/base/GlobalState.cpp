@@ -53,7 +53,6 @@ GlobalState::GlobalState()
 	ramRetainStructPtr = &ramRetainStruct;
 	ramRetainStructPreviousBootPtr = &ramRetainStructPreviousBoot;
 	rebootMagicNumberPtr = &rebootMagicNumber;
-	eventLooperHandlers.zeroData();
 #if defined(SIM_ENABLED)
 	CheckedMemset(currentEventBuffer, 0, sizeof(currentEventBuffer));
 #endif
@@ -66,20 +65,9 @@ GlobalState::GlobalState()
 	CheckedMemset(scanBuffer, 0, sizeof(scanBuffer));
 }
 
-uint32_t GlobalState::SetEventHandlers(
-    FruityHal::SystemEventHandler systemEventHandler,
-    FruityHal::TimerEventHandler  timerEventHandler,
-    FruityHal::ButtonEventHandler buttonEventHandler,
-    FruityHal::AppErrorHandler    appErrorHandler,
-    FruityHal::StackErrorHandler  stackErrorHandler,
-    FruityHal::HardfaultHandler   hardfaultHandler)
+uint32_t GlobalState::SetEventHandlers(FruityHal::AppErrorHandler    appErrorHandler)
 {
-	this->systemEventHandler = systemEventHandler;
-	this->timerEventHandler  = timerEventHandler;
-	this->buttonEventHandler = buttonEventHandler;
 	this->appErrorHandler    = appErrorHandler;
-	this->stackErrorHandler  = stackErrorHandler;
-	this->hardfaultHandler   = hardfaultHandler;
 	return 0;
 }
 
@@ -88,12 +76,28 @@ void GlobalState::SetUartHandler(FruityHal::UartEventHandler uartEventHandler)
 	this->uartEventHandler = uartEventHandler;
 }
 
-void GlobalState::RegisterEventLooperHandler(FruityHal::EventLooperHandler handler)
+void GlobalState::RegisterApplicationInterruptHandler(FruityHal::ApplicationInterruptHandler handler)
 {
-	if (amountOfEventLooperHandlers >= eventLooperHandlers.length)
+	if (numApplicationInterruptHandlers >= applicationInterruptHandlers.size())
 	{
+		logt("ERROR", "Could not register application interrupt handler");
 		SIMEXCEPTION(BufferTooSmallException);
+		logger.logCustomError(CustomErrorTypes::FATAL_FAILED_TO_REGISTER_APPLICATION_INTERRUPT_HANDLER, 0);
+		return;
 	}
-	eventLooperHandlers[amountOfEventLooperHandlers] = handler;
-	amountOfEventLooperHandlers++;
+	applicationInterruptHandlers[numApplicationInterruptHandlers] = handler;
+	numApplicationInterruptHandlers++;
+}
+
+void GlobalState::RegisterMainContextHandler(FruityHal::MainContextHandler handler)
+{
+	if (numMainContextHandlers >= mainContextHandlers.size())
+	{
+		logt("ERROR", "Could not register main context handler");
+		SIMEXCEPTION(BufferTooSmallException);
+		logger.logCustomError(CustomErrorTypes::FATAL_FAILED_TO_REGISTER_MAIN_CONTEXT_HANDLER, 0);
+		return;
+	}
+	mainContextHandlers[numMainContextHandlers] = handler;
+	numMainContextHandlers++;
 }

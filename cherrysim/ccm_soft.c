@@ -65,7 +65,7 @@ static inline void utils_reverse_memcpy(uint8_t * p_dst, const uint8_t * p_src, 
     p_src += size;
     while (size--)
     {
-        *((uint8_t *) p_dst++) = *((uint8_t *) --p_src);
+        *((uint8_t *) p_dst++) = *((const uint8_t *) --p_src);
     }
 }
 
@@ -142,13 +142,13 @@ static void ccm_soft_authenticate(const ccm_soft_data_t * p_data, uint8_t T[])
         ((L_LEN - 1) & 0x07));
 
     memcpy(&B[1], p_data->p_nonce, (15 - L_LEN));
-    utils_reverse_memcpy(&B[16-L_LEN], (uint8_t *) &p_data->m_len, L_LEN);
+    utils_reverse_memcpy(&B[16-L_LEN], (const uint8_t *) &p_data->m_len, L_LEN);
 
     aes_encrypt(p_data->p_key, B, X);
 
     if (p_data->a_len > 0)
     {
-        utils_reverse_memcpy(&B[0], (uint8_t*) &p_data->a_len, 2);
+        utils_reverse_memcpy(&B[0], (const uint8_t*) &p_data->a_len, 2);
         ccm_soft_authenticate_blocks(p_data->p_key, p_data->p_a, p_data->a_len, B, 2, X);
     }
 

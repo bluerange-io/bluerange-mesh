@@ -21,7 +21,7 @@
 static void xor_aes_block(u8 *dst, const u8 *src)
 {
     u32 *d = (u32 *) dst;
-    u32 *s = (u32 *) src;
+    const u32 *s = (const u32 *) src;
     *d++ ^= *s++;
     *d++ ^= *s++;
     *d++ ^= *s++;

@@ -1,0 +1,318 @@
+ifndef::imagesdir[:imagesdir: ../assets/images]
+= Sending Raw Data
+
+There are two variants of raw data. There is xref:#RawData[raw data] for larger transfers such as e.g. zip files and xref:#RawDataLight[lightweight raw data] for sending small messages with custom data.
+
+[#RawData]
+== Raw Data
+Sending raw data can be used to send any arbitrary data, e.g. zip files. The data to be sent is split into chunks that are then sent through the mesh. The data to be sent is called the "payload".
+
+=== General Overview
+
+image::raw_data_flow.png[]
+
+Every raw data transaction (except _raw_data_light_, which will be explained later) starts with a _raw_data_start_ message. This message includes the amount of chunks in the transaction and the protocol of the payload. Once the receiver receives this message, it answers with a _raw_data_start_received_ message, which indicates to the sender that the receiver is ready to receive the chunks.
+
+When the sender receives the _raw_data_start_received_ message, it starts sending all _raw_data_chunk_ objects. In addition of payload data, every _raw_data_chunk_ includes a chunk ID, which is a unique (regarding the current transaction) ascending number, starting at 1 for the first _raw_data_chunk_ object. chunk ID 0 is reserved for the _raw_data_start_. Using this chunk ID, and the information of the amount of chunks form the _raw_data_start_ message, the receiver is able to determine the last chunk in the transaction. Once it receives the last chunk, it reports back to the sender using a single _raw_data_report_. This message includes the chunk IDs of up to three missing chunks. If all chunks were received, the list of missing chunks is empty, which tells the sender that the transaction was successful. If however, the list of missing chunks is not empty, the sender must send the chunks with the corresponding chunk IDs again. The last chunk IDs of the previous _raw_data_report_ message acts as a last chunk, regarding the sending of additional _raw_data_report_. This sending of _raw_data_chunk_ and _raw_data_report_ is repeated until _raw_data_report_ has an empty list of missing chunk IDs.
+
+All devices involved in the communication (sender, receiver, and the mesh) are able to cancel the communication by sending a _raw_data_error_ message to the sender as well as the receiver. If the sender or the receiver is the device that hung up the transmission, it is allowed to not send the error to itself. The _raw_data_error_ message includes an error code, indicating the reason for the cancellation. It is possible to receive a _raw_data_error_ message without an open transmission. This can happen if the sender cancels the transmission using a _raw_data_error_, but this error is dropped during the transmission. The receiver then might send another _raw_data_error_ indicating a timeout while the sender already canceled the communication. Such messages without an open transmission may be discarded.
+
+=== Implementation
+
+As any other message in the mesh, every message in the raw send protocol could be dropped. This section describes how an implementation must behave in such scenarios. It also describes the obligations of the sender and the receiver.
+
+[cols="1,2"]
+|===
+|Dropped message | Reaction
+
+|raw_data_start +
+raw_data_start_received | The sender must send the _raw_data_start_ again after a timeout of 10 seconds or stop the transmission. The receiver has to be able to handle several successive _raw_data_start_ messages with the same content (in case the _raw_data_start_received_ message is dropped) and close a dropped connection after a timeout of 15 seconds (in case the sender does not send another _raw_data_start_).
+|raw_data_chunk | Missing chunks are reported in _raw_data_report_ once the last chunk is received. These missing chunks must be resent.
+|Last raw_data_chunk or raw_data_report | Using the ChunkID, both sender and receiver are able to identify the last data chunk. If this message or the _raw_data_report_ are dropped, the sender must send the last chunk again. This means that the receiver is only allowed to save the last chunk ID once the first chunk after a _raw_data_report_ is received, not immediately after the _raw_data_report_ is sent.
+|raw_data_error | If a _raw_data_error_ message is dropped, the sender or receiver has already canceled the transmission, leading to the sending of another _raw_data_error_ upon receiving an invalid out-of-transmission message or a _raw_data_error_ indicating a timeout. In the rare cases where the origin of the _raw_data_error_ is the mesh itself, it could happen that both _raw_data_error_ messages are dropped. In such cases the connection is still up, but will probably create another _raw_data_error_ once the ill-formed chunk is sent again.
+|===
+
+==== Transmission Start
+`raw_data_start [receiverId] [destinationModuleId] [numChunks] [protocolId] {requestHandle = 0}`
+
+This command starts a raw data transmission. The payload shall be sent using _raw_data_chunk_ messages.
+
+[cols="2,1,4"]
+|===
+|Command Parameter | Type | Description
+
+|receiverId | u16 | The node ID that this message should be sent to
+|destinationModuleId | u8 | The module ID is used for giving context to this message. If the transmission should only be printed on the receiver and otherwise be ignored by the firmware, it must be set to 0.
+|numChunks | u24 | Number of Chunks for the total message. Must not be 0.
+|protocolId | u8 | One of the protocol IDs mentioned in the table below
+|requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions (Default: 0)
+|===
+
+[#RawDataProtocolId]
+[cols="1,1,3"]
+|===
+|Raw Data Protocol ID| Name | Description
+
+|0 | Invalid | Invalid protocol ID
+|1 | HTTP | A raw HTTP request or response
+|2 | GZIPPED_JSON | A JSON that was gzipped
+|3 | KBM | Mway proprietary building automation protocol
+|4 - 199 | Reserved | Not yet used
+|200 - 255 | User defined | May be different in each implementation
+|===
+
+If received by a device with a terminal, _raw_data_start_ is printed out like this:
+[source,javascript]
+----
+{
+	"nodeId":5,
+	"type":"raw_data_start",
+	"module":4,
+	"numChunks":3,
+	"protocol":1,
+	"fmKeyId":2,
+	"requestHandle":0
+}
+----
+
+==== Accept Transmission
+`raw_data_start_received [receiverId] [destinationModuleId] {requestHandle = 0}`
+
+Once a _raw_data_start_ is received, the receiver shall send the sender a _raw_data_start_received_ message.
+
+[cols="2,1,4"]
+|===
+|Command Parameter | Type | Description
+
+|receiverId | u16 | The node ID that this message should be sent to
+|destinationModuleId | u8 | The module ID is used for giving context to this message. If the transmission should only be printed on the receiver and otherwise be ignored by the firmware, it must be set to 0.
+|requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions (Default: 0)
+|===
+
+
+If received by a JSON-capable device, the _raw_data_start_ is printed out like this:
+[source,javascript]
+----
+{
+	"nodeId":5,
+	"type":"raw_data_start_received",
+	"module":4,
+	"requestHandle":0
+}
+----
+
+==== Subsequent Chunk Messages
+`raw_data_chunk [receiverId] [destinationModuleId] [chunkId] [payloadHex] {requestHandle = 0}`
+
+Once a raw transmission has been started, the appropriate number of chunks should follow in the correct order. Once the last chunk is received by the receiver, it is possible to reassemble and parse the whole message. The _moduleId_ is present in all chunks so that they can be assigned to the correct stream and to avoid clashes between different modules. A module can send intermittent data streams if is uses different request handles.
+
+[cols="2,1,4"]
+|===
+|Command Parameter | Type | Description
+
+|receiverId | u16 | The NodeID that this message should be sent to
+|destinationModuleId | u8 | The ModuleId is used for giving context to this message. If the transmission should only be printed on the receiver and otherwise be ignored by the firmware, it must be set to 0.
+|chunkId | u24 | ID of this data chunk starting from 0.
+|payloadHex | HexString or Base64String | The binary data to send. E.g. AA:BB:CC. The maximum length is 60 bytes for HexStrings, 120 bytes for Base64Strings.
+|requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions (Default: 0)
+|===
+
+If received by a JSON-capable device, the _raw_data_start_ is printed out like this:
+[source,javascript]
+----
+{
+	"nodeId":5,
+	"type":"raw_data_chunk",
+	"module":4,
+	"chunkId":1,
+	"payload":"abcdeQ==",
+	"requestHandle":0
+}
+----
+
+==== Send Report
+`raw_data_report [receiverId] [destinationModuleId] [MissingChunkIds] {requestHandle = 0}`
+
+Once the last chunk is received, the receiver sends this message to the sender, indicating either a successful transmission (empty missing chunk IDs) or informs the sender about missing chunk IDs.
+
+[cols="2,2,4"]
+|===
+|Command Parameter | Type | Description
+
+|receiverId | u16 | The node ID that this message should be sent to
+|destinationModuleId | u8 | The module ID is used for giving context to this message. If the transmission should only be printed on the receiver and otherwise be ignored by the firmware, it must be set to 0.
+|MissingChunkIds | Comma-separated integers or the literal string "-" (without "") | Up to three chunk IDs of missing chunks. Must not contain spaces! E.g. 2,17,312
+|requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions (Default: 0)
+|===
+
+If received by a JSON-capable device, the _raw_data_start_ is printed out like this:
+[source,javascript]
+----
+{
+	"nodeId":5,
+	"type":"raw_data_report",
+	"module":4,
+	"missing":[2,17,312],
+	"requestHandle":0
+}
+----
+Or in cases where the transmission was successful:
+[source,javascript]
+----
+{
+	"nodeId":5,
+	"type":"raw_data_report",
+	"module":4,
+	"missing":[],
+	"requestHandle":0
+}
+----
+
+
+==== Send Error
+`raw_data_error [receiverId] [destinationModuleId] [errorCode] [destination] {requestHandle = 0}`
+
+This command indicates that some error occurred and the transmission must be closed. Will is sent to the receiver as well as the sender.
+
+[cols="1,2,4"]
+|===
+|Error Code | Name | Meaning
+
+| 1 | Unexpected end of transmission | Three timeouts happened without receiving a message from the transmission partner.
+| 2 | Not in a transmission | A _raw_data_chunk_ or _raw_data_report_ was received without an open transmission.
+| 3 | Malformed Message | A message was received which was malformed and did not fit any other error code.
+| 4 | Unsupported Protocol | The receiver is unable to interpret the given protocol.
+| 5 | Malformed GZIP | The receiver got all chunks but could could not unpack the GZIP.
+| 6 | Malformed Type | Thrown in case of a GZIP communication. The unpacking worked, but the provided type inside the GZIP JSIN was unknown.
+| 7 | Invalid Chunk ID | The given chunk ID was out of range.
+| 0, 4 - 199 | Reserved | Not yet used
+| 200 - 255 | User defined | May be different in each implementation.
+|===
+
+[cols="1,1,3"]
+|===
+|Destination Code | Name | Meaning
+
+| 1 | Sender | The error is sent to the sender.
+| 2 | Receiver | The error is sent to the receiver.
+| 3 | Both | The error is sent both to the sender and the receiver.
+|===
+
+If received by a JSON-capable device, the _raw_data_error_ is printed out like this:
+[source,javascript]
+----
+{
+	"nodeId":5,
+	"type":"raw_data_error",
+	"module":4,
+	"error":1,
+	"destination":1
+	"requestHandle":0
+}
+----
+
+[#RawDataLight]
+== Lightweight Raw data
+Sending messages that fit into a single mesh packet can be done by using raw_data_light with minimal overhead and almost no implementation effort.
+
+=== Terminal Command
+`raw_data_light [receiverId] [destinationModuleId] [protocolId] [payload] {requestHandle = 0}`
+
+Sends a single chunk of arbitrary data to the receiver. There is no guarantee that the message is transmitted if the mesh is in the process of restructuring or busy. The sender should provide some resending logic if desired.
+
+[cols="2,1,4"]
+|===
+|Command Parameter | Type | Description
+
+|receiverId | u16 | The node ID that this message should be sent to
+|destinationModuleId | u8 | The module ID is used for giving context to this message. If the transmission should only be printed on the receiver and otherwise be ignored by the firmware, it must be set to 0.
+|protocolId | u8 | One of the protocol IDs mentioned in the table of raw_data_start
+|payloadHex | HexString or Base64String | The binary data to send. E.g. AA:BB:CC. The maximum length is 60 bytes for HexStrings, 120 bytes for Base64Strings.
+|requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions (Default: 0)
+|===
+
+=== Terminal Response
+If received by a JSON-capable device, then _raw_data_start_ is printed out like this:
+[source,javascript]
+----
+{
+	"nodeId":5,
+	"type":"raw_data_light",
+	"module":4,
+	"protocol":2,
+	"payload":"abcdeQ==",
+	"requestHandle":0
+}
+----
+
+The mesh message is documented xref:#RawDataLightMessage[here].
+
+== Messages
+
+=== Raw Data Start Message
+
+[cols="1,2,2,3"]
+|===
+|Bytes |Type| Name| Description
+
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule]| Conn Packet Module | Message Type = 54, Action Type = 0.
+|3 |u24                                     | Number of Chunks   | The total amount of raw_data_chunk messages for this transmission.
+|1 |u8                                      | Protocol ID        | See above for a list of valid protocol IDs.
+|4 |u32                                     | fmKeyId            | <<Specification.adoc#,See EncryptionKeys Heading.>>
+|===
+
+=== Raw Data Start Received Message
+
+[cols="1,2,2,3"]
+|===
+|Bytes |Type| Name| Description
+
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule]| Conn Packet Module | Message Type = 54, Action Type = 1.
+|===
+
+=== Raw Data Error Message
+
+[cols="1,2,2,3"]
+|===
+|Bytes |Type| Name| Description
+
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule]| Conn Packet Module | Message Type = 54, Action Type = 4.
+|1 |u8                                      |Error Code          | See above for a list of possible error codes.
+|1 |u8                                      |Destination Code    | See above for a list of possible Destination Codes.
+|===
+
+=== Raw Data Chunk message
+
+[cols="1,2,2,3"]
+|===
+|Bytes |Type| Name| Description
+
+|8   |xref:Specification.adoc#connPacketModule[connPacketModule]| Conn Packet Module | Message Type = 54, Action Type = 2.
+|3   |u24                                     | Chunk ID           | The ID of this chunk. The first chunk has ID 1.
+|1   |u8                                      | reserved           | A reserved value that must be set to 0.
+|1-60|u8[1-60]                                | payload            | The payload.
+|===
+
+=== Raw Data Report Message
+
+[cols="1,2,2,3"]
+|===
+|Bytes |Type| Name| Description
+
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule]| Conn Packet Module | Message Type = 54, Action Type = 3.
+|12|u32[3]                                  | missings           | The IDs of the missing chunks.
+|===
+
+[#RawDataLightMessage]
+=== Raw Data Light Message
+
+[cols="1,2,2,3"]
+|===
+|Bytes|Type|Name|Description
+
+|5|xref:Specification.adoc#connPacketHeader[connPacketHeader]|header|Message Type = 55
+|1|u8|moduleId|The id of the module that should process the message. 0 to only print it at the gateway.
+|1|u8|requestHandle|Used to identify the message
+|1|xref:#RawDataProtocolId[RawDataProtocolId]|protocolId|Raw Data Protocol Id as given above
+|1-60|u8[1-60]|payload|The custom payload to send
+|===

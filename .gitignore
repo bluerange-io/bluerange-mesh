@@ -7,6 +7,10 @@ _build/
 /deploy/current.txt
 dist/
 
+# Cppcheck
+a-cppcheck-build-dir/
+cppcheck.cppcheck
+
 /NRF51_BOARD/
 enc_temp_folder
 /config/featureset.h
@@ -21,6 +25,9 @@ fruityloader/.settings/
 *.sln.docstates
 *.user
 *.userprefs
+
+# VsCode ignore
+.vscode
 
 # Eclipse
 .classpath

@@ -36,14 +36,13 @@
 #include <GlobalState.h>
 #include <MeshConnection.h>
 
-
-constexpr int BASE_CONNECTION_MAX_SEND_RETRY = 5;
 constexpr int BASE_CONNECTION_MAX_SEND_FAIL  = 10;
 
-//The Connection Class does have methods like Connect,... but connections, service
-//discovery or encryption are handeled by the Connectionmanager so that we can control
-//The parallel flow of multiple connections
-
+/*
+Note: The Connection Class does have methods like Connect,... but connections, service
+discovery or encryption are handeled by the Connectionmanager so that we can control
+The parallel flow of multiple connections.
+*/
 BaseConnection::BaseConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress)
 	: connectionId(id),
 	uniqueConnectionId(GS->cm.GenerateUniqueConnectionId()),
@@ -57,13 +56,12 @@ BaseConnection::BaseConnection(u8 id, ConnectionDirection direction, FruityHal::
 	clusterUpdateCounter = 0;
 	nextExpectedClusterUpdateCounter = 1;
 
-	packetReassemblyBuffer.zeroData();
-
 	GS->cm.NotifyNewConnection();
 }
 
 BaseConnection::~BaseConnection()
 {
+	GS->amountOfRemovedConnections++;
 	GS->cm.NotifyDeleteConnection();
 }
 
@@ -83,11 +81,15 @@ void BaseConnection::DisconnectAndRemove(AppDisconnectReason reason)
 	//### STEP 2: Try to disconnect (could already be disconnected or not yet even connected
 
 	//Stop connecting if we were trying to build a connection
-	//FIXME: This does break sth. (tested in simulator) when used, why?
+	//KNOWNISSUE: This does break sth. (tested in simulator) when used
 	//if(GS->cm.pendingConnection == this) FruityHal::ConnectCancel();
 
 	//Disconnect if possible
-	FruityHal::Disconnect(connectionHandle, FruityHal::BleHciError::REMOTE_USER_TERMINATED_CONNECTION);
+	const ErrorType err = FruityHal::Disconnect(connectionHandle, FruityHal::BleHciError::REMOTE_USER_TERMINATED_CONNECTION);
+	if (err != ErrorType::SUCCESS)
+	{
+		logt("CM", "Could not disconnect because %u", (u32)err);
+	}
 
 	//### STEP 3: Inform ConnectionManager to do the final cleanup
 	GS->cm.DeleteConnection(this, reason);
@@ -158,7 +160,7 @@ bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8 const 
 
 void BaseConnection::FillTransmitBuffers()
 {
-	u32 err = 0;
+	ErrorType err = ErrorType::SUCCESS;
 
 	if (bufferFull) return;
 
@@ -220,7 +222,8 @@ void BaseConnection::FillTransmitBuffers()
 		if(sentData.length == 0){
 			logt("ERROR", "Packet processing failed");
 			GS->logger.logCustomError(CustomErrorTypes::FATAL_PACKET_PROCESSING_FAILED, partnerId);
-			return; //FIXME: this could break a connection
+			DisconnectAndRemove(AppDisconnectReason::INVALID_PACKET);
+			return;
 		}
 
 		//Send the packet to the SoftDevice
@@ -251,16 +254,16 @@ void BaseConnection::FillTransmitBuffers()
 					sentData.length);
 		}
 
-		if(err == (u32)ErrorType::SUCCESS)
+		if(err == ErrorType::SUCCESS)
 		{
 			//FIXME: This is not using the preprocessed data (sentData)
 			PacketSuccessfullyQueuedWithSoftdevice(activeQueue, sendDataPacked, data, &sentData);
 		}
-		else if(err == (u32)ErrorType::BUSY)
+		else if(err == ErrorType::BUSY)
 		{
 			return;
 		}
-		else if(err == (u32)ErrorType::RESOURCES){
+		else if(err == ErrorType::RESOURCES){
 			//No free buffers in the softdevice, so packet could not be queued, go to next connection
 			//Also set the bufferFull variable
 			bufferFull = true;
@@ -268,11 +271,18 @@ void BaseConnection::FillTransmitBuffers()
 		}
 		else
 		{
-			logt("ERROR", "GATT WRITE ERROR 0x%x on handle %u", err, connectionHandle);
+			const char* tag = "WARNING";
+			if (
+				err != ErrorType::BLE_INVALID_CONN_HANDLE // May happen e.g. if the connection is not fully created yet or was destroyed already.
+				)
+			{
+				tag = "ERROR";
+			}
+			logt(tag, "GATT WRITE ERROR 0x%x on handle %u", (u32)err, connectionHandle);
 
-			GS->logger.logCustomError(CustomErrorTypes::WARN_GATT_WRITE_ERROR, err);
+			GS->logger.logCustomError(CustomErrorTypes::WARN_GATT_WRITE_ERROR, (u32)err);
 
-			HandlePacketQueuingFail(*activeQueue, sendDataPacked, err);
+			HandlePacketQueuingFail(*activeQueue, sendDataPacked, (u32)err);
 
 			//Stop queuing packets for this connection to prevent infinite loops
 			return;
@@ -478,7 +488,7 @@ SizedData BaseConnection::GetSplitData(const BaseConnectionSendData &sendData, u
 		result.data = packetBuffer;
 		result.length = (sendData.dataLength - packetSendQueue.packetSendPosition * payloadSize) + SIZEOF_CONN_PACKET_SPLIT_HEADER;
 		if(result.length < 5){
-			logt("ERROR", "Split packet because of very few bytes, optimisation?");
+			logt("WARNING", "Split packet because of very few bytes, optimisation?");
 		}
 
 		char stringBuffer[100];
@@ -527,7 +537,7 @@ u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 c
 	}
 
 	//Check if reassembly buffer limit is reached
-	if(sendData->dataLength - SIZEOF_CONN_PACKET_SPLIT_HEADER + packetReassemblyPosition > packetReassemblyBuffer.length){
+	if(sendData->dataLength - (u32)SIZEOF_CONN_PACKET_SPLIT_HEADER + packetReassemblyPosition > packetReassemblyBuffer.size()){
 		logt("ERROR", "Packet too big for reassembly");
 		GS->logger.logCustomError(CustomErrorTypes::FATAL_PACKET_TOO_BIG, sendData->dataLength);
 		packetReassemblyPosition = 0;
@@ -558,7 +568,7 @@ u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 c
 
 	//Save at correct position in the reassembly buffer
 	CheckedMemcpy(
-		packetReassemblyBuffer.getRaw() + packetReassemblyDestination,
+		packetReassemblyBuffer.data() + packetReassemblyDestination,
 		data + SIZEOF_CONN_PACKET_SPLIT_HEADER,
 		sendData->dataLength);
 
@@ -574,7 +584,7 @@ u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 c
 	{
 		//Modify info for the reassembled packet
 		sendData->dataLength = packetReassemblyPosition;
-		data = packetReassemblyBuffer.getRaw();
+		data = packetReassemblyBuffer.data();
 
 		//Reset the assembly buffer
 		packetReassemblyPosition = 0;
@@ -596,8 +606,6 @@ u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 c
 
 void BaseConnection::ConnectionSuccessfulHandler(u16 connectionHandle)
 {
-	ErrorType err = ErrorType::SUCCESS;
-
 	this->handshakeStartedDs = GS->appTimerDs;
 
 	if (direction == ConnectionDirection::DIRECTION_IN)
@@ -690,18 +698,26 @@ SizedData BaseConnection::GetNextPacketToSend(const PacketQueue& queue) const
 	return zeroData;
 }
 
+u32 BaseConnection::GetAmountOfRemovedConnections()
+{
+	return GS->amountOfRemovedConnections;
+}
+
 #ifdef SIM_ENABLED
 //Helper function to print the contents of the queues, not used in the code, but very useful for executing
 //in the debugger
 void BaseConnection::PrintQueueInfo()
 {
-	PacketQueue* queue;
-	for (int i = 0; i < 2; i++) {
-		if (i == 0) {
+	PacketQueue* queue = nullptr;
+	for (int i = 0; i < 2; i++)
+	{
+		if (i == 0) 
+		{
 			queue = &packetSendQueue;
 			printf("------ Normal Queue Last to First (%u), sendRemaining %u ------" EOL, queue->_numElements, queue->packetSentRemaining);
 		}
-		else if (i == 1) {
+		else if (i == 1)
+		{
 			queue = &packetSendQueueHighPrio;
 			printf("------ High Prio Queue Last to First (%u), sendRemaining %u ------" EOL, queue->_numElements, queue->packetSentRemaining);
 		}
@@ -711,7 +727,7 @@ void BaseConnection::PrintQueueInfo()
 			BaseConnectionSendDataPacked* sendData = (BaseConnectionSendDataPacked*)data.data;
 			connPacketHeader* header = (connPacketHeader*)(data.data + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
 
-			char* type = "INVALID";
+			const char* type = "INVALID";
 			if (sendData->deliveryOption == (u8)DeliveryOption::WRITE_CMD) type = "WRITE_CMD";
 			if (sendData->deliveryOption == (u8)DeliveryOption::WRITE_REQ) type = "WRITE_REQ";
 			if (sendData->deliveryOption == (u8)DeliveryOption::NOTIFICATION) type = "NOTIF";

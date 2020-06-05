@@ -29,15 +29,16 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 
-
-#include <StatusReporterModule.h>
-
-#include <Logger.h>
-#include <Utility.h>
-#include <Node.h>
-#include <Config.h>
-#include <GlobalState.h>
 #include <cstdlib>
+
+
+#include "StatusReporterModule.h"
+#include "Logger.h"
+#include "Utility.h"
+#include "Node.h"
+#include "Config.h"
+#include "GlobalState.h"
+#include "MeshAccessModule.h"
 
 constexpr u8 STATUS_REPORTER_MODULE_CONFIG_VERSION = 2;
 constexpr u16 STATUS_REPORTER_MODULE_MAX_HOPS = NODE_ID_HOPS_BASE + NODE_ID_HOPS_BASE_SIZE - 1;
@@ -83,42 +84,85 @@ void StatusReporterModule::ConfigurationLoadedHandler(ModuleConfiguration* migra
 
 void StatusReporterModule::TimerEventHandler(u16 passedTimeDs)
 {
-	//Device Info
-	if(SHOULD_IV_TRIGGER(GS->appTimerDs+GS->appTimerRandomOffsetDs, passedTimeDs, configuration.deviceInfoReportingIntervalDs)){
-		SendDeviceInfoV2(NODE_ID_BROADCAST, 0, MessageType::MODULE_ACTION_RESPONSE);
-	}
-	//Status
-	if(SHOULD_IV_TRIGGER(GS->appTimerDs+GS->appTimerRandomOffsetDs, passedTimeDs, configuration.statusReportingIntervalDs)){
-		SendStatus(NODE_ID_BROADCAST, 0, MessageType::MODULE_ACTION_RESPONSE);
-	}
-	//Connections
-	if(SHOULD_IV_TRIGGER(GS->appTimerDs+GS->appTimerRandomOffsetDs, passedTimeDs, configuration.connectionReportingIntervalDs)){
-		SendAllConnections(NODE_ID_BROADCAST, 0, MessageType::MODULE_GENERAL);
-	}
-	//Nearby Nodes
-	if(SHOULD_IV_TRIGGER(GS->appTimerDs+GS->appTimerRandomOffsetDs, passedTimeDs, configuration.nearbyReportingIntervalDs)){
-		SendNearbyNodes(NODE_ID_BROADCAST, 0, MessageType::MODULE_ACTION_RESPONSE);
+	//Peridoic Message sending does not make sense for Assets as they are not connected most of the time.
+	//So instead, the asset fully relies on manual querying these messages. Other than "not making sense"
+	//this can lead to issues on the Gateway if it receives a messages through a MA-Connection that has a
+	//virtual partnerId as the gateway gets confused by the unknown nodeId.
+	if (GET_DEVICE_TYPE() != DeviceType::ASSET)
+	{
+		//Device Info
+		if (SHOULD_IV_TRIGGER(GS->appTimerDs + GS->appTimerRandomOffsetDs, passedTimeDs, configuration.deviceInfoReportingIntervalDs)) {
+			SendDeviceInfoV2(NODE_ID_BROADCAST, 0, MessageType::MODULE_ACTION_RESPONSE);
+		}
+		//Status
+		if (SHOULD_IV_TRIGGER(GS->appTimerDs + GS->appTimerRandomOffsetDs, passedTimeDs, configuration.statusReportingIntervalDs)) {
+			SendStatus(NODE_ID_BROADCAST, 0, MessageType::MODULE_ACTION_RESPONSE);
+		}
+		//Connections
+		if (SHOULD_IV_TRIGGER(GS->appTimerDs + GS->appTimerRandomOffsetDs, passedTimeDs, configuration.connectionReportingIntervalDs)) {
+			SendAllConnections(NODE_ID_BROADCAST, 0, MessageType::MODULE_GENERAL);
+		}
+		//Nearby Nodes
+		if (SHOULD_IV_TRIGGER(GS->appTimerDs + GS->appTimerRandomOffsetDs, passedTimeDs, configuration.nearbyReportingIntervalDs)) {
+			SendNearbyNodes(NODE_ID_BROADCAST, 0, MessageType::MODULE_ACTION_RESPONSE);
+		}
 	}
 	//BatteryMeasurement (measure short after reset and then priodically)
 	if( (GS->appTimerDs < SEC_TO_DS(40) && Boardconfig->batteryAdcInputPin != -1 )
 		|| SHOULD_IV_TRIGGER(GS->appTimerDs, passedTimeDs, batteryMeasurementIntervalDs)){
 		BatteryVoltageADC();
 	}
-//	//ErrorLog
-//	if(SHOULD_IV_TRIGGER(node->appTimerDs+node->appTimerRandomOffsetDs, passedTimeDs, SEC_TO_DS(4))){
-//		SendErrors(0);
-//	}
+
+	if (IsPeriodicTimeSendActive() != periodicTimeSendWasActivePreviousTimerEventHandler)
+	{
+		MeshAccessModule* maMod = (MeshAccessModule*)GS->node.GetModuleById(ModuleId::MESH_ACCESS_MODULE);
+		if (maMod != nullptr) {
+			maMod->UpdateMeshAccessBroadcastPacket();
+		}
+
+		periodicTimeSendWasActivePreviousTimerEventHandler = IsPeriodicTimeSendActive();
+		logt("STATUSMOD", "Periodic Time Send is now: %u", (u32)periodicTimeSendWasActivePreviousTimerEventHandler);
+	}
+
+	if (IsPeriodicTimeSendActive())
+	{
+		timeSinceLastPeriodicTimeSendDs += passedTimeDs;
+		if(timeSinceLastPeriodicTimeSendDs > TIME_BETWEEN_PERIODIC_TIME_SENDS_DS){
+			timeSinceLastPeriodicTimeSendDs = 0;
+
+			//todocurrent: Interested in connection
+			constexpr size_t bufferSize = sizeof(componentMessageHeader) + sizeof(GS->timeManager.GetTime());
+			alignas(u32) u8 buffer[bufferSize];
+			CheckedMemset(buffer, 0x00, sizeof(buffer));
+
+			connPacketComponentMessage *outPacket = (connPacketComponentMessage*)buffer;
+
+			outPacket->componentHeader.header.messageType = MessageType::COMPONENT_SENSE;
+			outPacket->componentHeader.header.sender = GS->node.configuration.nodeId;
+			outPacket->componentHeader.header.receiver = periodicTimeSendReceiver;
+
+			outPacket->componentHeader.moduleId = ModuleId::STATUS_REPORTER_MODULE;
+			outPacket->componentHeader.requestHandle = periodicTimeSendRequestHandle;
+			outPacket->componentHeader.actionType = (u8)SensorMessageActionType::READ_RSP;
+			outPacket->componentHeader.component = (u16)StatusReporterModuleComponent::TIME;
+			outPacket->componentHeader.registerAddress = (u16)StatusReporterModuleRegister::TIME;
+
+			*(decltype(GS->timeManager.GetTime())*)outPacket->payload = GS->timeManager.GetTime();
+
+			GS->cm.SendMeshMessage(buffer, bufferSize, DeliveryPriority::LOW);
+		}
+	}
 }
 
 //This method sends the node's status over the network
 void StatusReporterModule::SendStatus(NodeId toNode, u8 requestHandle, MessageType messageType) const
 {
 	MeshConnections conn = GS->cm.GetMeshConnections(ConnectionDirection::DIRECTION_IN);
-	MeshConnection* inConnection = nullptr;
+	MeshConnectionHandle inConnection;
 
 	for (u32 i = 0; i < conn.count; i++) {
-		if (conn.connections[i]->handshakeDone()) {
-			inConnection = conn.connections[i];
+		if (conn.handles[i].IsHandshakeDone()) {
+			inConnection = conn.handles[i];
 		}
 	}
 
@@ -129,8 +173,8 @@ void StatusReporterModule::SendStatus(NodeId toNode, u8 requestHandle, MessageTy
 	data.connectionLossCounter = (u8) GS->node.connectionLossCounter; //TODO: connectionlosscounter is random at the moment, and the u8 will wrap
 	data.freeIn = GS->cm.freeMeshInConnections;
 	data.freeOut = GS->cm.freeMeshOutConnections;
-	data.inConnectionPartner = inConnection == nullptr ? 0 : inConnection->partnerId;
-	data.inConnectionRSSI = inConnection == nullptr ? 0 : inConnection->GetAverageRSSI();
+	data.inConnectionPartner = !inConnection.Exists() ? 0 : inConnection.GetPartnerId();
+	data.inConnectionRSSI = !inConnection.Exists() ? 0 : inConnection.GetAverageRSSI();
 	data.initializedByGateway = GS->node.initializedByGateway;
 
 	SendModuleActionMessage(
@@ -153,7 +197,7 @@ void StatusReporterModule::SendDeviceInfoV2(NodeId toNode, u8 requestHandle, Mes
 	data.deviceType = GET_DEVICE_TYPE();
 	FruityHal::GetDeviceAddress(data.chipId);
 	data.serialNumberIndex = RamConfig->GetSerialNumberIndex();
-	FruityHal::BleGapAddressGet(&data.accessAddress);
+	data.accessAddress = FruityHal::GetBleGapAddress();
 	data.nodeVersion = GS->config.getFruityMeshVersion();
 	data.networkId = GS->node.configuration.networkId;
 	data.dBmRX = Boardconfig->dBmRX;
@@ -225,14 +269,16 @@ void StatusReporterModule::SendAllConnections(NodeId toNode, u8 requestHandle, M
 	u8* buffer = (u8*)&message;
 
 	if(connIn.count > 0){
-		CheckedMemcpy(buffer, &connIn.connections[0]->partnerId, 2);
-		i8 avgRssi = connIn.connections[0]->GetAverageRSSI();
+		NodeId partnerId = connIn.handles[0].GetPartnerId();
+		CheckedMemcpy(buffer, &partnerId, 2);
+		i8 avgRssi = connIn.handles[0].GetAverageRSSI();
 		CheckedMemcpy(buffer + 2, &avgRssi, 1);
 	}
 
 	for(u32 i=0; i<connOut.count; i++){
-		CheckedMemcpy(buffer + (i+1)*3, &connOut.connections[i]->partnerId, 2);
-		i8 avgRssi = connOut.connections[i]->GetAverageRSSI();
+		NodeId partnerId = connOut.handles[i].GetPartnerId();
+		CheckedMemcpy(buffer + (i+1)*3, &partnerId, 2);
+		i8 avgRssi = connOut.handles[i].GetAverageRSSI();
 		CheckedMemcpy(buffer + (i+1)*3 + 2, &avgRssi, 1);
 	}
 
@@ -310,8 +356,6 @@ void StatusReporterModule::SendLiveReport(LiveReportTypes type, u16 requestHandl
 }
 
 void StatusReporterModule::StartConnectionRSSIMeasurement(MeshConnection& connection) const{
-	u32 err = 0;
-
 	if (connection.isConnected())
 	{
 		//Reset old values
@@ -319,21 +363,13 @@ void StatusReporterModule::StartConnectionRSSIMeasurement(MeshConnection& connec
 		connection.rssiAverageTimes1000 = 0;
 
 		//Both possible errors are due to a disconnect and we can simply ignore them
-		FruityHal::BleGapRssiStart(connection.connectionHandle, 2, 7);
-		
-		logt("STATUSMOD", "RSSI measurement started for connection %u with code %u", connection.connectionId, err);
-	}
-}
+		const ErrorType err = FruityHal::BleGapRssiStart(connection.connectionHandle, 2, 7);
+		if (err != ErrorType::SUCCESS && err != ErrorType::BLE_INVALID_CONN_HANDLE)
+		{
+			logt("STATUSMOD", "Unexpected error for BleGapRssiStart %u", (u32)err);
+		}
 
-void StatusReporterModule::StopConnectionRSSIMeasurement(const MeshConnection& connection) const{
-	u32 err = 0;
-
-	if (connection.isConnected())
-	{
-		//Both possible errors are due to a disconnect and we can simply ignore them
-		FruityHal::BleGapRssiStop(connection.connectionHandle);
-
-		logt("STATUSMOD", "RSSI measurement stopped for connection %u with code %u", connection.connectionId, err);
+		logt("STATUSMOD", "RSSI measurement started for connection %u with code %u", connection.connectionId, (u32)err);
 	}
 }
 
@@ -345,9 +381,8 @@ void StatusReporterModule::GapAdvertisementReportEventHandler(const FruityHal::G
 
 	const advPacketHeader* packetHeader = (const advPacketHeader*)data;
 
-	switch (packetHeader->messageType)
+	if (packetHeader->messageType == ServiceDataMessageType::JOIN_ME_V0)
 	{
-	case MESSAGE_TYPE_JOIN_ME_V0:
 		if (dataLength == SIZEOF_ADV_PACKET_JOIN_ME)
 		{
 			const advPacketJoinMeV0* packet = (const advPacketJoinMeV0*)data;
@@ -377,7 +412,6 @@ void StatusReporterModule::GapAdvertisementReportEventHandler(const FruityHal::G
 					}
 				}
 			}
-
 		}
 	}
 }
@@ -586,7 +620,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 				if (connection != nullptr)
 				{
 					u16 receivedHopsToSink = STATUS_REPORTER_MODULE_MAX_HOPS - packetHeader->receiver;
-					MeshConnection * meshconn = GS->cm.GetMeshConnectionToPartner(connection->partnerId);
+					MeshConnection * meshconn = GS->cm.GetMeshConnectionToPartner(connection->partnerId).GetConnection();
 					if (meshconn != nullptr)
 					{
 						//meshconn can be nullptr if the connection for example is a mesh access connection.
@@ -594,7 +628,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 
 						if (receivedHopsToSink != hopsToSink)
 						{
-							GS->logger.logCustomError(CustomErrorTypes::FATAL_INCORRECT_HOPS_TO_SINK, (receivedHopsToSink << 16) | hopsToSink);
+							GS->logger.logCustomError(CustomErrorTypes::FATAL_INCORRECT_HOPS_TO_SINK, ((u32)receivedHopsToSink << 16) | hopsToSink);
 							logt("DEBUGMOD", "FATAL receivedHopsToSink: %d", receivedHopsToSink);
 							logt("DEBUGMOD", "FATAL getHopsToSink: %d", hopsToSink);
 							meshconn->setHopsToSink(receivedHopsToSink);
@@ -643,7 +677,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 
 				u8 const * addr = data->accessAddress.addr;
 
-				char serialBuffer[NODE_SERIAL_NUMBER_LENGTH + 1];
+				char serialBuffer[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
 				Utility::GenerateBeaconSerialForIndex(data->serialNumberIndex, serialBuffer);
 
 				logjson_partial("STATUSMOD", "{\"nodeId\":%u,\"type\":\"device_info\",\"module\":%d,", packet->header.sender, (u32)moduleId);
@@ -738,6 +772,34 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 			}
 		}
 	}
+
+	if (packetHeader->messageType == MessageType::COMPONENT_ACT && sendData->dataLength >= SIZEOF_CONN_PACKET_COMPONENT_MESSAGE)
+	{
+		connPacketComponentMessage const * packet = (connPacketComponentMessage const *)packetHeader;
+		if (packet->componentHeader.moduleId == moduleId)
+		{
+			if (packet->componentHeader.actionType == (u8)ActorMessageActionType::WRITE)
+			{
+				if (packet->componentHeader.component == (u16)StatusReporterModuleComponent::TIME)
+				{
+					if (packet->componentHeader.registerAddress == (u16)StatusReporterModuleRegister::TIME)
+					{
+						if (packet->payload[0] != 0)
+						{
+							periodicTimeSendStartTimestampDs = GS->appTimerDs;
+							timeSinceLastPeriodicTimeSendDs = TIME_BETWEEN_PERIODIC_TIME_SENDS_DS;
+							periodicTimeSendReceiver = packet->componentHeader.header.sender;
+							periodicTimeSendRequestHandle = packet->componentHeader.requestHandle;
+						}
+						else
+						{
+							periodicTimeSendStartTimestampDs = 0;
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 void StatusReporterModule::MeshConnectionChangedHandler(MeshConnection& connection)
@@ -747,9 +809,7 @@ void StatusReporterModule::MeshConnectionChangedHandler(MeshConnection& connecti
 		//TODO: Implement low and medium rssi sampling with timer handler
 		//TODO: disable and enable rssi sampling on existing connections
 		if(Conf::enableConnectionRSSIMeasurement){
-			if(connectionRSSISamplingMode == connectionRSSISamplingMode){
-				StartConnectionRSSIMeasurement(connection);
-			}
+			StartConnectionRSSIMeasurement(connection);
 		}
 	}
 }
@@ -779,26 +839,31 @@ void StatusReporterModule::initBatteryVoltageADC() {
 		// Battery input
 		pin = 0xFF;
 	}
+	ErrorType err = ErrorType::SUCCESS;
 #if FEATURE_AVAILABLE(ADC_INTERNAL_MEASUREMENT)
 	if(Boardconfig->batteryAdcInputPin == -2) {
-		FruityHal::AdcConfigureChannel(pin, 
+		err = FruityHal::AdcConfigureChannel(pin,
 		                               FruityHal::AdcReference::ADC_REFERENCE_0_6V, 
 		                               FruityHal::AdcResoultion::ADC_10_BIT, 
 		                               FruityHal::AdcGain::ADC_GAIN_1_6);
 	}
 	else
 	{
-		FruityHal::AdcConfigureChannel(pin, 
+		err = FruityHal::AdcConfigureChannel(pin,
 		                               FruityHal::AdcReference::ADC_REFERENCE_1_4_POWER_SUPPLY, 
 		                               FruityHal::AdcResoultion::ADC_10_BIT, 
 		                               FruityHal::AdcGain::ADC_GAIN_1_5);
 	}
 #else
-	FruityHal::AdcConfigureChannel(pin, 
+	err = FruityHal::AdcConfigureChannel(pin, 
 	                               FruityHal::AdcReference::ADC_REFERENCE_1_2V, 
 	                               FruityHal::AdcResoultion::ADC_8_BIT, 
 	                               FruityHal::AdcGain::ADC_GAIN_1);
 #endif // FEATURE_AVAILABLE(ADC_INTERNAL_MEASUREMENT)
+	if (err != ErrorType::SUCCESS)
+	{
+		logt("STATUS", "Failed to configure adc because %u", (u32)err);
+	}
 	isADCInitialized = true;
 #endif
 }
@@ -846,6 +911,11 @@ void StatusReporterModule::convertADCtoVoltage()
 #endif
 }
 
+bool StatusReporterModule::IsPeriodicTimeSendActive()
+{
+	return periodicTimeSendStartTimestampDs != 0 && GS->appTimerDs < periodicTimeSendStartTimestampDs + PERIODIC_TIME_SEND_AUTOMATIC_DEACTIVATION;
+}
+
 u8 StatusReporterModule::GetBatteryVoltage() const
 {
 	return batteryVoltageDv;
@@ -855,4 +925,46 @@ u16 StatusReporterModule::ExternalVoltageDividerDv(u32 Resistor1, u32 Resistor2)
 {
 	u16 voltageDividerDv = u16(((double(Resistor1 + Resistor2)) / double(Resistor2)) * 10);
 	return voltageDividerDv;
+}
+
+MeshAccessAuthorization StatusReporterModule::CheckMeshAccessPacketAuthorization(BaseConnectionSendData * sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction)
+{
+	connPacketHeader const * packet = (connPacketHeader const *)data;
+
+	if (packet->messageType == MessageType::MODULE_TRIGGER_ACTION
+		|| packet->messageType == MessageType::MODULE_ACTION_RESPONSE)
+	{
+		connPacketModule const * mod = (connPacketModule const *)data;
+		if (mod->moduleId == moduleId)
+		{
+			//The Gateway queries get_status and get_device_info through the orga key.
+			if (fmKeyId == FmKeyId::ORGANIZATION)
+			{
+				static_assert((u8)StatusModuleTriggerActionMessages::GET_STATUS         == (u8)StatusModuleActionResponseMessages::STATUS,         "The following check assumes that both have the same value in both directions");
+				static_assert((u8)StatusModuleTriggerActionMessages::GET_DEVICE_INFO_V2 == (u8)StatusModuleActionResponseMessages::DEVICE_INFO_V2, "The following check assumes that both have the same value in both directions");
+				if (mod->actionType == (u8)StatusModuleTriggerActionMessages::GET_STATUS
+					|| mod->actionType == (u8)StatusModuleTriggerActionMessages::GET_DEVICE_INFO_V2)
+				{
+					return MeshAccessAuthorization::WHITELIST;
+				}
+			}
+		}
+	}
+
+	if (packet->messageType == MessageType::COMPONENT_ACT
+		|| packet->messageType == MessageType::COMPONENT_SENSE)
+	{
+		connPacketComponentMessage const * packet = (connPacketComponentMessage const *)data;
+		if (packet->componentHeader.moduleId == moduleId)
+		{
+			return MeshAccessAuthorization::WHITELIST;
+		}
+	}
+
+	return MeshAccessAuthorization::UNDETERMINED;
+}
+
+bool StatusReporterModule::IsInterestedInMeshAccessConnection()
+{
+	return IsPeriodicTimeSendActive();
 }

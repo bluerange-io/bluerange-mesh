@@ -29,10 +29,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 /*
-This is meant as a small HAL Layer for abstracting some platform specific code which should make
-things easier when porting to other platforms.
-It is clearly meant as a work in progress.
-*/
+ * This is a collection of BLE error types.
+ */
 
 #pragma once
 #include "types.h"

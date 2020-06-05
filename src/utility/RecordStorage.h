@@ -32,19 +32,14 @@
 #include <types.h>
 #include <FlashStorage.h>
 
-/**
- * The RecordStorage is able to manage multiple records in the flash. It is possible to create new
- * records, update records and delete records
- */
-
  /*## RecordIds #############################################################*/
  // The modules use their moduleId as a recordId, records outside this range can be used
  // for other types of storage
 
  //Specific Record Ids
-#define RECORD_STORAGE_RECORD_ID_UPDATE_STATUS 1000 //Stores the done status of an update
-#define RECORD_STORAGE_RECORD_ID_UICR_REPLACEMENT 1001 //Can be used, if UICR can not be flashed, e.g. when updating another beacon with different firmware
-#define RECORD_STORAGE_RECORD_ID_DEPRECATED 1002 //Was used to store fake positions for nodes to modify the incoming events
+constexpr u16 RECORD_STORAGE_RECORD_ID_UPDATE_STATUS = 1000; //Stores the done status of an update
+constexpr u16 RECORD_STORAGE_RECORD_ID_UICR_REPLACEMENT = 1001; //Can be used, if UICR can not be flashed, e.g. when updating another beacon with different firmware
+constexpr u16 RECORD_STORAGE_RECORD_ID_DEPRECATED = 1002; //Was used to store fake positions for nodes to modify the incoming events
 
 
 constexpr u16 RECORD_STORAGE_ACTIVE_PAGE_MAGIC_NUMBER = 0xAC71;
@@ -179,7 +174,10 @@ class RecordStorageEventListener;
 
 constexpr int RECORD_STORAGE_QUEUE_SIZE = 256;
 
-
+/**
+ * The RecordStorage is able to manage multiple records in the flash. It is possible to create new
+ * records, update records and delete records. It uses the FlashStorage class for storage operations.
+ */
 class RecordStorage : public FlashStorageEventListener
 {
 	friend class TestRecordStorage;
@@ -187,14 +185,14 @@ class RecordStorage : public FlashStorageEventListener
 	private:
 		enum class FlashUserTypes : u32
 		{
-			DEFAULT   = 0, //FIXME: All usages of this value should be refactored to use a distinct user type instead.
+			DEFAULT   = 0, //TODO: All usages of this value should be refactored to use a distinct user type instead.
 			LOCK_DOWN = 1,
 		};
 
 		u8* startPage = nullptr;
 
 		//A queue that stores high level operations
-		u32 opBuffer[RECORD_STORAGE_QUEUE_SIZE / sizeof(u32)] = { 0 };
+		u32 opBuffer[RECORD_STORAGE_QUEUE_SIZE / sizeof(u32)] = {};
 		PacketQueue opQueue;
 
 		//Variables for repair

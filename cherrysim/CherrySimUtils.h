@@ -38,6 +38,5 @@ public:
 	//Returns a set of 'count' distinct numbers withing the range of min and max
 	//ATTENTION: Only works if a simulator is instanciated as it relies on its PSRNG
 	static std::set<int> generateRandomNumbers(const int min, const int max, const unsigned int count);
-	static void generateBeaconSerialForIndex(u32 index, char* buffer);
 	static std::string getNormalizedPath();
 };

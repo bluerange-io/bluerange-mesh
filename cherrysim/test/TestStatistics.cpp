@@ -40,11 +40,11 @@ TEST(TestStatistics, TestNumberClusteringMessagesSent) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 
-	simConfig.numNodes = 10;
 	simConfig.enableSimStatistics = true;
 
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -52,7 +52,7 @@ TEST(TestStatistics, TestNumberClusteringMessagesSent) {
 
 	//Calculate the statistic for all messages routed by all nodes summed up
 	PacketStat stat[PACKET_STAT_SIZE];
-	for (u32 i = 0; i < simConfig.numNodes; i++) {
+	for (u32 i = 0; i < tester.sim->getTotalNodes(); i++) {
 		for (u32 j = 0; j < PACKET_STAT_SIZE; j++) {
 			tester.sim->AddPacketToStats(stat, tester.sim->nodes[i].routedPackets + j);
 		}

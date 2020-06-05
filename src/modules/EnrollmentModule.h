@@ -29,6 +29,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <array>
 #include <Module.h>
 #include <ScanController.h>
 
@@ -72,10 +73,10 @@ struct EnrollmentModuleConfiguration : ModuleConfiguration {
 		u32 serialNumberIndex;
 		NodeId newNodeId;
 		NetworkId newNetworkId;
-		SimpleArray<u8, 16> newNetworkKey;
-		SimpleArray<u8, 16> newUserBaseKey;
-		SimpleArray<u8, 16> newOrganizationKey;
-		SimpleArray<u8, 16> nodeKey; // Key used to connect to the unenrolled node
+		std::array<u8, 16> newNetworkKey;
+		std::array<u8, 16> newUserBaseKey;
+		std::array<u8, 16> newOrganizationKey;
+		std::array<u8, 16> nodeKey; // Key used to connect to the unenrolled node
 		u8 timeoutSec : 7; //how long to try to connect to the unenrolled node, 0 means default time
 		u8 enrollOnlyIfUnenrolled : 1; //Set to 1 in order to return an error if already enrolled
 
@@ -136,7 +137,12 @@ struct EnrollmentModuleConfiguration : ModuleConfiguration {
 #pragma pack(pop)
 //####### Module messages end
 
-
+/**
+ * The EnrollmentModule contains functionality to receive and store enrollments
+ * send to the node. Also it is used to provide enrollment-over-the mesh
+ * functionality using MeshAccess connections. This is sometimes also called
+ * provisioning.
+ */
 class EnrollmentModule: public Module
 {
 	public:
@@ -243,15 +249,15 @@ class EnrollmentModule: public Module
 
 		EnrollmentModule();
 
-		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override;
+		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
 
-		void ResetToDefaultConfiguration() override;
+		void ResetToDefaultConfiguration() override final;
 
-		void TimerEventHandler(u16 passedTimeDs) override;
+		void TimerEventHandler(u16 passedTimeDs) override final;
 
-		void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override;
+		void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override final;
 
-		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
+		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
 
 		//PreEnrollment
 
@@ -261,14 +267,14 @@ class EnrollmentModule: public Module
 
 		//Handlers
 #if IS_ACTIVE(BUTTONS)
-		void ButtonHandler(u8 buttonId, u32 holdTimeDs) override;
+		void ButtonHandler(u8 buttonId, u32 holdTimeDs) override final;
 #endif
 
 		#ifdef TERMINAL_ENABLED
-		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
+		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
 		#endif
 
-		void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
+		void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override final;
 
-		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) override;
+		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) override final;
 };

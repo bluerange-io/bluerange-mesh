@@ -92,6 +92,7 @@ MeshAccessConnection::MeshAccessConnection(u8 id, ConnectionDirection direction,
 		//This is only possible if less than NODE_ID_VIRTUAL_BASE nodes are in the network and if
 		//the enrollment ensures that successive nodeIds are used
 		this->virtualPartnerId = GS->node.configuration.nodeId + (this->connectionId + 1) * NODE_ID_VIRTUAL_BASE;
+		this->virtualPartnerIdWasOverwritten = false;
 	}
 	else
 	{
@@ -99,6 +100,7 @@ MeshAccessConnection::MeshAccessConnection(u8 id, ConnectionDirection direction,
 		//when the meshGw wants to communicate to a device that has an organization wide unique
 		//node Id (e.g. an asset).
 		this->virtualPartnerId = overwriteVirtualPartnerId;
+		this->virtualPartnerIdWasOverwritten = true;
 	}
 
 	//Fetch the MeshAccessModule reference
@@ -155,12 +157,13 @@ u32 MeshAccessConnection::ConnectAsMaster(FruityHal::BleGapAddr const * address,
 	if (GS->cm.pendingConnection != nullptr) return 0;
 
 	//Check if we already have a MeshAccessConnection to this address and do not allow a second
-	BaseConnections conns = GS->cm.GetConnectionsOfType(ConnectionType::MESH_ACCESS, ConnectionDirection::INVALID);
+	MeshAccessConnections conns = GS->cm.GetMeshAccessConnections(ConnectionDirection::INVALID);
 	for(u32 i=0; i<conns.count; i++)
 	{
-		BaseConnection* conn = GS->cm.allConnections[conns.connectionIndizes[i]];
-		if (conn != nullptr) {
-			u32 result = memcmp(&(conn->partnerAddress), address, FH_BLE_SIZEOF_GAP_ADDR);
+		MeshAccessConnectionHandle conn = conns.handles[i];
+		if (conn) {
+			FruityHal::BleGapAddr partnerAddress = conn.GetPartnerAddress();
+			u32 result = memcmp(&partnerAddress, address, FH_BLE_SIZEOF_GAP_ADDR);
 			if (result == 0) {
 				//TODO wouldn't it be better to return conn->uniqueConnectionId instead?
 				//Probably the callee does not care if a real new connection was established,
@@ -218,8 +221,8 @@ void MeshAccessConnection::RegisterForNotifications()
 
     u16 data = 0x0001; //Bit to enable the notifications
 
-    u32 err = GS->gattController.bleWriteCharacteristic(connectionHandle, partnerTxCharacteristicCccdHandle, (u8*)&data, sizeof(data), true);
-    if(err == 0){
+    ErrorType err = GS->gattController.bleWriteCharacteristic(connectionHandle, partnerTxCharacteristicCccdHandle, (u8*)&data, sizeof(data), true);
+    if(err == ErrorType::SUCCESS){
     	manualPacketsSent++;
     }
 
@@ -304,7 +307,7 @@ void MeshAccessConnection::HandshakeANonce(connPacketEncryptCustomStart const * 
 	bool keyValid = GenerateSessionKey((u8*)decryptionNonce, partnerId, fmKeyId, sessionDecryptionKey);
 
 	if(!keyValid){
-		logt("ERROR", "Invalid Key");
+		logt("WARNING", "Invalid Key"); //See: IOT-3821
 		DisconnectAndRemove(AppDisconnectReason::INVALID_KEY);
 		return;
 	}
@@ -862,7 +865,7 @@ bool MeshAccessConnection::SendData(BaseConnectionSendData* sendData, u8 const *
 		if(packetHeader->receiver == this->virtualPartnerId){
 			CheckedMemcpy(modifiedData, data, sendData->dataLength);
 			connPacketHeader * modifiedPacketHeader = (connPacketHeader*)modifiedData;
-			modifiedPacketHeader->receiver = this->partnerId; //FIXME: Must not modify id here, copy packet first to queue
+			modifiedPacketHeader->receiver = this->partnerId;
 			data = modifiedData;
 		}
 
@@ -941,7 +944,7 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
 		data = decryptedData;
 
 		if(!valid){
-			logt("ERROR", "Invalid packet");
+			logt("WARNING", "Invalid packet");
 			OnCorruptedMessage();
 			return;
 		}
@@ -966,7 +969,7 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
 		else if(sendData->dataLength == SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_SNONCE){
 			HandshakeDone((connPacketEncryptCustomSNonce const *) data);
 		} else {
-			logt("ERROR", "Wrong handshake packet");
+			logt("WARNING", "Wrong handshake packet"); //See: IOT-3820
 			DisconnectAndRemove(AppDisconnectReason::INVALID_HANDSHAKE_PACKET);
 		}
 	}
@@ -995,6 +998,17 @@ void MeshAccessConnection::ReceiveMeshAccessMessageHandler(BaseConnectionSendDat
 	if (packetHeader->messageType == MessageType::COMPONENT_SENSE) {
 		connPacketComponentMessage const *packet = (connPacketComponentMessage const *)data;
 		if (packet->componentHeader.moduleId == ModuleId::ASSET_MODULE) {
+			replaceSenderId = false;
+		}
+	}
+	//If our partner has a global id, we don't have to replace the ID with the virtual partner ID...
+	if (partnerId >= NODE_ID_GLOBAL_DEVICE_BASE && partnerId < NODE_ID_GLOBAL_DEVICE_BASE + NODE_ID_GLOBAL_DEVICE_BASE_SIZE)
+	{
+		//...but only if the virtual partner id was not overwritten. This is because an overwritten virtual partner id always
+		//comes from the user which should always be a respected value or else the user sees the connected device under a
+		//different nodeId than he specified.
+		if (!virtualPartnerIdWasOverwritten)
+		{
 			replaceSenderId = false;
 		}
 	}
@@ -1050,7 +1064,7 @@ void MeshAccessConnection::ReceiveMeshAccessMessageHandler(BaseConnectionSendDat
 	if (packetHeader->messageType == MessageType::CLUSTER_INFO_UPDATE
 		&& sendData->dataLength >= sizeof(connPacketClusterInfoUpdate)
 	) {
-		connPacketClusterInfoUpdate* data = (connPacketClusterInfoUpdate*)packetHeader;
+		const connPacketClusterInfoUpdate* data = (connPacketClusterInfoUpdate const *)packetHeader;
 		logt("MACONN", "Received ClusterInfoUpdate over MACONN with size:%u and hops:%d", data->payload.clusterSizeChange, data->payload.hopsToSink);
 	}
 #endif
@@ -1070,7 +1084,11 @@ void MeshAccessConnection::ConnectionSuccessfulHandler(u16 connectionHandle)
 	if(direction == ConnectionDirection::DIRECTION_OUT)
 	{
 		//First, we need to discover the remote service
-		GS->gattController.DiscoverService(connectionHandle, meshAccessService->serviceUuid);
+		const ErrorType err = GS->gattController.DiscoverService(connectionHandle, meshAccessService->serviceUuid);
+		if (err != ErrorType::SUCCESS)
+		{
+			logt("MACONN", "Failed to start discover service because %u", (u32)err);
+		}
 	}
 }
 

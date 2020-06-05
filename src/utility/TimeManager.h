@@ -47,6 +47,11 @@ public:
 	u32 getAdditionalTicks();
 };
 
+
+/*
+ * The TimeManager is responsible for synchronizing times beetween different
+ * nodes in the network.
+ */
 class TimeManager {
 private:
 	u32 syncTime = 0; // The sync time is a timestamp that describes since when the time is synced and progragated via the mesh.

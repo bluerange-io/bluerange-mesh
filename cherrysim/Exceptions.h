@@ -35,6 +35,7 @@
 #include <typeinfo>
 #include <exception>
 #include <typeindex>
+#include "debugbreak.h"
 
 struct FruityMeshException : public std::exception {};
 
@@ -55,16 +56,19 @@ CREATEEXCEPTIONINHERITING(CommandTooLongException                               
 CREATEEXCEPTIONINHERITING(NotANumberStringException                                 , IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(NumberStringNotInRangeException                           , IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(MoreThanOneTerminalCommandHandlerReactedOnCommandException, IllegalArgumentException);
+CREATEEXCEPTIONINHERITING(UnknownJsonEntryException                                 , IllegalArgumentException);
 
 CREATEEXCEPTION(IllegalStateException);
 CREATEEXCEPTIONINHERITING(ZeroOnNonPodTypeException               , IllegalStateException);
 CREATEEXCEPTIONINHERITING(UartNotSetException                     , IllegalStateException);
 CREATEEXCEPTIONINHERITING(ReceivedWrongTimeSyncPaketException     , IllegalStateException);
-CREATEEXCEPTIONINHERITING(CommandbufferAlreadyInUseException      , IllegalStateException);
 CREATEEXCEPTIONINHERITING(ModuleAllocatorMemoryAlreadySetException, IllegalStateException);
 CREATEEXCEPTIONINHERITING(ErrorCodeUnknownException               , IllegalStateException);
 CREATEEXCEPTIONINHERITING(RecordStorageIsLockedDownException      , IllegalStateException);
 CREATEEXCEPTIONINHERITING(StackOverflowException                  , IllegalStateException);
+CREATEEXCEPTIONINHERITING(AccessToRemovedConnectionException      , IllegalStateException);
+CREATEEXCEPTIONINHERITING(InternalTerminalCommandErrorException   , IllegalStateException);
+CREATEEXCEPTIONINHERITING(FileException                           , IllegalStateException);
 
 CREATEEXCEPTION(BufferException);
 CREATEEXCEPTIONINHERITING(TriedToReadEmptyBufferException         , BufferException);
@@ -101,6 +105,7 @@ CREATEEXCEPTION(MalformedPaketException);
 CREATEEXCEPTION(NotImplementedException);
 CREATEEXCEPTION(CorruptOrOutdatedSavefile);
 CREATEEXCEPTION(ZeroTimeoutNotSupportedException);
+CREATEEXCEPTION(ErrorLoggedException);
 //LCOV_EXCL_STOP debug code
 
 #undef CREATEEXCEPTION //Exceptions must be created above!
@@ -121,7 +126,7 @@ namespace Exceptions {
 	class DisableDebugBreakOnException {
 	public:
 		DisableDebugBreakOnException();
-		~DisableDebugBreakOnException();
+		~DisableDebugBreakOnException() noexcept(false);
 	};
 
 	template<typename T>
@@ -141,7 +146,7 @@ namespace Exceptions {
 	{\
 		printf("Exception occured: " #T " " __FILE__ " %d\n", __LINE__); \
 		if(Exceptions::getDebugBreakOnException()) {\
-			__debugbreak(); \
+			debug_break(); \
 		}\
 		throw T(); \
 	}

@@ -39,13 +39,12 @@
 #endif //GITHUB_RELEASE
 #endif
 #include "Utility.h"
-#include "SimpleArray.h"
+#include <array>
 
 /*
 * The ConnectionAllocator is an implementation of a PoolAllocator, specialized on
 * Connections. It is able to allocate and deallocate any Connection.
 */
-
 class ConnectionAllocator {
 private:
 	union AnyConnection
@@ -66,7 +65,7 @@ private:
 	};
 
 	static constexpr AnyConnection* NO_NEXT_CONNECTION = nullptr;
-	SimpleArray<AnyConnection, TOTAL_NUM_CONNECTIONS + 1> data;	//Max + one resolver connection.
+	std::array<AnyConnection, TOTAL_NUM_CONNECTIONS + 1> data{};	//Max + one resolver connection.
 	AnyConnection* dataHead = NO_NEXT_CONNECTION;
 
 	AnyConnection* allocateMemory();

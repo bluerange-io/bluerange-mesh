@@ -28,10 +28,10 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef SRC_GLOBALSTATE_H_
-#define SRC_GLOBALSTATE_H_
+#pragma once
 
 #include <new>
+#include <array>
 #include "FruityHal.h"
 #include "TimeManager.h"
 #include "AdvertisingController.h"
@@ -65,6 +65,10 @@ class Module;
 #endif
 #endif
 
+/*
+ * The GlobalState holds the instances of all modules and all of the data that is not on the stack.
+ * This is necessary for the mesh simulator CherrySim to be able to simulate multiple nodes in one process.
+ */
 class GlobalState
 {
 	public:
@@ -76,10 +80,7 @@ class GlobalState
 		static GlobalState instance;
 #endif
 
-		uint32_t SetEventHandlers(
-			FruityHal::SystemEventHandler systemEventHandler, FruityHal::TimerEventHandler timerEventHandler,
-            FruityHal::ButtonEventHandler buttonEventHandler, FruityHal::AppErrorHandler   appErrorHandler,
-            FruityHal::StackErrorHandler  stackErrorHandler, FruityHal::HardfaultHandler  hardfaultHandler);
+		uint32_t SetEventHandlers(FruityHal::AppErrorHandler appErrorHandler);
 		void SetUartHandler(FruityHal::UartEventHandler uartEventHandler);
 
 		//#################### Event Buffer ###########################
@@ -100,6 +101,8 @@ class GlobalState
 		u32 appTimerDs = 0; //The app timer is used for all mesh and module timings and keeps track of the time in ds since bootup
 
 		TimeManager timeManager;
+
+		u32 amountOfRemovedConnections = 0;
 
 		//########## Singletons ###############
 		//Base
@@ -125,7 +128,7 @@ class GlobalState
 
 		//########## Modules ###############
 		u32 amountOfModules = 0;
-		Module* activeModules[MAX_MODULE_COUNT] = { 0 };
+		Module* activeModules[MAX_MODULE_COUNT] = {};
 		template<typename T>
 		u32 InitializeModule(bool createModule)
 		{
@@ -172,20 +175,23 @@ class GlobalState
 #endif
 		RamRetainStruct * ramRetainStructPreviousBootPtr;
 
-		FruityHal::SystemEventHandler systemEventHandler = nullptr;
-		FruityHal::TimerEventHandler  timerEventHandler = nullptr;
 		FruityHal::UartEventHandler   uartEventHandler = nullptr;
-		FruityHal::ButtonEventHandler buttonEventHandler = nullptr;
 		FruityHal::AppErrorHandler    appErrorHandler = nullptr;
-		FruityHal::StackErrorHandler  stackErrorHandler = nullptr;
-		FruityHal::HardfaultHandler   hardfaultHandler = nullptr;
 #ifdef SIM_ENABLED
 		FruityHal::DBDiscoveryHandler dbDiscoveryHandler = nullptr;
 #endif
-		u32 amountOfEventLooperHandlers = 0;
-		SimpleArray<FruityHal::EventLooperHandler, 16> eventLooperHandlers;
-		void RegisterEventLooperHandler(FruityHal::EventLooperHandler handler
-		);
-};
+		u32 numApplicationInterruptHandlers = 0;
+		std::array<FruityHal::ApplicationInterruptHandler, 16> applicationInterruptHandlers{};
 
-#endif /* SRC_GLOBALSTATE_H_ */
+		//This registers a handler that will be called from the application interrupt level
+		//It will be called on every application interrupt and can only be interrupted by higher priority interrupts,
+		//not by other parts of the application logic
+		void RegisterApplicationInterruptHandler(FruityHal::ApplicationInterruptHandler handler);
+
+		u32 numMainContextHandlers = 0;
+		std::array<FruityHal::MainContextHandler, 2> mainContextHandlers;
+
+		//This registers a handler that will be called from the main context (non-interrupt)
+		//It allows us to execute logic in the main Thread that will be interrupted by every interrupt priority
+		void RegisterMainContextHandler(FruityHal::MainContextHandler handler);
+};

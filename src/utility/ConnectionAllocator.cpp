@@ -33,12 +33,11 @@
 
 ConnectionAllocator::ConnectionAllocator()
 {
-	CheckedMemset(data.getRaw(), 0, sizeof(data));
-	for (unsigned i = 0; i < data.length - 1; i++) {
-		data[i].nextConnection = data.getRaw() + (i + 1);
+	for (unsigned i = 0; i < data.size() - 1; i++) {
+		data[i].nextConnection = data.data() + (i + 1);
 	}
-	data[data.length - 1].nextConnection = NO_NEXT_CONNECTION;
-	dataHead = data.getRaw();
+	data[data.size() - 1].nextConnection = NO_NEXT_CONNECTION;
+	dataHead = data.data();
 }
 
 ConnectionAllocator & ConnectionAllocator::getInstance()
@@ -103,12 +102,14 @@ void ConnectionAllocator::deallocate(BaseConnection * bc)
 		                                            //Remove this check if this assumption ever breaks and was not a bug.
 
 	}
-	if ((void*)bc < data.getRaw() || (void*)bc > data.getRaw() + sizeof(data)) {
+	if ((void*)bc < data.data() || (void*)bc > data.data() + sizeof(data)) {
 		SIMEXCEPTION(NotFromThisAllocatorException);//The allocator does not know this memory and does not own it! Wherever
 		                                            //you got this connection from, it was not from this allocator!
 	}
 
 	bc->~BaseConnection();
+	// The following is valid as we completely own and manage that memory region inside the
+	// ConnectionAllocator, calling the destructors and constructors (via placement new) manually.
 	// cppcheck-suppress memsetClass
 	CheckedMemset((u8*)bc, 0, sizeof(AnyConnection));
 	

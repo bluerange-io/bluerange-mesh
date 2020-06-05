@@ -27,6 +27,7 @@
 // **
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
+
 /*
  * This file contains the structs that are used for packets that are sent
  * over standard BLE connections, such as the mesh-handshake and other packets
@@ -99,6 +100,16 @@ enum class MessageType : u8
 	DATA_1 = 80,
 
 	CLC_DATA = 83,
+
+	// The most significant bit of the MessageType is reserved for future use.
+	// Such a use could be (but is not limited to) to extend the connPacketHeader
+	// if the bit is set. This way an extended MessageType could be implemented
+	// that uses 7 bit of the first byte and 8 bit of the second byte to have a
+	// maximum possible amount of 32768 different message types. Of course the
+	// most significant bit of the second byte could also be used to further
+	// extend the range.
+	RESERVED_BIT_START = 128,
+	RESERVED_BIT_END = 255,
 };
 #endif
 
@@ -107,16 +118,16 @@ enum class MessageType : u8
 //If hasMoreParts is set to true, the next message will only contain 1 byte hasMoreParts + messageType
 //and all remaining 19 bytes are used for transferring data, the last message of a split message does not have this flag
 //activated
-#define SIZEOF_CONN_PACKET_HEADER 5
+constexpr size_t SIZEOF_CONN_PACKET_HEADER = 5;
 typedef struct
 {
 	MessageType messageType;
 	NodeId sender;
 	NodeId receiver;
 }connPacketHeader;
-STATIC_ASSERT_SIZE(connPacketHeader, 5);
+STATIC_ASSERT_SIZE(connPacketHeader, SIZEOF_CONN_PACKET_HEADER);
 
-#define SIZEOF_COMPONENT_MESSAGE_HEADER 12
+constexpr size_t SIZEOF_COMPONENT_MESSAGE_HEADER = 12;
 typedef struct
 {
 	connPacketHeader header;
@@ -126,22 +137,22 @@ typedef struct
 	u16 component;
 	u16 registerAddress;
 }componentMessageHeader;
-STATIC_ASSERT_SIZE(componentMessageHeader, 12);
+STATIC_ASSERT_SIZE(componentMessageHeader, SIZEOF_COMPONENT_MESSAGE_HEADER);
 
 //Used for new message splitting
 //Each split packet uses this header (first one, subsequent ones)
 //First byte must be identical in with connPacketHeader
-#define SIZEOF_CONN_PACKET_SPLIT_HEADER 2
+constexpr size_t SIZEOF_CONN_PACKET_SPLIT_HEADER = 2;
 typedef struct
 {
 	MessageType splitMessageType;
 	u8 splitCounter;
 }connPacketSplitHeader;
-STATIC_ASSERT_SIZE(connPacketSplitHeader, 2);
+STATIC_ASSERT_SIZE(connPacketSplitHeader, SIZEOF_CONN_PACKET_SPLIT_HEADER);
 
 //CLUSTER_WELCOME
-#define SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_WELCOME 11
-#define SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_WELCOME_WITH_NETWORK_ID 13
+constexpr size_t SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_WELCOME = 11;
+constexpr size_t SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_WELCOME_WITH_NETWORK_ID = 13;
 typedef struct
 {
 	ClusterId clusterId;
@@ -151,57 +162,57 @@ typedef struct
 	u8 preferredConnectionInterval;
 	NetworkId networkId;
 }connPacketPayloadClusterWelcome;
-STATIC_ASSERT_SIZE(connPacketPayloadClusterWelcome, 13);
+STATIC_ASSERT_SIZE(connPacketPayloadClusterWelcome, SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_WELCOME_WITH_NETWORK_ID);
 
-#define SIZEOF_CONN_PACKET_CLUSTER_WELCOME (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_WELCOME)
-#define SIZEOF_CONN_PACKET_CLUSTER_WELCOME_WITH_NETWORK_ID (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_WELCOME_WITH_NETWORK_ID)
+constexpr size_t SIZEOF_CONN_PACKET_CLUSTER_WELCOME = (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_WELCOME);
+constexpr size_t SIZEOF_CONN_PACKET_CLUSTER_WELCOME_WITH_NETWORK_ID = (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_WELCOME_WITH_NETWORK_ID);
 typedef struct
 {
 	connPacketHeader header;
 	connPacketPayloadClusterWelcome payload;
 }connPacketClusterWelcome;
-STATIC_ASSERT_SIZE(connPacketClusterWelcome, 18);
+STATIC_ASSERT_SIZE(connPacketClusterWelcome, SIZEOF_CONN_PACKET_CLUSTER_WELCOME_WITH_NETWORK_ID);
 
 
 //CLUSTER_ACK_1
-#define SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_ACK_1 3
+constexpr size_t SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_ACK_1 = 3;
 typedef struct
 {
 	ClusterSize hopsToSink;
 	u8 preferredConnectionInterval;
 }connPacketPayloadClusterAck1;
-STATIC_ASSERT_SIZE(connPacketPayloadClusterAck1, 3);
+STATIC_ASSERT_SIZE(connPacketPayloadClusterAck1, SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_ACK_1);
 
-#define SIZEOF_CONN_PACKET_CLUSTER_ACK_1 (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_ACK_1)
+constexpr size_t SIZEOF_CONN_PACKET_CLUSTER_ACK_1 = (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_ACK_1);
 typedef struct
 {
 	connPacketHeader header;
 	connPacketPayloadClusterAck1 payload;
 }connPacketClusterAck1;
-STATIC_ASSERT_SIZE(connPacketClusterAck1, 8);
+STATIC_ASSERT_SIZE(connPacketClusterAck1, SIZEOF_CONN_PACKET_CLUSTER_ACK_1);
 
 
 //CLUSTER_ACK_2
-#define SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_ACK_2 8
+constexpr size_t SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_ACK_2 = 8;
 typedef struct
 {
 	ClusterId clusterId;
 	ClusterSize clusterSize;
 	ClusterSize hopsToSink;
 }connPacketPayloadClusterAck2;
-STATIC_ASSERT_SIZE(connPacketPayloadClusterAck2, 8);
+STATIC_ASSERT_SIZE(connPacketPayloadClusterAck2, SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_ACK_2);
 
-#define SIZEOF_CONN_PACKET_CLUSTER_ACK_2 (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_ACK_2)
+constexpr size_t SIZEOF_CONN_PACKET_CLUSTER_ACK_2 = (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_ACK_2);
 typedef struct
 {
 	connPacketHeader header;
 	connPacketPayloadClusterAck2 payload;
 }connPacketClusterAck2;
-STATIC_ASSERT_SIZE(connPacketClusterAck2, 13);
+STATIC_ASSERT_SIZE(connPacketClusterAck2, SIZEOF_CONN_PACKET_CLUSTER_ACK_2);
 
 
 //CLUSTER_INFO_UPDATE
-#define SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_INFO_UPDATE 9
+constexpr size_t SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_INFO_UPDATE = 9;
 typedef struct
 {
 	ClusterId newClusterId_deprecated;
@@ -212,37 +223,27 @@ typedef struct
 	u8 reserved : 6;
 	
 }connPacketPayloadClusterInfoUpdate;
-STATIC_ASSERT_SIZE(connPacketPayloadClusterInfoUpdate, 9);
+STATIC_ASSERT_SIZE(connPacketPayloadClusterInfoUpdate, SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_INFO_UPDATE);
 
-#define SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_INFO_UPDATE)
+constexpr size_t SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE = (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_CLUSTER_INFO_UPDATE);
 typedef struct
 {
 	connPacketHeader header;
 	connPacketPayloadClusterInfoUpdate payload;
 }connPacketClusterInfoUpdate;
-STATIC_ASSERT_SIZE(connPacketClusterInfoUpdate, 14);
+STATIC_ASSERT_SIZE(connPacketClusterInfoUpdate, SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE);
 
-
-//CLUSTER_RECONNECT
-#define SIZEOF_CONN_PACKET_PAYLOAD_RECONNECT 0
-typedef struct
-{
-
-}connPacketPayloadReconnect;
-STATIC_ASSERT_SIZE(connPacketPayloadReconnect, 1);
-
-#define SIZEOF_CONN_PACKET_RECONNECT (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_RECONNECT)
+constexpr size_t SIZEOF_CONN_PACKET_RECONNECT = (SIZEOF_CONN_PACKET_HEADER);
 typedef struct
 {
 	connPacketHeader header;
-	connPacketPayloadReconnect payload;
+	//No Payload
 }connPacketReconnect;
-STATIC_ASSERT_SIZE(connPacketReconnect, 6);
-
+STATIC_ASSERT_SIZE(connPacketReconnect, SIZEOF_CONN_PACKET_RECONNECT);
 
 //Packets for CUSTOM ENC Handshake
 
-#define SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_START (SIZEOF_CONN_PACKET_HEADER + 6)
+constexpr size_t SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_START = (SIZEOF_CONN_PACKET_HEADER + 6);
 typedef struct
 {
 	connPacketHeader header;
@@ -252,116 +253,115 @@ typedef struct
 	u8 reserved : 6;
 
 }connPacketEncryptCustomStart;
-STATIC_ASSERT_SIZE(connPacketEncryptCustomStart, 11);
+STATIC_ASSERT_SIZE(connPacketEncryptCustomStart, SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_START);
 
-#define SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_ANONCE (SIZEOF_CONN_PACKET_HEADER + 8)
+constexpr size_t SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_ANONCE = (SIZEOF_CONN_PACKET_HEADER + 8);
 typedef struct
 {
 	connPacketHeader header;
 	u32 anonce[2];
 
 }connPacketEncryptCustomANonce;
-STATIC_ASSERT_SIZE(connPacketEncryptCustomANonce, 13);
+STATIC_ASSERT_SIZE(connPacketEncryptCustomANonce, SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_ANONCE);
 
-#define SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE (SIZEOF_CONN_PACKET_HEADER + 8)
+constexpr size_t SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE = (SIZEOF_CONN_PACKET_HEADER + 8);
 typedef struct
 {
 	connPacketHeader header;
 	u32 snonce[2];
 
 }connPacketEncryptCustomSNonce;
-STATIC_ASSERT_SIZE(connPacketEncryptCustomSNonce, 13);
+STATIC_ASSERT_SIZE(connPacketEncryptCustomSNonce, SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE);
 
-#define SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_DONE (SIZEOF_CONN_PACKET_HEADER + 1)
+constexpr size_t SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_DONE = (SIZEOF_CONN_PACKET_HEADER + 1);
 typedef struct
 {
 	connPacketHeader header;
 	u8 status;
 
 }connPacketEncryptCustomDone;
-STATIC_ASSERT_SIZE(connPacketEncryptCustomDone, 6);
+STATIC_ASSERT_SIZE(connPacketEncryptCustomDone, SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_DONE);
 
 
 //DATA_PACKET
-#define SIZEOF_CONN_PACKET_PAYLOAD_DATA_1 (MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER)
+constexpr size_t SIZEOF_CONN_PACKET_PAYLOAD_DATA_1 = (MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER);
 typedef struct
 {
 	u8 length;
 	u8 data[SIZEOF_CONN_PACKET_PAYLOAD_DATA_1 - 1];
 	
 }connPacketPayloadData1;
-STATIC_ASSERT_SIZE(connPacketPayloadData1, 15);
+STATIC_ASSERT_SIZE(connPacketPayloadData1, SIZEOF_CONN_PACKET_PAYLOAD_DATA_1);
 
-#define SIZEOF_CONN_PACKET_DATA_1 (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_DATA_1)
+constexpr size_t SIZEOF_CONN_PACKET_DATA_1 = (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_DATA_1);
 typedef struct
 {
 	connPacketHeader header;
 	connPacketPayloadData1 payload;
 }connPacketData1;
-STATIC_ASSERT_SIZE(connPacketData1, 20);
+STATIC_ASSERT_SIZE(connPacketData1, SIZEOF_CONN_PACKET_DATA_1);
 
 
 
 
 //DATA_2_PACKET
-#define SIZEOF_CONN_PACKET_PAYLOAD_DATA_2 (MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER)
+constexpr size_t SIZEOF_CONN_PACKET_PAYLOAD_DATA_2 = (MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER);
 typedef struct
 {
 	u8 length;
 	u8 data[SIZEOF_CONN_PACKET_PAYLOAD_DATA_2 - 1];
-
 }connPacketPayloadData2;
-STATIC_ASSERT_SIZE(connPacketPayloadData2, 15);
+STATIC_ASSERT_SIZE(connPacketPayloadData2, SIZEOF_CONN_PACKET_PAYLOAD_DATA_2);
 
-#define SIZEOF_CONN_PACKET_DATA_2 (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_DATA_2)
+constexpr size_t SIZEOF_CONN_PACKET_DATA_2 = (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_DATA_2);
 typedef struct
 {
 	connPacketHeader header;
 	connPacketPayloadData1 payload;
 }connPacketData2;
-STATIC_ASSERT_SIZE(connPacketData2, 20);
+STATIC_ASSERT_SIZE(connPacketData2, SIZEOF_CONN_PACKET_DATA_2);
 
 
 //DATA_3_PACKET
-#define SIZEOF_CONN_PACKET_PAYLOAD_DATA_3 (MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER)
+constexpr size_t SIZEOF_CONN_PACKET_PAYLOAD_DATA_3 = (MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER);
 typedef struct
 {
 	u8 len;
 	u8 data[SIZEOF_CONN_PACKET_PAYLOAD_DATA_3-1];
 
 }connPacketPayloadData3;
-STATIC_ASSERT_SIZE(connPacketPayloadData3, 15);
+STATIC_ASSERT_SIZE(connPacketPayloadData3, SIZEOF_CONN_PACKET_PAYLOAD_DATA_3);
 
-#define SIZEOF_CONN_PACKET_DATA_3 (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_DATA_3)
+constexpr size_t SIZEOF_CONN_PACKET_DATA_3 = (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_DATA_3);
 typedef struct
 {
 	connPacketHeader header;
 	connPacketPayloadData3 payload;
 }connPacketData3;
-STATIC_ASSERT_SIZE(connPacketData3, 20);
+STATIC_ASSERT_SIZE(connPacketData3, SIZEOF_CONN_PACKET_DATA_3);
 
 
 
 //CLC_DATA_PACKET
-#define SIZEOF_CONN_PACKET_PAYLOAD_CLC_DATA (MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER)
+constexpr size_t SIZEOF_CONN_PACKET_PAYLOAD_CLC_DATA = (MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER);
 typedef struct
 {
 	u8 data[SIZEOF_CONN_PACKET_PAYLOAD_CLC_DATA];
 
 }connPacketPayloadClcData;
-STATIC_ASSERT_SIZE(connPacketPayloadClcData, 15);
+STATIC_ASSERT_SIZE(connPacketPayloadClcData, SIZEOF_CONN_PACKET_PAYLOAD_CLC_DATA);
 
-#define SIZEOF_CONN_PACKET_CLC_DATA (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_CLC_DATA)
+constexpr size_t SIZEOF_CONN_PACKET_CLC_DATA = (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_CLC_DATA);
 typedef struct
 {
 	connPacketHeader header;
 	connPacketPayloadClcData payload;
 }connPacketDataClcData;
-STATIC_ASSERT_SIZE(connPacketDataClcData, 20);
+STATIC_ASSERT_SIZE(connPacketDataClcData, SIZEOF_CONN_PACKET_CLC_DATA);
 
 
 //Timestamp synchronization packet
-#define SIZEOF_CONN_PACKET_UPDATE_TIMESTAMP (SIZEOF_CONN_PACKET_HEADER + 6)
+constexpr size_t SIZEOF_CONN_PACKET_UPDATE_TIMESTAMP = (SIZEOF_CONN_PACKET_HEADER + 8);
 typedef struct
 {
 	connPacketHeader header;
@@ -369,19 +369,19 @@ typedef struct
 	u16 remainderTicks;
 	i16 offset;
 }connPacketUpdateTimestamp;
-STATIC_ASSERT_SIZE(connPacketUpdateTimestamp, 13);
+STATIC_ASSERT_SIZE(connPacketUpdateTimestamp, SIZEOF_CONN_PACKET_UPDATE_TIMESTAMP);
 
 //Used to tell nodes to update their connection interval settings
-#define SIZEOF_CONN_PACKET_UPDATE_CONNECTION_INTERVAL (SIZEOF_CONN_PACKET_HEADER + 2)
+constexpr size_t SIZEOF_CONN_PACKET_UPDATE_CONNECTION_INTERVAL = (SIZEOF_CONN_PACKET_HEADER + 2);
 typedef struct
 {
 	connPacketHeader header;
 	u16 newInterval;
 }connPacketUpdateConnectionInterval;
-STATIC_ASSERT_SIZE(connPacketUpdateConnectionInterval, 7);
+STATIC_ASSERT_SIZE(connPacketUpdateConnectionInterval, SIZEOF_CONN_PACKET_UPDATE_CONNECTION_INTERVAL);
 
 //This message is used for different module request message types
-#define SIZEOF_CONN_PACKET_MODULE (SIZEOF_CONN_PACKET_HEADER + 3) //This size does not include the data region which is variable, add the used data region size to this size
+constexpr size_t SIZEOF_CONN_PACKET_MODULE = (SIZEOF_CONN_PACKET_HEADER + 3); //This size does not include the data region which is variable, add the used data region size to this size
 typedef struct
 {
 	connPacketHeader header;
@@ -391,11 +391,11 @@ typedef struct
 	u8 data[MAX_DATA_SIZE_PER_WRITE - SIZEOF_CONN_PACKET_HEADER - 4]; //Data can be larger and will be transmitted in subsequent packets
 
 }connPacketModule;
-STATIC_ASSERT_SIZE(connPacketModule, 19);
+STATIC_ASSERT_SIZE(connPacketModule, SIZEOF_CONN_PACKET_MODULE + sizeof(connPacketModule::data));
 
 
 //ADVINFO_PACKET
-#define SIZEOF_CONN_PACKET_PAYLOAD_ADV_INFO 9
+constexpr size_t SIZEOF_CONN_PACKET_PAYLOAD_ADV_INFO = 9;
 typedef struct
 {
 	u8 peerAddress[6];
@@ -403,23 +403,23 @@ typedef struct
 	u8 packetCount;
 
 }connPacketPayloadAdvInfo;
-STATIC_ASSERT_SIZE(connPacketPayloadAdvInfo, 9);
+STATIC_ASSERT_SIZE(connPacketPayloadAdvInfo, SIZEOF_CONN_PACKET_PAYLOAD_ADV_INFO);
 
 //ADV_INFO
 //This packet is used to distribute receied advertising messages in the mesh
 //if the packet has passed the filterung
-#define SIZEOF_CONN_PACKET_ADV_INFO (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_ADV_INFO)
+constexpr size_t SIZEOF_CONN_PACKET_ADV_INFO = (SIZEOF_CONN_PACKET_HEADER + SIZEOF_CONN_PACKET_PAYLOAD_ADV_INFO);
 typedef struct
 {
 	connPacketHeader header;
 	connPacketPayloadAdvInfo payload;
 }connPacketAdvInfo;
-STATIC_ASSERT_SIZE(connPacketAdvInfo, 14);
+STATIC_ASSERT_SIZE(connPacketAdvInfo, SIZEOF_CONN_PACKET_ADV_INFO);
 
 
 //SENSOR MESSAGE
 //This packet generates a sensor event or instruct device to write data into register and send it through mesh
-#define SIZEOF_CONN_PACKET_COMPONENT_MESSAGE 12
+constexpr size_t SIZEOF_CONN_PACKET_COMPONENT_MESSAGE = 12;
 typedef struct
 {
 	componentMessageHeader componentHeader;

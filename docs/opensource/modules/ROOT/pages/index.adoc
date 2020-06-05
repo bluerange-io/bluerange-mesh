@@ -1,7 +1,7 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
 image:logo.png[fruitymesh]
 
-FruityMesh is the reference implementation of the **BlueRange** initiative. It was the first open source implementation of a mesh network that is based on standard *Bluetooth Low Energy 4.1 connections*. In contrast to meshes that use advertising and scanning, this allows for a network run with *battery powered* devices. FruityMesh works with the Nordic nRF51 or nRF52 chipset in combination with the *S130/S132/S140 SoftDevices* and enables tons of devices to connect to each other with its auto-meshing capabilities. It is *always connected* with configurable connection intervals of *7.5 ms to 4 seconds* while still being able to run on batteries.
+FruityMesh is the reference implementation of the **BlueRange** initiative. It was the first open source implementation of a mesh network that is based on standard *Bluetooth Low Energy 4.1 connections*. In contrast to meshes that use advertising and scanning, this allows for a network run with *battery powered* devices. FruityMesh works with the Nordic nRF52 chipset in combination with the *S132/S140 SoftDevices* and enables tons of devices to connect to each other with its auto-meshing capabilities. It is *always connected* with configurable connection intervals of *7.5 ms to 4 seconds* while still being able to run on batteries.
 
 == BlueRange
 BlueRange is our commercial product that includes our Mesh, MeshGateway, Platform, Asset Tracking and much more. Have a look at our website:
@@ -14,7 +14,7 @@ We have invested some time in extending our opensource documentation, so be sure
 Make sure to take a look at the xref:Concepts.adoc[Concepts] document if you already know a bit about the Bluetooth SIG mesh to see how the two implementations compare.
 
 == Where To Begin
-Before you begin, you should have at least two boards with the nRF51/nRF52 chipsets and either an external or an onboard debugger. If not, we recommend that you get two https://www.nordicsemi.com/Software-and-Tools/Development-Kits[DevKits from Nordic] to get you started as easily and quickly as possible. Next, have a look at the xref:Quick-Start.adoc[Quick Start] page to get everything running. Then test some commands from the xref:BasicUsage.adoc[Basic Usage] page. Afterwards, you could follow one of the xref:Tutorials.adoc[Tutorials].
+Before you begin, you should have at least two boards with the nRF52 chipset and either an external or an onboard debugger. If not, we recommend that you get two https://www.nordicsemi.com/Software-and-Tools/Development-Kits[DevKits from Nordic] to get you started as easily and quickly as possible. Next, have a look at the xref:Quick-Start.adoc[Quick Start] page to get everything running. Then test some commands from the xref:BasicUsage.adoc[Basic Usage] page. Afterwards, you could follow one of the xref:Tutorials.adoc[Tutorials].
 
 == What To Expect
 Take some nRF devices, flash them with FruityMesh and expect them to connect to each other in an instant. Open the terminal and send them some commands over the mesh, trigger LEDs or watch some data going through. Power consumption is minimal with the correct settings. For a list of some of the features, have a look at the xref:Features.adoc[Features] page.

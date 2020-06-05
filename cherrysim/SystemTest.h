@@ -36,7 +36,6 @@
 #pragma warning( disable : 4996)
 #pragma warning( disable : 4297)
 
-#ifdef _MSC_VER
 #ifndef __ASM
 #define __ASM               __asm
 #endif
@@ -53,13 +52,20 @@
 #define __ALIGN(n)          __align(n)
 #endif
 
+#ifndef __REV
+#define __REV(n) ((((n) & 0xFF) << 24) | (((n) & 0xFF00) << 8) | (((n) & 0xFF0000) >> 8) | (((n) & 0xFF000000) >> 24))
+#endif
+
+#ifndef __STATIC_INLINE
+#define __STATIC_INLINE static inline 
+#endif
+
 #define GET_SP()                __current_sp()
 
 #define STACK_BASE 0 //FIXME: Should point to stack base
 #define STACK_TOP 0 //FIXME: should point to stack top
 
 #define _CRT_SECURE_NO_WARNINGS 1
-#endif
 
 
 #ifdef SIM_ENABLED
@@ -88,7 +94,7 @@
 #define NRF_UART_BAUDRATE_460800 (460800UL)
 #define NRF_UART_BAUDRATE_1M (1000000UL)
 
-#define APP_TIMER_PRESCALER       0 // Value of the RTC1 PRESCALER register
+#define APP_TIMER_CONFIG_RTC_FREQUENCY       0 // Value of the RTC1 PRESCALER register
 
 //Some config stuff
 //#define ACTIVATE_LOGGING
@@ -98,6 +104,17 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+
+#ifdef __cplusplus
+typedef class Node Node;
+typedef class GlobalState GlobalState;
+
+//We keep a pointer to our GlobalState, this state contains the whole state of a node as known to FruityMesh
+extern GlobalState* simGlobalStatePtr;
+#define GS (simGlobalStatePtr)
+#endif //__cplusplus
+
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -117,14 +134,13 @@ extern "C" {
 #define ACTIVATE_ASSET_MODULE 1
 #define ACTIVATE_VS_MODULE 1
 #define ACTIVATE_WM_MODULE 0
+#define ACTIVATE_MODBUS_MODULE 1
+#define ACTIVATE_MODBUS_COMM 1
 #define ACTIVATE_INS 1
 
 #define ACTIVATE_WATCHDOG 1
 
 #define ACTIVATE_UNSECURE_MEMORY_READBACK 1
-
-typedef struct Node Node;
-typedef struct GlobalState GlobalState;
 
 #define NRF_GPIOTE_POLARITY_TOGGLE 1
 #define NRF_GPIOTE_POLARITY_HITOLO 2
@@ -135,36 +151,38 @@ typedef uint32_t nrf_gpiote_polarity_t;
 
 typedef uint32_t nrf_uart_baudrate_t;
 
-typedef struct {                                    /*!< FICR Structure                                                        */
-  uint32_t  RESERVED0[4];
-  uint32_t  CODEPAGESIZE;                      /*!< Code memory page size in bytes.                                       */
-  uint32_t  CODESIZE;                          /*!< Code memory size in pages.                                            */
-  uint32_t  RESERVED1[4];
-  uint32_t  CLENR0;                            /*!< Length of code region 0 in bytes.                                     */
-  uint32_t  PPFC;                              /*!< Pre-programmed factory code present.                                  */
-  uint32_t  RESERVED2;
-  uint32_t  NUMRAMBLOCK;                       /*!< Number of individualy controllable RAM blocks.                        */
+typedef struct {
+	uint32_t RAM;
+	// Not the original struct, unused by the simulator.
+} FICR_INFO_Type;
 
-  union {
-    uint32_t  SIZERAMBLOCK[4];                 /*!< Deprecated array of size of RAM block in bytes. This name is
-                                                         kept for backward compatinility purposes. Use SIZERAMBLOCKS
-                                                          instead.                                                             */
-    uint32_t  SIZERAMBLOCKS;                   /*!< Size of RAM blocks in bytes.                                          */
-  };
-  uint32_t  RESERVED3[5];
-  uint32_t  CONFIGID;                          /*!< Configuration identifier.                                             */
-  uint32_t  DEVICEID[2];                       /*!< Device identifier.                                                    */
-  uint32_t  RESERVED4[6];
-  uint32_t  ER[4];                             /*!< Encryption root.                                                      */
-  uint32_t  IR[4];                             /*!< Identity root.                                                        */
-  uint32_t  DEVICEADDRTYPE;                    /*!< Device address type.                                                  */
-  uint32_t  DEVICEADDR[2];                     /*!< Device address.                                                       */
-  uint32_t  OVERRIDEEN;                        /*!< Radio calibration override enable.                                    */
-  uint32_t  NRF_1MBIT[5];                      /*!< Override values for the OVERRIDEn registers in RADIO for NRF_1Mbit
-                                                         mode.                                                                 */
-  uint32_t  RESERVED5[10];
-  uint32_t  BLE_1MBIT[5];                      /*!< Override values for the OVERRIDEn registers in RADIO for BLE_1Mbit
-                                                         mode.                                                                 */
+typedef struct {
+	uint32_t dummyValue;
+	// Not the original struct, unused by the simulator.
+} FICR_TEMP_Type;
+
+typedef struct {
+	uint32_t dummyValue;
+	// Not the original struct, unused by the simulator.
+} FICR_NFC_Type;
+
+typedef struct {
+	uint32_t  RESERVED0[4];
+	uint32_t  CODEPAGESIZE;
+	uint32_t  CODESIZE;
+	uint32_t  RESERVED1[18];
+	uint32_t  DEVICEID[2];
+	uint32_t  RESERVED2[6];
+	uint32_t  ER[4];
+	uint32_t  IR[4];
+	uint32_t  DEVICEADDRTYPE;
+	uint32_t  DEVICEADDR[2];
+	uint32_t  RESERVED3[21];
+	FICR_INFO_Type INFO;
+	uint32_t  RESERVED4[185];
+	FICR_TEMP_Type TEMP;
+	uint32_t  RESERVED5[2];
+	FICR_NFC_Type NFC;
 } NRF_FICR_Type;
 
 typedef struct {                                    /*!< UICR Structure                                                        */
@@ -222,6 +240,7 @@ typedef enum
 	NRF_UART_HWFC_ENABLED  = 1
 } nrf_uart_hwfc_t;
 
+#undef SD_EVT_IRQn
 typedef enum 
 {
 	SD_EVT_IRQn = 1,
@@ -273,6 +292,11 @@ typedef enum
 #define NRF_WDT_BEHAVIOUR_RUN_SLEEP 0
 #define FM_WATCHDOG_TIMEOUT (32768UL * 60UL * 2UL)
 #define FM_WATCHDOG_TIMEOUT_SAFE_BOOT (32768UL * 20UL)
+#define NRF_SDH_BLE_GATT_MAX_MTU_SIZE 251
+#define NRF_SDH_BLE_GATTS_ATTR_TAB_SIZE 580
+#define GATT_MTU_SIZE_DEFAULT 23
+
+#define NRF_GPIO_PIN_MAP(port, pin) (pin)
 
 void nrf_gpio_pin_set(uint32_t pin_number);
 void nrf_gpio_pin_clear(uint32_t pin_number);
@@ -311,6 +335,7 @@ uint8_t ST_getRebootReason();
 #define BMG250_ODR_100HZ 5
 #define BMG250_BW_NORMAL_MODE 6
 #define BMG250_DATA_TIME_SEL 7
+#define BMG250_DATA_SEL 8
 #define BMG250_FIFO_ALL_SETTING 8
 #define BMG250_DISABLE 0
 #define BMG250_FIFO_GYRO 9
@@ -466,50 +491,176 @@ uint32_t TLV493D_A1B6_read_frame(void* ptr, TLV493D_data_frame_t *out);
 
 #define LIS2DH12_INTERFACE_SPI 1
 #define LIS2DH12_INTERFACE_TWI 2
-#define LIS2DH12_MODE_BYPASS 3
-#define LIS2DH12_SCALE2G 4
-#define LIS2DH12_RES12BIT 5
-#define LIS2DH12_ODR_MASK_100HZ 6
-#define LIS2DH12_HIGH_RESOLUTION_MODE 7
-#define LIS2DH12_ODR_MASK_10HZ 8
-#define LIS2DH12_I1_AOI 9
-#define LIS2DH12_I1_WTM 10
-#define LIS2DH12_MODE_STREAM 12
-#define LIS2DH12_ZHIE_MASK 1
-#define LIS2DH12_YHIE_MASK 2
-#define LIS2DH12_XHIE_MASK 4
-#define LIS2DH12_HPCF_BW_0_5HZ_MASK 0x20
-#define LIS2DH12_FDS_MASK 0x08
-#define LIS2DH12_HPIS1_MASK 0x01
-#define LIS2DH12_RET_OK 0
+
 typedef uint32_t lis2dh12_ret_t;
-uint8_t lis2dh12_init(uint32_t interface, int32_t slaveSelectPin);
-void lis2dh12_reset();
-void lis2dh12_enable();
-void lis2dh12_set_fifo_mode(uint32_t);
-void lis2dh12_set_scale(uint32_t);
-void lis2dh12_set_resolution(uint32_t);
-void lis2dh12_set_data_rate(uint32_t);
-void lis2dh12_set_mode(uint32_t);
-void lis2dh12_write_reg2(uint32_t);
-void lis2dh12_set_sleep_to_wake_threshold(float);
-uint32_t lis2dh12_set_interrupts(uint8_t, uint8_t);
-lis2dh12_ret_t lis2dh12_set_fifo_watermark(size_t count);
-lis2dh12_ret_t lis2dh12_set_sample_rate(lis2dh12_sample_rate_t sample_rate);
-uint8_t lis2dh12_set_latch();
-void lis2dh12_set_hlactive();
-void lis2dh12_set_sleep_to_wake_duration(uint32_t, uint32_t, float);
-uint32_t lis2dh12_set_int1_ths(float);
-uint32_t lis2dh12_set_int1_duration(uint32_t);
-uint32_t lis2dh12_set_int1_cfg(uint32_t);
-lis2dh12_ret_t lis2dh12_read_int1_src(uint8_t *ctrl, uint32_t size);
-uint32_t lis2dh12_reset_act_dur();
-uint32_t lis2dh12_reset_act_ths();
-void lis2dh12_read_samples(lis2dh12_sensor_buffer_t* buffer, uint32_t count);
+
+typedef int32_t(*lis2dh12_write_ptr)(void *, uint8_t, uint8_t*, uint16_t);
+typedef int32_t(*lis2dh12_read_ptr) (void *, uint8_t, uint8_t*, uint16_t);
+
+typedef struct {
+	/** Component mandatory fields **/
+	lis2dh12_write_ptr  write_reg;
+	lis2dh12_read_ptr   read_reg;
+	/** Customizable optional pointer **/
+	void *handle;
+} lis2dh12_ctx_t;
+
+typedef struct {
+	uint8_t not_used_01 : 1;
+	uint8_t i1_overrun : 1;
+	uint8_t i1_wtm : 1;
+	uint8_t not_used_02 : 1;
+	uint8_t i1_zyxda : 1;
+	uint8_t i1_ia2 : 1;
+	uint8_t i1_ia1 : 1;
+	uint8_t i1_click : 1;
+} lis2dh12_ctrl_reg3_t;
+
+typedef struct {
+	uint8_t not_used_01 : 1;
+	uint8_t int_polarity : 1;
+	uint8_t not_used_02 : 1;
+	uint8_t i2_act : 1;
+	uint8_t i2_boot : 1;
+	uint8_t i2_ia2 : 1;
+	uint8_t i2_ia1 : 1;
+	uint8_t i2_click : 1;
+} lis2dh12_ctrl_reg6_t;
+
+typedef struct {
+	uint8_t xlie : 1;
+	uint8_t xhie : 1;
+	uint8_t ylie : 1;
+	uint8_t yhie : 1;
+	uint8_t zlie : 1;
+	uint8_t zhie : 1;
+	uint8_t _6d : 1;
+	uint8_t aoi : 1;
+} lis2dh12_int1_cfg_t;
+
+typedef enum {
+	LIS2DH12_2g = 0,
+	LIS2DH12_4g = 1,
+	LIS2DH12_8g = 2,
+	LIS2DH12_16g = 3,
+} lis2dh12_fs_t;
+
+
+typedef enum {
+	LIS2DH12_POWER_DOWN = 0,
+	LIS2DH12_ODR_1Hz = 1,
+	LIS2DH12_ODR_10Hz = 2,
+	LIS2DH12_ODR_25Hz = 3,
+	LIS2DH12_ODR_50Hz = 4,
+	LIS2DH12_ODR_100Hz = 5,
+	LIS2DH12_ODR_200Hz = 6,
+	LIS2DH12_ODR_400Hz = 7,
+	LIS2DH12_ODR_1kHz620_LP = 8,
+	LIS2DH12_ODR_5kHz376_LP = 9,
+	LIS2DH12_ODR_1kHz344_NM_HP = 9,
+} lis2dh12_odr_t;
+
+typedef enum {
+	LIS2DH12_AGGRESSIVE = 0,
+	LIS2DH12_STRONG = 1,
+	LIS2DH12_MEDIUM = 2,
+	LIS2DH12_LIGHT = 3,
+} lis2dh12_hpcf_t;
+
+typedef enum {
+	LIS2DH12_DISC_FROM_INT_GENERATOR = 0,
+	LIS2DH12_ON_INT1_GEN = 1,
+	LIS2DH12_ON_INT2_GEN = 2,
+	LIS2DH12_ON_TAP_GEN = 4,
+	LIS2DH12_ON_INT1_INT2_GEN = 3,
+	LIS2DH12_ON_INT1_TAP_GEN = 5,
+	LIS2DH12_ON_INT2_TAP_GEN = 6,
+	LIS2DH12_ON_INT1_INT2_TAP_GEN = 7,
+} lis2dh12_hp_t;
+
+typedef enum {
+	LIS2DH12_HR_12bit = 0,
+	LIS2DH12_NM_10bit = 1,
+	LIS2DH12_LP_8bit = 2,
+} lis2dh12_op_md_t;
+
+typedef enum {
+	LIS2DH12_BYPASS_MODE = 0,
+	LIS2DH12_FIFO_MODE = 1,
+	LIS2DH12_DYNAMIC_STREAM_MODE = 2,
+	LIS2DH12_STREAM_TO_FIFO_MODE = 3,
+} lis2dh12_fm_t;
+
+typedef enum {
+	LIS2DH12_NORMAL_WITH_RST = 0,
+	LIS2DH12_REFERENCE_MODE = 1,
+	LIS2DH12_NORMAL = 2,
+	LIS2DH12_AUTORST_ON_INT = 3,
+} lis2dh12_hpm_t;
+
+typedef union {
+	int16_t i16bit[3];
+	uint8_t u8bit[6];
+} axis3bit16_t;
+
+#define LIS2DH12_FROM_FS_2g_HR_TO_mg(lsb)  lsb
+#define LIS2DH12_FROM_FS_4g_HR_TO_mg(lsb)  lsb
+#define LIS2DH12_FROM_FS_8g_HR_TO_mg(lsb)  lsb
+#define LIS2DH12_FROM_FS_16g_HR_TO_mg(lsb) lsb
+
+
+#define LIS2DH12_FROM_FS_2g_NM_TO_mg(lsb) lsb
+#define LIS2DH12_FROM_FS_4g_NM_TO_mg(lsb) lsb
+#define LIS2DH12_FROM_FS_8g_NM_TO_mg(lsb) lsb
+#define LIS2DH12_FROM_FS_16g_NM_TO_mg(lsb) lsb
+
+#define LIS2DH12_FROM_FS_2g_LP_TO_mg(lsb) lsb
+#define LIS2DH12_FROM_FS_4g_LP_TO_mg(lsb) lsb
+#define LIS2DH12_FROM_FS_8g_LP_TO_mg(lsb) lsb
+#define LIS2DH12_FROM_FS_16g_LP_TO_mg(lsb) lsb
+
+
+#define LIS2DH12_I2C_ADD_L		0x18
+#define LIS2DH12_I2C_ADD_H		0x19
+#define LIS2DH12_ID				0x33
+#define LIS2DH12_CTRL_REG1		0x20
+#define PROPERTY_ENABLE			0x01
+#define PROPERTY_DISABLE		0x00
+#define WATERMARK_LEVEL			0x1E
+int32_t lis2dh12_device_id_get(lis2dh12_ctx_t *ctx, uint8_t *buff);
+int32_t lis2dh12_fifo_mode_set(lis2dh12_ctx_t *ctx, lis2dh12_fm_t val);
+int32_t lis2dh12_write_reg(lis2dh12_ctx_t* ctx, uint8_t reg, uint8_t* data,
+	uint16_t len);
+int32_t lis2dh12_data_rate_set(lis2dh12_ctx_t *ctx, lis2dh12_odr_t val);
+int32_t lis2dh12_full_scale_set(lis2dh12_ctx_t *ctx, lis2dh12_fs_t val);
+int32_t lis2dh12_operating_mode_set(lis2dh12_ctx_t *ctx, lis2dh12_op_md_t val);
+int32_t lis2dh12_fifo_set(lis2dh12_ctx_t *ctx, uint8_t val);
+int32_t lis2dh12_fifo_mode_set(lis2dh12_ctx_t *ctx, lis2dh12_fm_t val);
+int32_t lis2dh12_fifo_watermark_set(lis2dh12_ctx_t *ctx, uint8_t val);
+int32_t lis2dh12_pin_int1_config_set(lis2dh12_ctx_t *ctx,
+	lis2dh12_ctrl_reg3_t *val);
+int32_t lis2dh12_fifo_fth_flag_get(lis2dh12_ctx_t *ctx, uint8_t *val);
+int32_t lis2dh12_fifo_ovr_flag_get(lis2dh12_ctx_t* ctx, uint8_t* val);
+int32_t lis2dh12_fifo_data_level_get(lis2dh12_ctx_t *ctx, uint8_t *val);
+int32_t lis2dh12_acceleration_raw_get(lis2dh12_ctx_t *ctx, uint8_t *buff);
+int32_t lis2dh12_high_pass_int_conf_set(lis2dh12_ctx_t *ctx,
+	lis2dh12_hp_t val);
+int32_t lis2dh12_int1_gen_threshold_set(lis2dh12_ctx_t *ctx, uint8_t val);
+int32_t lis2dh12_int1_gen_conf_set(lis2dh12_ctx_t *ctx,
+	lis2dh12_int1_cfg_t *val);
+int32_t lis2dh12_pin_int2_config_set(lis2dh12_ctx_t *ctx,
+	lis2dh12_ctrl_reg6_t *val);
+
+int32_t lis2dh12_high_pass_bandwidth_set(lis2dh12_ctx_t *ctx,
+	lis2dh12_hpcf_t val);
+
+int32_t lis2dh12_high_pass_mode_set(lis2dh12_ctx_t *ctx, lis2dh12_hpm_t val);
+int32_t lis2dh12_high_pass_on_outputs_set(lis2dh12_ctx_t *ctx, uint8_t val);
+int32_t lis2dh12_data_rate_get(lis2dh12_ctx_t *ctx, lis2dh12_odr_t *val);
+
 uint32_t nrf_drv_gpiote_in_init(nrf_drv_gpiote_pin_t pin, nrf_drv_gpiote_in_config_t const * p_config, nrf_drv_gpiote_evt_handler_t evt_handler);
-uint32_t nrf_drv_gpiote_in_event_enable(nrf_drv_gpiote_pin_t pin, bool);
-lis2dh12_ret_t lis2dh12_get_fifo_sample_number(size_t* count);
-lis2dh12_ret_t lis2dh12_get_fifo_status(fifo_status* status);
+void nrf_drv_gpiote_in_event_enable(nrf_drv_gpiote_pin_t pin, bool);
+
 
 #define BME280_RET_OK 0
 #define BME280_MODE_SLEEP 1
@@ -543,10 +694,6 @@ uint32_t bme280_get_humidity();
 
 extern int globalBreakCounter; 
 
-//We keep a pointer to our GlobalState, this state contains the whole state of a node as known to FruityMesh
-extern GlobalState* simGlobalStatePtr;
-#define GS (simGlobalStatePtr)
-
 //We keep a number of pointers to hardware peripherals so that our FruityMesh implementation
 //does not have to include the simulator. It will access all hardware using these pointers and we can
 //therefore redirect all access
@@ -572,11 +719,11 @@ extern uint8_t* simFlashPtr;
 
 uint32_t sd_ble_gap_adv_data_set(uint8_t const *p_data, uint8_t dlen, uint8_t const *p_sr_data, uint8_t srdlen);
 uint32_t sd_ble_gap_adv_stop();
-uint32_t sd_ble_gap_adv_start(ble_gap_adv_params_t const *p_adv_params);
+uint32_t sd_ble_gap_adv_start(ble_gap_adv_params_t const *p_adv_params, uint32_t);
 uint32_t sd_ble_gap_device_name_set(ble_gap_conn_sec_mode_t const *p_write_perm, uint8_t const *p_dev_name, uint16_t len);
 uint32_t sd_ble_gap_appearance_set(uint16_t appearance);
 uint32_t sd_ble_gap_ppcp_set(ble_gap_conn_params_t const *p_conn_params);
-uint32_t sd_ble_gap_connect(ble_gap_addr_t const *p_peer_addr, ble_gap_scan_params_t const *p_scan_params, ble_gap_conn_params_t const *p_conn_params);
+uint32_t sd_ble_gap_connect(ble_gap_addr_t const *p_peer_addr, ble_gap_scan_params_t const *p_scan_params, ble_gap_conn_params_t const *p_conn_params, uint32_t);
 uint32_t sd_ble_gap_connect_cancel();
 uint32_t sd_ble_gap_disconnect(uint16_t conn_handle, uint8_t hci_status_code);
 uint32_t sd_ble_gap_sec_info_reply(uint16_t conn_handle, ble_gap_enc_info_t const *p_enc_info, ble_gap_irk_t const *p_id_info, ble_gap_sign_info_t const *p_sign_info);
@@ -593,8 +740,8 @@ uint32_t sd_ble_gap_scan_stop();
 uint32_t sd_ble_gap_scan_start(ble_gap_scan_params_t const *p_scan_params);
 uint32_t sd_ble_tx_packet_count_get(uint16_t conn_handle, uint8_t *p_count);
 uint32_t sd_ble_gap_disconnect(uint16_t conn_handle, uint8_t hci_status_code);
-uint32_t sd_ble_gap_address_set(uint8_t addr_cycle_mode, ble_gap_addr_t const *p_addr);
-uint32_t sd_ble_gap_address_get(ble_gap_addr_t *p_addr);
+uint32_t sd_ble_gap_addr_set(ble_gap_addr_t const *p_addr);
+uint32_t sd_ble_gap_addr_get(ble_gap_addr_t *p_addr);
 uint32_t sd_nvic_SystemReset();
 uint32_t sd_ble_gap_rssi_start(uint16_t conn_handle, uint8_t threshold_dbm, uint8_t skip_count);
 uint32_t sd_ble_gap_rssi_stop(uint16_t conn_handle);
@@ -606,7 +753,9 @@ uint32_t sd_rand_application_vector_get(uint8_t * p_buff, uint8_t length);
 uint32_t sd_ble_evt_get(uint8_t *p_dest, uint16_t *p_len);
 uint32_t sd_app_evt_wait();
 uint32_t sd_nvic_ClearPendingIRQ(IRQn_Type IRQn);
-uint32_t sd_ble_enable(ble_enable_params_t * p_ble_enable_params, uint32_t * p_app_ram_base);
+uint32_t nrf_sdh_ble_enable(uint32_t * p_app_ram_base);
+uint32_t nrf_sdh_enable_request();
+uint32_t sd_ble_cfg_set(uint32_t, ble_cfg_t*, uint32_t);
 uint32_t sd_ble_gap_tx_power_set(int8_t tx_power);
 uint32_t sd_nvic_EnableIRQ(IRQn_Type IRQn);
 uint32_t sd_nvic_SetPriority(IRQn_Type IRQn, uint32_t priority);
@@ -619,8 +768,8 @@ uint32_t sd_ble_gattc_descriptors_discover(uint16_t conn_handle, ble_gattc_handl
 
 uint32_t NVIC_SystemReset();
 
-uint32_t app_timer_cnt_get(uint32_t* time);
-uint32_t app_timer_cnt_diff_compute(uint32_t nowTime, uint32_t previousTime, uint32_t* passedTime);
+uint32_t app_timer_cnt_get();
+uint32_t app_timer_cnt_diff_compute(uint32_t nowTime, uint32_t previousTime);
 typedef void (*ble_radio_notification_evt_handler_t) (bool radio_active);
 
 
@@ -632,7 +781,9 @@ uint32_t sim_get_stack_type();
 
 //Configuration
 struct ModuleConfiguration;
+#ifdef __cplusplus
 void setBoardConfiguration_CherrySim(struct BoardConfiguration* config);
+#endif
 void setFeaturesetConfiguration_CherrySim(struct ModuleConfiguration* config, void* module);
 uint32_t initializeModules_CherrySim(bool createModule);
 

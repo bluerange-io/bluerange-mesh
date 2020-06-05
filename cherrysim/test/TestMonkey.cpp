@@ -355,11 +355,11 @@ void ExecuteCommands(std::vector<CommandWithTarget> &commands, u32 seed, u32 amo
 {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = amountOfNodes;
 	simConfig.terminalId = 0;
 	simConfig.verboseCommands = false;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", amountOfNodes - 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -433,6 +433,7 @@ void StartTestMonkey(bool onlyValidCommands, bool allCommandsInOrder)
 	Exceptions::ExceptionDisabler<ErrorCodeUnknownException> errorCodeUnknownException;
 	//Can happen if a enroll command is followed by a saverec command.
 	Exceptions::ExceptionDisabler<RecordStorageIsLockedDownException> recordStorageIsLockedDownException;
+	Exceptions::ExceptionDisabler<WrongCommandParameterException> wrongCommandParameterException;
 	Exceptions::DisableDebugBreakOnException antiDebugBreak;
 	constexpr u32 amountOfNodes = 3;
 

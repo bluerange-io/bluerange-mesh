@@ -28,15 +28,14 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
- * The packet queue implements a circular buffer for sending packets of varying
- * sizes.
- */
-
 #pragma once
 
 #include <types.h>
 
+/*
+ * The packet queue implements a circular buffer for sending packets of varying
+ * sizes.
+ */
 class PacketQueue
 {
 private: 

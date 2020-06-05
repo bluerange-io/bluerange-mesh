@@ -28,8 +28,23 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * This file contains a number of types that are used throughout the implementation.
+ */
+
 #pragma once
+
 #include <stdint.h>
+#include <type_traits>
+
+// The [[nodiscard]] attribute is a C++17 feature
+// and thus is only supported in the Simulator.
+#ifdef SIM_ENABLED
+#define NO_DISCARD [[nodiscard]]
+#else
+#define NO_DISCARD
+#endif
+
 
 //Unsigned ints
 typedef uint8_t u8;
@@ -88,7 +103,7 @@ constexpr NodeId NODE_ID_INVALID = 0xFFFF; //Special node id that is used in err
 //Different types of supported BLE stacks, specific versions can be added later if necessary
 enum class BleStackType {
 	INVALID = 0,
-	NRF_SD_130_ANY = 100,
+	//NRF_SD_130_ANY = 100, //Deprecated as of 09.04.2020
 	NRF_SD_132_ANY = 200,
 	NRF_SD_140_ANY = 300
 };
@@ -97,7 +112,7 @@ enum class BleStackType {
 enum class Chipset : NodeId
 {
 	CHIP_INVALID = 0,
-	CHIP_NRF51 = 20000,
+	//CHIP_NRF51 = 20000, //Deprecated as of 09.04.2020
 	CHIP_NRF52 = 20001,
 	CHIP_NRF52840 = 20015,
 };
@@ -143,6 +158,8 @@ enum class ModuleId : u8 {
 	ASSET_MODULE = 153,
 	EINK_MODULE = 154,
 	WM_MODULE = 155,
+	ET_MODULE = 156, //Placeholder for Partner
+	MODBUS_MODULE = 157,
 
 	//Other Modules
 	MY_CUSTOM_MODULE = 200,
@@ -180,6 +197,7 @@ enum class RebootReason : u8 {
 	SET_SERIAL_FAILED = 20,
 	SEND_TO_BOOTLOADER = 21,
 	UNKNOWN_BUT_BOOTED = 22,
+	STACK_OVERFLOW = 23,
 
 	USER_DEFINED_START = 200,
 	USER_DEFINED_END = 255,
@@ -220,7 +238,7 @@ enum class LiveReportHandshakeFailCode : u8
 	UNPREFERRED_CONNECTION
 };
 
-enum class SensorIdentifier : u16 {
+enum class PinsetIdentifier : u16 {
 	UNKNOWN = 0,
 	BME280 = 1,
 	LIS2DH12 = 2,
@@ -228,11 +246,11 @@ enum class SensorIdentifier : u16 {
 	BMG250 = 4
 };
 
-struct SensorPins {
-	SensorIdentifier sensorIdentifier = SensorIdentifier::UNKNOWN;
+struct CustomPins {
+	PinsetIdentifier pinsetIdentifier = PinsetIdentifier::UNKNOWN;
 };
 
-struct Bme280Pins : SensorPins {
+struct Bme280Pins : CustomPins {
 	i32 misoPin = -1;
 	i32 mosiPin = -1;
 	i32 sckPin = -1;
@@ -241,7 +259,7 @@ struct Bme280Pins : SensorPins {
 	bool sensorEnablePinActiveHigh = true;
 };
 
-struct Tlv493dPins : SensorPins {
+struct Tlv493dPins : CustomPins {
 	i32 sckPin = -1;
 	i32 sdaPin = -1;
 	i32 sensorEnablePin = -1;
@@ -250,7 +268,7 @@ struct Tlv493dPins : SensorPins {
 	bool twiEnablePinActiveHigh = true;
 };
 
-struct Bmg250Pins : SensorPins {
+struct Bmg250Pins : CustomPins {
 	i32 sckPin = -1;
 	i32 sdaPin = -1;
 	i32 interrupt1Pin = -1;
@@ -260,7 +278,7 @@ struct Bmg250Pins : SensorPins {
 	bool twiEnablePinActiveHigh = true;
 };
 
-struct Lis2dh12Pins : SensorPins {
+struct Lis2dh12Pins : CustomPins {
 	i32 mosiPin = -1;
 	i32 misoPin = -1;
 	i32 sckPin = -1;
@@ -398,7 +416,7 @@ enum class DfuStartDfuResponseCode : u8
 	TOO_MANY_CHUNKS = 12,
 };
 
-enum class ErrorType : u32
+enum class NO_DISCARD ErrorType : u32
 {
 	SUCCESS = 0,  ///< Successful command
 	SVC_HANDLER_MISSING = 1,  ///< SVC handler is missing
@@ -423,17 +441,52 @@ enum class ErrorType : u32
 	UNKNOWN = 20,
 	BLE_INVALID_CONN_HANDLE = 101,
 	BLE_INVALID_ATTR_HANDLE = 102,
-	BLE_NO_TX_PACKETS = 103
+	BLE_NO_TX_PACKETS = 103,
+	BLE_INVALID_ROLE = 104,
+	BLE_INVALID_ATTR_TYPE = 105,
+	BLE_SYS_ATTR_MISSING = 106,
+	BLE_INVALID_BLE_ADDR = 107,
+};
+
+enum class ErrorTypeUnchecked : std::underlying_type<ErrorType>::type {
+	SUCCESS =                 (u32)ErrorType::SUCCESS,
+	SVC_HANDLER_MISSING =     (u32)ErrorType::SVC_HANDLER_MISSING,
+	BLE_STACK_NOT_ENABLED =   (u32)ErrorType::BLE_STACK_NOT_ENABLED,
+	INTERNAL =                (u32)ErrorType::INTERNAL,
+	NO_MEM =                  (u32)ErrorType::NO_MEM,
+	NOT_FOUND =               (u32)ErrorType::NOT_FOUND,
+	NOT_SUPPORTED =           (u32)ErrorType::NOT_SUPPORTED,
+	INVALID_PARAM =           (u32)ErrorType::INVALID_PARAM,
+	INVALID_STATE =           (u32)ErrorType::INVALID_STATE,
+	INVALID_LENGTH =          (u32)ErrorType::INVALID_LENGTH,
+	INVALID_FLAGS =           (u32)ErrorType::INVALID_FLAGS,
+	INVALID_DATA =            (u32)ErrorType::INVALID_DATA,
+	DATA_SIZE =               (u32)ErrorType::DATA_SIZE,
+	TIMEOUT =                 (u32)ErrorType::TIMEOUT,
+	NULL_ERROR =              (u32)ErrorType::NULL_ERROR,
+	FORBIDDEN =               (u32)ErrorType::FORBIDDEN,
+	INVALID_ADDR =            (u32)ErrorType::INVALID_ADDR,
+	BUSY =                    (u32)ErrorType::BUSY,
+	CONN_COUNT =              (u32)ErrorType::CONN_COUNT,
+	RESOURCES =               (u32)ErrorType::RESOURCES,
+	UNKNOWN =                 (u32)ErrorType::UNKNOWN,
+	BLE_INVALID_CONN_HANDLE = (u32)ErrorType::BLE_INVALID_CONN_HANDLE,
+	BLE_INVALID_ATTR_HANDLE = (u32)ErrorType::BLE_INVALID_ATTR_HANDLE,
+	BLE_NO_TX_PACKETS =       (u32)ErrorType::BLE_NO_TX_PACKETS,
+	BLE_INVALID_ROLE =        (u32)ErrorType::BLE_INVALID_ROLE,
+	BLE_INVALID_ATTR_TYPE =   (u32)ErrorType::BLE_INVALID_ATTR_TYPE,
+	BLE_SYS_ATTR_MISSING =    (u32)ErrorType::BLE_SYS_ATTR_MISSING,
+	BLE_INVALID_BLE_ADDR =    (u32)ErrorType::BLE_INVALID_BLE_ADDR,
 };
 
 struct DeviceConfiguration {
 	u32 magicNumber;           // must be set to 0xF07700 when UICR data is available
 	u32 boardType;             // accepts an integer that defines the hardware board that fruitymesh should be running on
-	u32 serialNumber[2];       // the given serial number (2 words)
+	u32 serialNumber[2];       // Deprecated (since 12.05.2020), should be set to FFF...FFF and is now generated from the serialNumberIndex (2 words)
 	u32 nodeKey[4];            // randomly generated (4 words)
 	u32 manufacturerId;        // set to manufacturer id according to the BLE company identifiers: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
 	u32 defaultNetworkId;      // network id if preenrollment should be used
-	u32 defualtNodeId;         // node id to be used if not enrolled
+	u32 defaultNodeId;         // node id to be used if not enrolled
 	u32 deviceType;            // type of device (sink, mobile, etc,..)
 	u32 serialNumberIndex;     // unique index that represents the serial number
 	u32 networkKey[4];         // default network key if preenrollment should be used (4 words)

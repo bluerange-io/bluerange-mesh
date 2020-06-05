@@ -218,8 +218,13 @@ unsigned int parse_input(
     unsigned int *minpts)
 {
     unsigned int num_points, i = 0;
-    fscanf(file, "%lf %u %u\n",
+    int num_of_items = fscanf(file, "%lf %u %u\n",
            epsilon, minpts, &num_points);
+    if (num_of_items == 0)
+    {
+        perror("Failed to read from file.");
+        return 0;
+    }
     point_t *p = (point_t *)
         calloc(num_points, sizeof(point_t));
     if (p == NULL) {
@@ -227,8 +232,13 @@ unsigned int parse_input(
         return 0;
     }
     while (i < num_points) {
-          fscanf(file, "%lf %lf %lf\n",
+          num_of_items = fscanf(file, "%lf %lf %lf\n",
                  &(p[i].x), &(p[i].y), &(p[i].z));
+          if (num_of_items == 0)
+          {
+              perror("Failed to read from file.");
+              return 0;
+          }
           p[i].cluster_id = UNCLASSIFIED;
           ++i;
     }

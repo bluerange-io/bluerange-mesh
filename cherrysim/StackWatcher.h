@@ -52,10 +52,10 @@ class StackWatcher
 	friend StackBaseSetter;
 	friend StackWatcherDisabler;
 private:
-	static std::vector<void*> stackBase;
+	static std::vector<const void*> stackBase;
 	static u32 disableValue;
 
 public:
-	StackWatcher();
+	static void check();
 
 };

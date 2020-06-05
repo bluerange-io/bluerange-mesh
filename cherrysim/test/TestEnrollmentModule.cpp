@@ -40,12 +40,12 @@ TEST(TestEnrollmentModule, TestCommands) {
 	//Configure a clc sink and a mesh clc beacon
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
-	strcpy(simConfig.defaultNodeConfigName, "prod_sink_nrf52");
+
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert( { "prod_clc_mesh_nrf52", 1 } );
 	testerConfig.verbose = false;
 
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-	strcpy(tester.sim->nodes[1].nodeConfiguration, "prod_clc_mesh_nrf52");
 	tester.Start();
 
 	tester.SimulateUntilClusteringDone(100 * 1000);
@@ -72,9 +72,8 @@ TEST(TestEnrollmentModule, TestCommands) {
 TEST(TestEnrollmentModule, TestFactoryReset) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 1;
-	testerConfig.verbose = true;
-
+	//testerConfig.verbose = true;
+	simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -105,12 +104,11 @@ TEST(TestEnrollmentModule, TestEnrollmentBasicNewMesh) {
 	//Configure a clc sink and a mesh clc beacon
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 10;
 	simConfig.terminalId = 0;
 	simConfig.defaultNetworkId = 0;
 	simConfig.preDefinedPositions = { {0.997185, 0.932557},{0.715971, 0.802758},{0.446135, 0.522125},{0.865020, 0.829147},{0.935539, 0.846311},{0.783314, 0.612539},{0.910448, 0.698930},{0.593066, 0.671654},{0.660636, 0.598495},{0.939128, 0.778389} };
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 10} );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -155,7 +153,8 @@ TEST(TestEnrollmentModule, TestEnrollmentBasicExistingMesh) {
 	simConfig.defaultNetworkId = 0;
 	simConfig.preDefinedPositions = { {0.997185, 0.932557},{0.715971, 0.802758},{0.446135, 0.522125},{0.865020, 0.829147},{0.935539, 0.846311},{0.783314, 0.612539},{0.910448, 0.698930},{0.593066, 0.671654},{0.660636, 0.598495},{0.939128, 0.778389} };
 	testerConfig.verbose = false;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9 });
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -197,6 +196,8 @@ TEST(TestEnrollmentModule, TestEnrollmentBasicExistingMeshLong) {
 	simConfig.defaultNetworkId = 0;
 	simConfig.preDefinedPositions = { {0.997185, 0.932557},{0.715971, 0.802758},{0.446135, 0.522125},{0.865020, 0.829147},{0.935539, 0.846311},{0.783314, 0.612539},{0.910448, 0.698930},{0.593066, 0.671654},{0.660636, 0.598495},{0.939128, 0.778389} };
 	testerConfig.verbose = false;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9 });
 
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
@@ -235,10 +236,12 @@ TEST(TestEnrollmentModule, TestEnrollmentBasicExistingMeshLong) {
 TEST(TestEnrollmentModule, TestReceivingEnrollmentOverMeshResponses) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 4;
 	simConfig.terminalId = 0;
 	//Place nodes such that they are only reachable in a line.
 	simConfig.preDefinedPositions = { {0.2, 0.5}, {0.4, 0.55}, {0.6, 0.5}, {0.8, 0.55}};
+
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 3});
 	testerConfig.verbose = false;
 
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
@@ -263,13 +266,13 @@ TEST(TestEnrollmentModule, TestEnrollmentMultipleTimes) {
 
 		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-		simConfig.numNodes = 10;
 		simConfig.seed = seed;
 		simConfig.defaultNetworkId = 0;
 		simConfig.mapWidthInMeters = 5;
 		simConfig.mapHeightInMeters = 5;
 		//testerConfig.verbose = true;
-
+		simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+		simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9 });
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 		tester.Start();
 
@@ -286,7 +289,7 @@ TEST(TestEnrollmentModule, TestEnrollmentMultipleTimes) {
 			"action 0 enroll basic BBBBM 10 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 0A:00:00:00:0A:00:00:00:0A:00:00:00:0A:00:00:00 10 0 0",
 		};
 
-		for (int nodeIndex = 0; nodeIndex < messages.size(); nodeIndex++) {
+		for (size_t nodeIndex = 0; nodeIndex < messages.size(); nodeIndex++) {
 			//Make sure that no enroll_response messages are floating around
 			tester.SimulateForGivenTime(10 * 1000);
 			for (int i = 0; i < 1000; i++) {
@@ -296,14 +299,14 @@ TEST(TestEnrollmentModule, TestEnrollmentMultipleTimes) {
 					tester.SimulateUntilMessageReceived(5 * 1000, 1, "enroll_response");
 					break;
 				}
-				catch (TimeoutException) {
+				catch (const TimeoutException &e) {
 
 				}
 			}
 		}
 
 		//Check that all nodes have the correct nodeId
-		for (int i = 0; i < messages.size(); i++) {
+		for (size_t i = 0; i < messages.size(); i++) {
 			if (tester.sim->nodes[i].gs.node.configuration.nodeId != i + 1) {
 				SIMEXCEPTION(IllegalStateException);
 			}
@@ -316,17 +319,17 @@ TEST(TestEnrollmentModule, TestEnrollmentMultipleTimes) {
 TEST(TestEnrollmentModule, TestRequestProposals) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 10;
 	simConfig.terminalId = 0;
 	testerConfig.verbose = false;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9 });
 	//Place Node 0 and 1 in the middle, Node 2 far away, and the others in a circle around them.
 	simConfig.preDefinedPositions.push_back({ 0.51, 0.5 });
 	simConfig.preDefinedPositions.push_back({ 0.49, 0.5 });
 	simConfig.preDefinedPositions.push_back({ 0.99, 0.5 });
-	for (u32 i = 3; i < simConfig.numNodes; i++)
+	for (u32 i = 3; i < 10; i++)
 	{
-		double percentage = (double)i / (double)(simConfig.numNodes - 3);
+		double percentage = (double)i / (double)(10 - 3);
 		simConfig.preDefinedPositions.push_back({
 			std::sin(percentage * 3.14 * 2) * 0.1 + 0.5,
 			std::cos(percentage * 3.14 * 2) * 0.1 + 0.5,
@@ -336,7 +339,7 @@ TEST(TestEnrollmentModule, TestRequestProposals) {
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	//Set all the networkids except the middle ones to 0.
-	for (u32 i = 2; i < simConfig.numNodes; i++)
+	for (u32 i = 2; i < tester.sim->getTotalNodes(); i++)
 	{
 		tester.sim->nodes[i].uicr.CUSTOMER[9] = 0;
 	}

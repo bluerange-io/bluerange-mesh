@@ -62,32 +62,40 @@ public:
 class CherrySimTester : public TerminalPrintListener, public CherrySimEventListener
 {
 public:
-	CherrySim* sim;
+	CherrySim* sim = nullptr;
 
 	//Used for awaiting specific terminal messages
 	std::vector<SimulationMessage>* awaitedTerminalOutputs = nullptr;
-	bool useRegex;
-	char awaitedMessageResult[MAX_TERMINAL_OUTPUT];
-	u16 awaitedMessagePointer;
-	bool awaitedMessagesFound;
+	bool useRegex = false;
+	u16 awaitedMessagePointer = 0;
+	bool awaitedMessagesFound = false;
 
 	//Used for awaiting specific ble events
-	NodeId awaitedBleEventNodeId;
-	u16 awaitedBleEventEventId;
-	u8 awaitedBleEventDataPart[1000];
-	u16 awaitedBleEventDataPartLength;
-	bool awaitedBleEventFound;
+	NodeId awaitedBleEventNodeId = 0;
+	u16 awaitedBleEventEventId = 0;
+	std::array<u8, 1000> awaitedBleEventDataPart = {};
+	u16 awaitedBleEventDataPartLength = 0;
+	bool awaitedBleEventFound = false;
 
 	bool appendCrcToMessages = true;
 
 private:
-	CherrySimTesterConfig config;
-	SimConfiguration simConfig;
+	std::array<char, MAX_TERMINAL_OUTPUT> awaitedMessageResult = { '\0' };
+	CherrySimTesterConfig config = {};
+	SimConfiguration simConfig = {};
 	void _SimulateUntilMessageReceived(int timeoutMs);
 	bool started = false;
 
 public:
 	CherrySimTester(CherrySimTesterConfig testerConfig, SimConfiguration simConfig);
+	
+	//Deleting these as they are currently unused and implmenting
+	//them correctly would create unnecessary overhead for now.
+	CherrySimTester(const CherrySimTester& other) = delete;
+	CherrySimTester(CherrySimTester&& other);
+	CherrySimTester& operator=(const CherrySimTester& other) = delete;
+	CherrySimTester& operator=(CherrySimTester&& other) = delete;
+
 	~CherrySimTester();
 
 	static CherrySimTesterConfig CreateDefaultTesterConfiguration();
@@ -99,7 +107,7 @@ public:
 	void SimulateUntilClusteringDone(int timeoutMs);
 	void SimulateUntilClusteringDoneWithDifferentNetworkIds(int timeoutMs);
 
-	void SimulateUntilClusteringDoneWithExpectedNumberOfClusters(int timeoutMs, int clusters);
+	void SimulateUntilClusteringDoneWithExpectedNumberOfClusters(int timeoutMs, u32 clusters);
 	void SimulateGivenNumberOfSteps(int steps);
 	void SimulateForGivenTime(int numMilliseconds);
 	void SimulateUntilMessageReceived(int timeoutMs, NodeId nodeId, const char* messagePart, ...);

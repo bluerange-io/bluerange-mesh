@@ -44,20 +44,21 @@ GATTController::GATTController()
 void GATTController::Init()
 {
 	//Initialize the nordic service discovery module (we could write that ourselves,...)
-	FruityHal::DiscovereServiceInit(GATTController::ServiceDiscoveryDoneDispatcher);
+	const ErrorType err = FruityHal::DiscovereServiceInit(GATTController::ServiceDiscoveryDoneDispatcher);
+	if (err != ErrorType::SUCCESS)
+	{
+		logt("ERROR", "Failed to init discovery service, %u", (u32)err);
+	}
 }
 
-u32 GATTController::DiscoverService(u16 connHandle, const FruityHal::BleGattUuid &p_uuid)
+ErrorType GATTController::DiscoverService(u16 connHandle, const FruityHal::BleGattUuid &p_uuid)
 {
 	logt("GATTCTRL", "Starting Service discovery %04x type %u, connHnd %u", p_uuid.uuid, p_uuid.type, connHandle);
 
-	u32 err;
 	//Discovery only works for one connection at a time
-	if (FruityHal::DiscoveryIsInProgress()) return (u32)ErrorType::BUSY;
+	if (FruityHal::DiscoveryIsInProgress()) return ErrorType::BUSY;
 
-	err = FruityHal::DiscoverService(connHandle, p_uuid);
-
-	return err;
+	return FruityHal::DiscoverService(connHandle, p_uuid);
 }
 
 
@@ -72,10 +73,8 @@ void GATTController::ServiceDiscoveryDoneDispatcher(FruityHal::BleGattDBDiscover
 }
 
 //Throws different errors that must be handeled
-u32 GATTController::bleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable) const
+ErrorType GATTController::bleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable) const
 {
-	u32 err = 0;
-
 	logt("CONN_DATA", "TX Data size is: %d, handles(%d, %d), reliable %d", dataLength, connectionHandle, characteristicHandle, reliable);
 
 	char stringBuffer[100];
@@ -95,26 +94,19 @@ u32 GATTController::bleWriteCharacteristic(u16 connectionHandle, u16 characteris
 	{
 		writeParameters.type = FruityHal::BleGattWriteType::WRITE_REQ;
 
-		err = FruityHal::BleGattWrite(connectionHandle, writeParameters);
-
-		return err;
-
+		return FruityHal::BleGattWrite(connectionHandle, writeParameters);
 	}
 	else
 	{
 		writeParameters.type = FruityHal::BleGattWriteType::WRITE_CMD;
 
-		err = FruityHal::BleGattWrite(connectionHandle, writeParameters);
-
-		return err;
+		return FruityHal::BleGattWrite(connectionHandle, writeParameters);
 	}
 }
 
 //TODO: Rewrite properly
-u32 GATTController::bleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength) const
+ErrorType GATTController::bleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength) const
 {
-	u32 err = 0;
-
 	logt("CONN_DATA", "hvx Data size is: %d, handles(%d, %d)", dataLength, connectionHandle, characteristicHandle);
 
 	char stringBuffer[100];
@@ -130,9 +122,7 @@ u32 GATTController::bleSendNotification(u16 connectionHandle, u16 characteristic
 	notificationParams.len = dataLength;
 	notificationParams.type = FruityHal::BleGattWriteType::NOTIFICATION;
 
-	err = FruityHal::BleGattSendNotification(connectionHandle, notificationParams);
-
-	return err;
+	return FruityHal::BleGattSendNotification(connectionHandle, notificationParams);
 }
 
 GATTController & GATTController::getInstance()

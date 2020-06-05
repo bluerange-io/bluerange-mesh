@@ -16,7 +16,9 @@ file(GLOB TESTERCPP    ./CherrySimTester.cpp
 file(GLOB RUNNERCPP    ./CherrySimRunner.cpp)
 
 file(GLOB   CHERRYSIM_SRC   CONFIGURE_DEPENDS   "./*.c"
+                                                "./*.h"
                                                 "./CherrySim.cpp"
+                                                "./CherrySimTypes.cpp"
                                                 "./CherrySimUtils.cpp"
                                                 "./FruitySimPipe.cpp"
                                                 "./Exceptions.cpp"
@@ -31,37 +33,43 @@ file(GLOB   CHERRYSIM_SRC   CONFIGURE_DEPENDS   "./*.c"
                                                 "../config/boards/*.cpp"
                                                 )												
 SET(visual_studio_source_list ${visual_studio_source_list} ${CHERRYSIM_SRC} ${TESTERCPP} ${RUNNERCPP} CACHE INTERNAL "")
-list(APPEND LOCAL_INC             ${CMAKE_CURRENT_LIST_DIR}
-                                  ${gtest_include_dir}
+list(APPEND LOCAL_INC             ${gtest_include_dir}
                                   # NOTE: Nordic allowed us in their forums to use their headers in our simulator as long as it
                                   # is used to simulate a Nordic Integrated Circuit.
                                   # See: https://devzone.nordicsemi.com/f/nordic-q-a/57615/legal-issue-using-nordic-sdk-code
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/ble/common"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/ble/ble_db_discovery"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/ble/ble_radio_notification"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/ble/ble_services/ble_dfu"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/device"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/libraries/button"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/libraries/timer"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/libraries/util"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/softdevice/common"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/softdevice/common/softdevice_handler"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/softdevice/s130/headers"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/softdevice/s130/headers/nrf51"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/drivers_nrf/adc"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/drivers_nrf/spi_master"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/drivers_nrf/twi_master"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/drivers_nrf/clock"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/libraries/log"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/libraries/log/src"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk11/components/ble/ble_db_discovery"
-                                  "${PROJECT_SOURCE_DIR}/sdk/sdk14/external/nrf_cc310/include")
+                                  "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/ble/common"
+                                  "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/ble/ble_db_discovery"
+                                  "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/ble/ble_radio_notification"
+                                  "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/ble/ble_services/ble_dfu"
+                                  "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/device"
+                                  "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/libraries/button"
+                                  "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/drivers_nrf/spi_master"
+                                  "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/drivers_nrf/twi_master"
+                                  "${PROJECT_SOURCE_DIR}/sdk/sdk14/external/nrf_cc310/include"
+                                  "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/drivers_nrf/common"
+                                  "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/softdevice/common/softdevice_handler"
+                                  "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/libraries/util"
+                                  "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/libraries/timer"
+                                  "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/softdevice/s132/headers/nrf52"
+                                  "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/softdevice/s132/headers"
+								  )
 
-target_sources(cherrySim_tester PRIVATE ${CHERRYSIM_SRC} ${TESTERCPP})
-target_sources(cherrySim_runner PRIVATE ${CHERRYSIM_SRC} ${RUNNERCPP})
+# CHERRYSIM_SRC contains all the header files, including CherrySimRunner.h and CherrySimTester.h.
+# These files must be removed from the target that they don't belong to.
+set(TESTER_SRC ${CHERRYSIM_SRC})
+set(RUNNER_SRC ${CHERRYSIM_SRC})
+list(FILTER TESTER_SRC EXCLUDE REGEX ".*CherrySimRunner.h$")
+list(FILTER RUNNER_SRC EXCLUDE REGEX ".*CherrySimTester.h$")
+list(APPEND TESTER_SRC ${TESTERCPP})
+list(APPEND RUNNER_SRC ${RUNNERCPP})
+target_sources(cherrySim_tester PRIVATE ${TESTER_SRC})
+target_sources(cherrySim_runner PRIVATE ${RUNNER_SRC})
 
-target_include_directories(cherrySim_tester PRIVATE ${LOCAL_INC})
-target_include_directories(cherrySim_runner PRIVATE ${LOCAL_INC})
+target_include_directories(cherrySim_tester SYSTEM PRIVATE ${LOCAL_INC})
+target_include_directories(cherrySim_runner SYSTEM PRIVATE ${LOCAL_INC})
+
+target_include_directories(cherrySim_tester PRIVATE ${CMAKE_CURRENT_LIST_DIR})
+target_include_directories(cherrySim_runner PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 
 target_compile_definitions(cherrySim_tester PRIVATE "CHERRYSIM_TESTER_ENABLED")
 

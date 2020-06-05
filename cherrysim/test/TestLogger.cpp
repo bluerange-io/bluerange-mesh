@@ -37,10 +37,9 @@
 TEST(TestLogger, TestTags) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 2 } );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -64,7 +63,7 @@ TEST(TestLogger, TestParseHexStringToBuffer)
 		u8 prediction[] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF };
 
 		ASSERT_EQ(Logger::parseEncodedStringToBuffer(string, buffer, sizeof(buffer)), 16);
-		for (int i = 0; i < sizeof(prediction); i++)
+		for (size_t i = 0; i < sizeof(prediction); i++)
 		{
 			ASSERT_EQ(buffer[i], prediction[i]);
 		}
@@ -76,7 +75,7 @@ TEST(TestLogger, TestParseHexStringToBuffer)
 		u8 prediction[] = { 0xAA };
 
 		ASSERT_EQ(Logger::parseEncodedStringToBuffer(string, buffer, sizeof(buffer)), 1);
-		for (int i = 0; i < sizeof(prediction); i++)
+		for (size_t i = 0; i < sizeof(prediction); i++)
 		{
 			ASSERT_EQ(buffer[i], prediction[i]);
 		}
@@ -84,10 +83,10 @@ TEST(TestLogger, TestParseHexStringToBuffer)
 
 	{
 		auto string = "";
-		u8 buffer[1024] = { 0 };
+		u8 buffer[1024] = {};
 
 		ASSERT_EQ(Logger::parseEncodedStringToBuffer(string, buffer, sizeof(buffer)), 0);
-		for (int i = 0; i < sizeof(buffer); i++)
+		for (size_t i = 0; i < sizeof(buffer); i++)
 		{
 			ASSERT_EQ(buffer[i], 0);
 		}
@@ -100,7 +99,7 @@ void fillMemoryGuard(u8* data, u32 length) {
 	}
 }
 
-void checkMemoryGuard(u8* data, u32 length) {
+void checkMemoryGuard(const u8* data, u32 length) {
 	for (u32 i = 0; i < length; i++) {
 		u8 expectedData = (u8)((i + 100) % 255);
 		if (data[i] != expectedData) {
@@ -113,9 +112,9 @@ TEST(TestLogger, TestBase64StringToBuffer)
 {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 1;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -174,35 +173,35 @@ TEST(TestLogger, TestBase64StringToBuffer)
 	char encodeBuffer[1024];
 
 	data = "B";
-	Logger::convertBufferToBase64String((u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
+	Logger::convertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
 	ASSERT_STREQ(encodeBuffer, "Qg==");
 
 	data = "BR";
-	Logger::convertBufferToBase64String((u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
+	Logger::convertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
 	ASSERT_STREQ(encodeBuffer, "QlI=");
 
 	data = "BRT";
-	Logger::convertBufferToBase64String((u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
+	Logger::convertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
 	ASSERT_STREQ(encodeBuffer, "QlJU");
 
 	data = "BRTC";
-	Logger::convertBufferToBase64String((u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
+	Logger::convertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
 	ASSERT_STREQ(encodeBuffer, "QlJUQw==");
 
 	data = "BRTCR";
-	Logger::convertBufferToBase64String((u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
+	Logger::convertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
 	ASSERT_STREQ(encodeBuffer, "QlJUQ1I=");
 
 	{
 		Exceptions::DisableDebugBreakOnException disable;
 		data = "BRTCR";
-		ASSERT_THROW(Logger::convertBufferToBase64String((u8*)data.c_str(), data.size(), encodeBuffer, 5), BufferTooSmallException);
+		ASSERT_THROW(Logger::convertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, 5), BufferTooSmallException);
 
 		Exceptions::ExceptionDisabler<BufferTooSmallException> btsDisabler;
 		data = "BRTCR";
 		fillMemoryGuard((u8*)(encodeBuffer + 5), sizeof(encodeBuffer) - 5);
-		Logger::convertBufferToBase64String((u8*)data.c_str(), data.size(), encodeBuffer, 5);
-		checkMemoryGuard((u8*)(encodeBuffer + 5), sizeof(encodeBuffer) - 5);
+		Logger::convertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, 5);
+		checkMemoryGuard((const u8*)(encodeBuffer + 5), sizeof(encodeBuffer) - 5);
 		ASSERT_STREQ(encodeBuffer, "QlJU");
 	}
 

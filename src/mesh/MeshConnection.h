@@ -28,17 +28,17 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
- * The MeshConnection Class in instantiated once for every possible BLE connection,
- * either as a Master or Slave Connections. It provides methods and event handlers
- * to receive or send messages and handles the mesh-handshake.
- */
-
 #pragma once
 
 #include <BaseConnection.h>
 #include <TimeManager.h>
 
+/*
+ * The MeshConnection class is used to represent FruityMesh connections between
+ * nodes. It holds all the necessary properties for clustering.
+ * Also, it is responsible for doing the clustering handshake together with
+ * the ConnectionManager and the Node.
+ */
 class MeshConnection
 	: public BaseConnection
 {
@@ -49,6 +49,7 @@ class MeshConnection
 #endif
 	friend class ConnectionManager;
 	friend class Node;
+	friend class MeshConnectionHandle;
 
 	private:
 
@@ -102,12 +103,12 @@ class MeshConnection
 		static BaseConnection* ConnTypeResolver(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8 const * data);
 
 		void SaveClusteringSnapshot();
-		void DisconnectAndRemove(AppDisconnectReason reason) override;
+		void DisconnectAndRemove(AppDisconnectReason reason) override final;
 
 		//Mesh Handshake
-		void StartHandshake() override;
+		void StartHandshake();
 		void StartHandshakeAfterMtuExchange();
-		void ConnectionMtuUpgradedHandler(u16 gattPayloadSize) override;
+		void ConnectionMtuUpgradedHandler(u16 gattPayloadSize) override final;
 		void ReceiveHandshakePacketHandler(BaseConnectionSendData* sendData, u8 const * data);
 		void SendReconnectionHandshakePacket();
 		ErrorType SendReconnectionHandshakePacketAfterMtuExchange(); //Pay attention as this might disconnect the connection
@@ -117,28 +118,31 @@ class MeshConnection
 
 		void TryReestablishing();
 
+		void HandoverMasterBit();
+		bool HasConnectionMasterBit();
+
 		//Sending Data
-		bool TransmitHighPrioData() override;
+		bool TransmitHighPrioData() override final;
 		void ClearCurrentClusterInfoUpdatePacket();
-		SizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer) override;
-		void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData) override;
-		void DataSentHandler(const u8* data, u16 length) override;
+		SizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer) override final;
+		void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData) override final;
+		void DataSentHandler(const u8* data, u16 length) override final;
 
 		bool SendData(BaseConnectionSendData* sendData, u8 const * data);
-		bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable) override;
+		bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable) override final;
 
 		//Receiving Data
-		void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) override;
+		void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) override final;
 		//Called for received mesh messages after data has been processed
 		void ReceiveMeshMessageHandler(BaseConnectionSendData* sendData, u8 const * data);
 
 		//Handler
-		bool GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason) override;
-		void GapReconnectionSuccessfulHandler(const FruityHal::GapConnectedEvent& connectedEvent) override;
+		bool GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason) override final;
+		void GapReconnectionSuccessfulHandler(const FruityHal::GapConnectedEvent& connectedEvent) override final;
 
 		//Helpers
-		void PrintStatus() override;
-		bool GetPendingPackets() override;
+		void PrintStatus() override final;
+		bool GetPendingPackets() override final;
 		bool IsValidMessageType(MessageType type);
 
 		//Setter

@@ -28,6 +28,7 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
+#include <fstream>
 #include <CherrySimTester.h>
 #include <Logger.h>
 #include <Utility.h>
@@ -36,6 +37,7 @@
 #include "StatusReporterModule.h"
 #include "CherrySimUtils.h"
 #include "RingIndexGenerator.h"
+#include "json.hpp"
 
 
 extern "C"{
@@ -47,7 +49,8 @@ TEST(TestOther, BatteryTest)
 {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 10;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -56,7 +59,7 @@ TEST(TestOther, BatteryTest)
 	tester.SimulateForGivenTime(10000);
 
 	//Log the battery usage
-	for (u32 i = 0; i < simConfig.numNodes; i++) {
+	for (u32 i = 0; i < tester.sim->getTotalNodes(); i++) {
 		u32 usageMicroAmpere = tester.sim->nodes[i].nanoAmperePerMsTotal / tester.sim->simState.simTimeMs;
 		printf("Average Battery usage for node %d was %u uA" EOL, tester.sim->nodes[i].id, usageMicroAmpere);
 	}
@@ -66,8 +69,8 @@ TEST(TestOther, TestRebootReason)
 {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	testerConfig.verbose = true;
-	simConfig.numNodes = 1;
+	//testerConfig.verbose = true;
+	simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -88,51 +91,66 @@ TEST(TestOther, TestRebootReason)
 	tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"type\":\"reboot_reason\",\"nodeId\":1,\"module\":3,\"reason\":22");
 }
 
+#ifndef GITHUB_RELEASE
 TEST(TestOther, TestPositionSetting)
 {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	testerConfig.verbose = true;
-	simConfig.numNodes = 3;
-	simConfig.mapWidthInMeters = 1;
-	simConfig.mapHeightInMeters = 1;
+	//testerConfig.verbose = false;
+	simConfig.mapWidthInMeters = 10;
+	simConfig.mapHeightInMeters = 10;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
-	constexpr double absError = 0.0001;
+	constexpr double absError = 0.1;
 
 	tester.SendTerminalCommand(1, "sim set_position BBBBB 1337 52 12");
 	tester.SimulateGivenNumberOfSteps(1);
+	ASSERT_NEAR(tester.sim->nodes[0].x, 1337.f / simConfig.mapWidthInMeters,     absError);
+	ASSERT_NEAR(tester.sim->nodes[0].y,   52.f / simConfig.mapHeightInMeters,    absError);
+	ASSERT_NEAR(tester.sim->nodes[0].z,   12.f / simConfig.mapElevationInMeters, absError);
+
+	tester.SendTerminalCommand(1, "sim set_position_norm BBBBB 1337 52 12");
+	tester.SimulateGivenNumberOfSteps(1);
 	ASSERT_NEAR(tester.sim->nodes[0].x, 1337, absError);
-	ASSERT_NEAR(tester.sim->nodes[0].y, 52, absError);
-	ASSERT_NEAR(tester.sim->nodes[0].z, 12, absError);
+	ASSERT_NEAR(tester.sim->nodes[0].y,   52, absError);
+	ASSERT_NEAR(tester.sim->nodes[0].z,   12, absError);
+
+	tester.SendTerminalCommand(1, "sim add_position_norm BBBBB 12 13 14");
+	tester.SimulateGivenNumberOfSteps(1);
+	ASSERT_NEAR(tester.sim->nodes[0].x, 1349, absError);
+	ASSERT_NEAR(tester.sim->nodes[0].y,   65, absError);
+	ASSERT_NEAR(tester.sim->nodes[0].z,   26, absError);
 
 	tester.SendTerminalCommand(1, "sim set_position BBBBC 13 14 2");
 	tester.SimulateGivenNumberOfSteps(1);
-	ASSERT_NEAR(tester.sim->nodes[1].x, 13, absError);
-	ASSERT_NEAR(tester.sim->nodes[1].y, 14, absError);
-	ASSERT_NEAR(tester.sim->nodes[1].z, 2, absError);
+	ASSERT_NEAR(tester.sim->nodes[1].x, 13.f / simConfig.mapWidthInMeters,     absError);
+	ASSERT_NEAR(tester.sim->nodes[1].y, 14.f / simConfig.mapHeightInMeters,    absError);
+	ASSERT_NEAR(tester.sim->nodes[1].z,  2.f / simConfig.mapElevationInMeters, absError);
 
 	tester.SendTerminalCommand(1, "sim set_position BBBBD 100 200 111");
 	tester.SimulateGivenNumberOfSteps(1);
-	ASSERT_NEAR(tester.sim->nodes[2].x, 100, absError);
-	ASSERT_NEAR(tester.sim->nodes[2].y, 200, absError);
-	ASSERT_NEAR(tester.sim->nodes[2].z, 111, absError);
+	ASSERT_NEAR(tester.sim->nodes[2].x, 100.f / simConfig.mapWidthInMeters,     absError);
+	ASSERT_NEAR(tester.sim->nodes[2].y, 200.f / simConfig.mapHeightInMeters,    absError);
+	ASSERT_NEAR(tester.sim->nodes[2].z, 111.f / simConfig.mapElevationInMeters, absError);
 
 	tester.SendTerminalCommand(1, "set_serial ZZZZZ");
 	tester.SimulateGivenNumberOfSteps(1);
 	tester.SendTerminalCommand(1, "sim set_position ZZZZZ -42.2 17.5 0.123");
 	tester.SimulateGivenNumberOfSteps(1);
-	ASSERT_NEAR(tester.sim->nodes[0].x, -42.2, absError);
-	ASSERT_NEAR(tester.sim->nodes[0].y, 17.5, absError);
-	ASSERT_NEAR(tester.sim->nodes[0].z, 0.123, absError);
+	ASSERT_NEAR(tester.sim->nodes[0].x, -42.2   / simConfig.mapWidthInMeters,     absError);
+	ASSERT_NEAR(tester.sim->nodes[0].y,  17.5   / simConfig.mapHeightInMeters,    absError);
+	ASSERT_NEAR(tester.sim->nodes[0].z,   0.123 / simConfig.mapElevationInMeters, absError);
 
 	tester.SendTerminalCommand(1, "sim add_position BBBBC 5 6 -0.2");
 	tester.SimulateGivenNumberOfSteps(1);
-	ASSERT_NEAR(tester.sim->nodes[1].x, 18, absError);
-	ASSERT_NEAR(tester.sim->nodes[1].y, 20, absError);
-	ASSERT_NEAR(tester.sim->nodes[1].z, 1.8, absError);
+	ASSERT_NEAR(tester.sim->nodes[1].x, 18.f / simConfig.mapWidthInMeters,     absError);
+	ASSERT_NEAR(tester.sim->nodes[1].y, 20.f / simConfig.mapHeightInMeters,    absError);
+	ASSERT_NEAR(tester.sim->nodes[1].z,  1.8 / simConfig.mapElevationInMeters, absError);
 }
+#endif //!GITHUB_RELEASE
 
 TEST(TestOther, TestMersenneTwister)
 {
@@ -196,12 +214,10 @@ TEST(TestOther, ConfigurationTest)
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	testerConfig.verbose = false;
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-
-	strcpy(tester.sim->nodes[0].nodeConfiguration, "prod_sink_nrf52");
-	strcpy(tester.sim->nodes[1].nodeConfiguration, "prod_mesh_nrf52");
 
 	tester.Start();
 
@@ -209,18 +225,226 @@ TEST(TestOther, ConfigurationTest)
 	tester.SimulateUntilClusteringDone(100 * 1000);
 }
 
+TEST(TestOther, TestJsonConfigSerialization)
+{
+	// This sure seems evil, so let me explain. The basic struggle is the question:
+	// "What if someone changes the SimConfiguration but forgets to add the translation
+	// of the new values to the to_json and from_json functions?". In such a case the
+	// serialization of SimConfiguration might silently break, destroying e.g. the
+	// replay feature. This test makes sure that this does not happen by interpreting a
+	// memory region previously filled with garbage. Note that the object itself must not
+	// be created as that would call the construction of each value, silently leading to
+	// some probably valid values. CAREFUL THOUGH! If you add some member that needs
+	// propper construction/destruction you have to call placement new and the destructor!
+
+	static_assert(std::is_polymorphic<SimConfiguration>::value == false, "SimConfiguration must not be polymorphic as it does not get a valid v-table in this test.");
+
+	constexpr u32 garbageMagicNumber = 0xDEADDEAD;
+	alignas(SimConfiguration) u32 memoryArea[(sizeof(SimConfiguration) + 1) / sizeof(u32)];
+	for (size_t i = 0; i < sizeof(memoryArea) / sizeof(*memoryArea); i++)
+	{
+		memoryArea[i] = garbageMagicNumber;
+	}
+
+	SimConfiguration *simConfig = reinterpret_cast<SimConfiguration*>(memoryArea);
+	new (&simConfig->nodeConfigName)std::map<std::string, int>;
+	simConfig->nodeConfigName.insert({ "prod_mesh_nrf52",1 });
+	simConfig->seed = 3;
+	simConfig->mapWidthInMeters = 4;
+	simConfig->mapHeightInMeters = 5;
+	simConfig->mapElevationInMeters = 6;
+	simConfig->simTickDurationMs = 7;
+	simConfig->terminalId = 8;
+	simConfig->simOtherDelay = 9;
+	simConfig->playDelay = 10;
+	simConfig->interruptProbability = 11;
+	simConfig->connectionTimeoutProbabilityPerSec = 12;
+	simConfig->sdBleGapAdvDataSetFailProbability = 13;
+	simConfig->sdBusyProbability = 14;
+	simConfig->simulateAsyncFlash = true;
+	simConfig->asyncFlashCommitTimeProbability = 16;
+	simConfig->importFromJson = true;
+	simConfig->realTime = true;
+	new (&simConfig->siteJsonPath) std::string;
+	simConfig->siteJsonPath = "aaa";
+	new (&simConfig->devicesJsonPath) std::string;
+	simConfig->devicesJsonPath = "bbb";
+	new (&simConfig->replayPath) std::string;
+	simConfig->replayPath = "path";
+	simConfig->logReplayCommands = true;
+	simConfig->useLogAccumulator = true;
+	simConfig->defaultNetworkId = 19;
+	new (&simConfig->preDefinedPositions)std::vector<std::pair<double, double>>;
+	simConfig->preDefinedPositions = { {0.1, 0.2},{0.3, 0.4} };
+	simConfig->rssiNoise = true;
+	simConfig->simulateWatchdog = true;
+	simConfig->simulateJittering = true;
+	simConfig->verbose = true;
+	simConfig->enableClusteringValidityCheck = true;
+	simConfig->enableSimStatistics = true;
+	new (&simConfig->storeFlashToFile) std::string;
+	simConfig->storeFlashToFile = "eee";
+	simConfig->verboseCommands = true;
+	simConfig->defaultBleStackType = BleStackType::NRF_SD_132_ANY;
+
+	for (size_t i = 0; i < sizeof(memoryArea) / sizeof(*memoryArea); i++)
+	{
+#define myOffsetOf(x, y) ((size_t)((char*)(&(x->y)) - (char*)((x))))
+#define IsInSTLRange(x) (byteIndex >= myOffsetOf(simConfig, x) && byteIndex < myOffsetOf(simConfig, x) + sizeof(SimConfiguration::x))
+		const size_t byteIndex = i * sizeof(u32);
+		//The byte is ignored if it's in the range of an STL type as those are allowed to have uninitialized memory.
+
+		if(IsInSTLRange(siteJsonPath)
+		    || IsInSTLRange(devicesJsonPath)
+		    || IsInSTLRange(replayPath)
+		    || IsInSTLRange(preDefinedPositions)
+		    || IsInSTLRange(nodeConfigName)
+		    || IsInSTLRange(storeFlashToFile)) continue;
+#undef IsInSTLRange
+		ASSERT_NE(memoryArea[i], garbageMagicNumber);
+	}
+
+	nlohmann::json j = *simConfig;
+	SimConfiguration copy = j.get<SimConfiguration>();
+	std::map<std::string, int> nodeConfigCompare;
+	nodeConfigCompare.insert({ "prod_mesh_nrf52",1 });
+	ASSERT_EQ(copy.nodeConfigName, nodeConfigCompare);
+	ASSERT_EQ(copy.seed, 3);
+	ASSERT_EQ(copy.mapWidthInMeters, 4);
+	ASSERT_EQ(copy.mapHeightInMeters, 5);
+	ASSERT_EQ(copy.mapElevationInMeters, 6);
+	ASSERT_EQ(copy.simTickDurationMs, 7);
+	ASSERT_EQ(copy.terminalId, 8);
+	ASSERT_EQ(copy.simOtherDelay, 9);
+	ASSERT_EQ(copy.playDelay, 10);
+	ASSERT_EQ(copy.interruptProbability, 11);
+	ASSERT_NEAR(copy.connectionTimeoutProbabilityPerSec, 12, 0.01);
+	ASSERT_NEAR(copy.sdBleGapAdvDataSetFailProbability, 13, 0.01);
+	ASSERT_NEAR(copy.sdBusyProbability, 14, 0.01);
+	ASSERT_EQ(copy.simulateAsyncFlash, true);
+	ASSERT_NEAR(copy.asyncFlashCommitTimeProbability, 16, 0.01);
+	ASSERT_EQ(copy.importFromJson, true);
+	ASSERT_EQ(copy.realTime, true);
+	ASSERT_EQ(copy.siteJsonPath, "aaa");
+	ASSERT_EQ(copy.devicesJsonPath, "bbb");
+	ASSERT_EQ(copy.replayPath, "path");
+	ASSERT_EQ(copy.logReplayCommands, true);
+	ASSERT_EQ(copy.useLogAccumulator, true);
+	ASSERT_EQ(copy.defaultNetworkId, 19);
+	ASSERT_EQ(copy.preDefinedPositions.size(), 2);
+	ASSERT_NEAR(copy.preDefinedPositions[0].first, 0.1, 0.01);
+	ASSERT_NEAR(copy.preDefinedPositions[0].second, 0.2, 0.01);
+	ASSERT_NEAR(copy.preDefinedPositions[1].first, 0.3, 0.01);
+	ASSERT_NEAR(copy.preDefinedPositions[1].second, 0.4, 0.01);
+	ASSERT_EQ(copy.rssiNoise, true);
+	ASSERT_EQ(copy.simulateWatchdog, true);
+	ASSERT_EQ(copy.simulateJittering, true);
+	ASSERT_EQ(copy.verbose, true);
+	ASSERT_EQ(copy.enableClusteringValidityCheck, true);
+	ASSERT_EQ(copy.enableSimStatistics, true);
+	ASSERT_EQ(copy.storeFlashToFile, "eee");
+	ASSERT_EQ(copy.verboseCommands, true);
+	ASSERT_EQ(copy.defaultBleStackType, BleStackType::NRF_SD_132_ANY);
+
+	simConfig->storeFlashToFile.~basic_string();
+	simConfig->nodeConfigName.~map();
+	simConfig->preDefinedPositions.~vector();
+	simConfig->devicesJsonPath.~basic_string();
+	simConfig->replayPath.~basic_string();
+	simConfig->siteJsonPath.~basic_string();
+}
+
+#ifndef GITHUB_RELEASE
+TEST(TestOther, TestReplay)
+{
+	std::string logAccumulatorDemonstrator = "";
+	std::string logAccumulatorReplay = "";
+
+	constexpr u32 initialSleep = 1000;
+	constexpr u32 getStatusSleep = 1234;
+	constexpr u32 statusSleep = 91;
+	constexpr u32 enrollmentSleep = 10 * 1000;
+	constexpr u32 enrollmentRepeats = 5;
+
+	constexpr u32 totalSleep = initialSleep + getStatusSleep + statusSleep + enrollmentSleep * enrollmentRepeats;
+
+	{
+		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+		simConfig.nodeConfigName.insert({ "prod_sink_nrf52",1 });
+		simConfig.nodeConfigName.insert({ "prod_mesh_nrf52",9 });
+		simConfig.logReplayCommands = true;
+		simConfig.useLogAccumulator = true;
+		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+		tester.Start();
+
+		tester.SimulateForGivenTime(initialSleep);
+		tester.SendTerminalCommand(1, "action 0 status get_status");
+		tester.SimulateForGivenTime(getStatusSleep);
+		tester.SendTerminalCommand(7, "status");
+		tester.SimulateForGivenTime(statusSleep);
+		for (u32 i = 0; i < enrollmentRepeats; i++)
+		{
+			tester.SendTerminalCommand(1, "action 0 enroll basic BBBBG 5 118 ED:24:56:91:4E:48:C1:E1:7B:7B:D9:22:17:AE:59:EF FE:47:59:4D:FA:06:61:49:52:28:FD:5B:84:CA:DB:F5 43:BF:7F:7C:7B:AB:B2:C8:C5:3B:22:EB:F3:49:3B:01 05:00:00:00:05:00:00:00:05:00:00:00:05:00:00:00 5 0");
+			tester.SimulateForGivenTime(enrollmentSleep);
+		}
+
+		logAccumulatorDemonstrator = tester.sim->logAccumulator;
+	}
+
+	//Sanity checks for the log accumulator.
+	ASSERT_TRUE(logAccumulatorDemonstrator.size() > 200);
+	ASSERT_TRUE(logAccumulatorDemonstrator.find("Node BBBBJ (nodeId: 7)") != std::string::npos); //Part of the status message
+
+	//Check that all command executions are available
+	ASSERT_TRUE(logAccumulatorDemonstrator.find("[!]COMMAND EXECUTION START:[!]index:0,time:1000,cmd:action 0 status get_status CRC: 1730502495[!]COMMAND EXECUTION END[!]") != std::string::npos);
+	ASSERT_TRUE(logAccumulatorDemonstrator.find("[!]COMMAND EXECUTION START:[!]index:6,time:2250,cmd:status[!]COMMAND EXECUTION END[!]") != std::string::npos);
+	ASSERT_TRUE(logAccumulatorDemonstrator.find("[!]COMMAND EXECUTION START:[!]index:0,time:2350,cmd:action 0 enroll basic BBBBG 5 118 ED:24:56:91:4E:48:C1:E1:7B:7B:D9:22:17:AE:59:EF FE:47:59:4D:FA:06:61:49:52:28:FD:5B:84:CA:DB:F5 43:BF:7F:7C:7B:AB:B2:C8:C5:3B:22:EB:F3:49:3B:01 05:00:00:00:05:00:00:00:05:00:00:00:05:00:00:00 5 0 CRC: 2568303097[!]COMMAND EXECUTION END[!]") != std::string::npos);
+	ASSERT_TRUE(logAccumulatorDemonstrator.find("[!]COMMAND EXECUTION START:[!]index:0,time:12350,cmd:action 0 enroll basic BBBBG 5 118 ED:24:56:91:4E:48:C1:E1:7B:7B:D9:22:17:AE:59:EF FE:47:59:4D:FA:06:61:49:52:28:FD:5B:84:CA:DB:F5 43:BF:7F:7C:7B:AB:B2:C8:C5:3B:22:EB:F3:49:3B:01 05:00:00:00:05:00:00:00:05:00:00:00:05:00:00:00 5 0 CRC: 2568303097[!]COMMAND EXECUTION END[!]") != std::string::npos);
+	ASSERT_TRUE(logAccumulatorDemonstrator.find("[!]COMMAND EXECUTION START:[!]index:0,time:22350,cmd:action 0 enroll basic BBBBG 5 118 ED:24:56:91:4E:48:C1:E1:7B:7B:D9:22:17:AE:59:EF FE:47:59:4D:FA:06:61:49:52:28:FD:5B:84:CA:DB:F5 43:BF:7F:7C:7B:AB:B2:C8:C5:3B:22:EB:F3:49:3B:01 05:00:00:00:05:00:00:00:05:00:00:00:05:00:00:00 5 0 CRC: 2568303097[!]COMMAND EXECUTION END[!]") != std::string::npos);
+	ASSERT_TRUE(logAccumulatorDemonstrator.find("[!]COMMAND EXECUTION START:[!]index:0,time:32350,cmd:action 0 enroll basic BBBBG 5 118 ED:24:56:91:4E:48:C1:E1:7B:7B:D9:22:17:AE:59:EF FE:47:59:4D:FA:06:61:49:52:28:FD:5B:84:CA:DB:F5 43:BF:7F:7C:7B:AB:B2:C8:C5:3B:22:EB:F3:49:3B:01 05:00:00:00:05:00:00:00:05:00:00:00:05:00:00:00 5 0 CRC: 2568303097[!]COMMAND EXECUTION END[!]") != std::string::npos);
+	ASSERT_TRUE(logAccumulatorDemonstrator.find("[!]COMMAND EXECUTION START:[!]index:0,time:42350,cmd:action 0 enroll basic BBBBG 5 118 ED:24:56:91:4E:48:C1:E1:7B:7B:D9:22:17:AE:59:EF FE:47:59:4D:FA:06:61:49:52:28:FD:5B:84:CA:DB:F5 43:BF:7F:7C:7B:AB:B2:C8:C5:3B:22:EB:F3:49:3B:01 05:00:00:00:05:00:00:00:05:00:00:00:05:00:00:00 5 0 CRC: 2568303097[!]COMMAND EXECUTION END[!]") != std::string::npos);
+
+	const std::string replayPath = "TestReplay.log";
+	std::ofstream out(replayPath);
+	out << logAccumulatorDemonstrator;
+	out.close();
+
+	{
+		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+		simConfig.replayPath = replayPath;
+		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+		tester.Start();
+
+		tester.SimulateForGivenTime(totalSleep);
+		logAccumulatorReplay = tester.sim->logAccumulator;
+	}
+
+	//Unfortunately we can't check for equality as the logs contain pointer that change
+	//every time a new simulation is started. So instead we have to check that the length
+	//is roughly the same and additionally we check that the replay commands are present as well.
+	ASSERT_NEAR(logAccumulatorDemonstrator.size(), logAccumulatorReplay.size(), 100);
+	ASSERT_TRUE(logAccumulatorReplay.find("[!]COMMAND EXECUTION START:[!]index:0,time:1000,cmd:action 0 status get_status CRC: 1730502495[!]COMMAND EXECUTION END[!]") != std::string::npos);
+	ASSERT_TRUE(logAccumulatorReplay.find("[!]COMMAND EXECUTION START:[!]index:6,time:2250,cmd:status[!]COMMAND EXECUTION END[!]") != std::string::npos);
+	ASSERT_TRUE(logAccumulatorReplay.find("[!]COMMAND EXECUTION START:[!]index:0,time:2350,cmd:action 0 enroll basic BBBBG 5 118 ED:24:56:91:4E:48:C1:E1:7B:7B:D9:22:17:AE:59:EF FE:47:59:4D:FA:06:61:49:52:28:FD:5B:84:CA:DB:F5 43:BF:7F:7C:7B:AB:B2:C8:C5:3B:22:EB:F3:49:3B:01 05:00:00:00:05:00:00:00:05:00:00:00:05:00:00:00 5 0 CRC: 2568303097[!]COMMAND EXECUTION END[!]") != std::string::npos);
+	ASSERT_TRUE(logAccumulatorReplay.find("[!]COMMAND EXECUTION START:[!]index:0,time:12350,cmd:action 0 enroll basic BBBBG 5 118 ED:24:56:91:4E:48:C1:E1:7B:7B:D9:22:17:AE:59:EF FE:47:59:4D:FA:06:61:49:52:28:FD:5B:84:CA:DB:F5 43:BF:7F:7C:7B:AB:B2:C8:C5:3B:22:EB:F3:49:3B:01 05:00:00:00:05:00:00:00:05:00:00:00:05:00:00:00 5 0 CRC: 2568303097[!]COMMAND EXECUTION END[!]") != std::string::npos);
+	ASSERT_TRUE(logAccumulatorReplay.find("[!]COMMAND EXECUTION START:[!]index:0,time:22350,cmd:action 0 enroll basic BBBBG 5 118 ED:24:56:91:4E:48:C1:E1:7B:7B:D9:22:17:AE:59:EF FE:47:59:4D:FA:06:61:49:52:28:FD:5B:84:CA:DB:F5 43:BF:7F:7C:7B:AB:B2:C8:C5:3B:22:EB:F3:49:3B:01 05:00:00:00:05:00:00:00:05:00:00:00:05:00:00:00 5 0 CRC: 2568303097[!]COMMAND EXECUTION END[!]") != std::string::npos);
+	ASSERT_TRUE(logAccumulatorReplay.find("[!]COMMAND EXECUTION START:[!]index:0,time:32350,cmd:action 0 enroll basic BBBBG 5 118 ED:24:56:91:4E:48:C1:E1:7B:7B:D9:22:17:AE:59:EF FE:47:59:4D:FA:06:61:49:52:28:FD:5B:84:CA:DB:F5 43:BF:7F:7C:7B:AB:B2:C8:C5:3B:22:EB:F3:49:3B:01 05:00:00:00:05:00:00:00:05:00:00:00:05:00:00:00 5 0 CRC: 2568303097[!]COMMAND EXECUTION END[!]") != std::string::npos);
+	ASSERT_TRUE(logAccumulatorReplay.find("[!]COMMAND EXECUTION START:[!]index:0,time:42350,cmd:action 0 enroll basic BBBBG 5 118 ED:24:56:91:4E:48:C1:E1:7B:7B:D9:22:17:AE:59:EF FE:47:59:4D:FA:06:61:49:52:28:FD:5B:84:CA:DB:F5 43:BF:7F:7C:7B:AB:B2:C8:C5:3B:22:EB:F3:49:3B:01 05:00:00:00:05:00:00:00:05:00:00:00:05:00:00:00 5 0 CRC: 2568303097[!]COMMAND EXECUTION END[!]") != std::string::npos);
+}
+#endif //GITHUB_RELEASE
+
 //This test should check if two different configurations can be applied to two nodes using the simulator
 TEST(TestOther, SinkInMesh)
 {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	//testerConfig.verbose = true;
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 10;
 	simConfig.terminalId = 1;
-	strcpy(simConfig.defaultNodeConfigName, "prod_mesh_nrf52");
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-
-	strcpy(tester.sim->nodes[0].nodeConfiguration, "prod_sink_nrf52");
 
 	tester.Start();
 
@@ -234,7 +458,7 @@ TEST(TestOther, TestEncryption) {
 	//Boot up a simulator for our Logger
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 1;
+	simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -306,10 +530,10 @@ TEST(TestOther, TestConnectionAllocator) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	testerConfig.verbose = false;
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 1;
 	simConfig.terminalId = 0;
+	simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-	strcpy(tester.sim->nodes[0].nodeConfiguration, "prod_sink_nrf52");
+
 	tester.Start();
 
 	MersenneTwister mt;
@@ -352,10 +576,11 @@ TEST(TestOther, TestConnectionAllocator) {
 //Tests the implementation of CherrySimTester::SimulateUntilMessagesReceived.
 TEST(TestOther, TestMultiMessageSimulation) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-	testerConfig.verbose = true;
+	//testerConfig.verbose = true;
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -382,19 +607,21 @@ TEST(TestOther, TestGattcEvtTimeoutReporting) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	//testerConfig.verbose = true;
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
 	tester.SimulateUntilClusteringDone(10 * 1000);
 
 	//Find the mesh connection to the other node
+	tester.sim->setNode(0);
 	BaseConnections conns = tester.sim->nodes[0].gs.cm.GetConnectionsOfType(ConnectionType::FRUITYMESH, ConnectionDirection::INVALID);
 	MeshConnection* conn = nullptr;
 	for (int i = 0; i < conns.count; i++)
 	{
-		conn = (MeshConnection*)tester.sim->nodes[0].gs.cm.allConnections[conns.connectionIndizes[i]];
+		conn = (MeshConnection*)conns.handles[i].GetConnection();
 		break;
 	}
 	if (conn == nullptr)
@@ -430,15 +657,16 @@ TEST(TestOther, TestTimeSync) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 //	testerConfig.verbose = true;
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 10;
 	simConfig.terminalId = 0;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
 	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	//Test that all connections are unsynced
-	for (u32 i = 1; i <= simConfig.numNodes; i++) {
+	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "status");
 		tester.SimulateUntilMessageReceived(10 * 1000, i, "tSync:0");
 	}
@@ -448,12 +676,12 @@ TEST(TestOther, TestTimeSync) {
 	tester.SimulateForGivenTime(60 * 1000);
 
 	//Test that all connections are synced
-	for (u32 i = 1; i <= simConfig.numNodes; i++) {
+	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "status");
 		tester.SimulateUntilMessageReceived(100, i, "tSync:2");
 	}
 
-	for (u32 i = 1; i <= simConfig.numNodes; i++) {
+	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "gettime");
 		tester.SimulateUntilMessageReceived(10 * 1000, i, "Time is currently approx. 2019 years");
 	}
@@ -471,7 +699,7 @@ TEST(TestOther, TestTimeSync) {
 
 
 	//Reset most of the nodes (not node 1)
-	for (u32 i = 2; i <= simConfig.numNodes; i++)
+	for (u32 i = 2; i <= tester.sim->getTotalNodes(); i++)
 	{
 		tester.SendTerminalCommand(1, "action %d node reset", i);
 		tester.SimulateGivenNumberOfSteps(1);
@@ -485,13 +713,13 @@ TEST(TestOther, TestTimeSync) {
 	tester.SimulateForGivenTime(60 * 1000);
 
 	//Make sure that the reset worked.
-	for (u32 i = 2; i <= simConfig.numNodes; i++)
+	for (u32 i = 2; i <= tester.sim->getTotalNodes(); i++)
 	{
 		ASSERT_EQ(tester.sim->nodes[i - 1].restartCounter, 2);
 	}
 
 	//Check that the time has been correctly sent to each node again.
-	for (u32 i = 1; i <= simConfig.numNodes; i++) {
+	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "gettime");
 		tester.SimulateUntilMessageReceived(10 * 1000, i, "Time is currently approx. 2019 years");
 	}
@@ -500,7 +728,7 @@ TEST(TestOther, TestTimeSync) {
 	tester.SendTerminalCommand(1, "settime 2960262597 0");
 	tester.SimulateForGivenTime(60 * 1000);
 
-	for (u32 i = 1; i <= simConfig.numNodes; i++) {
+	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "gettime");
 		tester.SimulateUntilMessageReceived(10 * 1000, i, "Time is currently approx. 2063 years");
 	}
@@ -510,7 +738,7 @@ TEST(TestOther, TestTimeSync) {
 
 	tester.SimulateForGivenTime(60 * 1000);
 
-	for (u32 i = 1; i <= simConfig.numNodes; i++) {
+	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "gettime");
 		tester.SimulateUntilMessageReceived(10 * 1000, i, "Time is currently approx. 2009 years");
 	}
@@ -519,7 +747,7 @@ TEST(TestOther, TestTimeSync) {
 	tester.SendTerminalCommand(1, "settime 7200 60");
 	tester.SimulateForGivenTime(60 * 1000);
 
-	for (u32 i = 1; i <= simConfig.numNodes; i++) {
+	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "gettime");
 		tester.SimulateUntilMessageReceived(10 * 1000, i, "Time is currently approx. 1970 years, 1 days, 03h");
 	}
@@ -528,7 +756,7 @@ TEST(TestOther, TestTimeSync) {
 	tester.SendTerminalCommand(1, "settime 7200 -60");
 	tester.SimulateForGivenTime(60 * 1000);
 
-	for (u32 i = 1; i <= simConfig.numNodes; i++) {
+	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "gettime");
 		tester.SimulateUntilMessageReceived(10 * 1000, i, "Time is currently approx. 1970 years, 1 days, 01h");
 	}
@@ -537,7 +765,7 @@ TEST(TestOther, TestTimeSync) {
 	tester.SendTerminalCommand(1, "settime 7200 -10000");
 	tester.SimulateForGivenTime(60 * 1000);
 
-	for (u32 i = 1; i <= simConfig.numNodes; i++) {
+	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "gettime");
 		tester.SimulateUntilMessageReceived(10 * 1000, i, "Time is currently approx. 1970 years, 1 days, 02h");
 	}
@@ -547,8 +775,9 @@ TEST(TestOther, TestTimeSyncDuration_long) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	//testerConfig.verbose = true;
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 50;
 	simConfig.terminalId = 0;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 49});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -558,7 +787,7 @@ TEST(TestOther, TestTimeSyncDuration_long) {
 	tester.SimulateForGivenTime(150 * 1000);
 
 	//Test that all connections are synced
-	for (u32 i = 1; i <= simConfig.numNodes; i++) {
+	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "status");
 		tester.SimulateUntilMessageReceived(100, i, "tSync:2");
 	}
@@ -567,7 +796,7 @@ TEST(TestOther, TestTimeSyncDuration_long) {
 	u32 maxTime = 0;
 
 
-	for (u32 i = 0; i < simConfig.numNodes; i++)
+	for (u32 i = 0; i < tester.sim->getTotalNodes(); i++)
 	{
 		u32 time = tester.sim->nodes[i].gs.timeManager.GetTime();
 		if (time < minTime) minTime = time;
@@ -585,8 +814,8 @@ TEST(TestOther, TestRestrainedKeyGeneration) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	//testerConfig.verbose = true;
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 1;
 	simConfig.terminalId = 0;
+	simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 	tester.SimulateGivenNumberOfSteps(1);
@@ -623,8 +852,8 @@ TEST(TestOther, TestTimeout) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	//testerConfig.verbose = true;
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 10;
 	simConfig.terminalId = 0;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -648,11 +877,11 @@ TEST(TestOther, TestLegacyUicrSerialNumberSupport) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	//testerConfig.verbose = true;
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 1;
 	simConfig.terminalId = 0;
+	simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
-	char* serialNumber = "BRTCR";
+	const char* serialNumber = "BRTCR";
 
 	tester.sim->nodes[0].uicr.CUSTOMER[12] = EMPTY_WORD;
 	CheckedMemcpy(tester.sim->nodes[0].uicr.CUSTOMER + 2, serialNumber, 6);
@@ -669,12 +898,13 @@ TEST(TestOther, TestBulkMode) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	//testerConfig.verbose = true;
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
-	strcpy(tester.sim->nodes[0].nodeConfiguration, "prod_pcbridge_nrf52");
-	strcpy(tester.sim->nodes[1].nodeConfiguration, "prod_mesh_nrf52");
+	tester.sim->nodes[0].nodeConfiguration = "prod_pcbridge_nrf52";
+	tester.sim->nodes[1].nodeConfiguration = "prod_mesh_nrf52";
 
 	CheckedMemset(tester.sim->nodes[1].uicr.CUSTOMER, 0xFF, sizeof(tester.sim->nodes[1].uicr.CUSTOMER));	//invalidate UICR
 
@@ -704,7 +934,7 @@ TEST(TestOther, TestBulkMode) {
 	tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"nodeId\":2001,\"type\":\"get_memory_result\",\"addr\":\\d+,\"data\":\"39:05:00:00\"\\}");
 
 	u8 data[1024];
-	for (int i = 0; i < sizeof(data); i++)
+	for (size_t i = 0; i < sizeof(data); i++)
 	{
 		data[i] = i % 256;
 	}
@@ -737,9 +967,9 @@ TEST(TestOther, TestWatchdog) {
 		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 		//testerConfig.verbose = true;
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-		simConfig.numNodes = 1;
 		simConfig.terminalId = 0;
 		simConfig.simulateWatchdog = true;
+		simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 		tester.Start();
@@ -773,9 +1003,9 @@ TEST(TestOther, TestWatchdog) {
 		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 		//testerConfig.verbose = true;
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-		simConfig.numNodes = 1;
 		simConfig.terminalId = 0;
 		simConfig.simulateWatchdog = false;
+		simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 		tester.Start();
@@ -788,20 +1018,14 @@ TEST(TestOther, TestWatchdog) {
 
 
 #ifndef GITHUB_RELEASE
-extern void setBoard_0(BoardConfiguration *c);
-extern void setBoard_1(BoardConfiguration *c);
 extern void setBoard_3(BoardConfiguration *c);
 extern void setBoard_4(BoardConfiguration *c);
-extern void setBoard_6(BoardConfiguration *c);
-extern void setBoard_7(BoardConfiguration *c);
-extern void setBoard_8(BoardConfiguration *c);
 extern void setBoard_9(BoardConfiguration *c);
 extern void setBoard_10(BoardConfiguration *c);
 extern void setBoard_11(BoardConfiguration *c);
 extern void setBoard_12(BoardConfiguration *c);
 extern void setBoard_13(BoardConfiguration *c);
 extern void setBoard_14(BoardConfiguration *c);
-extern void setBoard_15(BoardConfiguration *c);
 extern void setBoard_16(BoardConfiguration *c);
 extern void setBoard_17(BoardConfiguration *c);
 extern void setBoard_18(BoardConfiguration *c);
@@ -819,34 +1043,19 @@ TEST(TestOther, TestBoards) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	//testerConfig.verbose = true;
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 1;
 	simConfig.terminalId = 0;
 	simConfig.simulateWatchdog = true;
+	simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
 	BoardConfiguration c;
-	
-	c.boardType = 0;
-	setBoard_0(&c);
-
-	c.boardType = 1;
-	setBoard_1(&c);
 
 	c.boardType = 3;
 	setBoard_3(&c);
 
 	c.boardType = 4;
 	setBoard_4(&c);
-
-	c.boardType = 6;
-	setBoard_6(&c);
-
-	c.boardType = 7;
-	setBoard_7(&c);
-
-	c.boardType = 8;
-	setBoard_8(&c);
 
 	c.boardType = 9;
 	setBoard_9(&c);
@@ -867,9 +1076,6 @@ TEST(TestOther, TestBoards) {
 
 	c.boardType = 14;
 	setBoard_14(&c);
-
-	c.boardType = 15;
-	setBoard_15(&c);
 
 	c.boardType = 16;
 	setBoard_16(&c);
@@ -1016,10 +1222,11 @@ TEST(TestOther, TestSimulatorFlashToFileStorage) {
 		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 		//testerConfig.verbose = true;
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-		simConfig.numNodes = 3;
 		simConfig.terminalId = 0;
 		simConfig.defaultNetworkId = 0;
 		simConfig.storeFlashToFile = testFilePath;
+		simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+		simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2});
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 		tester.Start();
 		
@@ -1037,9 +1244,9 @@ TEST(TestOther, TestSimulatorFlashToFileStorage) {
 				"action 0 enroll basic BBBBD 3 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0 0",
 			};
 
-			ASSERT_EQ(messages.size(), simConfig.numNodes);
+			ASSERT_EQ(messages.size(), tester.sim->getTotalNodes());
 
-			for (int nodeIndex = 0; nodeIndex < messages.size(); nodeIndex++) {
+			for (size_t nodeIndex = 0; nodeIndex < messages.size(); nodeIndex++) {
 				for (int i = 0; i < 10; i++) {
 					tester.SendTerminalCommand(nodeIndex + 1, messages[nodeIndex].c_str());
 					tester.SimulateGivenNumberOfSteps(10);

@@ -65,6 +65,30 @@ set_active 0 scan on //activates the scan module
 set_active 0 adv off //deactivates the advertising module
 ----
 
+Once received, the message is replied by the following message:
+
+[source,JSON]
+----
+{
+    "nodeId":2,
+    "type":"set_active_result",
+    "module":6,
+    "requestHandle":0,
+    "code":0
+}
+----
+
+Where "code" can have one of the following values:
+
+[cols="1,10"]
+|===
+|Value|Description
+|0|SUCCESS
+|1|NO_CONFIGURATION, the module was activate/deactivated but it was impossible to save the state as the module seems to have no configuration. (Report this to a firmware developer if it ever happens.)
+|2|NO_SUCH_MODULE, the given module does not exists.
+|3|RECORD_STORAGE_ERROR, the module does exist and does have a configuration but the record storage was unable to save the config. The best course of action is probably to try again later as the node seems to be busy right now.
+|===
+
 == Module Commands
 Most module commands are structured in the same way.
 You have to give the nodeId that should process the command, specify the

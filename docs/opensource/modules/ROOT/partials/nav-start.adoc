@@ -19,12 +19,25 @@ endif::[]
 ** xref:fruitymesh::Developers.adoc[Developer Overview]
 ** xref:fruitymesh::Class-Structure.adoc[Class Structure]
 ** xref:fruitymesh::Debugging.adoc[Debugging]
-** xref:fruitymesh::DocumentationTemplate.adoc[Documentation Template]
+** xref:fruitymesh::ModuleDocumentationTemplate.adoc[Module Documentation Template]
 ** xref:fruitymesh::BuildingWithCMake.adoc[Building with CMake]
+** xref:fruitymesh::VsCodeSetup.adoc[VsCode Setup]
+** xref:fruitymesh::CppCheck.adoc[CppCheck Setup]
 
 * Mesh
 ** xref:fruitymesh::Node.adoc[Node]
 ** xref:fruitymesh::Connections.adoc[Connections]
+
+* Core Functionality
+** xref:fruitymesh::AdvertisingController.adoc[AdvertisingController]
+** xref:fruitymesh::BoardConfig.adoc[Board Configuration]
+** xref:fruitymesh::FruityHal.adoc[FruityHal]
+** xref:fruitymesh::Logger.adoc[Logger]
+** xref:fruitymesh::RawData.adoc[RawData Protocol]
+** xref:fruitymesh::RecordStorage.adoc[Record Storage]
+** xref:fruitymesh::ScanController.adoc[ScanController]
+** xref:fruitymesh::SensorsAndActors.adoc[Sensors and Actors]
+** xref:fruitymesh::Terminal.adoc[Terminal]
 
 * Modules
 ** xref:fruitymesh::Modules.adoc[Module Overview]
@@ -38,15 +51,7 @@ endif::[]
 ** xref:fruitymesh::StatusReporterModule.adoc[StatusReportModule]
 
 * Simulator
-** xref:fruitymesh::Simulator.adoc[Old Simulator]
 ** xref:fruitymesh::CherrySim.adoc[CherrySim]
-
-* Other Classes
-** xref:fruitymesh::AdvertisingController.adoc[AdvertisingController]
-** xref:fruitymesh::FruityHal.adoc[FruityHal]
-** xref:fruitymesh::Logger.adoc[Logger]
-** xref:fruitymesh::RecordStorage.adoc[Record Storage]
-** xref:fruitymesh::ScanController.adoc[ScanController]
 
 * Measurements
 ** xref:fruitymesh::Battery-Consumption.adoc[Battery Consumption]
@@ -59,3 +64,5 @@ endif::[]
 * Tutorials
 ** xref:fruitymesh::Tutorials.adoc[Tutorial Overview]
 ** xref:fruitymesh::Implementing-a-Custom-Module.adoc[Implementing a Custom Module]
+
+* xref:fruitymesh::FAQ.adoc[FAQ]

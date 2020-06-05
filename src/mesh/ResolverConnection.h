@@ -34,7 +34,14 @@
 #include <BaseConnection.h>
 
 
-
+/*
+ * The ResolverConnection is instantiated as soon as an incoming connection
+ * (A central connecting to us) is made to our device. Because we do not know
+ * at first, which kind of connection type the central is interested in
+ * (e.g. MeshConnection, MeshAccessConnection, ....), we have to instantiate
+ * a Resolver Connection first. Once we determined the connection type, we replace
+ * the ResolverConnection by the correct instance for a connection type.
+ */
 class ResolverConnection
 		: public BaseConnection
 {

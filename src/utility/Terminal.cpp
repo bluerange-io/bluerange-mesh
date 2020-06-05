@@ -41,7 +41,6 @@
 #include <condition_variable>
 #include <chrono>
 static std::mutex terminalMutex;
-static std::condition_variable bufferFree;
 #endif
 
 #if defined(__unix)
@@ -71,7 +70,6 @@ extern "C"
 
 Terminal::Terminal(){
 	CheckedMemset(commandArgsPtr, 0, sizeof(commandArgsPtr));
-	CheckedMemset(registeredCommandCallbacks, 0, sizeof(registeredCommandCallbacks));
 	CheckedMemset(readBuffer, 0, sizeof(readBuffer));
 }
 
@@ -163,18 +161,6 @@ Terminal & Terminal::getInstance()
 	return GS->terminal;
 }
 
-//Register a string that will call the callback function with the rest of the string
-void Terminal::AddTerminalCommandListener(TerminalCommandListener* callback)
-{
-#ifdef TERMINAL_ENABLED
-	if (registeredCommandCallbacksNum >= MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS) {
-		SIMEXCEPTION(TooManyTerminalCommandListenersException); //LCOV_EXCL_LINE assertion
-	}
-	registeredCommandCallbacks[registeredCommandCallbacksNum] = callback;
-	registeredCommandCallbacksNum++;
-#endif
-}
-
 void Terminal::PutString(const char* buffer)
 {
 	if(!terminalIsInitialized) return;
@@ -228,16 +214,6 @@ void Terminal::OnJsonLogged(const char * json)
 const char ** Terminal::getCommandArgsPtr()
 {
 	return commandArgsPtr;
-}
-
-u8 Terminal::getAmountOfRegisteredCommandListeners()
-{
-	return registeredCommandCallbacksNum;
-}
-
-TerminalCommandListener ** Terminal::getRegisteredCommandListeners()
-{
-	return registeredCommandCallbacks;
 }
 
 u8 Terminal::getReadBufferOffset()
@@ -340,10 +316,11 @@ void Terminal::ProcessLine(char* line)
 	}
 
 	//Call all callbacks
-	TerminalCommandHandlerReturnType handled = TerminalCommandHandlerReturnType::UNKNOWN;
+	TerminalCommandHandlerReturnType handled = Logger::getInstance().TerminalCommandHandler(commandArgsPtr, (u8)commandArgsSize);
 
-	for(u32 i=0; i<registeredCommandCallbacksNum; i++){
-		TerminalCommandHandlerReturnType currentHandled = (registeredCommandCallbacks[i])->TerminalCommandHandler(commandArgsPtr, (u8)commandArgsSize);
+	
+	for(u32 i=0; i<GS->amountOfModules; i++){
+		TerminalCommandHandlerReturnType currentHandled = GS->activeModules[i]->TerminalCommandHandler(commandArgsPtr, (u8)commandArgsSize);
 
 		if (          handled != TerminalCommandHandlerReturnType::UNKNOWN
 			&& currentHandled != TerminalCommandHandlerReturnType::UNKNOWN)
@@ -422,6 +399,20 @@ void Terminal::ProcessLine(char* line)
 		SIMEXCEPTION(TooFewParameterException);
 #endif
 	}
+	else if (handled == TerminalCommandHandlerReturnType::INTERNAL_ERROR)
+	{
+		if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
+		{
+			log_transport_putstring("Internal Terminal Command Error" EOL);
+		}
+		else
+		{
+			logjson_error(Logger::UartErrorType::INTERNAL_ERROR);
+		}
+#ifdef CHERRYSIM_TESTER_ENABLED
+		SIMEXCEPTION(InternalTerminalCommandErrorException);
+#endif
+	}
 
 #if IS_INACTIVE(SAVE_SPACE)
 	else if (handled == TerminalCommandHandlerReturnType::WARN_DEPRECATED)
@@ -473,7 +464,7 @@ void Terminal::UartEnable(bool promptAndEchoMode)
 	if (Boardconfig->uartRXPin == -1) return;
 
 	//Disable UART if it was active before
-	FruityHal::disableUart();
+	FruityHal::DisableUart();
 
 	//Delay to fix successive stop or startterm commands
 	FruityHal::DelayMs(10);
@@ -749,7 +740,7 @@ void Terminal::SeggerRttPutChar(char character)
 //############################ STDIO
 #define ________________STDIO___________________
 #if IS_ACTIVE(STDIO)
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(CHERRYSIM_TESTER_ENABLED)
 static int _kbhit(void)
 {
     int ch = getch();
@@ -768,84 +759,119 @@ void Terminal::StdioInit()
 	setbuf(stdout, nullptr);
 }
 
-void Terminal::WriteStdioLineToReadBuffer() {
+std::string Terminal::ReadStdioLine() {
 	size_t i;
+	std::string retVal = "";
 #ifdef __unix
 	nodelay(stdscr, FALSE);
 #endif
 	for (i = 0; i < TERMINAL_READ_BUFFER_LENGTH - 1; i++) {
 		int c = fgetc(stdin);
 		if(c == EOF) break;
-
-		readBuffer[i] = (char)c;
-
 		if(c == '\n') break;
+
+		retVal += (char)c;
 	}
 #ifdef __unix
 	nodelay(stdscr, TRUE);
 #endif
-	readBuffer[i] = '\0';
+	return retVal;
 }
 
 extern bool meshGwCommunication;
 
 //Used to inject a message into the readBuffer directly
-bool Terminal::PutIntoReadBuffer(const char* message)
+void Terminal::PutIntoTerminalCommandQueue(std::string &message, bool skipCrc)
 {
-#ifdef SIM_ENABLED
 	std::unique_lock<std::mutex> guard(terminalMutex);
-#endif
-	u16 len = (u16)(strlen(message) + 1);
+	TerminalCommandQueueEntry terminalCommandQueueEntry;
+	terminalCommandQueueEntry.terminalCommand = std::move(message);
+	terminalCommandQueueEntry.skipCrcCheck = skipCrc;
+	terminalCommandQueue.push(terminalCommandQueueEntry);
+	message = "";
+}
 
-	if (meshGwCommunication)
+bool Terminal::GetNextTerminalQueueEntry(TerminalCommandQueueEntry & out)
+{
+	std::unique_lock<std::mutex> guard(terminalMutex);
+	if (terminalCommandQueue.size() > 0)
 	{
-		//Loop to catch spurious wakeups as well as timeouts.
-		while (readBufferOffset != 0)
-		{
-			bufferFree.wait_for(guard, std::chrono::seconds(1));
-		}
+		out = terminalCommandQueue.front();
+		terminalCommandQueue.pop();
+		return true;
 	}
-	else if (readBufferOffset != 0)
+	else
 	{
-		// You need to simulate before sending another command!
-		SIMEXCEPTION(CommandbufferAlreadyInUseException);
 		return false;
 	}
-	if (len >= TERMINAL_READ_BUFFER_LENGTH)
-	{
-		SIMEXCEPTION(CommandTooLongException);
-		return false;
-	}
-
-	CheckedMemcpy(readBuffer, message, len);
-	readBufferOffset = (u8)len;
-
-	return true;
 }
 
 void Terminal::StdioCheckAndProcessLine()
 {
-#ifdef SIM_ENABLED
-	std::lock_guard<std::mutex> guard(terminalMutex);
-#endif
 	if (cherrySimInstance->simConfig.terminalId != cherrySimInstance->currentNode->id && cherrySimInstance->simConfig.terminalId != 0) return;
 
 #if ((defined(__unix) || defined(_WIN32)) && !defined(CHERRYSIM_TESTER_ENABLED))
 	if(!meshGwCommunication && _kbhit() != 0){ //FIXME: Not supported by eclipse console
 		printf("mhTerm: ");
-		WriteStdioLineToReadBuffer();
-
-		Terminal::ProcessLine(readBuffer);
+		std::string line = ReadStdioLine();
+		PutIntoTerminalCommandQueue(line, true);
 	}
-	//Also process data that was written in the readBuffer
-	else 
 #endif
-	if (readBufferOffset != 0) {
-		if(cherrySimInstance->simConfig.verboseCommands) printf("mhTerm: %s" EOL, readBuffer);
-		Terminal::ProcessLine(readBuffer);
-		readBufferOffset = 0;
-		bufferFree.notify_one();
+
+	TerminalCommandQueueEntry entry;
+	if (GetNextTerminalQueueEntry(entry))
+	{
+		const std::string& message = entry.terminalCommand;
+		
+		if (cherrySimInstance->simConfig.logReplayCommands)
+		{
+			std::string executionReplayLine = 
+				  "[!]COMMAND EXECUTION START:[!]index:"
+				+ std::to_string(cherrySimInstance->currentNode->index)
+				+ ",time:"
+				+ std::to_string(cherrySimInstance->simState.simTimeMs)
+				+ ",cmd:"
+				+ message
+				+ "[!]COMMAND EXECUTION END[!]" EOL;
+			
+			StdioPutString(executionReplayLine.c_str());
+		}
+
+		const char *simPos = strstr(message.c_str(), "sim ");
+		if (simPos == message.c_str())
+		{
+			//Simulator commands are immediately redirected to cherrySim.
+			//This way, sim commands don't have to follow the same simulated
+			//restrictions like command length and amount of tokens.
+			cherrySimInstance->TerminalCommandHandler(message.c_str());
+		}
+		else
+		{
+			//Other commands are simulated via the internal buffers of the Terminal.
+			if (message.size() >= TERMINAL_READ_BUFFER_LENGTH)
+			{
+				SIMEXCEPTION(CommandTooLongException);
+			}
+
+			const bool oldCrcCheckEnabledValue = crcChecksEnabled;
+			if (entry.skipCrcCheck)
+			{
+				crcChecksEnabled = false;
+			}
+
+			const u16 len = (u16)(message.size() + 1);
+			CheckedMemcpy(readBuffer, message.c_str(), len);
+			readBufferOffset = (u8)len;
+			Terminal::ProcessLine(readBuffer);
+
+			if (entry.skipCrcCheck)
+			{
+				crcChecksEnabled = oldCrcCheckEnabledValue;
+			}
+		}
 	}
+
+	readBufferOffset = 0;
 }
 
 void Terminal::StdioPutString(const char*message)

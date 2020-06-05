@@ -43,7 +43,7 @@ public:
 		//We have to boot up a simulator for this test because the PacketQueue uses the Logger
 		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-		simConfig.numNodes = 1;
+		simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
 		tester = new CherrySimTester(testerConfig, simConfig);
 		tester->Start();
 	}
@@ -87,7 +87,6 @@ TEST_F(TestPacketQueue, TestPeekNext) {
 		}
 		else {
 			FAIL() << "Buffer too small";
-			return;
 		}
 	}
 
@@ -99,7 +98,6 @@ TEST_F(TestPacketQueue, TestPeekNext) {
 
 		if (d.data[0] != i) {
 			FAIL() << "Wrong entry read";
-			return;
 		}
 	}
 
@@ -108,7 +106,6 @@ TEST_F(TestPacketQueue, TestPeekNext) {
 
 	if (d.length != 0) {
 		FAIL() << "Item should not exist";
-		return;
 	}
 
 	queue->Clean();
@@ -148,7 +145,6 @@ TEST_F(TestPacketQueue, TestPeekNext) {
 
 			if (d.data[0] != (u8)(readCounter + i)) {
 				FAIL() << "FAIL: Wrong entry read";
-				return;
 			}
 		}
 
@@ -218,20 +214,17 @@ TEST_F(TestPacketQueue, TestRandomFill) {
 
 			if (((u32)readData.length) != rand) {
 				FAIL() << "Wrong size read (" << readData.length << " instead of " << rand << ")";
-				return;
 			}
 
 			//Check data
 			if (memcmp(testData, readData.data, rand) != 0) {
 				FAIL() << "FAIL: wrong data";
-				return;
 			}
 		}
 
 		//Check bounds for corruption
 		if (buffer[99] != 0 || buffer[bufferSize + 100] != 0) {
 			FAIL() << "overflow";
-			return;
 		}
 
 		i++;
@@ -271,11 +264,9 @@ TEST_F(TestPacketQueue, TestPeekLast) {
 
 	if (dataA.length != dataB.length) {
 		FAIL() << "WRONG size";
-		return;
 	}
 	if (dataA.data != dataB.data) {
 		FAIL() << "WRONG data";
-		return;
 	}
 
 	//Test if correct data is returned by peek last after a second element was added
@@ -289,19 +280,15 @@ TEST_F(TestPacketQueue, TestPeekLast) {
 
 	if (dataA.length != 8) {
 		FAIL() << "WRONG size";
-		return;
 	}
 	if (dataA.data[0] != 2) {
 		FAIL() << "WRONG data not 2";
-		return;
 	}
 	if (dataB.length != 7) {
 		FAIL() << "WRONG data not 7";
-		return;
 	}
 	if (dataB.data[0] != 1) {
 		FAIL() << "WRONG data not 1";
-		return;
 	}
 
 	//Test if correct data is returned by peek last after a third element was added
@@ -314,11 +301,9 @@ TEST_F(TestPacketQueue, TestPeekLast) {
 
 	if (dataA.length != 5) {
 		FAIL() << "WRONG size";
-		return;
 	}
 	if (dataA.data[0] != 3) {
 		FAIL() << "WRONG data";
-		return;
 	}
 
 	//Next, fill queue randomly with data, clean first
@@ -334,14 +319,12 @@ TEST_F(TestPacketQueue, TestPeekLast) {
 				queue->Put(testData, rand);
 				if (!CheckOuterBufferOk(buffer, bufferSize)) {
 					FAIL() << "Overflow";
-					return;
 				}
 			}
 			else {
 				queue->DiscardNext();
 				if (!CheckOuterBufferOk(buffer, bufferSize)) {
 					FAIL() << "Overflow";
-					return;
 				}
 			}
 			//printf("%u : %u\n",i, j);
@@ -361,11 +344,9 @@ TEST_F(TestPacketQueue, TestPeekLast) {
 
 		if (data.length != lastElementRand) {
 			FAIL() << "WRONG size";
-			return;
 		}
 		if (data.data[0] != 1 || data.data[1] != 2) {
 			FAIL() << "Wrong data";
-			return;
 		}
 	}
 
@@ -427,18 +408,15 @@ TEST_F(TestPacketQueue, TestDiscardLastRandom) {
 				if (removedElementCounters[elementId] != 0) {
 					PrintPacketQueueBuffer(queue);
 					FAIL() << "Element removed twice";
-					return;
 				}
 				if (data.length != elementSize) {
 					PrintPacketQueueBuffer(queue);
 					FAIL() << "Element has wrong size";
-					return;
 				}
 
 				if (!CheckOuterBufferOk(buffer, bufferSize)) {
 					PrintPacketQueueBuffer(queue);
 					FAIL() << "Overflow";
-					return;
 				}
 
 				removedElementCounters[elementId] = 2;
@@ -457,18 +435,15 @@ TEST_F(TestPacketQueue, TestDiscardLastRandom) {
 				if (removedElementCounters[elementId] != 0) {
 					PrintPacketQueueBuffer(queue);
 					FAIL() << "Element removed twice";
-					return;
 				}
 				if (data.length != elementSize) {
 					PrintPacketQueueBuffer(queue);
 					FAIL() << "Element has wrong size";
-					return;
 				}
 
 				if (!CheckOuterBufferOk(buffer, bufferSize)) {
 					PrintPacketQueueBuffer(queue);
 					FAIL() << "Overflow";
-					return;
 				}
 				removedElementCounters[elementId] = 1;
 			}
@@ -485,11 +460,9 @@ TEST_F(TestPacketQueue, TestDiscardLastRandom) {
 
 		if (removedElementCounters[elementId] != 0) {
 			FAIL() << "Element removed twice";
-			return;
 		}
 		if (data.length != elementSize) {
 			FAIL() << "Element has wrong size";
-			return;
 		}
 
 		removedElementCounters[elementId] = 2;
@@ -497,7 +470,6 @@ TEST_F(TestPacketQueue, TestDiscardLastRandom) {
 
 		if (!CheckOuterBufferOk(buffer, bufferSize)) {
 			FAIL() << "Overflow";
-			return;
 		}
 	}
 
@@ -507,7 +479,6 @@ TEST_F(TestPacketQueue, TestDiscardLastRandom) {
 	for (u32 i = 0; i < elementCounter; i++) {
 		if (removedElementCounters[i] == 0) {
 			FAIL() << "Element" << i << " has not been removed";
-			return;
 		}
 		else if (removedElementCounters[i] == 2) {
 			cntLast++;

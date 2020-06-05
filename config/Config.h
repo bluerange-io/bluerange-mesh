@@ -52,7 +52,7 @@ class RecordStorageEventListener;
 #define FM_VERSION_MINOR 8
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 2210
+#define FM_VERSION_PATCH 3430
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -84,7 +84,7 @@ extern DeviceType GET_DEVICE_TYPE();
 extern Chipset GET_CHIPSET();
 #define GET_FEATURE_SET_GROUP XCONCAT(getFeatureSetGroup_,FEATURESET)
 extern FeatureSetGroup GET_FEATURE_SET_GROUP();
-#elif SIM_ENABLED
+#elif defined(SIM_ENABLED)
 #define SET_BOARD_CONFIGURATION(configuration) setBoardConfiguration_CherrySim(configuration);
 #define SET_FEATURESET_CONFIGURATION(configuration, module) setFeaturesetConfiguration_CherrySim(configuration, module);
 #define INITIALIZE_MODULES(createModule) initializeModules_CherrySim((createModule));
@@ -127,11 +127,7 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 
 // Each of the connections has a buffer for outgoing packets, this is its size in bytes
 #ifndef PACKET_SEND_BUFFER_SIZE
-#ifdef NRF51
-#define PACKET_SEND_BUFFER_SIZE 600
-#else
 #define PACKET_SEND_BUFFER_SIZE 2000
-#endif
 #endif
 
 // Each connection also has a high prio buffer e.g. for mesh clustering packets
@@ -298,7 +294,7 @@ class Conf
 		bool isEmpty(const u8* mem, u16 numBytes) const;
 
 		//Buffer for the serialNumber in ASCII format
-		mutable char _serialNumber[6];
+		mutable char _serialNumber[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
 		mutable u32 serialNumberIndex = 0;
 
 
@@ -328,7 +324,7 @@ class Conf
 		void SetNodeKey(const u8 *key);
 
 		//The Firmware GroupIds are used to check update compatibility if a firmware update is
-		//requested. First id should be reserved for hardware type (e.g. nrf51/nrf52)
+		//requested. First id should be reserved for hardware type (e.g. nrf52)
 		NodeId fwGroupIds[MAX_NUM_FW_GROUP_IDS];
 
 		//################ The following data can use defaults from the code but is
@@ -462,20 +458,10 @@ class Conf
 		//Having two meshInConnections allows us to perform clustering more easily and
 		//prevents most denial of service attacks
 #ifndef SIM_ENABLED
-#if FEATURE_AVAILABLE(MULTIPILE_IN_CONNECTIONS)
 		static constexpr u8 totalInConnections = 3;
 		static constexpr u8 totalOutConnections = 3;
 		u8 meshMaxInConnections = 2;
 		static constexpr u8 meshMaxOutConnections = 3;
-#else
-		// Max amount of connections that the BLE stack will be configured with
-		static constexpr u8 totalInConnections = 1;
-		static constexpr u8 totalOutConnections = 3;
-		// Total connections for building the mesh, if more than one inConnection is configured,
-		// it will be used only temporarily but not for permanent connections
-		u8 meshMaxInConnections = 1;
-		static constexpr u8 meshMaxOutConnections = 3;;
-#endif // FEATURE_AVAILABLE(MULTIPILE_IN_CONNECTIONS)
 #else
 		u8 totalInConnections = 3;
 		u8 totalOutConnections = 3;
@@ -546,13 +532,6 @@ class Conf
 
 // Calculate the total connections
 #define MAX_NUM_CONNECTIONS (MESH_IN_CONNECTIONS+MESH_OUT_CONNECTIONS+APP_IN_CONNECTIONS+APP_OUT_CONNECTIONS)
-
-// Check if the connection vonfiguration is valid
-#if (defined(NRF51) || defined(SIM_ENABLED)) && (APP_IN_CONNECTIONS) > 1
-#error "NRF51 only supports 1 connection as a peripheral"
-#elif NRF52
-#define MAX_NUM_CONNECTIONS (MESH_IN_CONNECTIONS+MESH_OUT_CONNECTIONS+APP_IN_CONNECTIONS+APP_OUT_CONNECTIONS)
-#endif
 
 //Check if the packet size is valid
 #if PACKET_REASSEMBLY_BUFFER_SIZE < MAX_MESH_PACKET_SIZE

@@ -1,4 +1,7 @@
 if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/drivers")
   add_subdirectory(drivers)
 endif()
+if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/sensor_interface")
+  add_subdirectory(sensor_interface)
+endif()
 add_subdirectory(segger_rtt)

@@ -29,8 +29,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 /*
- * The LED Wrapper provides conveniant access to LEDs
- * Thanks to Torbjørn Øvrebekk.
+ * The LED Wrapper provides convenient access to LEDs
+ * Thanks to Torbjorn Ovrebekk.
  * https://devzone.nordicsemi.com/question/18377/c-development-using-nrf51-sdk-on-keil/
  * */
 #pragma once

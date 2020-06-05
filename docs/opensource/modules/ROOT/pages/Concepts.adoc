@@ -11,7 +11,7 @@ This document explains the basic concepts of FruityMesh and gives an overview of
 
 FruityMesh is based on the Bluetooth low energy part of the Bluetooth 4.1 Specification and is built on top of the host layer. On-air, FruityMesh physical representation is compatible with existing Bluetooth low energy devices as mesh messages are contained inside the payload of Bluetooth low energy connection packets. FruityMesh adds logic on top of the Bluetooth low energy host layer to automatically build connections with other mesh devices within the same mesh network. As it is implemented on top of the host, just as any normal BLE application would be, it is highly portable between chipsets and fully compatible with other Bluetooth Low Energy devices.
 
-In contrast to the SIG mesh, there is no use-case specific node configuration necessary. There is no concept of relay nodes, friend nodes or proxy nodes as each Node can do this decision based on the FruityMesh Algorithm at Runtime. There is however a concept of a Gateway (Sink) and Asset Nodes (movable nodes with very little battery capacity). Leaf nodes (aka. friend nodes) can be used for very specific use-cases.
+In contrast to the SIG mesh, there is no use-case specific node configuration necessary. There is no concept of relay nodes, friend nodes or proxy nodes as each Node can do this decision based on the FruityMesh Algorithm at Runtime. There is however a concept of a Gateway (Sink) and Asset Nodes (movable nodes with very little battery capacity). Also, leaf nodes (aka. friend nodes) can be used for very specific use-cases. See xref:#deviceTypes[Device Types] for more explanation.
 
 image:fruitymesh.png[FruityMesh]
 
@@ -52,6 +52,17 @@ For more information on battery consumption of FruityMesh, read the xref:Battery
 == Proxy
 
 Each FruityMesh node will allow standard BLE connections if it has free resources. This means, that any legacy Bluetooth Low Energy device has the possibility to connect to the mesh by either using the MeshAccess connection protocol or by implementing a custom connection type. This is similar to the SIG mesh GATT proxy, but doesn't interfere with the mesh in a similar manner as it can be scheduled much better together with mesh activity. The MeshAccessConnections provide security and can be used with a number of different keys. More information about connecting to a mesh network can be found in the documentation of the xref:MeshAccessModule.adoc[MeshAccessModule].
+
+[#deviceTypes]
+== Device Types (aka. Node Types)
+FruityMesh supports a number of different device types for different use cases. Most of the time, the default `STATIC` device type should be used. It is expected that static nodes remain at a fixed position. If these nodes are moved by a significant distance, the algorithm will need to reconfigure the connections, which will result in an instable mesh at the time of moving.
+
+Another use-case is that there is a core network of static nodes and some nodes (such as e.g. sensors), that might be moved around. The moving nodes should be configured as `LEAF` nodes. They will then not relay messages but will be connected to by one of the static nodes. The static nodes serve as the backbone of the network. Care must be taken that the number of leaf nodes is not higher than the number of static nodes in an area as the static nodes have a limit of connections. This could cause a situation in which some leaf nodes are not connected to the network.
+
+If there is a high number of moving nodes, these should be configured as `ASSET` nodes. By default, they will only send data to the mesh using broadcasts, but they are also connectable using xref:MeshAccessModule.adoc[MeshAccess Connections]. The asset will broadcast once it has data that it wants to deliver to the mesh. Setting up the MeshAccess Connection needs to be implemented in a MeshGateway as this is something that needs to be centrally scheduled.
+
+Last, there is the `SINK` device type. This is also considered to be a static node and something also referred to as a MeshGateway. A special xref:Specification.adoc##NodeIds[Node Id] is assigned to all connected sink nodes and messages to this node id are only received by devices configured as sink nodes.
+
 
 == Addressing
 

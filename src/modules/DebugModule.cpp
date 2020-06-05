@@ -166,10 +166,7 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
 				DebugModuleCounterMessage data;
 				data.counter = currentCounter;
 
-				//FIXME, should not increase if packet was not queued
-				currentCounter++;
-
-				SendModuleActionMessage(
+				ErrorTypeUnchecked err = SendModuleActionMessage(
 					MessageType::MODULE_TRIGGER_ACTION,
 					counterDestinationId,
 					(u8)DebugModuleTriggerActionMessages::COUNTER,
@@ -177,6 +174,7 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
 					(u8*)&data,
 					SIZEOF_DEBUG_MODULE_COUNTER_MESSAGE,
 					false);
+				if (err == ErrorTypeUnchecked::SUCCESS) currentCounter++;
 			}
 		}
 	}
@@ -196,10 +194,10 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
 
 				logt("DEBUGMOD", "Sent %u: %u, %u, %u, %u",
 					GS->appTimerDs,
-					conns.count >= 1 ? conns.connections[0]->sentUnreliable : 0,
-					conns.count >= 2 ? conns.connections[1]->sentUnreliable : 0,
-					conns.count >= 3 ? conns.connections[2]->sentUnreliable : 0,
-					conns.count >= 4 ? conns.connections[3]->sentUnreliable : 0
+					conns.count >= 1 ? conns.handles[0].GetSentUnreliable() : 0,
+					conns.count >= 2 ? conns.handles[1].GetSentUnreliable() : 0,
+					conns.count >= 3 ? conns.handles[2].GetSentUnreliable() : 0,
+					conns.count >= 4 ? conns.handles[3].GetSentUnreliable() : 0
 				);
 			}
 
@@ -511,6 +509,13 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
 				return TerminalCommandHandlerReturnType::SUCCESS;
 			}
+			else if (TERMARGS(3, "getRtcTime") && commandArgsSize >= 4)
+			{
+				u32 time = FruityHal::GetRtcMs();
+				logt("DEBUGMOD", "Time is %d", time);
+
+				return TerminalCommandHandlerReturnType::SUCCESS;
+			}
 #endif
 		}
 
@@ -688,21 +693,24 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 		//Second parameter is number of messages
 		u8 count = commandArgsSize > 2 ? Utility::StringToU8(commandArgs[2]) : 5;
 
+		ErrorType err = ErrorType::SUCCESS;
 		for (int i = 0; i < count; i++)
 		{
 			if(reliable == 0 || reliable == 2){
 				data.payload.data[0] = i*2;
 				data.payload.data[1] = 0;
-				GS->cm.SendMeshMessageInternal((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, DeliveryPriority::LOW, false, true, true);
+				err = GS->cm.SendMeshMessageInternal((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, DeliveryPriority::LOW, false, true, true);
 			}
 
 			if(reliable == 1 || reliable == 2){
 				data.payload.data[0] = i*2+1;
 				data.payload.data[1] = 1;
-				GS->cm.SendMeshMessageInternal((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, DeliveryPriority::LOW, true, true, true);
+				err = GS->cm.SendMeshMessageInternal((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, DeliveryPriority::LOW, true, true, true);
 			}
 		}
-		return TerminalCommandHandlerReturnType::SUCCESS;
+
+		if (err == ErrorType::SUCCESS) return TerminalCommandHandlerReturnType::SUCCESS;
+		else return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
 	}
 	//Add an advertising job
 	else if (TERMARGS(0, "advadd") && commandArgsSize >= 4)
@@ -830,7 +838,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
 		BaseConnections conns = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
 		for (u32 i = 0; i < conns.count; i++) {
-			BaseConnection* conn = GS->cm.allConnections[conns.connectionIndizes[i]];
+			BaseConnection* conn = conns.handles[i].GetConnection();
 			logt("DEBUGMOD", "conn %u pend %u", conn->connectionId, conn->GetPendingPackets());
 		}
 
@@ -857,9 +865,9 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 		if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
 		u16 hnd = Utility::StringToU16(commandArgs[1]);
-		BaseConnection* conn = GS->cm.GetConnectionFromHandle(hnd);
-		if (conn != nullptr) {
-			conn->packetSendQueue.Clean();
+		BaseConnectionHandle conn = GS->cm.GetConnectionFromHandle(hnd);
+		if (conn) {
+			conn.GetPacketSendQueue()->Clean();
 		}
 
 		return TerminalCommandHandlerReturnType::SUCCESS;
@@ -870,13 +878,18 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 		if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
 		u16 hnd = Utility::StringToU16(commandArgs[1]);
-		BaseConnection* conn = GS->cm.GetConnectionFromHandle(hnd);
+		BaseConnectionHandle conn = GS->cm.GetConnectionFromHandle(hnd);
 
-		if (conn != nullptr) {
-			conn->packetSendQueue.Print();
+		if (conn) {
+			conn.GetPacketSendQueue()->Print();
 		}
 
 		return TerminalCommandHandlerReturnType::SUCCESS;
+	}
+
+	if (TERMARGS(0, "stack_overflow"))
+	{
+		CauseStackOverflow();
 	}
 #endif
 
@@ -1030,7 +1043,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 				);
 
 				//Send the join_me buffer items
-				for (int i = 0; i < GS->node.joinMePackets.length; i++)
+				for (u32 i = 0; i < GS->node.joinMePackets.size(); i++)
 				{
 					SendModuleActionMessage(
 						MessageType::MODULE_ACTION_RESPONSE,
@@ -1264,3 +1277,20 @@ void DebugModule::CauseHardfault() const
 #endif
 }
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winfinite-recursion"
+#endif
+void DebugModule::CauseStackOverflow() const
+{
+	volatile char someDummyData[128];
+	for (size_t i = 0; i < sizeof(someDummyData); i++)
+	{
+		someDummyData[i] = 0x12;
+	}
+	logt("MAIN", "Dummy data addr: %u", (u32)&someDummyData);
+	CauseStackOverflow();
+}
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif

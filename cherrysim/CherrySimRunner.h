@@ -31,6 +31,8 @@
 
 #include <CherrySim.h>
 #include <thread>
+#include <string>
+#include <vector>
 
 struct CherrySimRunnerConfig
 {

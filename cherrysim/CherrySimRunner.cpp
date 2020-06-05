@@ -32,8 +32,11 @@
 #include "CherrySimUtils.h"
 #include <string>
 #include <iostream>
+#include <fstream>
 #include <chrono>
 #include <cmath>
+#include <regex>
+#include "json.hpp"
 #ifdef _MSC_VER
 #include <filesystem>
 #endif
@@ -65,13 +68,14 @@ int main(int argc, char** argv) {
 		if (s == "MeshGwCommunication")
 		{
 			meshGwCommunication = true;
-			simConfig.terminalId = CherrySimRunner::MESH_GW_NODE;
-			simConfig.defaultNetworkId = 0;
-			simConfig.numNodes = 10;
-			simConfig.numAssetNodes = 2;
-			simConfig.rssiNoise = true;
-			simConfig.storeFlashToFile = "CherrySimFlashState.bin";
-			strcpy(simConfig.defaultSinkConfigName, "prod_sink_nrf52");
+			std::ifstream i("MeshGWCommunicationConfig.json");
+			if (!i)
+			{
+				SIMEXCEPTION(FileException);
+			}
+			nlohmann::json configJson;
+			i >> configJson;
+			simConfig = configJson;
 			printf("Launching with MeshGwCommunication!" EOL);
 		}
 		else if (s == "shortLived")
@@ -84,7 +88,6 @@ int main(int argc, char** argv) {
 		}
 	}
 
-
 #ifdef _MSC_VER
 	std::filesystem::path currentWorkingDir = std::filesystem::current_path();
 	printf("Current Working Directory: %s" EOL, currentWorkingDir.string().c_str());
@@ -94,12 +97,21 @@ int main(int argc, char** argv) {
 	Exceptions::ExceptionDisabler<ErrorCodeUnknownException> ecue;
 	Exceptions::ExceptionDisabler<CRCMissingException> crcme;
 	Exceptions::ExceptionDisabler<CRCInvalidException> crcie;
+	Exceptions::ExceptionDisabler<CommandNotFoundException> disabler;
+
+	//Failing a SystemTest just because one Error Message was logged somewhere is
+	//probably too harsh and will lead to more issues than it solves in the future.
+	Exceptions::ExceptionDisabler<ErrorLoggedException> ele;
+
+	//@ReplayFeature@ <- Don't change this, it's a label used in the documentation.
+	//You may use the following line to enable the replay feature. As this change
+	//should not get commited anyway, you may use absolut paths.
+	//simConfig.replayPath = "C:/Path/to/some/log/file/MyLog.log";
 
 	CherrySimRunner* runner = new CherrySimRunner(runnerConfig, simConfig, meshGwCommunication);
 	printf("Launching Runner..." EOL);
 	startTime = std::chrono::high_resolution_clock::now();
 
-	Exceptions::ExceptionDisabler<CommandNotFoundException> disabler;
 	runner->Start();
 
 	return 0;
@@ -115,8 +127,11 @@ void CherrySimRunner::TerminalReaderMain() {
 		}
 		catch (const std::ios_base::failure &e)
 		{
-			//Some communication failure happend which probably means that the meshgw closed the connection. Thus this application is no longer needed.
 			running = false;
+			std::cout << "Some communication failure happend which probably means that the meshgw "
+				"closed the connection. Thus this application is no longer needed." << std::endl;
+			std::cout << "The details: " << std::endl;
+			std::cout << e.what() << std::endl;
 			return;
 		}
 
@@ -127,7 +142,8 @@ void CherrySimRunner::TerminalReaderMain() {
 			return;
 		}
 
-		sim->findNodeById(MESH_GW_NODE)->gs.terminal.PutIntoReadBuffer(input.c_str());
+		sim->receivedDataFromMeshGw = true;
+		sim->findNodeById(MESH_GW_NODE)->gs.terminal.PutIntoTerminalCommandQueue(input, false);
 	}
 }
 
@@ -144,16 +160,22 @@ SimConfiguration CherrySimRunner::CreateDefaultRunConfiguration()
 {
 	SimConfiguration simConfig;
 
-	simConfig.numNodes = 10;
-	simConfig.numAssetNodes = 0; //asset node ids are at the end e.g if we have numNode 2 and numAssetNode 1, the node id of asset node will be 3.
 	simConfig.seed = 117;
 	simConfig.mapWidthInMeters = 60;
 	simConfig.mapHeightInMeters = 40;
+	simConfig.mapElevationInMeters = 1;
 	simConfig.simTickDurationMs = 50;
 	simConfig.terminalId = 1; //Enter -1 to disable, 0 for all nodes, or a specific id
 
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 7 });
+	simConfig.nodeConfigName.insert({ "prod_vs_nrf52", 1 }); // vs node ids are before assetNodes and clcNodes
+	simConfig.nodeConfigName.insert({ "prod_clc_mesh_nrf52", 1 });//clc node ids are before assetNodes
+
 	simConfig.simOtherDelay = 1; // Enter 1 - 100000 to send sim_other message only each ... simulation steps, this increases the speed significantly
 	simConfig.playDelay = 10; //Allows us to view the simulation slower than simulated, is added after each step
+
+	simConfig.interruptProbability = 0.1f;
 
 	simConfig.connectionTimeoutProbabilityPerSec = 0;// 0.00001; //Every minute or so: 0.00001, randomly generates timout events for connections and disconnects them;
 	simConfig.sdBleGapAdvDataSetFailProbability = 0;// 0.0001; //Simulate fails on setting adv Data in the softdevice
@@ -162,11 +184,9 @@ SimConfiguration CherrySimRunner::CreateDefaultRunConfiguration()
 	simConfig.asyncFlashCommitTimeProbability = 0.9;
 
 	simConfig.importFromJson = false; //Set to true in order to not generate nodes
-	strcpy(simConfig.siteJsonPath, "testsite.json");
-	strcpy(simConfig.devicesJsonPath, "testdevices.json");
+	simConfig.siteJsonPath = "testsite.json";
+	simConfig.devicesJsonPath = "testdevices.json";
 
-	strcpy(simConfig.defaultNodeConfigName, "prod_mesh_nrf52");
-	strcpy(simConfig.defaultSinkConfigName, "prod_sink_nrf52");
 
 	simConfig.defaultBleStackType = BleStackType::NRF_SD_132_ANY;
 
@@ -177,13 +197,15 @@ SimConfiguration CherrySimRunner::CreateDefaultRunConfiguration()
 	simConfig.verboseCommands = true;
 	simConfig.enableSimStatistics = true;
 
+	simConfig.logReplayCommands = true;
+
 	return simConfig;
 }
 
 CherrySimRunner::CherrySimRunner(const CherrySimRunnerConfig &runnerConfig, const SimConfiguration &simConfig, bool meshGwCommunication)
 	: meshGwCommunication(meshGwCommunication),
-	simConfig(simConfig),
-	runnerConfig(runnerConfig)
+	runnerConfig(runnerConfig),
+	simConfig(simConfig)
 {
 	shouldRestartSim = false;
 	this->sim = nullptr;
@@ -206,18 +228,9 @@ void CherrySimRunner::Start()
 		//Set the first node to deviceType sink
 		sim->nodes[0].uicr.CUSTOMER[11] = (u32)DeviceType::SINK; //deviceType
 
-#ifndef GITHUB_RELEASE
-		// The last numNode will have prod_clc_configuration
-		strcpy(sim->nodes[simConfig.numNodes - 1].nodeConfiguration, "prod_clc_mesh_nrf52");
-		// The second last numNode will have prod_vs_nrf52 configuration
-		if (simConfig.numNodes >= 2) {
-			strcpy(sim->nodes[simConfig.numNodes - 2].nodeConfiguration, "prod_vs_nrf52");
-		}
-#endif //GITHUB_RELEASE
 
 		//Boot up all nodes
-		u32 numNodes = sim->getNumNodes();
-		for (u32 i = 0; i < numNodes; i++) {
+		for (u32 i = 0; i < sim->getTotalNodes(); i++) {
 			sim->setNode(i);
 			sim->bootCurrentNode();
 		}
@@ -253,8 +266,9 @@ bool CherrySimRunner::Simulate()
 				return false;
 			}
 			else {
-				u32 numNodesToReset = (u32)(std::ceil(sim->simConfig.numNodes / 5.0) * PSRNG() + 1);
-				auto nodeIndizesToReset = CherrySimUtils::generateRandomNumbers(0, sim->simConfig.numNodes - 1, numNodesToReset);
+				u32 numNoneAssetNodes = sim->getTotalNodes() - sim->getAssetNodes();
+				u32 numNodesToReset = (u32)(std::ceil(numNoneAssetNodes / 5.0) * PSRNG() + 1);
+				auto nodeIndizesToReset = CherrySimUtils::generateRandomNumbers(0, numNoneAssetNodes - 1, numNodesToReset);
 
 				for (auto const nodeIdx : nodeIndizesToReset) {
 					sim->setNode(nodeIdx);

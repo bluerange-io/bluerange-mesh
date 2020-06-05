@@ -173,8 +173,6 @@ RecordStorageResultCode RecordStorage::DeactivateRecord(u16 recordId, RecordStor
 //This function is called from the queue multiple times to do the actual store operations
 void RecordStorage::SaveRecordInternal(SaveRecordOperation& op)
 {
-	u32 err = 0;
-
 	//If any of the previous operations failed, call the callback with an error code
 	if (op.op.flashStorageErrorCode != FlashStorageError::SUCCESS) {
 		return RecordOperationFinished(op.op, RecordStorageResultCode::BUSY);
@@ -750,7 +748,7 @@ u8* RecordStorage::GetFreeRecordSpace(u16 dataLength) const
 		}
 
 		//Check if we have enough space left till the end of the page
-		if((u32)record - (u32)&page + dataLength <= FruityHal::GetCodePageSize()){
+		if(((u32)record - (u32)&page + dataLength) <= FruityHal::GetCodePageSize()){
 			return (u8*)record;
 		}
 	}

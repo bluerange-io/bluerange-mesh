@@ -28,12 +28,6 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
- * The Terminal is used for UART input and output and allows easy debugging
- * and function execution, it can be disabled for nodes that do not need
- * this capability.
- */
-
 #pragma once
 
 
@@ -41,6 +35,17 @@
 #include <Boardconfig.h>
 
 #include <types.h>
+#ifdef SIM_ENABLED
+#include <string>
+#include <queue>
+
+struct TerminalCommandQueueEntry
+{
+	std::string terminalCommand = "";
+	bool skipCrcCheck = false;
+};
+
+#endif
 
 //UART does not work with the SIM
 #ifdef SIM_ENABLED
@@ -63,20 +68,7 @@ enum class TerminalCommandHandlerReturnType : u8
 	WRONG_ARGUMENT       = 2, //...exists but the given arguments were malformed
 	NOT_ENOUGH_ARGUMENTS = 3, //...exists but the amount of arguments was too low
 	WARN_DEPRECATED      = 4, //...was successfully interpreted and executed but is marked deprecated and will potentially be removed in the future.
-};
-
-class TerminalCommandListener
-{
-public:
-	TerminalCommandListener() {};
-	virtual ~TerminalCommandListener() {};
-
-#ifdef TERMINAL_ENABLED
-	//This method can be implemented by any subclass and will be notified when
-	//a command is entered via uart.
-	virtual TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) /*nonconst*/ = 0;
-#endif
-
+	INTERNAL_ERROR       = 5, //An internal error occurred that potentially requires the attention of a firmware developer.
 };
 
 class TerminalJsonListener
@@ -93,26 +85,29 @@ public:
 
 };
 
-
+/*
+ * The Terminal is used for UART input and output and allows easy debugging
+ * and function execution, it can be disabled for nodes that do not need
+ * this capability.
+ */
 class Terminal
 {
 		friend class DebugModule;
 
 private:
 	const char* commandArgsPtr[MAX_NUM_TERM_ARGS];
-	
-	//CommandListeners
-	u8 registeredCommandCallbacksNum = 0;
-	TerminalCommandListener* registeredCommandCallbacks[MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS] = { 0 };
 
 	u8 registeredJsonCallbacksNum = 0;
-	TerminalJsonListener* registeredJsonCallbacks[MAX_TERMINAL_JSON_LISTENER_CALLBACKS] = { 0 };
+	TerminalJsonListener* registeredJsonCallbacks[MAX_TERMINAL_JSON_LISTENER_CALLBACKS] = {};
 	bool currentlyExecutingJsonCallbacks = false;	//Avoids endless recursion, where outputCallbacks themselves want to print something.
 
 	u32 readBufferOffset = 0;
 	char readBuffer[TERMINAL_READ_BUFFER_LENGTH];
 
-	void WriteStdioLineToReadBuffer();
+#ifdef SIM_ENABLED
+	std::queue<TerminalCommandQueueEntry> terminalCommandQueue;
+	std::string ReadStdioLine();
+#endif
 
 
 	//Will be false after a timeout and true after input is received
@@ -137,7 +132,6 @@ public:
 	i32 TokenizeLine(char* line, u16 lineLength);
 
 	//Register a class that will be notified when the activation string is entered
-	void AddTerminalCommandListener(TerminalCommandListener* callback);
 	void AddTerminalJsonListener(TerminalJsonListener* callback);
 
 	//###### Log Transport ######
@@ -150,8 +144,6 @@ public:
 	void OnJsonLogged(const char* json);
 
 	const char** getCommandArgsPtr();
-	u8 getAmountOfRegisteredCommandListeners();
-	TerminalCommandListener** getRegisteredCommandListeners();
 	u8 getReadBufferOffset();
 	char* getReadBuffer();
 
@@ -196,7 +188,8 @@ private:
 	void StdioInit();
 	void StdioCheckAndProcessLine();
 public:
-	bool PutIntoReadBuffer(const char* message);
+	void PutIntoTerminalCommandQueue(std::string &message, bool skipCrc);
+	bool GetNextTerminalQueueEntry(TerminalCommandQueueEntry &out);
 	void StdioPutString(const char* message);
 
 #endif

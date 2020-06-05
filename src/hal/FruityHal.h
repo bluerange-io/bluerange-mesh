@@ -28,12 +28,6 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-This is meant as a small HAL Layer for abstracting some platform specific code which should make
-things easier when porting to other platforms.
-It is clearly meant as a work in progress.
-*/
-
 #pragma once
 
 
@@ -45,6 +39,10 @@ It is clearly meant as a work in progress.
 #include <FruityHalBleGatt.h>
 #include <FruityHalBleGap.h>
 
+/*
+ * This is the FruityMesh HAL Layer for abstracting platform specific 
+ * code which makes things easier when porting to other platforms.
+ */
 namespace FruityHal
 {
 	enum class SystemEvents
@@ -62,15 +60,11 @@ namespace FruityHal
 		NUMBER_OF_EVTS
 	};
 	
-	typedef void(*SystemEventHandler) (SystemEvents systemEvent);
-	typedef void(*TimerEventHandler) (u16 passedTimeDs);
-	typedef void(*ButtonEventHandler) (u8 buttonId, u32 buttonHoldTime);
 	typedef void(*UartEventHandler) (void);
 	typedef void(*AppErrorHandler) (u32 error_code);
-	typedef void(*StackErrorHandler) (u32 id, u32 pc, u32 info);
-	typedef void(*HardfaultHandler) (stacked_regs_t* stack);
 	typedef void(*DBDiscoveryHandler) (BleGattDBDiscoveryEvent * p_dbEvent);
-	typedef void(*EventLooperHandler) (void);
+	typedef void(*ApplicationInterruptHandler) (void);
+	typedef void(*MainContextHandler) (void);
 
 	#define ______________________EVENT_DEFINITIONS_______________________
 
@@ -322,6 +316,7 @@ namespace FruityHal
 		BAUDRATE_1M,
 		BAUDRATE_115200,
 		BAUDRATE_57600,
+		BAUDRATE_38400,
 	};
 
 	// ######################### Ble Stack and Event Handling ############################
@@ -333,77 +328,74 @@ namespace FruityHal
 	void SetPendingEventIRQ();
 
 	// ######################### GAP ############################
-	u32 BleGapAddressGet(BleGapAddr *address);
-	u32 BleGapAddressSet(BleGapAddr const *address);
+	BleGapAddr GetBleGapAddress();
+	ErrorType SetBleGapAddress(BleGapAddr const &address);
 
-	ErrorType BleGapConnect(BleGapAddr const *peerAddress, BleGapScanParams const *scanParams, BleGapConnParams const *connectionParams);
-	u32 ConnectCancel();
-	ErrorType Disconnect(u16 conn_handle, FruityHal::BleHciError hci_status_code);
+	ErrorType BleGapConnect(BleGapAddr const &peerAddress, BleGapScanParams const &scanParams, BleGapConnParams const &connectionParams);
+	ErrorType ConnectCancel();
+	ErrorType Disconnect(u16 connHandle, FruityHal::BleHciError hci_status_code);
 
-	ErrorType BleGapScanStart(BleGapScanParams const *scanParams);
+	ErrorType BleGapScanStart(BleGapScanParams const &scanParams);
 	ErrorType BleGapScanStop();
 
-	ErrorType BleGapAdvStart(u8 *advHandle, BleGapAdvParams const *advParams);
+	ErrorType BleGapAdvStart(u8 *advHandle, BleGapAdvParams const &advParams);
 	ErrorType BleGapAdvDataSet(u8 * p_advHandle, u8 *advData, u8 advDataLength, u8 *scanData, u8 scanDataLength);
 	ErrorType BleGapAdvStop(u8 advHandle);
 
 	ErrorType BleTxPacketCountGet(u16 connectionHandle, u8* count);
 
-	u32 BleGapNameSet(BleGapConnSecMode & mode, u8 const * p_dev_name, u16 len);
-	u32 BleGapAppearance(BleAppearance appearance);
+	ErrorType BleGapNameSet(const BleGapConnSecMode & mode, u8 const * p_devName, u16 len);
+	ErrorType BleGapAppearance(BleAppearance appearance);
 
 	ErrorType BleGapConnectionParamsUpdate(u16 conn_handle, BleGapConnParams const & params);
-	u32 BleGapConnectionPreferredParamsSet(BleGapConnParams const & params);
+	ErrorType BleGapConnectionPreferredParamsSet(BleGapConnParams const & params);
 
-	u32 BleGapDataLengthExtensionRequest(u16 connHandle);
+	ErrorType BleGapDataLengthExtensionRequest(u16 connHandle);
 
-	u32 BleGapSecInfoReply(u16 conn_handle, BleGapEncInfo * p_info, u8 * p_id_info, u8 * p_sign_info);
+	ErrorType BleGapSecInfoReply(u16 connHandle, BleGapEncInfo * p_infoOut, u8 * p_id_info, u8 * p_sign_info);
 
-	u32 BleGapEncrypt(u16 conn_handle, BleGapMasterId const & master_id, BleGapEncInfo const & enc_info);
+	ErrorType BleGapEncrypt(u16 connHandle, BleGapMasterId const & masterId, BleGapEncInfo const & encInfo);
 
-	u32 BleGapRssiStart(u16 conn_handle, u8 threshold_dbm, u8 skip_count);
-	u32 BleGapRssiStop(u16 conn_handle);
+	ErrorType BleGapRssiStart(u16 connHandle, u8 thresholdDbm, u8 skipCount);
+	ErrorType BleGapRssiStop(u16 connHandle);
 
 	// ######################### GATT ############################
-	u32 DiscovereServiceInit(DBDiscoveryHandler dbEventHandler);
-	u32 DiscoverService(u16 connHandle, const BleGattUuid& p_uuid);
+	ErrorType DiscovereServiceInit(DBDiscoveryHandler dbEventHandler);
+	ErrorType DiscoverService(u16 connHandle, const BleGattUuid& p_uuid);
 	bool DiscoveryIsInProgress();
 
-	u32 BleGattSendNotification(u16 connHandle, BleGattWriteParams & params);
-	u32 BleGattWrite(u16 connHandle, BleGattWriteParams const & params);
+	ErrorType BleGattSendNotification(u16 connHandle, BleGattWriteParams & params);
+	ErrorType BleGattWrite(u16 connHandle, BleGattWriteParams const & params);
 
-	u32 BleUuidVsAdd(u8 const * p_vs_uuid, u8 * p_uuid_type);
-	u32 BleGattServiceAdd(BleGattSrvcType type, BleGattUuid const & p_uuid, u16 * p_handle);
-	u32 BleGattCharAdd(u16 service_handle, BleGattCharMd const & char_md, BleGattAttribute const & attr_char_value, BleGattCharHandles & handles);
+	ErrorType BleUuidVsAdd(u8 const * p_vsUuid, u8 * p_uuidType);
+	ErrorType BleGattServiceAdd(BleGattSrvcType type, BleGattUuid const & p_uuid, u16 * p_handle);
+	ErrorType BleGattCharAdd(u16 service_handle, BleGattCharMd const & charMd, BleGattAttribute const & attrCharValue, BleGattCharHandles & handles);
 
 	u32 BleGattGetMaxMtu();
-	u32 BleGattMtuExchangeRequest(u16 connHandle, u16 clientRxMtu);
-	u32 BleGattMtuExchangeReply(u16 connHandle, u16 clientRxMtu);
+	ErrorType BleGattMtuExchangeRequest(u16 connHandle, u16 clientRxMtu);
 	
 	// ######################### Radio ############################
-	ErrorType RadioSetTxPower(i8 tx_power, TxRole role, u16 handle);
+	ErrorType RadioSetTxPower(i8 txPower, TxRole role, u16 handle);
 
 
 	// ######################### Bootloader ############################
 	u32 GetBootloaderVersion();
 	u32 GetBootloaderAddress();
-	ErrorType ActivateBootloaderOnReset();
+	void ActivateBootloaderOnReset();
 
 	// ######################### Utility ############################
 
 	ErrorType WaitForEvent();
-	u32 InitializeButtons();
+	ErrorType InitializeButtons();
 	ErrorType GetRandomBytes(u8 * p_data, u8 len);
-	u32 ClearGeneralPurposeRegister(u32 gpregId, u32 mask);
-	u32 WriteGeneralPurposeRegister(u32 gpregId, u32 mask);
-	bool setRetentionRegisterTwo(u8 val);
+	bool SetRetentionRegisterTwo(u8 val);
 
 	// ######################### Timers ############################
 
 	typedef void(*TimerHandler)(void * p_context);
 	typedef u32* swTimer;
-	u32 InitTimers();
-	u32 StartTimers();
+	ErrorType InitTimers();
+	ErrorType StartTimers();
 	u32 GetRtcMs();
 	u32 GetRtcDifferenceMs(u32 nowTimeMs, u32 previousTimeMs);
 	ErrorType CreateTimer(swTimer &timer, bool repeated, TimerHandler handler);
@@ -415,12 +407,12 @@ namespace FruityHal
 	void SystemReset();
 	void SystemReset(bool softdeviceEnabled);
 	RebootReason GetRebootReason();
-	u32 ClearRebootReason();
+	ErrorType ClearRebootReason();
 	void StartWatchdog(bool safeBoot);
 	void FeedWatchdog();
 	void DelayUs(u32 delayMicroSeconds);
 	void DelayMs(u32 delayMs);
-	u32 EcbEncryptBlock(const u8 * p_key, const u8 * p_clearText, u8 * p_cipherText);
+	void EcbEncryptBlock(const u8 * p_key, const u8 * p_clearText, u8 * p_cipherText);
 	u8 ConvertPortToGpio(u8 port, u8 pin);
 
 	// ######################### FLASH ############################
@@ -430,27 +422,26 @@ namespace FruityHal
 
 	// ######################### NVIC ############################
 
-	void nvicEnableIRQ(u32 irqType);
-	void nvicDisableIRQ(u32 irqType);
-	void nvicSetPriorityIRQ(u32 irqType, u8 level);
-	void nvicClearPendingIRQ(u32 irqType);
+	void NvicEnableIRQ(u32 irqType);
+	void NvicDisableIRQ(u32 irqType);
+	void NvicSetPriorityIRQ(u32 irqType, u8 level);
+	void NvicClearPendingIRQ(u32 irqType);
 
 	// ######################### SERIAL COMMUNICATION ############################
 
 	// i2c
-	ErrorType twi_init(i32 sclPin, i32 sdaPin );
-	void twi_uninit(i32 sclPin, i32 sdaPin);
-	ErrorType twi_registerWrite(u8 slaveAddress, u8 const * pTransferData, u8 length);
-	ErrorType twi_registerRead(u8 slaveAddress, u8 reg, u8 * pReceiveData, u8 length);
-	ErrorType twi_read(u8 slaveAddress, u8 * pReceiveData, u8 length);
-	bool twi_isInitialized(void);
-	void twi_gpio_address_pin_set_and_wait(bool high, i32 sdaPin);
+	ErrorType TwiInit(i32 sclPin, i32 sdaPin);
+	ErrorType TwiRegisterWrite(u8 slaveAddress, u8 const * pTransferData, u8 length);
+	ErrorType TwiRegisterRead(u8 slaveAddress, u8 reg, u8 * pReceiveData, u8 length);
+	ErrorType TwiRead(u8 slaveAddress, u8 * pReceiveData, u8 length);
+	bool TwiIsInitialized(void);
+	void TwiGpioAddressPinSetAndWait(bool high, i32 sdaPin);
 
 	//spi
-	void spi_init(i32 sckPin, i32 misoPin, i32 mosiPin);
-	bool spi_isInitialized(void);
-	ErrorType spi_transfer(u8* const p_toWrite, u8 count, u8* const p_toRead, i32 slaveSelectPin);
-	void spi_configureSlaveSelectPin(i32 pin);
+	void SpiInit(i32 sckPin, i32 misoPin, i32 mosiPin);
+	bool SpiIsInitialized(void);
+	ErrorType SpiTransfer(u8* const p_toWrite, u8 count, u8* const p_toRead, i32 slaveSelectPin);
+	void SpiConfigureSlaveSelectPin(i32 pin);
 
 	// ######################### GPIO ############################
 	void GpioConfigureOutput(u32 pin);
@@ -480,11 +471,11 @@ namespace FruityHal
 	void VirtualComWriteData(const u8* data, u16 dataLength);
 
 	// ######################### UART ############################
-	void disableHardwareDfuBootloader();
-	void disableUart();
+	void DisableHardwareDfuBootloader();
+	void DisableUart();
 	void EnableUart(bool promptAndEchoMode);
-	bool checkAndHandleUartTimeout();
-	u32 checkAndHandleUartError();
+	bool CheckAndHandleUartTimeout();
+	u32 CheckAndHandleUartError();
 	void UartHandleError(u32 error);
 	bool UartCheckInputAvailable();
 	UartReadCharBlockingResult UartReadCharBlocking();
@@ -494,17 +485,13 @@ namespace FruityHal
 	bool IsUartTimedOutAndClear();
 	UartReadCharResult UartReadChar();
 
-	u32 getMasterBootRecordSize();
-	u32 getSoftDeviceSize();
+	u32 GetMasterBootRecordSize();
+	u32 GetSoftDeviceSize();
 	u32 GetSoftDeviceVersion();
 	BleStackType GetBleStackType();
-	void bleStackErrorHandler(u32 id, u32 info);
+	void BleStackErrorHandler(u32 id, u32 info);
 
-
-	//Functions for resolving error codes
-	const char* getBleEventNameString(u16 bleEventId);
-
-	ErrorType getDeviceConfiguration(DeviceConfiguration & config);
+	ErrorType GetDeviceConfiguration(DeviceConfiguration & config);
 	u32 * GetUserMemoryAddress();
 	u32 * GetDeviceMemoryAddress();
 	void GetCustomerData(u32 * p_data, u8 len);

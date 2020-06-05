@@ -28,21 +28,21 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
- * The AdvertisingModule is used to broadcast user-data that is not related with
- * the mesh during times where no mesh discovery is ongoing. It is used
- * to broadcast messages to smartphones or other devices from all mesh nodes.
- */
-
 #pragma once
 
 #include <Module.h>
 #include "AdvertisingController.h"
+#include <array>
 
 // Be sure to check the advertising controller for the maximum number of supported jobs before increasing this
 constexpr int ADVERTISING_MODULE_MAX_MESSAGES = 1;
 constexpr int ADVERTISING_MODULE_MAX_MESSAGE_LENGTH = 31;
 
+/*
+ * The AdvertisingModule is used to broadcast user-data that is not related with
+ * the mesh during times where no mesh discovery is ongoing. It is used
+ * to broadcast messages to smartphones or other devices from all mesh nodes.
+ */
 class AdvertisingModule: public Module
 {
 	private:
@@ -56,7 +56,7 @@ class AdvertisingModule: public Module
 			u8 forceConnectable : 1; //Message is only sent, when it is possible to send it in connectable mode (if we have a free slave connection)
 			u8 reserved : 1;
 			u8 messageLength : 5;
-			SimpleArray<u8, ADVERTISING_MODULE_MAX_MESSAGE_LENGTH> messageData;
+			std::array<u8, ADVERTISING_MODULE_MAX_MESSAGE_LENGTH> messageData;
 		};
 
 		//Module configuration that is saved persistently
@@ -67,12 +67,12 @@ class AdvertisingModule: public Module
 			//Number of messages
 			u8 messageCount;
 			i8 txPower;
-			SimpleArray<AdvertisingMessage, ADVERTISING_MODULE_MAX_MESSAGES> messageData;
+			std::array<AdvertisingMessage, ADVERTISING_MODULE_MAX_MESSAGES> messageData;
 			//Insert more persistent config values here
 		};
 		#pragma pack(pop)
 
-		SimpleArray<AdvJob*, ADVERTISING_MODULE_MAX_MESSAGES> advJobHandles;
+		std::array<AdvJob*, ADVERTISING_MODULE_MAX_MESSAGES> advJobHandles{};
 
 		u16 maxMessages = ADVERTISING_MODULE_MAX_MESSAGES; //Save this, so that it can be requested
 
@@ -87,9 +87,9 @@ class AdvertisingModule: public Module
 			u8 debugPacketIdentifier;
 			NodeId senderId;
 			u16 connLossCounter;
-			SimpleArray<NodeId, 4> partners;
-			SimpleArray<i8, 3> rssiVals;
-			SimpleArray<u8, 3> droppedVals;
+			std::array<NodeId, 4> partners;
+			std::array<i8, 3> rssiVals;
+			std::array<u8, 3> droppedVals;
 
 		} AdvertisingModuleDebugMessage;
 
@@ -101,11 +101,11 @@ class AdvertisingModule: public Module
 
 		AdvertisingModule();
 
-		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override;
+		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
 
-		void ResetToDefaultConfiguration() override;
+		void ResetToDefaultConfiguration() override final;
 
 		#ifdef TERMINAL_ENABLED
-		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
+		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
 		#endif
 };

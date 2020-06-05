@@ -1,0 +1,61 @@
+= ModuleTitle (ID #)
+
+== Purpose
+Provide a short statement about the purpose of this module and outline the use cases that this module applies to.
+
+Paragraphs are written without hard line breaks using the soft wrap functionality of an editor. This makes it easier to make changes to a document without having to adjust line endings.
+
+== Functionality
+Provide a brief explanation of the functionality of this module. This can be more content than the purpose section above.
+
+== Terminal Commands
+
+=== TheCommand Title
+`the_command [param1] [on / off] {opt_param = 1}`
+
+.Examples
+[source,Javascript]
+----
+//Sends the command 1 to all nodes to switch sth. on
+the_command 1 on
+----
+
+* param1 (u16): Description of this parameter
+
+The command above is given with commandName and parameters. In addition, some examples can be provided such that the reader gets a basic understanding of the command. Explanations should follow what the command can be used for and what response is to be expected.
+
+Source Javascript is used to get some syntax highlighting for comments and JSONs. The return message should be explained and an example should be provided.
+
+[source,Javascript]
+----
+{"type":"the_command_response","code":0}
+----
+
+<<TheCommand Title Binary Message Format,See also: Binary Message Format>>
+
+=== TheCommand2 Title
+
+...
+
+== Messages
+
+=== TheCommand Title Binary Message Format
+==== Request
+A short explanation for the binary message can be added here. Tables should not be indentated using spaces, as this makes editing quite tedious.
+|===
+|Bytes|Type|Name|Description
+|8|xref:Specification.adoc#connPacketModule[connPacketModule]|header|*messageType:* MESSAGE_TYPE_MODULE_TRIGGER_ACTION(51), *actionType:* THE_COMMAND(1)
+|2|u16|param|Param Description
+|4|u32|optParam|Opt param description
+|===
+==== Response
+A short explanation for the binary message response can be added here.
+|===
+|Bytes|Type|Name|Description
+|8|xref:Specification.adoc#connPacketModule[connPacketModule]|header|*messageType:* MESSAGE_TYPE_MODULE_ACTION_RESPONSE(52), *actionType:* THE_COMMAND_RESPONSE(1)
+|2|u16|param|Param Description
+|===
+
+
+=== TheCommand2 Title Binary Message Format
+...

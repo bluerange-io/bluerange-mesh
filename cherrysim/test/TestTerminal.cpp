@@ -36,10 +36,11 @@
 TEST(TestTerminal, TestTokenizeLine) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
 
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -59,52 +60,5 @@ TEST(TestTerminal, TestTokenizeLine) {
 
 
 	}
-}
-
-TEST(TestTerminal, TestAddTerminalCommandListener) {
-	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
-	simConfig.terminalId = 0;
-	//testerConfig.verbose = true;
-
-	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-	tester.Start();
-
-	struct TerminalCommandListenerImplementation : public TerminalCommandListener{
-		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override { return TerminalCommandHandlerReturnType::UNKNOWN; /*Dummy impl*/ }
-	};
-
-	TerminalCommandListenerImplementation impls[MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS];
-	ASSERT_LT(Terminal::getInstance().getAmountOfRegisteredCommandListeners(), MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS); //If this fails, there were not enough slots to test the function.
-
-	for (int i = Terminal::getInstance().getAmountOfRegisteredCommandListeners(); i < MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS; i++)
-	{
-		Terminal::getInstance().AddTerminalCommandListener(&(impls[i]));
-		ASSERT_EQ(Terminal::getInstance().getAmountOfRegisteredCommandListeners(), i + 1);
-	}
-
-
-	for (int i = Terminal::getInstance().getAmountOfRegisteredCommandListeners(); i < MAX_TERMINAL_COMMAND_LISTENER_CALLBACKS; i++)
-	{
-		ASSERT_EQ(Terminal::getInstance().getRegisteredCommandListeners()[i], &(impls[i]));
-	}
-
-}
-
-TEST(TestTerminal, TestPutIntoReadBuffer) {
-	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
-	simConfig.terminalId = 0;
-	//testerConfig.verbose = true;
-
-	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-	tester.Start();
-
-	ASSERT_TRUE(Terminal::getInstance().PutIntoReadBuffer("Hello World!"));
-	ASSERT_EQ(Terminal::getInstance().getReadBufferOffset(), 13);
-	ASSERT_STREQ(Terminal::getInstance().getReadBuffer(), "Hello World!");
-
 }
 

@@ -28,11 +28,6 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
- * The status reporter module is responsible for measuring battery, connections,
- * etc... and report them back to a sink
- */
-
 #pragma once
 
 #include <Module.h>
@@ -40,7 +35,15 @@
 
 #include <Terminal.h>
 
-#define BATTERY_SAMPLES_IN_BUFFER 					1//Number of SAADC samples in RAM before returning a SAADC event. For low power SAADC set this constant to 1. Otherwise the EasyDMA will be enabled for an extended time which consumes high current.
+constexpr size_t BATTERY_SAMPLES_IN_BUFFER = 1; //Number of SAADC samples in RAM before returning a SAADC event. For low power SAADC set this constant to 1. Otherwise the EasyDMA will be enabled for an extended time which consumes high current.
+
+enum class StatusReporterModuleComponent :u16 {
+	TIME = 0xABCD,
+};
+
+enum class StatusReporterModuleRegister : u16 {
+	TIME = 0x1234,
+};
 
 enum class RSSISamplingModes : u8 {
 	NONE = 0,
@@ -79,6 +82,11 @@ typedef struct
 STATIC_ASSERT_SIZE(StatusReporterModuleConnectionsMessage, 12);
 #pragma pack(pop)
 
+/*
+ * The StatusReporterModule can respond to a number of requests for device info
+ * or device status, current mesh connections, etc... it also does battery
+ * measurement of the node and can be seen as a generic health service.
+ */
 class StatusReporterModule: public Module
 {
 public:
@@ -211,13 +219,21 @@ private:
 		void SendRebootReason(NodeId toNode, u8 requestHandle) const;
 
 		void StartConnectionRSSIMeasurement(MeshConnection& connection) const;
-		void StopConnectionRSSIMeasurement(const MeshConnection& connection) const;
 
 		static void AdcEventHandler();
 		void initBatteryVoltageADC();
 		void BatteryVoltageADC();
 
 		void convertADCtoVoltage();
+
+		bool periodicTimeSendWasActivePreviousTimerEventHandler = false;
+		u32 periodicTimeSendStartTimestampDs = 0;
+		constexpr static u32 PERIODIC_TIME_SEND_AUTOMATIC_DEACTIVATION = SEC_TO_DS(/*10 minutes*/ 10 * 60);
+		constexpr static u32 TIME_BETWEEN_PERIODIC_TIME_SENDS_DS = SEC_TO_DS(5);
+		u32 timeSinceLastPeriodicTimeSendDs = 0;
+		NodeId periodicTimeSendReceiver = 0;
+		decltype(componentMessageHeader::requestHandle) periodicTimeSendRequestHandle = 0;
+		bool IsPeriodicTimeSendActive();
 
 	public:
 
@@ -228,26 +244,30 @@ private:
 
 		StatusReporterModule();
 
-		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override;
+		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
 
-		void ResetToDefaultConfiguration() override;
+		void ResetToDefaultConfiguration() override final;
 
-		void TimerEventHandler(u16 passedTimeDs) override;
+		void TimerEventHandler(u16 passedTimeDs) override final;
 
 		#ifdef TERMINAL_ENABLED
-		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
+		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
 		#endif
 
-		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
+		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
 
-		void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override;
+		void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override final;
 
-		void MeshConnectionChangedHandler(MeshConnection& connection) override;
+		void MeshConnectionChangedHandler(MeshConnection& connection) override final;
 
 		void SendLiveReport(LiveReportTypes type, u16 requestHandle, u32 extra, u32 extra2) const;
 
 		u8 GetBatteryVoltage() const;
 
 		u16 ExternalVoltageDividerDv(u32 Resistor1, u32 Resistor2);
+
+		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) override final;
+
+		bool IsInterestedInMeshAccessConnection() override final;
 };
 

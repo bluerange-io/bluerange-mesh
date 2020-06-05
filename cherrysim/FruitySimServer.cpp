@@ -52,6 +52,10 @@
 #include <unistd.h>
 #endif // __unix
 
+#ifdef _MSC_VER
+#define fileno _fileno
+#endif
+
 /**
 This provides a basic webserver that serves the fruitymap and information about the mesh.
 The only thing necessary to view the simulation is a browser, that's it :-)
@@ -229,8 +233,8 @@ std::string FruitySimServer::GenerateDevicesJson()
 {
 	json devices;
 	devices["status"] = "success";
-	u32 numNodes = cherrySimInstance->getNumNodes();
-	for (unsigned int i = 0; i < numNodes; i++) {
+	for (unsigned int i = 0; i < cherrySimInstance->getTotalNodes(); i++) {
+		NodeIndexSetter nodeIndexSetter(i);
 		nodeEntry* node = &cherrySimInstance->nodes[i];
 		json device;
 
@@ -241,14 +245,14 @@ std::string FruitySimServer::GenerateDevicesJson()
 		auto inConnections = node->gs.cm.GetMeshConnections(ConnectionDirection::DIRECTION_IN);
 		MeshConnection* inConnection = nullptr;
 		for (int k = 0; k < inConnections.count; k++) {
-			if (inConnections.connections[k]->handshakeDone()) {
-				inConnection = inConnections.connections[k];
+			if (inConnections.handles[k] && inConnections.handles[k].IsHandshakeDone()) {
+				inConnection = inConnections.handles[k].GetConnection();
 			}
 		}
 
 		//UUID is generated based on the node index
 		char uuid[50];
-		sprintf(uuid, "00000000-1111-2222-3333-00000000%04d", node->index);
+		sprintf(uuid, "00000000-1111-2222-3333-00000000%04u", node->index);
 
 		device["uuid"] = uuid;
 		device["deviceId"] = node->gs.config.GetSerialNumber();
@@ -269,8 +273,8 @@ std::string FruitySimServer::GenerateDevicesJson()
 				nodeEntry* partnerNode = foundSoftdeviceConnection->partner;
 				MeshConnections conn = partnerNode->gs.cm.GetMeshConnections(ConnectionDirection::DIRECTION_OUT);
 				for (int k = 0; k < conn.count; k++) {
-					if (conn.connections[k]->connectionHandle == inConnection->connectionHandle) {
-						partnerHasMB = conn.connections[k]->connectionMasterBit;
+					if (conn.handles[k] && conn.handles[k].GetConnectionHandle() == inConnection->connectionHandle) {
+						partnerHasMB = conn.handles[k].GetConnection()->connectionMasterBit;
 					}
 				}
 			}

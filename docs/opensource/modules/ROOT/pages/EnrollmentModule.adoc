@@ -137,7 +137,7 @@ actionType: SET_ENROLLMENT
 [cols="1,2,3"]
 |===
 |Bytes|Type|Description
-|8|**connPacketModule**|
+|8|xref:Specification.adoc#connPacketModule[connPacketModule]|
 |4|serialNumberIndex|Index of the serial number to be enrolled
 |2|newNodeId|The new node id that should be assigned to this node (Set to 0 to leave unchanged)
 |2|newNetworkId|The new network id to be assigned (Set to 0 to leave unchanged)
@@ -165,7 +165,7 @@ actionType: `ENROLLMENT_RESPONSE`
 [cols="1,2,3"]
 |===
 |Bytes|Type|Description
-|8|connPacketModule|
+|8|xref:Specification.adoc#connPacketModule[connPacketModule]|
 |4|serialNumberIndex|Index of the serial number that was enrolled
 |1|result|See above for possible result codes
 |===
@@ -176,7 +176,7 @@ actionType: `ENROLLMENT_PROPOSAL`
 [cols="1,2,3"]
 |===
 |Bytes|Type|Description
-|8|connPacketModule	|
+|8|xref:Specification.adoc#connPacketModule[connPacketModule]	|
 |4|serialNumberIndex[0]|nearby node serial number index
 |4|serialNumberIndex[1]|nearby node serial number index
 |4|serialNumberIndex[2]|nearby node serial number index
@@ -188,7 +188,7 @@ actionType: `REMOVE_ENROLLMENT`
 [cols="1,2,3"]
 |===
 |Bytes|Type|Description
-|8|connPacketModule	|
+|8|xref:Specification.adoc#connPacketModule[connPacketModule]	|
 |4|serialNumberIndex|Index of the serial number to be enrolled
 |===
 ==== Response
@@ -204,7 +204,7 @@ actionType: `REMOVE_ENROLLMENT_RESPONSE`
 [cols="1,2,3"]
 |===
 |Bytes|Type|Description
-|8|connPacketModule|
+|8|xref:Specification.adoc#connPacketModule[connPacketModule]|
 |4|serialNumberIndex|Index of the serial number that was enrolled
 |1|result|See above for possible result codes
 |===
@@ -215,7 +215,7 @@ actionType: `REQUEST_PROPOSALS (4)`
 [cols="1,2,3"]
 |===
 |Bytes|Type|Description
-|8|connPacketModule	|
+|8|xref:Specification.adoc#connPacketModule[connPacketModule]	|
 |4 - 44|serialNumberIndices|Up to 11 serial indices.
 |===
 ==== Response
@@ -223,6 +223,6 @@ actionType: `REQUEST_PROPOSALS_RESPONSE (4)`
 [cols="1,2,3"]
 |===
 |Bytes|Type|Description
-|8|connPacketModule|
+|8|xref:Specification.adoc#connPacketModule[connPacketModule]|
 |4|serialNumberIndex|The serial index that was possible to scan.
 |===

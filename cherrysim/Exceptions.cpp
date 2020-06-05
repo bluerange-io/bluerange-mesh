@@ -54,7 +54,11 @@ void Exceptions::enableExceptionByIndex(std::type_index index)
 		SIMEXCEPTION(MemoryCorruptionException);
 	}
 	else {
-		ignoredExceptions[index]++;
+		ignoredExceptions[index]--;
+		if (ignoredExceptions[index] <= 0)
+		{
+			ignoredExceptions.erase(index);
+		}
 	}
 }
 
@@ -73,7 +77,7 @@ Exceptions::DisableDebugBreakOnException::DisableDebugBreakOnException()
 	disableDebugBreakOnExceptionCounter++;
 }
 
-Exceptions::DisableDebugBreakOnException::~DisableDebugBreakOnException()
+Exceptions::DisableDebugBreakOnException::~DisableDebugBreakOnException() noexcept(false)
 {
 	disableDebugBreakOnExceptionCounter--;
 	if (disableDebugBreakOnExceptionCounter < 0)

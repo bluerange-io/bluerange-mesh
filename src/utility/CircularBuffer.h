@@ -37,6 +37,10 @@
 #include "types.h"
 
 template<typename T, int N>
+
+/**
+ * A simple circular buffer implementation.
+ */
 class CircularBuffer
 {
 private:
@@ -45,6 +49,14 @@ private:
 
 public:
 	static constexpr int length = N;
+
+	CircularBuffer()
+	{
+		for (int i = 0; i < N; i++)
+		{
+			data[i] = T();
+		}
+	}
 
 	T* getRaw()
 	{

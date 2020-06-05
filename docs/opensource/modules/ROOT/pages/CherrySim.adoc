@@ -4,25 +4,31 @@ ifndef::imagesdir[:imagesdir: ../assets/images]
 == General
 CherrySim uses the codebase of FruityMesh and provides a SoftDevice abstraction layer that simulates Bluetooth connections, advertising, flash access and much more. It gives the possibility to debug, develop and simulate multiple FruityMesh nodes on a development PC.
 
-NOTE: Nordic allowed us in their forums to use their headers in our simulator as long as it
-is used to simulate a Nordic Integrated Circuit.
-See: https://devzone.nordicsemi.com/f/nordic-q-a/57615/legal-issue-using-nordic-sdk-code
-
 image:cherrysim.png[cherrysim]
 
 == Functionality
-
 * Simulates nodes in a time step based simulation
-* Allows easy debugging of mesh-behaviour
-* Includes CherrySimRunner for manual testing and simulation and CherrySimTester for automatic mesh tests using the google test framework
-* Deterministic meshing using a pseude random number generator
-* Mesh state visualization on http://localhost:5555/
+* Allows easy xref:#Debugging[debugging] of mesh-behaviour with a deterministic pseudo random number generator
+* Includes CherrySimRunner for xref:#Terminal[manual testing] and simulation
+* xref:#CherrySimTester[CherrySimTester] is used for automatic mesh tests using the google test framework
+* Mesh state xref:#Visualization[visualization] in your web browser: http://localhost:5555/
+
+== Setting up the build environment
+The build environment can be set up by following the instructions under xref:BuildingWithCMake.adoc[Building with CMake].
+
+== Building
+See xref:BuildingWithCMake.adoc#BuildingSimulator[here] for a guide how to build the Simulator.
 
 == How It Works
-CherrySim uses a header file _SystemTest.h_ that is force-included before all other header files to be able to abstract the SoftDevice. All SoftDevice calls are implemented in a way to closely mock the funcationality of a real SoftDevice. For everything that uses the radio, such as advertising or connections, a simplified simulation is used that calculates the distances between nodes and simulates packet loss.
+CherrySim uses a header file _SystemTest.h_ that is force-included before all other header files to be able to abstract the SoftDevice. All SoftDevice calls are implemented in a way to closely mock the functionality of a real SoftDevice. For everything that uses the radio, such as advertising or connections, a simplified simulation is used that calculates the distances between nodes and simulates packet loss.
 
+CherrySim works with only one instance and is able to simulate many instances of FruityMesh. Hence FruityMesh must be written in a way that the code itself has no state variables. No global or functional static variables are allowed. Every variable that needs to be saved from one function call to the next needs to be a part of class since CherrySim creates instances of classes for every node. The `GlobalState.cpp` is used to store the whole state of a node and CherrySim switches the pointer to the currently simulated node for each simulation step.
+
+CherrySim gives each node a different serial numbers starting at `BBBBB` and incrementing. Every forth byte of the node key, starting with the first byte is equal to the serial number index + 1. So for example, `BBBBB` has the node key `01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00`, `BBBBC` has the node key `02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00` and so on. By default, all nodes have the same networkId and networkKey so that they are in the same mesh network. If this is not desired, the simulated UICR can be overwritten or the nodes can be enrolled using the standard enrollment command. Default featuresets are given to each node but the featureset can also be individually configured for each node.
+
+[#Visualization]
 == Visualization
-Open http://localhost:5555/ in a webbrowser while the simulator is running and simulating.
+Open http://localhost:5555/ in a web browser while the simulator is running and simulating.
 
 The Webserver serves the FruityMap for visualization and has some endpoints that serve dynamic JSONs that reflect the current mesh state. Be aware that the visualization shows the GAP connections and not the MeshConnections. This is an important difference. If all MeshConnections are handshaked, in a stable state and if there are no implementation errors, these visualizations match.
 
@@ -30,17 +36,75 @@ The connections are presented using arrows which originate from the central and 
 
 The LEDs are also visualized but all LED changes are mapped to a single one.
 
-== Node Properties In Simulator
-The serial numbers are counting upwards, starting at BBBBB. Every forth byte of the node key, starting with the first byte is equal to the serial number index + 1. So for example, BBBBB has the node key 01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00, BBBBC has the node key 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 and so on.
+[#Terminal]
+== Terminal Commands
+The simulator has a terminal that allows to input all commands that can be used with FruityMesh nodes. Depending on the simulator configuration (`simConfig.terminalId`), either no terminal is enabled (-1), all terminals are active (0) or the terminal of a specific node is active, e.g. 1. Additionally, the simulator adds a few commands for simulation control:
 
-== Docker Environment
-The simulator inside the docker environment has 10 nodes that take part in the mesh and additionally two assets.
+[source,c++]
+----
+sim term [terminalId] // e.g. "sim term 1" to interact with the first node
+----
+The active terminal can be either 0 to see the terminal output of all nodes at the same time, or you can give the nodeId of a single node. Afterwards, you can directly interact with that node with the usual FruityMesh terminal commands.
 
-== Instances
-CherrySim works with only one instance and is able to simulate many instances of FruityMesh. Hence FruityMesh must be written in a way that the code itself has no state variables. No global or functional static variables are allowed. Every variable that needs to be saved from function call to another needs to be a part of class since CherrySim creates instances of classes for every node.
+[source,c++]
+----
+sim stat
+----
+This command gives an overview of all available commands. Also, a number of _SIMSTATCOUNT_ and _SIMSTATAVG_ macros are spread throughout the code that are used to collect statistics. The results are also shown by this command.
 
+[source,c++]
+----
+sim nodes [numNodes] // e.g. "sim nodes 10" to start a simulation with 10 randomly generated nodes
+----
+Using the nodes command allows you to restart the simulation with a different number of nodes.
+
+[source,c++]
+----
+sim seedr [seedValue] // e.g. "sim seedr 123" to restart the simulation with this seed
+----
+As the simulation is deterministic, you can always restart it either with the same seed to get the same simulation output or choose a different seed.
+
+[source,c++]
+----
+sim set_position [serial] [x] [y] [z] //e.g. sim set_position BBBBD 0.5 0.21 1.7
+----
+Sets the position (in meters) in the virtual environment of the node with the serial number BBBBD to (0.5 / 0.21 / 1.7). Note: The third axis is the height axis.
+
+[source,c++]
+----
+sim set_position_norm [serial] [x] [y] [z] //e.g. sim set_position_norm BBBBD 0.5 0.21 1.7
+----
+Same as set_position, but relative to the normalized simulated environment dimensions instead of in meters.
+
+[source,c++]
+----
+sim add_position [serial] [x] [y] [z] //e.g. sim add_position BBBBD -0.17 0.23 12
+----
+Adds to the position (in meters) in the virtual environment of the node with the serial number BBBBD. Note: The third axis is the height axis.
+
+[source,c++]
+----
+sim add_position_norm [serial] [x] [y] [z] //e.g. sim add_position_norm BBBBD 0.5 0.21 1.7
+----
+Same as add_position, but relative to the normalized simulated environment dimensions instead of in meters.
+
+
+
+Using commands such as *nodes 20*, *width 40*, *height 50* allows to modify the simulation scenario. Scenarios can also be imported as JSON files by first giving the paths (*site site1.json*, *devices dev1.json*) and then enabling JSON import (*json 1*). Each simulation is always run deterministically with a preset seed. This seed can be modified using e.g. *seed 123*, which will result in a new simulation.
+
+[#Debugging]
 == Debugging
+CherrySim is great for debugging issues that only arise with multiple nodes. As you are able to add nodes with different featuresets, you can easily simulate this network and debug the node interaction.
+
+=== Reproducible Simulation
+All parts of CherrySim use a pseudo random number generator that is initialized with a user-given seed. This means that the simulation will always produce the exact same results on each run. This is great for debugging a complex problem as the simulation can be restarted multiple times. To get a different behaviour, the simulation can be restarted with a different seed.
+
+=== Replay
+Due to the reproducible, deterministic nature of CherrySim, it is possible to replay a log file of a previous CherrySim execution if that run was configured with `simConfig.logReplayCommands = true`. If you want to do this, all you have to do is set `simConfig.replayPath` to a path of a log file. In practice you probably want to use this feature in CherrySimRunner. A designated line was created to help you with this, look for the String "@ReplayFeature@" inside `CherrySimRunner.cpp` for more information.
+
 === Globally Available Variables
+There are a number of global variables that are helpful for inspecting the state of the simulation:
+
 *simGlobalStatePtr* always references the GlobalState of the current node that is simulated. Only one node is simulated at a time and the GlobalState object contains the full state of a FruityMesh node.
 
 *cherrySimInstance* points to the simulator and can be used to access all other information
@@ -69,33 +133,11 @@ counter++;
 ----
 Then check the value of the counter in the debugger, set a conditional breakpoint some lines before the error happened and compare the counter value against the count from the previous run.
 
-== Terminal Commands
-The simulator has a terminal that allows to input all commands that can be used with FruityMesh nodes. Depending on the simulator configuration, either no terminal is enabled (-1), all terminals are active (0) or the terminal of a specific node is active, e.g. 1.
+[#CherrySimTester]
+== CherrySimTester
+CherrySimTester is used to write automated tests against the mesh. Typically a test will first set up a mesh network with a few nodes, possibly with different featuresets. Afterwards, it might wait until they are clustered and then send some terminal commands. Next, the simulation might wait for some message to be received so that the test is considered passing. Have a look at the available tests under `<fruitymesh>/cherrysim/test` to get a better understanding.
 
-The active terminals can be switched at runtime by using the term command, e.g.:
-[source,c++]
-----
-term 1
-----
-The simulator provides a set of terminal commands as well that you can input via the terminal. The most important one is:
-[source,c++]
-----
-simstat
-----
-It gives an overview of all available commands. Also, a number of _SIMSTATCOUNT_ and _SIMSTATAVG_ macros are spread throughout the code that are used to collect statistics. The results are also shown by this command.
-
-[source,c++]
-----
-sim set_position BBBBD 0.5 0.21 1.7
-----
-
-Sets the position in the virtual environment of the node with the serial number BBBBD to (0.5 / 0.21 / 1.7). Note: The third axis is the height axis.
-
-[source,c++]
-----
-sim add_position BBBBD -0.17 0.23 12
-----
-
-Adds (-0.17 / 0.23 / 12) to the position in the virtual environment of the node with the serial number BBBBD. Note: The third axis is the height axis.
-
-Using commands such as *nodes 20*, *width 40*, *height 50* allows to modify the simulation scenario. Scenarios can also be imported as JSON files by first giving the paths and then enabling JSON import (*json 1*). Each simulation is always run deterministically with a preset seed. This seed can be modified using e.g. *seed 123*, which will result in a new simulation.
+== Legal Disclaimer
+Nordic allowed us in their forums to use their headers in our simulator as long as it
+is used to simulate a Nordic Integrated Circuit.
+See: https://devzone.nordicsemi.com/f/nordic-q-a/57615/legal-issue-using-nordic-sdk-code

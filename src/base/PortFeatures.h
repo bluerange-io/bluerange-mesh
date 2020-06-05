@@ -42,8 +42,6 @@
 // Chipset string name
 #if defined(NRF52)
 	#define CHIPSET_NAME "NRF52"
-#elif defined(NRF51)
-	#define CHIPSET_NAME "NRF51"
 #elif defined(SIM_ENABLED)
 	#define CHIPSET_NAME "SIMULATOR"
 #elif defined(ARM_TEMPLATE)
@@ -57,90 +55,10 @@
 	#define BOARD_TYPE 4
 #elif defined(NRF52840)
 	#define BOARD_TYPE 18
-#elif defined(NRF51)
-	#define BOARD_TYPE 1
 #elif defined(SIM_ENABLED)
 	#define BOARD_TYPE 19
 #elif defined(ARM_TEMPLATE)
 	#define BOARD_TYPE 1 // just for now
-#else
-	#error "No defined chipset"
-#endif
-
-// Preferred connections
-#if defined(NRF52)
-	#define PREFERRED_CONNECTIONS_AVAILABLE 1
-#elif defined(NRF51)
-	#define PREFERRED_CONNECTIONS_AVAILABLE 0
-#elif defined(SIM_ENABLED)
-	#define PREFERRED_CONNECTIONS_AVAILABLE 1
-#elif defined(ARM_TEMPLATE)
-	#define PREFERRED_CONNECTIONS_AVAILABLE 1
-#else
-	#error "No defined chipset"
-#endif
-
-// Device capabilites
-#if defined(NRF52)
-	#define DEVICE_CAPABILITIES_AVAILABLE 1
-#elif defined(NRF51)
-	#define DEVICE_CAPABILITIES_AVAILABLE 0
-#elif defined(SIM_ENABLED)
-	#define DEVICE_CAPABILITIES_AVAILABLE 1
-#elif defined(ARM_TEMPLATE)
-	#define DEVICE_CAPABILITIES_AVAILABLE 1
-#else
-	#error "No defined chipset"
-#endif
-
-// Accelerometer
-#if defined(NRF52)
-	#define ACCELEROMETER_AVAILABLE 1
-#elif defined(NRF51)
-	#define ACCELEROMETER_AVAILABLE 0
-#elif defined(SIM_ENABLED)
-	#define ACCELEROMETER_AVAILABLE 1
-#elif defined(ARM_TEMPLATE)
-	#define ACCELEROMETER_AVAILABLE 0
-#else
-	#error "No defined chipset"
-#endif
-
-// Gyroscope
-#if defined(NRF52)
-	#define GYROSCOPE_AVAILABLE 1
-#elif defined(NRF51)
-	#define GYROSCOPE_AVAILABLE 0
-#elif defined(SIM_ENABLED)
-	#define GYROSCOPE_AVAILABLE 1
-#elif defined(ARM_TEMPLATE)
-	#define GYROSCOPE_AVAILABLE 0
-#else
-	#error "No defined chipset"
-#endif
-
-// Barometer
-#if defined(NRF52)
-	#define BAROMETER_AVAILABLE 1
-#elif defined(NRF51)
-	#define BAROMETER_AVAILABLE 0
-#elif defined(SIM_ENABLED)
-	#define BAROMETER_AVAILABLE 1
-#elif defined(ARM_TEMPLATE)
-	#define BAROMETER_AVAILABLE 0
-#else
-	#error "No defined chipset"
-#endif
-
-// Magneto
-#if defined(NRF52)
-	#define MAGNETOMETER_AVAILABLE 1
-#elif defined(NRF51)
-	#define MAGNETOMETER_AVAILABLE 0
-#elif defined(SIM_ENABLED)
-	#define MAGNETOMETER_AVAILABLE 1
-#elif defined(ARM_TEMPLATE)
-	#define MAGNETOMETER_AVAILABLE 0
 #else
 	#error "No defined chipset"
 #endif
@@ -150,8 +68,6 @@
 	#define INS_AVAILABLE 1
 #elif defined(NRF52)
 	#define INS_AVAILABLE 0
-#elif defined(NRF51)
-	#define INS_AVAILABLE 0
 #elif defined(SIM_ENABLED)
 	#define INS_AVAILABLE 1
 #elif defined(ARM_TEMPLATE)
@@ -160,13 +76,9 @@
 	#error "No defined chipset"
 #endif
 
-static_assert((FEATURE_AVAILABLE(INS)) ? (FEATURE_AVAILABLE(ACCELEROMETER) && FEATURE_AVAILABLE(GYROSCOPE)) : true, "INS feature requires Accelerometer and Gyroscope to be available.");
-
 // adc internal measurement
 #if defined(NRF52)
 	#define ADC_INTERNAL_MEASUREMENT_AVAILABLE 1
-#elif defined(NRF51)
-	#define ADC_INTERNAL_MEASUREMENT_AVAILABLE 0
 #elif defined(SIM_ENABLED)
 	#define ADC_INTERNAL_MEASUREMENT_AVAILABLE 0
 #elif defined(ARM_TEMPLATE)
@@ -175,15 +87,3 @@ static_assert((FEATURE_AVAILABLE(INS)) ? (FEATURE_AVAILABLE(ACCELEROMETER) && FE
 	#error "No defined chipset"
 #endif
 
-// mutiple in connections
-#if defined(NRF52)
-	#define MULTIPILE_IN_CONNECTIONS_AVAILABLE 1
-#elif defined(NRF51)
-	#define MULTIPILE_IN_CONNECTIONS_AVAILABLE 0
-#elif defined(SIM_ENABLED)
-	#define MULTIPILE_IN_CONNECTIONS_AVAILABLE 1
-#elif defined(ARM_TEMPLATE)
-	#define MULTIPILE_IN_CONNECTIONS_AVAILABLE 1
-#else
-	#error "No defined chipset"
-#endif

@@ -57,6 +57,7 @@ using json = nlohmann::json;
 //These variables are normally defined by the linker sections, so we need to define them here
 uint32_t __application_start_address;
 uint32_t __application_end_address;
+uint32_t __application_ram_start_address;
 uint32_t __start_conn_type_resolvers;
 uint32_t __stop_conn_type_resolvers;
 
@@ -90,7 +91,7 @@ extern "C"
 	void nrf_uart_task_trigger(NRF_UART_Type *p_reg, nrf_uart_task_t task) {}
 
 
-	void nrf_uart_int_enable(NRF_UART_Type *p_reg, uint32_t int_mask) 
+	void nrf_uart_int_enable(NRF_UART_Type *p_reg, uint32_t int_mask)
 	{
 		START_OF_FUNCTION();
 		if (p_reg != NRF_UART0)
@@ -161,14 +162,14 @@ extern "C"
 			//At the moment we don't simulate uart errors or timeouts.
 			return false;
 		}
-		SoftdeviceState &state = cherrySimInstance->currentNode->state;
+		const SoftdeviceState &state = cherrySimInstance->currentNode->state;
 		return state.uartBufferLength != state.uartReadIndex;
 	}
 
 	void ResetUart(SoftdeviceState &state)
 	{
 		START_OF_FUNCTION();
-		state.uartBuffer.zeroData();
+		state.uartBuffer = {};
 		state.uartReadIndex = 0;
 		state.uartBufferLength = 0;
 		state.currentlyEnabledUartInterrupts = 0;
@@ -303,10 +304,10 @@ extern "C"
 			//Was not initialized!
 			SIMEXCEPTION(IllegalStateException);
 		}
-		gyro->x          = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
-		gyro->y          = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
-		gyro->z          = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
-		gyro->sensortime =           cherrySimInstance->simState.rnd.nextU32();
+		gyro->x = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
+		gyro->y = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
+		gyro->z = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
+		gyro->sensortime = cherrySimInstance->simState.rnd.nextU32();
 		return BMG250_OK;
 	}
 
@@ -384,9 +385,9 @@ extern "C"
 			//Was not initialized!
 			SIMEXCEPTION(IllegalStateException);
 		}
-		out->x    = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
-		out->y    = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
-		out->z    = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
+		out->x = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
+		out->y = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
+		out->z = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
 		out->temp = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
 		return 0;
 	}
@@ -449,7 +450,7 @@ extern "C"
 		}
 	}
 
-	uint32_t sd_ble_gap_adv_start(const ble_gap_adv_params_t* p_adv_params)
+	uint32_t sd_ble_gap_adv_start(const ble_gap_adv_params_t* p_adv_params, uint32_t)
 	{
 		START_OF_FUNCTION();
 		if (PSRNG() < cherrySimInstance->simConfig.sdBusyProbability) {
@@ -483,73 +484,279 @@ extern "C"
 		return NRF_SUCCESS;
 	}
 
-	uint8_t lis2dh12_init(uint32_t interface, i32 slaveSelectPin)
-	{
-		START_OF_FUNCTION();
-		if (cherrySimInstance->currentNode->lis2dh12WasInit)
-		{
-			//Already initialized!
-			SIMEXCEPTION(IllegalStateException);
-		}
-		cherrySimInstance->currentNode->lis2dh12WasInit = true;
 
-		return 0;
-	}
-	void lis2dh12_reset() {}
-	void lis2dh12_enable() {}
-	void lis2dh12_set_fifo_mode(uint32_t) {}
-	void lis2dh12_set_scale(uint32_t) {}
-	void lis2dh12_set_resolution(uint32_t) {}
-	void lis2dh12_set_data_rate(uint32_t) {}
-	void lis2dh12_set_mode(uint32_t) {}
-	void lis2dh12_write_reg2(uint32_t) {}
-	void lis2dh12_set_sleep_to_wake_threshold(float) {}
-	uint32_t lis2dh12_set_interrupts(uint8_t,uint8_t) { return 0; }
-	//TODO check the functionality once it is used by INS,currently count not changing value is fine
-	lis2dh12_ret_t lis2dh12_set_fifo_watermark(size_t count) { return LIS2DH12_RET_OK;}
-	lis2dh12_ret_t lis2dh12_get_fifo_sample_number(size_t* count) {return LIS2DH12_RET_OK;}
-	lis2dh12_ret_t lis2dh12_set_sample_rate(lis2dh12_sample_rate_t sample_rate) { return LIS2DH12_RET_OK;}
-	uint8_t lis2dh12_set_latch() { return 0; }
-	void lis2dh12_set_hlactive() {}
-	void lis2dh12_set_sleep_to_wake_duration(uint32_t, uint32_t, float) {}
-	uint32_t lis2dh12_set_int1_ths(float) { return 0; }
-	uint32_t lis2dh12_set_int1_duration(uint32_t) { return 0; }
-	uint32_t lis2dh12_set_int1_cfg(uint32_t) { return 0; }
-	lis2dh12_ret_t lis2dh12_read_int1_src(uint8_t *ctrl, uint32_t size) { return LIS2DH12_RET_OK; }
-	uint32_t lis2dh12_reset_act_dur() { return 0; }
-	uint32_t lis2dh12_reset_act_ths() { return 0; }
-	void lis2dh12_read_samples(lis2dh12_sensor_buffer_t* buffer, uint32_t count)
+	int32_t lis2dh12_device_id_get(lis2dh12_ctx_t *ctx, uint8_t *buff)
 	{
 		START_OF_FUNCTION();
-		if (!cherrySimInstance->currentNode->lis2dh12WasInit)
+		if (ctx == nullptr || buff == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+
+		if (cherrySimInstance->currentNode->spiWasInit)
+		{
+			*buff = LIS2DH12_ID;
+		}
+		else {
+			*buff = 0;
+		}
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+	int32_t lis2dh12_fifo_mode_set(lis2dh12_ctx_t *ctx, lis2dh12_fm_t val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+	int32_t lis2dh12_write_reg(lis2dh12_ctx_t* ctx, uint8_t reg, uint8_t* data, uint16_t len)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr || data == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+	int32_t lis2dh12_data_rate_set(lis2dh12_ctx_t *ctx, lis2dh12_odr_t val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+	int32_t lis2dh12_full_scale_set(lis2dh12_ctx_t *ctx, lis2dh12_fs_t val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+	int32_t lis2dh12_operating_mode_set(lis2dh12_ctx_t *ctx, lis2dh12_op_md_t val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+	int32_t lis2dh12_fifo_set(lis2dh12_ctx_t *ctx, uint8_t val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+
+	int32_t lis2dh12_fifo_watermark_set(lis2dh12_ctx_t *ctx, uint8_t val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+	int32_t lis2dh12_pin_int1_config_set(lis2dh12_ctx_t *ctx, lis2dh12_ctrl_reg3_t *val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr || val == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+	int32_t lis2dh12_fifo_fth_flag_get(lis2dh12_ctx_t *ctx, uint8_t *val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr || val == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+
+		*val = true;
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+	int32_t lis2dh12_fifo_ovr_flag_get(lis2dh12_ctx_t* ctx, uint8_t* val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr || val == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+
+		//TODO: We could simulate overruns here
+		*val = 0;
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+	int32_t lis2dh12_fifo_data_level_get(lis2dh12_ctx_t *ctx, uint8_t *val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr || val == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+
+		*val = WATERMARK_LEVEL;
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+	int32_t lis2dh12_acceleration_raw_get(lis2dh12_ctx_t *ctx, uint8_t *buff)
+	{
+		START_OF_FUNCTION();
+		if (!cherrySimInstance->currentNode->spiWasInit)
 		{
 			//Not initialized!
 			SIMEXCEPTION(IllegalStateException);
 		}
-
-		for (uint32_t i = 0; i < count; i++)
+		if (ctx == nullptr || buff == nullptr)
 		{
-			buffer[i].sensor.x = cherrySimInstance->simState.rnd.nextU32();
-			buffer[i].sensor.y = cherrySimInstance->simState.rnd.nextU32();
-			buffer[i].sensor.z = cherrySimInstance->simState.rnd.nextU32();
+			return (int32_t)ErrorType::NULL_ERROR;
 		}
-	}
-	uint32_t nrf_drv_gpiote_in_init(nrf_drv_gpiote_pin_t pin, nrf_drv_gpiote_in_config_t const * p_config, nrf_drv_gpiote_evt_handler_t evt_handler) { return 0; }
-	uint32_t nrf_drv_gpiote_in_event_enable(nrf_drv_gpiote_pin_t pin, bool) { return 0; }
+		axis3bit16_t* buffer = (axis3bit16_t*)buff;
+		buffer->i16bit[0] = (i16)cherrySimInstance->simState.rnd.nextU32();
+		buffer->i16bit[1] = (i16)cherrySimInstance->simState.rnd.nextU32();
+		buffer->i16bit[2] = (i16)cherrySimInstance->simState.rnd.nextU32();
 
-	lis2dh12_ret_t lis2dh12_get_fifo_status(fifo_status* status)
+		return (int32_t)ErrorType::SUCCESS;
+
+	}
+
+	int32_t lis2dh12_high_pass_int_conf_set(lis2dh12_ctx_t *ctx,
+		lis2dh12_hp_t val)
 	{
-
 		START_OF_FUNCTION();
-		if (cherrySimInstance->currentNode->lis2dh12WasInit) 
+		if (ctx == nullptr)
 		{
-			status->number_of_fifo_sample = 0;
-			status->fifo_watermark_interrupt = 0;
-			status->fifo_is_empty = 1;
+			return (int32_t)ErrorType::NULL_ERROR;
 		}
-		return LIS2DH12_RET_OK;
+		return (int32_t)ErrorType::SUCCESS;
+	}
+	int32_t lis2dh12_int1_gen_threshold_set(lis2dh12_ctx_t *ctx, uint8_t val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+		return (int32_t)ErrorType::SUCCESS;
 	}
 
+	int32_t lis2dh12_data_rate_get(lis2dh12_ctx_t *ctx, lis2dh12_odr_t *val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr || val == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+		//Just some value assigned
+		*val = LIS2DH12_ODR_100Hz;
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+	uint32_t nrf_drv_gpiote_in_init(nrf_drv_gpiote_pin_t pin, nrf_drv_gpiote_in_config_t const * p_config, nrf_drv_gpiote_evt_handler_t evt_handler)
+	{
+		if (cherrySimInstance->currentNode->gpioInitializedPins.find((u32)pin) != cherrySimInstance->currentNode->gpioInitializedPins.end())
+		{
+			//Pin was already initialized
+			SIMEXCEPTION(IllegalStateException);
+			return NRF_ERROR_INVALID_STATE;
+		}
+
+		if (cherrySimInstance->currentNode->gpioInitializedPins.size() > /*Some arbitrary size limitation.*/ 32)
+		{
+			//Too many Pins already initialized!
+			SIMEXCEPTION(IllegalStateException)
+			return NRF_ERROR_NO_MEM;
+		}
+
+		InterruptSettings interruptSettings;
+		interruptSettings.handler = evt_handler;
+
+		cherrySimInstance->currentNode->gpioInitializedPins.insert({ (u32)pin, interruptSettings });
+
+		return NRF_SUCCESS;
+	}
+
+	void nrf_drv_gpiote_in_event_enable(nrf_drv_gpiote_pin_t pin, bool enable)
+	{
+		if (cherrySimInstance->currentNode->gpioInitializedPins.find((u32)pin) != cherrySimInstance->currentNode->gpioInitializedPins.end()) {
+			cherrySimInstance->currentNode->gpioInitializedPins[pin].isEnabled = true;
+		}
+	}
+
+	int32_t lis2dh12_int1_gen_conf_set(lis2dh12_ctx_t *ctx, lis2dh12_int1_cfg_t *val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr || val == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+		return (int32_t)ErrorType::SUCCESS;
+	}
+	int32_t lis2dh12_pin_int2_config_set(lis2dh12_ctx_t *ctx,
+		lis2dh12_ctrl_reg6_t *val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr || val == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+	int32_t lis2dh12_high_pass_bandwidth_set(lis2dh12_ctx_t *ctx,
+		lis2dh12_hpcf_t val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+	int32_t lis2dh12_high_pass_mode_set(lis2dh12_ctx_t *ctx, lis2dh12_hpm_t val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+	int32_t lis2dh12_high_pass_on_outputs_set(lis2dh12_ctx_t *ctx, uint8_t val)
+	{
+		START_OF_FUNCTION();
+		if (ctx == nullptr)
+		{
+			return (int32_t)ErrorType::NULL_ERROR;
+		}
+		return (int32_t)ErrorType::SUCCESS;
+	}
+
+	
 	uint32_t bme280_init(int32_t slaveSelectPin)
 	{
 		START_OF_FUNCTION();
@@ -603,7 +810,7 @@ extern "C"
 		return cherrySimInstance->simState.rnd.nextU32();
 	}
 
-	uint32_t sd_ble_gap_connect(const ble_gap_addr_t* p_peer_addr, const ble_gap_scan_params_t* p_scan_params, const ble_gap_conn_params_t* p_conn_params)
+	uint32_t sd_ble_gap_connect(const ble_gap_addr_t* p_peer_addr, const ble_gap_scan_params_t* p_scan_params, const ble_gap_conn_params_t* p_conn_params, uint32_t)
 	{
 		START_OF_FUNCTION();
 		if (cherrySimInstance->currentNode->state.connectingActive) {
@@ -638,7 +845,10 @@ extern "C"
 
 		cherrySimInstance->currentNode->state.connectingActive = true;
 		cherrySimInstance->currentNode->state.connectingStartTimeMs = cherrySimInstance->simState.simTimeMs;
-		CheckedMemcpy(&cherrySimInstance->currentNode->state.connectingPartnerAddr, p_peer_addr, sizeof(*p_peer_addr));
+
+		cherrySimInstance->currentNode->state.connectingPartnerAddr.addr_type = (FruityHal::BleGapAddrType)p_peer_addr->addr_type;
+		static_assert(sizeof(cherrySimInstance->currentNode->state.connectingPartnerAddr.addr) == sizeof(p_peer_addr->addr), "See next line");
+		CheckedMemcpy(&cherrySimInstance->currentNode->state.connectingPartnerAddr.addr, p_peer_addr->addr, sizeof(p_peer_addr->addr));
 
 		cherrySimInstance->currentNode->state.connectingIntervalMs = UNITS_TO_MSEC(p_scan_params->interval, UNIT_0_625_MS);
 		cherrySimInstance->currentNode->state.connectingWindowMs = UNITS_TO_MSEC(p_scan_params->window, UNIT_0_625_MS);
@@ -695,7 +905,7 @@ extern "C"
 		s1.bleEvent.evt.gap_evt.conn_handle = connection->connectionHandle;
 		ble_gap_addr_t address = CherrySim::Convert(&cherrySimInstance->currentNode->address);
 		CheckedMemcpy(&s1.bleEvent.evt.gap_evt.params.sec_info_request.peer_addr, &address, sizeof(ble_gap_addr_t));
-		s1.bleEvent.evt.gap_evt.params.sec_info_request.master_id = { 0 }; //TODO: incomplete information
+		s1.bleEvent.evt.gap_evt.params.sec_info_request.master_id = {}; //TODO: incomplete information
 		s1.bleEvent.evt.gap_evt.params.sec_info_request.enc_info = 0; //TODO: incomplete information
 		s1.bleEvent.evt.gap_evt.params.sec_info_request.id_info = 0; //TODO: incomplete information
 		s1.bleEvent.evt.gap_evt.params.sec_info_request.sign_info = 0; //TODO: incomplete information
@@ -793,7 +1003,7 @@ extern "C"
 
 		return 0;
 	}
-	uint32_t sd_ble_gap_address_set(uint8_t addr_cycle_mode, const ble_gap_addr_t* p_addr)
+	uint32_t sd_ble_gap_addr_set(const ble_gap_addr_t* p_addr)
 	{
 		START_OF_FUNCTION();
 		if (PSRNG() < cherrySimInstance->simConfig.sdBusyProbability) {
@@ -811,7 +1021,7 @@ extern "C"
 		return 0;
 	}
 
-	uint32_t sd_ble_gap_address_get(ble_gap_addr_t* p_addr)
+	uint32_t sd_ble_gap_addr_get(ble_gap_addr_t* p_addr)
 	{
 		START_OF_FUNCTION();		
 		FruityHal::BleGapAddr addr = cherrySimInstance->currentNode->address;
@@ -1111,28 +1321,47 @@ extern "C"
 
 	//############### sd_ble ###################
 
-	uint32_t sd_ble_enable(ble_enable_params_t* p_ble_enable_params, uint32_t* p_app_ram_base)
+	uint32_t nrf_sdh_ble_enable(uint32_t* p_app_ram_base)
 	{
 		START_OF_FUNCTION();
-		//Check if the settings comply with the ble stack
-		if (p_ble_enable_params->gap_enable_params.periph_conn_count > cherrySimInstance->currentNode->bleStackMaxPeripheralConnections) {
-			SIMEXCEPTION(IllegalArgumentException);
-		}
-		if (p_ble_enable_params->gap_enable_params.central_conn_count > cherrySimInstance->currentNode->bleStackMaxCentralConnections) {
-			SIMEXCEPTION(IllegalArgumentException);
-		}
-		if (p_ble_enable_params->gap_enable_params.central_conn_count + p_ble_enable_params->gap_enable_params.periph_conn_count > cherrySimInstance->currentNode->bleStackMaxTotalConnections) {
-			SIMEXCEPTION(IllegalArgumentException);
-		}
-
-		//Apply the settings
-		cherrySimInstance->currentNode->state.configuredPeripheralConnectionCount = p_ble_enable_params->gap_enable_params.periph_conn_count;
-		cherrySimInstance->currentNode->state.configuredCentralConnectionCount = p_ble_enable_params->gap_enable_params.central_conn_count;
-		cherrySimInstance->currentNode->state.configuredTotalConnectionCount = p_ble_enable_params->gap_enable_params.central_conn_count + p_ble_enable_params->gap_enable_params.periph_conn_count;
 
 		//TODO: Do the same checks for uuids, services, characteristics, etc,...
 
 		cherrySimInstance->currentNode->state.initialized = true;
+		return 0;
+	}
+
+	uint32_t nrf_sdh_enable_request()
+	{
+		START_OF_FUNCTION();
+		return 0;
+	}
+
+	uint32_t sd_ble_cfg_set(uint32_t type, ble_cfg_t* cfg, uint32_t)
+	{
+		START_OF_FUNCTION();
+		
+		//Apply the settings
+		if (type == BLE_CONN_CFG_GAP)
+		{
+			if (cfg->conn_cfg.conn_cfg_tag != 1 /*BLE_CONN_CFG_TAG_FM*/)
+			{
+				SIMEXCEPTION(NotImplementedException);
+				return 1;
+			}
+			cherrySimInstance->currentNode->state.configuredTotalConnectionCount = cfg->conn_cfg.params.gap_conn_cfg.conn_count;
+		}
+		else if (type == BLE_GAP_CFG_ROLE_COUNT)
+		{
+			if (cfg->gap_cfg.role_count_cfg.central_sec_count != BLE_GAP_ROLE_COUNT_CENTRAL_SEC_DEFAULT)
+			{
+				SIMEXCEPTION(NotImplementedException);
+				return 1;
+			}
+			cherrySimInstance->currentNode->state.configuredPeripheralConnectionCount = cfg->gap_cfg.role_count_cfg.periph_role_count;
+			cherrySimInstance->currentNode->state.configuredCentralConnectionCount    = cfg->gap_cfg.role_count_cfg.central_role_count;
+		}
+
 		return 0;
 	}
 
@@ -1243,31 +1472,27 @@ extern "C"
 
 	//############### App Timer Library ###################
 
-	uint32_t app_timer_cnt_get(uint32_t* time)
+	uint32_t app_timer_cnt_get()
 	{
 		START_OF_FUNCTION();
-		if (APP_TIMER_PRESCALER != 0) {
+		if (APP_TIMER_CONFIG_RTC_FREQUENCY != 0) {
 			SIMEXCEPTION(IllegalArgumentException);//Non 0 prescaler not implemented
 		}
 
-		*time = (u32)(cherrySimInstance->simState.simTimeMs * (APP_TIMER_CLOCK_FREQ / 1000.0));
-
-		return 0;
+		return (u32)(cherrySimInstance->simState.simTimeMs * (APP_TIMER_CLOCK_FREQ / 1000.0));
 	}
 
-	uint32_t app_timer_cnt_diff_compute(uint32_t nowTime, uint32_t previousTime, uint32_t* passedTime)
+	uint32_t app_timer_cnt_diff_compute(uint32_t nowTime, uint32_t previousTime)
 	{
 		START_OF_FUNCTION();
 		//Normal case
 		if (nowTime >= previousTime) {
-			*passedTime = nowTime - previousTime;
+			return nowTime - previousTime;
 		}
 		//In case of integer overflow
 		else {
-			*passedTime = UINT32_MAX - (previousTime - nowTime);
+			return UINT32_MAX - (previousTime - nowTime);
 		}
-
-		return 0;
 	}
 
 
@@ -1356,7 +1581,10 @@ extern "C"
 		CheckedMemcpy(&buffer->params.hvxParams, p_hvx_params, sizeof(*p_hvx_params));
 		CheckedMemcpy(buffer->data, p_hvx_params->p_data, *p_hvx_params->p_len);
 		// This is a workaround for hvxParams keeping only pointer to len.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wint-to-pointer-cast"
 		buffer->params.hvxParams.p_len = (uint16_t *)*p_hvx_params->p_len;
+#pragma GCC diagnostic pop
 		buffer->params.hvxParams.p_data = buffer->data; //Reassign data pointer to our buffer
 		buffer->isHvx = true;
 

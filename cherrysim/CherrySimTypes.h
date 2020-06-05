@@ -31,8 +31,11 @@
 #include <types.h>
 #include <GlobalState.h>
 #include <queue>
-#include "SimpleArray.h"
+#include <map>
+#include <array>
+#include <string>
 #include "MersenneTwister.h"
+#include "json.hpp"
 #ifndef GITHUB_RELEASE
 #include "ClcMock.h"
 #endif //GITHUB_RELEASE
@@ -62,18 +65,18 @@ constexpr int PACKET_STAT_SIZE = 10*1024;
 #define PSRNGINT(min, max) ((u32)cherrySimInstance->simState.rnd.nextU32(min, max)) //Generates random int from min (inclusive) up to max (inclusive)
 
 //A BLE Event that is sent by the Simulator is wrapped
-typedef struct {
+struct simBleEvent {
 	ble_evt_t bleEvent;
 	u8 data[GATT_MTU_SIZE_DEFAULT]; //overflow area for ble_evt_t as sizeof(ble_evt_t) does not include write data, this must be added using the MTU
 	u32 size;
 	u32 globalId;
 	u32 additionalInfo; //Can be used to store a pointer or other information
-} simBleEvent;
+};
 
 
 //A packet that is buffered in the SoftDevice for sending
 struct nodeEntry;
-typedef struct {
+struct SoftDeviceBufferedPacket {
 	nodeEntry* sender;
 	nodeEntry* receiver;
 	u16 connHandle;
@@ -87,7 +90,7 @@ typedef struct {
 	bool isHvx;
 	uint8_t data[30];
 
-} SoftDeviceBufferedPacket;
+};
 
 constexpr int packetStatCompareBytes = 4;
 struct PacketStat {
@@ -100,7 +103,7 @@ struct PacketStat {
 
 
 //Simulator ble connection representation
-typedef struct SoftdeviceConnection {
+struct SoftdeviceConnection {
 	int connectionIndex = 0;
 	int connectionHandle = 0;
 	bool connectionActive = false;
@@ -113,41 +116,41 @@ typedef struct SoftdeviceConnection {
 	int connectionMtu = 0;
 	bool isCentral = false;
 
-	SoftDeviceBufferedPacket reliableBuffers[SIM_NUM_RELIABLE_BUFFERS] = { 0 };
-	SoftDeviceBufferedPacket unreliableBuffers[SIM_NUM_UNRELIABLE_BUFFERS] = { 0 };
+	SoftDeviceBufferedPacket reliableBuffers[SIM_NUM_RELIABLE_BUFFERS] = {};
+	SoftDeviceBufferedPacket unreliableBuffers[SIM_NUM_UNRELIABLE_BUFFERS] = {};
 
 	//Clustering validity
 	i16 validityClusterSizeToSend;
 
-} SoftdeviceConnection;
+};
 
-typedef struct
+struct CharacteristicDB_t
 {
-	ble_uuid_t  uuid = { 0 };
+	ble_uuid_t  uuid = {};
 	uint16_t    handle = 0;
 	uint16_t    cccd_handle = 0;
-}CharacteristicDB_t;
+};
 
-typedef struct
+struct ServiceDB_t
 {
-	ble_uuid_t          uuid = { 0 };
+	ble_uuid_t          uuid = {};
 	uint16_t            handle = 0;
 	int                 charCount = 0;
 	CharacteristicDB_t  charateristics[SIM_NUM_CHARS];
-} ServiceDB_t;
+};
 
 //The state of a SoftDevice
-typedef struct {
+struct SoftdeviceState {
 	//Softdevice / Generic
 	bool initialized = false;
-	int timeMs = 0;
+	u32 timeMs = 0;
 	i8 txPower = 0;
 
 	//Advertising
 	bool advertisingActive = false;
 	int advertisingIntervalMs = 0;
 	FruityHal::BleGapAdvType advertisingType = FruityHal::BleGapAdvType::ADV_IND;
-	u8 advertisingData[40] = { 0 };
+	u8 advertisingData[40] = {};
 	u8 advertisingDataLength = 0;
 
 	//Scanning
@@ -165,7 +168,7 @@ typedef struct {
 	int connectingParamIntervalMs = 0;
 
 	//Connecting security
-	u8 currentLtkForEstablishingSecurity[16] = { 0 }; //The Long Term key used to initiate the last encryption request for a connection
+	u8 currentLtkForEstablishingSecurity[16] = {}; //The Long Term key used to initiate the last encryption request for a connection
 
 	//Connections
 	SoftdeviceConnection connections[SIM_MAX_CONNECTION_NUM];
@@ -175,7 +178,7 @@ typedef struct {
 
 	//Service Disovery
 	u16         connHandle = 0; //Service discovery can only run for one connHandle at a time
-	ble_uuid_t  uuid = { 0 }; //Service uuid for the service currently being discovered
+	ble_uuid_t  uuid = {}; //Service uuid for the service currently being discovered
 	u32         discoveryDoneTime = 0; //Time after which service discovery should be done for that node in the simulator
 
 	int         servicesCount = 0; //Amount of services registered in the SoftDevice
@@ -183,9 +186,9 @@ typedef struct {
 
 	//UART
 	NRF_UART_Type uartType;
-	SimpleArray<char, 1024> uartBuffer;
-	int uartReadIndex = 0;
-	int uartBufferLength = 0;
+	std::array<char, 1024> uartBuffer;
+	u32 uartReadIndex = 0;
+	u32 uartBufferLength = 0;
 
 	uint32_t currentlyEnabledUartInterrupts = 0;
 
@@ -195,17 +198,23 @@ typedef struct {
 	u8 configuredTotalConnectionCount = 0;
 
 	//Clustering validity
-	i16 validityClusterSize;
+	ClusterSize validityClusterSize;
 
-} SoftdeviceState;
+};
 
-typedef struct nodeEntry {
-	int index;
+struct InterruptSettings
+{
+	bool isEnabled                       = false;
+	nrf_drv_gpiote_evt_handler_t handler = nullptr;
+};
+
+struct nodeEntry {
+	u32 index;
 	int id;
 	float x = 0;
 	float y = 0;
 	float z = 0;
-	char nodeConfiguration[50] = { 0 };
+	std::string nodeConfiguration = "";
 	FruityHal::BleGapAddr address;
 	GlobalState gs;
 #ifndef GITHUB_RELEASE
@@ -224,11 +233,14 @@ typedef struct nodeEntry {
 
 	uint32_t restartCounter = 0; //Counts how many times the node was restarted
 	int64_t simulatedFrames = 0;
-	unsigned long long watchdogTimeout = 0; //After how many simulated unfeed ms the watchdog should kill the node.
-	int lastWatchdogFeedTime = 0; //The timestamp at which the watchdog was fed last.
+	u32 watchdogTimeout = 0; //After how many simulated unfeed ms the watchdog should kill the node.
+	u32 lastWatchdogFeedTime = 0; //The timestamp at which the watchdog was fed last.
 	RebootReason rebootReason = RebootReason::UNKNOWN;
 
 	std::vector<int> impossibleConnection; //The rssi to these nodes is artificially increased to an unconnectable level.
+
+	std::map<u32, InterruptSettings> gpioInitializedPins; // Map from pin to settings
+	std::queue<u32> interruptQueue;
 
 	bool bmgWasInit        = false;
 	bool twiWasInit        = false;
@@ -236,6 +248,8 @@ typedef struct nodeEntry {
 	bool spiWasInit        = false;
 	bool lis2dh12WasInit   = false;
 	bool bme280WasInit     = false;
+
+	u32 lastMovementSimTimeMs = 0;
 
 	u32 fakeDfuVersion = 0;
 	bool fakeDfuVersionArmed = false;
@@ -250,54 +264,73 @@ typedef struct nodeEntry {
 	PacketStat sentPackets[PACKET_STAT_SIZE];
 	PacketStat routedPackets[PACKET_STAT_SIZE];
 
-} nodeEntry;
+};
 
 
-typedef struct {
+struct SimulatorState {
 	u32 simTimeMs = 0;
 	MersenneTwister rnd;
 	u16 globalConnHandleCounter = 0;
 	u32 globalEventIdCounter = 0;
 	u32 globalPacketIdCounter = 0;
-} SimulatorState;
+};
 
 struct SimConfiguration {
-	uint32_t numNodes                         = 0;
-	uint32_t numAssetNodes                    = 0;
-	uint32_t seed                             = 0;
-	uint32_t mapWidthInMeters                 = 0;
-	uint32_t mapHeightInMeters                = 0;
-	uint32_t simTickDurationMs                = 0;
-	int32_t terminalId                        = 0; //Enter -1 to disable, 0 for all nodes, or a specific id
-	int32_t simOtherDelay                     = 0; // Enter 1 - 100000 to send sim_other message only each ... simulation steps, this increases the speed significantly
-	int32_t playDelay                         = 0; //Allows us to view the simulation slower than simulated, is added after each step
-	double connectionTimeoutProbabilityPerSec = 0; //Every minute or so: 0.00001;
-	double sdBleGapAdvDataSetFailProbability  = 0;// 0.0001; //Simulate fails on setting adv Data
-	double sdBusyProbability                  = 0; // 0.0001; //Simulates getting back busy errors from softdevice
-	bool simulateAsyncFlash                   = false;
-	double asyncFlashCommitTimeProbability    = 0; // 0.0 - 1.0 where 1 is instant commit in the next simulation step
-	bool importFromJson                       = false; //Set to true and specify siteJsonPath and devicesJsonPath to read a scenario from json
-	char siteJsonPath[100]                    = {};
-	char devicesJsonPath[100]                 = {};
-	char defaultNodeConfigName[50]            = {};
-	char defaultSinkConfigName[50]            = {};
-	u32 defaultNetworkId                      = 0;
+	/*
+       _____          _____  ______ ______ _    _ _        _   _   _ 
+      / ____|   /\   |  __ \|  ____|  ____| |  | | |      | | | | | |
+     | |       /  \  | |__) | |__  | |__  | |  | | |      | | | | | |
+     | |      / /\ \ |  _  /|  __| |  __| | |  | | |      | | | | | |
+     | |____ / ____ \| | \ \| |____| |    | |__| | |____  |_| |_| |_|
+      \_____/_/    \_\_|  \_\______|_|     \____/|______| (_) (_) (_)
+	
+	If you change anything in this type, including adding new members,
+	make sure that they are properly translated inside of the to_json
+	and from_json functions below!
+	*/
+
+	std::map<std::string, int> nodeConfigName;
+	uint32_t    seed                               = 0;
+	uint32_t    mapWidthInMeters                   = 0;
+	uint32_t    mapHeightInMeters                  = 0;
+	uint32_t    mapElevationInMeters               = 0;
+	uint32_t    simTickDurationMs                  = 0;
+	int32_t     terminalId                         = 0; //Enter -1 to disable, 0 for all nodes, or a specific id
+	int32_t     simOtherDelay                      = 0; // Enter 1 - 100000 to send sim_other message only each ... simulation steps, this increases the speed significantly
+	int32_t     playDelay                          = 0; //Allows us to view the simulation slower than simulated, is added after each step
+	float       interruptProbability               = 0; // The probability that a queued interrupt is simulated.
+	float       connectionTimeoutProbabilityPerSec = 0; //Every minute or so: 0.00001;
+	float       sdBleGapAdvDataSetFailProbability  = 0;// 0.0001; //Simulate fails on setting adv Data
+	float       sdBusyProbability                  = 0; // 0.0001; //Simulates getting back busy errors from softdevice
+	bool        simulateAsyncFlash                 = false;
+	float       asyncFlashCommitTimeProbability    = 0; // 0.0 - 1.0 where 1 is instant commit in the next simulation step
+	bool        importFromJson                     = false; //Set to true and specify siteJsonPath and devicesJsonPath to read a scenario from json
+	bool        realTime                           = false; //If set to true, the simulator will only tick when the real time clock passed the necessary time. On false: As fast as possible.
+	std::string siteJsonPath                       = "";
+	std::string devicesJsonPath                    = "";
+	std::string replayPath                         = ""; //If set, a replay is loaded from this path.
+	bool        logReplayCommands                  = false; //If set, lines are logged out that can be used as input for the replay feature.
+	bool        useLogAccumulator                  = false; //If set, all logs are written to CherrySim::logAccumulator
+	u32         defaultNetworkId                   = 0;
 	std::vector<std::pair<double, double>> preDefinedPositions;
-	bool rssiNoise                            = false;
-	bool simulateWatchdog                     = false;
-	bool simulateJittering                    = false;
-	bool verbose                              = false;
+	bool        rssiNoise                          = false;
+	bool        simulateWatchdog                   = false;
+	bool        simulateJittering                  = false;
+	bool        verbose                            = false;
 
-	bool enableClusteringValidityCheck        = false; //Enable automatic checking of the clustering after each step
-	bool enableSimStatistics                  = false;
-	const char* storeFlashToFile              = nullptr;
+	bool        enableClusteringValidityCheck      = false; //Enable automatic checking of the clustering after each step
+	bool        enableSimStatistics                = false;
+	std::string storeFlashToFile                   = "";
 
-	bool verboseCommands                      = false;
+	bool        verboseCommands                    = false;
 
 
 	//BLE Stack capabilities
 	BleStackType defaultBleStackType          = BleStackType::INVALID;
 };
+
+void to_json(nlohmann::json& j, const SimConfiguration& config);
+void from_json(const nlohmann::json& j, SimConfiguration& config);
 
 //Notifies other classes of events happening in the simulator, e.g. node reset
 class CherrySimEventListener {

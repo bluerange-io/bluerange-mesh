@@ -72,58 +72,40 @@ Live reports are printed on the terminal of a sink node and can be used to debug
 {"type":"live_report","nodeId":123,"module":3,"code":1,"extra":2,"extra2":3}
 ----
 
+=== Component periodic timestamp sending
+The StatusReporterModule includes functionality for periodically sending the nodes current timestamp. Can be enabled and disabled via component_act. When enabled, it is automatically disabled after a few minutes to avoid unnecessary battery usage.
+
+[source,C++]
+----
+//Enables Periodic sending
+component_act [nodeId] 3 2 0xABCD 0x1234 01 [requestHandle]
+
+//Disabled Periodic sending
+component_act [nodeId] 3 2 0xABCD 0x1234 00 [requestHandle]
+----
+
+Upon activation, the component_act message is answered with multiple component_sense messages that roughly look like this example:
+
+[source,Javascript]
+----
+{"nodeId":33011,"type":"component_sense","module":3,"requestHandle":13,"actionType":2,"component":43981,"register":4660,"payload":"AgAAAA=="}
+----
+
+The payload of the answer is the base 64 timestamp of the target node.
+
 == Messages
-=== Device Info
+
+=== Device Info (v2)
 ==== Request
-actionType: `GET_DEVICE_INFO`
 
+[cols="1,2,2,5"]
 |===
-|Bytes |Type |Description
+|Bytes |Type |Name  |Description
 
-|8 |connPacketModule |
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule] |header|*messageType:* MODULE_TRIGGER_ACTION(51), *actionType:* GET_DEVICE_INFO_V2(10)
 |===
 
 ==== Response
-actionType: `DEVICE_INFO`
-
-The device info contains device information that is not changing often, e.g. only after a firmware update or an enrollment.
-
-[cols="1,2,5"]
-|===
-|Bytes |Type |Description
-
-|8 |connPacketModule |
-|2 |manufacturerId |ID according to Bluetooth SIG Assigned numbers
-company identifiers
-|5 |serialNumber |Serial number as ASCII without terminating 0 character
-|8 |chipId |A unique ID of the nRF chip
-|7 |gapAddress |1 byte address type, 6 byte BLE address
-|2 |networkid |The network ID
-|4 |nodeVersion |Version of the node +
-(10000000 * MAJOR + 10000 * MINOR + PATCH)
-|1 |dbmRx |Receive power in dBm (signed)
-|1 |dbmTx |Transmit power in dBm (signed)
-|1 |deviceType |cf. xref:Specification.adoc#_Device_Types[Device Types]
-|1 |calibratedTx |Calibrated TX power at 1m distance (signed)
-|2 |chipGroupId |Group ID for the chip (e.g. NRF51 or NRF52)
-|2 |featuresetGroupId |Group ID for the firmware feature set (used for
-firmware update). Matching groups are allowed to receive the firmware.
-|2 |bootloaderVersion |Version of the bootloader
-|===
-
-=== Device Info
-==== Request
-actionType: GET_DEVICE_INFO_V2
-
-[cols="1,2,5"]
-|===
-|Bytes |Type |Description
-
-|8 |connPacketModule |
-|===
-
-==== Response
-actionType: `DEVICE_INFO_V2`
 
 The device info contains information about the device that is not
 changing often, e.g. only after a firmware update or an enrollment.
@@ -132,7 +114,7 @@ changing often, e.g. only after a firmware update or an enrollment.
 |===
 |Bytes |Type |Name |Description
 
-|8 |connPacketModule | |
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule] |header|*messageType:* MODULE_ACTION_RESPONSE(52), *actionType:* DEVICE_INFO_V2(10)
 |2 |u16 |manufacturerId |ID according to Bluetooth SIG Assigned numbers
 company identifiers
 |4 |u32 |serialNumberIndex |Index of the serial number, can be converted
@@ -146,32 +128,29 @@ MINOR + PATCH)
 |1 |i8 |dbmTx |Transmit power in dBm (signed)
 |1 |u8 |deviceType |cf. xref:Specification.adoc#_Device_Types[Device Types]
 |1 |i8 |calibratedTx |Calibrated TX power at 1m distance (signed)
-|2 |u16 |chipGroupId |Group ID for the chip (e.g. NRF51 or NRF52)
+|2 |u16 |chipGroupId |Group ID for the chip (e.g. NRF52)
 |2 |u16 |featuresetGroupId |Group ID for the firmware featureset (used
 for firmware update). Matching groups are allowed to receive the firmware.
 |2 |u16 |bootloaderVersion |Version of the bootloader
 |===
 
 === Status
-==== Request
-actionType: `GET_STATUS`
 
+==== Request
 |===
 |Bytes |Type |Description
 
-|8 |connPacketModule |
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule] |*messageType:* MODULE_TRIGGER_ACTION(51), *actionType:* GET_STATUS(1)
 |===
 
-==== Response actionType: STATUS
-
-The device status contains information that is changing from time to
-time.
+==== Response
+The device status contains information that is changing from time to time.
 
 [cols="1,2,4"]
 |===
 |Bytes|Type|Description
 
-|8|connPacketModule|
+|8|xref:Specification.adoc#connPacketModule[connPacketModule]|*messageType:* MODULE_ACTION_RESPONSE(52), *actionType:* STATUS(1)
 |2|clusterSize|Size of the cluster that the node is connected to (current mesh size)
 |2|inConnectionPartner|NodeId of the node that is connected to the one and only peripheral connection with this node.
 |1|inConnectionRssi|RSSI of the incoming connection
@@ -184,35 +163,26 @@ time.
 |===
 
 === Connections
-Query all nodeIDs that a node is connected to including
-the connection rssi. The first entry is the incoming connection, the
-others are outgoing.
+Query all nodeIDs that a node is connected to including the connection rssi. The first entry is the incoming connection, the others are outgoing.
 
 ==== Request
-actionType: `GET_ALL_CONNECTIONS`
-
 [cols="1,2,4"]
 |===
 |Bytes |Type |Description
 
-|8 |connPacketModule |
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule] |*messageType:* MODULE_TRIGGER_ACTION(51), *actionType:* GET_ALL_CONNECTIONS(3)
 |===
 
 ==== Response
-actionType: `ALL_CONNECTIONS`
-
-The device status contains information that is changing from time to
-time.
 [cols="1,2,4"]
 |===
 |Bytes|Type|Description
 
-|8|connPacketModule|
+|8|xref:Specification.adoc#connPacketModule[connPacketModule]|*messageType:* MODULE_ACTION_RESPONSE(52), *actionType:* ALL_CONNECTIONS(3)
 |3*x|connections|Array of all _partnerEntries_
 |===
 
 ===== PartnerEntry
-
 [cols="1,2,4"]
 |===
 |Bytes|Type|Description
@@ -222,26 +192,22 @@ time.
 |===
 
 === Nearby Nodes
-Returns all nodes (limited to some maximum count) that
-are surrounding the node with the same networkid.
+Returns all nodes (limited to some maximum count) that are surrounding the node with the same networkId.
 
 ==== Request
-actionType: `GET_NEARBY_NODES`
-
 [cols="1,2,4"]
 |===
 |Bytes |Type |Description
 
-|8 |connPacketModule |
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule] | *messageType:* MODULE_TRIGGER_ACTION(51), *actionType:* GET_NEARBY_NODES(4)
 |===
 
 ==== Response
-actionType: `NEARBY_NODES`
 [cols="1,2,4"]
 |===
 |Bytes|Type|Description
 
-|8|connPacketModule|
+|8|xref:Specification.adoc#connPacketModule[connPacketModule]|*messageType:* MODULE_ACTION_RESPONSE(52), *actionType:* NEARBY_NODES(4)
 |3*x|nearbyNodes|Array of _NearbyNodeEntries_
 |===
 
@@ -286,13 +252,11 @@ enum LiveReportTypes {
 ----
 
 ==== Event
-actionType: `LIVE_REPORT`
-
 [cols="1,2,4"]
 |===
 |Bytes|Type|Description
 
-|8|connPacketModule|MESSAGE_TYPE_MODULE_GENERAL
+|8|xref:Specification.adoc#connPacketModule[connPacketModule]|*messageType:* MODULE_GENERAL(53), *actionType:* LIVE_REPORT(1)
 |1|reportType|Of type _LiveReportType_
 |4|extra|Additional data regarding the event, depending on _reportType_
 |4|extra2|Additional data regarding the event, depending on _reportType_

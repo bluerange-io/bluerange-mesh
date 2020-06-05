@@ -39,10 +39,10 @@
 TEST(TestMeshAccessModule, TestCommands) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -70,12 +70,13 @@ TEST(TestMeshAccessModule, TestReceivingClusterUpdate)
 {
 	//Create a mesh with 1 sink, 1 node and a third node not part of the mesh
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-	testerConfig.verbose = false;
+	//testerConfig.verbose = false;
 
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 3;
 	simConfig.terminalId = 0;
 	simConfig.preDefinedPositions = { {0.5, 0.5},{0.6, 0.5},{0.7, 0.5} };
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2 });
 
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
@@ -107,10 +108,10 @@ TEST(TestMeshAccessModule, TestReceivingClusterUpdate)
 TEST(TestMeshAccessModule, TestAdvertisement) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -129,10 +130,10 @@ TEST(TestMeshAccessModule, TestAdvertisement) {
 TEST(TestMeshAccessModule, TestUnsecureNoneKeyConnection) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 
@@ -176,10 +177,10 @@ TEST(TestMeshAccessModule, TestUnsecureNoneKeyConnection) {
 TEST(TestMeshAccessModule, TestRestrainedAccess) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
-	testerConfig.verbose = true;
-
+	//testerConfig.verbose = true;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.sim->nodes[1].uicr.CUSTOMER[9] = 123; // Change default network id of node 2
@@ -216,29 +217,26 @@ TEST(TestMeshAccessModule, TestSerialConnect) {
 
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = amountOfNodesInOtherNetwork + amountOfNodesInOwnNetwork;
+	u32 numNodes = amountOfNodesInOtherNetwork + amountOfNodesInOwnNetwork;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
 	simConfig.preDefinedPositions = { {0.1, 0.5}, {0.3, 0.55}, {0.5, 0.5} };
-	for (int i = 0; i < amountOfNodesInOtherNetwork; i++)
+	for (u32 i = 0; i < amountOfNodesInOtherNetwork; i++)
 	{
 		simConfig.preDefinedPositions.push_back({ 0.7, 0.0 + i * 0.2 });
 	}
-	for (int i = 0; i < amountOfNodesInOtherNetwork; i++)
+	for (u32 i = 0; i < amountOfNodesInOtherNetwork; i++)
 	{
 		simConfig.preDefinedPositions.push_back({ 0.9, 0.0 + i * 0.2 });
 	}
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", amountOfNodesInOwnNetwork - 1 });
+	simConfig.nodeConfigName.insert({ "prod_asset_nrf52", amountOfNodesInOtherNetwork });
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
-	for (int i = amountOfNodesInOwnNetwork; i < simConfig.numNodes; i++)
+	for (u32 i = amountOfNodesInOwnNetwork; i < numNodes; i++)
 	{
 		tester.sim->nodes[i].uicr.CUSTOMER[9] = 123; // Change default network id of node 4
-	}
-
-	for (int i = amountOfNodesInOwnNetwork; i < simConfig.numNodes; i++)
-	{
-		strcpy(tester.sim->nodes[i].nodeConfiguration, "prod_asset_nrf52");
 	}
 
 	tester.Start();
@@ -257,13 +255,58 @@ TEST(TestMeshAccessModule, TestSerialConnect) {
 	// The same applies for the organization key (4).
 	tester.SendTerminalCommand(1, "action 5 ma serial_connect BBBBP 4 FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF 33011 20 13");
 	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"serial_connect_response\",\"module\":10,\"nodeId\":5,\"requestHandle\":13,\"code\":0,\"partnerId\":33011}");
+	// Component act must be sendable through MA with orga key.
+	tester.SendTerminalCommand(1, "component_act 33011 3 1 0xABCD 0x1234 01 13");
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":33011,\"type\":\"component_sense\",\"module\":3,\"requestHandle\":13,\"actionType\":2,\"component\":\"0xABCD\",\"register\":\"0x1234\",\"payload\":");
+	// The same applies to capabilities
+	tester.SendTerminalCommand(1, "request_capability 33011");
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "\"type\":\"capability_entry\"");
 	tester.SimulateUntilMessageReceived(100 * 1000, 5, "Removing ma conn due to SCHEDULED_REMOVE");
 
 	// The node key (1) however must be given.
 	tester.SendTerminalCommand(1, "action 6 ma serial_connect BBBBQ 1 0D:00:00:00:0D:00:00:00:0D:00:00:00:0D:00:00:00 33012 20 13");
 	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"serial_connect_response\",\"module\":10,\"nodeId\":6,\"requestHandle\":13,\"code\":0,\"partnerId\":33012}");
 	tester.SimulateUntilMessageReceived(100 * 1000, 6, "Removing ma conn due to SCHEDULED_REMOVE");
+}
 
+TEST(TestMeshAccessModule, TestInfoRetrievalOverOrgaKey) {
+	//The gateway retrieves get_device_info and get_status
+	//messages from the assets through a mesh access connection.
+	//This test makes sure that this is possible.
+	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+	simConfig.terminalId = 0;
+	simConfig.defaultNetworkId = 0;
+	simConfig.preDefinedPositions = { {0.1, 0.5}, {0.3, 0.55}, {0.5, 0.5} };
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2});
+	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+	tester.sim->nodes[2].nodeConfiguration = "prod_asset_nrf52";
+	tester.Start();
 
+	tester.SendTerminalCommand(1, "action 0 enroll basic BBBBB 1 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00 10 0 0");
+	tester.SendTerminalCommand(2, "action 0 enroll basic BBBBC 2 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 10 0 0");
+	tester.SendTerminalCommand(3, "action 0 enroll basic BBBBD 3 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0 0");
+	
+	tester.SimulateUntilMessageReceived(100 * 1000, 1, "clusterSize\":2"); //Wait until the nodes have clustered.
+
+	//Connect using the orga key.
+	tester.SendTerminalCommand(1, "action 2 ma serial_connect BBBBD 4 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 33011 20 13");
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"serial_connect_response\",\"module\":10,\"nodeId\":2,\"requestHandle\":13,\"code\":0,\"partnerId\":33011}");
+
+	//Retriev the information using explicit nodeId
+	tester.SendTerminalCommand(1, "action 33011 status get_device_info");
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":33011,\"type\":\"device_info\"");
+	tester.SendTerminalCommand(1, "action 33011 status get_status");
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":33011,\"type\":\"status\"");
+
+	//Retriev the information using broadcast
+	tester.SendTerminalCommand(1, "action 0 status get_device_info");
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":33011,\"type\":\"device_info\"");
+	tester.SendTerminalCommand(1, "action 0 status get_status");
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":33011,\"type\":\"status\"");
+
+	//Make sure that the connection cleans up even after usage.
+	tester.SimulateUntilMessageReceived(100 * 1000, 2, "Removing ma conn due to SCHEDULED_REMOVE");
 }
 #endif //!GITHUB_RELEASE

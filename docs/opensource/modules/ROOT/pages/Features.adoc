@@ -15,6 +15,7 @@ FruityMesh can be seen both as a mesh and as a complete framework to make develo
 * Integrated message queuing
 
 == Additional Features
+* Mesh simulation and fast development using xref:#CherrySim[CherrySim]
 * UART Terminal to execute commands with a list of arguments for manual or automated communication with a MeshGateway (cf. xref:BasicUsage.adoc[Basic Usage])
 * Modular structure with persistent module configurations (cf. xref:Modules.adoc[Modules])
 * xref:RecordStorage.adoc[RecordStorage], a record based file system for storing data in flash that is always reliable
@@ -54,15 +55,18 @@ A number of modules of FruityMesh are not yet open source but can be used by cus
 
 == Upcoming Features
 
-* CherrySim
-** Compilation of FruityMesh for x86 together with a simulator that abstracts the hardware and can simulate hundreds of nodes at the same time.
-** Integrated testing suite to write tests against a mesh of multiple nodes that can all run with different featuresets.
-** Provides the ability to Mock 3rd Party hardware.
-** image:cherrysim.png[cherrysim]
 * Flow Control & Quality of Service (QoS)
 ** As an enhancement to our connections, we are planning to add Flow Control and QoS to better deal with throughput peaks and manage packet priorities
 
 == Features in Detail
+
+[#CherrySim]
+=== CherrySim
+* Compilation of FruityMesh for x86 together with a simulator that abstracts the hardware and can simulate hundreds of nodes at the same time.
+* Integrated testing suite to write tests against a mesh of multiple nodes that can all run with different featuresets.
+* Provides the ability to Mock 3rd Party hardware.
+* Find the simulator documentation on the xref:CherrySim.adoc[CherrySim] page.
+* image:cherrysim.png[cherrysim]
 
 === Time Synchronisation
 FruityMesh has inbuilt time synchronization. A gateway or smartphone can act as a synchronisation device to send a unix timestamp to one node in the mesh. This node will then take care that this timestamp is synchronized to all other nodes in the mesh. If any number of nodes are rebooted, the time will be synchronized again if there is at least one node that still has the current time. By using a counter value, we make sure that the latest timestamp will be synchronized and that the time can be corrected in both directions. The time is always synchronized between two partners in a kind of handshake where first the time is sent to the other node and next, an offset is sent to account for the delay in sending that message. Further documentation can be found xref:Node.adoc#TimeSynchronization[here].

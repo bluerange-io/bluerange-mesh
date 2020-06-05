@@ -276,7 +276,7 @@ void FlashStorage::SystemEventHandler(FruityHal::SystemEvents systemEvent)
 
 	if(systemEvent == FruityHal::SystemEvents::FLASH_OPERATION_ERROR)
 	{
-		logt("ERROR", "Flash operation error");
+		logt("WARNING", "Flash operation error");
 		GS->logger.logCustomCount(CustomErrorTypes::COUNT_FLASH_OPERATION_ERROR);
 
 		if(retryCount > 0)

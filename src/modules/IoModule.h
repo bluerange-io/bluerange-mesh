@@ -41,6 +41,10 @@ struct IoModuleConfiguration : ModuleConfiguration {
 STATIC_ASSERT_SIZE(IoModuleConfiguration, 5);
 #pragma pack(pop)
 
+/**
+ * The IoModule can be used for controlling different LED behavior and
+ * some very basic pin settings.
+ */
 class IoModule: public Module
 {
 	private:
@@ -97,15 +101,15 @@ class IoModule: public Module
 
 		IoModule();
 
-		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override;
+		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
 
-		void ResetToDefaultConfiguration() override;
+		void ResetToDefaultConfiguration() override final;
 
-		void TimerEventHandler(u16 passedTimeDs) override;
+		void TimerEventHandler(u16 passedTimeDs) override final;
 
-		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
+		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
 
 		#ifdef TERMINAL_ENABLED
-		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
+		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
 		#endif
 };

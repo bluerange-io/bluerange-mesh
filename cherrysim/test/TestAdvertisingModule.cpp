@@ -35,7 +35,8 @@
 TEST(TestAdvertisingModule, TestIfMessageIsBroadcasted) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
 	simConfig.terminalId = 1;
 	//testerConfig.verbose = true;
 

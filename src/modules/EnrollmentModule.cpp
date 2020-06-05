@@ -97,8 +97,8 @@ void EnrollmentModule::TimerEventHandler(u16 passedTimeDs)
 		PreEnrollmentFailed();
 	}
 
-	MeshAccessConnection* conn = nullptr;
-	if(ted.state > EnrollmentStates::PREENROLLMENT_RUNNING) conn = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(ted.uniqueConnId);
+	MeshAccessConnectionHandle conn;
+	if(ted.state > EnrollmentStates::PREENROLLMENT_RUNNING) conn = GS->cm.GetMeshAccessConnectionByUniqueId(ted.uniqueConnId);
 
 	//Check if the current enrollment over the mesh should time out
 	if (ted.state > EnrollmentStates::PREENROLLMENT_RUNNING && GS->appTimerDs > ted.endTimeDs) {
@@ -109,15 +109,19 @@ void EnrollmentModule::TimerEventHandler(u16 passedTimeDs)
 			//We do not stop the scanner as the node also needs it //TODO: scanning should be stopped once we have a scanController
 		} else if (ted.state == EnrollmentStates::CONNECTING) {
 			//Stop connecting and ensure that if the connection was already made by the softdevice, we do not accept it
-			FruityHal::ConnectCancel();
+			const ErrorType err = FruityHal::ConnectCancel();
+			if (err != ErrorType::SUCCESS && err != ErrorType::INVALID_STATE)
+			{
+				logt("ENROLLMOD", "Unexpected connect cancel return value %u", (u32)err);
+			}
 			if (GS->cm.pendingConnection != nullptr) {
 				GS->cm.DeleteConnection(GS->cm.pendingConnection, AppDisconnectReason::ENROLLMENT_TIMEOUT);
 			}
 		}
 		else if(ted.state >= EnrollmentStates::CONNECTED)
 		{
-			if(conn != nullptr){
-				conn->DisconnectAndRemove(AppDisconnectReason::ENROLLMENT_TIMEOUT2);
+			if(conn){
+				conn.DisconnectAndRemove(AppDisconnectReason::ENROLLMENT_TIMEOUT2);
 			}
 		}
 
@@ -125,8 +129,8 @@ void EnrollmentModule::TimerEventHandler(u16 passedTimeDs)
 	}
 
 	//Check if the enrollment connection was handshaked as we have no handler for that
-	if(ted.state == EnrollmentStates::CONNECTING && conn != nullptr) {
-		if(conn->connectionState == ConnectionState::HANDSHAKE_DONE) {
+	if(ted.state == EnrollmentStates::CONNECTING && conn) {
+		if(conn.GetConnectionState() == ConnectionState::HANDSHAKE_DONE) {
 			EnrollmentConnectionConnectedHandler();
 		}
 	}
@@ -150,7 +154,7 @@ TerminalCommandHandlerReturnType EnrollmentModule::TerminalCommandHandler(const 
 				CheckedMemset(&enrollmentMessage, 0x00, SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE);
 
 				//We clear the nodeKey with all F's for invalid key
-				CheckedMemset(enrollmentMessage.nodeKey.getRaw(), 0xFF, sizeof(enrollmentMessage.nodeKey));
+				enrollmentMessage.nodeKey = {};
 
 				bool didError = false;
 
@@ -164,16 +168,16 @@ TerminalCommandHandlerReturnType EnrollmentModule::TerminalCommandHandler(const 
 					return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
 				}
 				if(commandArgsSize > 7){
-					Logger::parseEncodedStringToBuffer(commandArgs[7], enrollmentMessage.newNetworkKey.getRaw(), 16);
+					Logger::parseEncodedStringToBuffer(commandArgs[7], enrollmentMessage.newNetworkKey.data(), 16);
 				}
 				if(commandArgsSize > 8){
-					Logger::parseEncodedStringToBuffer(commandArgs[8], enrollmentMessage.newUserBaseKey.getRaw(), 16);
+					Logger::parseEncodedStringToBuffer(commandArgs[8], enrollmentMessage.newUserBaseKey.data(), 16);
 				}
 				if(commandArgsSize > 9){
-					Logger::parseEncodedStringToBuffer(commandArgs[9], enrollmentMessage.newOrganizationKey.getRaw(), 16);
+					Logger::parseEncodedStringToBuffer(commandArgs[9], enrollmentMessage.newOrganizationKey.data(), 16);
 				}
 				if(commandArgsSize > 10){
-					Logger::parseEncodedStringToBuffer(commandArgs[10], enrollmentMessage.nodeKey.getRaw(), 16);
+					Logger::parseEncodedStringToBuffer(commandArgs[10], enrollmentMessage.nodeKey.data(), 16);
 				}
 				enrollmentMessage.timeoutSec = commandArgsSize > 11? Utility::StringToU8(commandArgs[11], &didError) : 10;
 				enrollmentMessage.enrollOnlyIfUnenrolled = commandArgsSize > 12 ? Utility::StringToU8(commandArgs[12], &didError) : 0;
@@ -393,7 +397,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 				for (u32 i = 0; i < amountOfProposals; i++)
 				{
 					requestProposalIndices[i] = data->serialNumberIndices[i];
-					char serialBuffer[NODE_SERIAL_NUMBER_LENGTH + 1];
+					char serialBuffer[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
 					Utility::GenerateBeaconSerialForIndex(requestProposalIndices[i], serialBuffer);
 					logjson_partial("ENROLLMOD", "\"%s\"", serialBuffer);
 					if (i != amountOfProposals - 1)
@@ -421,13 +425,13 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 			){
 				EnrollmentModuleEnrollmentResponse const * data = (EnrollmentModuleEnrollmentResponse const *)packet->data;
 
-				//Add null terminator to string
-				char serialNumber[NODE_SERIAL_NUMBER_LENGTH+1];
+				//Get serial number from index
+				char serialNumber[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
 				Utility::GenerateBeaconSerialForIndex(data->serialNumberIndex, serialNumber);
 
 				//Check if this came over our EnrollmentOverMesh Connection and terminate that connection
-				BaseConnection* tedConn = GS->cm.GetConnectionByUniqueId(ted.uniqueConnId);
-				if(ted.state >= EnrollmentStates::CONNECTED && (tedConn == nullptr || tedConn == connection)){
+				BaseConnectionHandle tedConn = GS->cm.GetConnectionByUniqueId(ted.uniqueConnId);
+				if(ted.state >= EnrollmentStates::CONNECTED && (!tedConn || tedConn.GetConnection() == connection)){
 					ted.state = EnrollmentStates::NOT_ENROLLING;
 					if (connection != nullptr) {
 						connection->DisconnectAndRemove(AppDisconnectReason::ENROLLMENT_RESPONSE_RECEIVED);
@@ -468,7 +472,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 			else if (actionType == EnrollmentModuleActionResponseMessages::REQUEST_PROPOSALS_RESPONSE)
 			{
 				EnrollmentModuleRequestProposalResponse const * data = (EnrollmentModuleRequestProposalResponse const *)packet->data;
-				char serialBuffer[NODE_SERIAL_NUMBER_LENGTH + 1];
+				char serialBuffer[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
 				Utility::GenerateBeaconSerialForIndex(data->serialNumberIndex, serialBuffer);
 
 				logjson("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"request_proposals_response\",\"serialNumber\":\"%s\",\"module\":%d,\"requestHandle\":%d}" SEP, packet->header.sender, serialBuffer, (u32)packet->moduleId, (u32)packet->requestHandle);
@@ -502,9 +506,9 @@ void EnrollmentModule::Enroll(connPacketModule const * packet, u16 packetLength)
 		GS->node.configuration.enrollmentState == EnrollmentState::ENROLLED
 		&& GS->node.configuration.nodeId == data->newNodeId
 		&& GS->node.configuration.networkId == data->newNetworkId
-		&& (!CHECK_MSG_SIZE(packet, data->newNetworkKey.getRaw(),      16, packetLength) || Utility::CompareMem(0, data->newNetworkKey     .getRaw(), 16) || memcmp(data->newNetworkKey.getRaw(),      GS->node.configuration.networkKey,      16) == 0)
-		&& (!CHECK_MSG_SIZE(packet, data->newUserBaseKey.getRaw(),     16, packetLength) || Utility::CompareMem(0, data->newUserBaseKey    .getRaw(), 16) || memcmp(data->newUserBaseKey.getRaw(),     GS->node.configuration.userBaseKey,     16) == 0)
-		&& (!CHECK_MSG_SIZE(packet, data->newOrganizationKey.getRaw(), 16, packetLength) || Utility::CompareMem(0, data->newOrganizationKey.getRaw(), 16) || memcmp(data->newOrganizationKey.getRaw(), GS->node.configuration.organizationKey, 16) == 0)
+		&& (!CHECK_MSG_SIZE(packet, data->newNetworkKey.data(),      16, packetLength) || Utility::CompareMem(0, data->newNetworkKey     .data(), 16) || memcmp(data->newNetworkKey.data(),      GS->node.configuration.networkKey,      16) == 0)
+		&& (!CHECK_MSG_SIZE(packet, data->newUserBaseKey.data(),     16, packetLength) || Utility::CompareMem(0, data->newUserBaseKey    .data(), 16) || memcmp(data->newUserBaseKey.data(),     GS->node.configuration.userBaseKey,     16) == 0)
+		&& (!CHECK_MSG_SIZE(packet, data->newOrganizationKey.data(), 16, packetLength) || Utility::CompareMem(0, data->newOrganizationKey.data(), 16) || memcmp(data->newOrganizationKey.data(), GS->node.configuration.organizationKey, 16) == 0)
 	){
 		// Already enrolled with same data, send ok, do not reboot
 		SendEnrollmentResponse(
@@ -543,22 +547,22 @@ void EnrollmentModule::SaveEnrollment(connPacketModule* packet, u16 packetLength
 	GS->node.configuration.networkId = data->newNetworkId;
 
 	if(
-		CHECK_MSG_SIZE(packet, data->newNetworkKey.getRaw(), 16, packetLength)
-		&& !Utility::CompareMem(0x00, data->newNetworkKey.getRaw(), 16)
+		CHECK_MSG_SIZE(packet, data->newNetworkKey.data(), 16, packetLength)
+		&& !Utility::CompareMem(0x00, data->newNetworkKey.data(), 16)
 	){
-		CheckedMemcpy(GS->node.configuration.networkKey, data->newNetworkKey.getRaw(), 16);
+		CheckedMemcpy(GS->node.configuration.networkKey, data->newNetworkKey.data(), 16);
 	}
 	if(
-		CHECK_MSG_SIZE(packet, data->newUserBaseKey.getRaw(), 16, packetLength)
-		&& !Utility::CompareMem(0x00, data->newUserBaseKey.getRaw(), 16)
+		CHECK_MSG_SIZE(packet, data->newUserBaseKey.data(), 16, packetLength)
+		&& !Utility::CompareMem(0x00, data->newUserBaseKey.data(), 16)
 	){
-		CheckedMemcpy(GS->node.configuration.userBaseKey, data->newUserBaseKey.getRaw(), 16);
+		CheckedMemcpy(GS->node.configuration.userBaseKey, data->newUserBaseKey.data(), 16);
 	}
 	if(
-		CHECK_MSG_SIZE(packet, data->newOrganizationKey.getRaw(), 16, packetLength)
-		&& !Utility::CompareMem(0x00, data->newOrganizationKey.getRaw(), 16)
+		CHECK_MSG_SIZE(packet, data->newOrganizationKey.data(), 16, packetLength)
+		&& !Utility::CompareMem(0x00, data->newOrganizationKey.data(), 16)
 	){
-		CheckedMemcpy(GS->node.configuration.organizationKey, data->newOrganizationKey.getRaw(), 16);
+		CheckedMemcpy(GS->node.configuration.organizationKey, data->newOrganizationKey.data(), 16);
 	}
 
 
@@ -635,7 +639,7 @@ bool EnrollmentModule::IsSerialIndexInRequestProposalAndRemove(u32 serialIndex)
 		if (requestProposalIndices[i] == serialIndex)
 		{
 			//Remove the Serial Index from the array so that the response is only sent once per request.
-			requestProposalIndices[i] = INVALID_SERIAL_NUMBER;
+			requestProposalIndices[i] = INVALID_SERIAL_NUMBER_INDEX;
 			return true;
 		}
 	}
@@ -791,8 +795,8 @@ void EnrollmentModule::EnrollOverMesh(connPacketModule const * packet, u16 packe
 
 	//If no node key was given, don't attempt to enroll over a meshaccess connection
 	if(
-		!CHECK_MSG_SIZE(packet, data->nodeKey.getRaw(), 16, packetLength)
-		|| Utility::CompareMem(0xFF, data->nodeKey.getRaw(), 16)
+		!CHECK_MSG_SIZE(packet, data->nodeKey.data(), 16, packetLength)
+		|| Utility::CompareMem(0xFF, data->nodeKey.data(), 16)
 	){
 		logt("ENROLLMOD", "No node key given");
 		return;
@@ -828,12 +832,12 @@ void EnrollmentModule::EnrollOverMesh(connPacketModule const * packet, u16 packe
 	//If there are any open MeshAccessConnections, we disconnect these so we can use them after
 	//our scan returned a positive result. This will throw out users that try to connect during an
 	//enrollment, but we cannot easily distinguish between used and unused meshAccessConnections
-	BaseConnections conns = GS->cm.GetConnectionsOfType(ConnectionType::MESH_ACCESS, ConnectionDirection::INVALID);
+	MeshAccessConnections conns = GS->cm.GetMeshAccessConnections(ConnectionDirection::INVALID);
 	for(u32 i=0; i<conns.count; i++){
-		MeshAccessConnection *conn = (MeshAccessConnection*)GS->cm.allConnections[conns.connectionIndizes[i]];
+		MeshAccessConnectionHandle conn = conns.handles[i];
 		//We make sure that we do not disconnect the sender of the enrollment
-		if (conn != nullptr && conn->virtualPartnerId != packet->header.sender) {
-			conn->DisconnectAndRemove(AppDisconnectReason::NEEDED_FOR_ENROLLMENT);
+		if (conn && conn.GetVirtualPartnerId() != packet->header.sender) {
+			conn.DisconnectAndRemove(AppDisconnectReason::NEEDED_FOR_ENROLLMENT);
 		}
 	}
 
@@ -884,11 +888,11 @@ void EnrollmentModule::EnrollNodeViaMeshAccessConnection(FruityHal::BleGapAddr& 
 	FmKeyId fmKeyId = FmKeyId::NODE;
 
 	//If the given key was 000....000, we try to connect using key id none
-	if(Utility::CompareMem(0x00, ted.requestData.nodeKey.getRaw(), ted.requestData.nodeKey.length)){
+	if(Utility::CompareMem(0x00, ted.requestData.nodeKey.data(), ted.requestData.nodeKey.size())){
 		fmKeyId = FmKeyId::ZERO;
 	}
 
-	ted.uniqueConnId = MeshAccessConnection::ConnectAsMaster(&addr, 10, timeLeftSec, fmKeyId, ted.requestData.nodeKey.getRaw(), MeshAccessTunnelType::PEER_TO_PEER);
+	ted.uniqueConnId = MeshAccessConnection::ConnectAsMaster(&addr, 10, timeLeftSec, fmKeyId, ted.requestData.nodeKey.data(), MeshAccessTunnelType::PEER_TO_PEER);
 
 	logt("ENROLLMOD", "uiniqueId: %u", ted.uniqueConnId);
 
@@ -906,11 +910,11 @@ void EnrollmentModule::EnrollmentConnectionConnectedHandler()
 	}
 
 
-	MeshAccessConnection* conn = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(ted.uniqueConnId);
+	MeshAccessConnectionHandle conn = GS->cm.GetMeshAccessConnectionByUniqueId(ted.uniqueConnId);
 	
 	//We need to overwrite the receiver as our node might have been instructed to enroll the remote node
 	//If we send the message unmodified, our partner would not accept the packet as it was not adressed to him
-	ted.requestHeader.header.receiver = conn != nullptr ? conn->virtualPartnerId : 0;
+	ted.requestHeader.header.receiver = conn ? conn.GetVirtualPartnerId() : 0;
 
 	//Send the enrollment to our partner after we are connected
 	u8 len = SIZEOF_CONN_PACKET_MODULE + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE;
@@ -920,8 +924,8 @@ void EnrollmentModule::EnrollmentConnectionConnectedHandler()
 
 	logt("ENROLLMOD", "Sender was %u", ted.requestHeader.header.sender);
 
-	if(conn != nullptr){
-		conn->SendData(buffer, len, DeliveryPriority::LOW, false);
+	if(conn){
+		conn.SendData(buffer, len, DeliveryPriority::LOW, false);
 	}
 
 	//Final state reached, will be cleared after timeout is reached
@@ -1002,7 +1006,7 @@ void EnrollmentModule::GapAdvertisementReportEventHandler(const FruityHal::GapAd
 		advertisementReportEvent.isConnectable()
 		&& dataLength >= SIZEOF_MESH_ACCESS_SERVICE_DATA_ADV_MESSAGE
 		&& message->flags.type == (u8)BleGapAdType::TYPE_FLAGS
-		&& message->serviceUuids.uuid == SERVICE_DATA_SERVICE_UUID16
+		&& message->serviceUuids.uuid == MESH_SERVICE_DATA_SERVICE_UUID16
 		&& message->serviceData.data.messageType == ServiceDataMessageType::MESH_ACCESS
 	){
 		if(advertisementReportEvent.getRssi() > STABLE_CONNECTION_RSSI_THRESHOLD){

@@ -28,16 +28,9 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
- * The ScanModule should provide filtering so that all nodes are able to scan
- * for advertising messages and broadcast them through the mesh.
- * This module should also allow to trigger certain tasks after specific
- * packets have been scanned.
- *
- */
-
 #pragma once
 
+#include <array>
 #include <Module.h>
 
 #if IS_ACTIVE(ASSET_MODULE)
@@ -69,8 +62,8 @@ typedef struct
 	i8 minRSSI;
 	i8 maxRSSI;
 	u8 advertisingType;
-	SimpleArray<u8, 31> byteMask;
-	SimpleArray<u8, 31> mandatory;
+	std::array<u8, 31> byteMask;
+	std::array<u8, 31> mandatory;
 
 } scanFilterEntry;
 
@@ -81,6 +74,14 @@ struct ScanningModuleConfiguration : ModuleConfiguration{
 };
 #pragma pack(pop)
 
+/*
+ * The ScanModule should provide filtering so that all nodes are able to scan
+ * for advertising messages and broadcast them through the mesh. (not yet implemented)
+ * This module should also allow to trigger certain tasks after specific
+ * packets have been scanned.
+ * Currently it is used for scanning asset packets.
+ *
+ */
 class ScanningModule : public Module
 {
 private:
@@ -116,7 +117,7 @@ private:
 		u8 reservedBits : 5;
 	};
 
-	SimpleArray<ScannedAssetTrackingStorage, ASSET_PACKET_BUFFER_SIZE> assetPackets;
+	std::array<ScannedAssetTrackingStorage, ASSET_PACKET_BUFFER_SIZE> assetPackets{};
 
 	typedef struct
 	{
@@ -125,9 +126,9 @@ private:
 		u16 count;
 	} scannedPacket;
 
-	SimpleArray<scanFilterEntry, SCAN_FILTER_NUMBER> scanFilters;
+	std::array<scanFilterEntry, SCAN_FILTER_NUMBER> scanFilters;
 
-	SimpleArray<scannedPacket, SCAN_BUFFERS_SIZE> groupedPackets;
+	std::array<scannedPacket, SCAN_BUFFERS_SIZE> groupedPackets;
 
 
 
@@ -137,9 +138,9 @@ private:
 
 	// Addresses of active devices
 	//uint8_t addressPointer;
-	//SimpleArray<SimpleArray<u8, FH_BLE_GAP_ADDR_LEN>, NUM_ADDRESSES_TRACKED> addresses;
-	//SimpleArray<u32, NUM_ADDRESSES_TRACKED> totalRSSIsPerAddress;
-	//SimpleArray<u32, NUM_ADDRESSES_TRACKED> totalMessagesPerAdress;
+	//std::array<SimpleArray<u8, FH_BLE_GAP_ADDR_LEN>, NUM_ADDRESSES_TRACKED> addresses;
+	//std::array<u32, NUM_ADDRESSES_TRACKED> totalRSSIsPerAddress;
+	//std::array<u32, NUM_ADDRESSES_TRACKED> totalMessagesPerAdress;
 
 	u32 totalMessages;
 	u32 totalRSSI;
@@ -212,7 +213,7 @@ private:
 		u8 reservedBits : 5;
 	};
 
-	SimpleArray<ScannedAssetInsTrackingStorage, ASSET_INS_PACKET_BUFFER_SIZE> assetInsPackets;
+	std::array<ScannedAssetInsTrackingStorage, ASSET_INS_PACKET_BUFFER_SIZE> assetInsPackets{};
 
 	//####### End of Module specitic messages
 #pragma pack(pop)
@@ -265,18 +266,18 @@ public:
 
 	ScanningModule();
 
-	void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override;
+	void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
 
-	void ResetToDefaultConfiguration() override;
+	void ResetToDefaultConfiguration() override final;
 
-	void TimerEventHandler(u16 passedTimeDs) override;
+	void TimerEventHandler(u16 passedTimeDs) override final;
 
-	virtual void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override;
+	virtual void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override final;
 
-	void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
+	void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
 
 #ifdef TERMINAL_ENABLED
-	TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
+	TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
 #endif
 };
 

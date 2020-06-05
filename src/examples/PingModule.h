@@ -32,6 +32,9 @@
 
 #include <Module.h>
 
+/*
+ * The PinModule is a sample implementation of a module for showcasing FruityMesh.
+ */
 class PingModule: public Module
 {
 	private:

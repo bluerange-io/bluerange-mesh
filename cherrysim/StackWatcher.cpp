@@ -33,10 +33,10 @@
 #include "Exceptions.h"
 #include <cstdio> //for std::size_t
 
-std::vector<void*> StackWatcher::stackBase;
+std::vector<const void*> StackWatcher::stackBase;
 u32 StackWatcher::disableValue = 0;
 
-StackWatcher::StackWatcher()
+void StackWatcher::check()
 {
 	if (stackBase.size() == 0)
 	{
@@ -50,29 +50,24 @@ StackWatcher::StackWatcher()
 
 	int someDummyStackVariable = 0;
 
-	const u32 uncleanedStackSize = (char*)StackWatcher::stackBase.back() - (char*)&someDummyStackVariable;
-	const u32 cleanedStackSize = uncleanedStackSize - StackWatcher::stackBase.size() * sizeof(StackBaseSetter);
+	const u32 uncleanedStackSize = (const char*)StackWatcher::stackBase.back() - (const char*)&someDummyStackVariable;
+	const u32 cleanedStackSize = uncleanedStackSize - sizeof(StackBaseSetter);
 
-	//static on purpose. This variable should track the biggest Stack usage accross all nodes and all simulations.
-	static u32 biggest = 0;
-	if (cleanedStackSize > biggest)
-	{
-		biggest = cleanedStackSize;
-		printf("BIGGEST: %u\n", biggest);
-	}
 	if (cleanedStackSize > 10000)
 	{
-#ifndef GITHUB_RELEASE
+#if !defined(GITHUB_RELEASE) && !defined(__clang__)
 		SIMEXCEPTION(StackOverflowException);
 #else
 		//The "GITHUB_RELEASE" configuration executes only github featuresets which, by definition, consume much more RAM.
+		//__clang__ has vastly different stack frames and is thus not supported as well. As this is just a sanity check,
+		//supporting one compiler for the pipeline and one for local runs is sufficient.
 #endif //GITHUB_RELEASE
 	}
 }
 
 StackBaseSetter::StackBaseSetter()
 {
-	int someDummyStackVariable = 0;
+	const int someDummyStackVariable = 0;
 	// Suppressing the following check is okay because we don't dereference the pointer
 	// given to the container anywhere. We just care about value of the pointer itself.
 	// cppcheck-suppress danglingLifetime

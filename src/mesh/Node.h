@@ -28,12 +28,6 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
- * The Node class is the heart and soul of this implementation. It uses a state
- * machine and timers to control the behaviour of the node.
- * It uses the FruityMesh algorithm to build up connections with surrounding nodes
- *
- */
 
 #pragma once
 
@@ -49,7 +43,8 @@
 #include <RecordStorage.h>
 #include <Module.h>
 #include <Terminal.h>
-#include "SimpleArray.h"
+#include <array>
+#include "ConnectionHandle.h"
 
 constexpr int MAX_RAW_CHUNK_SIZE = 60;
 constexpr int TIME_BEFORE_DISCOVERY_MESSAGE_SENT_SEC = 30;
@@ -107,7 +102,7 @@ struct RawDataHeader
 	RawDataActionType actionType;
 };
 
-#define SIZEOF_RAW_DATA_LIGHT_PACKET (SIZEOF_CONN_PACKET_HEADER + 3)
+constexpr size_t SIZEOF_RAW_DATA_LIGHT_PACKET = SIZEOF_CONN_PACKET_HEADER + 3;
 struct RawDataLight
 {
 	connPacketHeader connHeader;
@@ -168,7 +163,6 @@ struct RawDataReport
 };
 STATIC_ASSERT_SIZE(RawDataReport, 20);
 
-#if FEATURE_AVAILABLE(DEVICE_CAPABILITIES)
 enum class CapabilityActionType : u8
 {
 	REQUESTED = 0,
@@ -202,7 +196,6 @@ struct CapabilityEndMessage
 	u32 amountOfCapabilities;
 };
 STATIC_ASSERT_SIZE(CapabilityEndMessage, 10);
-#endif // FEATURE_AVAILABLE(DEVICE_CAPABILITIES)
 
 enum class EmergencyDisconnectErrorCode : u8
 {
@@ -254,6 +247,12 @@ typedef struct meshServiceStruct_temporary
 	};
 #pragma pack(pop)
 
+/*
+ * The node represents a mesh-enabled device and is a mandatory module (id 0).
+ * It implements the FruityMesh algorithm together with the ConnectionManager
+ * and the MeshConnection. It also implements some core functionality that
+ * other layers can use.
+ */
 class Node: public Module
 {
 
@@ -289,16 +288,15 @@ private:
 
 		u32 ModifyScoreBasedOnPreferredPartners(u32 score, NodeId partner) const;
 		
-		joinMeBufferPacket* DetermineBestCluster		(u32(Node::*clusterRatingFunction)(joinMeBufferPacket& packet) const);
+		joinMeBufferPacket* DetermineBestCluster		(u32(Node::*clusterRatingFunction)(const joinMeBufferPacket& packet) const);
 		joinMeBufferPacket* DetermineBestClusterAsSlave ();
 		joinMeBufferPacket* DetermineBestClusterAsMaster();
 
-		u32 CalculateClusterScoreAsMaster(joinMeBufferPacket& packet) const;
-		u32 CalculateClusterScoreAsSlave(joinMeBufferPacket& packet) const;
+		u32 CalculateClusterScoreAsMaster(const joinMeBufferPacket& packet) const;
+		u32 CalculateClusterScoreAsSlave(const joinMeBufferPacket& packet) const;
 
 		bool DoesBiggerKnownClusterExist();
 
-#if FEATURE_AVAILABLE(DEVICE_CAPABILITIES)
 		bool isSendingCapabilities = false;
 		bool firstCallForCurrentCapabilityModule = false;
 		constexpr static u32 TIME_BETWEEN_CAPABILITY_SENDINGS_DS = SEC_TO_DS(1);
@@ -306,7 +304,7 @@ private:
 		u32 capabilityRetrieverModuleIndex = 0;
 		u32 capabilityRetrieverLocal = 0;
 		u32 capabilityRetrieverGlobal = 0;
-#endif
+
 		bool isInit = false;
 
 
@@ -329,7 +327,7 @@ private:
 
 		u32 emergencyDisconnectTimerDs = 0; //The time since this node was not involved in any mesh. Can be reset by other means as well, e.g. when an emergency disconnect was sent.
 		constexpr static u32 emergencyDisconnectTimerTriggerDs = SEC_TO_DS(/*Two minutes*/ 2 * 60);
-		u32 emergencyDisconnectValidationConnectionUniqueId = 0;
+		MeshAccessConnectionHandle emergencyDisconnectValidationConnectionUniqueId;
 		void ResetEmergencyDisconnect(); //Resets all the emergency disconnect variables and closes the validation connection.
 
 	public:
@@ -338,7 +336,7 @@ private:
 
 		static constexpr int MAX_JOIN_ME_PACKET_AGE_DS = SEC_TO_DS(10);
 		static constexpr int JOIN_ME_PACKET_BUFFER_MAX_ELEMENTS = 10;
-		SimpleArray<joinMeBufferPacket, JOIN_ME_PACKET_BUFFER_MAX_ELEMENTS> joinMePackets;
+		std::array<joinMeBufferPacket, JOIN_ME_PACKET_BUFFER_MAX_ELEMENTS> joinMePackets{};
 		ClusterId currentAckId = 0;
 		u16 connectionLossCounter = 0;
 		u16 randomBootNumber = 0;
@@ -410,15 +408,15 @@ private:
 		Node();
 		void Init();
 		bool IsInit();
-		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override;
-		void ResetToDefaultConfiguration() override;
+		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
+		void ResetToDefaultConfiguration() override final;
 
 		void InitializeMeshGattService();
 
 		//Connection
 		void HandshakeTimeoutHandler() const;
 		void HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinner); 
-		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) override;
+		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) override final;
 
 		void SendComponentMessage(connPacketComponentMessage& message, u16 payloadSize);
 
@@ -439,7 +437,7 @@ private:
 		joinMeBufferPacket* findTargetBuffer(const advPacketJoinMeV0* packet);
 
 		//Timers
-		void TimerEventHandler(u16 passedTimeDs) override;
+		void TimerEventHandler(u16 passedTimeDs) override final;
 
 		//Helpers
 		ClusterId GenerateClusterID(void) const;
@@ -456,23 +454,18 @@ private:
 		void PrintStatus() const;
 		void PrintBufferStatus() const;
 		void SetTerminalTitle() const;
-#if FEATURE_AVAILABLE(DEVICE_CAPABILITIES)
-		CapabilityEntry GetCapability(u32 index, bool firstCall) override;
+		CapabilityEntry GetCapability(u32 index, bool firstCall) override final;
 		CapabilityEntry GetNextGlobalCapability();
-#endif
-
-		void StartConnectionRSSIMeasurement(MeshConnection& connection);
-		void StopConnectionRSSIMeasurement(const MeshConnection& connection);
 
 		void Reboot(u32 delayDs, RebootReason reason);
 		bool IsRebootScheduled();
 
 		//Receiving
-		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
+		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
 
 		//Methods of TerminalCommandListener
 		#ifdef TERMINAL_ENABLED
-		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
+		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
 		#endif
 
 		//Methods of ConnectionManagerCallback

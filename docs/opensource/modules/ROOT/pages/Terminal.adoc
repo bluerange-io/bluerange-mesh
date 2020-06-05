@@ -1,0 +1,56 @@
+= Terminal
+
+The terminal can be used to communicate with nodes either by connecting to them using a debugger connection and Segger RTT or by using UART. The terminal is optional and the user can decide whether to compile it into the firmware or not by specifying this in the featureset. The terminal can be either used in `prompt mode` or `json mode` which can also be specified in the featureset using the `terminalMode` setting in the config. Prompt mode is mostly for testing and debugging, while json mode can be used to build a MeshGateway that processes received messages and sends commands into the mesh.
+
+== Setting Terminal Mode (Local Command)
+
+When working with UART (Terminal and UART must be enabled), FruityMesh
+supports a convenient blocking terminal mode with echo back
+functionality. For communication with another device such as a
+MeshGateway, an interrupt based input method and JSON output is used. To
+toggle between these two modes, there are two commands:
+
+`startterm`
+
+Using _startterm_ invokes a blocking mode where all functionality is
+halted and user input is received in a busy loop until a line feed '\r'
+is received. The command is then processed and other functionality
+is resumed. The input is echoed back on the terminal.
+Backspace is supported as well for most terminal programs. If the
+command isn't recognized, a warning is echoed.
+
+`stopterm`
+
+The _stopterm_ command switches the node into an interrupt based input
+mode where terminal input does not affect the functionality until a line
+feed '\r' is received. All output messages are in JSON format.
+
+== Rebooting (Local Command)
+
+`reset`
+
+To reset the node via the terminal, enter this command
+and a software reboot is performed.
+
+== Enabling CRC checks on Terminal Communication
+
+It is possible to add a CRCs check to all communications that go through the terminal. This might be necessary if the communication channel is unreliable. To do this, execute the following command:
+
+[source,C++]
+----
+enable_corruption_check
+----
+
+After this command is sent, the firmware only accepts terminal commands that have a correct CRC32 appended at the end. For example, a terminal command may look like this:
+
+[source,C++]
+----
+action this status get_status CRC: 3968018817
+----
+
+In addition, all JSON messages from the firmware have a CRC32 appended:
+
+[source,Javascript]
+----
+{"nodeId":1,"type":"status","module":3,"batteryInfo":0,"clusterSize":2,"connectionLossCounter":0,"freeIn":2,"freeOut":2,"inConnectionPartner":0,"inConnectionRSSI":0, "initialized":0} CRC: 3703755059
+----

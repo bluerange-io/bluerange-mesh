@@ -30,8 +30,11 @@
 
 #pragma once
 
+/*
+ * This file includes platform independent definitions for the BLE GAP layer.
+ */
 
-//TODO: types.h should not include references to nrf sdk
+
 #include "types.h"
 
 #define _________________GAP_DEFINITIONS______________________

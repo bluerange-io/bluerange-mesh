@@ -28,17 +28,12 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
- * The Advertising Controller is responsible for wrapping all advertising
- * functionality and the necessary softdevice calls in one class.
- */
-
 #pragma once
 
 #include <types.h>
 #include <Config.h>
 #include <FruityHal.h>
-#include "SimpleArray.h"
+#include <array>
 
 enum class AdvJobTypes : u8{
 	INVALID,
@@ -76,6 +71,13 @@ struct AdvData {
 	u8 scanDataLength;
 };
 
+/*
+ * The Advertising Controller is responsible for wrapping all advertising
+ * functionality and the necessary softdevice calls in one class.
+ * It provides a scheduler that can be used to schedule a number of messages.
+ * The current message broadcast is then automatically switched between all
+ * croadcasted messages.
+ */
 class AdvertisingController
 {
 private:
@@ -92,8 +94,8 @@ private:
 public:
 	AdvertisingController();
 
-	SimpleArray<AdvJob, ADVERTISING_CONTROLLER_MAX_NUM_JOBS> jobs;
-	SimpleArray<AdvData, 2> advData;
+	std::array<AdvJob, ADVERTISING_CONTROLLER_MAX_NUM_JOBS> jobs{};
+	std::array<AdvData, 2> advData{};
 	u8 currentSlotUsed = 0;
 
 	enum class AdvertisingState : u8{

@@ -38,10 +38,10 @@
 TEST(TestRawData, TestRawDataLight) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
-	testerConfig.verbose = true;
-
+	//testerConfig.verbose = true;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.Start();
@@ -68,10 +68,10 @@ TEST(TestRawData, TestRawDataLight) {
 TEST(TestRawData, TestSimpleTransmissions) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.Start();
@@ -118,10 +118,10 @@ TEST(TestRawData, TestSimpleTransmissions) {
 TEST(TestRawData, TestSimpleTransmissionsViaMeshAccess) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.sim->nodes[0].uicr.CUSTOMER[9] = 100; // Change default network id of node 1
@@ -153,10 +153,10 @@ TEST(TestRawData, TestSimpleTransmissionsViaMeshAccessFail) {
 	Exceptions::DisableDebugBreakOnException disable;
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.sim->nodes[0].uicr.CUSTOMER[9] = 100; // Change default network id of node 1
@@ -187,10 +187,10 @@ TEST(TestRawData, TestSimpleTransmissionsViaMeshAccessFail) {
 TEST(TestRawData, TestTransmissionsOfAllPossibleSizes) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.Start();
@@ -217,8 +217,8 @@ TEST(TestRawData, TestRandomTransmissions) {
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 		simConfig.sdBusyProbability = 0;
 		simConfig.seed = repeat;
-		simConfig.numNodes = numNodes;
-
+		simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+		simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", numNodes - 1});
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 		tester.Start();

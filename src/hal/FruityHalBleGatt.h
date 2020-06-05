@@ -30,8 +30,10 @@
 
 #pragma once
 
+/*
+ * This file includes platform independent definitions for the BLE GATT layer.
+ */
 
-//TODO: types.h should not include references to nrf sdk
 #include <types.h>
 #include <FruityHalBleGap.h>
 

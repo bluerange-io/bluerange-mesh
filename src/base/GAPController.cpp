@@ -53,7 +53,7 @@ GAPController & GAPController::getInstance()
 //		Appearance
 //		Peripheral Preferred Connection Parameters
 void GAPController::bleConfigureGAP() const{
-	u32 err = 0;
+	ErrorType err = ErrorType::SUCCESS;
 	//Set up an open link write permission
 	//There are multiple security modes defined in the BLE spec
 	//Use these macros: http://developer.nordicsemi.com/nRF51_SDK/doc/7.1.0/s110/html/a00813.html
@@ -101,9 +101,9 @@ ErrorType GAPController::connectToPeripheral(const FruityHal::BleGapAddr &addres
 	connectionParams.connSupTimeout = Conf::meshConnectionSupervisionTimeout;
 
 	//Connect to the peripheral
-	err = FruityHal::BleGapConnect(&address, &scanParams, &connectionParams);
+	err = FruityHal::BleGapConnect(address, scanParams, connectionParams);
 	if(err != ErrorType::SUCCESS){
-		logt("ERROR", "GATT connect fail %d", (u8)err);
+		logt("WARNING", "GATT connect fail %d", (u8)err);
 		GS->logger.logCustomCount(CustomErrorTypes::COUNT_GATT_CONNECT_FAILED);
 		//Just ignore it, the connection will not happen
 		return err;
@@ -154,19 +154,28 @@ void GAPController::GapSecurityInfoRequestEvenetHandler(const FruityHal::GapSecu
 		key.longTermKeyLength = 16;
 
 		//Reply  with our stored key
-		FruityHal::BleGapSecInfoReply(
+		const ErrorType err = FruityHal::BleGapSecInfoReply(
 			securityInfoRequestEvent.getConnectionHandle(),
 			&key, //This is our stored long term key
 			nullptr, //We do not have an identity resolving key
 			nullptr //We do not have signing info
 		);
 
+		if (err != ErrorType::SUCCESS)
+		{
+			GS->logger.logCustomError(CustomErrorTypes::WARN_GAP_SEC_INFO_REPLY_FAILED, (u32)err);
+		}
+
 		logt("SEC", "SEC_INFO_REQUEST received, replying with key %02x:%02x:%02x...%02x:%02x", 
 			key.longTermKey[0], key.longTermKey[1], key.longTermKey[2], key.longTermKey[14], key.longTermKey[15]);
 	}
 	else {
 		logt("SEC", "No Encryption available");
-		FruityHal::Disconnect(securityInfoRequestEvent.getConnectionHandle(), FruityHal::BleHciError::REMOTE_USER_TERMINATED_CONNECTION);
+		const ErrorType err = FruityHal::Disconnect(securityInfoRequestEvent.getConnectionHandle(), FruityHal::BleHciError::REMOTE_USER_TERMINATED_CONNECTION);
+		if (err != ErrorType::SUCCESS)
+		{
+			GS->logger.logCustomError(CustomErrorTypes::WARN_GAP_SEC_DISCONNECT_FAILED, (u32)err);
+		}
 	}
 }
 
@@ -185,8 +194,6 @@ void GAPController::GapConnectionSecurityUpdateEventHandler(const FruityHal::Gap
 
 void GAPController::startEncryptingConnection(u16 connectionHandle) const
 {
-	u32 err = 0;
-
 	//Key identification data
 	//We do not need a key identification currently, because we only have one
 	FruityHal::BleGapMasterId keyId;
@@ -205,8 +212,8 @@ void GAPController::startEncryptingConnection(u16 connectionHandle) const
 	//This starts the Central Encryption Establishment using stored keys
 	//http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.s130.api.v1.0.0/group___b_l_e___g_a_p___c_e_n_t_r_a_l___e_n_c___m_s_c.html
 	//http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.s130.api.v1.0.0/group___b_l_e___g_a_p___p_e_r_i_p_h___e_n_c___m_s_c.html
-	err = FruityHal::BleGapEncrypt(connectionHandle, keyId, key);
-	logt("SEC", "encrypting connection handle %u with key. result %u", connectionHandle, err);
+	ErrorType err = FruityHal::BleGapEncrypt(connectionHandle, keyId, key);
+	logt("SEC", "encrypting connection handle %u with key. result %u", connectionHandle, (u32)err);
 }
 
 void GAPController::RequestConnectionParameterUpdate(u16 connectionHandle, u16 minConnectionInterval, u16 maxConnectionInterval, u16 slaveLatency, u16 supervisionTimeout) const

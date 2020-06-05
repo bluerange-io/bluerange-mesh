@@ -30,7 +30,7 @@
 
 #pragma once
 
-
+#include <array>
 #include <Module.h>
 
 #include <MeshAccessConnection.h>
@@ -61,7 +61,7 @@ typedef struct
 	u8 interestedInConnetion : 1;
 	u8 reserved : 3;
 	u32 serialIndex; //SerialNumber index of the beacon
-	SimpleArray<ModuleId, 3> moduleIds; //Additional subServices offered with their data
+	std::array<ModuleId, 3> moduleIds; //Additional subServices offered with their data
 
 }advStructureMeshAccessServiceData;
 STATIC_ASSERT_SIZE(advStructureMeshAccessServiceData, 16);
@@ -88,8 +88,6 @@ STATIC_ASSERT_SIZE(meshAccessServiceAdvMessage, 23);
 
 #pragma pack(pop)
 
-
-#define MA_SERVICE_UUID_TYPE BLE_UUID_TYPE_VENDOR_BEGIN
 constexpr u8 MA_SERVICE_BASE_UUID[] = { 0x58, 0x18, 0x05, 0xA0, 0x07, 0x0C, 0xFD, 0x93, 0x3C, 0x42, 0xCE, 0xAC, 0x00, 0x00, 0x00, 0x00 };
 
 constexpr int MA_SERVICE_SERVICE_CHARACTERISTIC_UUID = 0x0001;
@@ -127,7 +125,7 @@ enum class MeshAccessSerialConnectError : u8 {
 	{
 		FruityHal::BleGapAddr targetAddress;
 		FmKeyId fmKeyId;
-		SimpleArray<u8, 16> key;
+		std::array<u8, 16> key;
 		u8 tunnelType : 2;
 		u8 reserved;
 
@@ -183,6 +181,12 @@ enum class MeshAccessSerialConnectError : u8 {
 	};
 #pragma pack(pop)
 
+/**
+ * The MeshAccessModule manages all MeshAccessConnections and is used to either
+ * set up connections to nodes in a different network (e.g. during enrollment).
+ * Also, to be able to connect to Smartphones and being connectable.
+ * It also manages the MeshAccess advertising job for broadcasting.
+ */
 class MeshAccessModule: public Module
 {
 	public:
@@ -196,7 +200,7 @@ class MeshAccessModule: public Module
 		static constexpr u32 meshAccessInterestedInConnectionInitialKeepAliveDs = SEC_TO_DS(10);
 	private:
 
-		SimpleArray<ModuleId, 3> moduleIdsToAdvertise;
+		std::array<ModuleId, 3> moduleIdsToAdvertise{};
 
 		void RegisterGattService();
 		bool gattRegistered;
@@ -224,32 +228,32 @@ class MeshAccessModule: public Module
 		DECLARE_CONFIG_AND_PACKED_STRUCT(MeshAccessModuleConfiguration);
 
 		MeshAccessModule();
-		void UpdateMeshAccessBroadcastPacket(u16 advIntervalMs = 100, bool interestedInConnection = false);
+		void UpdateMeshAccessBroadcastPacket(u16 advIntervalMs = 0);
 
-		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override;
+		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
 
-		void ResetToDefaultConfiguration() override;
+		void ResetToDefaultConfiguration() override final;
 
-		void TimerEventHandler(u16 passedTimeDs) override;
+		void TimerEventHandler(u16 passedTimeDs) override final;
 
-		void MeshConnectionChangedHandler(MeshConnection& connection) override;
+		void MeshConnectionChangedHandler(MeshConnection& connection) override final;
 
 		//Boradcast messages
 		void AddModuleIdToAdvertise(ModuleId moduleId);
 		void DisableBroadcast();
 
 		//Authorization
-		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) override;
+		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) override final;
 		MeshAccessAuthorization CheckAuthorizationForAll(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) const;
 
 		//Messages
-		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
+		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
 		void MeshAccessMessageReceivedHandler(MeshAccessConnection* connection, BaseConnectionSendData* sendData, u8* data) const;
 
 		#ifdef TERMINAL_ENABLED
-		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
+		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
 		#endif
-		void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override;
+		void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override final;
 
 		bool IsZeroKeyConnectable(const ConnectionDirection direction);
 };

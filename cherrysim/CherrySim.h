@@ -37,6 +37,7 @@ into all files in order to rewrite macros and other calls.
 #pragma once
 
 #ifdef SIM_ENABLED
+#include <vector>
 #include <types.h>
 #include <GlobalState.h>
 #include <FruitySimServer.h>
@@ -44,22 +45,37 @@ into all files in order to rewrite macros and other calls.
 #include <LedWrapper.h>
 #include <CherrySimTypes.h>
 #include <map>
+#include <chrono>
+#include <string>
 
-
-constexpr int MAX_NUM_NODES = 200; //The maximum number of nodes supported by the simulator
-
-#define SHOULD_SIM_IV_TRIGGER(ivMs) (((currentNode->state.timeMs) % (ivMs)) == 0)
-
-class CherrySim : public TerminalCommandListener
+struct ReplayRecordEntry
 {
+	u32 index = 0;
+	u32 time = 0;
+	std::string command = "";
+
+	bool operator<(const ReplayRecordEntry &other) const
+	{
+		return time < other.time;
+	}
+};
+
+
+
+class CherrySim
+{
+private:
+	std::vector<char> nodeEntryBuffer; // As std::vector calls the copy constructor of it's type and nodeEntry has no copy constructor we have to provide the memory like this.
 public:
 	int globalBreakCounter = 0; //Can be used to increment globally everywhere in sim and break on a specific count
 	bool shouldRestartSim = false;
 	bool blockConnections = false; //Can be set to true to stop packets from being sent
+	volatile bool receivedDataFromMeshGw = false;
 	SimConfiguration simConfig; //The current configuration for the simulator
 	SimulatorState simState; //The current state of the simulator
 	nodeEntry* currentNode = nullptr; //A pointer to the current node under simulation
-	nodeEntry nodes[MAX_NUM_NODES]; //An array that hold the complete state of all nodes
+	nodeEntry* nodes = nullptr; //A pointer that points to the memory that holds the complete state of all nodes
+	std::string logAccumulator;
 
 	CherrySimEventListener* simEventListener = nullptr;
 
@@ -67,7 +83,6 @@ public:
 	static constexpr int flashToFileWriteInterval = 128; // Will write flash to file every flashToFileWriteInterval's simulation step.
 
 	void erasePage(u32 pageAddress);
-
 	struct FeaturesetPointers
 	{
 		FeatureSetGroup(*getFeaturesetGroupPtr)(void)                                   = nullptr;
@@ -76,42 +91,60 @@ public:
 		u32(*initializeModulesPtr)(bool createModule)                                   = nullptr;
 		DeviceType(*getDeviceTypePtr)(void)                                             = nullptr;
 		Chipset(*getChipsetPtr)(void)                                                   = nullptr;
+		u32 featuresetOrder                                                             = 0;
 	};
 
 	std::map<std::string, FeaturesetPointers> featuresetPointers;
 
+	std::queue<ReplayRecordEntry> replayRecordEntries;
+
+
+	static std::string LoadFileContents(const char* path);
+	static std::string ExtractReplayToken(const std::string &fileContents, const std::string &startToken, const std::string &endToken);
+	static std::queue<ReplayRecordEntry> ExtractReplayRecord(const std::string &fileContents);
+	static SimConfiguration ExtractSimConfigurationFromReplayRecord(const std::string &fileContents);
+	static void CheckVersionFromReplayRecord(const std::string &fileContents);
+
 private:
+	u32 totalNodes = 0;
+	u32 assetNodes = 0;
 	constexpr static float N = 2.5; //Our calibration value for distance calculation
 	TerminalPrintListener* terminalPrintListener = nullptr;
 	FruitySimServer* server = nullptr;
 
+	std::chrono::time_point<std::chrono::steady_clock> lastTick;
+
+	bool shouldSimIvTrigger(u32 ivMs);
+
 	void StoreFlashToFile();
 	void LoadFlashFromFile();
 	void PrepareSimulatedFeatureSets();
+	void QueueInterrupts();
 
 public:
-
 	//#### Simulation Control
 	explicit CherrySim(const SimConfiguration &simConfig);
 	~CherrySim();
 
 	void SetCherrySimEventListener(CherrySimEventListener* listener); // Register Listener for Simulator events
 
+	void SetFeaturesets();
+
 	void Init(); //Creates and flashes all nodes
 	void SimulateStepForAllNodes(); //Simulates on timestep for all nodes
 	void quitSimulation();
 
 	//#### Terminal
-	void registerSimulatorTerminalHandler(); //Call this to register the Simulator Terminal Handler for a node
 	#ifdef TERMINAL_ENABLED
-	TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
+	TerminalCommandHandlerReturnType TerminalCommandHandler(const std::string& message);
 	#endif // Inherited via TerminalCommandListener
 	void RegisterTerminalPrintListener(TerminalPrintListener* callback); // Register a class that will be notified when sth. is printed to the Terminal
 	void TerminalPrintHandler(const char* message); //Called for all simulator output
 
 	//#### Node Lifecycle
 	void setNode(u32 i);
-	uint32_t getNumNodes() const;
+	u32 getTotalNodes(bool countAgain = false) const; // returns number of all nodes i.e our nodes, vendor nodes and asset nodes
+	u32 getAssetNodes(bool countAgain = false) const; //iterates over all the nodes and calculate the node with device type Asset
 	void initNode(u32 i); // Creates a node with default settings (like manufacturing the hardware)
 	void flashNode(u32 i); // Flashes a node with uicr and settings
 	void bootCurrentNode(); // Starts the node. shutdownCurrentNode() must be called to clean up
@@ -125,6 +158,9 @@ public:
 	static int chipsetToBootloaderAddr(Chipset chipset);
 
 	void CheckForMultiTensorflowUsage();
+
+	void QueueInterruptCurrentNode(u32 pin);
+	void QueueAccelerationInterrutCurrentNode();
 
 public:
 	//This section is public so that softdevice calls from c code can access the functions
@@ -156,7 +192,6 @@ public:
 	void SendUnreliableTxCompleteEvent(nodeEntry* node, int connHandle, u8 packetCount);
 	void GenerateWrite(SoftDeviceBufferedPacket* bufferedPacket);
 	void GenerateNotification(SoftDeviceBufferedPacket* bufferedPacket);
-	void PacketHandler(u32 senderId, u32 receiverId, u8* data, u32 dataLength);
 
 	//GPIO Simulation
 	void SetSimLed(bool state);
@@ -177,9 +212,11 @@ public:
 	void simulateTimer();
 	void simulateWatchDog();
 
+	void SimulateInterrupts();
+
 	//Validity Checking
 	void CheckMeshingConsistency();
-	u32 DetermineClusterSizeAndPropagateClusterUpdates(nodeEntry* node, nodeEntry* startNode);
+	ClusterSize DetermineClusterSizeAndPropagateClusterUpdates(nodeEntry* node, nodeEntry* startNode);
 
 	//Configuration
 	void SetCustomAdvertisingModuleConfig();
@@ -188,12 +225,12 @@ public:
 	//Statistics
 	void AddPacketToStats(PacketStat* statArray, PacketStat* packet);
 	void AddMessageToStats(PacketStat* statArray, u8* message, u16 messageLength);
-	void PrintPacketStats(NodeId nodeId, char* statId);
+	void PrintPacketStats(NodeId nodeId, const char* statId);
 
 	//#### Helpers
 	bool IsClusteringDone();
 	bool IsClusteringDoneWithDifferentNetworkIds();	//Checks if each network Id for itself is completly clustered.
-	bool IsClusteringDoneWithExpectedNumberOfClusters(int clusters);
+	bool IsClusteringDoneWithExpectedNumberOfClusters(u32 clusters);
 
 	void ChooseSimulatorTerminal();
 
@@ -211,6 +248,9 @@ public:
 
 	void enableTagForAll(const char* tag);
 	void disableTagForAll(const char* tag);
+
+	bool SetPosition(u32 nodeIndex, float x, float y, float z);
+	bool AddPosition(u32 nodeIndex, float x, float y, float z);
 };
 
 //Throw this in the simulator in order to quit from the simulation
@@ -218,6 +258,34 @@ struct CherrySimQuitException : public std::exception { char const * what() cons
 //Thrown by a node if the node should be reset
 struct NodeSystemResetException : public std::exception { char const * what() const noexcept override { return "NodeSystemResetException"; }
 };
+
+//RAII implementation for setNode function
+class NodeIndexSetter
+{
+private:
+	u32 originalIndex = 0;
+
+public:
+	explicit NodeIndexSetter(u32 indexToSet)
+	{
+		if (cherrySimInstance->currentNode == nullptr)
+		{
+			originalIndex = 0;
+		}
+		else
+		{
+			originalIndex = cherrySimInstance->currentNode->index;
+		}
+
+		cherrySimInstance->setNode(indexToSet);
+	}
+
+	~NodeIndexSetter()
+	{
+		cherrySimInstance->setNode(originalIndex);
+	}
+};
+
 
 #endif
 /** @} */

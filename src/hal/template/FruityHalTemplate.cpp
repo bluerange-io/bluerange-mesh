@@ -109,52 +109,51 @@ u16 FruityHal::GetEventBufferSize(){ return 0; }
 void FruityHal::DispatchBleEvents(void const * evt){ }
 
 // ######################### GAP ############################
-u32 FruityHal::BleGapAddressGet(BleGapAddr *address){ return 0; }
-u32 FruityHal::BleGapAddressSet(BleGapAddr const *address){ return 0; }
+FruityHal::BleGapAddr FruityHal::GetBleGapAddress(){ return FruityHal::BleGapAddr(); }
+ErrorType FruityHal::SetBleGapAddress(BleGapAddr const &address){ return ErrorType::SUCCESS; }
 
-ErrorType FruityHal::BleGapConnect(BleGapAddr const *peerAddress, BleGapScanParams const *scanParams, BleGapConnParams const *connectionParams){ return ErrorType::SUCCESS; }
-u32 FruityHal::ConnectCancel(){ return 0; }
+ErrorType FruityHal::BleGapConnect(BleGapAddr const &peerAddress, BleGapScanParams const &scanParams, BleGapConnParams const &connectionParams){ return ErrorType::SUCCESS; }
+ErrorType FruityHal::ConnectCancel(){ return ErrorType::SUCCESS; }
 ErrorType FruityHal::Disconnect(u16 conn_handle, FruityHal::BleHciError hci_status_code){ return ErrorType::SUCCESS; }
 
-ErrorType FruityHal::BleGapScanStart(BleGapScanParams const *scanParams){ return ErrorType::SUCCESS; }
+ErrorType FruityHal::BleGapScanStart(BleGapScanParams const &scanParams){ return ErrorType::SUCCESS; }
 ErrorType FruityHal::BleGapScanStop(){ return ErrorType::SUCCESS; }
 
-ErrorType FruityHal::BleGapAdvStart(u8 * advHandle, BleGapAdvParams const *advParams){ return ErrorType::SUCCESS; }
+ErrorType FruityHal::BleGapAdvStart(u8 * advHandle, BleGapAdvParams const &advParams){ return ErrorType::SUCCESS; }
 ErrorType FruityHal::BleGapAdvDataSet(u8 * p_advHandle, u8 *advData, u8 advDataLength, u8 *scanData, u8 scanDataLength){ return ErrorType::SUCCESS; }
 ErrorType FruityHal::BleGapAdvStop(u8 advHandle){ return ErrorType::SUCCESS; }
 
 ErrorType FruityHal::BleTxPacketCountGet(u16 connectionHandle, u8* count){ return ErrorType::SUCCESS; }
 
-u32 FruityHal::BleGapNameSet(BleGapConnSecMode & mode, u8 const * p_dev_name, u16 len){ return 0; }
-u32 FruityHal::BleGapAppearance(BleAppearance appearance){ return 0; }
+ErrorType FruityHal::BleGapNameSet(const BleGapConnSecMode & mode, u8 const * p_dev_name, u16 len){ return ErrorType::SUCCESS; }
+ErrorType FruityHal::BleGapAppearance(BleAppearance appearance){ return ErrorType::SUCCESS; }
 
 ErrorType FruityHal::BleGapConnectionParamsUpdate(u16 conn_handle, BleGapConnParams const & params){ return ErrorType::SUCCESS; }
-u32 FruityHal::BleGapConnectionPreferredParamsSet(BleGapConnParams const & params){ return 0; }
+ErrorType FruityHal::BleGapConnectionPreferredParamsSet(BleGapConnParams const & params){ return ErrorType::SUCCESS; }
 
-u32 FruityHal::BleGapDataLengthExtensionRequest(u16 connHandle){ return 0; }
+ErrorType FruityHal::BleGapDataLengthExtensionRequest(u16 connHandle){ return ErrorType::SUCCESS; }
 
-u32 FruityHal::BleGapSecInfoReply(u16 conn_handle, BleGapEncInfo * p_info, u8 * p_id_info, u8 * p_sign_info){ return 0; }
+ErrorType FruityHal::BleGapSecInfoReply(u16 conn_handle, BleGapEncInfo * p_info, u8 * p_id_info, u8 * p_sign_info){ return ErrorType::SUCCESS; }
 
-u32 FruityHal::BleGapEncrypt(u16 conn_handle, BleGapMasterId const & master_id, BleGapEncInfo const & enc_info){ return 0; }
+ErrorType FruityHal::BleGapEncrypt(u16 conn_handle, BleGapMasterId const & master_id, BleGapEncInfo const & enc_info){ return ErrorType::SUCCESS; }
 
-u32 FruityHal::BleGapRssiStart(u16 conn_handle, u8 threshold_dbm, u8 skip_count){ return 0; }
-u32 FruityHal::BleGapRssiStop(u16 conn_handle){ return 0; }
+ErrorType FruityHal::BleGapRssiStart(u16 conn_handle, u8 threshold_dbm, u8 skip_count){ return ErrorType::SUCCESS; }
+ErrorType FruityHal::BleGapRssiStop(u16 conn_handle){ return ErrorType::SUCCESS; }
 
 // ######################### GATT ############################
-u32 FruityHal::DiscovereServiceInit(DBDiscoveryHandler dbEventHandler){ return 0; }
-u32 FruityHal::DiscoverService(u16 connHandle, const BleGattUuid &p_uuid){ return 0; }
+ErrorType FruityHal::DiscovereServiceInit(DBDiscoveryHandler dbEventHandler){ return ErrorType::SUCCESS; }
+ErrorType FruityHal::DiscoverService(u16 connHandle, const BleGattUuid &p_uuid){ return ErrorType::SUCCESS; }
 bool FruityHal::DiscoveryIsInProgress(){ return true; }
 
-u32 FruityHal::BleGattSendNotification(u16 connHandle, BleGattWriteParams & params){ return 0; }
-u32 FruityHal::BleGattWrite(u16 connHandle, BleGattWriteParams const & params){ return 0; }
+ErrorType FruityHal::BleGattSendNotification(u16 connHandle, BleGattWriteParams & params){ return ErrorType::SUCCESS; }
+ErrorType FruityHal::BleGattWrite(u16 connHandle, BleGattWriteParams const & params){ return ErrorType::SUCCESS; }
 
-u32 FruityHal::BleUuidVsAdd(u8 const * p_vs_uuid, u8 * p_uuid_type){ return 0; }
-u32 FruityHal::BleGattServiceAdd(BleGattSrvcType type, BleGattUuid const & p_uuid, u16 * p_handle){ return 0; }
-u32 FruityHal::BleGattCharAdd(u16 service_handle, BleGattCharMd const & char_md, BleGattAttribute const & attr_char_value, BleGattCharHandles & handles){ return 0; }
+ErrorType FruityHal::BleUuidVsAdd(u8 const * p_vs_uuid, u8 * p_uuid_type){ return ErrorType::SUCCESS; }
+ErrorType FruityHal::BleGattServiceAdd(BleGattSrvcType type, BleGattUuid const & p_uuid, u16 * p_handle){ return ErrorType::SUCCESS; }
+ErrorType FruityHal::BleGattCharAdd(u16 service_handle, BleGattCharMd const & char_md, BleGattAttribute const & attr_char_value, BleGattCharHandles & handles){ return ErrorType::SUCCESS; }
 
-u32 FruityHal::BleGattMtuExchangeRequest(u16 connHandle, u16 clientRxMtu){ return 0; }
+ErrorType FruityHal::BleGattMtuExchangeRequest(u16 connHandle, u16 clientRxMtu){ return ErrorType::SUCCESS; }
 u32 FruityHal::BleGattGetMaxMtu(){ return 0; }
-u32 FruityHal::BleGattMtuExchangeReply(u16 connHandle, u16 clientRxMtu){ return 0; }
 
 // ######################### Radio ############################
 ErrorType FruityHal::RadioSetTxPower(i8 tx_power, TxRole role, u16 handle){ return ErrorType::SUCCESS; }
@@ -162,14 +161,12 @@ ErrorType FruityHal::RadioSetTxPower(i8 tx_power, TxRole role, u16 handle){ retu
 // ######################### Utility ############################
 
 ErrorType FruityHal::WaitForEvent(){ return ErrorType::SUCCESS; }
-u32 FruityHal::InitializeButtons(){ return 0; }
+ErrorType FruityHal::InitializeButtons(){ return ErrorType::SUCCESS; }
 ErrorType FruityHal::GetRandomBytes(u8 * p_data, u8 len){ return ErrorType::SUCCESS; }
-u32 FruityHal::ClearGeneralPurposeRegister(u32 gpregId, u32 mask){ return 0; }
-u32 FruityHal::WriteGeneralPurposeRegister(u32 gpregId, u32 mask){ return 0; }
 
 // ######################### Timers ############################
-u32 FruityHal::InitTimers(){ return 0; }
-u32 FruityHal::StartTimers(){ return 0; }
+ErrorType FruityHal::InitTimers(){ return ErrorType::SUCCESS; }
+ErrorType FruityHal::StartTimers(){ return ErrorType::SUCCESS; }
 u32 FruityHal::GetRtcMs(){ return 0; }
 u32 FruityHal::GetRtcDifferenceMs(u32 nowTimeMs, u32 previousTimeMs){ return 0; }
 ErrorType FruityHal::CreateTimer(swTimer &timer, bool repeated, TimerHandler handler){ return ErrorType::SUCCESS; }
@@ -181,15 +178,15 @@ ErrorType FruityHal::StopTimer(swTimer timer){ return ErrorType::SUCCESS; }
 void FruityHal::SystemReset(){ }
 void FruityHal::SystemReset(bool softdeviceEnabled){ }
 RebootReason FruityHal::GetRebootReason(){ return RebootReason::UNKNOWN; }
-u32 FruityHal::ClearRebootReason(){ return 0; }
+ErrorType FruityHal::ClearRebootReason(){ return ErrorType::SUCCESS; }
 void FruityHal::StartWatchdog(bool safeBoot){ }
 void FruityHal::FeedWatchdog(){ }
 u32 FruityHal::GetBootloaderVersion(){ return 0; }
 u32 FruityHal::GetBootloaderAddress(){ return 0; }
-ErrorType FruityHal::ActivateBootloaderOnReset(){ return ErrorType::SUCCESS;}
+void FruityHal::ActivateBootloaderOnReset(){ }
 void FruityHal::DelayUs(u32 delayMicroSeconds){ }
 void FruityHal::DelayMs(u32 delayMs){ }
-u32 FruityHal::EcbEncryptBlock(const u8 * p_key, const u8 * p_clearText, u8 * p_cipherText){ return 0; }
+void FruityHal::EcbEncryptBlock(const u8 * p_key, const u8 * p_clearText, u8 * p_cipherText){ }
 u8 FruityHal::ConvertPortToGpio(u8 port, u8 pin){ return 0; }
 
 // ######################### FLASH ############################
@@ -199,27 +196,26 @@ ErrorType FruityHal::FlashWrite(u32 * p_addr, u32 * p_data, u32 len){ return Err
 
 // ######################### NVIC ############################
 
-void FruityHal::nvicEnableIRQ(u32 irqType){ }
-void FruityHal::nvicDisableIRQ(u32 irqType){ }
-void FruityHal::nvicSetPriorityIRQ(u32 irqType, u8 level){ }
-void FruityHal::nvicClearPendingIRQ(u32 irqType){ }
+void FruityHal::NvicEnableIRQ(u32 irqType) { }
+void FruityHal::NvicDisableIRQ(u32 irqType) { }
+void FruityHal::NvicSetPriorityIRQ(u32 irqType, u8 level) { }
+void FruityHal::NvicClearPendingIRQ(u32 irqType) { }
 
 // ######################### SERIAL COMMUNICATION ############################
 
 // i2c
-ErrorType FruityHal::twi_init(i32 sclPin, i32 sdaPin ){ return ErrorType::SUCCESS; }
-void FruityHal::twi_uninit(i32 sclPin, i32 sdaPin){ }
-ErrorType FruityHal::twi_registerWrite(u8 slaveAddress, u8 const * pTransferData, u8 length){ return ErrorType::SUCCESS; }
-ErrorType FruityHal::twi_registerRead(u8 slaveAddress, u8 reg, u8 * pReceiveData, u8 length){ return ErrorType::SUCCESS; }
-ErrorType FruityHal::twi_read(u8 slaveAddress, u8 * pReceiveData, u8 length){ return ErrorType::SUCCESS; }
-bool FruityHal::twi_isInitialized(void){ return false; }
-void FruityHal::twi_gpio_address_pin_set_and_wait(bool high, i32 sdaPin){ }
+ErrorType FruityHal::TwiInit(i32 sclPin, i32 sdaPin) { return ErrorType::SUCCESS; }
+ErrorType FruityHal::TwiRegisterWrite(u8 slaveAddress, u8 const * pTransferData, u8 length) { return ErrorType::SUCCESS; }
+ErrorType FruityHal::TwiRegisterRead(u8 slaveAddress, u8 reg, u8 * pReceiveData, u8 length) { return ErrorType::SUCCESS; }
+ErrorType FruityHal::TwiRead(u8 slaveAddress, u8 * pReceiveData, u8 length) { return ErrorType::SUCCESS; }
+bool FruityHal::TwiIsInitialized(void) { return false; }
+void FruityHal::TwiGpioAddressPinSetAndWait(bool high, i32 sdaPin) { }
 
 //spi
-void FruityHal::spi_init(i32 sckPin, i32 misoPin, i32 mosiPin){ }
-bool FruityHal::spi_isInitialized(void){ return false; }
-ErrorType FruityHal::spi_transfer(u8* const p_toWrite, u8 count, u8* const p_toRead, i32 slaveSelectPin){ return ErrorType::SUCCESS; }
-void FruityHal::spi_configureSlaveSelectPin(i32 pin){ }
+void FruityHal::SpiInit(i32 sckPin, i32 misoPin, i32 mosiPin) { }
+bool FruityHal::SpiIsInitialized(void) { return false; }
+ErrorType FruityHal::SpiTransfer(u8* const p_toWrite, u8 count, u8* const p_toRead, i32 slaveSelectPin) { return ErrorType::SUCCESS; }
+void FruityHal::SpiConfigureSlaveSelectPin(i32 pin) { }
 
 // ######################### GPIO ############################
 void FruityHal::GpioConfigureOutput(u32 pin){ }
@@ -243,12 +239,12 @@ u8 FruityHal::AdcConvertSampleToDeciVoltage(u32 sample, u16 voltageDivider){ ret
 //These functions are temporary until event handling is implemented in the HAL and events
 //are generated by the HAL
 
-bool FruityHal::setRetentionRegisterTwo(u8 val){ return false; }
-void FruityHal::disableHardwareDfuBootloader(){ }
-void FruityHal::disableUart(){ }
+bool FruityHal::SetRetentionRegisterTwo(u8 val){ return false; }
+void FruityHal::DisableHardwareDfuBootloader(){ }
+void FruityHal::DisableUart(){ }
 void FruityHal::EnableUart(bool promptAndEchoMode){ }
-bool FruityHal::checkAndHandleUartTimeout(){ return false; }
-u32 FruityHal::checkAndHandleUartError(){ return 0; }
+bool FruityHal::CheckAndHandleUartTimeout(){ return false; }
+u32 FruityHal::CheckAndHandleUartError(){ return 0; }
 void FruityHal::UartHandleError(u32 error){ }
 bool FruityHal::UartCheckInputAvailable(){ return false; }
 FruityHal::UartReadCharBlockingResult FruityHal::UartReadCharBlocking(){ UartReadCharBlockingResult ret; ret.didError = false; return ret; }
@@ -258,17 +254,13 @@ bool FruityHal::IsUartErroredAndClear(){ return false; }
 bool FruityHal::IsUartTimedOutAndClear(){ return false; }
 FruityHal::UartReadCharResult FruityHal::UartReadChar(){ UartReadCharResult ret; ret.hasNewChar = false; return ret; }
 
-u32 FruityHal::getMasterBootRecordSize(){ return 0; }
-u32 FruityHal::getSoftDeviceSize(){ return 0; }
+u32 FruityHal::GetMasterBootRecordSize(){ return 0; }
+u32 FruityHal::GetSoftDeviceSize(){ return 0; }
 u32 FruityHal::GetSoftDeviceVersion(){ return 0; }
 BleStackType FruityHal::GetBleStackType(){ return BleStackType::INVALID; }
-void FruityHal::bleStackErrorHandler(u32 id, u32 info){ }
+void FruityHal::BleStackErrorHandler(u32 id, u32 info){ }
 
-
-//Functions for resolving error codes
-const char* FruityHal::getBleEventNameString(u16 bleEventId){ return "UNKNOWN_EVENT"; }
-
-ErrorType FruityHal::getDeviceConfiguration(DeviceConfiguration & config){ return ErrorType::SUCCESS; }
+ErrorType FruityHal::GetDeviceConfiguration(DeviceConfiguration & config){ return ErrorType::SUCCESS; }
 u32 * FruityHal::GetUserMemoryAddress(){ return 0; }
 u32 * FruityHal::GetDeviceMemoryAddress(){ return 0; }
 void FruityHal::GetCustomerData(u32 * p_data, u8 len) {};

@@ -29,10 +29,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include <FruityHal.h>
 #include <Boardconfig.h>
+#include <GlobalState.h>
+
+extern void setCustomPins_4(CustomPins* pinConfig);
 //PCA10040 - nRF52 DK
 void setBoard_4(BoardConfiguration* c)
 {
-#if BOARD_TYPE == 4
 	if(c->boardType == 4)
 	{
 		c->led1Pin =  17;
@@ -51,6 +53,25 @@ void setBoard_4(BoardConfiguration* c)
 		c->lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_XTAL;
 		c->lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_20_PPM;
 		c->dcDcEnabled = true;
+		GS->boardconf.getCustomPinset = &setCustomPins_4;
 	}
-#endif // BOARD_TYPE == 4
+}
+
+//This is an example implementation of how custom pins
+//can be configured. This function is then passed to the function pointer
+//void (*getCustomPinset)(CustomPinset*), defined in BoardConfig.h
+
+void setCustomPins_4(CustomPins* pinConfig){
+	if(pinConfig->pinsetIdentifier == PinsetIdentifier::LIS2DH12){
+		Lis2dh12Pins* pins = (Lis2dh12Pins*)pinConfig;
+		pins->misoPin = -1;
+		pins->mosiPin = -1;
+		pins->sckPin = -1;
+		pins->ssPin = -1;
+		pins->sensorEnablePinActiveHigh = true;
+		pins->sensorEnablePin = -1;
+		pins->sdaPin = -1;
+		pins->interrupt1Pin = -1;
+		pins->interrupt2Pin = -1;
+	}
 }

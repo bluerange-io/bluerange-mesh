@@ -40,10 +40,10 @@
 TEST(TestNode, TestCommands) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 	tester.SimulateUntilClusteringDone(100 * 1000);
@@ -97,7 +97,7 @@ TEST(TestNode, TestCommands) {
 	tester.sim->setNode(0);
 	BaseConnections bc = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
 	ASSERT_EQ(bc.count, 1);
-	tester.SendTerminalCommand(1, "gap_disconnect %d", GS->cm.allConnections[bc.connectionIndizes[0]]->connectionHandle);
+	tester.SendTerminalCommand(1, "gap_disconnect %d", bc.handles[0].GetConnection()->connectionHandle);
 
 
 	tester.SimulateUntilMessageReceived(10 * 1000, 1, "Disconnected device 22");
@@ -154,8 +154,8 @@ TEST(TestNode, TestCommands) {
 				"\"module\":123,"
 				"\"requestHandle\":0,"
 				"\"actionType\":0,"
-				"\"component\":7,"
-				"\"register\":77,"
+				"\"component\":\"0x0007\","
+				"\"register\":\"0x004D\","
 				"\"payload\":\"qrs=\""
 			"}");
 
@@ -208,9 +208,9 @@ TEST(TestNode, TestCRCValidation)
 {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 	tester.SimulateUntilClusteringDone(100 * 1000);
@@ -260,9 +260,9 @@ TEST(TestNode, TestCRCValidation)
 TEST(TestNode, TestGenerateLoad) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 3;
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 	tester.SimulateUntilClusteringDone(100 * 1000);
@@ -289,7 +289,6 @@ TEST(TestNode, TestGenerateLoad) {
 TEST(TestNode, TestPreferredConnections) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 10;
 	simConfig.terminalId = 0;
 	simConfig.preDefinedPositions = {
 		{0.45, 0.45},
@@ -305,7 +304,8 @@ TEST(TestNode, TestPreferredConnections) {
 	};
 
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -325,7 +325,8 @@ TEST(TestNode, TestPreferredConnections) {
 	tester.SimulateForGivenTime(20 * 1000);	//Make sure that the nodes rebooted.
 	tester.SimulateUntilClusteringDone(100 * 1000);
 
-	for (u32 i = 0; i < simConfig.numNodes; i++) {
+	for (u32 i = 0; i < tester.sim->getTotalNodes(); i++) {
+		tester.sim->setNode(i);
 		const nodeEntry* node = &(tester.sim->nodes[i]);
 		const MeshConnections conns = node->gs.cm.GetMeshConnections(ConnectionDirection::INVALID);
 
@@ -337,7 +338,7 @@ TEST(TestNode, TestPreferredConnections) {
 			hasLowerIdConnected = true; // Not actually true, but he has no lower id to connect to!
 			ASSERT_EQ(conns.count, 1);
 		}
-		else if (i == simConfig.numNodes - 1)
+		else if (i == tester.sim->getTotalNodes() - 1)
 		{
 			hasHigherIdConnected = true; //Not actually true, but he has no higher id to connect to!
 			ASSERT_EQ(conns.count, 1);
@@ -348,7 +349,7 @@ TEST(TestNode, TestPreferredConnections) {
 		}
 
 		for (int j = 0; j < conns.count; j++) {
-			const MeshConnection* conn = conns.connections[j];
+			const MeshConnection* conn = conns.handles[j].GetConnection();
 			const int myId = i + 1;
 			if      (conn->partnerId == myId + 1) hasHigherIdConnected = true;
 			else if (conn->partnerId == myId - 1) hasLowerIdConnected  = true;
@@ -365,8 +366,8 @@ TEST(TestNode, TestPreferredConnections) {
 TEST(TestNode, DISABLED_TestDiscoveryStates) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
-	strcpy(simConfig.defaultNodeConfigName, "dev");  //FIXME: Do not test against dev
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	//testerConfig.verbose = true;
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
@@ -395,9 +396,10 @@ TEST(TestNode, DISABLED_TestDiscoveryStates) {
 TEST(TestNode, TestMeshConnectionPacketQueuing) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 	tester.SimulateUntilClusteringDone(10 * 1000);
@@ -453,9 +455,10 @@ TEST(TestNode, TestMeshConnectionPacketQueuing) {
 TEST(TestNode, TestMeshAccessConnectionPacketQueuing) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.sim->nodes[1].uicr.CUSTOMER[9] = 123; // Change default network id of node 2
@@ -516,9 +519,10 @@ TEST(TestNode, TestMeshAccessConnectionPacketQueuing) {
 TEST(TestNode, TestCapabilitySending) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.Start();
@@ -536,9 +540,9 @@ TEST(TestNode, TestCapabilitySending) {
 TEST(TestNode, TestRapidDisconnections) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
-	strcpy(simConfig.defaultNodeConfigName, "prod_mesh_nrf52");
 	//testerConfig.verbose = true;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -559,13 +563,13 @@ TEST(TestNode, TestRapidDisconnections) {
 TEST(TestNode, TestReconnectionPacketQueuing) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 2;
 
 	//The reestablishment ist not optimized to work if the SoftDevice returns busy
 	simConfig.sdBusyProbability = 0;
 
-	strcpy(simConfig.defaultNodeConfigName, "prod_mesh_nrf52");
 	//testerConfig.verbose = true;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -594,12 +598,12 @@ TEST(TestNode, TestReconnectionPacketQueuing) {
 TEST(TestNode, TestReestablishmentTimesOut) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.numNodes = 4;
 	simConfig.terminalId = 0;
 	//Place nodes such that they are only reachable in a line.
 	simConfig.preDefinedPositions = { {0.2, 0.5}, {0.4, 0.55}, {0.6, 0.5}, {0.8, 0.55} };
 	//testerConfig.verbose = true;
-
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 3});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 

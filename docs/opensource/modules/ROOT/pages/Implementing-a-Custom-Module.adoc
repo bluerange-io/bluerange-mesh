@@ -119,7 +119,7 @@ image:tutorial-pingmod.png[pingmod_1]
 
 Now that the module is reacting to our command, you are ready to send the ping
 packet. Because this is going to be a very simple message, we will use a
-predefined message format called `connPacketModule`. This packet is
+predefined message format called xref:Specification.adoc#connPacketModule[connPacketModule]. This packet is
 intended to be used for triggering actions and for responding to these
 triggers. It has a special message header that contains the moduleId and
 an actionType. This will ensure that they do not interfere with mesh

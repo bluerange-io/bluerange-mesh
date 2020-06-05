@@ -37,11 +37,16 @@
 
 #include <types.h>
 
-#define ADV_PACKET_MAX_SIZE 31
+constexpr u32 ADV_PACKET_MAX_SIZE = 31;
 
-enum class ServiceDataMessageType : u16
+//####### Advertising packets => Message Types #################################################
+
+//Message types: Protocol defined, up to 19 because we want to have a unified
+//type across advertising and connection packets if we need to unify these.
+enum class ServiceDataMessageType : u8
 {
 	INVALID        = 0,
+	JOIN_ME_V0     = 0x01,
 	STANDARD_ASSET = 0x02,
 	MESH_ACCESS    = 0x03,
 	INS_ASSET      = 0x04,
@@ -59,59 +64,54 @@ enum class ServiceDataMessageType : u16
 //###### AD structures for advertising messages ###############################
 
 //BLE AD Type FLAGS
-#define SIZEOF_ADV_STRUCTURE_FLAGS 3
+constexpr size_t SIZEOF_ADV_STRUCTURE_FLAGS = 3;
 typedef struct
 {
 	u8 len;
 	u8 type;
 	u8 flags;
 }advStructureFlags;
-STATIC_ASSERT_SIZE(advStructureFlags, 3);
+STATIC_ASSERT_SIZE(advStructureFlags, SIZEOF_ADV_STRUCTURE_FLAGS);
 
 //BLE AD Type list of 16-bit service UUIDs
-#define SIZEOF_ADV_STRUCTURE_UUID16 4
+constexpr size_t SIZEOF_ADV_STRUCTURE_UUID16 = 4;
 typedef struct
 {
 	u8 len;
 	u8 type;
 	u16 uuid;
 }advStructureUUID16;
-STATIC_ASSERT_SIZE(advStructureUUID16, 4);
+STATIC_ASSERT_SIZE(advStructureUUID16, SIZEOF_ADV_STRUCTURE_UUID16);
 
 //Header of service data + our custom messageType
-#define SIZEOF_ADV_STRUCTURE_SERVICE_DATA_AND_TYPE 6
+constexpr size_t SIZEOF_ADV_STRUCTURE_SERVICE_DATA_AND_TYPE = 6;
 typedef struct
 {
 	advStructureUUID16 uuid;
 	ServiceDataMessageType messageType; //Message type depending on our custom service
+	u8 reserved;
 }advStructureServiceDataAndType;
-STATIC_ASSERT_SIZE(advStructureServiceDataAndType, 6);
+STATIC_ASSERT_SIZE(advStructureServiceDataAndType, SIZEOF_ADV_STRUCTURE_SERVICE_DATA_AND_TYPE);
 
 //BLE AD Type Manufacturer specific data
-#define SIZEOF_ADV_STRUCTURE_MANUFACTURER 4
+constexpr size_t SIZEOF_ADV_STRUCTURE_MANUFACTURER = 4;
 typedef struct
 {
 	u8 len;
 	u8 type;
 	u16 companyIdentifier;
 }advStructureManufacturer;
-STATIC_ASSERT_SIZE(advStructureManufacturer, 4);
+STATIC_ASSERT_SIZE(advStructureManufacturer, SIZEOF_ADV_STRUCTURE_MANUFACTURER);
 
 
-#define SIZEOF_ADV_PACKET_SERVICE_AND_DATA_HEADER (SIZEOF_ADV_STRUCTURE_FLAGS+SIZEOF_ADV_STRUCTURE_UUID16+SIZEOF_ADV_STRUCTURE_SERVICE_DATA_AND_TYPE)
+constexpr size_t SIZEOF_ADV_PACKET_SERVICE_AND_DATA_HEADER = (SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_UUID16 + SIZEOF_ADV_STRUCTURE_SERVICE_DATA_AND_TYPE);
 typedef struct
 {
 	advStructureFlags flags;
 	advStructureUUID16 uuid;
 	advStructureServiceDataAndType data;
 }advPacketServiceAndDataHeader;
-STATIC_ASSERT_SIZE(advPacketServiceAndDataHeader, 13);
-
-//####### Advertising packets => Message Types #################################################
-
-//Message types: Protocol defined, up to 19 because we want to have a unified
-//type across advertising and connection packets if we need to unify these.
-#define MESSAGE_TYPE_JOIN_ME_V0 1
+STATIC_ASSERT_SIZE(advPacketServiceAndDataHeader, SIZEOF_ADV_PACKET_SERVICE_AND_DATA_HEADER);
 
 
 //####### Advertising packets => Structs #################################################
@@ -125,7 +125,7 @@ typedef struct
 	advStructureManufacturer manufacturer;
 	u8 meshIdentifier;
 	NetworkId networkId;
-	u8 messageType;
+	ServiceDataMessageType messageType;
 }advPacketHeader;
 STATIC_ASSERT_SIZE(advPacketHeader, 11);
 

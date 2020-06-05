@@ -1,0 +1,32 @@
+= Cppcheck
+
+== General
+CherrySim uses http://cppcheck.sourceforge.net[Cppcheck], a static code analysis tool that helps us to spot common coding errors quickly.
+
+== Prerequisite
+
+Cppcheck 2.0 must be installed.
+
+== Usage
+Cppcheck is used in our pipeline. For the most accurate results for the internal development environment, it is recommended to do small commits often so that the pipeline spots error as soon as possible. If you want to execute Cppcheck locally however, you have the following options (both have limitations, see below):
+
+* (Recommended) **Use the CMake GUI to analyze the Visual Studio Solution**.
+
+** Copy `cppcheck.cppcheck.template` to `cppcheck.cppcheck` inside your Fruitymesh repository
+** Modify `cppcheck.cppcheck`.
+*** All occurrences of `PATH_TO_CMAKE_DIRECTORY` must be replaced with your CMake build directory. For example, `PATH_TO_CMAKE_DIRECTORY/CherrySim.sln` may become `D:/projects/cmakebuild/CherrySim.sln`.
+*** All occurrences of `PATH_TO_FRUITYMESH_REPOSITORY` must be replaced with the path of the Fruitymesh Repository. For example, `PATH_TO_FRUITYMESH_REPOSITORY/cherrysim/json.hpp` may become `D:/projects/fruitymesh/cherrysim/json.hpp`.
+** Open the CppCheck GUI
+** Make sure that the following is ticked: Edit -> Preferences -> General -> "Enable inline suppressions"
+** File -> Open Project File -> Select the modified cppcheck.cppcheck
+** If asked if the build dir should be created, click "Yes"
+** Cppcheck now scans the repository. This might take some time.
+* (Advanced) **Use CMake to execute Cppcheck on Windows**. 
+** According to https://cmake.org/cmake/help/v3.17/prop_tgt/LANG_CPPCHECK.html#prop_tgt:%3CLANG%3E_CPPCHECK[the CMake docs], this is only supported with Makefile and Ninja Generators but will produce the closest result to the one of our pipeline. Cppcheck must be placed in your PATH variable.
+** Download and install https://releases.llvm.org/9.0.0/LLVM-9.0.0-win32.exe[clang 9.0 32-bit] (part of LLVM). We highly recommend not changing the default installation path so you can directly use the commands down below as they are.
+** Create a sibling directory next to the Fruitymesh repository
+** Inside that directory execute the following command in a terminal: `cmake ../fruitymesh -G "Unix Makefiles" -DFORCE_CPPCHECK=ON -D CMAKE_C_COMPILER="C:/Program Files (x86)/LLVM/bin/clang.exe" -D CMAKE_CXX_COMPILER="C:/Program Files (x86)/LLVM/bin/clang++.exe"`. If you changed the default installation path of clang, replace the values of `CMAKE_C_COMPILER` and `CMAKE_CXX_COMPILER` to the paths to clang on your machine.
+** Execute the following and look out for the occurring warnings: `cmake --build .`
+
+== Limitations
+* Both approaches don't mimic the behavior of the pipeline exactly, so both have the potential to show some warnings that are not on the pipeline and vice versa.

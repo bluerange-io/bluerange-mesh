@@ -28,24 +28,6 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
- * The Module class can be subclassed for a number of purposes:
- * - Implement a driver for a sensor or an actuator
- * - Add functionality like parsing advertising data, etc...
- *
- * It provides a basic set of handlers that are called from the main event handling
- * routines and the received events can be used and acted upon.
- *
- *
- * Module ids start with 1, this id is also used for saving persistent
- * module configurations with the RecordStorage class
- * Module ids must persist between updates to guearantee that the
- * same module receives the same storage slot.
- *
- * ModuleIds must also be the same within a mesh network to guarantee the correct
- * delivery of actions and responses.
- */
-
 #pragma once
 
 constexpr int INVALID_U8_CONFIG  = 0xFF;
@@ -78,11 +60,35 @@ struct CapabilityEntry
 	char revision[32];
 };
 
+enum class SetActiveReturnValues : u8
+{
+	SUCCESS              = 0,
+	NO_CONFIGURATION     = 1,
+	NO_SUCH_MODULE       = 2,
+	RECORD_STORAGE_ERROR = 3,
+};
+
 class Node;
 
+/*
+ * The Module class can be subclassed for a number of purposes:
+ * - Implement a driver for a sensor or an actuator
+ * - Add functionality like parsing advertising data, etc...
+ *
+ * It provides a basic set of handlers that are called from the main event handling
+ * routines and the received events can be used and acted upon.
+ *
+ *
+ * Module ids start with 1, this id is also used for saving persistent
+ * module configurations with the RecordStorage class
+ * Module ids must persist between updates to guearantee that the
+ * same module receives the same storage slot.
+ *
+ * ModuleIds must also be the same within a mesh network to guarantee the correct
+ * delivery of actions and responses.
+ */
 class Module:
-		public RecordStorageEventListener,
-		public TerminalCommandListener
+		public RecordStorageEventListener
 {
 	friend class FruityMesh;
 
@@ -137,8 +143,8 @@ protected:
 		void LoadModuleConfigurationAndStart();
 
 		//Constructs a simple TriggerAction message and sends it
-		void SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool loopback) const;
-		void SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable) const;
+		ErrorTypeUnchecked SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool loopback) const;
+		ErrorTypeUnchecked SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable) const;
 
 
 		//##### Handlers that can be implemented by any module, but are implemented empty here
@@ -181,10 +187,9 @@ protected:
 
 		virtual void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
 
-#if FEATURE_AVAILABLE(DEVICE_CAPABILITIES)
 		//Queries a single capability of a module. If no capability with the given index is available the value INVALID must be returned.
 		//After the first invalid index, no valid indices must follow. To limit the amount of virtual methods, this method is called once
-		//for every capability per capability in the module, thus leading to a time complexity of O(n²). This means that this method
+		//for every capability per capability in the module, thus leading to a time complexity of O(n^2). This means that this method
 		//should not do complex tasks! The firstCall parameter tells the callee if this is the firstCall to the method for the current
 		//Capability retrieval run. This can be used for initialization tasks. Note that testing for "index == 0" is not sufficient as it
 		//is possible that the CapabilityEntryType is NOT_READY, which then later would call the function again with index == 0 but with
@@ -194,7 +199,6 @@ protected:
 			retVal.type = CapabilityEntryType::INVALID;
 			return retVal;
 		};
-#endif
 
 		//MeshAccessConnections should only allow authorized packets to be sent into the mesh
 		//This function is called once a packet was received through a meshAccessConnection to
@@ -212,12 +216,19 @@ protected:
 
 		//The Terminal Command handler is called for all modules with the user input
 #ifdef TERMINAL_ENABLED
-		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[],u8 commandArgsSize) override;
+		//This method can be implemented by any subclass and will be notified when
+		//a command is entered.
+		virtual TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) /*nonconst*/;
 #endif
 
 #if IS_ACTIVE(BUTTONS)
 		virtual void ButtonHandler(u8 buttonId, u32 holdTime) {};
 #endif
 
+		//This method indicates if this module is interested in a mesh access connection that
+		//should be created from a different node to this node. Typically is used by assets
+		//as they are not permanent members of the mesh but regularly have some new sensor values
+		//to publish.
+		virtual bool IsInterestedInMeshAccessConnection() { return false; }
 
 };

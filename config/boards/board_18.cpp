@@ -32,7 +32,6 @@
 //PCA10056 - nRF82840 Devkit
 void setBoard_18(BoardConfiguration* c)
 {
-#if BOARD_TYPE == 18
 	if(c->boardType == 18)
 	{
 		c->led1Pin =  13;
@@ -49,8 +48,7 @@ void setBoard_18(BoardConfiguration* c)
 		c->dBmRX = -90;
 		c->calibratedTX =  -63;
 		c->lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_XTAL;
-		c->lfClockSource = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_20_PPM;
+		c->lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_20_PPM;
 		c->dcDcEnabled = true;
 	}
-#endif // BOARD_TYPE == 18
 }
