@@ -39,6 +39,7 @@
 #include <algorithm>
 #include <thread>
 #include <sstream>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <functional>
@@ -85,6 +86,13 @@ extern "C"{
 #include "ConnectionAllocator.h"
 
 #include <regex>
+
+#ifdef CI_PIPELINE
+//Stacktrace handling on segfault
+#include <execinfo.h>
+#include <signal.h>
+#include <unistd.h>
+#endif
 
 using json = nlohmann::json;
 
@@ -196,7 +204,9 @@ void CherrySim::LoadFlashFromFile()
 	extern u32 initializeModules_##featureset(bool createModule); \
 	extern DeviceType getDeviceType_##featureset(); \
 	extern Chipset getChipset_##featureset(); \
-	FeaturesetPointers fp; \
+	extern u32 getWatchdogTimeout_##featureset(); \
+	extern u32 getWatchdogTimeoutSafeBoot_##featureset(); \
+	FeaturesetPointers fp = {}; \
 	fp.setBoardConfigurationPtr = setBoardConfiguration_##featureset; \
 	fp.getFeaturesetGroupPtr = getFeatureSetGroup_##featureset; \
 	fp.setFeaturesetConfigurationPtr = setFeaturesetConfiguration_##featureset; \
@@ -204,6 +214,8 @@ void CherrySim::LoadFlashFromFile()
 	fp.getDeviceTypePtr = getDeviceType_##featureset; \
 	fp.getChipsetPtr = getChipset_##featureset; \
 	fp.featuresetOrder = featuresetOrderCounter; \
+	fp.getWatchdogTimeout = getWatchdogTimeout_##featureset; \
+	fp.getWatchdogTimeoutSafeBoot = getWatchdogTimeoutSafeBoot_##featureset; \
 	featuresetPointers.insert(std::pair<std::string, FeaturesetPointers>(std::string(#featureset), fp)); \
 	featuresetOrderCounter++; \
 }
@@ -222,6 +234,7 @@ void CherrySim::PrepareSimulatedFeatureSets()
 	AddSimulatedFeatureSet(prod_vs_nrf52);
 	AddSimulatedFeatureSet(prod_clc_mesh_nrf52);
 	AddSimulatedFeatureSet(dev);
+	AddSimulatedFeatureSet(dev_sig_mesh);
 	AddSimulatedFeatureSet(dev_automated_tests_master_nrf52);
 	AddSimulatedFeatureSet(dev_automated_tests_slave_nrf52);
 	AddSimulatedFeatureSet(prod_vs_converter_nrf52);
@@ -234,6 +247,7 @@ void CherrySim::PrepareSimulatedFeatureSets()
 
 #endif //GITHUB_RELEASE
 }
+#undef AddSimulatedFeatureSet
 
 void CherrySim::QueueInterrupts()
 {
@@ -243,11 +257,54 @@ void CherrySim::QueueInterrupts()
 	}
 }
 
-#undef AddSimulatedFeatureSet
+#ifdef GITHUB_RELEASE
+bool CherrySim::isRedirectedFeatureset(const std::string& featureset)
+{
+	return featureset == "prod_sink_nrf52" || featureset == "prod_mesh_nrf52";
+}
+std::string CherrySim::redirectFeatureset(const std::string & oldFeatureset)
+{
+	if (isRedirectedFeatureset(oldFeatureset))
+	{
+		return "github_nrf52";
+	}
+	return oldFeatureset;
+}
+#endif
+
+
+#ifdef CI_PIPELINE
+void segFaultHandler(int sig)
+{
+	constexpr size_t stacktraceMaxSize = 128;
+	void* stacktrace[stacktraceMaxSize] = {};
+	const size_t stacktraceSize = backtrace(stacktrace, stacktraceMaxSize);
+	printf(EOL
+	       "##########################" EOL
+	       "#                        #" EOL
+	       "#   SEGMENTATION FAULT   #" EOL
+	       "#                        #" EOL
+	       "##########################" EOL
+	       EOL);
+	backtrace_symbols_fd(stacktrace, stacktraceSize, STDERR_FILENO);
+	exit(1);
+}
+#endif
 
 CherrySim::CherrySim(const SimConfiguration &simConfig)
 	: simConfig(simConfig)
 {
+#ifdef CI_PIPELINE
+	//Static is okay, as the seg fault handler works accross all simulations.
+	static bool segfaultHandlerSet = false;
+	if (!segfaultHandlerSet)
+	{
+		signal(SIGSEGV, segFaultHandler);
+		segfaultHandlerSet = true;
+		printf("Segfault handler set!\n");
+	}
+#endif
+
 	if (simConfig.replayPath != "")
 	{
 #if defined(CI_PIPELINE) && !defined(CHERRYSIM_TESTER_ENABLED)
@@ -316,7 +373,7 @@ void CherrySim::Init()
 	}
 
 	//Generate a psuedo random number generator with a uniform distribution
-	simState.rnd = MersenneTwister(simConfig.seed);
+	simState.rnd.setSeed(simConfig.seed);
 
 	//Load site and device data from a json if given
 	if (simConfig.importFromJson) {
@@ -473,6 +530,19 @@ void CherrySim::PositionNodesRandomly()
 	}
 }
 
+
+nodeEntry * CherrySim::GetNodeEntryBySerialNumber(u32 serialNumber)
+{
+	for (u32 i = 0; i < getTotalNodes(); i++)
+	{
+		NodeIndexSetter setter(i);
+		if (RamConfig->GetSerialNumberIndex() == serialNumber)
+		{
+			return &nodes[i];
+		}
+	}
+	return nullptr;
+}
 
 std::string CherrySim::LoadFileContents(const char * path)
 {
@@ -652,7 +722,8 @@ void CherrySim::SimulateStepForAllNodes()
 	}
 	const int64_t avgSimulatedFrames = sumOfAllSimulatedFrames / getTotalNodes();
 
-	while (replayRecordEntries.size() > 0 && replayRecordEntries.front().time <= simState.simTimeMs)
+	const size_t s = replayRecordEntries.size(); //Meant to be used as a break point condition.
+	while (s > 0 && replayRecordEntries.front().time <= simState.simTimeMs)
 	{
 		setNode(replayRecordEntries.front().index);
 		GS->terminal.PutIntoTerminalCommandQueue(replayRecordEntries.front().command, false);
@@ -679,6 +750,7 @@ void CherrySim::SimulateStepForAllNodes()
 			StackBaseSetter sbs;
 
 			currentNode->simulatedFrames++;
+			SimulateMovement();
 			QueueInterrupts();
 			simulateTimer();
 			simulateTimeouts();
@@ -709,7 +781,7 @@ void CherrySim::SimulateStepForAllNodes()
 
 	simState.simTimeMs += simConfig.simTickDurationMs;
 	//Initialize RNG with new seed in order to be able to jump to a frame and resimulate it
-	simState.rnd = MersenneTwister(simState.simTimeMs + simConfig.seed);
+	simState.rnd.setSeed(simState.simTimeMs + simConfig.seed);
 
 	//Back up the flash every flashToFileWriteInterval's step.
 	flashToFileWriteCycle++;
@@ -815,18 +887,24 @@ TerminalCommandHandlerReturnType CherrySim::TerminalCommandHandler(const std::st
 
 			return TerminalCommandHandlerReturnType::SUCCESS;
 		}
-		else if (commandArgs.size() >= 4 && commandArgs[1] == "nodes") {
-			simConfig.nodeConfigName.insert_or_assign(commandArgs[3].c_str(),Utility::StringToU32(commandArgs[2].c_str()));
-			getTotalNodes(true);
+		else if (commandArgs[1] == "nodes") {
+			if (commandArgs.size() < 4) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+			
+			bool didError = false;
+			const u32 amountOfNodes = Utility::StringToU32(commandArgs[2].c_str(), &didError);
+			if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+			
+			if (amountOfNodes > 0)
+			{
+				simConfig.nodeConfigName.insert_or_assign(commandArgs[3].c_str(), amountOfNodes);
+			}
+			else
+			{
+				simConfig.nodeConfigName.erase(commandArgs[3].c_str());
+			}
+
 			quitSimulation();
 			return TerminalCommandHandlerReturnType::SUCCESS;
-		}
-		else if (commandArgs.size() >= 3 && commandArgs[1] == "assetnodes") {
-			simConfig.nodeConfigName.insert_or_assign( "prod_asset_nrf52",Utility::StringToU32(commandArgs[2].c_str()) );
-			getAssetNodes(true);
-			quitSimulation();
-			//Use "sim nodes 10 prod_asset_nrf52" instead
-			return TerminalCommandHandlerReturnType::WARN_DEPRECATED;
 		}
 		else if (commandArgs[1] == "seed" || commandArgs[1] == "seedr") {
 			if (commandArgs.size() >= 3) {
@@ -961,6 +1039,257 @@ TerminalCommandHandlerReturnType CherrySim::TerminalCommandHandler(const std::st
 			PrintPacketStats(nodeId, "ROUTED");
 			return TerminalCommandHandlerReturnType::SUCCESS;
 		}
+
+		else if (commandArgs[1] == "animation")
+		{
+			if(commandArgs.size() >= 4)
+			{
+				const std::string& animationSubCommand = commandArgs[2];
+				if (   animationSubCommand == "create"
+				    || animationSubCommand == "remove"
+				    || animationSubCommand == "exists"
+				    || animationSubCommand == "set_default_type"
+				    || animationSubCommand == "add_keypoint"
+				    || animationSubCommand == "set_looped")
+				{
+					//These have in common that commandArgs[3] is the name of the animation
+					const std::string& animationName = commandArgs[3];
+					if (animationName.size() == 0)
+					{
+						return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+					}
+					if (animationSubCommand == "create")
+					{
+						// sim animation create my_anim_name
+						if (AnimationExists(animationName))
+						{
+							return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+						}
+						else
+						{
+							AnimationCreate(animationName);
+							return TerminalCommandHandlerReturnType::SUCCESS;
+						}
+					}
+					else if (animationSubCommand == "remove")
+					{
+						// sim animation remove my_anim_name
+						if (!AnimationExists(animationName))
+						{
+							return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+						}
+						else
+						{
+							AnimationRemove(animationName);
+							return TerminalCommandHandlerReturnType::SUCCESS;
+						}
+					}
+					else if (animationSubCommand == "exists")
+					{
+						//sim animation exists my_anim_name
+						NodeIndexSetter logjsonSetter(0);
+						if (AnimationExists(animationName))
+						{
+							logjson("SIM", "{\"type\":\"sim_animation_exists\",\"name\":\"%s\",\"exists\":true}" SEP, animationName.c_str());
+						}
+						else
+						{
+							logjson("SIM", "{\"type\":\"sim_animation_exists\",\"name\":\"%s\",\"exists\":false}" SEP, animationName.c_str());
+						}
+						return TerminalCommandHandlerReturnType::SUCCESS;
+					}
+					else if (animationSubCommand == "set_default_type")
+					{
+						//sim animation set_default_type my_anim_name 1
+						if (commandArgs.size() >= 5)
+						{
+							bool didError = false;
+							const MoveAnimationType animationType = (MoveAnimationType)Utility::StringToU32(commandArgs[4].c_str(), &didError);
+							if (didError)
+							{
+								return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+							}
+
+							if (!AnimationExists(animationName))
+							{
+								return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+							}
+							else
+							{
+								AnimationSetDefaultType(animationName, animationType);
+								return TerminalCommandHandlerReturnType::SUCCESS;
+							}
+						}
+						else
+						{
+							return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+						}
+					}
+					else if (animationSubCommand == "add_keypoint")
+					{
+						//sim animation add_keypoint my_anim_name 1 2 3 10
+						if (commandArgs.size() >= 8)
+						{
+							const float x        = ::atof(commandArgs[4].c_str());
+							const float y        = ::atof(commandArgs[5].c_str());
+							const float z        = ::atof(commandArgs[6].c_str());
+							const float duration = ::atof(commandArgs[7].c_str());
+
+							if (!AnimationExists(animationName))
+							{
+								return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+							}
+
+							if (commandArgs.size() >= 9)
+							{
+								bool didError = false;
+								const MoveAnimationType animationType = (MoveAnimationType)Utility::StringToU32(commandArgs[4].c_str(), &didError);
+								if (didError)
+								{
+									return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+								}
+								AnimationAddKeypoint(animationName, x, y, z, duration, animationType);
+							}
+							else
+							{
+								AnimationAddKeypoint(animationName, x, y, z, duration);
+							}
+							return TerminalCommandHandlerReturnType::SUCCESS;
+						}
+						else
+						{
+							return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+						}
+					}
+					else if (animationSubCommand == "set_looped")
+					{
+						//sim animation set_looped my_anim_name 1
+						if (commandArgs.size() >= 5)
+						{
+							bool looped = false;
+							if (commandArgs[4] == "1")
+							{
+								looped = true;
+							}
+							else if (commandArgs[4] == "0")
+							{
+								looped = false;
+							}
+							else
+							{
+								return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+							}
+							if (!AnimationExists(animationName))
+							{
+								return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+							}
+
+							AnimationGet(animationName).SetLooped(looped);
+							return TerminalCommandHandlerReturnType::SUCCESS;
+						}
+						else
+						{
+							return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+						}
+					}
+				}
+				else if (animationSubCommand == "is_running"
+				      || animationSubCommand == "get_name"
+				      || animationSubCommand == "start"
+				      || animationSubCommand == "stop")
+				{
+					bool didError = false;
+					const u32 serialNumber = Utility::GetIndexForSerial(commandArgs[3].c_str(), &didError);
+					if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+					if (!GetNodeEntryBySerialNumber(serialNumber))
+					{
+						return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+					}
+
+					if (animationSubCommand == "is_running")
+					{
+						//sim animation is_running BBCBC
+						NodeIndexSetter logjsonSetter(0);
+						if (AnimationIsRunning(serialNumber))
+						{
+							logjson("SIM", "{\"type\":\"sim_animation_is_running\",\"serial\":\"%s\",\"code\":1}" SEP, commandArgs[3].c_str());
+						}
+						else
+						{
+							logjson("SIM", "{\"type\":\"sim_animation_is_running\",\"serial\":\"%s\",\"code\":0}" SEP, commandArgs[3].c_str());
+						}
+						return TerminalCommandHandlerReturnType::SUCCESS;
+					}
+					else if (animationSubCommand == "get_name")
+					{
+						//sim animation get_name BBCBC
+						NodeIndexSetter logjsonSetter(0);
+						const std::string animationName = AnimationGetName(serialNumber);
+						logjson("SIM", "{\"type\":\"sim_animation_get_name\",\"serial\":\"%s\",\"name\":\"%s\"}" SEP, commandArgs[3].c_str(), animationName.c_str());
+						return TerminalCommandHandlerReturnType::SUCCESS;
+					}
+					else if (animationSubCommand == "start")
+					{
+						//sim animation start BBCBC my_anim_name
+						if (commandArgs.size() >= 5)
+						{
+							const std::string& animationName = commandArgs[4];
+							if (animationName.size() == 0)
+							{
+								return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+							}
+							if (!AnimationExists(animationName))
+							{
+								return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+							}
+							if (AnimationGet(animationName).GetAmounOfKeyPoints() == 0)
+							{
+								return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+							}
+							AnimationStart(serialNumber, animationName);
+							return TerminalCommandHandlerReturnType::SUCCESS;
+						}
+						else
+						{
+							return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+						}
+					}
+					else if (animationSubCommand == "stop")
+					{
+						//sim animation stop BBCBC
+						AnimationStop(serialNumber);
+						return TerminalCommandHandlerReturnType::SUCCESS;
+					}
+				}
+				else if (animationSubCommand == "load_path")
+				{
+					//sim animation load_path /Bla/bli/blub
+					if (commandArgs.size() >= 4)
+					{
+						//This is relative to the normalized path so that it is (more or less) guaranteed that
+						//it is part of the repository. This is necessary so that the replay function still works
+						//properly.
+						if (AnimationLoadJsonFromPath((CherrySimUtils::getNormalizedPath() + commandArgs[3]).c_str()))
+						{
+							return TerminalCommandHandlerReturnType::SUCCESS;
+						}
+						else
+						{
+							return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
+						}
+					}
+					else
+					{
+						return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+					}
+				}
+			}
+			else
+			{
+				return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+			}
+		}
+
 		//sim set_position BBBBD 0.5 0.21 0.17
 		else if (commandArgs.size() >= 5 && (commandArgs[1] == "set_position" || commandArgs[1] == "add_position" || commandArgs[1] == "set_position_norm" || commandArgs[1] == "add_position_norm"))
 		{
@@ -1009,26 +1338,21 @@ TerminalCommandHandlerReturnType CherrySim::TerminalCommandHandler(const std::st
 				y /= simConfig.mapHeightInMeters;
 				z /= simConfig.mapElevationInMeters;
 			}
-
-			bool posChanged = false;
-
+			
 			if (commandArgs[1] == "set_position" || commandArgs[1] == "set_position_norm")
 			{
-				posChanged = SetPosition(index, x, y, z);
+				SetPosition(index, x, y, z);
 			}
 			else if (commandArgs[1] == "add_position" || commandArgs[1] == "add_position_norm")
 			{
-				posChanged = AddPosition(index, x, y, z);
+				AddPosition(index, x, y, z);
 			}
 			else
 			{
 				return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
 			}
 
-			if (posChanged)
-			{
-				nodes[index].lastMovementSimTimeMs = simState.simTimeMs;
-			}
+			nodes[index].animation = MoveAnimation(); //Stops the animation
 
 			return TerminalCommandHandlerReturnType::SUCCESS;
 		}
@@ -1225,9 +1549,29 @@ void CherrySim::SetFeaturesets()
 {
 #ifdef GITHUB_RELEASE
 	for (u32 i = 0; i < getTotalNodes(); i++) {
-		nodes[i].nodeConfiguration = "github_nrf52";
+		nodes[i].nodeConfiguration = redirectFeatureset(nodes[i].nodeConfiguration);
 	}
-#else
+	int amountOfRedirectedFeaturesets = 0;
+	std::vector<decltype(simConfig.nodeConfigName.begin())> simConfigsToErase;
+	for (auto it = simConfig.nodeConfigName.begin(); it != simConfig.nodeConfigName.end(); it++) {
+		if (isRedirectedFeatureset(it->first))
+		{
+			amountOfRedirectedFeaturesets += it->second;
+			simConfigsToErase.push_back(it);
+		}
+	}
+	for (auto& eraser : simConfigsToErase) {
+		simConfig.nodeConfigName.erase(eraser);
+	}
+	if (simConfig.nodeConfigName.find("github_nrf52") == simConfig.nodeConfigName.end())
+	{
+		simConfig.nodeConfigName.insert({ "github_nrf52", amountOfRedirectedFeaturesets });
+	}
+	else
+	{
+		simConfig.nodeConfigName["github_nrf52"] += amountOfRedirectedFeaturesets;
+	}
+#endif //GITHUB_RELEASE
 	struct FeatureNameOrderPair{
 		std::string featuresetName = "";
 		u32 noOfNodesWithFeatureset = 0;
@@ -1266,7 +1610,6 @@ void CherrySim::SetFeaturesets()
 			nodes[nodeIndex++].nodeConfiguration = it->featuresetName;
 		}
 	}
-#endif //GITHUB_RELEASE
 }
 
 //This will configure UICR / FICR and flash (settings,...) of a node
@@ -1613,11 +1956,13 @@ void CherrySim::ConnectMasterToSlave(nodeEntry* master, nodeEntry* slave)
 	freeInConnection->rssiMeasurementActive = false;
 	freeInConnection->connectionIndex = 0;
 	freeInConnection->connectionHandle = simState.globalConnHandleCounter;
-	freeInConnection->connectionInterval = UNITS_TO_MSEC(Conf::getInstance().meshMinConnectionInterval, CONFIG_UNIT_1_25_MS); //TODO: which node's params are used?
+	freeInConnection->connectionInterval = master->state.connectionParamIntervalMs;
+	freeInConnection->connectionSupervisionTimeoutMs = master->state.connectionTimeoutMs;
 	freeInConnection->owningNode = slave;
 	freeInConnection->partner = master;
 	freeInConnection->connectionMtu = GATT_MTU_SIZE_DEFAULT;
 	freeInConnection->isCentral = false;
+	freeInConnection->lastReceivedPacketTimestampMs = simState.simTimeMs;
 
 	//Generate an event for the current node
 	simBleEvent s2;
@@ -1626,8 +1971,8 @@ void CherrySim::ConnectMasterToSlave(nodeEntry* master, nodeEntry* slave)
 	s2.bleEvent.header.evt_len = s2.globalId;
 	s2.bleEvent.evt.gap_evt.conn_handle = simState.globalConnHandleCounter;
 
-	s2.bleEvent.evt.gap_evt.params.connected.conn_params.min_conn_interval = slave->state.connectingParamIntervalMs;
-	s2.bleEvent.evt.gap_evt.params.connected.conn_params.max_conn_interval = slave->state.connectingParamIntervalMs;
+	s2.bleEvent.evt.gap_evt.params.connected.conn_params.min_conn_interval = slave->state.connectionParamIntervalMs;
+	s2.bleEvent.evt.gap_evt.params.connected.conn_params.max_conn_interval = slave->state.connectionParamIntervalMs;
 	s2.bleEvent.evt.gap_evt.params.connected.peer_addr = Convert(&master->address);
 	s2.bleEvent.evt.gap_evt.params.connected.role = BLE_GAP_ROLE_PERIPH;
 
@@ -1663,11 +2008,13 @@ void CherrySim::ConnectMasterToSlave(nodeEntry* master, nodeEntry* slave)
 	freeOutConnection->connectionActive = true;
 	freeOutConnection->rssiMeasurementActive = false;
 	freeOutConnection->connectionHandle = simState.globalConnHandleCounter;
-	freeOutConnection->connectionInterval = UNITS_TO_MSEC(Conf::getInstance().meshMinConnectionInterval, CONFIG_UNIT_1_25_MS); //TODO: should take the proper interval
+	freeOutConnection->connectionInterval = master->state.connectionParamIntervalMs;
+	freeOutConnection->connectionSupervisionTimeoutMs = master->state.connectionTimeoutMs;
 	freeOutConnection->owningNode = master;
 	freeOutConnection->partner = slave;
 	freeOutConnection->connectionMtu = GATT_MTU_SIZE_DEFAULT;
 	freeOutConnection->isCentral = true;
+	freeOutConnection->lastReceivedPacketTimestampMs = simState.simTimeMs;
 
 	//Save connection references
 	freeInConnection->partnerConnection = freeOutConnection;
@@ -1680,8 +2027,8 @@ void CherrySim::ConnectMasterToSlave(nodeEntry* master, nodeEntry* slave)
 	s.bleEvent.header.evt_len = s.globalId;
 	s.bleEvent.evt.gap_evt.conn_handle = simState.globalConnHandleCounter;
 
-	s.bleEvent.evt.gap_evt.params.connected.conn_params.min_conn_interval = slave->state.connectingParamIntervalMs;
-	s.bleEvent.evt.gap_evt.params.connected.conn_params.max_conn_interval = slave->state.connectingParamIntervalMs;
+	s.bleEvent.evt.gap_evt.params.connected.conn_params.min_conn_interval = slave->state.connectionParamIntervalMs;
+	s.bleEvent.evt.gap_evt.params.connected.conn_params.max_conn_interval = slave->state.connectionParamIntervalMs;
 	s.bleEvent.evt.gap_evt.params.connected.peer_addr = Convert(&slave->address);
 	s.bleEvent.evt.gap_evt.params.connected.role = BLE_GAP_ROLE_CENTRAL;
 
@@ -1869,6 +2216,11 @@ void CherrySim::SimulateConnections() {
 				{
 					numPacketsToSend = 0;
 				}
+				else
+				{
+					currentNode->state.connections[i].lastReceivedPacketTimestampMs = this->simState.simTimeMs;
+				}
+				
 
 				//Simulate timeouts if messages can't be send anymore.
 				SoftDeviceBufferedPacket* packet = getNextPacketToWrite(connection);
@@ -1880,6 +2232,14 @@ void CherrySim::SimulateConnections() {
 						DisconnectSimulatorConnection(&currentNode->state.connections[i], BLE_HCI_CONNECTION_TIMEOUT, BLE_HCI_CONNECTION_TIMEOUT);
 						continue;
 					}
+				}
+
+				// Simulate timeouts if there was no message received within connection interval
+				if (simState.simTimeMs >= 
+					(currentNode->state.connections[i].lastReceivedPacketTimestampMs + 
+					 currentNode->state.connections[i].connectionSupervisionTimeoutMs))
+				{
+					DisconnectSimulatorConnection(&currentNode->state.connections[i], BLE_HCI_CONNECTION_TIMEOUT, BLE_HCI_CONNECTION_TIMEOUT);
 				}
 
 				for (int k = 0; k < numPacketsToSend; k++) {
@@ -2151,6 +2511,15 @@ void CherrySim::SimulateClcData() {
 }
 #endif //GITHUB_RELEASE
 
+void CherrySim::SimulateMovement()
+{
+	if (currentNode->animation.IsStarted())
+	{
+		auto pos = currentNode->animation.Evaluate(simState.simTimeMs);
+		SetPosition(currentNode->index, pos.x, pos.y, pos.z);
+	}
+}
+
 //################################## Battery Usage Simulation #############################
 // Checks the features that are activated on a node and estimates the battery usage
 //#########################################################################################
@@ -2184,6 +2553,7 @@ void CherrySim::simulateBatteryUsage()
 	u32 conn10Ms = 900 * 1000 / divider; //900 uA per connection at 10ms interval (imaginary value)
 	u32 conn15Ms = 750 * 1000 / divider; //750 uA per connection at 15ms interval (imaginary value)
 	u32 conn30Ms = 600 * 1000 / divider; //600 uA per connection at 30ms interval (imaginary value)
+	u32 conn90Ms = 300 * 1000 / divider; //300 uA per connection at 90ms interval (imaginary value)
 
 	//Other values
 	u32 scanUsage = 11 * 1000 * 1000 / divider; //11mA for scanning at 100% duty cycle
@@ -2241,6 +2611,9 @@ void CherrySim::simulateBatteryUsage()
 			else if (conn->connectionInterval == 30) {
 				currentNode->nanoAmperePerMsTotal += conn30Ms;
 			}
+			else if (conn->connectionInterval == 90) {
+				currentNode->nanoAmperePerMsTotal += conn90Ms;
+			}
 			else {
 				printf("Conn interval not integrated into battery test" EOL);
 				SIMEXCEPTION(IllegalStateException);
@@ -2268,7 +2641,6 @@ void CherrySim::simulateTimer() {
 
 void CherrySim::simulateWatchDog()
 {
-#ifdef FM_WATCHDOG_TIMEOUT
 	if (simConfig.simulateWatchdog) {
 		if (currentNode->state.timeMs - currentNode->lastWatchdogFeedTime > currentNode->watchdogTimeout)
 		{
@@ -2276,7 +2648,6 @@ void CherrySim::simulateWatchDog()
 			resetCurrentNode(RebootReason::WATCHDOG);
 		}
 	}
-#endif
 }
 
 struct InterruptGuard
@@ -2612,18 +2983,22 @@ ClusterSize CherrySim::DetermineClusterSizeAndPropagateClusterUpdates(nodeEntry*
 // 
 //#########################################################################################
 
-CherrySim::FeaturesetPointers* getFeaturesetPointers()
+FeaturesetPointers* getFeaturesetPointers()
 {
-	std::string configurationName = cherrySimInstance->currentNode->nodeConfiguration;
-
-	auto entry = cherrySimInstance->featuresetPointers.find(configurationName);
-	if (entry == cherrySimInstance->featuresetPointers.end())
+	if (cherrySimInstance->currentNode->featuresetPointers == nullptr)
 	{
-		printf("Featureset %s was not found!", configurationName.c_str());
-		SIMEXCEPTION(IllegalStateException); //Featureset configuration not found
-		return nullptr;
+		const std::string& configurationName = cherrySimInstance->currentNode->nodeConfiguration;
+
+		auto entry = cherrySimInstance->featuresetPointers.find(configurationName);
+		if (entry == cherrySimInstance->featuresetPointers.end())
+		{
+			printf("Featureset %s was not found!", configurationName.c_str());
+			SIMEXCEPTION(IllegalStateException); //Featureset configuration not found
+			return nullptr;
+		}
+		cherrySimInstance->currentNode->featuresetPointers = &(entry->second);
 	}
-	return &(entry->second);
+	return cherrySimInstance->currentNode->featuresetPointers;
 }
 
 //This function is called by every module's SetToDefaults function
@@ -2656,6 +3031,16 @@ Chipset getChipset_CherrySim()
 FeatureSetGroup getFeatureSetGroup_CherrySim()
 {
 	return getFeaturesetPointers()->getFeaturesetGroupPtr();
+}
+
+u32 getWatchdogTimeout_CherrySim()
+{
+	return getFeaturesetPointers()->getWatchdogTimeout();
+}
+
+u32 getWatchdogTimeoutSafeBoot_CherrySim()
+{
+	return getFeaturesetPointers()->getWatchdogTimeoutSafeBoot();
 }
 
 //This function is responsible for setting all the BLE Stack dependent configurations according to the datasheet of the ble stack used
@@ -2777,10 +3162,14 @@ float CherrySim::GetReceptionRssi(const nodeEntry* sender, const nodeEntry* rece
 
 float CherrySim::GetReceptionRssi(const nodeEntry* sender, const nodeEntry* receiver, int8_t senderDbmTx, int8_t senderCalibratedTx) {
 	// If either the sender or the receiver has the other marked as as a impossibleConnection, the rssi is set to a unconnectable level.
-	if (   std::find(sender  ->impossibleConnection.begin(), sender  ->impossibleConnection.end(), receiver->index) != sender  ->impossibleConnection.end()
-		|| std::find(receiver->impossibleConnection.begin(), receiver->impossibleConnection.end(), sender  ->index) != receiver->impossibleConnection.end())
+	if (   sender  ->impossibleConnection.size() > 0 
+	    || receiver->impossibleConnection.size() > 0)
 	{
-		return -10000;
+		if (   std::find(sender  ->impossibleConnection.begin(), sender  ->impossibleConnection.end(), receiver->index) != sender  ->impossibleConnection.end()
+			|| std::find(receiver->impossibleConnection.begin(), receiver->impossibleConnection.end(), sender->index)   != receiver->impossibleConnection.end())
+		{
+			return -10000;
+		}
 	}
 	float dist = GetDistanceBetween(sender, receiver);
 	if (!simConfig.rssiNoise)
@@ -2854,29 +3243,26 @@ void CherrySim::disableTagForAll(const char * tag)
 	}
 }
 
-bool CherrySim::SetPosition(u32 nodeIndex, float x, float y, float z)
+void CherrySim::SetPosition(u32 nodeIndex, float x, float y, float z)
 {
 	if (nodes[nodeIndex].x != x || nodes[nodeIndex].y != y || nodes[nodeIndex].z != z)
 	{
 		nodes[nodeIndex].x = x;
 		nodes[nodeIndex].y = y;
 		nodes[nodeIndex].z = z;
-		return true;
+		nodes[nodeIndex].lastMovementSimTimeMs = simState.simTimeMs;
 	}
-	return false;
 }
 
-bool CherrySim::AddPosition(u32 nodeIndex, float x, float y, float z)
+void CherrySim::AddPosition(u32 nodeIndex, float x, float y, float z)
 {
 	if (nodes[nodeIndex].x != 0 || nodes[nodeIndex].y != 0 || nodes[nodeIndex].z != 0)
 	{
 		nodes[nodeIndex].x += x;
 		nodes[nodeIndex].y += y;
 		nodes[nodeIndex].z += z;
-		return true;
+		nodes[nodeIndex].lastMovementSimTimeMs = simState.simTimeMs;
 	}
-
-	return false;
 }
 
 
@@ -3002,3 +3388,288 @@ void CherrySim::PrintPacketStats(NodeId nodeId, const char* statId)
 /**
  *@}
  **/
+
+MoveAnimation & CherrySim::AnimationGet(const std::string & name)
+{
+	if (!AnimationExists(name))
+	{
+		//Animation does not exist!
+		SIMEXCEPTIONFORCE(IllegalStateException);
+	}
+	else
+	{
+		return loadedMoveAnimations[name];
+	}
+}
+
+void CherrySim::AnimationCreate(const std::string & name)
+{
+	if (AnimationExists(name))
+	{
+		//Animation does already exist!
+		SIMEXCEPTIONFORCE(IllegalStateException);
+	}
+	MoveAnimation animation;
+	animation.SetName(name);
+	loadedMoveAnimations.insert({ name, animation });
+}
+
+bool CherrySim::AnimationExists(const std::string & name) const
+{
+	return loadedMoveAnimations.find(name) != loadedMoveAnimations.end();
+}
+
+void CherrySim::AnimationRemove(const std::string & name)
+{
+	if (!AnimationExists(name))
+	{
+		SIMEXCEPTIONFORCE(IllegalStateException);
+	}
+	loadedMoveAnimations.erase(name);
+}
+
+void CherrySim::AnimationSetDefaultType(const std::string&name, MoveAnimationType type)
+{
+	AnimationGet(name).SetDefaultType(type);
+}
+
+void CherrySim::AnimationAddKeypoint(const std::string & name, float x, float y, float z, float duration)
+{
+	AnimationGet(name).AddKeyPoint(x, y, z, duration);
+}
+
+void CherrySim::AnimationAddKeypoint(const std::string & name, float x, float y, float z, float duration, MoveAnimationType type)
+{
+	AnimationGet(name).AddKeyPoint(x, y, z, duration, type);
+}
+
+void CherrySim::AnimationSetLooped(const std::string & name, bool looped)
+{
+	if (!AnimationExists(name))
+	{
+		SIMEXCEPTIONFORCE(IllegalStateException);
+	}
+	AnimationGet(name).SetLooped(looped);
+}
+
+bool CherrySim::AnimationIsRunning(u32 serialNumber)
+{
+	nodeEntry* entry = GetNodeEntryBySerialNumber(serialNumber);
+	if (entry == nullptr)
+	{
+		SIMEXCEPTIONFORCE(IllegalStateException);
+	}
+	return entry->animation.IsStarted();
+}
+
+std::string CherrySim::AnimationGetName(u32 serialNumber)
+{
+	nodeEntry* entry = GetNodeEntryBySerialNumber(serialNumber);
+	if (entry == nullptr)
+	{
+		SIMEXCEPTIONFORCE(IllegalStateException);
+	}
+	return entry->animation.GetName();
+}
+
+void CherrySim::AnimationStart(u32 serialNumber, const std::string & name)
+{
+	nodeEntry* entry = GetNodeEntryBySerialNumber(serialNumber);
+	if (entry == nullptr)
+	{
+		SIMEXCEPTIONFORCE(IllegalStateException);
+	}
+	if (!AnimationExists(name))
+	{
+		SIMEXCEPTIONFORCE(IllegalStateException);
+	}
+	entry->animation = loadedMoveAnimations[name];
+	entry->animation.Start(simState.simTimeMs, { entry->x, entry->y, entry->z });
+}
+
+void CherrySim::AnimationStop(u32 serialNumber)
+{
+	nodeEntry* entry = GetNodeEntryBySerialNumber(serialNumber);
+	if (entry == nullptr)
+	{
+		SIMEXCEPTIONFORCE(IllegalStateException);
+	}
+	entry->animation = MoveAnimation();
+}
+
+MoveAnimationType StringToMoveAnimationType(const std::string& s)
+{
+	if (s == "lerp")
+	{
+		return MoveAnimationType::LERP;
+	}
+	if (s == "cosine")
+	{
+		return MoveAnimationType::COSINE;
+	}
+	if (s == "boolean")
+	{
+		return MoveAnimationType::BOOLEAN;
+	}
+
+	return MoveAnimationType::INVALID;
+}
+
+bool IsNumberType(nlohmann::json::value_t t)
+{
+	return t == nlohmann::json::value_t::number_float
+	    || t == nlohmann::json::value_t::number_integer
+	    || t == nlohmann::json::value_t::number_unsigned;
+}
+
+bool CherrySim::IsValidMoveAnimationJson(const nlohmann::json &json) const
+{
+	bool foundErrorInJson = false;
+	for (nlohmann::json::const_iterator it = json.begin(); it != json.end(); ++it)
+	{
+		//Check if any animation already exists.
+		if (AnimationExists(it.key()))
+		{
+			printf("Animation already exists: %s" EOL, it.key().c_str());
+			foundErrorInJson = true;
+		}
+
+		//Check that mandatory elements are present.
+		if (!it.value().contains("type"))
+		{
+			printf("Animation did not contain a type: %s" EOL, it.key().c_str());
+			foundErrorInJson = true;
+		}
+		else if (it.value()["type"].type() != nlohmann::json::value_t::string)
+		{
+			printf("Animation type is not a string: %s" EOL, it.key().c_str());
+			foundErrorInJson = true;
+		}
+		else if (StringToMoveAnimationType(it.value()["type"]) == MoveAnimationType::INVALID)
+		{
+			const std::string type = it.value()["type"];
+			printf("Found illegal type in Animation %s: %s" EOL, it.key().c_str(), type.c_str());
+			foundErrorInJson = true;
+		}
+
+		if (!it.value().contains("key_points"))
+		{
+			printf("Animation did not contain key points: %s" EOL, it.key().c_str());
+			foundErrorInJson = true;
+		}
+		else if (it.value()["key_points"].type() != nlohmann::json::value_t::array)
+		{
+			printf("Animation key_points is not an array: %s" EOL, it.key().c_str());
+			foundErrorInJson = true;
+		}
+
+		//Check optional elements
+		if (it.value().contains("looped") && it.value()["looped"].type() != nlohmann::json::value_t::boolean)
+		{
+			printf("Animation looped is not a boolean: %s" EOL, it.key().c_str());
+			foundErrorInJson = true;
+		}
+
+		for (nlohmann::json::const_iterator it2 = it.value()["key_points"].begin(); it2 != it.value()["key_points"].end(); ++it2)
+		{
+			//Check that mandatory elements within keypoints are present.
+			if (!it2.value().contains("x"))
+			{
+				printf("Key Point in Animation %s did not contain a x value!" EOL, it.key().c_str());
+				foundErrorInJson = true;
+			}
+			else if (!IsNumberType(it2.value()["x"].type()))
+			{
+				printf("X in Key Point in Animation %s is not a number type!" EOL, it.key().c_str());
+				foundErrorInJson = true;
+			}
+
+			if (!it2.value().contains("y"))
+			{
+				printf("Key Point in Animation %s did not contain a y value!" EOL, it.key().c_str());
+				foundErrorInJson = true;
+			}
+			else if (!IsNumberType(it2.value()["y"].type()))
+			{
+				printf("Y in Key Point in Animation %s is not a number type!" EOL, it.key().c_str());
+				foundErrorInJson = true;
+			}
+
+			if (!it2.value().contains("z"))
+			{
+				printf("Key Point in Animation %s did not contain a z value!" EOL, it.key().c_str());
+				foundErrorInJson = true;
+			}
+			else if (!IsNumberType(it2.value()["z"].type()))
+			{
+				printf("Z in Key Point in Animation %s is not a number type!" EOL, it.key().c_str());
+				foundErrorInJson = true;
+			}
+
+			if (!it2.value().contains("durationSec"))
+			{
+				printf("Key Point in Animation %s did not contain a durationSec value!" EOL, it.key().c_str());
+				foundErrorInJson = true;
+			}
+			else if (!IsNumberType(it2.value()["durationSec"].type()))
+			{
+				printf("durationSec in Key Point in Animation %s is not a number type!" EOL, it.key().c_str());
+				foundErrorInJson = true;
+			}
+			else if (it2.value()["durationSec"] < 0.0)
+			{
+				printf("durationSec in Key Point in Animation %s was less than zero!" EOL, it.key().c_str());
+				foundErrorInJson = true;
+			}
+
+			//Check optional elements
+			if (it2.value().contains("type") && it.value()["type"].type() != nlohmann::json::value_t::string)
+			{
+				printf("Animation keypoint type is not a string: %s" EOL, it.key().c_str());
+				foundErrorInJson = true;
+			}
+			else if (it2.value().contains("type") && StringToMoveAnimationType(it2.value()["type"]) == MoveAnimationType::INVALID)
+			{
+				printf("Animation keypoint type has no valid value: %s" EOL, it.key().c_str());
+				foundErrorInJson = true;
+			}
+		}
+	}
+
+	return !foundErrorInJson;
+}
+
+bool CherrySim::AnimationLoadJsonFromPath(const char * path)
+{
+	std::ifstream file(path);
+	if (!file) SIMEXCEPTION(FileException);
+	nlohmann::json json;
+	file >> json;
+
+	if (!IsValidMoveAnimationJson(json)) return false;
+
+	for (nlohmann::json::const_iterator it = json.begin(); it != json.end(); ++it)
+	{
+		AnimationCreate(it.key());
+		AnimationSetDefaultType(it.key(), StringToMoveAnimationType(it.value()["type"]));
+
+		if (it.value().contains("looped"))
+		{
+			AnimationSetLooped(it.key(), it.value()["looped"]);
+		}
+
+		for (nlohmann::json::const_iterator it2 = it.value()["key_points"].begin(); it2 != it.value()["key_points"].end(); ++it2)
+		{
+			if (it2.value().contains("type"))
+			{
+				AnimationAddKeypoint(it.key(), it2.value()["x"], it2.value()["y"], it2.value()["z"], it2.value()["durationSec"], StringToMoveAnimationType(it2.value()["type"]));
+			}
+			else
+			{
+				AnimationAddKeypoint(it.key(), it2.value()["x"], it2.value()["y"], it2.value()["z"], it2.value()["durationSec"]);
+			}
+		}
+	}
+
+	return true;
+}

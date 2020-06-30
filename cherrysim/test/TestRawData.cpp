@@ -216,7 +216,7 @@ TEST(TestRawData, TestRandomTransmissions) {
 		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 		simConfig.sdBusyProbability = 0;
-		simConfig.seed = repeat;
+		simConfig.seed = repeat + 1;
 		simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 		simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", numNodes - 1});
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);

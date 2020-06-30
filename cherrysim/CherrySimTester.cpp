@@ -260,8 +260,8 @@ void CherrySimTester::Start()
 	//Boot up all nodes
 	for (u32 i = 0; i < sim->getTotalNodes(); i++) {
 #ifdef GITHUB_RELEASE
-		sim->nodes[i].nodeConfiguration = "github_nrf52";
-#endif //GITHUB_RELEASE
+		sim->nodes[i].nodeConfiguration = sim->redirectFeatureset(sim->nodes[i].nodeConfiguration);
+#endif
 		sim->setNode(i);
 		sim->bootCurrentNode();
 	}
@@ -485,10 +485,10 @@ void CherrySimTester::SendTerminalCommand(NodeId nodeId, const char* message, ..
 			{
 				commandToSend = crcCommand;
 			}
-			GS->terminal.PutIntoTerminalCommandQueue(commandToSend, false);
 			if (config.verbose) {
 				printf("NODE %d TERM_IN: %s" EOL, sim->currentNode->id, commandToSend.c_str());
 			}
+			GS->terminal.PutIntoTerminalCommandQueue(commandToSend, false);
 		}
 	} else if (nodeId > 0 && nodeId < sim->getTotalNodes() + 1) {
 		sim->setNode(nodeId - 1);
@@ -501,10 +501,10 @@ void CherrySimTester::SendTerminalCommand(NodeId nodeId, const char* message, ..
 		{
 			commandToSend = crcCommand;
 		}
-		GS->terminal.PutIntoTerminalCommandQueue(commandToSend, false);
 		if (config.verbose) {
 			printf("NODE %d TERM_IN: %s" EOL, sim->currentNode->id, commandToSend.c_str());
 		}
+		GS->terminal.PutIntoTerminalCommandQueue(commandToSend, false);
 	} else {
 		SIMEXCEPTION(IllegalStateException); //Wrong nodeId given for SendTerminalCommand
 	}

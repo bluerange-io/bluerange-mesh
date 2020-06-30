@@ -56,7 +56,7 @@ void DoClusteringTestImportedFromJson(const std::string &site, const std::string
 		printf("ClusterTest Iteration %u" EOL, i);
 		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-		simConfig.seed = i;
+		simConfig.seed = i + 1;
 		simConfig.importFromJson = true;
 		simConfig.siteJsonPath = site;
 		simConfig.devicesJsonPath = device;
@@ -85,7 +85,7 @@ TEST_P(MultiStackFixture, TestBasicClustering) {
 		printf("ClusterTest Iteration %u" EOL, i);
 		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-		simConfig.seed = i;
+		simConfig.seed = i + 1;
 		//simConfig.verbose = true;
 		//Run with the parametrized config
 		simConfig.nodeConfigName.insert({ config.featuresetName.c_str(), 10 });
@@ -168,7 +168,7 @@ TEST(TestClustering, TestClusteringWithManySdBusy) {
 		printf("ClusterTest Iteration %u" EOL, i);
 		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-		simConfig.seed = i;
+		simConfig.seed = i + 1;
 		simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 10 } );
 		simConfig.sdBusyProbability = 0.5;
 		simConfig.connectionTimeoutProbabilityPerSec = 0;
@@ -195,7 +195,7 @@ TEST_P(MultiStackFixture, TestBasicClusteringWithNodeReset) {
 		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 		simConfig.connectionTimeoutProbabilityPerSec = 0; //TODO: do this test with and without timeouts
-		simConfig.seed = i;
+		simConfig.seed = i + 1;
 
 		//testerConfig.verbose = true;
 
@@ -541,7 +541,7 @@ TEST(TestClustering, TestHighPrioQueueFull) {
 		//testerConfig.verbose = true;
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 		simConfig.terminalId = 0;
-		simConfig.seed = seed;
+		simConfig.seed = seed + 1;
 
 		simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 20 } );
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);

@@ -38,6 +38,7 @@ The LEDs are also visualized but all LED changes are mapped to a single one.
 
 [#Terminal]
 == Terminal Commands
+=== General
 The simulator has a terminal that allows to input all commands that can be used with FruityMesh nodes. Depending on the simulator configuration (`simConfig.terminalId`), either no terminal is enabled (-1), all terminals are active (0) or the terminal of a specific node is active, e.g. 1. Additionally, the simulator adds a few commands for simulation control:
 
 [source,c++]
@@ -54,7 +55,7 @@ This command gives an overview of all available commands. Also, a number of _SIM
 
 [source,c++]
 ----
-sim nodes [numNodes] // e.g. "sim nodes 10" to start a simulation with 10 randomly generated nodes
+sim nodes [numNodes] [featureSet] // e.g. "sim nodes 10 prod_mesh_nrf52" to start a simulation with 10 randomly placed nodes with the prod_mesh_nrf52 feature set.
 ----
 Using the nodes command allows you to restart the simulation with a different number of nodes.
 
@@ -64,11 +65,14 @@ sim seedr [seedValue] // e.g. "sim seedr 123" to restart the simulation with thi
 ----
 As the simulation is deterministic, you can always restart it either with the same seed to get the same simulation output or choose a different seed.
 
+=== Positions
+The following commands change positions of nodes.
+
 [source,c++]
 ----
 sim set_position [serial] [x] [y] [z] //e.g. sim set_position BBBBD 0.5 0.21 1.7
 ----
-Sets the position (in meters) in the virtual environment of the node with the serial number BBBBD to (0.5 / 0.21 / 1.7). Note: The third axis is the height axis.
+Sets the position (in meters) in the virtual environment of the node with the serial number BBBBD to (0.5 / 0.21 / 1.7). Stops the animation of the given node, if one is playing. Note: The third axis is the height axis.
 
 [source,c++]
 ----
@@ -80,7 +84,7 @@ Same as set_position, but relative to the normalized simulated environment dimen
 ----
 sim add_position [serial] [x] [y] [z] //e.g. sim add_position BBBBD -0.17 0.23 12
 ----
-Adds to the position (in meters) in the virtual environment of the node with the serial number BBBBD. Note: The third axis is the height axis.
+Adds to the position (in meters) in the virtual environment of the node with the serial number BBBBD. Stops the animation of the given node, if one is playing. Note: The third axis is the height axis.
 
 [source,c++]
 ----
@@ -88,7 +92,111 @@ sim add_position_norm [serial] [x] [y] [z] //e.g. sim add_position_norm BBBBD 0.
 ----
 Same as add_position, but relative to the normalized simulated environment dimensions instead of in meters.
 
+=== Animations
+The following commands can be used to play movement animations on nodes so that they move along a specified path.
 
+[source,c++]
+----
+sim animation create [name] //e.g. sim animation create my_animation
+----
+Create a new, empty animation.
+
+[source,c++]
+----
+sim animation remove [name] //e.g. sim animation remove my_animation
+----
+Removes an animation by name.
+
+[source,c++]
+----
+sim animation exists [name] //e.g. sim animation exists my_animation
+----
+Checks if an animation with name exists. The command is answered with the following JSON:
+[source,java]
+----
+{
+    "type":"animation_exists",
+    "name":"name_of_animation",
+    "exists":true
+}
+----
+Where name is the name of this animation given by the command.
+
+[source,c++]
+----
+sim animation set_default_type [name] [type] //e.g. sim animation set_default_type my_animation 2
+----
+Sets the default interpolation type of an animation. If a key point does not specify a type, is has the default type of the animation. The type can be:
+[source,c++]
+----
+	LERP = 0,    //Linear interpolation
+	COSINE = 1,  //Linear interpolation with slow start and end
+	BOOLEAN = 2, //Stays at the start location for 50% of the time, then teleports to the end location and stays there.
+----
+
+[source,c++]
+----
+sim animation add_keypoint [x] [y] [z] [durationSec] {type} //e.g. sim animation add_keypoint 1 2 3 10 0
+----
+Adds a new keypoint to an animation with x/y/z in relative coordinate space. The keypoint is reached after the previous keypoint after durationSec seconds. The type is optional. If none is given, the type set by set_default_type is used.
+
+[source,c++]
+----
+sim animation set_looped [name] [1/0] //e.g. sim animation set_looped 1
+----
+Set the animation to be looped or not looped.
+
+[source,c++]
+----
+sim animation is_running [serial] //e.g. sim animation is_running BBCBC
+----
+Checks if a node has an animation that is currently playing. The command is answered by the following JSON:
+[source,java]
+----
+{
+    "type":"animation_is_running",
+    "serial":"BBCBC",
+    "code":1
+}
+----
+Where code is 1 if it has an animation playing and 0 if it doesn't.
+
+[source,c++]
+----
+sim animation get_name [serial] //e.g. sim animation get_name BBCBC
+----
+Gets the name of the animation that is currently playing on a node. The command is answered by the following JSON:
+[source,java]
+----
+{
+    "type":"animation_get_name",
+    "serial":"BBCBC",
+    "name":"my_animation"
+}
+----
+Where name is the name of the animation that is currently playing or the string "NULL" if none is playing.
+
+[source,c++]
+----
+sim animation start [serial] [name] //e.g. sim animation start BBCBC my_animation
+----
+Starts an animation with the name "name" of the node with the given serial number.
+
+NOTE: Once an animation has been started on a node, changing the animation with any command has no effect on the animation currently playing on the node. Changes to an animation only have an effect on future animation start commands.
+
+[source,c++]
+----
+sim animation stop [serial] //e.g. sim animation stop BBCBC
+----
+Stops an animation on the node with the given serial number.
+
+[source,c++]
+----
+sim animation load_path [path] //e.g. sim animation load_path /path/to/anim.json
+----
+Loads animations from a JSON file. See "cherrysim/test/res/MoveAnimation.json" for an example.
+
+NOTE: The path is always relative to the normalized path, which is the "cherrySim" directory in the repository. This means that played animations must be part of the FruityMesh repository. This is mandatory as else the replay function will not work properly.
 
 Using commands such as *nodes 20*, *width 40*, *height 50* allows to modify the simulation scenario. Scenarios can also be imported as JSON files by first giving the paths (*site site1.json*, *devices dev1.json*) and then enabling JSON import (*json 1*). Each simulation is always run deterministically with a preset seed. This seed can be modified using e.g. *seed 123*, which will result in a new simulation.
 

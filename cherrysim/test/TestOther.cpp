@@ -537,6 +537,7 @@ TEST(TestOther, TestConnectionAllocator) {
 	tester.Start();
 
 	MersenneTwister mt;
+	mt.setSeed(1);
 
 	std::vector<BaseConnection*> conns;
 
@@ -899,14 +900,11 @@ TEST(TestOther, TestBulkMode) {
 	//testerConfig.verbose = true;
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 	simConfig.terminalId = 0;
-	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_pcbridge_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
-	tester.sim->nodes[0].nodeConfiguration = "prod_pcbridge_nrf52";
-	tester.sim->nodes[1].nodeConfiguration = "prod_mesh_nrf52";
-
-	CheckedMemset(tester.sim->nodes[1].uicr.CUSTOMER, 0xFF, sizeof(tester.sim->nodes[1].uicr.CUSTOMER));	//invalidate UICR
+	CheckedMemset(tester.sim->nodes[0].uicr.CUSTOMER, 0xFF, sizeof(tester.sim->nodes[1].uicr.CUSTOMER));	//invalidate UICR
 
 	tester.Start();
 
@@ -918,20 +916,20 @@ TEST(TestOther, TestBulkMode) {
 
 	tester.SimulateForGivenTime(10 * 1000); //Simulate a little to calculate battery usage.
 
-	u32 usageMicroAmpere = tester.sim->nodes[1].nanoAmperePerMsTotal / tester.sim->simState.simTimeMs;
+	u32 usageMicroAmpere = tester.sim->nodes[0].nanoAmperePerMsTotal / tester.sim->simState.simTimeMs;
 	if (usageMicroAmpere > 100)
 	{
 		FAIL() << "Bulk Mode should consume very low energy, but consumed: " << usageMicroAmpere;
 	}
-	tester.SendTerminalCommand(2, "set_node_key 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00");
+	tester.SendTerminalCommand(1, "set_node_key 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00");
 	tester.SimulateGivenNumberOfSteps(1);
 
-	tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 1 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00"); //1 = FmKeyId::NODE
+	tester.SendTerminalCommand(2, "action this ma connect 00:00:00:01:00:00 1 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00"); //1 = FmKeyId::NODE
 
 	tester.SimulateForGivenTime(10 * 1000);
 	u32 dummyVal = 1337;
-	tester.SendTerminalCommand(1, "action 2001 bulk get_memory %u 4", (u32)(&dummyVal));
-	tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"nodeId\":2001,\"type\":\"get_memory_result\",\"addr\":\\d+,\"data\":\"39:05:00:00\"\\}");
+	tester.SendTerminalCommand(2, "action 2002 bulk get_memory %u 4", (u32)(&dummyVal));
+	tester.SimulateUntilRegexMessageReceived(10 * 1000, 2, "\\{\"nodeId\":2002,\"type\":\"get_memory_result\",\"addr\":\\d+,\"data\":\"39:05:00:00\"\\}");
 
 	u8 data[1024];
 	for (size_t i = 0; i < sizeof(data); i++)
@@ -939,37 +937,39 @@ TEST(TestOther, TestBulkMode) {
 		data[i] = i % 256;
 	}
 	u32 expectedValue = Utility::CalculateCrc32(data, sizeof(data));
-	tester.SendTerminalCommand(1, "action 2001 bulk get_crc32 %u %u", (u32)(data), (u32)(sizeof(data)));
-	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2001,\"type\":\"get_crc32_result\",\"crc32\":%u}", expectedValue);
+	tester.SendTerminalCommand(2, "action 2002 bulk get_crc32 %u %u", (u32)(data), (u32)(sizeof(data)));
+	tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":2002,\"type\":\"get_crc32_result\",\"crc32\":%u}", expectedValue);
 
-	tester.SendTerminalCommand(1, "action 2001 bulk get_uicr_custom");
-	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2001,\"type\":\"get_uicr_custom_result\",\"data\":\"FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF\"}");
+	tester.SendTerminalCommand(2, "action 2002 bulk get_uicr_custom");
+	tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":2002,\"type\":\"get_uicr_custom_result\",\"data\":\"FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF\"}");
 	
-	tester.SendTerminalCommand(1, "action 2001 bulk set_uicr_custom AA:BB:CC:DD");
-	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2001,\"type\":\"set_uicr_custom_result\",\"code\":0}");
+	tester.SendTerminalCommand(2, "action 2002 bulk set_uicr_custom AA:BB:CC:DD");
+	tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":2002,\"type\":\"set_uicr_custom_result\",\"code\":0}");
 	tester.SimulateForGivenTime(20 * 1000); //Give the node time to reboot.
 
-	ASSERT_EQ(tester.sim->nodes[1].restartCounter, 2);
-	ASSERT_EQ(((u8*)(tester.sim->nodes[1].uicr.CUSTOMER))[0], 0xAA);
-	ASSERT_EQ(((u8*)(tester.sim->nodes[1].uicr.CUSTOMER))[1], 0xBB);
-	ASSERT_EQ(((u8*)(tester.sim->nodes[1].uicr.CUSTOMER))[2], 0xCC);
-	ASSERT_EQ(((u8*)(tester.sim->nodes[1].uicr.CUSTOMER))[3], 0xDD);
-	ASSERT_EQ(((u8*)(tester.sim->nodes[1].uicr.CUSTOMER))[4], 0xFF);
+	ASSERT_EQ(tester.sim->nodes[0].restartCounter, 2);
+	ASSERT_EQ(((u8*)(tester.sim->nodes[0].uicr.CUSTOMER))[0], 0xAA);
+	ASSERT_EQ(((u8*)(tester.sim->nodes[0].uicr.CUSTOMER))[1], 0xBB);
+	ASSERT_EQ(((u8*)(tester.sim->nodes[0].uicr.CUSTOMER))[2], 0xCC);
+	ASSERT_EQ(((u8*)(tester.sim->nodes[0].uicr.CUSTOMER))[3], 0xDD);
+	ASSERT_EQ(((u8*)(tester.sim->nodes[0].uicr.CUSTOMER))[4], 0xFF);
 }
 #endif //GITHUB_RELEASE
 
+#ifndef GITHUB_RELEASE
 TEST(TestOther, TestWatchdog) {
 	Exceptions::ExceptionDisabler<WatchdogTriggeredException> wtDisabler;
 	Exceptions::ExceptionDisabler<SafeBootTriggeredException> stDisabler;
-	constexpr unsigned long long starvationTimeNormalMode = FM_WATCHDOG_TIMEOUT / 32768UL * 1000UL;
-	constexpr unsigned long long starvationTimeSafeBoot = FM_WATCHDOG_TIMEOUT_SAFE_BOOT / 32768UL * 1000UL;;
+	const char* usedFeatureset = "dev_automated_tests_master_nrf52"; //Has a very small watchdog time which is convenient for this test and its duration.
+	constexpr unsigned long long starvationTimeNormalMode = 60UL * 2UL * 1000UL;
+	constexpr unsigned long long starvationTimeSafeBoot = 20UL * 1000UL;
 	{
 		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 		//testerConfig.verbose = true;
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 		simConfig.terminalId = 0;
 		simConfig.simulateWatchdog = true;
-		simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
+		simConfig.nodeConfigName.insert( { usedFeatureset, 1 } );
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 		tester.Start();
@@ -1005,7 +1005,7 @@ TEST(TestOther, TestWatchdog) {
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 		simConfig.terminalId = 0;
 		simConfig.simulateWatchdog = false;
-		simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
+		simConfig.nodeConfigName.insert( { usedFeatureset, 1 } );
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 		tester.Start();
@@ -1015,6 +1015,7 @@ TEST(TestOther, TestWatchdog) {
 		ASSERT_EQ(tester.sim->nodes[0].restartCounter, 1); //watchdogs are disabled, nodes should not starve at all.
 	}
 }
+#endif //GITHUB_RELEASE
 
 
 #ifndef GITHUB_RELEASE
@@ -1262,5 +1263,62 @@ TEST(TestOther, TestSimulatorFlashToFileStorage) {
 		}
 	}
 
+}
+
+TEST(TestOther, TestConnectionSupervisionTimeoutWillDisconnect) {
+	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+	// testerConfig.verbose = true;
+	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+	simConfig.terminalId = 0;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+
+	simConfig.mapWidthInMeters = 100;
+	simConfig.mapHeightInMeters = 100;
+	simConfig.preDefinedPositions = {{0, 0},{0, 0.1}};
+
+	// We want to check if with variable noise when device is at distance limit it will disconnect within few seconds
+	// as expected because of connection supervision timeout
+	simConfig.rssiNoise = true;
+
+	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+	tester.Start();
+	tester.sim->findNodeById(1)->gs.logger.enableTag("C");
+	tester.sim->findNodeById(2)->gs.logger.enableTag("C");
+
+	tester.SimulateUntilClusteringDone(10 * 1000);
+
+	// With following settings static RSSI is around -89.95dbm which is just above reception level (0.3 probability).
+	// With variable noise it should casue connection timeout
+	tester.sim->SetPosition(1, 0, 0.25, 0);
+	tester.SimulateUntilMessageReceived(1000 * 1000, 2, "Disconnected device %d", FruityHal::BleHciError::CONNECTION_TIMEOUT);
+}
+
+TEST(TestOther, TestConnectionSupervisionTimeoutWontDisconnect) {
+	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+	// testerConfig.verbose = true;
+	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+	simConfig.terminalId = 0;
+	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+
+	simConfig.mapWidthInMeters = 100;
+	simConfig.mapHeightInMeters = 100;
+	simConfig.preDefinedPositions = {{0, 0},{0, 0.1}};
+
+	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+	tester.Start();
+	tester.sim->findNodeById(1)->gs.logger.enableTag("C");
+	tester.sim->findNodeById(2)->gs.logger.enableTag("C");
+
+	tester.SimulateUntilClusteringDone(10 * 1000);
+
+	// With following settings static RSSI is around -89.95dbm which is just above reception level (0.3 probability).
+	// With no variable noise we never get reception probability to 0 so there is almost no chance all packets will be lost with connection timeout
+	tester.sim->SetPosition(1, 0, 0.25, 0);
+	{
+		Exceptions::DisableDebugBreakOnException ddboe;
+		ASSERT_THROW(tester.SimulateUntilMessageReceived(1000 * 1000, 2, "Disconnected device %d", FruityHal::BleHciError::CONNECTION_TIMEOUT), TimeoutException);
+	}
 }
 #endif //GITHUB_RELEASE

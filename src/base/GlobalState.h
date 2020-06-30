@@ -50,6 +50,9 @@
 #include "Node.h"
 #include "ConnectionAllocator.h"
 #include "ModuleAllocator.h"
+#if IS_ACTIVE(SIG_MESH)
+#include "SigAccessLayer.h"
+#endif
 
 constexpr int MAX_MODULE_COUNT = 17;
 
@@ -111,7 +114,6 @@ class GlobalState
 		GAPController gapController;
 		GATTController gattController;
 
-		//Reference to Node
 		Node node;
 		Conf config;
 		Boardconf boardconf;
@@ -120,6 +122,10 @@ class GlobalState
 		Terminal terminal;
 		FlashStorage flashStorage;
 		RecordStorage recordStorage;
+
+#if IS_ACTIVE(SIG_MESH)
+		SigAccessLayer sig;
+#endif
 
 		LedWrapper ledRed;
 		LedWrapper ledGreen;
@@ -132,24 +138,25 @@ class GlobalState
 		template<typename T>
 		u32 InitializeModule(bool createModule)
 		{
-			static_assert(alignof(T) == 4, "This code assumes that the alignment of all modules is the same, which happens to be 4 (continue reading in comment)");
-			// If this assumption would be false, we could not simply sum up the size of all modules and allocate
-			// as much memory as the sum tells us. We'd have to allocate more. How much more is very hard to tell
-			// thus we don't allow different alignments of modules.
+			static_assert(alignof(T) == 4 || alignof(T) == 8, "This code assumes that the alignment of all modules either 4 or 8 (continue reading in comment)");
+			// Modules that are compiled with double support will have an alignment of 8, while others only have an alignment of 4
+			// To simplify this, we simply pad all modules to 8 byte boundaries when allocating them
+
+			u32 paddedSize = sizeof(T) + (8 - (sizeof(T) % 8)) % 8;
 
 			if (createModule)
 			{
 				if (amountOfModules >= MAX_MODULE_COUNT) {
 					SIMEXCEPTION(TooManyModulesException);
 				}
-				void *memoryBlock = moduleAllocator.allocateMemory(sizeof(T));
+				void *memoryBlock = moduleAllocator.allocateMemory(paddedSize);
 				if (memoryBlock != nullptr)
 				{
 					activeModules[amountOfModules] = new (memoryBlock) T();
 					amountOfModules++;
 				}
 			}
-			return sizeof(T);
+			return paddedSize;
 		}
 
 		ConnectionAllocator connectionAllocator;

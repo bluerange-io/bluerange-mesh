@@ -266,7 +266,7 @@ TEST(TestEnrollmentModule, TestEnrollmentMultipleTimes) {
 
 		CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 		SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-		simConfig.seed = seed;
+		simConfig.seed = seed + 1;
 		simConfig.defaultNetworkId = 0;
 		simConfig.mapWidthInMeters = 5;
 		simConfig.mapHeightInMeters = 5;

@@ -123,6 +123,7 @@ void MeshAccessConnection::SetCustomKey(u8 const * key)
 
 MeshAccessConnection::~MeshAccessConnection(){
 	logt("MACONN", "Deleted MeshAccessConnection, discR: %u, appDiscR: %u", (u32)this->disconnectionReason, (u32)this->appDisconnectionReason);
+	NotifyConnectionStateSubscriber(ConnectionState::DISCONNECTED); //Make sure subscribers are informed about a removed connection.
 }
 
 BaseConnection* MeshAccessConnection::ConnTypeResolver(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8 const * data)
@@ -190,7 +191,7 @@ u32 MeshAccessConnection::ConnectAsMaster(FruityHal::BleGapAddr const * address,
 		}
 	}
 	if(GS->cm.pendingConnection == nullptr){
-		logt("ERROR", "No free connection");
+		logt("MACONN", "No free connection");
 		return 0;
 	}
 
@@ -1090,15 +1091,6 @@ void MeshAccessConnection::ConnectionSuccessfulHandler(u16 connectionHandle)
 			logt("MACONN", "Failed to start discover service because %u", (u32)err);
 		}
 	}
-}
-
-bool MeshAccessConnection::GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason)
-{
-	bool result = BaseConnection::GapDisconnectionHandler(hciDisconnectReason);
-
-	NotifyConnectionStateSubscriber(ConnectionState::DISCONNECTED);
-
-	return result;
 }
 
 void MeshAccessConnection::GATTServiceDiscoveredHandler(FruityHal::BleGattDBDiscoveryEvent& evt)

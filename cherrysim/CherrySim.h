@@ -60,7 +60,18 @@ struct ReplayRecordEntry
 	}
 };
 
-
+struct FeaturesetPointers
+{
+	FeatureSetGroup(*getFeaturesetGroupPtr)(void) = nullptr;
+	void(*setBoardConfigurationPtr)(BoardConfiguration* config) = nullptr;
+	void(*setFeaturesetConfigurationPtr)(ModuleConfiguration* config, void* module) = nullptr;
+	u32(*initializeModulesPtr)(bool createModule) = nullptr;
+	DeviceType(*getDeviceTypePtr)(void) = nullptr;
+	Chipset(*getChipsetPtr)(void) = nullptr;
+	u32(*getWatchdogTimeout)(void) = nullptr;
+	u32(*getWatchdogTimeoutSafeBoot)(void) = nullptr;
+	u32 featuresetOrder = 0;
+};
 
 class CherrySim
 {
@@ -83,21 +94,12 @@ public:
 	static constexpr int flashToFileWriteInterval = 128; // Will write flash to file every flashToFileWriteInterval's simulation step.
 
 	void erasePage(u32 pageAddress);
-	struct FeaturesetPointers
-	{
-		FeatureSetGroup(*getFeaturesetGroupPtr)(void)                                   = nullptr;
-		void(*setBoardConfigurationPtr)(BoardConfiguration* config)                     = nullptr;
-		void(*setFeaturesetConfigurationPtr)(ModuleConfiguration* config, void* module) = nullptr;
-		u32(*initializeModulesPtr)(bool createModule)                                   = nullptr;
-		DeviceType(*getDeviceTypePtr)(void)                                             = nullptr;
-		Chipset(*getChipsetPtr)(void)                                                   = nullptr;
-		u32 featuresetOrder                                                             = 0;
-	};
 
 	std::map<std::string, FeaturesetPointers> featuresetPointers;
 
 	std::queue<ReplayRecordEntry> replayRecordEntries;
 
+	nodeEntry* GetNodeEntryBySerialNumber(u32 serialNumber);
 
 	static std::string LoadFileContents(const char* path);
 	static std::string ExtractReplayToken(const std::string &fileContents, const std::string &startToken, const std::string &endToken);
@@ -105,7 +107,7 @@ public:
 	static SimConfiguration ExtractSimConfigurationFromReplayRecord(const std::string &fileContents);
 	static void CheckVersionFromReplayRecord(const std::string &fileContents);
 
-private:
+TESTER_PUBLIC:
 	u32 totalNodes = 0;
 	u32 assetNodes = 0;
 	constexpr static float N = 2.5; //Our calibration value for distance calculation
@@ -114,12 +116,34 @@ private:
 
 	std::chrono::time_point<std::chrono::steady_clock> lastTick;
 
+	std::map<std::string, MoveAnimation> loadedMoveAnimations;
+	bool IsValidMoveAnimationJson(const nlohmann::json &json) const;
+	MoveAnimation& AnimationGet(const std::string &name);
+	void AnimationCreate(const std::string &name);
+	bool AnimationExists(const std::string &name) const;
+	void AnimationRemove(const std::string &name);
+	void AnimationSetDefaultType(const std::string&name, MoveAnimationType type);
+	void AnimationAddKeypoint(const std::string &name, float x, float y, float z, float duration);
+	void AnimationAddKeypoint(const std::string &name, float x, float y, float z, float duration, MoveAnimationType type);
+	void AnimationSetLooped(const std::string& name, bool looped);
+	bool AnimationIsRunning(u32 serialNumber);
+	std::string AnimationGetName(u32 serialNumber);
+	void AnimationStart(u32 serialNumber, const std::string& name);
+	void AnimationStop(u32 serialNumber);
+	bool AnimationLoadJsonFromPath(const char* path);
+
 	bool shouldSimIvTrigger(u32 ivMs);
 
 	void StoreFlashToFile();
 	void LoadFlashFromFile();
 	void PrepareSimulatedFeatureSets();
 	void QueueInterrupts();
+
+#ifdef GITHUB_RELEASE
+	//Used to redirect featuresets on github releases
+	bool isRedirectedFeatureset(const std::string& featureset);
+	std::string redirectFeatureset(const std::string& oldFeatureset);
+#endif
 
 public:
 	//#### Simulation Control
@@ -196,6 +220,9 @@ public:
 	//GPIO Simulation
 	void SetSimLed(bool state);
 
+	//Movement Simulation
+	void SimulateMovement();
+
 	//Battery usage simulation
 	void simulateBatteryUsage();
 
@@ -249,8 +276,8 @@ public:
 	void enableTagForAll(const char* tag);
 	void disableTagForAll(const char* tag);
 
-	bool SetPosition(u32 nodeIndex, float x, float y, float z);
-	bool AddPosition(u32 nodeIndex, float x, float y, float z);
+	void SetPosition(u32 nodeIndex, float x, float y, float z);
+	void AddPosition(u32 nodeIndex, float x, float y, float z);
 };
 
 //Throw this in the simulator in order to quit from the simulation

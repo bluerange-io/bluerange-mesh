@@ -91,3 +91,13 @@ FeatureSetGroup getFeatureSetGroup_github_nrf52()
 {
 	return FeatureSetGroup::NRF52_MESH;
 }
+
+u32 getWatchdogTimeout_github_nrf52()
+{
+	return 32768UL * 60 * 60 * 2;
+}
+
+u32 getWatchdogTimeoutSafeBoot_github_nrf52()
+{
+	return 32768UL * 20UL;
+}

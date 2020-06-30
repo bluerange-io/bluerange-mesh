@@ -13,6 +13,7 @@ SET(visual_studio_source_list "${visual_studio_source_list}" CACHE INTERNAL "")
 option(BUILD_FEATURESETS "Compile featuresets instead of simulator code." OFF)
 option(CI_PIPELINE "Can be set by the CI Pipeline to do some code manipulation." OFF)
 option(FORCE_CPPCHECK "If set and the simulator is built, the generation fails if cppcheck could not be found." OFF)
+option(ENABLE_SANITIZERS "If set, GCC is used, and the simulator is built, sanitizer flags are used during compilation." ON) # ON by default is intentional
 
 if(WIN32)
   set(exe_suffix ".exe")
@@ -286,6 +287,7 @@ else(BUILD_FEATURESETS)
 	  "--suppress=zerodiv"
 	  "--suppress=redundantInitialization"
 	  "--suppress=useInitializationList"
+	  "--suppress=useStlAlgorithm"
 	)
 	if(CI_PIPELINE)
 	  list(APPEND cppcheck_command "--error-exitcode=1")

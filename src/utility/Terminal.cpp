@@ -40,6 +40,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <chrono>
+#include <iostream>
 static std::mutex terminalMutex;
 #endif
 
@@ -843,7 +844,26 @@ void Terminal::StdioCheckAndProcessLine()
 			//Simulator commands are immediately redirected to cherrySim.
 			//This way, sim commands don't have to follow the same simulated
 			//restrictions like command length and amount of tokens.
-			cherrySimInstance->TerminalCommandHandler(message.c_str());
+			std::cout << "SIM COMMAND: " << message << std::endl;
+			TerminalCommandHandlerReturnType handled = cherrySimInstance->TerminalCommandHandler(message.c_str());
+			switch (handled)
+			{
+#ifdef CHERRYSIM_TESTER_ENABLED
+			case TerminalCommandHandlerReturnType::UNKNOWN:              SIMEXCEPTION(CommandNotFoundException);              break;
+			case TerminalCommandHandlerReturnType::WRONG_ARGUMENT:       SIMEXCEPTION(WrongCommandParameterException);        break;
+			case TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS: SIMEXCEPTION(TooFewParameterException);              break;
+			case TerminalCommandHandlerReturnType::INTERNAL_ERROR:       SIMEXCEPTION(InternalTerminalCommandErrorException); break;
+
+				// Don't do anything with the follow codes.
+			case TerminalCommandHandlerReturnType::WARN_DEPRECATED:
+			case TerminalCommandHandlerReturnType::SUCCESS:
+				break;
+#else
+				// Just so that handled is not unused in other build configs.
+			default:
+				break;
+#endif
+			}
 		}
 		else
 		{

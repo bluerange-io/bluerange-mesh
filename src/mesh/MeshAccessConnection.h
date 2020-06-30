@@ -169,7 +169,6 @@ public:
 
 	/*############### Handler ##################*/
 	void ConnectionSuccessfulHandler(u16 connectionHandle) override final;
-	bool GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason) override final;
 	void GATTServiceDiscoveredHandler(FruityHal::BleGattDBDiscoveryEvent &evt) override final;
 
 	void PrintStatus() override final;

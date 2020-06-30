@@ -19,7 +19,7 @@ Before you begin, you should have at least two boards with the nRF52 chipset and
 == What To Expect
 Take some nRF devices, flash them with FruityMesh and expect them to connect to each other in an instant. Open the terminal and send them some commands over the mesh, trigger LEDs or watch some data going through. Power consumption is minimal with the correct settings. For a list of some of the features, have a look at the xref:Features.adoc[Features] page.
 
-FruityMesh is **great for attaching sensors / actors or 3rd party devices** e.g. via UART. Whether you need a mesh of lamps, sensors, want to do asset tracking, etc., FruityMesh will be a great framework to get everything running quickly.
+FruityMesh is **great for attaching sensors / actuators or 3rd party devices** e.g. via UART. Whether you need a mesh of lamps, sensors, want to do asset tracking, etc., FruityMesh will be a great framework to get everything running quickly.
 
 == Talk To Us
 We’re interested in contributions of every kind, otherwise we wouldn’t be here on GitHub. If you have any questions on how to help and bring the technology forward, do not hesitate to contact us. Make sure to read the xref:Developers.adoc[Developers] page to find out how to help.

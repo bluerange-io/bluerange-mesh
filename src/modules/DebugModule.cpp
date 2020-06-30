@@ -762,6 +762,16 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
 		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
+	else if (TERMARGS(0, "scanjobs"))
+	{
+		ScanController* scanCtrl = &(GS->scanController);
+
+		for (u32 i = 0; i < scanCtrl->jobs.size(); i++) {
+			trace("Job type %u, state %u, window %u, iv %u" EOL, (u32)scanCtrl->jobs[i].type, (u32)scanCtrl->jobs[i].state, scanCtrl->jobs[i].window, scanCtrl->jobs[i].interval);
+		}
+
+		return TerminalCommandHandlerReturnType::SUCCESS;
+	}
 	else if (TERMARGS(0, "feed"))
 	{
 		FruityHal::FeedWatchdog();

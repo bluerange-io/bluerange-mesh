@@ -190,7 +190,9 @@ struct advPacketAssetInsServiceData
 	u16 pressure; //0xFFFF = not available
 	
 	NetworkId networkId;
-	//8 bytes reserved
+	//6 bytes reserved
+	//NOTE: It might be a good idea to use 4 bytes for a serial number as
+	//      that could be used to speed up the serial_connect time.
 	u8 reserved[6]; //Must be set to 0
 };
 STATIC_ASSERT_SIZE(advPacketAssetInsServiceData, SIZEOF_ADV_STRUCTURE_ASSET_INS_SERVICE_DATA);

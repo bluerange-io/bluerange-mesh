@@ -36,7 +36,6 @@ fruityloader/.settings/
 
 #Documentation
 node_modules/
-package-lock.json
 ui-bundle.zip
 
 ## Intellij

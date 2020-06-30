@@ -54,6 +54,9 @@ typedef struct ScanJob
 	ScanState		type;
 }ScanJob;
 
+//Forward declaration
+class DebugModule;
+
 /*
  * The ScanController wraps SoftDevice calls around scanning/observing and
  * provides an interface to control this behaviour.
@@ -61,6 +64,8 @@ typedef struct ScanJob
  */
 class ScanController
 {
+	friend DebugModule;
+
 private:
 	FruityHal::BleGapScanParams currentScanParams;
 	bool scanStateOk = true;

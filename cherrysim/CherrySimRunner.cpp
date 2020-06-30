@@ -169,8 +169,10 @@ SimConfiguration CherrySimRunner::CreateDefaultRunConfiguration()
 
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 7 });
+#ifndef GITHUB_RELEASE
 	simConfig.nodeConfigName.insert({ "prod_vs_nrf52", 1 }); // vs node ids are before assetNodes and clcNodes
 	simConfig.nodeConfigName.insert({ "prod_clc_mesh_nrf52", 1 });//clc node ids are before assetNodes
+#endif
 
 	simConfig.simOtherDelay = 1; // Enter 1 - 100000 to send sim_other message only each ... simulation steps, this increases the speed significantly
 	simConfig.playDelay = 10; //Allows us to view the simulation slower than simulated, is added after each step

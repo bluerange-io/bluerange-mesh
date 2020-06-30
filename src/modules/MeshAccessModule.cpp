@@ -548,6 +548,26 @@ void MeshAccessModule::SendMeshAccessSerialConnectResponse(MeshAccessSerialConne
 	);
 }
 
+void MeshAccessModule::OnFoundSerialIndexWithAddr(const FruityHal::BleGapAddr& addr, u32 serialNumberIndex)
+{
+	if (meshAccessSerialConnectMessage.serialNumberIndexToConnectTo == serialNumberIndex &&
+			meshAccessSerialConnectMessage.serialNumberIndexToConnectTo != 0 && 
+				(
+					GS->cm.GetConnectionByUniqueId(meshAccessSerialConnectConnectionId).GetConnection() == nullptr
+				)
+			)
+		{
+			meshAccessSerialConnectConnectionId = MeshAccessConnection::ConnectAsMaster(&addr, 10, 4, meshAccessSerialConnectMessage.fmKeyId, meshAccessSerialConnectMessage.key, MeshAccessTunnelType::LOCAL_MESH, meshAccessSerialConnectMessage.nodeIdAfterConnect);
+
+			MeshAccessConnection* maconn = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(meshAccessSerialConnectConnectionId).GetConnection();
+			if (maconn != nullptr)
+			{
+				maconn->connectionStateSubscriberId = meshAccessSerialConnectSender;
+			}
+			//Register for changes in the connection state
+		}
+}
+
 MeshAccessAuthorization MeshAccessModule::CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction)
 {
 	connPacketHeader const * packet = (connPacketHeader const *)data;
@@ -792,7 +812,6 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
 void MeshAccessModule::GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent)
 {
 	const advPacketServiceAndDataHeader* packet = (const advPacketServiceAndDataHeader*)advertisementReportEvent.getData();
-	const advStructureMeshAccessServiceData* maPacket = (const advStructureMeshAccessServiceData*)&packet->data;
 #if IS_INACTIVE(GW_SAVE_SPACE)
 	if(logNearby){
 		//Check if the advertising packet is an asset packet
@@ -804,6 +823,7 @@ void MeshAccessModule::GapAdvertisementReportEventHandler(const FruityHal::GapAd
 				&& packet->data.uuid.uuid == MESH_SERVICE_DATA_SERVICE_UUID16
 				&& packet->data.messageType == ServiceDataMessageType::MESH_ACCESS
 		){
+			const advStructureMeshAccessServiceData* maPacket = (const advStructureMeshAccessServiceData*)&packet->data;
 			char serialNumber[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
 			Utility::GenerateBeaconSerialForIndex(maPacket->serialIndex, serialNumber);
 
@@ -827,46 +847,42 @@ void MeshAccessModule::GapAdvertisementReportEventHandler(const FruityHal::GapAd
 		}
 	}
 #endif
-	if (advertisementReportEvent.getDataLength() >= SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA
-		&& packet->flags.len == SIZEOF_ADV_STRUCTURE_FLAGS - 1
-		&& packet->uuid.len == SIZEOF_ADV_STRUCTURE_UUID16 - 1
-		&& packet->data.uuid.type == (u8)BleGapAdType::TYPE_SERVICE_DATA
-		&& packet->data.uuid.uuid == MESH_SERVICE_DATA_SERVICE_UUID16
-		&& packet->data.messageType == ServiceDataMessageType::MESH_ACCESS)
+	FruityHal::BleGapAddr addr;
+	addr.addr_type = advertisementReportEvent.getPeerAddrType();
+	CheckedMemcpy(addr.addr, advertisementReportEvent.getPeerAddr(), 6);
+
+	if (   packet->flags.len == SIZEOF_ADV_STRUCTURE_FLAGS - 1
+	    && packet->uuid.len == SIZEOF_ADV_STRUCTURE_UUID16 - 1
+	    && packet->data.uuid.type == (u8)BleGapAdType::TYPE_SERVICE_DATA
+	    && packet->data.uuid.uuid == MESH_SERVICE_DATA_SERVICE_UUID16)
 	{
-		FruityHal::BleGapAddr addr;
-		addr.addr_type = advertisementReportEvent.getPeerAddrType();
-		CheckedMemcpy(addr.addr, advertisementReportEvent.getPeerAddr(), 6);
-		if (maPacket->interestedInConnetion == 1
-			&& maPacket->networkId == GS->node.configuration.networkId
-			&& maPacket->networkId != 0)
+		if (advertisementReportEvent.getDataLength() >= SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA
+			&& packet->data.messageType == ServiceDataMessageType::MESH_ACCESS)
 		{
-			u16 connectionId = MeshAccessConnection::ConnectAsMaster(&addr, 10, 4, FmKeyId::ORGANIZATION, GS->node.configuration.organizationKey, MeshAccessTunnelType::LOCAL_MESH);
-			if (connectionId != 0)
+			const advStructureMeshAccessServiceData* maPacket = (const advStructureMeshAccessServiceData*)&packet->data;
+			if (maPacket->interestedInConnetion == 1
+				&& maPacket->networkId == GS->node.configuration.networkId
+				&& maPacket->networkId != 0)
 			{
-				MeshAccessConnectionHandle maconn = GS->cm.GetMeshAccessConnectionByUniqueId(connectionId);
-				if (maconn)
+				u16 connectionId = MeshAccessConnection::ConnectAsMaster(&addr, 10, 4, FmKeyId::ORGANIZATION, GS->node.configuration.organizationKey, MeshAccessTunnelType::LOCAL_MESH);
+				if (connectionId != 0)
 				{
-					maconn.GetConnection()->KeepAliveFor(meshAccessInterestedInConnectionInitialKeepAliveDs);
+					MeshAccessConnectionHandle maconn = GS->cm.GetMeshAccessConnectionByUniqueId(connectionId);
+					if (maconn)
+					{
+						maconn.GetConnection()->KeepAliveFor(meshAccessInterestedInConnectionInitialKeepAliveDs);
+					}
 				}
 			}
+
+			OnFoundSerialIndexWithAddr(addr, maPacket->serialIndex);
 		}
 
-		if (meshAccessSerialConnectMessage.serialNumberIndexToConnectTo == maPacket->serialIndex &&
-			meshAccessSerialConnectMessage.serialNumberIndexToConnectTo != 0 && 
-				(
-					GS->cm.GetConnectionByUniqueId(meshAccessSerialConnectConnectionId).GetConnection() == nullptr
-				)
-			)
+		if (advertisementReportEvent.getDataLength() >= SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA
+			&& packet->data.messageType == ServiceDataMessageType::STANDARD_ASSET)
 		{
-			meshAccessSerialConnectConnectionId = MeshAccessConnection::ConnectAsMaster(&addr, 10, 4, meshAccessSerialConnectMessage.fmKeyId, meshAccessSerialConnectMessage.key, MeshAccessTunnelType::LOCAL_MESH, meshAccessSerialConnectMessage.nodeIdAfterConnect);
-
-			MeshAccessConnection* maconn = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(meshAccessSerialConnectConnectionId).GetConnection();
-			if (maconn != nullptr)
-			{
-				maconn->connectionStateSubscriberId = meshAccessSerialConnectSender;
-			}
-			//Register for changes in the connection state
+			const advPacketAssetServiceData* assetPacket = (const advPacketAssetServiceData*)&packet->data;
+			OnFoundSerialIndexWithAddr(addr, assetPacket->serialNumberIndex);
 		}
 	}
 }

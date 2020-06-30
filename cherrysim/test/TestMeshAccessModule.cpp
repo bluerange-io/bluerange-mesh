@@ -251,6 +251,7 @@ TEST(TestMeshAccessModule, TestSerialConnect) {
 	tester.SendTerminalCommand(1, "action 33010 status get_status");
 	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":33010,\"type\":\"status\"");
 	tester.SimulateUntilMessageReceived(100 * 1000, 4, "Removing ma conn due to SCHEDULED_REMOVE");
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":4,\"type\":\"ma_conn_state\",\"module\":10,\"requestHandle\":0,\"partnerId\":33010,\"state\":0}");
 
 	// The same applies for the organization key (4).
 	tester.SendTerminalCommand(1, "action 5 ma serial_connect BBBBP 4 FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF 33011 20 13");
@@ -262,11 +263,19 @@ TEST(TestMeshAccessModule, TestSerialConnect) {
 	tester.SendTerminalCommand(1, "request_capability 33011");
 	tester.SimulateUntilMessageReceived(10 * 1000, 1, "\"type\":\"capability_entry\"");
 	tester.SimulateUntilMessageReceived(100 * 1000, 5, "Removing ma conn due to SCHEDULED_REMOVE");
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":5,\"type\":\"ma_conn_state\",\"module\":10,\"requestHandle\":0,\"partnerId\":33011,\"state\":0}");
 
 	// The node key (1) however must be given.
 	tester.SendTerminalCommand(1, "action 6 ma serial_connect BBBBQ 1 0D:00:00:00:0D:00:00:00:0D:00:00:00:0D:00:00:00 33012 20 13");
 	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"serial_connect_response\",\"module\":10,\"nodeId\":6,\"requestHandle\":13,\"code\":0,\"partnerId\":33012}");
 	tester.SimulateUntilMessageReceived(100 * 1000, 6, "Removing ma conn due to SCHEDULED_REMOVE");
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":6,\"type\":\"ma_conn_state\",\"module\":10,\"requestHandle\":0,\"partnerId\":33012,\"state\":0}");
+
+	// Test that not just scheduled removals but also other disconnect reasons e.g. a reset generate a ma_conn_state message.
+	tester.SendTerminalCommand(1, "action 4 ma serial_connect BBBBN 2 FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF 33010 20 12");
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"serial_connect_response\",\"module\":10,\"nodeId\":4,\"requestHandle\":12,\"code\":0,\"partnerId\":33010}");
+	tester.SendTerminalCommand(11, "reset");
+	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":4,\"type\":\"ma_conn_state\",\"module\":10,\"requestHandle\":0,\"partnerId\":33010,\"state\":0}");
 }
 
 TEST(TestMeshAccessModule, TestInfoRetrievalOverOrgaKey) {
@@ -279,9 +288,9 @@ TEST(TestMeshAccessModule, TestInfoRetrievalOverOrgaKey) {
 	simConfig.defaultNetworkId = 0;
 	simConfig.preDefinedPositions = { {0.1, 0.5}, {0.3, 0.55}, {0.5, 0.5} };
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
-	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2});
+	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+	simConfig.nodeConfigName.insert({ "prod_asset_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-	tester.sim->nodes[2].nodeConfiguration = "prod_asset_nrf52";
 	tester.Start();
 
 	tester.SendTerminalCommand(1, "action 0 enroll basic BBBBB 1 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00 10 0 0");

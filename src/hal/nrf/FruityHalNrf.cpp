@@ -482,11 +482,13 @@ void ProcessAppEvents()
 	}
 
 	//When using the watchdog with a timeout smaller than 60 seconds, we feed it in our event loop
-#if IS_ACTIVE(WATCHDOG)
-	if(FM_WATCHDOG_TIMEOUT < 32768UL * 60){
-		FruityHal::FeedWatchdog();
+	if (GET_WATCHDOG_TIMEOUT() != 0)
+	{
+		if (GET_WATCHDOG_TIMEOUT() < 32768UL * 60)
+		{
+			FruityHal::FeedWatchdog();
+		}
 	}
-#endif
 
 	//Check if there is input on uart
 	GS->terminal.CheckAndProcessLine();
@@ -2101,10 +2103,11 @@ RebootReason FruityHal::GetRebootReason()
 #ifndef SIM_ENABLED
 	u32 reason = NRF_POWER->RESETREAS;
 
-	if(reason & POWER_RESETREAS_DOG_Msk){
-		return RebootReason::WATCHDOG;
-	} else if (reason & POWER_RESETREAS_RESETPIN_Msk){
+	//Pin reset must be checked first because of errata [136] System: Bits in RESETREAS are set when they should not be
+	if (reason & POWER_RESETREAS_RESETPIN_Msk) {
 		return RebootReason::PIN_RESET;
+	} else if (reason & POWER_RESETREAS_DOG_Msk) {
+		return RebootReason::WATCHDOG;
 	} else if (reason & POWER_RESETREAS_OFF_Msk){
 		return RebootReason::FROM_OFF_STATE;
 	} else {
@@ -2154,32 +2157,38 @@ bool FruityHal::SetRetentionRegisterTwo(u8 val)
 //Starts the Watchdog with a static interval so that changing a config can do no harm
 void FruityHal::StartWatchdog(bool safeBoot)
 {
-#if IS_ACTIVE(WATCHDOG)
-	//Configure Watchdog to default: Run while CPU sleeps
-	nrf_wdt_behaviour_set(NRF_WDT_BEHAVIOUR_RUN_SLEEP);
-	//Configure Watchdog timeout
-	if (!safeBoot) {
-		nrf_wdt_reload_value_set(FM_WATCHDOG_TIMEOUT);
-	}
-	else {
-		nrf_wdt_reload_value_set(FM_WATCHDOG_TIMEOUT_SAFE_BOOT);
-	}
-	// Configure Reload Channels
-	nrf_wdt_reload_request_enable(NRF_WDT_RR0);
+	if (GET_WATCHDOG_TIMEOUT() != 0)
+	{
+		//Configure Watchdog to default: Run while CPU sleeps
+		nrf_wdt_behaviour_set(NRF_WDT_BEHAVIOUR_RUN_SLEEP);
+		//Configure Watchdog timeout
+		if (!safeBoot) {
+			nrf_wdt_reload_value_set(GET_WATCHDOG_TIMEOUT());
+		}
+		else {
+			nrf_wdt_reload_value_set(GET_WATCHDOG_TIMEOUT_SAFE_BOOT());
+		}
+		// Configure Reload Channels
+		nrf_wdt_reload_request_enable(NRF_WDT_RR0);
 
-	//Enable
-	nrf_wdt_task_trigger(NRF_WDT_TASK_START);
+		//Enable
+		nrf_wdt_task_trigger(NRF_WDT_TASK_START);
 
-	logt("FH", "Watchdog started");
-#endif
+		logt("FH", "Watchdog started");
+	}
 }
 
 //Feeds the Watchdog to keep it quiet
 void FruityHal::FeedWatchdog()
 {
-#if IS_ACTIVE(WATCHDOG)
-	nrf_wdt_reload_request_set(NRF_WDT_RR0);
+#ifdef SIM_ENABLED
+	logt("FH", "Feeding Watchdog");
 #endif
+
+	if (GET_WATCHDOG_TIMEOUT() != 0)
+	{
+		nrf_wdt_reload_request_set(NRF_WDT_RR0);
+	}
 }
 
 void FruityHal::DelayUs(u32 delayMicroSeconds)

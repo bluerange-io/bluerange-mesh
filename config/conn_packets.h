@@ -76,6 +76,7 @@ enum class MessageType : u8
 	ASSET_V2 = 32,
 	CAPABILITY = 33,
 	ASSET_GENERIC = 34,
+	SIG_MESH_SIMPLE = 35, //A lightweight wrapper for SIG mesh access layer messages
 
 	//Module messages: Protocol defined (yet unfinished)
 	//MODULE_CONFIG: Used for many different messages that set and get the module config
@@ -90,7 +91,7 @@ enum class MessageType : u8
 	MODULE_RAW_DATA_LIGHT = 55,
 	MODULES_GET_LIST = 56,
 	MODULES_LIST = 57,
-	COMPONENT_ACT = 58, //Actor messages
+	COMPONENT_ACT = 58, //Actuator messages
 	COMPONENT_SENSE = 59, //Sensor messages
 
 	TIME_SYNC = 60,

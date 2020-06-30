@@ -42,6 +42,12 @@ constexpr int INVALID_U32_CONFIG = 0xFFFFFFFF;
 #include <MeshConnection.h>
 #include <BaseConnection.h>
 
+#if IS_ACTIVE(SIG_MESH)
+#include <SigElement.h>
+#include <SigModel.h>
+#include <SigState.h>
+#endif
+
 enum class CapabilityEntryType : u8
 {
 	INVALID = 0,
@@ -199,6 +205,12 @@ protected:
 			retVal.type = CapabilityEntryType::INVALID;
 			return retVal;
 		};
+
+#if IS_ACTIVE(SIG_MESH)
+		//This handler is called once a sig mesh state changes. This is called on all modules for all states so that they can also react
+		//on state changes for elements or models that they have not originally created
+		virtual void SigMeshStateChangedHandler(SigElement* element, SigModel* model, SigState* state) {};
+#endif
 
 		//MeshAccessConnections should only allow authorized packets to be sent into the mesh
 		//This function is called once a packet was received through a meshAccessConnection to

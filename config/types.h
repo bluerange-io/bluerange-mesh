@@ -283,11 +283,13 @@ STATIC_ASSERT_SIZE(BootloaderSettings, (16 + BOOTLOADER_BITMASK_SIZE + BOOTLOADE
 #define DECLARE_CONFIG_AND_PACKED_STRUCT(structname) struct structname##Aligned : structname {} __attribute__((packed, aligned(4))); structname##Aligned configuration
 //Because Visual Studio does not support C99 dynamic arrays
 #define DYNAMIC_ARRAY(arrayName, size) alignas(4) u8 arrayName[size]
+#define DYNAMIC_ARRAY_FLOAT(arrayName, size) float arrayName[size]
 #endif
 #if defined(_MSC_VER)
 #include <malloc.h>
 #define DECLARE_CONFIG_AND_PACKED_STRUCT(structname) structname configuration = {}
 #define DYNAMIC_ARRAY(arrayName, size) std::vector<uint8_t> arrayName##Base(size); uint8_t* arrayName = arrayName##Base.data()
+#define DYNAMIC_ARRAY_FLOAT(arrayName, size) std::vector<float> arrayName##Base(size); float* arrayName = arrayName##Base.data()
 #endif
 
 // ########### TIMER ############

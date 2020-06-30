@@ -46,6 +46,10 @@
 #include "MeshAccessModule.h"
 #include "mini-printf.h"
 
+#if IS_ACTIVE(SIG_MESH)
+#include <SigAccessLayer.h>
+#endif
+
 #include <ctime>
 #include <cmath>
 #include <cstdlib>
@@ -1228,7 +1232,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 	{
 		connPacketComponentMessage const * packet = (connPacketComponentMessage const *)packetHeader;
 
-		char payload[50];
+		char payload[200];
 		u8 payloadLength = sendData->dataLength - sizeof(packet->componentHeader);
 		Logger::convertBufferToBase64String(packet->payload,  payloadLength, payload, sizeof(payload));
 		logjson("NODE",
@@ -1254,14 +1258,20 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 
 	else if (packetHeader->messageType == MessageType::COMPONENT_ACT)
 	{
-		connPacketComponentMessage const * packet = (connPacketComponentMessage const *)packetHeader;
+		connPacketComponentMessage const* packet = (connPacketComponentMessage const*)packetHeader;
 
 		char payload[50];
 		u8 payloadLength = sendData->dataLength - sizeof(packet->componentHeader);
-		Logger::convertBufferToHexString(packet->payload,  payloadLength, payload, sizeof(payload));
-		logt("NODE","component_act payload = %s",payload);
-
+		Logger::convertBufferToHexString(packet->payload, payloadLength, payload, sizeof(payload));
+		logt("NODE", "component_act payload = %s", payload);
 	}
+#if IS_ACTIVE(SIG_MESH)
+	//Forwards tunneled SIG mesh messages to the implementation
+	else if (packetHeader->messageType == MessageType::SIG_MESH_SIMPLE && sendData->dataLength >= SIZEOF_SIMPLE_SIG_MESSAGE)
+	{
+		GS->sig.SigMessageReceivedHandler((const SimpleSigMessage*)packetHeader, sendData->dataLength);
+	}
+#endif
 }
 //Processes incoming CLUSTER_INFO_UPDATE packets
 /*

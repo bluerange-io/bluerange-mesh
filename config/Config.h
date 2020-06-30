@@ -52,7 +52,7 @@ class RecordStorageEventListener;
 #define FM_VERSION_MINOR 8
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 3430
+#define FM_VERSION_PATCH 3800
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -84,6 +84,10 @@ extern DeviceType GET_DEVICE_TYPE();
 extern Chipset GET_CHIPSET();
 #define GET_FEATURE_SET_GROUP XCONCAT(getFeatureSetGroup_,FEATURESET)
 extern FeatureSetGroup GET_FEATURE_SET_GROUP();
+#define GET_WATCHDOG_TIMEOUT XCONCAT(getWatchdogTimeout_,FEATURESET)
+extern u32 GET_WATCHDOG_TIMEOUT();
+#define GET_WATCHDOG_TIMEOUT_SAFE_BOOT XCONCAT(getWatchdogTimeoutSafeBoot_,FEATURESET)
+extern u32 GET_WATCHDOG_TIMEOUT_SAFE_BOOT();
 #elif defined(SIM_ENABLED)
 #define SET_BOARD_CONFIGURATION(configuration) setBoardConfiguration_CherrySim(configuration);
 #define SET_FEATURESET_CONFIGURATION(configuration, module) setFeaturesetConfiguration_CherrySim(configuration, module);
@@ -94,6 +98,10 @@ extern Chipset getChipset_CherrySim();
 #define GET_CHIPSET() getChipset_CherrySim()
 extern FeatureSetGroup getFeatureSetGroup_CherrySim();
 #define GET_FEATURE_SET_GROUP() getFeatureSetGroup_CherrySim();
+extern u32 getWatchdogTimeout_CherrySim();
+#define GET_WATCHDOG_TIMEOUT() getWatchdogTimeout_CherrySim()
+extern u32 getWatchdogTimeoutSafeBoot_CherrySim();
+#define GET_WATCHDOG_TIMEOUT_SAFE_BOOT() getWatchdogTimeoutSafeBoot_CherrySim()
 #else
 static_assert(false, "Featureset was not defined, which is mandatory!");
 #endif
@@ -252,27 +260,6 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 // Activate periodic battery measurement that is reported through the node status
 #ifndef ACTIVATE_BATTERY_MEASUREMENT
 #define ACTIVATE_BATTERY_MEASUREMENT 1
-#endif
-
-// ########### Watchdog ##########################################
-
-//The watchdog will trigger a system reset if it is not feed in time
-#ifndef ACTIVATE_WATCHDOG
-#define ACTIVATE_WATCHDOG 1
-#endif
-
-#ifndef FM_WATCHDOG_TIMEOUT
-#define FM_WATCHDOG_TIMEOUT (32768UL * 60 * 60 * 2)
-#endif
-
-#ifndef FM_WATCHDOG_TIMEOUT_SAFE_BOOT
-#define FM_WATCHDOG_TIMEOUT_SAFE_BOOT (32768UL * 20) // Timeout in safe boot mode
-#endif
-
-//Using the safe boot mode will allow the beacon to reboot with its default configuration
-//each second reboot (it will not read the config from flash)
-#ifndef ACTIVATE_WATCHDOG_SAFE_BOOT_MODE
-#define ACTIVATE_WATCHDOG_SAFE_BOOT_MODE 1
 #endif
 
 // ########### Config class ##########################################

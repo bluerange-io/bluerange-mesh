@@ -115,18 +115,19 @@ void BootFruityMesh()
 
 	//If reboot reason is empty (clean power bootup) or
 	bool safeBootEnabled = false;
-#if IS_ACTIVE(WATCHDOG_SAFE_BOOT_MODE)
-	if (Utility::IsUnknownRebootReason(GS->ramRetainStructPtr->rebootReason)
-		|| *GS->rebootMagicNumberPtr == REBOOT_MAGIC_NUMBER) {
-		safeBootEnabled = false;
-		*GS->rebootMagicNumberPtr = 0;
+	if(GET_WATCHDOG_TIMEOUT_SAFE_BOOT() != 0)
+	{
+		if (Utility::IsUnknownRebootReason(GS->ramRetainStructPtr->rebootReason)
+			|| *GS->rebootMagicNumberPtr == REBOOT_MAGIC_NUMBER) {
+			safeBootEnabled = false;
+			*GS->rebootMagicNumberPtr = 0;
+		}
+		else {
+			safeBootEnabled = true;
+			*GS->rebootMagicNumberPtr = REBOOT_MAGIC_NUMBER;
+			SIMEXCEPTION(SafeBootTriggeredException);
+		}
 	}
-	else {
-		safeBootEnabled = true;
-		*GS->rebootMagicNumberPtr = REBOOT_MAGIC_NUMBER;
-		SIMEXCEPTION(SafeBootTriggeredException);
-	}
-#endif
 
 	//Resetting the GPREGRET2 Retained register will block the nordic secure DFU bootloader
 	//from starting the DFU process

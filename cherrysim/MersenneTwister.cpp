@@ -22,6 +22,7 @@
 //SOFTWARE.
 #include "MersenneTwister.h"
 #include <cmath>
+#include "Exceptions.h"
 
 void MersenneTwister::twistIteration(uint32_t i)
 {
@@ -47,7 +48,6 @@ void MersenneTwister::twist()
 }
 
 MersenneTwister::MersenneTwister()
-	: MersenneTwister((uint32_t)std::time(nullptr))
 {
 }
 
@@ -58,6 +58,7 @@ MersenneTwister::MersenneTwister(uint32_t seed)
 
 void MersenneTwister::setSeed(uint32_t seed)
 {
+	m_seed = seed;
 	m_mt[0] = seed;
 
 	for (uint32_t i = 1; i < N; i++)
@@ -113,6 +114,10 @@ double MersenneTwister::nextNormal(double mean, double sigma)
 
 uint32_t MersenneTwister::nextU32()
 {
+	if (m_seed == 0)
+	{
+		SIMEXCEPTION(IllegalStateException);
+	}
 	if (m_index >= N)
 	{
 		twist();

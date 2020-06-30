@@ -224,6 +224,8 @@ class MeshAccessModule: public Module
 
 		void ResetSerialConnectAttempt();
 		void SendMeshAccessSerialConnectResponse(MeshAccessSerialConnectError code, NodeId partnerId = 0);
+
+		void OnFoundSerialIndexWithAddr(const FruityHal::BleGapAddr& addr, u32 serialNumberIndex);
 	public:
 		DECLARE_CONFIG_AND_PACKED_STRUCT(MeshAccessModuleConfiguration);
 

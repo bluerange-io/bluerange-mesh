@@ -36,6 +36,7 @@
 #include <string>
 #include "MersenneTwister.h"
 #include "json.hpp"
+#include "MoveAnimation.h"
 #ifndef GITHUB_RELEASE
 #include "ClcMock.h"
 #endif //GITHUB_RELEASE
@@ -114,7 +115,9 @@ struct SoftdeviceConnection {
 	struct SoftdeviceConnection* partnerConnection = nullptr;
 	int connectionInterval = 0;
 	int connectionMtu = 0;
+	u32 connectionSupervisionTimeoutMs = 0;
 	bool isCentral = false;
+	u32 lastReceivedPacketTimestampMs = 0;
 
 	SoftDeviceBufferedPacket reliableBuffers[SIM_NUM_RELIABLE_BUFFERS] = {};
 	SoftDeviceBufferedPacket unreliableBuffers[SIM_NUM_UNRELIABLE_BUFFERS] = {};
@@ -165,7 +168,10 @@ struct SoftdeviceState {
 	int connectingIntervalMs = 0;
 	int connectingWindowMs = 0;
 	int connectingTimeoutTimestampMs = 0;
-	int connectingParamIntervalMs = 0;
+
+	//Connection
+	int connectionParamIntervalMs = 0;
+	int connectionTimeoutMs = 0;
 
 	//Connecting security
 	u8 currentLtkForEstablishingSecurity[16] = {}; //The Long Term key used to initiate the last encryption request for a connection
@@ -208,6 +214,8 @@ struct InterruptSettings
 	nrf_drv_gpiote_evt_handler_t handler = nullptr;
 };
 
+struct FeaturesetPointers;
+
 struct nodeEntry {
 	u32 index;
 	int id;
@@ -215,6 +223,7 @@ struct nodeEntry {
 	float y = 0;
 	float z = 0;
 	std::string nodeConfiguration = "";
+	FeaturesetPointers* featuresetPointers = nullptr;
 	FruityHal::BleGapAddr address;
 	GlobalState gs;
 #ifndef GITHUB_RELEASE
@@ -264,6 +273,7 @@ struct nodeEntry {
 	PacketStat sentPackets[PACKET_STAT_SIZE];
 	PacketStat routedPackets[PACKET_STAT_SIZE];
 
+	MoveAnimation animation;
 };
 
 

@@ -23,7 +23,6 @@
 #pragma once
 
 #include <stdint.h>
-#include <ctime>
 
 class MersenneTwister
 {
@@ -44,8 +43,9 @@ private:
 	static constexpr uint64_t MASK_LOWER = (1ull << R) - 1;
 	static constexpr uint64_t MASK_UPPER = (1ull << R);
 
-	uint16_t m_index;
-	uint32_t m_mt[N];
+	uint16_t m_index = 0;
+	uint32_t m_mt[N]{};
+	uint32_t m_seed = 0;
 
 	void twistIteration(uint32_t i);
 	void twist();

@@ -854,7 +854,8 @@ extern "C"
 		cherrySimInstance->currentNode->state.connectingWindowMs = UNITS_TO_MSEC(p_scan_params->window, UNIT_0_625_MS);
 		cherrySimInstance->currentNode->state.connectingTimeoutTimestampMs = cherrySimInstance->simState.simTimeMs + p_scan_params->timeout * 1000UL;
 
-		cherrySimInstance->currentNode->state.connectingParamIntervalMs = UNITS_TO_MSEC(p_conn_params->min_conn_interval, UNIT_1_25_MS);
+		cherrySimInstance->currentNode->state.connectionParamIntervalMs = UNITS_TO_MSEC(p_conn_params->min_conn_interval, UNIT_1_25_MS);
+		cherrySimInstance->currentNode->state.connectionTimeoutMs = UNITS_TO_MSEC(p_conn_params->conn_sup_timeout, CONFIG_UNIT_10_MS);
 
 		//TODO: could save more params, could return invalid state
 

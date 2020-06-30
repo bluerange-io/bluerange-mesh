@@ -233,8 +233,8 @@ The response acknowledges the receipt of the command.
 {"type":"set_preferred_connections_result","nodeId":123,"module":0}
 ----
 
-=== Sensor and Actor Messages
-The node includes functionality to send sensor messages and actor messages in a vendor specific manner using a generic packet. This is documented under xref:SensorsAndActors.adoc[Sensors and Actors].
+=== Sensor and Actuator Messages
+The node includes functionality to send sensor messages and actuator messages in a vendor specific manner using a generic packet. This is documented under xref:SensorsAndActuators.adoc[Sensors and Actuators].
 
 [#TimeSynchronization]
 == Time Synchronization
