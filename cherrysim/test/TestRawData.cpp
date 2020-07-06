@@ -42,6 +42,7 @@ TEST(TestRawData, TestRawDataLight) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.Start();
@@ -72,6 +73,7 @@ TEST(TestRawData, TestSimpleTransmissions) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.Start();
@@ -122,6 +124,7 @@ TEST(TestRawData, TestSimpleTransmissionsViaMeshAccess) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.sim->nodes[0].uicr.CUSTOMER[9] = 100; // Change default network id of node 1
@@ -157,6 +160,7 @@ TEST(TestRawData, TestSimpleTransmissionsViaMeshAccessFail) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.sim->nodes[0].uicr.CUSTOMER[9] = 100; // Change default network id of node 1
@@ -191,6 +195,7 @@ TEST(TestRawData, TestTransmissionsOfAllPossibleSizes) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.Start();
@@ -219,6 +224,7 @@ TEST(TestRawData, TestRandomTransmissions) {
 		simConfig.seed = repeat + 1;
 		simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 		simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", numNodes - 1});
+		simConfig.SetToPerfectConditions();
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 		tester.Start();

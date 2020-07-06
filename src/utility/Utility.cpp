@@ -257,7 +257,7 @@ unsigned long Utility::StringToUnsignedLong(const char * str, bool *outDidError)
 	if (endPtr == str || (*endPtr != '\0' && *endPtr != '\r' && *endPtr != '\n'))
 	{
 		if (outDidError != nullptr) *outDidError = true;
-		logt("ERROR", "Tried to interpret the none number string \"%s\" as a number", str);
+		logt("WARN", "Tried to interpret the none number string \"%s\" as a number", str);
 		SIMEXCEPTION(NotANumberStringException);
 		return 0;
 	}

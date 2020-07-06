@@ -57,6 +57,7 @@ CREATEEXCEPTIONINHERITING(NotANumberStringException                             
 CREATEEXCEPTIONINHERITING(NumberStringNotInRangeException                           , IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(MoreThanOneTerminalCommandHandlerReactedOnCommandException, IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(UnknownJsonEntryException                                 , IllegalArgumentException);
+CREATEEXCEPTIONINHERITING(IllegalParameterException                                 , IllegalArgumentException);
 
 CREATEEXCEPTION(IllegalStateException);
 CREATEEXCEPTIONINHERITING(ZeroOnNonPodTypeException               , IllegalStateException);

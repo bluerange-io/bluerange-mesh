@@ -41,6 +41,7 @@ TEST(TestDebugModule, TestCommands) {
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 2 } );
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 	tester.SimulateUntilClusteringDone(10 * 1000);
@@ -147,21 +148,6 @@ TEST(TestDebugModule, TestCommands) {
 	tester.SendTerminalCommand(1, "printqueue 1");
 	tester.SimulateUntilMessageReceived(10 * 1000, 1, "Printing Queue: ");
 
-}
-
-TEST(TestDebugModule, TestClearQueue) {
-	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.terminalId = 0;
-	//testerConfig.verbose = true;
-	simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 2 } );
-	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-	tester.Start();
-	tester.SimulateUntilClusteringDone(10 * 1000);
-
-	//We only test if the command does not crash
-	tester.SendTerminalCommand(1, "clearqueue 1");
-	tester.SimulateForGivenTime(5 * 1000);
 }
 
 TEST(TestDebugModule, TestReadMemory) {

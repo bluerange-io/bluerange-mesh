@@ -40,6 +40,7 @@ TEST(TestServiceDiscovery, TestIfMeshAccessConnectionIsSetUp) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.sim->nodes[1].uicr.CUSTOMER[9] = 123; // Change default network id of node 2

@@ -477,6 +477,43 @@ void CherrySim::importPositionsFromJson()
 	}
 }
 
+void HelperPositionNodesRandomly(CherrySim &instance, std::vector<point_t> &points, u32 numberOfNodesToPlace)
+{
+	//Calculate the epsilon using the rssi threshold and the transmission powers
+	double epsilon = pow(10, ((double)-STABLE_CONNECTION_RSSI_THRESHOLD + SIMULATOR_NODE_DEFAULT_CALIBRATED_TX + SIMULATOR_NODE_DEFAULT_DBM_TX) / 10 / instance.N);
+
+	unsigned int minpts = 0; //a point must reach only one of another cluster to become part of its cluster
+
+	bool retry = true;
+	while (retry) {
+		//printf("try\n");
+		retry = false;
+
+		//Create 2D points for all node positions
+		for (u32 i = 0; i < instance.getTotalNodes(); i++) {
+			points[i].cluster_id = -1; //unclassified
+			points[i].x = (double)instance.nodes[i].x * (double)instance.simConfig.mapWidthInMeters;
+			points[i].y = (double)instance.nodes[i].y * (double)instance.simConfig.mapHeightInMeters;
+			points[i].z = (double)instance.nodes[i].z * (double)instance.simConfig.mapElevationInMeters;
+		}
+
+		//Use dbscan algorithm to check how many clusters these nodes can generate
+		dbscan(points.data(), numberOfNodesToPlace, epsilon, minpts, euclidean_dist);
+
+		//printf("Epsilon for dbscan: %lf\n", epsilon);
+		//printf("Minimum points: %u\n", minpts);
+		//print_points(points, num_points);
+
+		for (u32 i = 0; i < numberOfNodesToPlace; i++) {
+			if (points[i].cluster_id != 0) {
+				retry = true;
+				instance.nodes[i].x = (float)PSRNG();
+				instance.nodes[i].y = (float)PSRNG();
+			}
+		}
+	}
+}
+
 //This will position all nodes randomly, by using dbscan to generate a configuration that can be clustered
 void CherrySim::PositionNodesRandomly()
 {
@@ -488,46 +525,16 @@ void CherrySim::PositionNodesRandomly()
 	}
 
 	u32 numNoneAssetNodes = getTotalNodes() - getAssetNodes();
-	if (numNoneAssetNodes > 1) {
-		//Next, we must check if the configuraton can cluster
-		std::vector<point_t> points = {};
-		points.resize(getTotalNodes());
+	//Next, we must check if the configuraton can cluster
+	std::vector<point_t> points = {};
+	points.resize(getTotalNodes());
 
-		//Calculate the epsilon using the rssi threshold and the transmission powers
-		double epsilon = pow(10, ((double)-STABLE_CONNECTION_RSSI_THRESHOLD + SIMULATOR_NODE_DEFAULT_CALIBRATED_TX + SIMULATOR_NODE_DEFAULT_DBM_TX) / 10 / N);
-
-		unsigned int minpts = 1; //a point must reach only one of another cluster to become part of its cluster
-		u32 num_points = numNoneAssetNodes;
-
-		bool retry = false;
-		do {
-			//printf("try\n");
-			retry = false;
-
-			//Create 2D points for all node positions
-			for (u32 i = 0; i < numNoneAssetNodes; i++) {
-				points[i].cluster_id = -1; //unclassified
-				points[i].x = (double)nodes[i].x * (double)simConfig.mapWidthInMeters;
-				points[i].y = (double)nodes[i].y * (double)simConfig.mapHeightInMeters;
-				points[i].z = (double)nodes[i].z * (double)simConfig.mapElevationInMeters;
-			}
-
-			//Use dbscan algorithm to check how many clusters these nodes can generate
-			dbscan(points.data(), num_points, epsilon, minpts, euclidean_dist);
-
-			//printf("Epsilon for dbscan: %lf\n", epsilon);
-			//printf("Minimum points: %u\n", minpts);
-			//print_points(points, num_points);
-
-			for (u32 i = 0; i < numNoneAssetNodes; i++) {
-				if (points[i].cluster_id != 0) {
-					retry = true;
-					nodes[i].x = (float)PSRNG();
-					nodes[i].y = (float)PSRNG();
-				}
-			}
-		} while (retry);
-	}
+	//Two passes for DBScan are required, once for none assets, once for assets.
+	//This is necessary to make sure that assets are not considered as valid mesh
+	//nodes to DBScan.
+	HelperPositionNodesRandomly(*this, points, numNoneAssetNodes);
+	HelperPositionNodesRandomly(*this, points, getTotalNodes());
+	
 }
 
 
@@ -722,8 +729,8 @@ void CherrySim::SimulateStepForAllNodes()
 	}
 	const int64_t avgSimulatedFrames = sumOfAllSimulatedFrames / getTotalNodes();
 
-	const size_t s = replayRecordEntries.size(); //Meant to be used as a break point condition.
-	while (s > 0 && replayRecordEntries.front().time <= simState.simTimeMs)
+	size_t s = replayRecordEntries.size(); //Meant to be used as a break point condition.
+	while ((s = replayRecordEntries.size()) > 0 && replayRecordEntries.front().time <= simState.simTimeMs)
 	{
 		setNode(replayRecordEntries.front().index);
 		GS->terminal.PutIntoTerminalCommandQueue(replayRecordEntries.front().command, false);
@@ -3187,10 +3194,10 @@ double CherrySim::calculateReceptionProbability(const nodeEntry* sendingNode, co
 	//TODO: Add some randomness and use a function to do the mapping
 	float rssi = GetReceptionRssi(sendingNode, receivingNode);
 
-	if (rssi > -60) return 0.9;
-	else if (rssi > -80) return 0.8;
-	else if (rssi > -85) return 0.5;
-	else if (rssi > -90) return 0.3;
+	     if (rssi > -60) return simConfig.receptionProbabilityVeryClose;
+	else if (rssi > -80) return simConfig.receptionProbabilityClose;
+	else if (rssi > -85) return simConfig.receptionProbabilityFar;
+	else if (rssi > -90) return simConfig.receptionProbabilityVeryFar;
 	else return 0;
 }
 

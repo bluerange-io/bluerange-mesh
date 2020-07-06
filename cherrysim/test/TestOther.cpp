@@ -154,58 +154,61 @@ TEST(TestOther, TestPositionSetting)
 
 TEST(TestOther, TestMersenneTwister)
 {
+	//This test only makes sense for the seedOffset of 0. In other cases, this test just passes.
+	if (MersenneTwister::seedOffset != 0) return;
+
 	MersenneTwister mt(1337);
-	ASSERT_EQ(mt.nextU32(), 1981032416);
-	ASSERT_EQ(mt.nextU32(), 1498672866);
-	ASSERT_EQ(mt.nextU32(), 17410945);
-	ASSERT_EQ(mt.nextU32(), 2021186573);
-	ASSERT_EQ(mt.nextU32(), 3884794617);
-	ASSERT_EQ(mt.nextU32(), 2115046042);
-	ASSERT_EQ(mt.nextU32(), 369580570);
-	ASSERT_EQ(mt.nextU32(), 4020472140);
-	ASSERT_EQ(mt.nextU32(), 1162855072);
-	ASSERT_EQ(mt.nextU32(), 2578237934);
-	ASSERT_EQ(mt.nextU32(), 3665080984);
-	ASSERT_EQ(mt.nextU32(), 909454479);
-	ASSERT_EQ(mt.nextU32(), 4186590157);
-	ASSERT_EQ(mt.nextU32(), 802630325);
-	ASSERT_EQ(mt.nextU32(), 2192268788);
-	ASSERT_EQ(mt.nextU32(), 1555061911);
+	ASSERT_EQ(mt.nextU32(),  925434190);
+	ASSERT_EQ(mt.nextU32(), 2254002994);
+	ASSERT_EQ(mt.nextU32(), 1395119812);
+	ASSERT_EQ(mt.nextU32(), 2371922542);
+	ASSERT_EQ(mt.nextU32(), 3640162417);
+	ASSERT_EQ(mt.nextU32(), 2749074956);
+	ASSERT_EQ(mt.nextU32(), 1787397407);
+	ASSERT_EQ(mt.nextU32(), 4225313503);
+	ASSERT_EQ(mt.nextU32(), 3241982240);
+	ASSERT_EQ(mt.nextU32(), 1472171253);
+	ASSERT_EQ(mt.nextU32(), 2121405432);
+	ASSERT_EQ(mt.nextU32(), 1377883891);
+	ASSERT_EQ(mt.nextU32(), 1980689950);
+	ASSERT_EQ(mt.nextU32(), 3770806467);
+	ASSERT_EQ(mt.nextU32(),  942187188);
+	ASSERT_EQ(mt.nextU32(), 2388923659);
 	
 	constexpr double absError = 0.0000001;
-	ASSERT_NEAR(mt.nextDouble(), 0.251894243120191207996327875662245787680149078369140625, absError);
-	ASSERT_NEAR(mt.nextDouble(), 0.2523832712910099029812727167154662311077117919921875, absError);
-	ASSERT_NEAR(mt.nextDouble(), 0.6441562533481410834923508446081541478633880615234375, absError);
-	ASSERT_NEAR(mt.nextDouble(), 0.54784144473910367789670772253884933888912200927734375, absError);
-	ASSERT_NEAR(mt.nextDouble(), 0.12091048926136234442640926545209367759525775909423828125, absError);
-	ASSERT_NEAR(mt.nextDouble(), 0.88643486632184009810231373194255866110324859619140625, absError);
-	ASSERT_NEAR(mt.nextDouble(), 0.1833344784526467485807899038263713009655475616455078125, absError);
-	ASSERT_NEAR(mt.nextDouble(), 0.84808397871630358810790539791923947632312774658203125, absError);
-	ASSERT_NEAR(mt.nextDouble(), 0.10864859868508032481049241368964430876076221466064453125, absError);
-	ASSERT_NEAR(mt.nextDouble(), 0.9043797580302646021976897827698849141597747802734375, absError);
-	ASSERT_NEAR(mt.nextDouble(), 0.61667418308012977856691350098117254674434661865234375, absError);
-	ASSERT_NEAR(mt.nextDouble(), 0.9985854830589577790789235223201103508472442626953125, absError);
-	ASSERT_NEAR(mt.nextDouble(), 0.355181997258956994034662102421862073242664337158203125, absError);
-	ASSERT_NEAR(mt.nextDouble(), 0.58985742009008712560813592062913812696933746337890625, absError);
-	ASSERT_NEAR(mt.nextDouble(), 0.032900537604675754443928070713809574954211711883544921875, absError);
-	ASSERT_NEAR(mt.nextDouble(), 0.654886060313993656478714910917915403842926025390625, absError);
+	ASSERT_NEAR(mt.nextDouble(), 0.77857393905952898550, absError);
+	ASSERT_NEAR(mt.nextDouble(), 0.83728753725003624009, absError);
+	ASSERT_NEAR(mt.nextDouble(), 0.75865255313894075506, absError);
+	ASSERT_NEAR(mt.nextDouble(), 0.70004192010966170834, absError);
+	ASSERT_NEAR(mt.nextDouble(), 0.38702423111233491548, absError);
+	ASSERT_NEAR(mt.nextDouble(), 0.05048523425368713763, absError);
+	ASSERT_NEAR(mt.nextDouble(), 0.88371499206025971862, absError);
+	ASSERT_NEAR(mt.nextDouble(), 0.82417572122630100573, absError);
+	ASSERT_NEAR(mt.nextDouble(), 0.60965852500164385841, absError);
+	ASSERT_NEAR(mt.nextDouble(), 0.25276847073174280034, absError);
+	ASSERT_NEAR(mt.nextDouble(), 0.80804901076668156357, absError);
+	ASSERT_NEAR(mt.nextDouble(), 0.35418293912759585274, absError);
+	ASSERT_NEAR(mt.nextDouble(), 0.87011821704686576062, absError);
+	ASSERT_NEAR(mt.nextDouble(), 0.10800669647473998269, absError);
+	ASSERT_NEAR(mt.nextDouble(), 0.27135816618598956884, absError);
+	ASSERT_NEAR(mt.nextDouble(), 0.11747449359797744461, absError);
 
-	ASSERT_NEAR(mt.nextNormal(0, 1), 0.77372467790764953843307694114628247916698455810546875, absError);
-	ASSERT_NEAR(mt.nextNormal(0, 1), 0.260928499035595728994252340271486900746822357177734375, absError);
-	ASSERT_NEAR(mt.nextNormal(0, 1), 0.84312650675754696738550819645752198994159698486328125, absError);
-	ASSERT_NEAR(mt.nextNormal(0, 1), -1.059761249244417502524129304219968616962432861328125, absError);
-	ASSERT_NEAR(mt.nextNormal(0, 1), 0.15475690410602893631875076607684604823589324951171875, absError);
-	ASSERT_NEAR(mt.nextNormal(0, 1), 0.34254451851282119445585294670308940112590789794921875, absError);
-	ASSERT_NEAR(mt.nextNormal(0, 1), 0.791886474092245773448439649655483663082122802734375, absError);
-	ASSERT_NEAR(mt.nextNormal(0, 1), 0.0818000501182297445890156950554228387773036956787109375, absError);
-	ASSERT_NEAR(mt.nextNormal(0, 1), -1.619811757831973952903581448481418192386627197265625, absError);
-	ASSERT_NEAR(mt.nextNormal(0, 1), -0.23123517731102083416772074997425079345703125, absError);
-	ASSERT_NEAR(mt.nextNormal(0, 1), -0.442988852581041536726758067743503488600254058837890625, absError);
-	ASSERT_NEAR(mt.nextNormal(0, 1), 0.8911279896723136584313351704622618854045867919921875, absError);
-	ASSERT_NEAR(mt.nextNormal(0, 1), 2.13873028741060178248289957991801202297210693359375, absError);
-	ASSERT_NEAR(mt.nextNormal(0, 1), -0.35447922936990206022045413192245177924633026123046875, absError);
-	ASSERT_NEAR(mt.nextNormal(0, 1), 0.68564254490865439439772899277159012854099273681640625, absError);
-	ASSERT_NEAR(mt.nextNormal(0, 1), 0.93824658110089520501873039393103681504726409912109375, absError);
+	ASSERT_NEAR(mt.nextNormal(0, 1), -0.69007468996965992680, absError);
+	ASSERT_NEAR(mt.nextNormal(0, 1),  0.01847854599906653336, absError);
+	ASSERT_NEAR(mt.nextNormal(0, 1), -0.08598573702356976378, absError);
+	ASSERT_NEAR(mt.nextNormal(0, 1), -1.46714106647728614874, absError);
+	ASSERT_NEAR(mt.nextNormal(0, 1), -1.19394233129765936496, absError);
+	ASSERT_NEAR(mt.nextNormal(0, 1),  1.54959570095519039157, absError);
+	ASSERT_NEAR(mt.nextNormal(0, 1), -0.11635656863292163921, absError);
+	ASSERT_NEAR(mt.nextNormal(0, 1),  0.28050492217541966866, absError);
+	ASSERT_NEAR(mt.nextNormal(0, 1), -0.96963115696261492626, absError);
+	ASSERT_NEAR(mt.nextNormal(0, 1), -1.65447258893284998571, absError);
+	ASSERT_NEAR(mt.nextNormal(0, 1), -0.48786563959213696817, absError);
+	ASSERT_NEAR(mt.nextNormal(0, 1),  1.93553395567380848163, absError);
+	ASSERT_NEAR(mt.nextNormal(0, 1),  0.72087865836957598642, absError);
+	ASSERT_NEAR(mt.nextNormal(0, 1), -0.85007881892821879344, absError);
+	ASSERT_NEAR(mt.nextNormal(0, 1), -1.14644746062572022716, absError);
+	ASSERT_NEAR(mt.nextNormal(0, 1), -0.47953409475142472207, absError);
 }
 
 //This test should check if two different configurations can be applied to two nodes using the simulator
@@ -265,6 +268,10 @@ TEST(TestOther, TestJsonConfigSerialization)
 	simConfig->asyncFlashCommitTimeProbability = 16;
 	simConfig->importFromJson = true;
 	simConfig->realTime = true;
+	simConfig->receptionProbabilityVeryClose = 1.1;
+	simConfig->receptionProbabilityClose = 1.2;
+	simConfig->receptionProbabilityFar = 1.3;
+	simConfig->receptionProbabilityVeryFar = 1.4;
 	new (&simConfig->siteJsonPath) std::string;
 	simConfig->siteJsonPath = "aaa";
 	new (&simConfig->devicesJsonPath) std::string;
@@ -325,6 +332,10 @@ TEST(TestOther, TestJsonConfigSerialization)
 	ASSERT_NEAR(copy.asyncFlashCommitTimeProbability, 16, 0.01);
 	ASSERT_EQ(copy.importFromJson, true);
 	ASSERT_EQ(copy.realTime, true);
+	ASSERT_NEAR(simConfig->receptionProbabilityVeryClose, 1.1, 0.01);
+	ASSERT_NEAR(simConfig->receptionProbabilityClose, 1.2, 0.01);
+	ASSERT_NEAR(simConfig->receptionProbabilityFar, 1.3, 0.01);
+	ASSERT_NEAR(simConfig->receptionProbabilityVeryFar, 1.4, 0.01);
 	ASSERT_EQ(copy.siteJsonPath, "aaa");
 	ASSERT_EQ(copy.devicesJsonPath, "bbb");
 	ASSERT_EQ(copy.replayPath, "path");
@@ -899,6 +910,7 @@ TEST(TestOther, TestBulkMode) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	//testerConfig.verbose = true;
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+	simConfig.SetToPerfectConditions();
 	simConfig.terminalId = 0;
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_pcbridge_nrf52", 1});

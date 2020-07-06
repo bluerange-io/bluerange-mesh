@@ -870,19 +870,6 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 
-	if(TERMARGS(0, "clearqueue"))
-	{
-		if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
-
-		u16 hnd = Utility::StringToU16(commandArgs[1]);
-		BaseConnectionHandle conn = GS->cm.GetConnectionFromHandle(hnd);
-		if (conn) {
-			conn.GetPacketSendQueue()->Clean();
-		}
-
-		return TerminalCommandHandlerReturnType::SUCCESS;
-	}
-
 	if(TERMARGS(0, "printqueue") )
 	{
 		if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;

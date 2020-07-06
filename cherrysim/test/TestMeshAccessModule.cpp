@@ -43,6 +43,7 @@ TEST(TestMeshAccessModule, TestCommands) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -77,6 +78,7 @@ TEST(TestMeshAccessModule, TestReceivingClusterUpdate)
 	simConfig.preDefinedPositions = { {0.5, 0.5},{0.6, 0.5},{0.7, 0.5} };
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2 });
+	simConfig.SetToPerfectConditions();
 
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
@@ -134,6 +136,7 @@ TEST(TestMeshAccessModule, TestUnsecureNoneKeyConnection) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 
@@ -179,6 +182,7 @@ TEST(TestMeshAccessModule, TestRestrainedAccess) {
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 	simConfig.terminalId = 0;
 	//testerConfig.verbose = true;
+	simConfig.SetToPerfectConditions();
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
@@ -219,19 +223,22 @@ TEST(TestMeshAccessModule, TestSerialConnect) {
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 	u32 numNodes = amountOfNodesInOtherNetwork + amountOfNodesInOwnNetwork;
 	simConfig.terminalId = 0;
+	simConfig.mapWidthInMeters = 150;
+	simConfig.mapHeightInMeters = 150;
 	//testerConfig.verbose = true;
-	simConfig.preDefinedPositions = { {0.1, 0.5}, {0.3, 0.55}, {0.5, 0.5} };
+	simConfig.preDefinedPositions = { {0.3, 0.5}, {0.4, 0.5}, {0.5, 0.5} };
 	for (u32 i = 0; i < amountOfNodesInOtherNetwork; i++)
 	{
-		simConfig.preDefinedPositions.push_back({ 0.7, 0.0 + i * 0.2 });
+		simConfig.preDefinedPositions.push_back({ 0.6, 0.3 + i * 0.1 });
 	}
 	for (u32 i = 0; i < amountOfNodesInOtherNetwork; i++)
 	{
-		simConfig.preDefinedPositions.push_back({ 0.9, 0.0 + i * 0.2 });
+		simConfig.preDefinedPositions.push_back({ 0.7, 0.3 + i * 0.1 });
 	}
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", amountOfNodesInOwnNetwork - 1 });
 	simConfig.nodeConfigName.insert({ "prod_asset_nrf52", amountOfNodesInOtherNetwork });
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	for (u32 i = amountOfNodesInOwnNetwork; i < numNodes; i++)
@@ -240,6 +247,13 @@ TEST(TestMeshAccessModule, TestSerialConnect) {
 	}
 
 	tester.Start();
+
+	for (u32 i = 0; i < numNodes; i++)
+	{
+		NodeIndexSetter setter(i);
+		GS->logger.disableTag("ASMOD");
+	}
+
 	tester.SimulateUntilMessageReceived(100 * 1000, 1, "clusterSize\":%u", amountOfNodesInOwnNetwork); //Simulate a little to let the first 4 nodes connect to each other.
 	
 	// Make sure that the network key (2) works without specifying it (FF:...:FF)
@@ -266,10 +280,10 @@ TEST(TestMeshAccessModule, TestSerialConnect) {
 	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":5,\"type\":\"ma_conn_state\",\"module\":10,\"requestHandle\":0,\"partnerId\":33011,\"state\":0}");
 
 	// The node key (1) however must be given.
-	tester.SendTerminalCommand(1, "action 6 ma serial_connect BBBBQ 1 0D:00:00:00:0D:00:00:00:0D:00:00:00:0D:00:00:00 33012 20 13");
-	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"serial_connect_response\",\"module\":10,\"nodeId\":6,\"requestHandle\":13,\"code\":0,\"partnerId\":33012}");
-	tester.SimulateUntilMessageReceived(100 * 1000, 6, "Removing ma conn due to SCHEDULED_REMOVE");
-	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":6,\"type\":\"ma_conn_state\",\"module\":10,\"requestHandle\":0,\"partnerId\":33012,\"state\":0}");
+	tester.SendTerminalCommand(1, "action 4 ma serial_connect BBBBN 1 0B:00:00:00:0B:00:00:00:0B:00:00:00:0B:00:00:00 33012 20 13");
+	tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"type\":\"serial_connect_response\",\"module\":10,\"nodeId\":4,\"requestHandle\":13,\"code\":0,\"partnerId\":33012}");
+	tester.SimulateUntilMessageReceived(100 * 1000, 4, "Removing ma conn due to SCHEDULED_REMOVE");
+	tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"nodeId\":4,\"type\":\"ma_conn_state\",\"module\":10,\"requestHandle\":0,\"partnerId\":33012,\"state\":0}");
 
 	// Test that not just scheduled removals but also other disconnect reasons e.g. a reset generate a ma_conn_state message.
 	tester.SendTerminalCommand(1, "action 4 ma serial_connect BBBBN 2 FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF 33010 20 12");

@@ -103,6 +103,15 @@ int main(int argc, char **argv) {
 	bool GitLab = false;
 	bool Scheduled = false;
 
+	std::regex seedStartRegex("SeedStart=(\\w+)");
+	std::regex seedIncrementRegex("SeedIncrement=(\\w+)");
+	std::regex numRunsRegex("numRuns=(\\w+)");
+	std::smatch matches;
+
+	uint32_t seedOffset = 0;
+	uint32_t seedIncrement = 0;
+	uint32_t numRuns = 1;
+	bool didError = false;
 	for (int i = 0; i < argc; i++)
 	{
 		std::string s = argv[i];
@@ -117,6 +126,23 @@ int main(int argc, char **argv) {
 		{
 			Scheduled = true;
 		}
+		else if (std::regex_search(s, matches, seedStartRegex))
+		{
+			seedOffset = Utility::StringToU32(matches[1].str().c_str(), &didError);
+		}
+		else if (std::regex_search(s, matches, seedIncrementRegex))
+		{
+			seedIncrement = Utility::StringToU32(matches[1].str().c_str(), &didError);
+		}
+		else if (std::regex_search(s, matches, numRunsRegex))
+		{
+			numRuns = Utility::StringToU32(matches[1].str().c_str(), &didError);
+		}
+	}
+
+	if (didError)
+	{
+		SIMEXCEPTION(IllegalParameterException);
 	}
 
 	if (GitLab) {
@@ -134,18 +160,24 @@ int main(int argc, char **argv) {
 	openAllocs = 0; //Some allocations happen from global objects or GTEST Code. We don't care about those, so we set the openAllocs to zero.
 #endif
 	int exitCode = 0;
-	if (GitLab) {
-		Exceptions::DisableDebugBreakOnException disabler;
-		exitCode = RUN_ALL_TESTS();
-	}
-	else {
-		exitCode = RUN_ALL_TESTS();
-	}
-	auto endTime = std::chrono::high_resolution_clock::now();
-	auto diff = endTime - startTime;
-	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(diff).count();
+	for(uint32_t i = 0; i<numRuns && !exitCode; i++, seedOffset += seedIncrement)
+	{
+		std::cout << "Seed offset is now: " << seedOffset << std::endl;
+		MersenneTwister::seedOffset = seedOffset;
 
-	std::cout << "\n\nTime for all tests: " << (ms / 1000.0) << " seconds." << std::endl;
+		if (GitLab) {
+			Exceptions::DisableDebugBreakOnException disabler;
+			exitCode = RUN_ALL_TESTS();
+		}
+		else {
+			exitCode = RUN_ALL_TESTS();
+		}
+		auto endTime = std::chrono::high_resolution_clock::now();
+		auto diff = endTime - startTime;
+		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(diff).count();
+
+		std::cout << "\n\nTime for all tests: " << (ms / 1000.0) << " seconds." << std::endl;
+	}
 
 #if MANUAL_LEAK_SEARCH == 1
 	if (openAllocs)

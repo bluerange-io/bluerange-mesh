@@ -44,6 +44,7 @@ TEST(TestNode, TestCommands) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 	tester.SimulateUntilClusteringDone(100 * 1000);
@@ -58,8 +59,6 @@ TEST(TestNode, TestCommands) {
 
 	tester.SendTerminalCommand(1, "disconnect all");
 	tester.SimulateUntilMessageReceived(10 * 1000, 1, "Cleaning up conn ");
-	std::string command = "connect 2 00:00:00:02:00:00";
-	tester.SendTerminalCommand(1, command.c_str());
 	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	tester.SendTerminalCommand(1, "action 2 node discovery off");
@@ -211,6 +210,7 @@ TEST(TestNode, TestCRCValidation)
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 	tester.SimulateUntilClusteringDone(100 * 1000);
@@ -263,6 +263,7 @@ TEST(TestNode, TestGenerateLoad) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 	tester.SimulateUntilClusteringDone(100 * 1000);
@@ -306,6 +307,7 @@ TEST(TestNode, TestPreferredConnections) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -400,6 +402,7 @@ TEST(TestNode, TestMeshConnectionPacketQueuing) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 	tester.SimulateUntilClusteringDone(10 * 1000);
@@ -459,6 +462,7 @@ TEST(TestNode, TestMeshAccessConnectionPacketQueuing) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.sim->nodes[1].uicr.CUSTOMER[9] = 123; // Change default network id of node 2
@@ -523,6 +527,7 @@ TEST(TestNode, TestCapabilitySending) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
 	tester.Start();
@@ -543,6 +548,7 @@ TEST(TestNode, TestRapidDisconnections) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -570,6 +576,7 @@ TEST(TestNode, TestReconnectionPacketQueuing) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -604,11 +611,12 @@ TEST(TestNode, TestReestablishmentTimesOut) {
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 3});
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
 	//Wait until nodes 2, 3, and 4 are connected
-	tester.SimulateUntilClusteringDone(10 * 1000);
+	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	//Remove connection to node 4 by generating a timeout (Might happen if the disconnect before a reboot is not received)
 	for (int i = 0; i < SIM_MAX_CONNECTION_NUM; i++) {

@@ -78,6 +78,7 @@ class CherrySim
 private:
 	std::vector<char> nodeEntryBuffer; // As std::vector calls the copy constructor of it's type and nodeEntry has no copy constructor we have to provide the memory like this.
 public:
+	constexpr static float N = 2.5; //Our calibration value for distance calculation
 	int globalBreakCounter = 0; //Can be used to increment globally everywhere in sim and break on a specific count
 	bool shouldRestartSim = false;
 	bool blockConnections = false; //Can be set to true to stop packets from being sent
@@ -110,7 +111,6 @@ public:
 TESTER_PUBLIC:
 	u32 totalNodes = 0;
 	u32 assetNodes = 0;
-	constexpr static float N = 2.5; //Our calibration value for distance calculation
 	TerminalPrintListener* terminalPrintListener = nullptr;
 	FruitySimServer* server = nullptr;
 

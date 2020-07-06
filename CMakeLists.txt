@@ -42,8 +42,8 @@ if(BUILD_FEATURESETS)
   # Visual Studio executables. The only solution that worked was if the correct
   # Generator is specified on the CLI. This of course is dirty. If anybody can
   # find a better solution, please let me know.
-  if(NOT CMAKE_GENERATOR STREQUAL "Unix Makefiles")
-    message(FATAL_ERROR "Wrong Generator selected: ${CMAKE_GENERATOR} but \"Unix Makefiles\" was expected. Remove all files that were just created and call cmake again with -G \"Unix Makefiles\".")
+  if(NOT CMAKE_GENERATOR STREQUAL "Unix Makefiles" AND NOT CMAKE_GENERATOR STREQUAL "Ninja")
+    message(FATAL_ERROR "Wrong Generator selected: ${CMAKE_GENERATOR} but \"Unix Makefiles\" or \"Ninja\" was expected. Remove all files that were just created and call cmake again with -G \"Unix Makefiles\".")
   endif()
   
   set(GCC_PATH "" CACHE STRING "Path to GCC 4.9")

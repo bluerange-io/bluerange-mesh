@@ -36,6 +36,7 @@ TEST(TestBaseConnection, TestSimpleTransmissions) {
 	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 
+	simConfig.SetToPerfectConditions();
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
 	//testerConfig.verbose = true;

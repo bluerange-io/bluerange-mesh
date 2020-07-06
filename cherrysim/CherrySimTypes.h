@@ -316,6 +316,10 @@ struct SimConfiguration {
 	float       asyncFlashCommitTimeProbability    = 0; // 0.0 - 1.0 where 1 is instant commit in the next simulation step
 	bool        importFromJson                     = false; //Set to true and specify siteJsonPath and devicesJsonPath to read a scenario from json
 	bool        realTime                           = false; //If set to true, the simulator will only tick when the real time clock passed the necessary time. On false: As fast as possible.
+	float       receptionProbabilityVeryClose      = 0.9;
+	float       receptionProbabilityClose          = 0.8;
+	float       receptionProbabilityFar            = 0.5;
+	float       receptionProbabilityVeryFar        = 0.3;
 	std::string siteJsonPath                       = "";
 	std::string devicesJsonPath                    = "";
 	std::string replayPath                         = ""; //If set, a replay is loaded from this path.
@@ -337,6 +341,8 @@ struct SimConfiguration {
 
 	//BLE Stack capabilities
 	BleStackType defaultBleStackType          = BleStackType::INVALID;
+
+	void SetToPerfectConditions();
 };
 
 void to_json(nlohmann::json& j, const SimConfiguration& config);

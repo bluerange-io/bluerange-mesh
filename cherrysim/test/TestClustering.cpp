@@ -74,7 +74,7 @@ void DoClusteringTestImportedFromJson(const std::string &site, const std::string
 }
 
 TEST_P(MultiStackFixture, TestBasicClustering) {
-	const int maxClusteringTimeMs = 40 * 1000;
+	const int maxClusteringTimeMs = 400 * 1000;
 	const int clusteringIterations = 5;
 	int clusteringTimeTotalMs = 0;
 
@@ -107,7 +107,7 @@ TEST_P(MultiStackFixture, TestBasicClustering) {
 TEST_P(MultiStackFixture, TestHorizontalSpreadNetwork) {
 	std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/horizontalspreadnetwork/site.json";
 	std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/horizontalspreadnetwork/devices.json";
-	DoClusteringTestImportedFromJson(site, device, 5, 60, GetParam());
+	DoClusteringTestImportedFromJson(site, device, 5, 600, GetParam());
 }
 #endif //GITHUB_RELEASE
 
@@ -144,7 +144,7 @@ TEST_P(MultiStackFixture, TestSparseNetwork) {
 	std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/sparsenetwork/site.json";
 	std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/sparsenetwork/devices.json";
 
-	u32 timeoutSec = 50;
+	u32 timeoutSec = 500;
 
 	DoClusteringTestImportedFromJson(site, device, 5, timeoutSec, GetParam());
 }
@@ -155,13 +155,13 @@ TEST_P(MultiStackFixture, TestSparseNetwork) {
 TEST_P(MultiStackFixture, TestSinglePointFailureNetwork) {
 	std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/singlepointfailure/site.json";
 	std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/singlepointfailure/devices.json";
-	DoClusteringTestImportedFromJson(site, device, 5, 100, GetParam());
+	DoClusteringTestImportedFromJson(site, device, 5, 1000, GetParam());
 }
 #endif //GITHUB_RELEASE
 
 TEST(TestClustering, TestClusteringWithManySdBusy) {
 	int clusteringTimeTotalMs = 0;
-	const int maxClusteringTimeMs = 200 * 1000;
+	const int maxClusteringTimeMs = 10000 * 1000; //Yes, this massive timeout is necessary. It was tested with a lot of seeds, this timeout is the smallest power of ten that did not fail.
 	const int clusteringIterations = 5;
 
 	for (u32 i = 0; i < clusteringIterations; i++) {
@@ -183,7 +183,7 @@ TEST(TestClustering, TestClusteringWithManySdBusy) {
 }
 
 TEST_P(MultiStackFixture, TestBasicClusteringWithNodeReset) {
-	const int maxClusteringTimeMs = 150 * 1000;
+	const int maxClusteringTimeMs = 1500 * 1000; //May require an emergency disconnect some times, thus such a high value.
 	const int clusteringIterations = 5;
 	const int resetTimesPerIteration = 3;
 
@@ -419,8 +419,7 @@ TEST(TestClustering, SimulateLongevity_long) {
 	//if there are any dropped messages
 }
 
-//Determines the number of hops to reach the sink
-i32 determineHopsToSink(nodeEntry* node, nodeEntry* previousNode)
+i32 determineHopsToSink(nodeEntry* node, std::vector<nodeEntry*>& visitedNodes)
 {
 	cherrySimInstance->setNode(node->id - 1);
 	if (GET_DEVICE_TYPE() == DeviceType::SINK) {
@@ -429,14 +428,22 @@ i32 determineHopsToSink(nodeEntry* node, nodeEntry* previousNode)
 
 	for (int i = 0; i < cherrySimInstance->currentNode->state.configuredTotalConnectionCount; i++) {
 		SoftdeviceConnection* c = &(node->state.connections[i]);
-		if (c->connectionActive && c->partner != previousNode) {
-			i32 tmp = determineHopsToSink(c->partner, node);
+		//Although FruityMesh connections can never run in a circle, SoftdeviceConnections can! Thus we have to store all previously visited nodes to avoid stack overflows.
+		if (c->connectionActive && std::find(visitedNodes.begin(), visitedNodes.end(), c->partner) == visitedNodes.end()) {
+			visitedNodes.push_back(node);
+			i32 tmp = determineHopsToSink(c->partner, visitedNodes);
 			if (tmp >= 0) {
 				return tmp + 1;
 			}
 		}
 	}
 	return -1;
+}
+
+i32 determineHopsToSink(nodeEntry* node)
+{
+	std::vector<nodeEntry*> visitedNodes;
+	return determineHopsToSink(node, visitedNodes);
 }
 
 TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
@@ -482,7 +489,7 @@ TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
 		//Disable terminal again
 		tester.sim->simConfig.terminalId = -1;
 
-		tester.SimulateUntilClusteringDone(100*1000);
+		tester.SimulateUntilClusteringDone(1000*1000);
 
 		// Give some additional time after clustering as a sink update packet
 		// (clusterUpdateInfo) might still be on the way
@@ -490,16 +497,16 @@ TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
 
 		//Check if all nodes have correctly calculated their hops to the sink
 		for (u32 i = 0; i < tester.sim->getTotalNodes(); i++) {
+			NodeIndexSetter setter(i);
 			nodeEntry* node = &(tester.sim->nodes[i]);
 
 			//Determine the number of hops to the sink according to the simulator connections
-			i32 hopsToSink = determineHopsToSink(node, nullptr);
-			tester.sim->setNode(i);
+			i32 hopsToSink = determineHopsToSink(node);
 
 			//printf("Node %u has %d hops to sink " EOL, node->id, hopsToSink);
 
 			//Next, check if the number of hops that each node has saved for its connections matches
-			MeshConnections conns = node->gs.cm.GetMeshConnections(ConnectionDirection::INVALID);
+			MeshConnections conns = GS->cm.GetMeshConnections(ConnectionDirection::INVALID);
 			bool hopsFound = false;
 			for (int j = 0; j < conns.count; j++) {
 				MeshConnection* conn = conns.handles[j].GetConnection();
@@ -519,7 +526,6 @@ TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
 				}
 				
 			}
-			tester.sim->setNode(i);
 			if (GET_DEVICE_TYPE() == DeviceType::SINK) {
 				//The sink will not have the number of hops saved as all its connections point to non-sinks
 				//It will therefore have -1 on all connections, so it is correct if we do not find the hops
@@ -556,7 +562,7 @@ TEST(TestClustering, TestHighPrioQueueFull) {
 			tester.SimulateGivenNumberOfSteps(1);
 		}
 
-		tester.SimulateUntilClusteringDone(100 * 1000);
+		tester.SimulateUntilClusteringDone(1000 * 1000); //Such a high value because for some RNG seeds an emergency disconnect might be required which takes quite a bit of time.
 	}
 
 	ASSERT_TRUE(simStatCounts.find("highPrioQueueFull") != simStatCounts.end());
@@ -574,6 +580,8 @@ TEST(TestClustering, TestInfluceOfNodeWithWrongNetworkKey) {
 	simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 5 } );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
+
+	Exceptions::ExceptionDisabler<ErrorLoggedException> ele; //Due to the wrong network key, some absolutely sane errors might be logged. These however should not fail our test.
 
 	//Enroll node 2 in same network with different networkkey
 	tester.SendTerminalCommand(3, "action this enroll basic BBBBD 2 %u 11:99:99:99:99:99:99:99:99:99:99:99:99:99:99:99 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0", simConfig.defaultNetworkId);

@@ -761,7 +761,7 @@ void EnrollmentModule::DispatchPreEnrollment(Module* lastModuleCalled, PreEnroll
 	RecordStorageResultCode errorCode = GS->recordStorage.LockDownAndClearAllSettings(moduleId, this, (u32)EnrollmentModuleSaveActions::ERASE_RECORD_STORAGE);
 	if (errorCode != RecordStorageResultCode::SUCCESS)
 	{
-		logt("ERROR", "Could not save because %u", (u32)errorCode);
+		logt("WARN", "Could not save because %u", (u32)errorCode);
 		GS->logger.logCustomError(CustomErrorTypes::WARN_ENROLLMENT_LOCK_DOWN_FAILED, (u16)errorCode);
 	}
 }

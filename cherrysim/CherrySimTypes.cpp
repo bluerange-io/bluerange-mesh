@@ -92,6 +92,10 @@ void from_json(const nlohmann::json & j, SimConfiguration & config)
 		else if(it.key() == "asyncFlashCommitTimeProbability"   ) config.asyncFlashCommitTimeProbability   = *it;
 		else if(it.key() == "importFromJson"                    ) config.importFromJson                    = *it;
 		else if(it.key() == "realTime"                          ) config.realTime                          = *it;
+		else if(it.key() == "receptionProbabilityVeryClose"     ) config.receptionProbabilityVeryClose     = *it;
+		else if(it.key() == "receptionProbabilityClose"         ) config.receptionProbabilityClose         = *it;
+		else if(it.key() == "receptionProbabilityFar"           ) config.receptionProbabilityFar           = *it;
+		else if(it.key() == "receptionProbabilityVeryFar"       ) config.receptionProbabilityVeryFar       = *it;
 		else if(it.key() == "siteJsonPath"                      ) config.siteJsonPath                      = *it;
 		else if(it.key() == "devicesJsonPath"                   ) config.devicesJsonPath                   = *it;
 		else if(it.key() == "replayPath"                        ) config.replayPath                        = *it;
@@ -110,4 +114,17 @@ void from_json(const nlohmann::json & j, SimConfiguration & config)
 		else if(it.key() == "defaultBleStackType"               ) config.defaultBleStackType               = *it;
 		else SIMEXCEPTION(UnknownJsonEntryException);
 	}
+}
+
+void SimConfiguration::SetToPerfectConditions()
+{
+	this->interruptProbability = 1;
+	this->connectionTimeoutProbabilityPerSec = 0;
+	this->sdBleGapAdvDataSetFailProbability = 0;
+	this->sdBusyProbability = 0;
+	this->asyncFlashCommitTimeProbability = 1;
+	this->receptionProbabilityVeryClose = 1;
+	this->receptionProbabilityClose = 1;
+	this->receptionProbabilityFar = 1;
+	this->receptionProbabilityVeryFar = 1;
 }

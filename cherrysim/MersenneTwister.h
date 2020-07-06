@@ -51,6 +51,8 @@ private:
 	void twist();
 
 public:
+	static inline uint32_t seedOffset = 0;
+
 	MersenneTwister();
 	explicit MersenneTwister(uint32_t seed);
 

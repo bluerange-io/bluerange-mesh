@@ -68,7 +68,6 @@ const std::vector<std::string> templates{
 	"filltx",
 	"getpending",
 //	"writedata [[[0-1000]]] AA:BB:CC:DD:EE:FF", //dangerzone proposal
-//	"clearqueue [[[0-65535]]]", //dangerzone proposal
 	"printqueue [[[0-255]]]",
 
 /*********************/
@@ -130,7 +129,6 @@ const std::vector<std::string> templates{
 	"datal {{{u|r}}}",
 	"stop",
 	"start",
-	"connect [[[0-4]]] 00:00:00:{{{01|02|03|04}}}:00:00",
 	"disconnect [[[0-65535]]]",
 	"gap_disconnect [[[0-255]]]",
 	"update_iv [[[0-4]]] [[[0-65535]]]",
@@ -427,13 +425,14 @@ void ReduceCommandVector(std::vector<CommandWithTarget> &commands, u32 seed, u32
 	}
 }
 
-void StartTestMonkey(bool onlyValidCommands, bool allCommandsInOrder) 
+void StartTestMonkey(bool onlyValidCommands, bool allCommandsInOrder, bool reduceCommandsOnFail) 
 {
 	//We do not care for this exception as it might happen (and that's ok), if the user logs an error that is unknown
 	Exceptions::ExceptionDisabler<ErrorCodeUnknownException> errorCodeUnknownException;
 	//Can happen if a enroll command is followed by a saverec command.
 	Exceptions::ExceptionDisabler<RecordStorageIsLockedDownException> recordStorageIsLockedDownException;
 	Exceptions::ExceptionDisabler<WrongCommandParameterException> wrongCommandParameterException;
+	Exceptions::ExceptionDisabler<InternalTerminalCommandErrorException> internalTerminalCommandErrorException;
 	Exceptions::DisableDebugBreakOnException antiDebugBreak;
 	constexpr u32 amountOfNodes = 3;
 
@@ -454,8 +453,11 @@ void StartTestMonkey(bool onlyValidCommands, bool allCommandsInOrder)
 		}
 		catch (...)
 		{
-			std::cout << "An exception occured. Trying to reduce commands for easier reproducibility..." << std::endl;
-			ReduceCommandVector(commands, seed, amountOfNodes);
+			if (reduceCommandsOnFail)
+			{
+				std::cout << "An exception occured. Trying to reduce commands for easier reproducibility..." << std::endl;
+				ReduceCommandVector(commands, seed, amountOfNodes);
+			}
 			throw;
 		}
 	}
@@ -465,11 +467,11 @@ void StartTestMonkey(bool onlyValidCommands, bool allCommandsInOrder)
 }
 
 TEST(TestMonkey, TestMonkeyValid_scheduled) {
-	StartTestMonkey(true, false);
+	StartTestMonkey(true, false, true);
 }
 
 TEST(TestMonkey, TestMonkeyValidAllInOrder) {
-	StartTestMonkey(true, true);
+	StartTestMonkey(true, true, false);
 }
 
 /*TEST(TestMonkey, ReproductionTest) {

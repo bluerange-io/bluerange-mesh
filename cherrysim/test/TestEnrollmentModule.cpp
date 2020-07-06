@@ -43,6 +43,7 @@ TEST(TestEnrollmentModule, TestCommands) {
 
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert( { "prod_clc_mesh_nrf52", 1 } );
+	simConfig.SetToPerfectConditions();
 	testerConfig.verbose = false;
 
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
@@ -74,6 +75,8 @@ TEST(TestEnrollmentModule, TestFactoryReset) {
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
+	simConfig.asyncFlashCommitTimeProbability = 1.0f;
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -109,6 +112,7 @@ TEST(TestEnrollmentModule, TestEnrollmentBasicNewMesh) {
 	simConfig.preDefinedPositions = { {0.997185, 0.932557},{0.715971, 0.802758},{0.446135, 0.522125},{0.865020, 0.829147},{0.935539, 0.846311},{0.783314, 0.612539},{0.910448, 0.698930},{0.593066, 0.671654},{0.660636, 0.598495},{0.939128, 0.778389} };
 	//testerConfig.verbose = true;
 	simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 10} );
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -155,6 +159,7 @@ TEST(TestEnrollmentModule, TestEnrollmentBasicExistingMesh) {
 	testerConfig.verbose = false;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9 });
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
@@ -198,6 +203,7 @@ TEST(TestEnrollmentModule, TestEnrollmentBasicExistingMeshLong) {
 	testerConfig.verbose = false;
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9 });
+	simConfig.SetToPerfectConditions();
 
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
@@ -242,6 +248,7 @@ TEST(TestEnrollmentModule, TestReceivingEnrollmentOverMeshResponses) {
 
 	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 3});
+	simConfig.SetToPerfectConditions();
 	testerConfig.verbose = false;
 
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
@@ -273,6 +280,7 @@ TEST(TestEnrollmentModule, TestEnrollmentMultipleTimes) {
 		//testerConfig.verbose = true;
 		simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
 		simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9 });
+		simConfig.SetToPerfectConditions();
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 		tester.Start();
 
@@ -327,6 +335,7 @@ TEST(TestEnrollmentModule, TestRequestProposals) {
 	simConfig.preDefinedPositions.push_back({ 0.51, 0.5 });
 	simConfig.preDefinedPositions.push_back({ 0.49, 0.5 });
 	simConfig.preDefinedPositions.push_back({ 0.99, 0.5 });
+	simConfig.SetToPerfectConditions();
 	for (u32 i = 3; i < 10; i++)
 	{
 		double percentage = (double)i / (double)(10 - 3);

@@ -1254,6 +1254,9 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 		packet->componentHeader.registerAddress,
 		payload);
 
+		Logger::convertBufferToHexString(packet->payload, payloadLength, payload, sizeof(payload));
+		logt("DEBUG", "component_sense as HEX: %s", payload);
+
 	}
 
 	else if (packetHeader->messageType == MessageType::COMPONENT_ACT)
@@ -1648,7 +1651,7 @@ void Node::GapAdvertisementMessageHandler(const FruityHal::GapAdvertisementRepor
 			joinMeBufferPacket* targetBuffer = findTargetBuffer(packet);
 
 			//Now, we have the space for our packet and we fill it with the latest information
-			if (targetBuffer != nullptr)
+			if (targetBuffer != nullptr && packet->payload.clusterId != this->clusterId)
 			{
 				CheckedMemcpy(targetBuffer->addr.addr, advertisementReportEvent.getPeerAddr(), FH_BLE_GAP_ADDR_LEN);
 				targetBuffer->addr.addr_type = advertisementReportEvent.getPeerAddrType();
@@ -2760,45 +2763,6 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 		return TerminalCommandHandlerReturnType::SUCCESS;
 	}
 #endif
-	//Try to connect to one of the nodes in the test devices array
-	else if (TERMARGS(0, "connect"))
-	{
-		if(commandArgsSize <= 2) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
-
-		//Allows us to connect to any node when giving the GAP Address
-		bool didError = false;
-		NodeId partnerId = Utility::StringToU16(commandArgs[1], &didError);
-		u8 buffer[6];
-		Logger::parseEncodedStringToBuffer(commandArgs[2], buffer, 6, &didError);
-		FruityHal::BleGapAddr addr;
-		addr.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
-		addr.addr[0] = buffer[5];
-		addr.addr[1] = buffer[4];
-		addr.addr[2] = buffer[3];
-		addr.addr[3] = buffer[2];
-		addr.addr[4] = buffer[1];
-		addr.addr[5] = buffer[0];
-
-		if (didError)
-		{
-			return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
-		}
-
-		//Using the same GATT handle as our own will probably work if our partner has the same implementation
-		const ErrorType err = GS->cm.ConnectAsMaster(partnerId, &addr, meshService.sendMessageCharacteristicHandle.valueHandle, MSEC_TO_UNITS(10, CONFIG_UNIT_1_25_MS));
-
-		if (err != ErrorType::SUCCESS)
-		{
-			logt("NODE", "Failed to connect as master because %u", (u32)err);
-			if (err == ErrorType::INVALID_ADDR)
-			{
-				return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
-			}
-			return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
-		}
-
-		return TerminalCommandHandlerReturnType::SUCCESS;
-	}
 #endif
 
 #if IS_INACTIVE(SAVE_SPACE)
