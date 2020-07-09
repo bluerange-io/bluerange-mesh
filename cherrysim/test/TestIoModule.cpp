@@ -35,11 +35,12 @@ TEST(TestIoModule, TestCommands) {
 	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 	testerConfig.verbose = false;
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9 });
+	simConfig.SetToPerfectConditions();
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	//Could modify the default test or sim config here,...
 	tester.Start();
 
-	tester.SimulateUntilClusteringDone(100 * 1000);
+	tester.SimulateUntilClusteringDone(1000 * 1000);
 	tester.SendTerminalCommand(2, "action this io led on");
 	tester.SimulateUntilMessageReceived(500, 2, "set_led_result");
 

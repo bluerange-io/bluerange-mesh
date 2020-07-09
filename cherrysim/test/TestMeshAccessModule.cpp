@@ -148,10 +148,14 @@ TEST(TestMeshAccessModule, TestUnsecureNoneKeyConnection) {
 	tester.SimulateForGivenTime(10 * 1000); //An enrollment reboot takes 4 seconds to start. We give the node additional 6 seconds to start up again.
 
 	//Enable unsecure connections.
-	tester.sim->setNode(0);
-	static_cast<MeshAccessModule*>(tester.sim->currentNode->gs.node.GetModuleById(ModuleId::MESH_ACCESS_MODULE))->allowUnenrolledUnsecureConnections = true;
-	tester.sim->setNode(1); 
-	static_cast<MeshAccessModule*>(tester.sim->currentNode->gs.node.GetModuleById(ModuleId::MESH_ACCESS_MODULE))->allowUnenrolledUnsecureConnections = true;
+	{
+		NodeIndexSetter setter(0);
+		static_cast<MeshAccessModule*>(tester.sim->currentNode->gs.node.GetModuleById(ModuleId::MESH_ACCESS_MODULE))->allowUnenrolledUnsecureConnections = true;
+	}
+	{
+		NodeIndexSetter setter(1);
+		static_cast<MeshAccessModule*>(tester.sim->currentNode->gs.node.GetModuleById(ModuleId::MESH_ACCESS_MODULE))->allowUnenrolledUnsecureConnections = true;
+	}
 
 	//Wait for establishing mesh access connection
 	tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 0"); //0 = FmKeyId::ZERO
@@ -162,10 +166,14 @@ TEST(TestMeshAccessModule, TestUnsecureNoneKeyConnection) {
 
 
 	//Disable unsecure connections.
-	tester.sim->setNode(0);
-	static_cast<MeshAccessModule*>(tester.sim->currentNode->gs.node.GetModuleById(ModuleId::MESH_ACCESS_MODULE))->allowUnenrolledUnsecureConnections = false;
-	tester.sim->setNode(1);
-	static_cast<MeshAccessModule*>(tester.sim->currentNode->gs.node.GetModuleById(ModuleId::MESH_ACCESS_MODULE))->allowUnenrolledUnsecureConnections = false;
+	{
+		NodeIndexSetter setter(0);
+		static_cast<MeshAccessModule*>(tester.sim->currentNode->gs.node.GetModuleById(ModuleId::MESH_ACCESS_MODULE))->allowUnenrolledUnsecureConnections = false;
+	}
+	{
+		NodeIndexSetter setter(1);
+		static_cast<MeshAccessModule*>(tester.sim->currentNode->gs.node.GetModuleById(ModuleId::MESH_ACCESS_MODULE))->allowUnenrolledUnsecureConnections = false;
+	}
 
 	//Wait for establishing mesh access connection
 	tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 0"); //0 = FmKeyId::ZERO

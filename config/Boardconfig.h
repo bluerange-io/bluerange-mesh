@@ -71,6 +71,10 @@ typedef struct BoardConfiguration
 	//Default, can be overridden by boards
 	uint32_t uartBaudRate : 32;
 
+	//Display Dimensions
+	uint16_t displayWidth;
+	uint16_t displayHeight;
+
 	//Receiver sensitivity of this device, set from board configs
 	int8_t dBmRX;
 	// This value should be calibrated at 1m distance, set by board configs

@@ -449,6 +449,7 @@ namespace FruityHal
 	void GpioConfigureDefault(u32 pin);
 	void GpioPinSet(u32 pin);
 	void GpioPinClear(u32 pin);
+	u32 GpioPinRead(u32 pin);
 	void GpioPinToggle(u32 pin);
 	typedef void (*GpioInterruptHandler)(u32 pin, GpioTransistion transistion);
 	ErrorType GpioConfigureInterrupt(u32 pin, GpioPullMode mode, GpioTransistion trigger, GpioInterruptHandler handler);
@@ -503,6 +504,7 @@ namespace FruityHal
 	void GetDeviceAddress(u8 * p_address);
 
 	u32 GetHalMemorySize();
+	
 }
 
 extern "C" {

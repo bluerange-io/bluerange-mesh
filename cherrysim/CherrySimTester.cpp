@@ -294,7 +294,7 @@ void CherrySimTester::Start()
 #ifdef GITHUB_RELEASE
 		sim->nodes[i].nodeConfiguration = sim->redirectFeatureset(sim->nodes[i].nodeConfiguration);
 #endif
-		sim->setNode(i);
+		NodeIndexSetter setter(i);
 		sim->bootCurrentNode();
 	}
 
@@ -507,7 +507,7 @@ void CherrySimTester::SendTerminalCommand(NodeId nodeId, const char* message, ..
 	const std::string crcCommand = originalCommand + std::string(" CRC: ") + std::to_string(crc);
 	if (nodeId == 0) {
 		for (u32 i = 0; i < sim->getTotalNodes(); i++) {
-			sim->setNode(i);
+			NodeIndexSetter setter(i);
 			if (!GS->terminal.terminalIsInitialized) {
 				//you have not activated the terminal of that node either through the config or through the sim config
 				SIMEXCEPTION(IllegalStateException); //Terminal of node is not active, cannot send message
@@ -523,7 +523,7 @@ void CherrySimTester::SendTerminalCommand(NodeId nodeId, const char* message, ..
 			GS->terminal.PutIntoTerminalCommandQueue(commandToSend, false);
 		}
 	} else if (nodeId > 0 && nodeId < sim->getTotalNodes() + 1) {
-		sim->setNode(nodeId - 1);
+		NodeIndexSetter setter(nodeId - 1);
 		if (!GS->terminal.terminalIsInitialized) {
 			//you have not activated the terminal of that node either through the config or through the sim config
 			SIMEXCEPTION(IllegalStateException); //Terminal of node is not active, cannot send message
@@ -544,7 +544,7 @@ void CherrySimTester::SendTerminalCommand(NodeId nodeId, const char* message, ..
 
 void CherrySimTester::SendButtonPress(NodeId nodeId, u8 buttonId, u32 holdTimeDs)
 {
-	sim->setNode(nodeId);
+	NodeIndexSetter setter(nodeId);
 	if (buttonId == 1) {
 		GS->button1HoldTimeDs = holdTimeDs;
 	}

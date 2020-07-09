@@ -120,7 +120,7 @@ TEST(TestStatusReporterModule, TestHopsToSinkFixing) {
 
 	for (int i = 1; i <= 6; i++) tester.sim->findNodeById(i)->gs.logger.enableTag("DEBUGMOD");
 
-	tester.sim->setNode(1);
+	NodeIndexSetter setter(1);
 	MeshConnections inConnections = tester.sim->findNodeById(2)->gs.cm.GetMeshConnections(ConnectionDirection::DIRECTION_IN);
 	MeshConnections outConnections = tester.sim->findNodeById(2)->gs.cm.GetMeshConnections(ConnectionDirection::DIRECTION_OUT);
 	u16 invalidHops = tester.sim->getTotalNodes() + 10; // a random value that is not possible to be correct

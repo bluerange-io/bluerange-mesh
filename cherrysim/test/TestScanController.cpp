@@ -33,54 +33,41 @@
 #include <Node.h>
 #include <ScanController.h>
 
-static int current_node_idx;
-
 static void simulateAndCheckScanning(int simulate_time, bool is_scanning_active, CherrySimTester &tester)
 {
 	tester.SimulateForGivenTime(simulate_time);
-	current_node_idx = tester.sim->currentNode->index;
-	tester.sim->setNode(0);
+	NodeIndexSetter setter(0);
 	ASSERT_TRUE(tester.sim->currentNode->state.scanningActive == is_scanning_active);
-	tester.sim->setNode(current_node_idx);
 }
 
 static void simulateAndCheckWindow(int simulate_time, int window, CherrySimTester &tester)
 {
 	tester.SimulateForGivenTime(simulate_time);
-	current_node_idx = tester.sim->currentNode->index;
-	tester.sim->setNode(0);
+	NodeIndexSetter setter(0);
 	ASSERT_EQ(tester.sim->currentNode->state.scanWindowMs, window);
-	tester.sim->setNode(current_node_idx);
 }
 
 static ScanJob * AddJob(ScanJob &scan_job, CherrySimTester &tester)
 {
 	ScanJob * p_job;
-	current_node_idx = tester.sim->currentNode->index;
-	tester.sim->setNode(0);
+	NodeIndexSetter setter(0);
 	p_job = tester.sim->currentNode->gs.scanController.AddJob(scan_job);
-	tester.sim->setNode(current_node_idx);
 	return p_job;
 }
 
 static void RemoveJob(ScanJob * p_scan_job, CherrySimTester &tester)
 {
-	current_node_idx = tester.sim->currentNode->index;
-	tester.sim->setNode(0);
+	NodeIndexSetter setter(0);
 	tester.sim->currentNode->gs.scanController.RemoveJob(p_scan_job);
-
-	tester.sim->setNode(current_node_idx);
 }
 
 static void ForceStopAllScanJobs(CherrySimTester &tester)
 {
-	current_node_idx = tester.sim->currentNode->index;
-	tester.sim->setNode(0);
+	NodeIndexSetter setter(0);
 	for (int i = 0; i < tester.sim->currentNode->gs.scanController.GetAmountOfJobs(); i++)
 	{
 		tester.sim->currentNode->gs.scanController.RemoveJob(tester.sim->currentNode->gs.scanController.GetJob(i));
 	}
-	tester.sim->setNode(current_node_idx);
 }
 
 TEST(TestScanController, TestIfScannerGetsEnabled) {

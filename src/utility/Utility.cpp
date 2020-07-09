@@ -191,6 +191,14 @@ bool Utility::IsPowerOfTwo(u32 val)
 	else return ((val & (val - 1ul)) == 0ul);
 }
 
+u32 Utility::NextMultipleOf(const u32 val, const u32 multiple)
+{
+	if (multiple <= 1) return val;
+	const u32 remainder = val % multiple;
+	if (remainder == 0) return val;
+	return val + multiple - remainder;
+}
+
 NodeId Utility::TerminalArgumentToNodeId(const char * arg, bool* didErrorArg)
 {
 	if (arg == nullptr)

@@ -2292,6 +2292,12 @@ void FruityHal::GpioPinClear(u32 pin)
 	nrf_gpio_pin_clear(pin);
 }
 
+u32 FruityHal::GpioPinRead(u32 pin)
+{
+	u32 state = nrf_gpio_pin_read(pin);
+	return state;
+}
+
 void FruityHal::GpioPinToggle(u32 pin)
 {
 	nrf_gpio_pin_toggle(pin);
@@ -3299,8 +3305,8 @@ void FruityHal::SpiInit(i32 sckPin, i32 misoPin, i32 mosiPin)
 	/* Conigure SPI Interface */
 	nrf_drv_spi_config_t spi_config = NRF_DRV_SPI_DEFAULT_CONFIG;
 	spi_config.sck_pin = (u32)sckPin;
-	spi_config.miso_pin = (u32)misoPin;
-	spi_config.mosi_pin = (u32)mosiPin;
+	spi_config.miso_pin = (misoPin == -1) ? NRF_DRV_SPI_PIN_NOT_USED : (u32)misoPin;
+	spi_config.mosi_pin = (mosiPin == -1) ? NRF_DRV_SPI_PIN_NOT_USED : (u32)mosiPin;
 	spi_config.frequency = NRF_DRV_SPI_FREQ_4M;
 
 	FRUITYMESH_ERROR_CHECK(nrf_drv_spi_init(&spi, &spi_config, spi_event_handler,NULL));

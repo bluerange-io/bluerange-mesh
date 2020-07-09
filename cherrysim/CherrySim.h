@@ -75,6 +75,7 @@ struct FeaturesetPointers
 
 class CherrySim
 {
+	friend class NodeIndexSetter;
 private:
 	std::vector<char> nodeEntryBuffer; // As std::vector calls the copy constructor of it's type and nodeEntry has no copy constructor we have to provide the memory like this.
 public:
@@ -108,7 +109,10 @@ public:
 	static SimConfiguration ExtractSimConfigurationFromReplayRecord(const std::string &fileContents);
 	static void CheckVersionFromReplayRecord(const std::string &fileContents);
 
+private:
+
 TESTER_PUBLIC:
+	void SetNode(u32 i); //Should not be called publicly. Use the NodeIndexSetter instead.
 	u32 totalNodes = 0;
 	u32 assetNodes = 0;
 	TerminalPrintListener* terminalPrintListener = nullptr;
@@ -166,7 +170,6 @@ public:
 	void TerminalPrintHandler(const char* message); //Called for all simulator output
 
 	//#### Node Lifecycle
-	void setNode(u32 i);
 	u32 getTotalNodes(bool countAgain = false) const; // returns number of all nodes i.e our nodes, vendor nodes and asset nodes
 	u32 getAssetNodes(bool countAgain = false) const; //iterates over all the nodes and calculate the node with device type Asset
 	void initNode(u32 i); // Creates a node with default settings (like manufacturing the hardware)
@@ -290,26 +293,26 @@ struct NodeSystemResetException : public std::exception { char const * what() co
 class NodeIndexSetter
 {
 private:
-	u32 originalIndex = 0;
+	u32 originalIndex = 0xFFFFFFFF;
 
 public:
 	explicit NodeIndexSetter(u32 indexToSet)
 	{
 		if (cherrySimInstance->currentNode == nullptr)
 		{
-			originalIndex = 0;
+			originalIndex = 0xFFFFFFFF;
 		}
 		else
 		{
 			originalIndex = cherrySimInstance->currentNode->index;
 		}
 
-		cherrySimInstance->setNode(indexToSet);
+		cherrySimInstance->SetNode(indexToSet);
 	}
 
 	~NodeIndexSetter()
 	{
-		cherrySimInstance->setNode(originalIndex);
+		cherrySimInstance->SetNode(originalIndex);
 	}
 };
 

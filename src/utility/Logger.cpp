@@ -125,16 +125,6 @@ void Logger::log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJs
 void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...) const
 {
 #if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
-#ifdef SIM_ENABLED
-	if (strcmp(tag, "ERROR") == 0)
-	{
-		//ERRORs are classified as severe enough that they should not happend
-		//during normal execution. If they are logged, something went wrong
-		//and must be analyzed.
-		SIMEXCEPTION(ErrorLoggedException);
-	}
-#endif
-
 	if (
 			//UART communication (json mode)
 			(
@@ -177,6 +167,15 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
 			logjson_skip_event("LOG", "%s\"}" SEP, mhTraceBuffer);
 		}
 	}
+#ifdef SIM_ENABLED
+	if (strcmp(tag, "ERROR") == 0)
+	{
+		//ERRORs are classified as severe enough that they should not happend
+		//during normal execution. If they are logged, something went wrong
+		//and must be analyzed.
+		SIMEXCEPTION(ErrorLoggedException);
+	}
+#endif
 #endif
 }
 

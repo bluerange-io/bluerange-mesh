@@ -70,6 +70,8 @@ CREATEEXCEPTIONINHERITING(StackOverflowException                  , IllegalState
 CREATEEXCEPTIONINHERITING(AccessToRemovedConnectionException      , IllegalStateException);
 CREATEEXCEPTIONINHERITING(InternalTerminalCommandErrorException   , IllegalStateException);
 CREATEEXCEPTIONINHERITING(FileException                           , IllegalStateException);
+CREATEEXCEPTIONINHERITING(SigProvisioningFailedException          , IllegalStateException);
+CREATEEXCEPTIONINHERITING(SigCreateElementFailedException         , IllegalStateException);
 
 CREATEEXCEPTION(BufferException);
 CREATEEXCEPTIONINHERITING(TriedToReadEmptyBufferException         , BufferException);

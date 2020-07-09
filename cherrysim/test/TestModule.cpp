@@ -56,22 +56,30 @@ TEST(TestModule, TestCommands) {
 
 	tester.SendTerminalCommand(1, "set_active 2 io on");
 	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"set_active_result\",\"module\":6,\"requestHandle\":0,\"code\":0"); // 0 = SUCCESS
-	tester.sim->setNode(1);
-	ASSERT_TRUE(static_cast<IoModule*>(GS->node.GetModuleById(ModuleId::IO_MODULE))->configurationPointer->moduleActive == true);
-
+	{
+		NodeIndexSetter setter(1);
+		ASSERT_TRUE(static_cast<IoModule*>(GS->node.GetModuleById(ModuleId::IO_MODULE))->configurationPointer->moduleActive == true);
+	}
 	tester.SendTerminalCommand(2, "reset");
 	tester.SimulateForGivenTime(20 * 1000);
 	tester.SimulateUntilClusteringDone(100 * 1000);
-	ASSERT_TRUE(static_cast<IoModule*>(GS->node.GetModuleById(ModuleId::IO_MODULE))->configurationPointer->moduleActive == true);
+	{
+		NodeIndexSetter setter(1);
+		ASSERT_TRUE(static_cast<IoModule*>(GS->node.GetModuleById(ModuleId::IO_MODULE))->configurationPointer->moduleActive == true);
+	}
 
 	tester.SendTerminalCommand(1, "set_active 2 io off");
 	tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"set_active_result\",\"module\":6,\"requestHandle\":0,\"code\":0"); // 0 = SUCCESS
-	tester.sim->setNode(1);
-	ASSERT_TRUE(static_cast<IoModule*>(GS->node.GetModuleById(ModuleId::IO_MODULE))->configurationPointer->moduleActive == false);
+	{
+		NodeIndexSetter setter(1);
+		ASSERT_TRUE(static_cast<IoModule*>(GS->node.GetModuleById(ModuleId::IO_MODULE))->configurationPointer->moduleActive == false);
+	}
 
 	tester.SendTerminalCommand(2, "reset");
 	tester.SimulateForGivenTime(20 * 1000);
 	tester.SimulateUntilClusteringDone(100 * 1000);
-	ASSERT_TRUE(static_cast<IoModule*>(GS->node.GetModuleById(ModuleId::IO_MODULE))->configurationPointer->moduleActive == false);
-
+	{
+		NodeIndexSetter setter(1);
+		ASSERT_TRUE(static_cast<IoModule*>(GS->node.GetModuleById(ModuleId::IO_MODULE))->configurationPointer->moduleActive == false);
+	}
 }

@@ -59,6 +59,7 @@ void PrintPacketQueueBuffer(PacketQueue* queue);
 TEST_F(TestPacketQueue, TestPeekNext) {
 	//printf("------ Testing packet queue peeknext ------");
 	StackBaseSetter sbs;
+	NodeIndexSetter setter(0);
 	const int bufferSize = 600;
 
 	//Create some buffer space
@@ -167,6 +168,7 @@ TEST_F(TestPacketQueue, TestPeekNext) {
 TEST_F(TestPacketQueue, TestRandomFill) {
 	//printf("------ Testing packet queue ------");
 	StackBaseSetter sbs;
+	NodeIndexSetter setter(0);
 
 	const int bufferSize = 600;
 
@@ -237,6 +239,7 @@ TEST_F(TestPacketQueue, TestRandomFill) {
 TEST_F(TestPacketQueue, TestPeekLast) {
 	//printf("------ Testingpeek last ------");
 	StackBaseSetter sbs;
+	NodeIndexSetter setter(0);
 	const int bufferSize = 200;
 
 	//Create some buffer space
@@ -357,6 +360,7 @@ TEST_F(TestPacketQueue, TestDiscardLastRandom) {
 	// Next, fill queue randomly with data, while using discardLast
 	//printf("------ Testing data returned peekNext and peekLast random fill ------");
 	StackBaseSetter sbs;
+	NodeIndexSetter setter(0);
 	const int bufferSize = 200;
 
 	//Create some buffer space

@@ -32,6 +32,10 @@
 #include <types.h>
 #include <FlashStorage.h>
 
+#if IS_ACTIVE(SIG_MESH)
+#include <SigConfig.h>
+#endif //IS_ACTIVE(SIG_MESH)
+
  /*## RecordIds #############################################################*/
  // The modules use their moduleId as a recordId, records outside this range can be used
  // for other types of storage
@@ -41,6 +45,16 @@ constexpr u16 RECORD_STORAGE_RECORD_ID_UPDATE_STATUS = 1000; //Stores the done s
 constexpr u16 RECORD_STORAGE_RECORD_ID_UICR_REPLACEMENT = 1001; //Can be used, if UICR can not be flashed, e.g. when updating another beacon with different firmware
 constexpr u16 RECORD_STORAGE_RECORD_ID_DEPRECATED = 1002; //Was used to store fake positions for nodes to modify the incoming events
 
+constexpr u16 RECORD_STORAGE_RECORD_ID_SIG_AMOUNT = 256;  //The maximum amount of record ids reserverd for sig
+#if IS_ACTIVE(SIG_MESH)
+static_assert(SIG_MAX_NUM_ELEMENTS <= RECORD_STORAGE_RECORD_ID_SIG_AMOUNT, "Not enough record ids for all elements!");
+#endif //IS_ACTIVE(SIG_MESH)
+constexpr u16 RECORD_STORAGE_RECORD_ID_SIG_CONFIG_BASE = 2000; //This + the SIG elements localIndex is the record ID for the config of the element
+constexpr u16 RECORD_STORAGE_RECORD_ID_SIG_CONFIG_LAST = RECORD_STORAGE_RECORD_ID_SIG_CONFIG_BASE + RECORD_STORAGE_RECORD_ID_SIG_AMOUNT - 1;
+constexpr u16 RECORD_STORAGE_RECORD_ID_SIG_STATES_BASE = RECORD_STORAGE_RECORD_ID_SIG_CONFIG_LAST + 1;
+constexpr u16 RECORD_STORAGE_RECORD_ID_SIG_STATES_LAST = RECORD_STORAGE_RECORD_ID_SIG_STATES_BASE + RECORD_STORAGE_RECORD_ID_SIG_AMOUNT - 1;
+
+constexpr u16 RECORD_STORAGE_RECORD_ID_INVALID = 0xFFFF;
 
 constexpr u16 RECORD_STORAGE_ACTIVE_PAGE_MAGIC_NUMBER = 0xAC71;
 
@@ -161,6 +175,7 @@ enum class RecordStorageResultCode : u8
 	WRONG_ALIGNMENT          = 2,
 	NO_SPACE                 = 3,
 	RECORD_STORAGE_LOCK_DOWN = 4, //The best action for a module that receives this is to discard the write access completely.
+	INTERNAL_ERROR           = 5, //Not used by the RecordStorage itself but can be used by users of the RecordStorage if they return this enum.
 };
 
 enum class RecordStoragePageState : u8

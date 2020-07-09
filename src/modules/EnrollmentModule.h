@@ -52,6 +52,7 @@ enum class EnrollmentResponseCode : u8 {
 	// There are more enroll response codes that are taken from the Flash Storage response codes
 	ALREADY_ENROLLED_WITH_DIFFERENT_DATA = 0x10,
 	PREENROLLMENT_FAILED                 = 0x11,
+	SIG_CONFIGURATION_INVALID            = 0x12,
 	HIGHEST_POSSIBLE_VALUE               = 0xFF,
 };
 

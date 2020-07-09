@@ -152,6 +152,7 @@ TEST(TestUtility, TestGetRandomInteger) {
 	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
+	NodeIndexSetter setter(0);
 
 	std::set<u32> randoms;
 	int amountOfClashes = 0;

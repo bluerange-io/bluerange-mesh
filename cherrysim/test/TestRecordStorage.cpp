@@ -54,6 +54,7 @@ public:
 		tester = new CherrySimTester(testerConfig, simConfig);
 		tester->sim->nodes[0].nodeConfiguration = "prod_sink_nrf52";
 		tester->Start();
+		NodeIndexSetter setter(0);
 
 		startPage = (u8*)Utility::GetSettingsPageBaseAddress();
 	}
@@ -96,6 +97,7 @@ public:
 
 
 TEST_F(TestRecordStorage, TestCleanup) {
+	NodeIndexSetter setter(0);
 	logt("WARNING", "---- TEST CLEANUP ----");
 
 	//###### Test with all empty pages
@@ -174,6 +176,7 @@ TEST_F(TestRecordStorage, TestCleanup) {
 }
 
 TEST_F(TestRecordStorage, TestSave) {
+	NodeIndexSetter setter(0);
 	u32 cmp = 0;
 
 	//Setup
@@ -229,6 +232,7 @@ TEST_F(TestRecordStorage, TestSave) {
 //TODO: Check what happens if we use a record size that is larger than a page
 
 TEST_F(TestRecordStorage, TestRandomSingleRecordUpdates) {
+	NodeIndexSetter setter(0);
 	logt("WARNING", "---- TEST RANDOM SINGLE RECORD UPDATE ----");
 
 	u32 cmp = 0;
@@ -263,6 +267,7 @@ TEST_F(TestRecordStorage, TestRandomSingleRecordUpdates) {
 }
 
 TEST_F(TestRecordStorage, TestGetNonExistentRecord) {
+	NodeIndexSetter setter(0);
 	logt("WARNING", "---- TEST GET NON EXISTENT RECORD ----");
 
 	//Setup
@@ -277,6 +282,7 @@ TEST_F(TestRecordStorage, TestGetNonExistentRecord) {
 }
 
 TEST_F(TestRecordStorage, TestGetNonExistentRecordAfterStore) {
+	NodeIndexSetter setter(0);
 	logt("WARNING", "---- TEST GET NON EXISTENT RECORD AFTER STORE ----");
 
 	//Setup
@@ -294,6 +300,7 @@ TEST_F(TestRecordStorage, TestGetNonExistentRecordAfterStore) {
 }
 
 TEST_F(TestRecordStorage, TestDeactivateRecord) {
+	NodeIndexSetter setter(0);
 	logt("WARNING", "---- CLEANUP ----");
 
 	//Setup
@@ -357,6 +364,7 @@ TEST_F(TestRecordStorage, TestDeactivateRecord) {
 }
 
 TEST_F(TestRecordStorage, TestFlashBusy) {
+	NodeIndexSetter setter(0);
 	logt("WARNING", "---- CLEANUP ----");
 
 	//Setup
@@ -398,6 +406,7 @@ TEST_F(TestRecordStorage, TestFlashBusy) {
 }
 
 TEST_F(TestRecordStorage, TestAsyncQueuing) {
+	NodeIndexSetter setter(0);
 	logt("WARNING", "---- CLEANUP ----");
 
 	//Setup
@@ -460,6 +469,7 @@ TEST_F(TestRecordStorage, TestAsyncQueuing) {
 u8 testBuffer[MULTI_RECORD_TEST_RECORD_MAX_SIZE * MULTI_RECORD_TEST_NUM_RECORD_IDS];
 
 TEST_F(TestRecordStorage, TestRandomMultiRecordUpdates) {
+	NodeIndexSetter setter(0);
 	logt("WARNING", "---- TEST RANDOM MULTI RECORD UPDATE ----");
 
 	//Setup

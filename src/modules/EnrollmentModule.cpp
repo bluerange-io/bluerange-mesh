@@ -532,6 +532,21 @@ void EnrollmentModule::Enroll(connPacketModule const * packet, u16 packetLength)
 		return;
 	}
 
+#if IS_ACTIVE(SIG_MESH)
+	if (SigAccessLayer::getInstance().IsEnrollableWithAutoProvisioning() == false)
+	{
+		//The SigAccessLayer uses the nodeId from the enrollment to reserve an address range
+		//for its elements. If the configuration of the SigAccessLayer is incorrect (e.g.
+		//too many elements), the most safe thing we can do is fail the enrollment as else
+		//we run the risk of having clashes in the SigAddress number space.
+		SendEnrollmentResponse(
+			EnrollmentModuleActionResponseMessages::ENROLLMENT_RESPONSE,
+			EnrollmentResponseCode::SIG_CONFIGURATION_INVALID,
+			packet->requestHandle);
+		return;
+	}
+#endif //IS_ACTIVE(SIG_MESH)
+
 	StoreTemporaryEnrollmentDataAndDispatch(packet, packetLength);
 
 }
@@ -789,7 +804,6 @@ void EnrollmentModule::EnrollOverMesh(connPacketModule const * packet, u16 packe
 	logt("ENROLLMOD", "Received Enrollment over the mesh request");
 
 	EnrollmentModuleSetEnrollmentBySerialMessage const * data = (EnrollmentModuleSetEnrollmentBySerialMessage const *)packet->data;
-
 
 	u32 rand = Utility::GetRandomInteger();
 

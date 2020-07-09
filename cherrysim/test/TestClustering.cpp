@@ -60,6 +60,7 @@ void DoClusteringTestImportedFromJson(const std::string &site, const std::string
 		simConfig.importFromJson = true;
 		simConfig.siteJsonPath = site;
 		simConfig.devicesJsonPath = device;
+		simConfig.terminalId = -1;
 		//testerConfig.verbose = true;
 
 		simConfig.defaultBleStackType = config.bleStack;
@@ -90,6 +91,7 @@ TEST_P(MultiStackFixture, TestBasicClustering) {
 		//Run with the parametrized config
 		simConfig.nodeConfigName.insert({ config.featuresetName.c_str(), 10 });
 		simConfig.defaultBleStackType = config.bleStack;
+		simConfig.terminalId = -1;
 
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 		tester.Start();
@@ -172,6 +174,7 @@ TEST(TestClustering, TestClusteringWithManySdBusy) {
 		simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 10 } );
 		simConfig.sdBusyProbability = 0.5;
 		simConfig.connectionTimeoutProbabilityPerSec = 0;
+		simConfig.terminalId = -1;
 
 		CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 		tester.Start();
@@ -421,7 +424,7 @@ TEST(TestClustering, SimulateLongevity_long) {
 
 i32 determineHopsToSink(nodeEntry* node, std::vector<nodeEntry*>& visitedNodes)
 {
-	cherrySimInstance->setNode(node->id - 1);
+	cherrySimInstance->SetNode(node->id - 1);
 	if (GET_DEVICE_TYPE() == DeviceType::SINK) {
 		return 0;
 	}

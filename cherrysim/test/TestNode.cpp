@@ -93,7 +93,7 @@ TEST(TestNode, TestCommands) {
 	tester.SendTerminalCommand(1, "start");
 	tester.SimulateUntilMessageReceived(10 * 1000, 1, "Starting state machine.");
 
-	tester.sim->setNode(0);
+	NodeIndexSetter setter(0);
 	BaseConnections bc = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
 	ASSERT_EQ(bc.count, 1);
 	tester.SendTerminalCommand(1, "gap_disconnect %d", bc.handles[0].GetConnection()->connectionHandle);
@@ -216,7 +216,7 @@ TEST(TestNode, TestCRCValidation)
 	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	//Make sure that the commands are working without CRC...
-	tester.sim->setNode(0);
+	NodeIndexSetter setter(0);
 	GS->terminal.DisableCrcChecks();
 	tester.SendTerminalCommand(1, "action this status get_status");
 	tester.SimulateUntilMessageReceived(1 * 1000, 1, "\"type\":\"status\",\"");
@@ -328,7 +328,7 @@ TEST(TestNode, TestPreferredConnections) {
 	tester.SimulateUntilClusteringDone(100 * 1000);
 
 	for (u32 i = 0; i < tester.sim->getTotalNodes(); i++) {
-		tester.sim->setNode(i);
+		NodeIndexSetter setter(i);
 		const nodeEntry* node = &(tester.sim->nodes[i]);
 		const MeshConnections conns = node->gs.cm.GetMeshConnections(ConnectionDirection::INVALID);
 

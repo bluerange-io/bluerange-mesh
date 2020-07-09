@@ -241,10 +241,11 @@ enum class LiveReportHandshakeFailCode : u8
 
 enum class PinsetIdentifier : u16 {
 	UNKNOWN = 0,
-	BME280 = 1,
-	LIS2DH12 = 2,
-	TLV493D = 3,
-	BMG250 = 4
+	BME280 = 1, //Barometer
+	LIS2DH12 = 2, //Accelerometer
+	TLV493D = 3, //Magnetometer
+	BMG250 = 4, //Gyroscope
+	GDEWO27W3 = 5, //Eink Display
 };
 
 struct CustomPins {
@@ -289,6 +290,17 @@ struct Lis2dh12Pins : CustomPins {
 	i32 interrupt2Pin = -1;//movement detection interrupt is on pin 2
 	i32 sensorEnablePin = -1;//if equal to -1 means that enable Pin is not present
 	bool sensorEnablePinActiveHigh = true;
+};
+
+struct Gdewo27w3Pins : CustomPins {
+	i32 dcPin = -1;
+	i32 mosiPin = -1;
+	i32 sckPin = -1;
+	i32 ssPin = -1;
+	i32 resPin = -1;
+	i32 busyPin = -1;
+	i32 epdEnablePin = -1;
+	bool epdEnablePinActiveHigh = true;
 };
 
 //A struct that combines a data pointer and the accompanying length

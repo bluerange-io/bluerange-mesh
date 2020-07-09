@@ -133,7 +133,7 @@ extern "C" {
 #define ACTIVATE_EINK_MODULE 1
 #define ACTIVATE_ASSET_MODULE 1
 #define ACTIVATE_VS_MODULE 1
-#define ACTIVATE_WM_MODULE 0
+#define ACTIVATE_WM_MODULE 1
 #define ACTIVATE_MODBUS_MODULE 1
 #define ACTIVATE_MODBUS_COMM 1
 #define ACTIVATE_INS 1
@@ -283,7 +283,6 @@ typedef enum
 	NRF_UART_PARITY_EXCLUDED = 1,//Not the original value!
 } nrf_uart_parity_t;
 
-
 #define NRF_UART_INT_MASK_RXTO 0 //Not the original value!
 #define NRF_WDT_RR0 0
 #define NRF_WDT_TASK_START 0
@@ -296,10 +295,12 @@ typedef enum
 
 void nrf_gpio_pin_set(uint32_t pin_number);
 void nrf_gpio_pin_clear(uint32_t pin_number);
+uint32_t  nrf_gpio_pin_read(uint32_t pin);
 void nrf_gpio_pin_toggle(uint32_t pin_number);
 void nrf_gpio_cfg_default(uint32_t pin_number);
 void nrf_gpio_cfg_output(uint32_t pin_number);
 void nrf_gpio_cfg_input(uint32_t pin_number, nrf_gpio_pin_pull_t pull_config);
+uint32_t nrf_gpio_pin_read(uint32_t pin_number);
 void nrf_uart_baudrate_set(NRF_UART_Type *p_reg, nrf_uart_baudrate_t baudrate);
 void nrf_uart_configure(NRF_UART_Type *p_reg, nrf_uart_parity_t parity, nrf_uart_hwfc_t hwfc);
 void nrf_uart_txrx_pins_set(NRF_UART_Type *p_reg, uint32_t pseltxd, uint32_t pselrxd);

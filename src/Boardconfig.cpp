@@ -73,6 +73,8 @@ void Boardconf::ResetToDefaultConfiguration()
 	configuration.calibratedTX = -60;
 	configuration.lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_RC;
 	configuration.lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_500_PPM; //Use a safe default if this is not given
+	configuration.displayWidth = 400;
+	configuration.displayHeight = 300;
 	configuration.batteryAdcInputPin = -1;
 	configuration.batteryMeasurementEnablePin = -1;
 	configuration.voltageDividerR1 = 0;

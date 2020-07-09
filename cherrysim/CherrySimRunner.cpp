@@ -233,7 +233,7 @@ void CherrySimRunner::Start()
 
 		//Boot up all nodes
 		for (u32 i = 0; i < sim->getTotalNodes(); i++) {
-			sim->setNode(i);
+			NodeIndexSetter setter(i);
 			sim->bootCurrentNode();
 		}
 
@@ -273,7 +273,7 @@ bool CherrySimRunner::Simulate()
 				auto nodeIndizesToReset = CherrySimUtils::generateRandomNumbers(0, numNoneAssetNodes - 1, numNodesToReset);
 
 				for (auto const nodeIdx : nodeIndizesToReset) {
-					sim->setNode(nodeIdx);
+					NodeIndexSetter setter(nodeIdx);
 					try {
 						sim->resetCurrentNode(RebootReason::UNKNOWN);
 					}

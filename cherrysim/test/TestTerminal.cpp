@@ -46,6 +46,7 @@ TEST(TestTerminal, TestTokenizeLine) {
 
 	for (int i = 0; i < 2; i++)	//There are some direct memory accesses so we just repeat the test once.
 	{
+		NodeIndexSetter setter(0);
 		char line[] = "This will be tokenized! Also with ~some special chars! This !is !one !token!";
 		Terminal::getInstance().TokenizeLine(line, sizeof(line));
 		ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[0], &(line[0 ])); ASSERT_STREQ(&(line[0 ]), "This");

@@ -92,8 +92,8 @@ TEST(TestDebugModule, TestCommands) {
 	tester.SendTerminalCommand(1, "action 2 debug flood 1 1 10 100");
 	tester.SimulateUntilMessageReceived(10 * 1000, 1, "Resetting flood counter.");
 	tester.SimulateForGivenTime(100 * 1000);
-	
-	tester.sim->setNode(0);
+
+	NodeIndexSetter setter(0);
 	ASSERT_GT(static_cast<DebugModule*>(tester.sim->findNodeById(1)->gs.node.GetModuleById(ModuleId::DEBUG_MODULE))->getPacketsIn(), (u32)95);
 
 	tester.SendTerminalCommand(1, "action 2 debug ping 1 r");

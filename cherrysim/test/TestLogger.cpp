@@ -43,6 +43,7 @@ TEST(TestLogger, TestTags) {
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
+	NodeIndexSetter setter(0);
 	auto tag = "TEST123";
 	ASSERT_FALSE(Logger::getInstance().IsTagEnabled(tag));
 	Logger::getInstance().enableTag(tag);

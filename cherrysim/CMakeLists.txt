@@ -39,6 +39,7 @@ list(APPEND LOCAL_INC             ${gtest_include_dir}
                                   # is used to simulate a Nordic Integrated Circuit.
                                   # See: https://devzone.nordicsemi.com/f/nordic-q-a/57615/legal-issue-using-nordic-sdk-code
                                   "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/ble/common"
+				  "${PROJECT_SOURCE_DIR}/sdk/config_nrf52"
                                   "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/ble/ble_db_discovery"
                                   "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/ble/ble_radio_notification"
                                   "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/ble/ble_services/ble_dfu"

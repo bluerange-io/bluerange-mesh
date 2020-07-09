@@ -230,6 +230,7 @@ void CherrySim::PrepareSimulatedFeatureSets()
 #ifndef GITHUB_RELEASE
 	AddSimulatedFeatureSet(prod_sink_nrf52);
 	AddSimulatedFeatureSet(prod_mesh_nrf52);
+	AddSimulatedFeatureSet(prod_mesh_usb_nrf52840);
 	AddSimulatedFeatureSet(dev_vslog);
 	AddSimulatedFeatureSet(prod_vs_nrf52);
 	AddSimulatedFeatureSet(prod_clc_mesh_nrf52);
@@ -241,6 +242,7 @@ void CherrySim::PrepareSimulatedFeatureSets()
 	AddSimulatedFeatureSet(prod_pcbridge_nrf52);
 	AddSimulatedFeatureSet(prod_wm_nrf52840);
 	AddSimulatedFeatureSet(prod_bp_nrf52840);
+	AddSimulatedFeatureSet(prod_eink_nrf52);
 	//AssetNodes will be assigned the last nodeIds
 	AddSimulatedFeatureSet(prod_asset_ins_nrf52840);
 	AddSimulatedFeatureSet(prod_asset_nrf52);
@@ -336,7 +338,7 @@ CherrySim::~CherrySim()
 
 	//Clean up up all nodes
 	for (u32 i = 0; i < getTotalNodes(); i++) {
-		setNode(i);
+		NodeIndexSetter setter(i);
 		shutdownCurrentNode();
 	}
 
@@ -415,6 +417,7 @@ void CherrySim::Init()
 //This will load the site data from a json and will read the device json to import all devices
 void CherrySim::importDataFromJson()
 {
+	simConfig.nodeConfigName.clear();
 	//Load the site json
 	std::ifstream siteJsonStream(simConfig.siteJsonPath);
 	json siteJson;
@@ -430,14 +433,43 @@ void CherrySim::importDataFromJson()
 	simConfig.mapHeightInMeters = siteJson["results"][0]["heightInMeter"];
 
 	//Get number of nodes
-	u32 j = 0;
-	for (size_t i = 0; i < devicesJson["results"].size(); i++) {
-		if (devicesJson["results"][i]["platform"] == "BLENODE" && (devicesJson["results"][i]["properties"]["onMap"] == true || devicesJson["results"][i]["properties"]["onMap"] == "true")) {
-			j++;
+	for (size_t i = 0; i < devicesJson["results"].size(); i++) 
+	{
+		if ((devicesJson["results"][i]["platform"] == "BLENODE" ||
+			 devicesJson["results"][i]["platform"] == "ASSET" ||
+			 devicesJson["results"][i]["platform"] == "EDGEROUTER") &&
+			(devicesJson["results"][i]["properties"]["onMap"] == true || devicesJson["results"][i]["properties"]["onMap"] == "true"))
+		{
+			bool available = (devicesJson["results"][i]["properties"].contains("cherrySimFeatureSet"));
+			if (available)
+			{
+				auto featuresetAlreadyInserted = simConfig.nodeConfigName.find(devicesJson["results"][i]["properties"]["cherrySimFeatureSet"]);
+				if (featuresetAlreadyInserted != simConfig.nodeConfigName.end())
+				{
+					u8 count = featuresetAlreadyInserted->second + 1;
+					simConfig.nodeConfigName.insert_or_assign(devicesJson["results"][i]["properties"]["cherrySimFeatureSet"], count );
+				}
+				else
+				{
+					simConfig.nodeConfigName.insert({ devicesJson["results"][i]["properties"]["cherrySimFeatureSet"], 1 });
+				}
+			}
+			else
+			{
+				auto featuresetAlreadyInserted = simConfig.nodeConfigName.find((devicesJson["results"][i]["platform"] == "EDGEROUTER") ? "prod_sink_nrf52" : "prod_mesh_nrf52");
+				if (featuresetAlreadyInserted != simConfig.nodeConfigName.end())
+				{
+					u8 count = featuresetAlreadyInserted->second + 1;
+					simConfig.nodeConfigName.insert_or_assign((devicesJson["results"][i]["platform"] == "EDGEROUTER") ? "prod_sink_nrf52" : "prod_mesh_nrf52", count);
+				}
+				else
+				{
+					simConfig.nodeConfigName.insert({(devicesJson["results"][i]["platform"] == "EDGEROUTER") ? "prod_sink_nrf52" : "prod_mesh_nrf52", 1 });
+				}
+
+			}
 		}
 	}
-
-	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", j });
 }
 
 //This will read the device json and will set all the node positions from it
@@ -450,8 +482,13 @@ void CherrySim::importPositionsFromJson()
 
 	//Get other data from our devices
 	int j = 0;
-	for (u32 i = 0; i < devicesJson["results"].size(); i++) {
-		if (devicesJson["results"][i]["platform"] == "BLENODE" && (devicesJson["results"][i]["properties"]["onMap"] == true || devicesJson["results"][i]["properties"]["onMap"] == "true")) {
+	for (u32 i = 0; i < devicesJson["results"].size(); i++) 
+	{
+		if ((devicesJson["results"][i]["platform"] == "BLENODE" ||
+			 devicesJson["results"][i]["platform"] == "EDGEROUTER" ||
+			 devicesJson["results"][i]["platform"] == "ASSET") &&
+			(devicesJson["results"][i]["properties"]["onMap"] == true || devicesJson["results"][i]["properties"]["onMap"] == "true"))
+		{
 			if (std::string("number") == devicesJson["results"][i]["properties"]["x"].type_name())
 			{
 				nodes[j].x = devicesJson["results"][i]["properties"]["x"];
@@ -724,7 +761,7 @@ void CherrySim::SimulateStepForAllNodes()
 
 	int64_t sumOfAllSimulatedFrames = 0;
 	for (u32 i = 0; i < getTotalNodes(); i++) {
-		setNode(i);
+		NodeIndexSetter setter(i);
 		sumOfAllSimulatedFrames += currentNode->simulatedFrames;
 	}
 	const int64_t avgSimulatedFrames = sumOfAllSimulatedFrames / getTotalNodes();
@@ -732,14 +769,14 @@ void CherrySim::SimulateStepForAllNodes()
 	size_t s = replayRecordEntries.size(); //Meant to be used as a break point condition.
 	while ((s = replayRecordEntries.size()) > 0 && replayRecordEntries.front().time <= simState.simTimeMs)
 	{
-		setNode(replayRecordEntries.front().index);
+		NodeIndexSetter setter(replayRecordEntries.front().index);
 		GS->terminal.PutIntoTerminalCommandQueue(replayRecordEntries.front().command, false);
 		replayRecordEntries.pop();
 	}
 
 	//printf("-- %u --" EOL, simState.simTimeMs);
 	for (u32 i = 0; i < getTotalNodes(); i++) {
-		setNode(i);
+		NodeIndexSetter setter(i);
 		bool simulateNode = true;
 		if (simConfig.simulateJittering)
 		{
@@ -787,9 +824,7 @@ void CherrySim::SimulateStepForAllNodes()
 	if(simConfig.enableClusteringValidityCheck) CheckMeshingConsistency();
 
 	simState.simTimeMs += simConfig.simTickDurationMs;
-	//Initialize RNG with new seed in order to be able to jump to a frame and resimulate it
-	simState.rnd.setSeed(simState.simTimeMs + simConfig.seed);
-
+	
 	//Back up the flash every flashToFileWriteInterval's step.
 	flashToFileWriteCycle++;
 	if (flashToFileWriteCycle % flashToFileWriteInterval == 0) StoreFlashToFile();
@@ -1397,8 +1432,19 @@ void CherrySim::TerminalPrintHandler(const char* message)
 /**
 Redirects all pointers used by the FruityMesh implementation to point to the correct data for the node
 */
-void CherrySim::setNode(u32 i)
+void CherrySim::SetNode(u32 i)
 {
+	if (i == 0xFFFFFFFF)
+	{
+		currentNode       = nullptr;
+		simGlobalStatePtr = nullptr;
+		simFicrPtr        = nullptr;
+		simUicrPtr        = nullptr;
+		simGpioPtr        = nullptr;
+		simFlashPtr       = nullptr;
+		simUartPtr        = nullptr;
+		return;
+	}
 	if (i >= getTotalNodes())
 	{
 		std::cerr << "Tried to access node: " << i << std::endl;
@@ -1490,7 +1536,7 @@ void CherrySim::CheckForMultiTensorflowUsage()
 	u32 amountOfTensorflowUsers = 0;
 	for (u32 i = 0; i < getTotalNodes(); i++)
 	{
-		setNode(i);
+		NodeIndexSetter setter(i);
 		AssetModule *assetMod = static_cast<AssetModule*>(GS->node.GetModuleById(ModuleId::ASSET_MODULE));
 
 		if (assetMod != nullptr && assetMod->useIns)
@@ -1764,7 +1810,7 @@ void CherrySim::resetCurrentNode(RebootReason rebootReason, bool throwException)
 	}
 
 	//Boot node again
-	setNode(index);
+	NodeIndexSetter setter(index);
 	if (rebootReason != RebootReason::UNKNOWN)
 	{
 		currentNode->rebootReason = rebootReason;

@@ -68,7 +68,7 @@ TEST(TestScanningModule, TestCommands) {
 	assetPacket->serialNumberIndex = 10;
 	assetPacket->nodeId = 1337;
 
-	tester.sim->setNode(0);
+	NodeIndexSetter setter(0);
 	FruityHal::DispatchBleEvents(&evt);
 	tester.SimulateGivenNumberOfSteps(1);
 

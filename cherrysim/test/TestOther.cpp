@@ -85,7 +85,7 @@ TEST(TestOther, TestRebootReason)
 	tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"type\":\"reboot_reason\",\"nodeId\":1,\"module\":3,\"reason\":7");
 
 	//After a successful boot, the node should no longer report RebootReason::UNKNOWN but RebootReason::UNKNOWN_BUT_BOOTED
-	tester.sim->setNode(0);
+	NodeIndexSetter setter(0);
 	tester.sim->resetCurrentNode(RebootReason::UNKNOWN, false);
 	tester.SendTerminalCommand(1, "action this status get_rebootreason");
 	tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"type\":\"reboot_reason\",\"nodeId\":1,\"module\":3,\"reason\":22");
@@ -491,6 +491,7 @@ TEST(TestOther, TestEncryption) {
 
 	StackBaseSetter sbs;
 
+	NodeIndexSetter setter(0);
 	Utility::Aes128BlockEncrypt((Aes128Block*)cleartext, (Aes128Block*)key, (Aes128Block*)ciphertext);
 
 	ccm_soft_data_t ccme;
@@ -551,6 +552,7 @@ TEST(TestOther, TestConnectionAllocator) {
 	mt.setSeed(1);
 
 	std::vector<BaseConnection*> conns;
+	NodeIndexSetter setter(0);
 
 	for (int i = 0; i < 10000; i++) 
 	{
@@ -628,7 +630,7 @@ TEST(TestOther, TestGattcEvtTimeoutReporting) {
 	tester.SimulateUntilClusteringDone(10 * 1000);
 
 	//Find the mesh connection to the other node
-	tester.sim->setNode(0);
+	NodeIndexSetter setter(0);
 	BaseConnections conns = tester.sim->nodes[0].gs.cm.GetConnectionsOfType(ConnectionType::FRUITYMESH, ConnectionDirection::INVALID);
 	MeshConnection* conn = nullptr;
 	for (int i = 0; i < conns.count; i++)
@@ -675,12 +677,12 @@ TEST(TestOther, TestTimeSync) {
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
 
-	tester.SimulateUntilClusteringDone(100 * 1000);
+	tester.SimulateUntilClusteringDone(1000 * 1000);
 
 	//Test that all connections are unsynced
 	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "status");
-		tester.SimulateUntilMessageReceived(10 * 1000, i, "tSync:0");
+		tester.SimulateUntilMessageReceived(100 * 1000, i, "tSync:0");
 	}
 
 	//Set the time of node 1. This node will then start propagating the time through the mesh.
@@ -690,16 +692,16 @@ TEST(TestOther, TestTimeSync) {
 	//Test that all connections are synced
 	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "status");
-		tester.SimulateUntilMessageReceived(100, i, "tSync:2");
+		tester.SimulateUntilMessageReceived(1000, i, "tSync:2");
 	}
 
 	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "gettime");
-		tester.SimulateUntilMessageReceived(10 * 1000, i, "Time is currently approx. 2019 years");
+		tester.SimulateUntilMessageReceived(100 * 1000, i, "Time is currently approx. 2019 years");
 	}
 
 	//Check that time is running and simulate 10 seconds of passing time...
-	tester.sim->setNode(0);
+	NodeIndexSetter setter(0);
 	auto start = tester.sim->currentNode->gs.timeManager.GetTime();
 	tester.SimulateForGivenTime(10 * 1000);
 
@@ -720,7 +722,7 @@ TEST(TestOther, TestTimeSync) {
 	//Give the nodes time to reset
 	tester.SimulateForGivenTime(15 * 1000);
 	//Wait until they clustered
-	tester.SimulateUntilClusteringDone(100 * 1000);
+	tester.SimulateUntilClusteringDone(1000 * 1000);
 	//Wait until they have synced their time
 	tester.SimulateForGivenTime(60 * 1000);
 
@@ -733,7 +735,7 @@ TEST(TestOther, TestTimeSync) {
 	//Check that the time has been correctly sent to each node again.
 	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "gettime");
-		tester.SimulateUntilMessageReceived(10 * 1000, i, "Time is currently approx. 2019 years");
+		tester.SimulateUntilMessageReceived(100 * 1000, i, "Time is currently approx. 2019 years");
 	}
 
 	//Set the time again, to some higher value (also checks for year 2038 problem)
@@ -742,7 +744,7 @@ TEST(TestOther, TestTimeSync) {
 
 	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "gettime");
-		tester.SimulateUntilMessageReceived(10 * 1000, i, "Time is currently approx. 2063 years");
+		tester.SimulateUntilMessageReceived(100 * 1000, i, "Time is currently approx. 2063 years");
 	}
 
 	//... and to some lower value
@@ -752,7 +754,7 @@ TEST(TestOther, TestTimeSync) {
 
 	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "gettime");
-		tester.SimulateUntilMessageReceived(10 * 1000, i, "Time is currently approx. 2009 years");
+		tester.SimulateUntilMessageReceived(100 * 1000, i, "Time is currently approx. 2009 years");
 	}
 
 	// Test positive offset...
@@ -761,7 +763,7 @@ TEST(TestOther, TestTimeSync) {
 
 	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "gettime");
-		tester.SimulateUntilMessageReceived(10 * 1000, i, "Time is currently approx. 1970 years, 1 days, 03h");
+		tester.SimulateUntilMessageReceived(100 * 1000, i, "Time is currently approx. 1970 years, 1 days, 03h");
 	}
 
 	// ... and negative offset
@@ -770,7 +772,7 @@ TEST(TestOther, TestTimeSync) {
 
 	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "gettime");
-		tester.SimulateUntilMessageReceived(10 * 1000, i, "Time is currently approx. 1970 years, 1 days, 01h");
+		tester.SimulateUntilMessageReceived(100 * 1000, i, "Time is currently approx. 1970 years, 1 days, 01h");
 	}
 
 	// Test edge case where the offset is larger than the time itself. In such a case the offset should be ignored.
@@ -779,7 +781,7 @@ TEST(TestOther, TestTimeSync) {
 
 	for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
 		tester.SendTerminalCommand(i, "gettime");
-		tester.SimulateUntilMessageReceived(10 * 1000, i, "Time is currently approx. 1970 years, 1 days, 02h");
+		tester.SimulateUntilMessageReceived(100 * 1000, i, "Time is currently approx. 1970 years, 1 days, 02h");
 	}
 }
 
@@ -834,6 +836,7 @@ TEST(TestOther, TestRestrainedKeyGeneration) {
 	char restrainedKeyHexBuffer[1024];
 	u8 restrainedKeyBuffer[1024];
 	StackBaseSetter sbs;
+	NodeIndexSetter setter(0);
 
 	tester.SendTerminalCommand(1, "set_node_key 00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF");
 	tester.SimulateGivenNumberOfSteps(1);
@@ -920,12 +923,6 @@ TEST(TestOther, TestBulkMode) {
 
 	tester.Start();
 
-	/*for (u32 i = 0; i < simConfig.numNodes; i++)
-	{
-		tester.sim->setNode(i);
-		Logger::getInstance().enableAll();
-	}*/
-
 	tester.SimulateForGivenTime(10 * 1000); //Simulate a little to calculate battery usage.
 
 	u32 usageMicroAmpere = tester.sim->nodes[0].nanoAmperePerMsTotal / tester.sim->simState.simTimeMs;
@@ -996,6 +993,7 @@ TEST(TestOther, TestWatchdog) {
 		tester.SimulateForGivenTime(2000); //Starve it and give it some time to reboot.
 		ASSERT_EQ(tester.sim->nodes[0].restartCounter, 2);
 
+		NodeIndexSetter setter(0);
 		ASSERT_EQ(*GS->rebootMagicNumberPtr, REBOOT_MAGIC_NUMBER); // Check whether it is in safeBoot mode
 
 		tester.SimulateForGivenTime(starvationTimeSafeBoot); //Starve it in safe boot mode and hence shorter watchdog delays
@@ -1061,6 +1059,8 @@ TEST(TestOther, TestBoards) {
 	simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
 	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 	tester.Start();
+
+	NodeIndexSetter setter(0);
 
 	BoardConfiguration c;
 

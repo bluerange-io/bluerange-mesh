@@ -110,6 +110,7 @@ namespace Utility
 	bool Contains(const u8* data, const u32 length, const u8 searchValue);
 
 	bool IsPowerOfTwo(u32 val);
+	u32 NextMultipleOf(u32 val, u32 multiple);
 
 	NodeId TerminalArgumentToNodeId(const char* arg, bool* didError = nullptr);
 

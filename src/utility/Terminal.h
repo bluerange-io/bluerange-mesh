@@ -117,6 +117,8 @@ private:
 
 	bool receivedProcessableLine = false;
 
+	void ProcessTerminalCommandHandlerReturnType(TerminalCommandHandlerReturnType handled, i32 commandArgsSize);
+
 public:
 	static Terminal& getInstance();
 

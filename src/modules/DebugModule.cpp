@@ -575,18 +575,26 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 		if(TERMARGS(1, "uicr")) offset = (u32)FruityHal::GetUserMemoryAddress();
 		if(TERMARGS(1, "ficr")) offset = (u32)FruityHal::GetDeviceMemoryAddress();
 		if(TERMARGS(1, "ram")) offset = (u32)0x20000000;
+		bool didError = false;
 
 		u16 numBlocks = 1;
 		if(commandArgsSize > 2){
-			numBlocks = Utility::StringToU16(commandArgs[2]);
+			numBlocks = Utility::StringToU16(commandArgs[2], &didError);
+			if (didError)
+			{
+				return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+			}
 		}
 
 		u32 bufferSize = 32;
 		DYNAMIC_ARRAY(buffer, bufferSize);
 		DYNAMIC_ARRAY(charBuffer, bufferSize * 3 + 1);
-
 		for(int j=0; j<numBlocks; j++){
-			u16 block = Utility::StringToU16(commandArgs[1]) + j;
+			u32 block = Utility::StringToU32(commandArgs[1], &didError) + j;
+			if (didError)
+			{
+				return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+			}
 
 			for(u32 i=0; i<blockSize/bufferSize; i++)
 			{

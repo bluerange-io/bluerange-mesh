@@ -311,6 +311,21 @@ void BootModules()
 		GS->activeModules[i]->LoadModuleConfigurationAndStart();
 	}
 
+#if IS_ACTIVE(SIG_MESH)
+	if (GS->node.configuration.enrollmentState == EnrollmentState::ENROLLED
+		&& GS->node.configuration.nodeId >= NODE_ID_DEVICE_BASE
+		&& GS->node.configuration.nodeId < NODE_ID_DEVICE_BASE + NODE_ID_DEVICE_BASE_SIZE
+		&& GET_DEVICE_TYPE() != DeviceType::ASSET)
+	{
+		ErrorType err = (ErrorType)SigAccessLayer::getInstance().ProvisionNodeWithNodeId(GS->node.configuration.nodeId);
+		if (err != ErrorType::SUCCESS)
+		{
+			SIMEXCEPTION(SigProvisioningFailedException);
+			GS->logger.logCustomError(CustomErrorTypes::FATAL_SIG_PROVISIONING_FAILED, 1000);
+		}
+	}
+#endif //IS_ACTIVE(SIG_MESH)
+
 	//Configure a periodic timer that will call the TimerEventHandlers
 #ifndef SIM_ENABLED
 	logt("ERROR", "Timer start");
@@ -378,6 +393,10 @@ void DispatchTimerEvents(u16 passedTimeDs)
 	AdvertisingController::getInstance().TimerEventHandler(passedTimeDs);
 
 	ScanController::getInstance().TimerEventHandler(passedTimeDs);
+
+#if IS_ACTIVE(SIG_MESH)
+	GS->sig.TimerEventHandler(passedTimeDs);
+#endif
 
 	//Dispatch event to all modules
 	for(u32 i=0; i<GS->amountOfModules; i++){

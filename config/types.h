@@ -158,6 +158,7 @@ enum class FeatureSetGroup : NodeId
 	/*FruityDeploy-FeatureSetGroup*/NRF52840_SINK_USB     = 20017,
 	/*FruityDeploy-FeatureSetGroup*/NRF52840_MESH_USB     = 20018,
 	/*FruityDeploy-FeatureSetGroup*/NRF52840_BP_MESH      = 20019,
+	/*FruityDeploy-FeatureSetGroup*/NRF52_EINK            = 20020,
 };
 
 //Sets the maximum number of firmware group ids that can be compiled into the firmware

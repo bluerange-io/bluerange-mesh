@@ -157,6 +157,99 @@ void Terminal::Init()
 #endif //IS_ACTIVE(UART)
 }
 
+void Terminal::ProcessTerminalCommandHandlerReturnType(TerminalCommandHandlerReturnType handled, i32 commandArgsSize)
+{
+	//Output result
+	if (handled == TerminalCommandHandlerReturnType::UNKNOWN)
+	{
+		if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
+		{
+			log_transport_putstring("Command not found:");
+			for (u32 i = 0; i < (u8)commandArgsSize; i++)
+			{
+				log_transport_putstring(" ");
+				log_transport_putstring(commandArgsPtr[i]);
+			}
+			log_transport_putstring(EOL);
+		}
+		else
+		{
+			logjson_partial("ERROR", "{\"type\":\"error\",\"code\":1,\"text\":\"Command not found:");
+			for (u32 i = 0; i < (u8)commandArgsSize; i++)
+			{
+				logjson_partial("ERROR", " %s", commandArgsPtr[i]);
+			}
+			logjson("ERROR", "\"}" SEP);
+		}
+#ifdef CHERRYSIM_TESTER_ENABLED
+		SIMEXCEPTION(CommandNotFoundException);
+#endif
+	}
+	else if (handled == TerminalCommandHandlerReturnType::SUCCESS)
+	{
+		if (Conf::getInstance().terminalMode == TerminalMode::JSON)
+		{
+			logjson_error(Logger::UartErrorType::SUCCESS);
+		}
+	}
+	else if (handled == TerminalCommandHandlerReturnType::WRONG_ARGUMENT)
+	{
+		if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
+		{
+			log_transport_putstring("Wrong Arguments" EOL);
+		}
+		else
+		{
+			logjson_error(Logger::UartErrorType::ARGUMENTS_WRONG);
+		}
+#ifdef CHERRYSIM_TESTER_ENABLED
+		SIMEXCEPTION(WrongCommandParameterException);
+#endif
+	}
+	else if (handled == TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS)
+	{
+		if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
+		{
+			log_transport_putstring("Not enough arguments" EOL);
+		}
+		else
+		{
+			logjson_error(Logger::UartErrorType::TOO_FEW_ARGUMENTS);
+		}
+#ifdef CHERRYSIM_TESTER_ENABLED
+		SIMEXCEPTION(TooFewParameterException);
+#endif
+	}
+	else if (handled == TerminalCommandHandlerReturnType::INTERNAL_ERROR)
+	{
+		if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
+		{
+			log_transport_putstring("Internal Terminal Command Error" EOL);
+		}
+		else
+		{
+			logjson_error(Logger::UartErrorType::INTERNAL_ERROR);
+		}
+#ifdef CHERRYSIM_TESTER_ENABLED
+		SIMEXCEPTION(InternalTerminalCommandErrorException);
+#endif
+	}
+
+#if IS_INACTIVE(SAVE_SPACE)
+	else if (handled == TerminalCommandHandlerReturnType::WARN_DEPRECATED)
+	{
+		if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
+		{
+			log_transport_putstring("Warning: Command is marked deprecated!" EOL);
+		}
+		else
+		{
+			logjson_error(Logger::UartErrorType::WARN_DEPRECATED);
+		}
+	}
+#endif
+}
+
 Terminal & Terminal::getInstance()
 {
 	return GS->terminal;
@@ -339,95 +432,7 @@ void Terminal::ProcessLine(char* line)
 	if (handled == TerminalCommandHandlerReturnType::WARN_DEPRECATED) handled = TerminalCommandHandlerReturnType::SUCCESS;
 #endif
 
-
-
-	//Output result
-	if (handled == TerminalCommandHandlerReturnType::UNKNOWN)
-	{
-		if(Conf::getInstance().terminalMode == TerminalMode::PROMPT)
-		{
-			log_transport_putstring("Command not found:" );
-			for (u32 i = 0; i < (u8)commandArgsSize; i++) 
-			{
-				log_transport_putstring(" ");
-				log_transport_putstring(commandArgsPtr[i]);
-			}
-			log_transport_putstring(EOL);
-		} else
-		{
-			logjson_partial("ERROR", "{\"type\":\"error\",\"code\":1,\"text\":\"Command not found:");
-			for (u32 i = 0; i < (u8)commandArgsSize; i++) 
-			{
-				logjson_partial("ERROR", " %s", commandArgsPtr[i]);
-			}
-			logjson("ERROR", "\"}" SEP);
-		}
-#ifdef CHERRYSIM_TESTER_ENABLED
-		SIMEXCEPTION(CommandNotFoundException);
-#endif
-	} else if(handled == TerminalCommandHandlerReturnType::SUCCESS)
-	{
-		if (Conf::getInstance().terminalMode == TerminalMode::JSON)
-		{
-			logjson_error(Logger::UartErrorType::SUCCESS);
-		}
-	}
-	else if (handled == TerminalCommandHandlerReturnType::WRONG_ARGUMENT)
-	{
-		if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
-		{
-			log_transport_putstring("Wrong Arguments" EOL);
-		}
-		else
-		{
-			logjson_error(Logger::UartErrorType::ARGUMENTS_WRONG);
-		}
-#ifdef CHERRYSIM_TESTER_ENABLED
-		SIMEXCEPTION(WrongCommandParameterException);
-#endif
-	}
-	else if (handled == TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS)
-	{
-		if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
-		{
-			log_transport_putstring("Not enough arguments" EOL);
-		}
-		else
-		{
-			logjson_error(Logger::UartErrorType::TOO_FEW_ARGUMENTS);
-		}
-#ifdef CHERRYSIM_TESTER_ENABLED
-		SIMEXCEPTION(TooFewParameterException);
-#endif
-	}
-	else if (handled == TerminalCommandHandlerReturnType::INTERNAL_ERROR)
-	{
-		if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
-		{
-			log_transport_putstring("Internal Terminal Command Error" EOL);
-		}
-		else
-		{
-			logjson_error(Logger::UartErrorType::INTERNAL_ERROR);
-		}
-#ifdef CHERRYSIM_TESTER_ENABLED
-		SIMEXCEPTION(InternalTerminalCommandErrorException);
-#endif
-	}
-
-#if IS_INACTIVE(SAVE_SPACE)
-	else if (handled == TerminalCommandHandlerReturnType::WARN_DEPRECATED)
-	{
-		if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
-		{
-			log_transport_putstring("Warning: Command is marked deprecated!" EOL);
-		}
-		else
-		{
-			logjson_error(Logger::UartErrorType::WARN_DEPRECATED);
-		}
-	}
-#endif
+	ProcessTerminalCommandHandlerReturnType(handled, commandArgsSize);
 #endif
 }
 
@@ -846,24 +851,7 @@ void Terminal::StdioCheckAndProcessLine()
 			//restrictions like command length and amount of tokens.
 			std::cout << "SIM COMMAND: " << message << std::endl;
 			TerminalCommandHandlerReturnType handled = cherrySimInstance->TerminalCommandHandler(message.c_str());
-			switch (handled)
-			{
-#ifdef CHERRYSIM_TESTER_ENABLED
-			case TerminalCommandHandlerReturnType::UNKNOWN:              SIMEXCEPTION(CommandNotFoundException);              break;
-			case TerminalCommandHandlerReturnType::WRONG_ARGUMENT:       SIMEXCEPTION(WrongCommandParameterException);        break;
-			case TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS: SIMEXCEPTION(TooFewParameterException);              break;
-			case TerminalCommandHandlerReturnType::INTERNAL_ERROR:       SIMEXCEPTION(InternalTerminalCommandErrorException); break;
-
-				// Don't do anything with the follow codes.
-			case TerminalCommandHandlerReturnType::WARN_DEPRECATED:
-			case TerminalCommandHandlerReturnType::SUCCESS:
-				break;
-#else
-				// Just so that handled is not unused in other build configs.
-			default:
-				break;
-#endif
-			}
+			ProcessTerminalCommandHandlerReturnType(handled, 0);
 		}
 		else
 		{

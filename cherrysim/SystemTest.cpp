@@ -83,6 +83,7 @@ extern "C"
 	void nrf_gpio_cfg_output(uint32_t pin_number) {}
 	void nrf_gpio_cfg_input(uint32_t pin_number, nrf_gpio_pin_pull_t pull_config) {}
 	void nrf_uart_baudrate_set(NRF_UART_Type *p_reg, nrf_uart_baudrate_t baudrate) {}
+	uint32_t nrf_gpio_pin_read(uint32_t pin) { return 1; }
 	void nrf_uart_configure(NRF_UART_Type *p_reg, nrf_uart_parity_t parity, nrf_uart_hwfc_t hwfc) {}
 	void nrf_uart_txrx_pins_set(NRF_UART_Type *p_reg, uint32_t pseltxd, uint32_t pselrxd) {}
 	void nrf_uart_hwfc_pins_set(NRF_UART_Type *p_reg, uint32_t pselrts, uint32_t pselcts) {}
