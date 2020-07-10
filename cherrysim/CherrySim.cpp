@@ -1566,11 +1566,14 @@ void CherrySim::QueueInterruptCurrentNode(u32 pin)
 
 void CherrySim::QueueAccelerationInterrutCurrentNode()
 {
-	Lis2dh12Pins lis2dh12PinConfig;
-	lis2dh12PinConfig.pinsetIdentifier = PinsetIdentifier::LIS2DH12;
-	GS->boardconf.getCustomPinset(&lis2dh12PinConfig);
-	if (lis2dh12PinConfig.interrupt1Pin != -1) QueueInterruptCurrentNode(lis2dh12PinConfig.interrupt1Pin);
-	if (lis2dh12PinConfig.interrupt2Pin != -1) QueueInterruptCurrentNode(lis2dh12PinConfig.interrupt2Pin);
+	if (GS->boardconf.getCustomPinset != nullptr)
+	{
+		Lis2dh12Pins lis2dh12PinConfig;
+		lis2dh12PinConfig.pinsetIdentifier = PinsetIdentifier::LIS2DH12;
+		GS->boardconf.getCustomPinset(&lis2dh12PinConfig);
+		if (lis2dh12PinConfig.interrupt1Pin != -1) QueueInterruptCurrentNode(lis2dh12PinConfig.interrupt1Pin);
+		if (lis2dh12PinConfig.interrupt2Pin != -1) QueueInterruptCurrentNode(lis2dh12PinConfig.interrupt2Pin);
+	}
 }
 
 /**
