@@ -39,25 +39,25 @@
 
 class TestRecordStorage : public RecordStorageEventListener
 {
-	private:
-		u8* startPage;
-		u16 numPages;
+    private:
+        u8* startPage;
+        u16 numPages;
 
-	public:
-		TestRecordStorage();
+    public:
+        TestRecordStorage();
 
-		void Start();
-		void TestCleanup();
-		void TestSave();
-		void TestRandomSingleRecordUpdates();
-		void TestGetNonExistentRecord();
-		void TestGetNonExistentRecordAfterStore();
-		void TestDeactivateRecord();
-		void TestFlashBusy();
-		void TestAsyncQueuing();
-		void TestRandomMultiRecordUpdates();
+        void Start();
+        void TestCleanup();
+        void TestSave();
+        void TestRandomSingleRecordUpdates();
+        void TestGetNonExistentRecord();
+        void TestGetNonExistentRecordAfterStore();
+        void TestDeactivateRecord();
+        void TestFlashBusy();
+        void TestAsyncQueuing();
+        void TestRandomMultiRecordUpdates();
 
-		void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength);
+        void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength);
 };
 
 #endif

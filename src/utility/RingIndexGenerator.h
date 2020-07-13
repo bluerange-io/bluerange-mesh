@@ -38,13 +38,13 @@
 class RingIndexGenerator
 {
 private:
-	u32 localIndex = 0;
-	const u32 startIndex;
-	const u32 arrayLength;
+    u32 localIndex = 0;
+    const u32 startIndex;
+    const u32 arrayLength;
 
 public:
-	RingIndexGenerator(u32 startIndex, u32 arrayLength);
+    RingIndexGenerator(u32 startIndex, u32 arrayLength);
 
-	u32 Next();
-	bool HasNext() const;
+    u32 Next();
+    bool HasNext() const;
 };

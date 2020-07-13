@@ -34,17 +34,17 @@ constexpr static u32 ticksPerSecond = 32768; // The amount of ticks it takes for
 
 class TimePoint {
 private:
-	u32 unixTime;
-	u32 additionalTicks;
+    u32 unixTime;
+    u32 additionalTicks;
 public:
-	TimePoint(u32 unixTime, u32 additionalTicks);
-	TimePoint();
+    TimePoint(u32 unixTime, u32 additionalTicks);
+    TimePoint();
 
-	//The difference between two TimePoints, in ticks 
-	i32 operator-(const TimePoint& other);
-	TimePoint& operator=(const TimePoint& other) = default;
+    //The difference between two TimePoints, in ticks 
+    i32 operator-(const TimePoint& other);
+    TimePoint& operator=(const TimePoint& other) = default;
 
-	u32 getAdditionalTicks();
+    u32 getAdditionalTicks();
 };
 
 
@@ -54,38 +54,38 @@ public:
  */
 class TimeManager {
 private:
-	u32 syncTime = 0; // The sync time is a timestamp that describes since when the time is synced and progragated via the mesh.
-	                  // Note: This is NOT the timestamp when the node was synced but the mesh!
-	u32 timeSinceSyncTime = 0;
-	u32 additionalTicks = 0; // Time that was impossible to store in timeSinceSyncTime, because it is too short (less than one 
-	                         // second). Unit is platform dependent!
+    u32 syncTime = 0; // The sync time is a timestamp that describes since when the time is synced and progragated via the mesh.
+                      // Note: This is NOT the timestamp when the node was synced but the mesh!
+    u32 timeSinceSyncTime = 0;
+    u32 additionalTicks = 0; // Time that was impossible to store in timeSinceSyncTime, because it is too short (less than one 
+                             // second). Unit is platform dependent!
 
-	u32 counter = 0; // Gets incremented every time new data is available. Makes sure that we are always able to set the time, even backwards.
+    u32 counter = 0; // Gets incremented every time new data is available. Makes sure that we are always able to set the time, even backwards.
 
-	i32 offset = 0; // Time Offset in minutes, can be used for time zones
+    i32 offset = 0; // Time Offset in minutes, can be used for time zones
 
-	bool waitingForCorrection = false;
-	bool timeCorrectionReceived = false;
+    bool waitingForCorrection = false;
+    bool timeCorrectionReceived = false;
 
 public:
-	TimeManager();
+    TimeManager();
 
-	u32 GetTime();
-	TimePoint GetTimePoint();
-	void SetTime(u32 syncTime, u32 timeSinceSyncTime, i16 offset, u32 additionalTicks = 0);
-	void SetTime(const TimeSyncInitial& timeSyncIntitialMessage);
-	bool IsTimeSynced() const;
-	bool IsTimeCorrected() const;
+    u32 GetTime();
+    TimePoint GetTimePoint();
+    void SetTime(u32 syncTime, u32 timeSinceSyncTime, i16 offset, u32 additionalTicks = 0);
+    void SetTime(const TimeSyncInitial& timeSyncIntitialMessage);
+    bool IsTimeSynced() const;
+    bool IsTimeCorrected() const;
 
-	void AddTicks(u32 ticks);
-	void AddCorrection(u32 ticks);
-	void ProcessTicks();
-	
-	void HandleUpdateTimestampMessages(connPacketHeader const * packetHeader, u16 dataLength);
+    void AddTicks(u32 ticks);
+    void AddCorrection(u32 ticks);
+    void ProcessTicks();
+    
+    void HandleUpdateTimestampMessages(connPacketHeader const * packetHeader, u16 dataLength);
 
-	//Trivial implementation for converting the timestamp in human readable format
-	//This does not pay respect to any leap seconds, gap years, whatever
-	void convertTimestampToString(char* buffer);
+    //Trivial implementation for converting the timestamp in human readable format
+    //This does not pay respect to any leap seconds, gap years, whatever
+    void convertTimestampToString(char* buffer);
 
-	TimeSyncInitial GetTimeSyncIntialMessage(NodeId receiver) const;
+    TimeSyncInitial GetTimeSyncIntialMessage(NodeId receiver) const;
 };

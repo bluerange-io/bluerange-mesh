@@ -32,23 +32,23 @@
 //PCA10056 - nRF82840 Devkit
 void setBoard_18(BoardConfiguration* c)
 {
-	if(c->boardType == 18)
-	{
-		c->led1Pin =  13;
-		c->led2Pin =  14;
-		c->led3Pin =  15;
-		c->ledActiveHigh =  false;
-		c->button1Pin =  11;
-		c->buttonsActiveHigh =  false;
-		c->uartRXPin =  8;
-		c->uartTXPin =  6;
-		c->uartCTSPin =  7;
-		c->uartRTSPin =  5;
-		c->uartBaudRate = (u32)FruityHal::UartBaudrate::BAUDRATE_1M;
-		c->dBmRX = -90;
-		c->calibratedTX =  -63;
-		c->lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_XTAL;
-		c->lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_20_PPM;
-		c->dcDcEnabled = true;
-	}
+    if(c->boardType == 18)
+    {
+        c->led1Pin =  13;
+        c->led2Pin =  14;
+        c->led3Pin =  15;
+        c->ledActiveHigh =  false;
+        c->button1Pin =  11;
+        c->buttonsActiveHigh =  false;
+        c->uartRXPin =  8;
+        c->uartTXPin =  6;
+        c->uartCTSPin =  7;
+        c->uartRTSPin =  5;
+        c->uartBaudRate = (u32)FruityHal::UartBaudrate::BAUDRATE_1M;
+        c->dBmRX = -90;
+        c->calibratedTX =  -63;
+        c->lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_XTAL;
+        c->lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_20_PPM;
+        c->dcDcEnabled = true;
+    }
 }

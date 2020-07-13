@@ -43,37 +43,37 @@ constexpr u8 PACKET_QUEUED_HANDLE_COUNTER_START = 10;
 
 
 enum class DeliveryOption : u8 {
-	INVALID,
-	WRITE_CMD,
-	WRITE_REQ,
-	NOTIFICATION
+    INVALID,
+    WRITE_CMD,
+    WRITE_REQ,
+    NOTIFICATION
 };
 enum class DeliveryPriority : u8{
-	MESH_INTERNAL_HIGH=0, //Must only be used for mesh relevant data
-	MEDIUM=1,
-	LOW=2,
-	LOWEST=3,
-	INVALID=4,
+    MESH_INTERNAL_HIGH=0, //Must only be used for mesh relevant data
+    MEDIUM=1,
+    LOW=2,
+    LOWEST=3,
+    INVALID=4,
 };
 
 
 typedef struct BaseConnectionSendData {
-	u16 characteristicHandle;
-	DeliveryOption deliveryOption;
-	DeliveryPriority priority;
-	u8 sendHandle;
-	u16 dataLength;
+    u16 characteristicHandle;
+    DeliveryOption deliveryOption;
+    DeliveryPriority priority;
+    u8 sendHandle;
+    u16 dataLength;
 } BaseConnectionSendData;
 
 constexpr size_t SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED = 6;
 #pragma pack(push)
 #pragma pack(1)
 typedef struct BaseConnectionSendDataPacked {
-	u16 characteristicHandle;
-	u8 deliveryOption : 4;
-	u8 priority : 4;
-	u8 sendHandle;
-	u16 dataLength;
+    u16 characteristicHandle;
+    u8 deliveryOption : 4;
+    u8 priority : 4;
+    u8 sendHandle;
+    u16 dataLength;
 } BaseConnectionSendDataPacked;
 #pragma pack(pop)
 STATIC_ASSERT_SIZE(BaseConnectionSendDataPacked, SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
@@ -83,73 +83,73 @@ class ConnectionManager;
 
 //The reason why this connection was purposefully disconnected
 enum class AppDisconnectReason : u8 {
-	UNKNOWN = 0,
-	HANDSHAKE_TIMEOUT = 1,
-	RECONNECT_TIMEOUT = 2,
-	GAP_DISCONNECT_NO_REESTABLISH_REQUESTED = 3,
-	SAME_CLUSTERID = 4,
-	TOO_MANY_SEND_RETRIES = 5,
-	I_AM_SMALLER = 6,
-	PARTNER_HAS_MASTERBIT = 7,
-	SHOULD_WAIT_AS_SLAVE = 8,
-	LEAF_NODE = 9,
-	STATIC_NODE = 10,
-	QUEUE_NUM_MISMATCH = 11,
-	CM_FAIL_NO_SPOT = 12,
-	USER_REQUEST = 13,
-	CURRENTLY_IN_HANDSHAKE = 14,
-	GAP_CONNECTING_TIMEOUT = 15,
-	PENDING_TIMEOUT = 16,
-	ENROLLMENT_TIMEOUT = 17,
-	ENROLLMENT_TIMEOUT2 = 18,
-	NETWORK_ID_MISMATCH = 19,
-	RECONNECT_BLE_ERROR = 20,
-	UNPREFERRED_CONNECTION = 21,
-	EMERGENCY_DISCONNECT = 22,
-	GAP_ERROR = 23,
-	WRONG_PARTNERID = 24,
-	ILLEGAL_TUNNELTYPE = 25,
-	INVALID_KEY = 26,
-	INVALID_PACKET = 27,
-	ENROLLMENT_RESPONSE_RECEIVED = 28,
-	NEEDED_FOR_ENROLLMENT = 29,
-	WRONG_DIRECTION = 30,
-	GATTC_TIMEOUT = 31,
-	//ASSET_SCHEDULE_REMOVE = 32, //Deprecated as of 03.03.2020
-	INVALID_HANDSHAKE_PACKET = 33,
-	REBOOT = 34,
-	EMERGENCY_DISCONNECT_RESET = 35,
-	SCHEDULED_REMOVE = 36,
+    UNKNOWN = 0,
+    HANDSHAKE_TIMEOUT = 1,
+    RECONNECT_TIMEOUT = 2,
+    GAP_DISCONNECT_NO_REESTABLISH_REQUESTED = 3,
+    SAME_CLUSTERID = 4,
+    TOO_MANY_SEND_RETRIES = 5,
+    I_AM_SMALLER = 6,
+    PARTNER_HAS_MASTERBIT = 7,
+    SHOULD_WAIT_AS_SLAVE = 8,
+    LEAF_NODE = 9,
+    STATIC_NODE = 10,
+    QUEUE_NUM_MISMATCH = 11,
+    CM_FAIL_NO_SPOT = 12,
+    USER_REQUEST = 13,
+    CURRENTLY_IN_HANDSHAKE = 14,
+    GAP_CONNECTING_TIMEOUT = 15,
+    PENDING_TIMEOUT = 16,
+    ENROLLMENT_TIMEOUT = 17,
+    ENROLLMENT_TIMEOUT2 = 18,
+    NETWORK_ID_MISMATCH = 19,
+    RECONNECT_BLE_ERROR = 20,
+    UNPREFERRED_CONNECTION = 21,
+    EMERGENCY_DISCONNECT = 22,
+    GAP_ERROR = 23,
+    WRONG_PARTNERID = 24,
+    ILLEGAL_TUNNELTYPE = 25,
+    INVALID_KEY = 26,
+    INVALID_PACKET = 27,
+    ENROLLMENT_RESPONSE_RECEIVED = 28,
+    NEEDED_FOR_ENROLLMENT = 29,
+    WRONG_DIRECTION = 30,
+    GATTC_TIMEOUT = 31,
+    //ASSET_SCHEDULE_REMOVE = 32, //Deprecated as of 03.03.2020
+    INVALID_HANDSHAKE_PACKET = 33,
+    REBOOT = 34,
+    EMERGENCY_DISCONNECT_RESET = 35,
+    SCHEDULED_REMOVE = 36,
 };
 
 
 //Connection Direction: In => We are peripheral, Out => We are central
 enum class ConnectionDirection : u8{ 
-	DIRECTION_IN,	//Can't make it shorter like "IN", because thats a predefined Microsoft macro.
-	DIRECTION_OUT, 
-	INVALID 
+    DIRECTION_IN,    //Can't make it shorter like "IN", because thats a predefined Microsoft macro.
+    DIRECTION_OUT, 
+    INVALID 
 };
 
 enum class DataDirection : u8 {
-	DIRECTION_IN,	//Can't make it shorter like "IN", because thats a predefined Microsoft macro.
-	DIRECTION_OUT
+    DIRECTION_IN,    //Can't make it shorter like "IN", because thats a predefined Microsoft macro.
+    DIRECTION_OUT
 };
 
 //Possible states for a connection
 enum class ConnectionState : u8{
-	DISCONNECTED=0, 
-	CONNECTING=1, 
-	CONNECTED=2, 
-	HANDSHAKING=3, 
-	HANDSHAKE_DONE=4, 
-	REESTABLISHING = 5, 
-	REESTABLISHING_HANDSHAKE = 6,
+    DISCONNECTED=0, 
+    CONNECTING=1, 
+    CONNECTED=2, 
+    HANDSHAKING=3, 
+    HANDSHAKE_DONE=4, 
+    REESTABLISHING = 5, 
+    REESTABLISHING_HANDSHAKE = 6,
 };
 //State of connection encryption
 enum class EncryptionState : u8{
-	NOT_ENCRYPTED=0, 
-	ENCRYPTING=1, 
-	ENCRYPTED=2
+    NOT_ENCRYPTED=0, 
+    ENCRYPTING=1, 
+    ENCRYPTED=2
 };
 
 /*
@@ -159,136 +159,136 @@ enum class EncryptionState : u8{
  */
 class BaseConnection
 {
-	private: 
-		bool currentMessageIsMissingASplit = false;
-	protected:
-		//Will Queue the data in the packet queue of the connection
-		bool QueueData(const BaseConnectionSendData& sendData, u8 const * data);
-		bool QueueData(const BaseConnectionSendData& sendData, u8 const * data, bool fillTxBuffers); // Can be used to avoid infinite recursion in queue and fillTxBuffers
+    private: 
+        bool currentMessageIsMissingASplit = false;
+    protected:
+        //Will Queue the data in the packet queue of the connection
+        bool QueueData(const BaseConnectionSendData& sendData, u8 const * data);
+        bool QueueData(const BaseConnectionSendData& sendData, u8 const * data, bool fillTxBuffers); // Can be used to avoid infinite recursion in queue and fillTxBuffers
 
-		bool PrepareBaseConnection(FruityHal::BleGapAddr* address, ConnectionType connectionType) const;
-
-
-	public:
-		u16 connectionMtu = MAX_DATA_SIZE_PER_WRITE;
-		u16 connectionPayloadSize = MAX_DATA_SIZE_PER_WRITE;
-
-		ConnectionType connectionType = ConnectionType::INVALID;
-		ConnectionState connectionState = ConnectionState::CONNECTING;
-		EncryptionState encryptionState = EncryptionState::NOT_ENCRYPTED;
-		//Backup for the last conneciton state before it was disconnected
-		ConnectionState connectionStateBeforeDisconnection = ConnectionState::DISCONNECTED;
-		FruityHal::BleHciError disconnectionReason = FruityHal::BleHciError::SUCCESS;
-		AppDisconnectReason appDisconnectionReason = AppDisconnectReason::UNKNOWN;
+        bool PrepareBaseConnection(FruityHal::BleGapAddr* address, ConnectionType connectionType) const;
 
 
-		//################### Connection creation ######################
+    public:
+        u16 connectionMtu = MAX_DATA_SIZE_PER_WRITE;
+        u16 connectionPayloadSize = MAX_DATA_SIZE_PER_WRITE;
 
-		//Initializes connection but does not connect
-		BaseConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
-		virtual ~BaseConnection();
-
-		virtual void DisconnectAndRemove(AppDisconnectReason reason);
-
-		//################### Sending ######################
-		//Must be implemented in super class
-		virtual bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable) = 0;
-		//Allow a subclass to transmit data before the writeQueue is processed
-		virtual bool TransmitHighPrioData() { return false; };
-		//Allows a subclass to process data closely before sending it
-		virtual SizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer);
-		//Called after data has been queued in the softdevice, pay attention that data points to the full packet in the queue
-		//whereas sentData is the data that was really sent (e.g. the packet was split or preprocessed in some way before sending)
-		virtual void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData);
-		//Fills the tx buffers of the softdevice with the packets from the packet queue
-		virtual void FillTransmitBuffers();
-		virtual void DataSentHandler(const u8* data, u16 length) {};
-
-		//Handler
-		virtual void ConnectionSuccessfulHandler(u16 connectionHandle);
-		virtual void GapReconnectionSuccessfulHandler(const FruityHal::GapConnectedEvent& connectedEvent);
-		virtual bool GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason);
-		virtual void GATTServiceDiscoveredHandler(FruityHal::BleGattDBDiscoveryEvent& evt);
-		//Called, once the MTU of the connection was upgraded. The connection can then increase the packet splitting size
-		virtual void ConnectionMtuUpgradedHandler(u16 gattPayloadSize);
-		//Called when data from a connection is received
-		virtual void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) = 0;
-		//Can be called by subclasses to use the connPacketHeader reassembly
-		u8 const * ReassembleData(BaseConnectionSendData* sendData, u8 const * data);
-		SizedData GetSplitData(const BaseConnectionSendData &sendData, u8* data, u8* packetBuffer) const;
-
-		//Helpers
-		virtual void PrintStatus() = 0;
-
-		i8 GetAverageRSSI() const;
-		//Must return the number of packets that are queued. (Not just in the Packetqueues, also HighPrioData!)
-		virtual bool GetPendingPackets() { return packetSendQueue._numElements + packetSendQueueHighPrio._numElements; };
+        ConnectionType connectionType = ConnectionType::INVALID;
+        ConnectionState connectionState = ConnectionState::CONNECTING;
+        EncryptionState encryptionState = EncryptionState::NOT_ENCRYPTED;
+        //Backup for the last conneciton state before it was disconnected
+        ConnectionState connectionStateBeforeDisconnection = ConnectionState::DISCONNECTED;
+        FruityHal::BleHciError disconnectionReason = FruityHal::BleHciError::SUCCESS;
+        AppDisconnectReason appDisconnectionReason = AppDisconnectReason::UNKNOWN;
 
 
-		SizedData GetNextPacketToSend(const PacketQueue& queue) const;
+        //################### Connection creation ######################
 
-		void HandlePacketQueued(PacketQueue* activeQueue, BaseConnectionSendDataPacked* sendDataPacked);
-		void HandlePacketQueuingFail(PacketQueue& activeQueue, BaseConnectionSendDataPacked* sendDataPacked, u32 err);
-		void HandlePacketSent(u8 sentUnreliable, u8 sentReliable);
+        //Initializes connection but does not connect
+        BaseConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
+        virtual ~BaseConnection();
 
-		void ResendAllPackets(PacketQueue& queueToReset) const;
+        virtual void DisconnectAndRemove(AppDisconnectReason reason);
 
-		u8 GetNextQueueHandle();
+        //################### Sending ######################
+        //Must be implemented in super class
+        virtual bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable) = 0;
+        //Allow a subclass to transmit data before the writeQueue is processed
+        virtual bool TransmitHighPrioData() { return false; };
+        //Allows a subclass to process data closely before sending it
+        virtual SizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer);
+        //Called after data has been queued in the softdevice, pay attention that data points to the full packet in the queue
+        //whereas sentData is the data that was really sent (e.g. the packet was split or preprocessed in some way before sending)
+        virtual void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData);
+        //Fills the tx buffers of the softdevice with the packets from the packet queue
+        virtual void FillTransmitBuffers();
+        virtual void DataSentHandler(const u8* data, u16 length) {};
 
-		//Getter
-		bool isDisconnected() const{ return connectionState == ConnectionState::DISCONNECTED; };
-		bool isConnected() const{ return connectionState >= ConnectionState::CONNECTED; };
-		bool handshakeDone() const{ return connectionState >= ConnectionState::HANDSHAKE_DONE; };
+        //Handler
+        virtual void ConnectionSuccessfulHandler(u16 connectionHandle);
+        virtual void GapReconnectionSuccessfulHandler(const FruityHal::GapConnectedEvent& connectedEvent);
+        virtual bool GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason);
+        virtual void GATTServiceDiscoveredHandler(FruityHal::BleGattDBDiscoveryEvent& evt);
+        //Called, once the MTU of the connection was upgraded. The connection can then increase the packet splitting size
+        virtual void ConnectionMtuUpgradedHandler(u16 gattPayloadSize);
+        //Called when data from a connection is received
+        virtual void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) = 0;
+        //Can be called by subclasses to use the connPacketHeader reassembly
+        u8 const * ReassembleData(BaseConnectionSendData* sendData, u8 const * data);
+        SizedData GetSplitData(const BaseConnectionSendData &sendData, u8* data, u8* packetBuffer) const;
 
-		//Variables
-		u8 connectionId;
-		const u32 uniqueConnectionId;
-		ConnectionDirection direction;
+        //Helpers
+        virtual void PrintStatus() = 0;
 
-		u8 clusterUpdateCounter : 1;
-		u8 nextExpectedClusterUpdateCounter : 1;
-		
-		//RSSI measurement
-		i32 rssiAverageTimes1000 = 0; //The averaged rssi of the connection multiplied by 1000
-		i8 lastReportedRssi = 0; //The last rssi measurement that was reported
+        i8 GetAverageRSSI() const;
+        //Must return the number of packets that are queued. (Not just in the Packetqueues, also HighPrioData!)
+        virtual bool GetPendingPackets() { return packetSendQueue._numElements + packetSendQueueHighPrio._numElements; };
 
-		//Buffers
-		bool bufferFull = false; //Set to true once the softdevice reports that all buffers are full
-		u8 manualPacketsSent = 0; //Used to count the packets manually sent to the softdevice using bleWriteCharacteristic, will be decremented first before packets from the queue are removed. Packets must not be sent while the queue is working
 
-		//Normal Prio Queue
-		u32 packetSendBuffer[PACKET_SEND_BUFFER_SIZE / sizeof(u32)] = {};
-		PacketQueue packetSendQueue;
+        SizedData GetNextPacketToSend(const PacketQueue& queue) const;
 
-		//High Prio Queue
-		u32 packetSendBufferHighPrio[PACKET_SEND_BUFFER_HIGH_PRIO_SIZE / sizeof(u32)] = {};
-		PacketQueue packetSendQueueHighPrio;
+        void HandlePacketQueued(PacketQueue* activeQueue, BaseConnectionSendDataPacked* sendDataPacked);
+        void HandlePacketQueuingFail(PacketQueue& activeQueue, BaseConnectionSendDataPacked* sendDataPacked, u32 err);
+        void HandlePacketSent(u8 sentUnreliable, u8 sentReliable);
 
-		u8 packetQueuedHandleCounter = PACKET_QUEUED_HANDLE_COUNTER_START; //Used to assign handles to queued packets
+        void ResendAllPackets(PacketQueue& queueToReset) const;
 
-		std::array<u8, PACKET_REASSEMBLY_BUFFER_SIZE> packetReassemblyBuffer{};
-		u8 packetReassemblyPosition = 0; //Set to 0 if no reassembly is in progress
+        u8 GetNextQueueHandle();
 
-		//Partner
-		NodeId partnerId = 0;
-		u16 connectionHandle = FruityHal::FH_BLE_INVALID_HANDLE; //The handle that is given from the BLE stack to identify a connection
-		FruityHal::BleGapAddr partnerAddress;
+        //Getter
+        bool isDisconnected() const{ return connectionState == ConnectionState::DISCONNECTED; };
+        bool isConnected() const{ return connectionState >= ConnectionState::CONNECTED; };
+        bool handshakeDone() const{ return connectionState >= ConnectionState::HANDSHAKE_DONE; };
 
-		//Times
-		const u32 creationTimeDs;
-		u32 handshakeStartedDs = 0;
-		u32 connectionHandshakedTimestampDs = 0; //Set after handshake completed, not modified when reestablishing the connection
-		u32 disconnectedTimestampDs = 0;
+        //Variables
+        u8 connectionId;
+        const u32 uniqueConnectionId;
+        ConnectionDirection direction;
 
-		//Debug info
-		u16 droppedPackets = 0;
-		u16 sentReliable = 0;
-		u16 sentUnreliable = 0;
+        u8 clusterUpdateCounter : 1;
+        u8 nextExpectedClusterUpdateCounter : 1;
+        
+        //RSSI measurement
+        i32 rssiAverageTimes1000 = 0; //The averaged rssi of the connection multiplied by 1000
+        i8 lastReportedRssi = 0; //The last rssi measurement that was reported
 
-		static u32 GetAmountOfRemovedConnections();
+        //Buffers
+        bool bufferFull = false; //Set to true once the softdevice reports that all buffers are full
+        u8 manualPacketsSent = 0; //Used to count the packets manually sent to the softdevice using bleWriteCharacteristic, will be decremented first before packets from the queue are removed. Packets must not be sent while the queue is working
+
+        //Normal Prio Queue
+        u32 packetSendBuffer[PACKET_SEND_BUFFER_SIZE / sizeof(u32)] = {};
+        PacketQueue packetSendQueue;
+
+        //High Prio Queue
+        u32 packetSendBufferHighPrio[PACKET_SEND_BUFFER_HIGH_PRIO_SIZE / sizeof(u32)] = {};
+        PacketQueue packetSendQueueHighPrio;
+
+        u8 packetQueuedHandleCounter = PACKET_QUEUED_HANDLE_COUNTER_START; //Used to assign handles to queued packets
+
+        std::array<u8, PACKET_REASSEMBLY_BUFFER_SIZE> packetReassemblyBuffer{};
+        u8 packetReassemblyPosition = 0; //Set to 0 if no reassembly is in progress
+
+        //Partner
+        NodeId partnerId = 0;
+        u16 connectionHandle = FruityHal::FH_BLE_INVALID_HANDLE; //The handle that is given from the BLE stack to identify a connection
+        FruityHal::BleGapAddr partnerAddress;
+
+        //Times
+        const u32 creationTimeDs;
+        u32 handshakeStartedDs = 0;
+        u32 connectionHandshakedTimestampDs = 0; //Set after handshake completed, not modified when reestablishing the connection
+        u32 disconnectedTimestampDs = 0;
+
+        //Debug info
+        u16 droppedPackets = 0;
+        u16 sentReliable = 0;
+        u16 sentUnreliable = 0;
+
+        static u32 GetAmountOfRemovedConnections();
 
 #ifdef SIM_ENABLED
-		void PrintQueueInfo();
+        void PrintQueueInfo();
 #endif
 
 };

@@ -80,11 +80,11 @@ std::unique_ptr<evhttp, decltype(&evhttp_free)>* server = nullptr;
 #ifdef _WIN32
 class WSACleanuper {
 public:
-	~WSACleanuper() {
-		if (WSAStartupWasCalled) {
-			WSACleanup();
-		}
-	}
+    ~WSACleanuper() {
+        if (WSAStartupWasCalled) {
+            WSACleanup();
+        }
+    }
 };
 static WSACleanuper wsaCleanuper;
 #endif // _WIN32
@@ -93,247 +93,247 @@ static WSACleanuper wsaCleanuper;
 
 FruitySimServer::FruitySimServer()
 {
-	StartServer();
+    StartServer();
 }
 
 int FruitySimServer::StartServer()
 {
 #if defined(SIM_SERVER_PRESENT)
 #ifdef _WIN32
-	//Initialize Winsock
-	if (!WSAStartupWasCalled) {
-		int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-		if (result != 0) {
-			printf("WSAStartup failed: %d\n", result);
-			return 1;
-		}
-		WSAStartupWasCalled = true;
-	}
+    //Initialize Winsock
+    if (!WSAStartupWasCalled) {
+        int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+        if (result != 0) {
+            printf("WSAStartup failed: %d\n", result);
+            return 1;
+        }
+        WSAStartupWasCalled = true;
+    }
 #endif // _WIN32
-	
-	eventBase = event_init();
+    
+    eventBase = event_init();
 
-	if (!eventBase)
-	{
-		std::cerr << "Failed to init libevent." << std::endl;
-		return -1;
-	}
+    if (!eventBase)
+    {
+        std::cerr << "Failed to init libevent." << std::endl;
+        return -1;
+    }
 
-	char const SrvAddress[] = "0.0.0.0";
-	std::uint16_t SrvPort = 5555;
-	server = new std::unique_ptr<evhttp, decltype(&evhttp_free)>(evhttp_start(SrvAddress, SrvPort), &evhttp_free);
-	if (!server)
-	{
-		std::cerr << "Failed to init http server." << std::endl;
-		return -1;
-	}
+    char const SrvAddress[] = "0.0.0.0";
+    std::uint16_t SrvPort = 5555;
+    server = new std::unique_ptr<evhttp, decltype(&evhttp_free)>(evhttp_start(SrvAddress, SrvPort), &evhttp_free);
+    if (!server)
+    {
+        std::cerr << "Failed to init http server." << std::endl;
+        return -1;
+    }
 
-	void(*OnReq)(evhttp_request *req, void *) = [](evhttp_request *req, void *)
-	{
-		FILE* file = nullptr;
-	
-		auto *OutBuf = evhttp_request_get_output_buffer(req);
-		if (!OutBuf)
-			return;
+    void(*OnReq)(evhttp_request *req, void *) = [](evhttp_request *req, void *)
+    {
+        FILE* file = nullptr;
+    
+        auto *OutBuf = evhttp_request_get_output_buffer(req);
+        if (!OutBuf)
+            return;
 
-		if (strstr(req->uri, "/devices") != nullptr)
-		{
-			std::string devices = GenerateDevicesJson();
-	
-			evbuffer_add_printf(OutBuf, "%s", devices.c_str());
-			evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "application/json");
-		}
-		else if (strstr(req->uri, "/site") != nullptr)
-		{
-			std::string site = GenerateSiteJson();
-			evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "application/json");
-	
-			evbuffer_add_printf(OutBuf, "%s", site.c_str());
-		}
-		else {
-			//Serve static files, no directories supported, only some mimetypes work, hacky approach
-			std::string fileName = CherrySimUtils::getNormalizedPath() + "/";
+        if (strstr(req->uri, "/devices") != nullptr)
+        {
+            std::string devices = GenerateDevicesJson();
+    
+            evbuffer_add_printf(OutBuf, "%s", devices.c_str());
+            evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "application/json");
+        }
+        else if (strstr(req->uri, "/site") != nullptr)
+        {
+            std::string site = GenerateSiteJson();
+            evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "application/json");
+    
+            evbuffer_add_printf(OutBuf, "%s", site.c_str());
+        }
+        else {
+            //Serve static files, no directories supported, only some mimetypes work, hacky approach
+            std::string fileName = CherrySimUtils::getNormalizedPath() + "/";
 
-			if (strstr(req->uri, ".png") != nullptr)
-			{
-				fileName += std::string("web/img/") + std::string(req->uri + 9);
-			}
-			else if (strcmp(req->uri, "/") == 0) {
-				fileName += std::string("web/index.html");
-			}
-			else if (strcmp(req->uri, "/simulator/floorplan") == 0) {
-				fileName += std::string("web/img/floorplan.png");
-			}
-			else if (strcmp(req->uri, "/simulator/wallplan") == 0) {
-				fileName += std::string("web/img/floorplan.png");
-			}
-			else {
-				fileName += std::string("web/") + std::string(req->uri + 1);
-			}
-			if ((file = fopen(fileName.c_str(), "r")) != nullptr) {
-				struct stat buf;
-				fstat(fileno(file), &buf);
-				off_t size = buf.st_size;
-	
-				if (strstr(fileName.c_str(), ".html") != nullptr) {
-					evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "text/html");
-				}
-				else if (strstr(fileName.c_str(), ".js") != nullptr) {
-					evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "application/javascript");
-				}
-				else if (strstr(fileName.c_str(), ".png") != nullptr) {
-					evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "image/png");
-				}
-	
-				//Add the file (will close the file once done)
-				evbuffer_add_file(OutBuf, fileno(file), 0, size);
-			}
-		}
-	
-		evhttp_send_reply(req, HTTP_OK, "OK", OutBuf);
-	};
-	
-	evhttp_set_gencb(server->get(), OnReq, nullptr);
+            if (strstr(req->uri, ".png") != nullptr)
+            {
+                fileName += std::string("web/img/") + std::string(req->uri + 9);
+            }
+            else if (strcmp(req->uri, "/") == 0) {
+                fileName += std::string("web/index.html");
+            }
+            else if (strcmp(req->uri, "/simulator/floorplan") == 0) {
+                fileName += std::string("web/img/floorplan.png");
+            }
+            else if (strcmp(req->uri, "/simulator/wallplan") == 0) {
+                fileName += std::string("web/img/floorplan.png");
+            }
+            else {
+                fileName += std::string("web/") + std::string(req->uri + 1);
+            }
+            if ((file = fopen(fileName.c_str(), "r")) != nullptr) {
+                struct stat buf;
+                fstat(fileno(file), &buf);
+                off_t size = buf.st_size;
+    
+                if (strstr(fileName.c_str(), ".html") != nullptr) {
+                    evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "text/html");
+                }
+                else if (strstr(fileName.c_str(), ".js") != nullptr) {
+                    evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "application/javascript");
+                }
+                else if (strstr(fileName.c_str(), ".png") != nullptr) {
+                    evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", "image/png");
+                }
+    
+                //Add the file (will close the file once done)
+                evbuffer_add_file(OutBuf, fileno(file), 0, size);
+            }
+        }
+    
+        evhttp_send_reply(req, HTTP_OK, "OK", OutBuf);
+    };
+    
+    evhttp_set_gencb(server->get(), OnReq, nullptr);
 #endif // SIM_SERVER_PRESENT
-	return 0;
+    return 0;
 }
 
 FruitySimServer::~FruitySimServer()
 {
 #if defined(SIM_SERVER_PRESENT)
-	if (server != nullptr) delete server;
-	server = nullptr;
-	event_base_free(eventBase);
+    if (server != nullptr) delete server;
+    server = nullptr;
+    event_base_free(eventBase);
 #endif // SIM_SERVER_PRESENT
 }
 
 void FruitySimServer::ProcessServerRequests()
 {
 #if defined(SIM_SERVER_PRESENT)
-	event_base_loop(eventBase, EVLOOP_NONBLOCK);
+    event_base_loop(eventBase, EVLOOP_NONBLOCK);
 #endif // SIM_SERVER_PRESENT
 }
 
 #if defined(SIM_SERVER_PRESENT)
 std::string FruitySimServer::GenerateSiteJson()
 {
-	json site;
+    json site;
 
-	site["heightInMeter"] = cherrySimInstance->simConfig.mapHeightInMeters;
-	site["lengthInMeter"] = cherrySimInstance->simConfig.mapWidthInMeters;
-	site["name"] = "SimulatorSite";
-	site["pixelPerMeter"] = 5;
+    site["heightInMeter"] = cherrySimInstance->simConfig.mapHeightInMeters;
+    site["lengthInMeter"] = cherrySimInstance->simConfig.mapWidthInMeters;
+    site["name"] = "SimulatorSite";
+    site["pixelPerMeter"] = 5;
 
-	return site.dump(4);
+    return site.dump(4);
 }
 #endif // SIM_SERVER_PRESENT
 
 #if defined(SIM_SERVER_PRESENT)
 std::string FruitySimServer::GenerateDevicesJson()
 {
-	json devices;
-	devices["status"] = "success";
-	for (unsigned int i = 0; i < cherrySimInstance->getTotalNodes(); i++) {
-		NodeIndexSetter nodeIndexSetter(i);
-		nodeEntry* node = &cherrySimInstance->nodes[i];
-		json device;
+    json devices;
+    devices["status"] = "success";
+    for (unsigned int i = 0; i < cherrySimInstance->getTotalNodes(); i++) {
+        NodeIndexSetter nodeIndexSetter(i);
+        nodeEntry* node = &cherrySimInstance->nodes[i];
+        json device;
 
-		//Get the only handshaked inConnection
-		//TODO: The inConnection is only used to draw the direction arrow in the fruitymap, but currently
-		//the json only supports communicating 1 inConnection, this should be changed at some point so that
-		//Each connection can report its direction and masterBit
-		auto inConnections = node->gs.cm.GetMeshConnections(ConnectionDirection::DIRECTION_IN);
-		MeshConnection* inConnection = nullptr;
-		for (int k = 0; k < inConnections.count; k++) {
-			if (inConnections.handles[k] && inConnections.handles[k].IsHandshakeDone()) {
-				inConnection = inConnections.handles[k].GetConnection();
-			}
-		}
+        //Get the only handshaked inConnection
+        //TODO: The inConnection is only used to draw the direction arrow in the fruitymap, but currently
+        //the json only supports communicating 1 inConnection, this should be changed at some point so that
+        //Each connection can report its direction and masterBit
+        auto inConnections = node->gs.cm.GetMeshConnections(ConnectionDirection::DIRECTION_IN);
+        MeshConnection* inConnection = nullptr;
+        for (int k = 0; k < inConnections.count; k++) {
+            if (inConnections.handles[k] && inConnections.handles[k].IsHandshakeDone()) {
+                inConnection = inConnections.handles[k].GetConnection();
+            }
+        }
 
-		//UUID is generated based on the node index
-		char uuid[50];
-		sprintf(uuid, "00000000-1111-2222-3333-00000000%04u", node->index);
+        //UUID is generated based on the node index
+        char uuid[50];
+        sprintf(uuid, "00000000-1111-2222-3333-00000000%04u", node->index);
 
-		device["uuid"] = uuid;
-		device["deviceId"] = node->gs.config.GetSerialNumber();
-		device["platform"] = "BLENODE";
-		device["ledOn"] = node->ledOn;
-		device["inConnectionHasMasterBit"] = false;
-		device["inConnectionPartnerHasMasterBit"] = false;
+        device["uuid"] = uuid;
+        device["deviceId"] = node->gs.config.GetSerialNumber();
+        device["platform"] = "BLENODE";
+        device["ledOn"] = node->ledOn;
+        device["inConnectionHasMasterBit"] = false;
+        device["inConnectionPartnerHasMasterBit"] = false;
 
-		//Find out who has the master bit of the inConnection
-		if(inConnection != nullptr) device["inConnectionHasMasterBit"] = inConnection->connectionMasterBit == 1;
+        //Find out who has the master bit of the inConnection
+        if(inConnection != nullptr) device["inConnectionHasMasterBit"] = inConnection->connectionMasterBit == 1;
 
-		bool partnerHasMB = false;
+        bool partnerHasMB = false;
 
-		if (inConnection != nullptr) {
-			SoftdeviceConnection* foundSoftdeviceConnection = cherrySimInstance->findConnectionByHandle(node, inConnection->connectionHandle);
-			//We must check if the simulator connection still exists as it might have been cleaned up already
-			if (foundSoftdeviceConnection != nullptr) {
-				nodeEntry* partnerNode = foundSoftdeviceConnection->partner;
-				MeshConnections conn = partnerNode->gs.cm.GetMeshConnections(ConnectionDirection::DIRECTION_OUT);
-				for (int k = 0; k < conn.count; k++) {
-					if (conn.handles[k] && conn.handles[k].GetConnectionHandle() == inConnection->connectionHandle) {
-						partnerHasMB = conn.handles[k].GetConnection()->connectionMasterBit;
-					}
-				}
-			}
-		}
+        if (inConnection != nullptr) {
+            SoftdeviceConnection* foundSoftdeviceConnection = cherrySimInstance->findConnectionByHandle(node, inConnection->connectionHandle);
+            //We must check if the simulator connection still exists as it might have been cleaned up already
+            if (foundSoftdeviceConnection != nullptr) {
+                nodeEntry* partnerNode = foundSoftdeviceConnection->partner;
+                MeshConnections conn = partnerNode->gs.cm.GetMeshConnections(ConnectionDirection::DIRECTION_OUT);
+                for (int k = 0; k < conn.count; k++) {
+                    if (conn.handles[k] && conn.handles[k].GetConnectionHandle() == inConnection->connectionHandle) {
+                        partnerHasMB = conn.handles[k].GetConnection()->connectionMasterBit;
+                    }
+                }
+            }
+        }
 
-		device["inConnectionPartnerHasMasterBit"] = partnerHasMB;
+        device["inConnectionPartnerHasMasterBit"] = partnerHasMB;
 
-		device["connectionLossCounter"] = node->gs.node.connectionLossCounter;
-		device["inConnectionPartner"] = inConnection == nullptr ? 0 : inConnection->partnerId;
-
-
-		//FIXME: This mixes fruitymesh and simulator connections, but should only use simulator data
-		if (inConnection != nullptr) {
-			SoftdeviceConnection* sdInConn = cherrySimInstance->findConnectionByHandle(node, inConnection->connectionHandle);
-			if (sdInConn != nullptr) device["inConnectionRssi"] = (int)cherrySimInstance->GetReceptionRssi(node, sdInConn->partner);
-		}
-		else {
-			device["inConnectionRssi"] = 0;
-		}
+        device["connectionLossCounter"] = node->gs.node.connectionLossCounter;
+        device["inConnectionPartner"] = inConnection == nullptr ? 0 : inConnection->partnerId;
 
 
-		char advData[200];
-		if (node->state.advertisingActive) {
-			Logger::convertBufferToHexString(node->state.advertisingData, node->state.advertisingDataLength, advData, sizeof(advData));
-		}
-		else {
-			sprintf(advData, "Not advertising");
-		}
+        //FIXME: This mixes fruitymesh and simulator connections, but should only use simulator data
+        if (inConnection != nullptr) {
+            SoftdeviceConnection* sdInConn = cherrySimInstance->findConnectionByHandle(node, inConnection->connectionHandle);
+            if (sdInConn != nullptr) device["inConnectionRssi"] = (int)cherrySimInstance->GetReceptionRssi(node, sdInConn->partner);
+        }
+        else {
+            device["inConnectionRssi"] = 0;
+        }
 
-		device["details"] = {
-			{"platform", "BLENODE"},
-			{"clusterId", node->gs.node.clusterId},
-			{"clusterSize", node->gs.node.clusterSize},
-			{"nodeId", node->gs.node.configuration.nodeId},
-			{"serialNumber", node->gs.config.GetSerialNumber()},
-			{"connections", json::array()},
-			{"nonConnections", json::array()},
-			{"lastSentAdvertisingMessage", advData},
-			{"freeIn", node->gs.cm.freeMeshInConnections},
-			{"freeOut", node->gs.cm.freeMeshOutConnections}
-		};
-		for (int j = 0; j < node->state.configuredTotalConnectionCount; j++) {
-			if (node->state.connections[j].connectionActive) {
-				json connection;
-				connection["handle"] = node->state.connections[j].connectionHandle;
-				connection["rssi"] = 7;
-				connection["target"] = node->state.connections[j].partner->gs.node.configuration.nodeId;
 
-				device["details"]["connections"].push_back(connection);
-			}
-		}
-		device["properties"] = {
-			{"onMap", "true"},
-			{"x", node->x},
-			{"y", node->y}
-		};
-		devices["result"].push_back(device);
-	}
+        char advData[200];
+        if (node->state.advertisingActive) {
+            Logger::convertBufferToHexString(node->state.advertisingData, node->state.advertisingDataLength, advData, sizeof(advData));
+        }
+        else {
+            sprintf(advData, "Not advertising");
+        }
 
-	return devices.dump(4);
+        device["details"] = {
+            {"platform", "BLENODE"},
+            {"clusterId", node->gs.node.clusterId},
+            {"clusterSize", node->gs.node.clusterSize},
+            {"nodeId", node->gs.node.configuration.nodeId},
+            {"serialNumber", node->gs.config.GetSerialNumber()},
+            {"connections", json::array()},
+            {"nonConnections", json::array()},
+            {"lastSentAdvertisingMessage", advData},
+            {"freeIn", node->gs.cm.freeMeshInConnections},
+            {"freeOut", node->gs.cm.freeMeshOutConnections}
+        };
+        for (int j = 0; j < node->state.configuredTotalConnectionCount; j++) {
+            if (node->state.connections[j].connectionActive) {
+                json connection;
+                connection["handle"] = node->state.connections[j].connectionHandle;
+                connection["rssi"] = 7;
+                connection["target"] = node->state.connections[j].partner->gs.node.configuration.nodeId;
+
+                device["details"]["connections"].push_back(connection);
+            }
+        }
+        device["properties"] = {
+            {"onMap", "true"},
+            {"x", node->x},
+            {"y", node->y}
+        };
+        devices["result"].push_back(device);
+    }
+
+    return devices.dump(4);
 }
 #endif // SIM_SERVER_PRESENT

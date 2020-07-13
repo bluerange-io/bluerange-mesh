@@ -74,131 +74,131 @@ class Module;
  */
 class GlobalState
 {
-	public:
-		GlobalState();
+    public:
+        GlobalState();
 #ifndef SIM_ENABLED
-		static GlobalState& getInstance() {
-			return instance;
-		}
-		static GlobalState instance;
+        static GlobalState& getInstance() {
+            return instance;
+        }
+        static GlobalState instance;
 #endif
 
-		uint32_t SetEventHandlers(FruityHal::AppErrorHandler appErrorHandler);
-		void SetUartHandler(FruityHal::UartEventHandler uartEventHandler);
+        uint32_t SetEventHandlers(FruityHal::AppErrorHandler appErrorHandler);
+        void SetUartHandler(FruityHal::UartEventHandler uartEventHandler);
 
-		//#################### Event Buffer ###########################
+        //#################### Event Buffer ###########################
 #if defined(SIM_ENABLED)
-		static constexpr u16 BLE_STACK_EVT_MSG_BUF_SIZE = 18;
-		u32 currentEventBuffer[BLE_STACK_EVT_MSG_BUF_SIZE];
-		static constexpr u16 SIZE_OF_EVENT_BUFFER = sizeof(currentEventBuffer);
+        static constexpr u16 BLE_STACK_EVT_MSG_BUF_SIZE = 18;
+        u32 currentEventBuffer[BLE_STACK_EVT_MSG_BUF_SIZE];
+        static constexpr u16 SIZE_OF_EVENT_BUFFER = sizeof(currentEventBuffer);
 #endif
 
-		//#################### App timer ###########################
-		//To keep track of timer ticks
-		u32 previousRtcTicks = 0;
+        //#################### App timer ###########################
+        //To keep track of timer ticks
+        u32 previousRtcTicks = 0;
 
-		//App timer uses deciseconds because milliseconds will overflow a u32 too fast
-		u32 tickRemainderTimesTen = 0;
-		u16 passsedTimeSinceLastTimerHandlerDs = 0;
-		u16 appTimerRandomOffsetDs = 0;
-		u32 appTimerDs = 0; //The app timer is used for all mesh and module timings and keeps track of the time in ds since bootup
+        //App timer uses deciseconds because milliseconds will overflow a u32 too fast
+        u32 tickRemainderTimesTen = 0;
+        u16 passsedTimeSinceLastTimerHandlerDs = 0;
+        u16 appTimerRandomOffsetDs = 0;
+        u32 appTimerDs = 0; //The app timer is used for all mesh and module timings and keeps track of the time in ds since bootup
 
-		TimeManager timeManager;
+        TimeManager timeManager;
 
-		u32 amountOfRemovedConnections = 0;
+        u32 amountOfRemovedConnections = 0;
 
-		//########## Singletons ###############
-		//Base
-		ScanController scanController;
-		AdvertisingController advertisingController;
-		GAPController gapController;
-		GATTController gattController;
+        //########## Singletons ###############
+        //Base
+        ScanController scanController;
+        AdvertisingController advertisingController;
+        GAPController gapController;
+        GATTController gattController;
 
-		Node node;
-		Conf config;
-		Boardconf boardconf;
-		ConnectionManager cm;
-		Logger logger;
-		Terminal terminal;
-		FlashStorage flashStorage;
-		RecordStorage recordStorage;
+        Node node;
+        Conf config;
+        Boardconf boardconf;
+        ConnectionManager cm;
+        Logger logger;
+        Terminal terminal;
+        FlashStorage flashStorage;
+        RecordStorage recordStorage;
 
 #if IS_ACTIVE(SIG_MESH)
-		SigAccessLayer sig;
+        SigAccessLayer sig;
 #endif
 
-		LedWrapper ledRed;
-		LedWrapper ledGreen;
-		LedWrapper ledBlue;
-		//########## END Singletons ###############
+        LedWrapper ledRed;
+        LedWrapper ledGreen;
+        LedWrapper ledBlue;
+        //########## END Singletons ###############
 
-		//########## Modules ###############
-		u32 amountOfModules = 0;
-		Module* activeModules[MAX_MODULE_COUNT] = {};
-		template<typename T>
-		u32 InitializeModule(bool createModule)
-		{
-			static_assert(alignof(T) == 4 || alignof(T) == 8, "This code assumes that the alignment of all modules either 4 or 8 (continue reading in comment)");
-			// Modules that are compiled with double support will have an alignment of 8, while others only have an alignment of 4
-			// To simplify this, we simply pad all modules to 8 byte boundaries when allocating them
+        //########## Modules ###############
+        u32 amountOfModules = 0;
+        Module* activeModules[MAX_MODULE_COUNT] = {};
+        template<typename T>
+        u32 InitializeModule(bool createModule)
+        {
+            static_assert(alignof(T) == 4 || alignof(T) == 8, "This code assumes that the alignment of all modules either 4 or 8 (continue reading in comment)");
+            // Modules that are compiled with double support will have an alignment of 8, while others only have an alignment of 4
+            // To simplify this, we simply pad all modules to 8 byte boundaries when allocating them
 
-			u32 paddedSize = sizeof(T) + (8 - (sizeof(T) % 8)) % 8;
+            u32 paddedSize = sizeof(T) + (8 - (sizeof(T) % 8)) % 8;
 
-			if (createModule)
-			{
-				if (amountOfModules >= MAX_MODULE_COUNT) {
-					SIMEXCEPTION(TooManyModulesException);
-				}
-				void *memoryBlock = moduleAllocator.allocateMemory(paddedSize);
-				if (memoryBlock != nullptr)
-				{
-					activeModules[amountOfModules] = new (memoryBlock) T();
-					amountOfModules++;
-				}
-			}
-			return paddedSize;
-		}
+            if (createModule)
+            {
+                if (amountOfModules >= MAX_MODULE_COUNT) {
+                    SIMEXCEPTION(TooManyModulesException);
+                }
+                void *memoryBlock = moduleAllocator.allocateMemory(paddedSize);
+                if (memoryBlock != nullptr)
+                {
+                    activeModules[amountOfModules] = new (memoryBlock) T();
+                    amountOfModules++;
+                }
+            }
+            return paddedSize;
+        }
 
-		ConnectionAllocator connectionAllocator;
-		ModuleAllocator moduleAllocator;
+        ConnectionAllocator connectionAllocator;
+        ModuleAllocator moduleAllocator;
 
-		void* halMemory = nullptr;
+        void* halMemory = nullptr;
 
-		//Time when the button 1 was pressed down and how long it was held
-		u32 button1PressTimeDs = 0;
-		u32 button1HoldTimeDs = 0;
+        //Time when the button 1 was pressed down and how long it was held
+        u32 button1PressTimeDs = 0;
+        u32 button1HoldTimeDs = 0;
 
-		u32 pendingSysEvent = 0;
+        u32 pendingSysEvent = 0;
 
-		RamRetainStruct* ramRetainStructPtr;
-		u32* rebootMagicNumberPtr; //Used to save a magic number for rebooting in safe mode
+        RamRetainStruct* ramRetainStructPtr;
+        u32* rebootMagicNumberPtr; //Used to save a magic number for rebooting in safe mode
 
-		u8 scanBuffer[BLE_GAP_SCAN_PACKET_BUFFER_SIZE];
+        u8 scanBuffer[BLE_GAP_SCAN_PACKET_BUFFER_SIZE];
 
 #ifdef SIM_ENABLED
-		RamRetainStruct ramRetainStruct;
-		RamRetainStruct ramRetainStructPreviousBoot;
-		u32 rebootMagicNumber;
+        RamRetainStruct ramRetainStruct;
+        RamRetainStruct ramRetainStructPreviousBoot;
+        u32 rebootMagicNumber;
 #endif
-		RamRetainStruct * ramRetainStructPreviousBootPtr;
+        RamRetainStruct * ramRetainStructPreviousBootPtr;
 
-		FruityHal::UartEventHandler   uartEventHandler = nullptr;
-		FruityHal::AppErrorHandler    appErrorHandler = nullptr;
+        FruityHal::UartEventHandler   uartEventHandler = nullptr;
+        FruityHal::AppErrorHandler    appErrorHandler = nullptr;
 #ifdef SIM_ENABLED
-		FruityHal::DBDiscoveryHandler dbDiscoveryHandler = nullptr;
+        FruityHal::DBDiscoveryHandler dbDiscoveryHandler = nullptr;
 #endif
-		u32 numApplicationInterruptHandlers = 0;
-		std::array<FruityHal::ApplicationInterruptHandler, 16> applicationInterruptHandlers{};
+        u32 numApplicationInterruptHandlers = 0;
+        std::array<FruityHal::ApplicationInterruptHandler, 16> applicationInterruptHandlers{};
 
-		//This registers a handler that will be called from the application interrupt level
-		//It will be called on every application interrupt and can only be interrupted by higher priority interrupts,
-		//not by other parts of the application logic
-		void RegisterApplicationInterruptHandler(FruityHal::ApplicationInterruptHandler handler);
+        //This registers a handler that will be called from the application interrupt level
+        //It will be called on every application interrupt and can only be interrupted by higher priority interrupts,
+        //not by other parts of the application logic
+        void RegisterApplicationInterruptHandler(FruityHal::ApplicationInterruptHandler handler);
 
-		u32 numMainContextHandlers = 0;
-		std::array<FruityHal::MainContextHandler, 2> mainContextHandlers;
+        u32 numMainContextHandlers = 0;
+        std::array<FruityHal::MainContextHandler, 2> mainContextHandlers;
 
-		//This registers a handler that will be called from the main context (non-interrupt)
-		//It allows us to execute logic in the main Thread that will be interrupted by every interrupt priority
-		void RegisterMainContextHandler(FruityHal::MainContextHandler handler);
+        //This registers a handler that will be called from the main context (non-interrupt)
+        //It allows us to execute logic in the main Thread that will be interrupted by every interrupt priority
+        void RegisterMainContextHandler(FruityHal::MainContextHandler handler);
 };

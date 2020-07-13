@@ -37,29 +37,29 @@
 
 std::set<int> CherrySimUtils::generateRandomNumbers(const int min, const int max, const unsigned int count)
 {
-	if (!(min < max) || ((int)count > max - min)) SIMEXCEPTION(IllegalArgumentException); //Wrong parameters
+    if (!(min < max) || ((int)count > max - min)) SIMEXCEPTION(IllegalArgumentException); //Wrong parameters
 
-	std::set<int> numbers;
+    std::set<int> numbers;
 
-	while (numbers.size() < count)
-	{
-		numbers.insert(PSRNGINT(min, max));
-	}
+    while (numbers.size() < count)
+    {
+        numbers.insert(PSRNGINT(min, max));
+    }
 
-	return numbers;
+    return numbers;
 }
 
 std::string CherrySimUtils::getNormalizedPath()
 {
 #ifdef __GNUC__
-	//Unfortunately the sanitizer goes wild for std::filesystem::path on our used GCC version, so we have to do it by hand...
-	std::string path = __FILE__;
-	size_t lastSlash = path.rfind("/");
-	std::string pathWithoutFile = path.substr(0, lastSlash);
-	return pathWithoutFile;
+    //Unfortunately the sanitizer goes wild for std::filesystem::path on our used GCC version, so we have to do it by hand...
+    std::string path = __FILE__;
+    size_t lastSlash = path.rfind("/");
+    std::string pathWithoutFile = path.substr(0, lastSlash);
+    return pathWithoutFile;
 #else
-	std::filesystem::path file = __FILE__;
-	std::string pathString = file.parent_path().string();
-	return pathString;
+    std::filesystem::path file = __FILE__;
+    std::string pathString = file.parent_path().string();
+    return pathString;
 #endif
 }

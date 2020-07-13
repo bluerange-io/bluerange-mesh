@@ -41,49 +41,49 @@
 
 // Chipset string name
 #if defined(NRF52)
-	#define CHIPSET_NAME "NRF52"
+    #define CHIPSET_NAME "NRF52"
 #elif defined(SIM_ENABLED)
-	#define CHIPSET_NAME "SIMULATOR"
+    #define CHIPSET_NAME "SIMULATOR"
 #elif defined(ARM_TEMPLATE)
-	#define CHIPSET_NAME "ARM"
+    #define CHIPSET_NAME "ARM"
 #else
-	#error "No defined chipset"
+    #error "No defined chipset"
 #endif
 
 // Chipset board ID
 #if defined(NRF52832)
-	#define BOARD_TYPE 4
+    #define BOARD_TYPE 4
 #elif defined(NRF52840)
-	#define BOARD_TYPE 18
+    #define BOARD_TYPE 18
 #elif defined(SIM_ENABLED)
-	#define BOARD_TYPE 19
+    #define BOARD_TYPE 19
 #elif defined(ARM_TEMPLATE)
-	#define BOARD_TYPE 1 // just for now
+    #define BOARD_TYPE 1 // just for now
 #else
-	#error "No defined chipset"
+    #error "No defined chipset"
 #endif
 
 // INS
 #if defined(NRF52840)
-	#define INS_AVAILABLE 1
+    #define INS_AVAILABLE 1
 #elif defined(NRF52)
-	#define INS_AVAILABLE 0
+    #define INS_AVAILABLE 0
 #elif defined(SIM_ENABLED)
-	#define INS_AVAILABLE 1
+    #define INS_AVAILABLE 1
 #elif defined(ARM_TEMPLATE)
-	#define INS_AVAILABLE 0
+    #define INS_AVAILABLE 0
 #else
-	#error "No defined chipset"
+    #error "No defined chipset"
 #endif
 
 // adc internal measurement
 #if defined(NRF52)
-	#define ADC_INTERNAL_MEASUREMENT_AVAILABLE 1
+    #define ADC_INTERNAL_MEASUREMENT_AVAILABLE 1
 #elif defined(SIM_ENABLED)
-	#define ADC_INTERNAL_MEASUREMENT_AVAILABLE 0
+    #define ADC_INTERNAL_MEASUREMENT_AVAILABLE 0
 #elif defined(ARM_TEMPLATE)
-	#define ADC_INTERNAL_MEASUREMENT_AVAILABLE 1
+    #define ADC_INTERNAL_MEASUREMENT_AVAILABLE 1
 #else
-	#error "No defined chipset"
+    #error "No defined chipset"
 #endif
 

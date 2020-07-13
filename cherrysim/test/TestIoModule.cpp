@@ -31,21 +31,21 @@
 #include <CherrySimTester.h>
 
 TEST(TestIoModule, TestCommands) {
-	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	testerConfig.verbose = false;
-	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9 });
-	simConfig.SetToPerfectConditions();
-	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-	//Could modify the default test or sim config here,...
-	tester.Start();
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    testerConfig.verbose = false;
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9 });
+    simConfig.SetToPerfectConditions();
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    //Could modify the default test or sim config here,...
+    tester.Start();
 
-	tester.SimulateUntilClusteringDone(1000 * 1000);
-	tester.SendTerminalCommand(2, "action this io led on");
-	tester.SimulateUntilMessageReceived(500, 2, "set_led_result");
+    tester.SimulateUntilClusteringDone(1000 * 1000);
+    tester.SendTerminalCommand(2, "action this io led on");
+    tester.SimulateUntilMessageReceived(500, 2, "set_led_result");
 
 
-	tester.SendTerminalCommand(1, "action 2 io pinset 1 2");
-	tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"nodeId\":2,\"type\":\"set_pin_config_result\",\"module\":6");
+    tester.SendTerminalCommand(1, "action 2 io pinset 1 2");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"nodeId\":2,\"type\":\"set_pin_config_result\",\"module\":6");
 
 }

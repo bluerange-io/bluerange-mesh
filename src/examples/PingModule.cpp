@@ -38,124 +38,124 @@ constexpr u8 PING_MODULE_CONFIG_VERSION = 1;
 
 
 PingModule::PingModule()
-	: Module(ModuleId::PING_MODULE, "ping")
+    : Module(ModuleId::PING_MODULE, "ping")
 {
-	//Register callbacks n' stuff
+    //Register callbacks n' stuff
 
-	//Save configuration to base class variables
-	//sizeof configuration must be a multiple of 4 bytes
-	configurationPointer = &configuration;
-	configurationLength = sizeof(PingModuleConfiguration);
+    //Save configuration to base class variables
+    //sizeof configuration must be a multiple of 4 bytes
+    configurationPointer = &configuration;
+    configurationLength = sizeof(PingModuleConfiguration);
 
-	//Set defaults
-	ResetToDefaultConfiguration();
+    //Set defaults
+    ResetToDefaultConfiguration();
 }
 
 void PingModule::ResetToDefaultConfiguration()
 {
-	//Set default configuration values
-	configuration.moduleId = moduleId;
-	configuration.moduleActive = true;
-	configuration.moduleVersion = PING_MODULE_CONFIG_VERSION;
+    //Set default configuration values
+    configuration.moduleId = moduleId;
+    configuration.moduleActive = true;
+    configuration.moduleVersion = PING_MODULE_CONFIG_VERSION;
 
-	//Set additional config values...
+    //Set additional config values...
 
 }
 
 void PingModule::ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength)
 {
-	//Do additional initialization upon loading the config
+    //Do additional initialization upon loading the config
 
 
-	//Start the Module...
+    //Start the Module...
 
 }
 
 void PingModule::TimerEventHandler(u16 passedTimeDs)
 {
-	//Do stuff on timer...
+    //Do stuff on timer...
 
 }
 
 #ifdef TERMINAL_ENABLED
 TerminalCommandHandlerReturnType PingModule::TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize)
 {
-	//React on commands, return true if handled, false otherwise
-	if(TERMARGS(0, "pingmod")){
-		//Get the id of the target node
-		NodeId targetNodeId = Utility::StringToU16(commandArgs[1]);
-		logt("PINGMOD", "Trying to ping node %u", targetNodeId);
+    //React on commands, return true if handled, false otherwise
+    if(TERMARGS(0, "pingmod")){
+        //Get the id of the target node
+        NodeId targetNodeId = Utility::StringToU16(commandArgs[1]);
+        logt("PINGMOD", "Trying to ping node %u", targetNodeId);
 
-		//Some data
-		u8 data[1];
-		data[0] = 123;
+        //Some data
+        u8 data[1];
+        data[0] = 123;
 
-		//Send ping packet to that node
-		SendModuleActionMessage(
-				MessageType::MODULE_TRIGGER_ACTION,
-				targetNodeId,
-				PingModuleTriggerActionMessages::TRIGGER_PING,
-				0,
-				data,
-				1,
-				false
-		);
+        //Send ping packet to that node
+        SendModuleActionMessage(
+                MessageType::MODULE_TRIGGER_ACTION,
+                targetNodeId,
+                PingModuleTriggerActionMessages::TRIGGER_PING,
+                0,
+                data,
+                1,
+                false
+        );
 
-		return TerminalCommandHandlerReturnType::SUCCESS;
-	}
+        return TerminalCommandHandlerReturnType::SUCCESS;
+    }
 
-	//Must be called to allow the module to get and set the config
-	return Module::TerminalCommandHandler(commandArgs, commandArgsSize);
+    //Must be called to allow the module to get and set the config
+    return Module::TerminalCommandHandler(commandArgs, commandArgsSize);
 }
 #endif
 
 void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
 {
-	//Must call superclass for handling
-	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
+    //Must call superclass for handling
+    Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
-	//Filter trigger_action messages
-	if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-		connPacketModule const * packet = (connPacketModule const *)packetHeader;
+    //Filter trigger_action messages
+    if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
+        connPacketModule const * packet = (connPacketModule const *)packetHeader;
 
-		//Check if our module is meant and we should trigger an action
-		if(packet->moduleId == moduleId){
-			//It's a ping message
-			if(packet->actionType == PingModuleTriggerActionMessages::TRIGGER_PING){
+        //Check if our module is meant and we should trigger an action
+        if(packet->moduleId == moduleId){
+            //It's a ping message
+            if(packet->actionType == PingModuleTriggerActionMessages::TRIGGER_PING){
 
-				//Inform the user
-				logt("PINGMOD", "Ping request received with data: %d", packet->data[0]);
+                //Inform the user
+                logt("PINGMOD", "Ping request received with data: %d", packet->data[0]);
 
-				u8 data[2];
-				data[0] = packet->data[0];
-				data[1] = 111;
+                u8 data[2];
+                data[0] = packet->data[0];
+                data[1] = 111;
 
-				//Send ping packet to that node
-				SendModuleActionMessage(
-						MessageType::MODULE_ACTION_RESPONSE,
-						packetHeader->sender,
-						PingModuleActionResponseMessages::PING_RESPONSE,
-						0,
-						data,
-						2,
-						false
-				);
-			}
-		}
-	}
+                //Send ping packet to that node
+                SendModuleActionMessage(
+                        MessageType::MODULE_ACTION_RESPONSE,
+                        packetHeader->sender,
+                        PingModuleActionResponseMessages::PING_RESPONSE,
+                        0,
+                        data,
+                        2,
+                        false
+                );
+            }
+        }
+    }
 
-	//Parse Module action_response messages
-	if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
+    //Parse Module action_response messages
+    if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
 
-		connPacketModule const * packet = (connPacketModule const *)packetHeader;
+        connPacketModule const * packet = (connPacketModule const *)packetHeader;
 
-		//Check if our module is meant and we should trigger an action
-		if(packet->moduleId == moduleId)
-		{
-			//Somebody reported its connections back
-			if(packet->actionType == PingModuleActionResponseMessages::PING_RESPONSE){
-				logt("PINGMOD", "Ping came back from %u with data %d, %d", packet->header.sender, packet->data[0], packet->data[1]);
-			}
-		}
-	}
+        //Check if our module is meant and we should trigger an action
+        if(packet->moduleId == moduleId)
+        {
+            //Somebody reported its connections back
+            if(packet->actionType == PingModuleActionResponseMessages::PING_RESPONSE){
+                logt("PINGMOD", "Ping came back from %u with data %d, %d", packet->header.sender, packet->data[0], packet->data[1]);
+            }
+        }
+    }
 }

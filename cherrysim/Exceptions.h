@@ -116,53 +116,53 @@ CREATEEXCEPTION(ErrorLoggedException);
 
 namespace Exceptions {
 
-	void disableExceptionByIndex(std::type_index index);
-	void enableExceptionByIndex(std::type_index index);
-	bool isExceptionEnabledByIndex(std::type_index index);
+    void disableExceptionByIndex(std::type_index index);
+    void enableExceptionByIndex(std::type_index index);
+    bool isExceptionEnabledByIndex(std::type_index index);
 
-	template<typename T>
-	bool isExceptionEnabled() {
-		return isExceptionEnabledByIndex(std::type_index(typeid(T)));
-	}
+    template<typename T>
+    bool isExceptionEnabled() {
+        return isExceptionEnabledByIndex(std::type_index(typeid(T)));
+    }
 
-	bool getDebugBreakOnException();
-	class DisableDebugBreakOnException {
-	public:
-		DisableDebugBreakOnException();
-		~DisableDebugBreakOnException() noexcept(false);
-	};
+    bool getDebugBreakOnException();
+    class DisableDebugBreakOnException {
+    public:
+        DisableDebugBreakOnException();
+        ~DisableDebugBreakOnException() noexcept(false);
+    };
 
-	template<typename T>
-	class ExceptionDisabler {
-	public:
-		ExceptionDisabler() {
-			disableExceptionByIndex(std::type_index(typeid(T)));
-		}
+    template<typename T>
+    class ExceptionDisabler {
+    public:
+        ExceptionDisabler() {
+            disableExceptionByIndex(std::type_index(typeid(T)));
+        }
 
-		~ExceptionDisabler() {
-			enableExceptionByIndex(std::type_index(typeid(T)));
-		}
-	};
+        ~ExceptionDisabler() {
+            enableExceptionByIndex(std::type_index(typeid(T)));
+        }
+    };
 }
 
 #define SIMEXCEPTIONFORCE(T) \
-	{\
-		printf("Exception occured: " #T " " __FILE__ " %d\n", __LINE__); \
-		if(Exceptions::getDebugBreakOnException()) {\
-			debug_break(); \
-		}\
-		throw T(); \
-	}
+    {\
+        printf("Exception occured: " #T " " __FILE__ " %d\n", __LINE__); \
+        if(Exceptions::getDebugBreakOnException()) {\
+            debug_break(); \
+        }\
+        throw T(); \
+    }
 
 #define SIMEXCEPTION(T) \
-	{\
-		if(Exceptions::isExceptionEnabled<T>()) {\
-			SIMEXCEPTIONFORCE(T); \
-		}\
-		else \
-		{ \
-			printf("Exception occured but ignored: " #T " " __FILE__ " %d\n", __LINE__); \
-		} \
-	}
+    {\
+        if(Exceptions::isExceptionEnabled<T>()) {\
+            SIMEXCEPTIONFORCE(T); \
+        }\
+        else \
+        { \
+            printf("Exception occured but ignored: " #T " " __FILE__ " %d\n", __LINE__); \
+        } \
+    }
 
 

@@ -42,69 +42,69 @@ void* fmBoardConfigPtr;
 
 Boardconf::Boardconf()
 {
-	CheckedMemset(&configuration, 0x00, sizeof(configuration));
+    CheckedMemset(&configuration, 0x00, sizeof(configuration));
 }
 
 void Boardconf::ResetToDefaultConfiguration()
 {
-	//Set a default boardType for all different platforms in case we do not have the boardType in UICR
-	configuration.boardType = BOARD_TYPE;
+    //Set a default boardType for all different platforms in case we do not have the boardType in UICR
+    configuration.boardType = BOARD_TYPE;
 
-	DeviceConfiguration config;
-	//If there is data in the DeviceConfiguration, we use the boardType from there
-	ErrorType err = FruityHal::GetDeviceConfiguration(config);
-	if (err == ErrorType::SUCCESS) {
-		if (config.boardType != EMPTY_WORD) configuration.boardType = config.boardType;
-	}
+    DeviceConfiguration config;
+    //If there is data in the DeviceConfiguration, we use the boardType from there
+    ErrorType err = FruityHal::GetDeviceConfiguration(config);
+    if (err == ErrorType::SUCCESS) {
+        if (config.boardType != EMPTY_WORD) configuration.boardType = config.boardType;
+    }
 
-	//Set everything else to safe defaults
-	configuration.led1Pin = -1;
-	configuration.led2Pin = -1;
-	configuration.led3Pin = -1;
-	configuration.ledActiveHigh = false;
-	configuration.button1Pin = -1;
-	configuration.buttonsActiveHigh = false;
-	configuration.uartRXPin = -1;
-	configuration.uartTXPin = -1;
-	configuration.uartCTSPin = -1;
-	configuration.uartRTSPin = -1;
-	configuration.uartBaudRate = (u32)FruityHal::UartBaudrate::BAUDRATE_1M;
-	configuration.dBmRX = -90;
-	configuration.calibratedTX = -60;
-	configuration.lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_RC;
-	configuration.lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_500_PPM; //Use a safe default if this is not given
-	configuration.displayWidth = 400;
-	configuration.displayHeight = 300;
-	configuration.batteryAdcInputPin = -1;
-	configuration.batteryMeasurementEnablePin = -1;
-	configuration.voltageDividerR1 = 0;
-	configuration.voltageDividerR2 = 0;
-	configuration.dcDcEnabled = false;
+    //Set everything else to safe defaults
+    configuration.led1Pin = -1;
+    configuration.led2Pin = -1;
+    configuration.led3Pin = -1;
+    configuration.ledActiveHigh = false;
+    configuration.button1Pin = -1;
+    configuration.buttonsActiveHigh = false;
+    configuration.uartRXPin = -1;
+    configuration.uartTXPin = -1;
+    configuration.uartCTSPin = -1;
+    configuration.uartRTSPin = -1;
+    configuration.uartBaudRate = (u32)FruityHal::UartBaudrate::BAUDRATE_1M;
+    configuration.dBmRX = -90;
+    configuration.calibratedTX = -60;
+    configuration.lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_RC;
+    configuration.lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_500_PPM; //Use a safe default if this is not given
+    configuration.displayWidth = 400;
+    configuration.displayHeight = 300;
+    configuration.batteryAdcInputPin = -1;
+    configuration.batteryMeasurementEnablePin = -1;
+    configuration.voltageDividerR1 = 0;
+    configuration.voltageDividerR2 = 0;
+    configuration.dcDcEnabled = false;
 
-	//Now, we load all Default boards (nRf Development kits)
-	setBoard_4(&configuration);
-	setBoard_18(&configuration);
+    //Now, we load all Default boards (nRf Development kits)
+    setBoard_4(&configuration);
+    setBoard_18(&configuration);
 
 #ifdef SIM_ENABLED
 #ifndef GITHUB_RELEASE
-	setBoard_19(&configuration);
+    setBoard_19(&configuration);
 #endif //GITHUB_RELEASE
 #endif
 
-	//We call our featureset to check if additional boards are available and if they should be set
-	//Each featureset can include a number of boards that it can run on
-	SET_BOARD_CONFIGURATION(&configuration);
+    //We call our featureset to check if additional boards are available and if they should be set
+    //Each featureset can include a number of boards that it can run on
+    SET_BOARD_CONFIGURATION(&configuration);
 }
 
 Boardconf & Boardconf::getInstance()
 {
-	return GS->boardconf;
+    return GS->boardconf;
 }
 
 void Boardconf::Initialize()
 {
-	ResetToDefaultConfiguration();
+    ResetToDefaultConfiguration();
 
-	//Can be used from C code to access the config
-	fmBoardConfigPtr = (void*)&(configuration.boardType);
+    //Can be used from C code to access the config
+    fmBoardConfigPtr = (void*)&(configuration.boardType);
 }

@@ -45,468 +45,468 @@
  */
 namespace FruityHal
 {
-	enum class SystemEvents
-	{
-		HIGH_FREQUENCY_CLOCK_STARTED,
-		POWER_FAILURE_WARNING,
-		FLASH_OPERATION_SUCCESS,
-		FLASH_OPERATION_ERROR,
-		RADIO_BLOCKED,
-		RADIO_CANCELED,
-		RADIO_SIGNAL_CALLBACK_INVALID_RETURN,
-		RADIO_SESSION_IDLE,
-		RADIO_SESSION_CLOSED,
-		UNKOWN_EVENT,
-		NUMBER_OF_EVTS
-	};
-	
-	typedef void(*UartEventHandler) (void);
-	typedef void(*AppErrorHandler) (u32 error_code);
-	typedef void(*DBDiscoveryHandler) (BleGattDBDiscoveryEvent * p_dbEvent);
-	typedef void(*ApplicationInterruptHandler) (void);
-	typedef void(*MainContextHandler) (void);
-
-	#define ______________________EVENT_DEFINITIONS_______________________
-
-	class BleEvent
-	{
-	protected:
-		explicit BleEvent(void const * evt);
-	#ifdef SIM_ENABLED //Unfortunatly a virtual destructor is too expensive for the real firmware.
-		virtual ~BleEvent();
-	#endif
-	};
-
-	class GapEvent : public BleEvent 
-	{
-	protected:
-		explicit GapEvent(void const * evt);
-	public:
-		u16 getConnectionHandle() const;
-	};
-
-	class GapConnParamUpdateEvent : public GapEvent 
-	{
-	public:
-		explicit GapConnParamUpdateEvent(void const * evt);
-		u16 getMaxConnectionInterval() const;
-	};
-
-	class GapRssiChangedEvent : public GapEvent
-	{
-	public:
-		explicit GapRssiChangedEvent(void const * evt);
-		i8 getRssi() const;
-	};
-
-	class GapAdvertisementReportEvent : public GapEvent
-	{
-	public:
-		explicit GapAdvertisementReportEvent(void const * evt);
-		i8 getRssi() const;
-		const u8* getData() const;
-		u32 getDataLength() const;
-		const u8* getPeerAddr() const;
-		BleGapAddrType getPeerAddrType() const;
-		bool isConnectable() const;
-	};
-
-	enum class GapRole : u8 {
-		INVALID    = 0,
-		PERIPHERAL = 1,
-		CENTRAL    = 2
-	};
-
-	class GapConnectedEvent : public GapEvent
-	{
-	public:
-		explicit GapConnectedEvent(void const * evt);
-		GapRole getRole() const;
-		const u8* getPeerAddr() const;
-		u8 getPeerAddrType() const;
-		u16 getMinConnectionInterval() const;
-	};
-
-	class GapDisconnectedEvent : public GapEvent
-	{
-	public:
-		explicit GapDisconnectedEvent(void const * evt);
-		FruityHal::BleHciError getReason() const;
-	};
-
-	enum class GapTimeoutSource : u8
-	{
-		ADVERTISING      = 0,
-		SECURITY_REQUEST = 1,
-		SCAN             = 2,
-		CONNECTION       = 3,
-		AUTH_PAYLOAD     = 4,
-		INVALID          = 255
-	};
-
-	class GapTimeoutEvent : public GapEvent
-	{
-	public:
-		explicit GapTimeoutEvent(void const * evt);
-		GapTimeoutSource getSource() const;
-	};
-
-	class GapSecurityInfoRequestEvent : public GapEvent
-	{
-	public:
-		explicit GapSecurityInfoRequestEvent(void const * evt);
-	};
-
-	enum class SecurityMode : u8
-	{
-		NO_PERMISSION = 0,
-		ONE = 1,
-		TWO = 2,
-	};
-
-	enum class SecurityLevel : u8
-	{
-		NO_PERMISSION = 0,
-		//These are the valid security levels.
-		ONE   = 1,
-		TWO   = 2,
-		THREE = 3,
-		FOUR  = 4
-	};
-
-	class GapConnectionSecurityUpdateEvent : public GapEvent
-	{
-	public:
-		explicit GapConnectionSecurityUpdateEvent(void const * evt);
-		u8 getKeySize() const;
-		SecurityLevel getSecurityLevel() const;
-		SecurityMode getSecurityMode() const;
-	};
-
-	class GattcEvent : public BleEvent
-	{
-	public:
-		explicit GattcEvent(void const * evt);
-		u16 getConnectionHandle() const;
-		FruityHal::BleGattEror getGattStatus() const;
-	};
-
-	class GattcWriteResponseEvent : public GattcEvent
-	{
-	public:
-		explicit GattcWriteResponseEvent(void const * evt);
-	};
-
-	class GattcTimeoutEvent : public GattcEvent
-	{
-	public:
-		explicit GattcTimeoutEvent(void const * evt);
-	};
-
-	class GattDataTransmittedEvent : public BleEvent /* Note: This is not a Gatt event because of implementation changes in the Nordic SDK. */
-	{
-	public:
-		explicit GattDataTransmittedEvent(void const * evt);
-
-		u16 getConnectionHandle() const;
-		bool isConnectionHandleValid() const;
-		u32 getCompleteCount() const;
-	};
-
-	class GattsWriteEvent : public BleEvent
-	{
-	public:
-		explicit GattsWriteEvent(void const * evt);
-
-		u16 getAttributeHandle() const;
-		bool isWriteRequest() const;
-		u16 getLength() const;
-		u16 getConnectionHandle() const;
-		u8 const * getData() const;
-	};
-
-	class GattcHandleValueEvent : public GattcEvent
-	{
-	public:
-		explicit GattcHandleValueEvent(void const * evt);
-
-		u16 getHandle() const;
-		u16 getLength() const;
-		u8 const * getData() const;
-
-	};
-
-	struct UartReadCharBlockingResult
-	{
-		bool didError = false;
-		char c = '0';
-	};
-
-	struct UartReadCharResult
-	{
-		bool hasNewChar = false;
-		char c = '0';
-	};
-
-	enum class TxRole : u8 {
-		CONNECTION  = 0x00,  // connection
-		ADVERTISING = 0x01,  // advertising
-		SCAN_INIT   = 0x02   // scanning and connection initiator
-	};
-
-	enum class ClockAccuracy : u8 {
-		CLOCK_ACCURACY_250_PPM = 0, //Default
-		CLOCK_ACCURACY_500_PPM = 1,
-		CLOCK_ACCURACY_150_PPM = 2,
-		CLOCK_ACCURACY_100_PPM = 3,
-		CLOCK_ACCURACY_75_PPM = 4,
-		CLOCK_ACCURACY_50_PPM = 5,
-		CLOCK_ACCURACY_30_PPM = 6,
-		CLOCK_ACCURACY_20_PPM = 7,
-		CLOCK_ACCURACY_10_PPM = 8,
-		CLOCK_ACCURACY_5_PPM = 9,
-		CLOCK_ACCURACY_2_PPM = 10,
-		CLOCK_ACCURACY_1_PPM = 11,
-	};
-
-	enum class ClockSource : u8 {
-		CLOCK_SOURCE_RC     = 0, 
-		CLOCK_SOURCE_XTAL   = 1, 
-		CLOCK_SOURCE_SYNTH  = 2
-	};
-
-	enum class GpioPullMode {
-		GPIO_PIN_NOPULL			= 0,
-		GPIO_PIN_PULLDOWN		= 1,
-		GPIO_PIN_PULLUP			= 2
-	};
-
-	enum class GpioTransistion {
-		GPIO_TRANSITION_TOGGLE      = 0,
-		GPIO_TRANSITION_LOW_TO_HIGH = 1,
-		GPIO_TRANSITION_HIGH_TO_LOW = 2
-	};
-
-	enum class AdcGain {
-		ADC_GAIN_1_6  = 0,
-		ADC_GAIN_1_5  = 1,
-		ADC_GAIN_1_4  = 2,
-		ADC_GAIN_1_3  = 3,
-		ADC_GAIN_1_2  = 4,
-		ADC_GAIN_2_3  = 5,
-		ADC_GAIN_1    = 6,
-		ADC_GAIN_2    = 7,
-		ADC_GAIN_4    = 8,
-	};
-
-	enum class AdcResoultion {
-		ADC_8_BIT		= 0,
-		ADC_10_BIT	= 1,
-	};
-
-	enum class AdcReference {
-		ADC_REFERENCE_0_6V              = 0,
-		ADC_REFERENCE_1_2V              = 1,
-		ADC_REFERENCE_1_2_POWER_SUPPLY  = 2,
-		ADC_REFERENCE_1_3_POWER_SUPPLY  = 3,
-		ADC_REFERENCE_1_4_POWER_SUPPLY  = 4,
-	};
-
-	enum class UartBaudrate {
-		BAUDRATE_1M,
-		BAUDRATE_115200,
-		BAUDRATE_57600,
-		BAUDRATE_38400,
-	};
-
-	// ######################### Ble Stack and Event Handling ############################
-	ErrorType BleStackInit();
-	void BleStackDeinit();
-	void EventLooper();
-	u16 GetEventBufferSize();
-	void DispatchBleEvents(void const * evt);
-	void SetPendingEventIRQ();
-
-	// ######################### GAP ############################
-	BleGapAddr GetBleGapAddress();
-	ErrorType SetBleGapAddress(BleGapAddr const &address);
-
-	ErrorType BleGapConnect(BleGapAddr const &peerAddress, BleGapScanParams const &scanParams, BleGapConnParams const &connectionParams);
-	ErrorType ConnectCancel();
-	ErrorType Disconnect(u16 connHandle, FruityHal::BleHciError hci_status_code);
-
-	ErrorType BleGapScanStart(BleGapScanParams const &scanParams);
-	ErrorType BleGapScanStop();
-
-	ErrorType BleGapAdvStart(u8 *advHandle, BleGapAdvParams const &advParams);
-	ErrorType BleGapAdvDataSet(u8 * p_advHandle, u8 *advData, u8 advDataLength, u8 *scanData, u8 scanDataLength);
-	ErrorType BleGapAdvStop(u8 advHandle);
-
-	ErrorType BleTxPacketCountGet(u16 connectionHandle, u8* count);
-
-	ErrorType BleGapNameSet(const BleGapConnSecMode & mode, u8 const * p_devName, u16 len);
-	ErrorType BleGapAppearance(BleAppearance appearance);
-
-	ErrorType BleGapConnectionParamsUpdate(u16 conn_handle, BleGapConnParams const & params);
-	ErrorType BleGapConnectionPreferredParamsSet(BleGapConnParams const & params);
-
-	ErrorType BleGapDataLengthExtensionRequest(u16 connHandle);
-
-	ErrorType BleGapSecInfoReply(u16 connHandle, BleGapEncInfo * p_infoOut, u8 * p_id_info, u8 * p_sign_info);
-
-	ErrorType BleGapEncrypt(u16 connHandle, BleGapMasterId const & masterId, BleGapEncInfo const & encInfo);
-
-	ErrorType BleGapRssiStart(u16 connHandle, u8 thresholdDbm, u8 skipCount);
-	ErrorType BleGapRssiStop(u16 connHandle);
-
-	// ######################### GATT ############################
-	ErrorType DiscovereServiceInit(DBDiscoveryHandler dbEventHandler);
-	ErrorType DiscoverService(u16 connHandle, const BleGattUuid& p_uuid);
-	bool DiscoveryIsInProgress();
-
-	ErrorType BleGattSendNotification(u16 connHandle, BleGattWriteParams & params);
-	ErrorType BleGattWrite(u16 connHandle, BleGattWriteParams const & params);
-
-	ErrorType BleUuidVsAdd(u8 const * p_vsUuid, u8 * p_uuidType);
-	ErrorType BleGattServiceAdd(BleGattSrvcType type, BleGattUuid const & p_uuid, u16 * p_handle);
-	ErrorType BleGattCharAdd(u16 service_handle, BleGattCharMd const & charMd, BleGattAttribute const & attrCharValue, BleGattCharHandles & handles);
-
-	u32 BleGattGetMaxMtu();
-	ErrorType BleGattMtuExchangeRequest(u16 connHandle, u16 clientRxMtu);
-	
-	// ######################### Radio ############################
-	ErrorType RadioSetTxPower(i8 txPower, TxRole role, u16 handle);
-
-
-	// ######################### Bootloader ############################
-	u32 GetBootloaderVersion();
-	u32 GetBootloaderAddress();
-	void ActivateBootloaderOnReset();
-
-	// ######################### Utility ############################
-
-	ErrorType WaitForEvent();
-	ErrorType InitializeButtons();
-	ErrorType GetRandomBytes(u8 * p_data, u8 len);
-	bool SetRetentionRegisterTwo(u8 val);
-
-	// ######################### Timers ############################
-
-	typedef void(*TimerHandler)(void * p_context);
-	typedef u32* swTimer;
-	ErrorType InitTimers();
-	ErrorType StartTimers();
-	u32 GetRtcMs();
-	u32 GetRtcDifferenceMs(u32 nowTimeMs, u32 previousTimeMs);
-	ErrorType CreateTimer(swTimer &timer, bool repeated, TimerHandler handler);
-	ErrorType StartTimer(swTimer timer, u32 timeoutMs);
-	ErrorType StopTimer(swTimer timer);
-
-	// ######################### Utility ############################
-
-	void SystemReset();
-	void SystemReset(bool softdeviceEnabled);
-	RebootReason GetRebootReason();
-	ErrorType ClearRebootReason();
-	void StartWatchdog(bool safeBoot);
-	void FeedWatchdog();
-	void DelayUs(u32 delayMicroSeconds);
-	void DelayMs(u32 delayMs);
-	void EcbEncryptBlock(const u8 * p_key, const u8 * p_clearText, u8 * p_cipherText);
-	u8 ConvertPortToGpio(u8 port, u8 pin);
-
-	// ######################### FLASH ############################
-
-	ErrorType FlashPageErase(u32 page);
-	ErrorType FlashWrite(u32 * p_addr, u32 * p_data, u32 len);
-
-	// ######################### NVIC ############################
-
-	void NvicEnableIRQ(u32 irqType);
-	void NvicDisableIRQ(u32 irqType);
-	void NvicSetPriorityIRQ(u32 irqType, u8 level);
-	void NvicClearPendingIRQ(u32 irqType);
-
-	// ######################### SERIAL COMMUNICATION ############################
-
-	// i2c
-	ErrorType TwiInit(i32 sclPin, i32 sdaPin);
-	ErrorType TwiRegisterWrite(u8 slaveAddress, u8 const * pTransferData, u8 length);
-	ErrorType TwiRegisterRead(u8 slaveAddress, u8 reg, u8 * pReceiveData, u8 length);
-	ErrorType TwiRead(u8 slaveAddress, u8 * pReceiveData, u8 length);
-	bool TwiIsInitialized(void);
-	void TwiGpioAddressPinSetAndWait(bool high, i32 sdaPin);
-
-	//spi
-	void SpiInit(i32 sckPin, i32 misoPin, i32 mosiPin);
-	bool SpiIsInitialized(void);
-	ErrorType SpiTransfer(u8* const p_toWrite, u8 count, u8* const p_toRead, i32 slaveSelectPin);
-	void SpiConfigureSlaveSelectPin(i32 pin);
-
-	// ######################### GPIO ############################
-	void GpioConfigureOutput(u32 pin);
-	void GpioConfigureInput(u32 pin, GpioPullMode mode);
-	void GpioConfigureDefault(u32 pin);
-	void GpioPinSet(u32 pin);
-	void GpioPinClear(u32 pin);
-	u32 GpioPinRead(u32 pin);
-	void GpioPinToggle(u32 pin);
-	typedef void (*GpioInterruptHandler)(u32 pin, GpioTransistion transistion);
-	ErrorType GpioConfigureInterrupt(u32 pin, GpioPullMode mode, GpioTransistion trigger, GpioInterruptHandler handler);
-
-	// ######################### ADC ############################
-
-	typedef void (*AdcEventHandler)(void);
-	ErrorType AdcInit(AdcEventHandler);
-	void AdcUninit();
-	ErrorType AdcConfigureChannel(u32 pin, AdcReference reference, AdcResoultion resolution, AdcGain gain);
-	ErrorType AdcSample(i16 & buffer, u8 len); // triggers non-blocking convertion which end will be reported by calling AdcEventHandler
-	u8 AdcConvertSampleToDeciVoltage(u32 sample);
-	u8 AdcConvertSampleToDeciVoltage(u32 sample, u16 voltageDivider);
-
-	// ################# USB CDC (Virtual Com Port) #############
-	void VirtualComInitBeforeStack();
-	void VirtualComInitAfterStack(void (*portEventHandler)(bool));
-	void VirtualComProcessEvents();
-	ErrorType VirtualComCheckAndProcessLine(u8* buffer, u16 bufferLength);
-	void VirtualComWriteData(const u8* data, u16 dataLength);
-
-	// ######################### UART ############################
-	void DisableHardwareDfuBootloader();
-	void DisableUart();
-	void EnableUart(bool promptAndEchoMode);
-	bool CheckAndHandleUartTimeout();
-	u32 CheckAndHandleUartError();
-	void UartHandleError(u32 error);
-	bool UartCheckInputAvailable();
-	UartReadCharBlockingResult UartReadCharBlocking();
-	void UartPutStringBlockingWithTimeout(const char* message);
-	void UartEnableReadInterrupt();
-	bool IsUartErroredAndClear();
-	bool IsUartTimedOutAndClear();
-	UartReadCharResult UartReadChar();
-
-	u32 GetMasterBootRecordSize();
-	u32 GetSoftDeviceSize();
-	u32 GetSoftDeviceVersion();
-	BleStackType GetBleStackType();
-	void BleStackErrorHandler(u32 id, u32 info);
-
-	ErrorType GetDeviceConfiguration(DeviceConfiguration & config);
-	u32 * GetUserMemoryAddress();
-	u32 * GetDeviceMemoryAddress();
-	void GetCustomerData(u32 * p_data, u8 len);
-	void WriteCustomerData(u32 * p_data, u8 len);
-	u32 GetBootloaderSettingsAddress();
-	u32 GetCodePageSize();
-	u32 GetCodeSize();
-	u32 GetDeviceId();
-	void GetDeviceAddress(u8 * p_address);
-
-	u32 GetHalMemorySize();
-	
+    enum class SystemEvents
+    {
+        HIGH_FREQUENCY_CLOCK_STARTED,
+        POWER_FAILURE_WARNING,
+        FLASH_OPERATION_SUCCESS,
+        FLASH_OPERATION_ERROR,
+        RADIO_BLOCKED,
+        RADIO_CANCELED,
+        RADIO_SIGNAL_CALLBACK_INVALID_RETURN,
+        RADIO_SESSION_IDLE,
+        RADIO_SESSION_CLOSED,
+        UNKOWN_EVENT,
+        NUMBER_OF_EVTS
+    };
+    
+    typedef void(*UartEventHandler) (void);
+    typedef void(*AppErrorHandler) (u32 error_code);
+    typedef void(*DBDiscoveryHandler) (BleGattDBDiscoveryEvent * p_dbEvent);
+    typedef void(*ApplicationInterruptHandler) (void);
+    typedef void(*MainContextHandler) (void);
+
+    #define ______________________EVENT_DEFINITIONS_______________________
+
+    class BleEvent
+    {
+    protected:
+        explicit BleEvent(void const * evt);
+    #ifdef SIM_ENABLED //Unfortunatly a virtual destructor is too expensive for the real firmware.
+        virtual ~BleEvent();
+    #endif
+    };
+
+    class GapEvent : public BleEvent 
+    {
+    protected:
+        explicit GapEvent(void const * evt);
+    public:
+        u16 getConnectionHandle() const;
+    };
+
+    class GapConnParamUpdateEvent : public GapEvent 
+    {
+    public:
+        explicit GapConnParamUpdateEvent(void const * evt);
+        u16 getMaxConnectionInterval() const;
+    };
+
+    class GapRssiChangedEvent : public GapEvent
+    {
+    public:
+        explicit GapRssiChangedEvent(void const * evt);
+        i8 getRssi() const;
+    };
+
+    class GapAdvertisementReportEvent : public GapEvent
+    {
+    public:
+        explicit GapAdvertisementReportEvent(void const * evt);
+        i8 getRssi() const;
+        const u8* getData() const;
+        u32 getDataLength() const;
+        const u8* getPeerAddr() const;
+        BleGapAddrType getPeerAddrType() const;
+        bool isConnectable() const;
+    };
+
+    enum class GapRole : u8 {
+        INVALID    = 0,
+        PERIPHERAL = 1,
+        CENTRAL    = 2
+    };
+
+    class GapConnectedEvent : public GapEvent
+    {
+    public:
+        explicit GapConnectedEvent(void const * evt);
+        GapRole getRole() const;
+        const u8* getPeerAddr() const;
+        u8 getPeerAddrType() const;
+        u16 getMinConnectionInterval() const;
+    };
+
+    class GapDisconnectedEvent : public GapEvent
+    {
+    public:
+        explicit GapDisconnectedEvent(void const * evt);
+        FruityHal::BleHciError getReason() const;
+    };
+
+    enum class GapTimeoutSource : u8
+    {
+        ADVERTISING      = 0,
+        SECURITY_REQUEST = 1,
+        SCAN             = 2,
+        CONNECTION       = 3,
+        AUTH_PAYLOAD     = 4,
+        INVALID          = 255
+    };
+
+    class GapTimeoutEvent : public GapEvent
+    {
+    public:
+        explicit GapTimeoutEvent(void const * evt);
+        GapTimeoutSource getSource() const;
+    };
+
+    class GapSecurityInfoRequestEvent : public GapEvent
+    {
+    public:
+        explicit GapSecurityInfoRequestEvent(void const * evt);
+    };
+
+    enum class SecurityMode : u8
+    {
+        NO_PERMISSION = 0,
+        ONE = 1,
+        TWO = 2,
+    };
+
+    enum class SecurityLevel : u8
+    {
+        NO_PERMISSION = 0,
+        //These are the valid security levels.
+        ONE   = 1,
+        TWO   = 2,
+        THREE = 3,
+        FOUR  = 4
+    };
+
+    class GapConnectionSecurityUpdateEvent : public GapEvent
+    {
+    public:
+        explicit GapConnectionSecurityUpdateEvent(void const * evt);
+        u8 getKeySize() const;
+        SecurityLevel getSecurityLevel() const;
+        SecurityMode getSecurityMode() const;
+    };
+
+    class GattcEvent : public BleEvent
+    {
+    public:
+        explicit GattcEvent(void const * evt);
+        u16 getConnectionHandle() const;
+        FruityHal::BleGattEror getGattStatus() const;
+    };
+
+    class GattcWriteResponseEvent : public GattcEvent
+    {
+    public:
+        explicit GattcWriteResponseEvent(void const * evt);
+    };
+
+    class GattcTimeoutEvent : public GattcEvent
+    {
+    public:
+        explicit GattcTimeoutEvent(void const * evt);
+    };
+
+    class GattDataTransmittedEvent : public BleEvent /* Note: This is not a Gatt event because of implementation changes in the Nordic SDK. */
+    {
+    public:
+        explicit GattDataTransmittedEvent(void const * evt);
+
+        u16 getConnectionHandle() const;
+        bool isConnectionHandleValid() const;
+        u32 getCompleteCount() const;
+    };
+
+    class GattsWriteEvent : public BleEvent
+    {
+    public:
+        explicit GattsWriteEvent(void const * evt);
+
+        u16 getAttributeHandle() const;
+        bool isWriteRequest() const;
+        u16 getLength() const;
+        u16 getConnectionHandle() const;
+        u8 const * getData() const;
+    };
+
+    class GattcHandleValueEvent : public GattcEvent
+    {
+    public:
+        explicit GattcHandleValueEvent(void const * evt);
+
+        u16 getHandle() const;
+        u16 getLength() const;
+        u8 const * getData() const;
+
+    };
+
+    struct UartReadCharBlockingResult
+    {
+        bool didError = false;
+        char c = '0';
+    };
+
+    struct UartReadCharResult
+    {
+        bool hasNewChar = false;
+        char c = '0';
+    };
+
+    enum class TxRole : u8 {
+        CONNECTION  = 0x00,  // connection
+        ADVERTISING = 0x01,  // advertising
+        SCAN_INIT   = 0x02   // scanning and connection initiator
+    };
+
+    enum class ClockAccuracy : u8 {
+        CLOCK_ACCURACY_250_PPM = 0, //Default
+        CLOCK_ACCURACY_500_PPM = 1,
+        CLOCK_ACCURACY_150_PPM = 2,
+        CLOCK_ACCURACY_100_PPM = 3,
+        CLOCK_ACCURACY_75_PPM = 4,
+        CLOCK_ACCURACY_50_PPM = 5,
+        CLOCK_ACCURACY_30_PPM = 6,
+        CLOCK_ACCURACY_20_PPM = 7,
+        CLOCK_ACCURACY_10_PPM = 8,
+        CLOCK_ACCURACY_5_PPM = 9,
+        CLOCK_ACCURACY_2_PPM = 10,
+        CLOCK_ACCURACY_1_PPM = 11,
+    };
+
+    enum class ClockSource : u8 {
+        CLOCK_SOURCE_RC     = 0, 
+        CLOCK_SOURCE_XTAL   = 1, 
+        CLOCK_SOURCE_SYNTH  = 2
+    };
+
+    enum class GpioPullMode {
+        GPIO_PIN_NOPULL            = 0,
+        GPIO_PIN_PULLDOWN        = 1,
+        GPIO_PIN_PULLUP            = 2
+    };
+
+    enum class GpioTransistion {
+        GPIO_TRANSITION_TOGGLE      = 0,
+        GPIO_TRANSITION_LOW_TO_HIGH = 1,
+        GPIO_TRANSITION_HIGH_TO_LOW = 2
+    };
+
+    enum class AdcGain {
+        ADC_GAIN_1_6  = 0,
+        ADC_GAIN_1_5  = 1,
+        ADC_GAIN_1_4  = 2,
+        ADC_GAIN_1_3  = 3,
+        ADC_GAIN_1_2  = 4,
+        ADC_GAIN_2_3  = 5,
+        ADC_GAIN_1    = 6,
+        ADC_GAIN_2    = 7,
+        ADC_GAIN_4    = 8,
+    };
+
+    enum class AdcResoultion {
+        ADC_8_BIT        = 0,
+        ADC_10_BIT    = 1,
+    };
+
+    enum class AdcReference {
+        ADC_REFERENCE_0_6V              = 0,
+        ADC_REFERENCE_1_2V              = 1,
+        ADC_REFERENCE_1_2_POWER_SUPPLY  = 2,
+        ADC_REFERENCE_1_3_POWER_SUPPLY  = 3,
+        ADC_REFERENCE_1_4_POWER_SUPPLY  = 4,
+    };
+
+    enum class UartBaudrate {
+        BAUDRATE_1M,
+        BAUDRATE_115200,
+        BAUDRATE_57600,
+        BAUDRATE_38400,
+    };
+
+    // ######################### Ble Stack and Event Handling ############################
+    ErrorType BleStackInit();
+    void BleStackDeinit();
+    void EventLooper();
+    u16 GetEventBufferSize();
+    void DispatchBleEvents(void const * evt);
+    void SetPendingEventIRQ();
+
+    // ######################### GAP ############################
+    BleGapAddr GetBleGapAddress();
+    ErrorType SetBleGapAddress(BleGapAddr const &address);
+
+    ErrorType BleGapConnect(BleGapAddr const &peerAddress, BleGapScanParams const &scanParams, BleGapConnParams const &connectionParams);
+    ErrorType ConnectCancel();
+    ErrorType Disconnect(u16 connHandle, FruityHal::BleHciError hci_status_code);
+
+    ErrorType BleGapScanStart(BleGapScanParams const &scanParams);
+    ErrorType BleGapScanStop();
+
+    ErrorType BleGapAdvStart(u8 *advHandle, BleGapAdvParams const &advParams);
+    ErrorType BleGapAdvDataSet(u8 * p_advHandle, u8 *advData, u8 advDataLength, u8 *scanData, u8 scanDataLength);
+    ErrorType BleGapAdvStop(u8 advHandle);
+
+    ErrorType BleTxPacketCountGet(u16 connectionHandle, u8* count);
+
+    ErrorType BleGapNameSet(const BleGapConnSecMode & mode, u8 const * p_devName, u16 len);
+    ErrorType BleGapAppearance(BleAppearance appearance);
+
+    ErrorType BleGapConnectionParamsUpdate(u16 conn_handle, BleGapConnParams const & params);
+    ErrorType BleGapConnectionPreferredParamsSet(BleGapConnParams const & params);
+
+    ErrorType BleGapDataLengthExtensionRequest(u16 connHandle);
+
+    ErrorType BleGapSecInfoReply(u16 connHandle, BleGapEncInfo * p_infoOut, u8 * p_id_info, u8 * p_sign_info);
+
+    ErrorType BleGapEncrypt(u16 connHandle, BleGapMasterId const & masterId, BleGapEncInfo const & encInfo);
+
+    ErrorType BleGapRssiStart(u16 connHandle, u8 thresholdDbm, u8 skipCount);
+    ErrorType BleGapRssiStop(u16 connHandle);
+
+    // ######################### GATT ############################
+    ErrorType DiscovereServiceInit(DBDiscoveryHandler dbEventHandler);
+    ErrorType DiscoverService(u16 connHandle, const BleGattUuid& p_uuid);
+    bool DiscoveryIsInProgress();
+
+    ErrorType BleGattSendNotification(u16 connHandle, BleGattWriteParams & params);
+    ErrorType BleGattWrite(u16 connHandle, BleGattWriteParams const & params);
+
+    ErrorType BleUuidVsAdd(u8 const * p_vsUuid, u8 * p_uuidType);
+    ErrorType BleGattServiceAdd(BleGattSrvcType type, BleGattUuid const & p_uuid, u16 * p_handle);
+    ErrorType BleGattCharAdd(u16 service_handle, BleGattCharMd const & charMd, BleGattAttribute const & attrCharValue, BleGattCharHandles & handles);
+
+    u32 BleGattGetMaxMtu();
+    ErrorType BleGattMtuExchangeRequest(u16 connHandle, u16 clientRxMtu);
+    
+    // ######################### Radio ############################
+    ErrorType RadioSetTxPower(i8 txPower, TxRole role, u16 handle);
+
+
+    // ######################### Bootloader ############################
+    u32 GetBootloaderVersion();
+    u32 GetBootloaderAddress();
+    void ActivateBootloaderOnReset();
+
+    // ######################### Utility ############################
+
+    ErrorType WaitForEvent();
+    ErrorType InitializeButtons();
+    ErrorType GetRandomBytes(u8 * p_data, u8 len);
+    bool SetRetentionRegisterTwo(u8 val);
+
+    // ######################### Timers ############################
+
+    typedef void(*TimerHandler)(void * p_context);
+    typedef u32* swTimer;
+    ErrorType InitTimers();
+    ErrorType StartTimers();
+    u32 GetRtcMs();
+    u32 GetRtcDifferenceMs(u32 nowTimeMs, u32 previousTimeMs);
+    ErrorType CreateTimer(swTimer &timer, bool repeated, TimerHandler handler);
+    ErrorType StartTimer(swTimer timer, u32 timeoutMs);
+    ErrorType StopTimer(swTimer timer);
+
+    // ######################### Utility ############################
+
+    void SystemReset();
+    void SystemReset(bool softdeviceEnabled);
+    RebootReason GetRebootReason();
+    ErrorType ClearRebootReason();
+    void StartWatchdog(bool safeBoot);
+    void FeedWatchdog();
+    void DelayUs(u32 delayMicroSeconds);
+    void DelayMs(u32 delayMs);
+    void EcbEncryptBlock(const u8 * p_key, const u8 * p_clearText, u8 * p_cipherText);
+    u8 ConvertPortToGpio(u8 port, u8 pin);
+
+    // ######################### FLASH ############################
+
+    ErrorType FlashPageErase(u32 page);
+    ErrorType FlashWrite(u32 * p_addr, u32 * p_data, u32 len);
+
+    // ######################### NVIC ############################
+
+    void NvicEnableIRQ(u32 irqType);
+    void NvicDisableIRQ(u32 irqType);
+    void NvicSetPriorityIRQ(u32 irqType, u8 level);
+    void NvicClearPendingIRQ(u32 irqType);
+
+    // ######################### SERIAL COMMUNICATION ############################
+
+    // i2c
+    ErrorType TwiInit(i32 sclPin, i32 sdaPin);
+    ErrorType TwiRegisterWrite(u8 slaveAddress, u8 const * pTransferData, u8 length);
+    ErrorType TwiRegisterRead(u8 slaveAddress, u8 reg, u8 * pReceiveData, u8 length);
+    ErrorType TwiRead(u8 slaveAddress, u8 * pReceiveData, u8 length);
+    bool TwiIsInitialized(void);
+    void TwiGpioAddressPinSetAndWait(bool high, i32 sdaPin);
+
+    //spi
+    void SpiInit(i32 sckPin, i32 misoPin, i32 mosiPin);
+    bool SpiIsInitialized(void);
+    ErrorType SpiTransfer(u8* const p_toWrite, u8 count, u8* const p_toRead, i32 slaveSelectPin);
+    void SpiConfigureSlaveSelectPin(i32 pin);
+
+    // ######################### GPIO ############################
+    void GpioConfigureOutput(u32 pin);
+    void GpioConfigureInput(u32 pin, GpioPullMode mode);
+    void GpioConfigureDefault(u32 pin);
+    void GpioPinSet(u32 pin);
+    void GpioPinClear(u32 pin);
+    u32 GpioPinRead(u32 pin);
+    void GpioPinToggle(u32 pin);
+    typedef void (*GpioInterruptHandler)(u32 pin, GpioTransistion transistion);
+    ErrorType GpioConfigureInterrupt(u32 pin, GpioPullMode mode, GpioTransistion trigger, GpioInterruptHandler handler);
+
+    // ######################### ADC ############################
+
+    typedef void (*AdcEventHandler)(void);
+    ErrorType AdcInit(AdcEventHandler);
+    void AdcUninit();
+    ErrorType AdcConfigureChannel(u32 pin, AdcReference reference, AdcResoultion resolution, AdcGain gain);
+    ErrorType AdcSample(i16 & buffer, u8 len); // triggers non-blocking convertion which end will be reported by calling AdcEventHandler
+    u8 AdcConvertSampleToDeciVoltage(u32 sample);
+    u8 AdcConvertSampleToDeciVoltage(u32 sample, u16 voltageDivider);
+
+    // ################# USB CDC (Virtual Com Port) #############
+    void VirtualComInitBeforeStack();
+    void VirtualComInitAfterStack(void (*portEventHandler)(bool));
+    void VirtualComProcessEvents();
+    ErrorType VirtualComCheckAndProcessLine(u8* buffer, u16 bufferLength);
+    void VirtualComWriteData(const u8* data, u16 dataLength);
+
+    // ######################### UART ############################
+    void DisableHardwareDfuBootloader();
+    void DisableUart();
+    void EnableUart(bool promptAndEchoMode);
+    bool CheckAndHandleUartTimeout();
+    u32 CheckAndHandleUartError();
+    void UartHandleError(u32 error);
+    bool UartCheckInputAvailable();
+    UartReadCharBlockingResult UartReadCharBlocking();
+    void UartPutStringBlockingWithTimeout(const char* message);
+    void UartEnableReadInterrupt();
+    bool IsUartErroredAndClear();
+    bool IsUartTimedOutAndClear();
+    UartReadCharResult UartReadChar();
+
+    u32 GetMasterBootRecordSize();
+    u32 GetSoftDeviceSize();
+    u32 GetSoftDeviceVersion();
+    BleStackType GetBleStackType();
+    void BleStackErrorHandler(u32 id, u32 info);
+
+    ErrorType GetDeviceConfiguration(DeviceConfiguration & config);
+    u32 * GetUserMemoryAddress();
+    u32 * GetDeviceMemoryAddress();
+    void GetCustomerData(u32 * p_data, u8 len);
+    void WriteCustomerData(u32 * p_data, u8 len);
+    u32 GetBootloaderSettingsAddress();
+    u32 GetCodePageSize();
+    u32 GetCodeSize();
+    u32 GetDeviceId();
+    void GetDeviceAddress(u8 * p_address);
+
+    u32 GetHalMemorySize();
+    
 }
 
 extern "C" {
-	void UART0_IRQHandler(void);
+    void UART0_IRQHandler(void);
 }

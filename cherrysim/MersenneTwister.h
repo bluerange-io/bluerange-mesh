@@ -27,43 +27,43 @@
 class MersenneTwister
 {
 private:
-	//Numbers are from the definition of mt19937
-	static constexpr uint16_t N = 624;
-	static constexpr int M = 397;
-	static constexpr int R = 31;
-	static constexpr unsigned int A = 0x9908B0DF;
-	static constexpr int F = 1812433253;
-	static constexpr int U = 11;
-	static constexpr int S = 7;
-	static constexpr unsigned int B = 0x9D2C5680;
-	static constexpr int T = 15;
-	static constexpr unsigned int C = 0xEFC60000;
-	static constexpr int L = 18;
+    //Numbers are from the definition of mt19937
+    static constexpr uint16_t N = 624;
+    static constexpr int M = 397;
+    static constexpr int R = 31;
+    static constexpr unsigned int A = 0x9908B0DF;
+    static constexpr int F = 1812433253;
+    static constexpr int U = 11;
+    static constexpr int S = 7;
+    static constexpr unsigned int B = 0x9D2C5680;
+    static constexpr int T = 15;
+    static constexpr unsigned int C = 0xEFC60000;
+    static constexpr int L = 18;
 
-	static constexpr uint64_t MASK_LOWER = (1ull << R) - 1;
-	static constexpr uint64_t MASK_UPPER = (1ull << R);
+    static constexpr uint64_t MASK_LOWER = (1ull << R) - 1;
+    static constexpr uint64_t MASK_UPPER = (1ull << R);
 
-	uint16_t m_index = 0;
-	uint32_t m_mt[N]{};
-	uint32_t m_seed = 0;
+    uint16_t m_index = 0;
+    uint32_t m_mt[N]{};
+    uint32_t m_seed = 0;
 
-	void twistIteration(uint32_t i);
-	void twist();
+    void twistIteration(uint32_t i);
+    void twist();
 
 public:
-	static inline uint32_t seedOffset = 0;
+    static inline uint32_t seedOffset = 0;
 
-	MersenneTwister();
-	explicit MersenneTwister(uint32_t seed);
+    MersenneTwister();
+    explicit MersenneTwister(uint32_t seed);
 
-	void setSeed(uint32_t seed);
+    void setSeed(uint32_t seed);
 
-	uint32_t nextU32();
-	double nextDouble();
+    uint32_t nextU32();
+    double nextDouble();
 
-	uint32_t nextU32(uint32_t min, uint32_t max);
-	double nextDouble(double min, double max);
-	double nextNormal(double mean, double sigma);
+    uint32_t nextU32(uint32_t min, uint32_t max);
+    double nextDouble(double min, double max);
+    double nextNormal(double mean, double sigma);
 };
 
 

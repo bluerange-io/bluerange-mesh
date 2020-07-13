@@ -92,11 +92,11 @@ static inline void utils_xor(uint8_t * p_dst, const uint8_t * p_src1, const uint
 
 void aes_encrypt(const uint8_t * const key, const uint8_t * const clear_text, uint8_t * const cipher_text)
 {
-	nrf_ecb_hal_data_t aes_data;
-	memcpy(aes_data.key, key, 16);
-	memcpy(aes_data.cleartext, clear_text, 16);
-	(void) sd_ecb_block_encrypt((nrf_ecb_hal_data_t *)&aes_data);
-	memcpy(cipher_text, aes_data.ciphertext, 16);
+    nrf_ecb_hal_data_t aes_data;
+    memcpy(aes_data.key, key, 16);
+    memcpy(aes_data.cleartext, clear_text, 16);
+    (void) sd_ecb_block_encrypt((nrf_ecb_hal_data_t *)&aes_data);
+    memcpy(cipher_text, aes_data.ciphertext, 16);
 }
 
 
@@ -188,7 +188,7 @@ void ccm_soft_encrypt(ccm_soft_data_t * p_data)
 #endif
     uint8_t A[16];
     uint8_t S[16];
-	DYNAMIC_ARRAY(T, p_data->mic_len);
+    DYNAMIC_ARRAY(T, p_data->mic_len);
 
     uint16_t i = 0;
 
@@ -238,7 +238,7 @@ void ccm_soft_decrypt(ccm_soft_data_t * p_data, bool * p_mic_passed)
 
     /* Authenticate data */
     ccm_soft_data_t auth_data;
-	DYNAMIC_ARRAY(mic, p_data->mic_len);
+    DYNAMIC_ARRAY(mic, p_data->mic_len);
 
     auth_data.p_key   = p_data->p_key;
     auth_data.p_nonce = p_data->p_nonce;

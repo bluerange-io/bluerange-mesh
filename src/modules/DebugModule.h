@@ -37,11 +37,11 @@
 #include <Module.h>
 
 enum class FloodMode : u8{
-	OFF = 0,
-	RELIABLE = 1,
-	UNRELIABLE = 2,
-	LISTEN = 3,
-	UNRELIABLE_SPLIT = 4
+    OFF = 0,
+    RELIABLE = 1,
+    UNRELIABLE = 2,
+    LISTEN = 3,
+    UNRELIABLE_SPLIT = 4
 };
 
 /**
@@ -51,223 +51,223 @@ enum class FloodMode : u8{
  */
 class DebugModule: public Module
 {
-	private:
+    private:
 
-		static constexpr u8 debugButtonEnableUartDs = 0;
+        static constexpr u8 debugButtonEnableUartDs = 0;
 
-		static constexpr u16 readMemMaxLength = 32;
+        static constexpr u16 readMemMaxLength = 32;
 
-		static constexpr u32 surplusAccuracy = 10000;
+        static constexpr u32 surplusAccuracy = 10000;
 
-		#pragma pack(push, 1)
-		//Module configuration that is saved persistently
-		struct DebugModuleConfiguration : ModuleConfiguration{
-			//Insert more persistent config values here
-		};
-		#pragma pack(pop)
+        #pragma pack(push, 1)
+        //Module configuration that is saved persistently
+        struct DebugModuleConfiguration : ModuleConfiguration{
+            //Insert more persistent config values here
+        };
+        #pragma pack(pop)
 
-		//Counters for flood messages
-		FloodMode floodMode;
-		bool floodFrameSkip = false; //When entering the flood command in the local terminal, the passed timeDs can be large. This skips these large values
-		NodeId floodDestinationId;
-		u32 floodMessagesPer10Sec = 0; // the number of ticks per 100 sec should ideally be dividable by this or should be a multiple
-		u32 floodMessagesSurplus = 0;
-		u32 floodTimeoutSec = 0;
-		u32 floodEndTimeDs = 0;
-		//Counters for flood messages
-		u32 packetsOut;
-		u32 packetsIn;
+        //Counters for flood messages
+        FloodMode floodMode;
+        bool floodFrameSkip = false; //When entering the flood command in the local terminal, the passed timeDs can be large. This skips these large values
+        NodeId floodDestinationId;
+        u32 floodMessagesPer10Sec = 0; // the number of ticks per 100 sec should ideally be dividable by this or should be a multiple
+        u32 floodMessagesSurplus = 0;
+        u32 floodTimeoutSec = 0;
+        u32 floodEndTimeDs = 0;
+        //Counters for flood messages
+        u32 packetsOut;
+        u32 packetsIn;
 
-		//Variables for counter mode
-		NodeId counterDestinationId = 0;
-		u16 counterMessagesPer10Sec = 0;
-		u32 counterMessagesSurplus = 0;
-		u32 counterMaxCount = 0;
-		u32 currentCounter = 0;
-		u32 counterCheck = 0;
+        //Variables for counter mode
+        NodeId counterDestinationId = 0;
+        u16 counterMessagesPer10Sec = 0;
+        u32 counterMessagesSurplus = 0;
+        u32 counterMaxCount = 0;
+        u32 currentCounter = 0;
+        u32 counterCheck = 0;
 
-		//Counters for ping
-		u32 pingSentTimeMs;
-		u8 pingHandle;
-		u16 pingCount;
-		u16 pingCountResponses;
-		bool syncTest;
+        //Counters for ping
+        u32 pingSentTimeMs;
+        u8 pingHandle;
+        u16 pingCount;
+        u16 pingCountResponses;
+        bool syncTest;
 
-		#pragma pack(push)
-		#pragma pack(1)
+        #pragma pack(push)
+        #pragma pack(1)
 
-		static constexpr int SIZEOF_DEBUG_MODULE_INFO_MESSAGE = 8;
-		typedef struct
-		{
-			u16 connectionLossCounter;
-			u16 droppedPackets;
-			u16 sentPacketsReliable;
-			u16 sentPacketsUnreliable;
-		} DebugModuleInfoMessage;
-		STATIC_ASSERT_SIZE(DebugModuleInfoMessage, 8);
+        static constexpr int SIZEOF_DEBUG_MODULE_INFO_MESSAGE = 8;
+        typedef struct
+        {
+            u16 connectionLossCounter;
+            u16 droppedPackets;
+            u16 sentPacketsReliable;
+            u16 sentPacketsUnreliable;
+        } DebugModuleInfoMessage;
+        STATIC_ASSERT_SIZE(DebugModuleInfoMessage, 8);
 
-		static constexpr int SIZEOF_DEBUG_MODULE_PINGPONG_MESSAGE = 1;
-		typedef struct
-		{
-			u8 ttl;
+        static constexpr int SIZEOF_DEBUG_MODULE_PINGPONG_MESSAGE = 1;
+        typedef struct
+        {
+            u8 ttl;
 
-		} DebugModulePingpongMessage;
-		STATIC_ASSERT_SIZE(DebugModulePingpongMessage, 1);
+        } DebugModulePingpongMessage;
+        STATIC_ASSERT_SIZE(DebugModulePingpongMessage, 1);
 
-		static constexpr int SIZEOF_DEBUG_MODULE_LPING_MESSAGE = 4;
-		typedef struct
-		{
-			NodeId leafNodeId;
-			u16 hops;
+        static constexpr int SIZEOF_DEBUG_MODULE_LPING_MESSAGE = 4;
+        typedef struct
+        {
+            NodeId leafNodeId;
+            u16 hops;
 
-		} DebugModuleLpingMessage;
-		STATIC_ASSERT_SIZE(DebugModuleLpingMessage, 4);
-
-
-		static constexpr int SIZEOF_DEBUG_MODULE_SET_DISCOVERY_MESSAGE = 1;
-		typedef struct
-		{
-			u8 discoveryMode;
-
-		} DebugModuleSetDiscoveryMessage;
-		STATIC_ASSERT_SIZE(DebugModuleSetDiscoveryMessage, 1);
+        } DebugModuleLpingMessage;
+        STATIC_ASSERT_SIZE(DebugModuleLpingMessage, 4);
 
 
-		static constexpr int SIZEOF_DEBUG_MODULE_RESET_MESSAGE = 1;
-		typedef struct
-		{
-			u8 resetSeconds;
+        static constexpr int SIZEOF_DEBUG_MODULE_SET_DISCOVERY_MESSAGE = 1;
+        typedef struct
+        {
+            u8 discoveryMode;
 
-		} DebugModuleResetMessage;
-		STATIC_ASSERT_SIZE(DebugModuleResetMessage, 1);
-
-
-		static constexpr int SIZEOF_DEBUG_MODULE_FLOOD_MESSAGE = 4;
-		typedef struct
-		{
-			u16 packetsIn;
-			u16 packetsOut;
-
-			u8 chunkData[21]; // This chunk is only there to bloat the message to such a size, that it has to be split.
-		} DebugModuleFloodMessage;
-		STATIC_ASSERT_SIZE(DebugModuleFloodMessage, 25);
+        } DebugModuleSetDiscoveryMessage;
+        STATIC_ASSERT_SIZE(DebugModuleSetDiscoveryMessage, 1);
 
 
-		static constexpr int SIZEOF_DEBUG_MODULE_SET_FLOOD_MODE_MESSAGE = 7;
-		typedef struct
-		{
-			NodeId floodDestinationId;
-			u16 packetsPer10Sec;
-			u8 floodMode;
-			u16 timeoutSec;
+        static constexpr int SIZEOF_DEBUG_MODULE_RESET_MESSAGE = 1;
+        typedef struct
+        {
+            u8 resetSeconds;
 
-		} DebugModuleSetFloodModeMessage;
-		STATIC_ASSERT_SIZE(DebugModuleSetFloodModeMessage, 7);
+        } DebugModuleResetMessage;
+        STATIC_ASSERT_SIZE(DebugModuleResetMessage, 1);
 
-		static constexpr int SIZEOF_DEBUG_MODULE_START_COUNTER_MESSAGE = 8;
-		typedef struct
-		{
-			NodeId counterDestinationId;
-			u16 packetsPer10Sec;
-			u32 maxCount;
 
-		} DebugModuleStartCounterMessage;
-		STATIC_ASSERT_SIZE(DebugModuleStartCounterMessage, 8);
+        static constexpr int SIZEOF_DEBUG_MODULE_FLOOD_MESSAGE = 4;
+        typedef struct
+        {
+            u16 packetsIn;
+            u16 packetsOut;
 
-		static constexpr int SIZEOF_DEBUG_MODULE_COUNTER_MESSAGE = 4;
-		typedef struct
-		{
-			u32 counter;
-		} DebugModuleCounterMessage;
-		STATIC_ASSERT_SIZE(DebugModuleCounterMessage, 4);
+            u8 chunkData[21]; // This chunk is only there to bloat the message to such a size, that it has to be split.
+        } DebugModuleFloodMessage;
+        STATIC_ASSERT_SIZE(DebugModuleFloodMessage, 25);
 
-		typedef struct
-		{
-			u8 data[MAX_MESH_PACKET_SIZE - SIZEOF_CONN_PACKET_MODULE];
-		} DebugModuleSendMaxMessageResponse;
 
-		//Read Memory
-		static constexpr int SIZEOF_DEBUG_MODULE_READ_MEMORY_MESSAGE = 6;
-		typedef struct
-		{
-			u32 address;
-			u16 length;
-		} DebugModuleReadMemoryMessage;
-		STATIC_ASSERT_SIZE(DebugModuleReadMemoryMessage, SIZEOF_DEBUG_MODULE_READ_MEMORY_MESSAGE);
+        static constexpr int SIZEOF_DEBUG_MODULE_SET_FLOOD_MODE_MESSAGE = 7;
+        typedef struct
+        {
+            NodeId floodDestinationId;
+            u16 packetsPer10Sec;
+            u8 floodMode;
+            u16 timeoutSec;
 
-		static constexpr int SIZEOF_DEBUG_MODULE_MEMORY_MESSAGE_HEADER = 4;
-		typedef struct
-		{
-			u32 address;
-			u8 data[readMemMaxLength];
-		} DebugModuleMemoryMessage;
-		STATIC_ASSERT_SIZE(DebugModuleMemoryMessage, readMemMaxLength + SIZEOF_DEBUG_MODULE_MEMORY_MESSAGE_HEADER);
+        } DebugModuleSetFloodModeMessage;
+        STATIC_ASSERT_SIZE(DebugModuleSetFloodModeMessage, 7);
 
-		#pragma pack(pop)
+        static constexpr int SIZEOF_DEBUG_MODULE_START_COUNTER_MESSAGE = 8;
+        typedef struct
+        {
+            NodeId counterDestinationId;
+            u16 packetsPer10Sec;
+            u32 maxCount;
 
-		void CauseHardfault() const;
+        } DebugModuleStartCounterMessage;
+        STATIC_ASSERT_SIZE(DebugModuleStartCounterMessage, 8);
 
-		void CauseStackOverflow() const;
+        static constexpr int SIZEOF_DEBUG_MODULE_COUNTER_MESSAGE = 4;
+        typedef struct
+        {
+            u32 counter;
+        } DebugModuleCounterMessage;
+        STATIC_ASSERT_SIZE(DebugModuleCounterMessage, 4);
 
-	public:
-		DECLARE_CONFIG_AND_PACKED_STRUCT(DebugModuleConfiguration);
+        typedef struct
+        {
+            u8 data[MAX_MESH_PACKET_SIZE - SIZEOF_CONN_PACKET_MODULE];
+        } DebugModuleSendMaxMessageResponse;
 
-		enum class DebugModuleTriggerActionMessages : u8{
-			//RESET_NODE = 0, Removed as of 21.05.2019
-			RESET_CONNECTION_LOSS_COUNTER = 1,
-			FLOOD_MESSAGE = 2,
-			GET_STATS_MESSAGE = 3,
-			CAUSE_HARDFAULT_MESSAGE = 4,
-			//REQUEST_FORCE_REESTABLISH = 5, deprecated
-			PING = 6,
-			PINGPONG = 7,
-			//SET_DISCOVERY = 8, deprecated
-			LPING = 9,
-			SET_FLOOD_MODE = 10,
-			//FORCE_REESTABLISH = 11, deprecated //Must be sent to a node that is connected to us to force a reestablishment
-			//SET_LIVEREPORTING_DEPRECATED = 12, Removed as of 21.05.2019
-			EINK_SETANDDRAW_DEPRECATED = 13,
-			GET_JOIN_ME_BUFFER = 14,
-			RESET_FLOOD_COUNTER = 15,
-			SEND_MAX_MESSAGE = 16,
-			START_COUNTER = 17,
-			COUNTER = 18,
-			READ_MEMORY = 19,
+        //Read Memory
+        static constexpr int SIZEOF_DEBUG_MODULE_READ_MEMORY_MESSAGE = 6;
+        typedef struct
+        {
+            u32 address;
+            u16 length;
+        } DebugModuleReadMemoryMessage;
+        STATIC_ASSERT_SIZE(DebugModuleReadMemoryMessage, SIZEOF_DEBUG_MODULE_READ_MEMORY_MESSAGE);
 
-		};
+        static constexpr int SIZEOF_DEBUG_MODULE_MEMORY_MESSAGE_HEADER = 4;
+        typedef struct
+        {
+            u32 address;
+            u8 data[readMemMaxLength];
+        } DebugModuleMemoryMessage;
+        STATIC_ASSERT_SIZE(DebugModuleMemoryMessage, readMemMaxLength + SIZEOF_DEBUG_MODULE_MEMORY_MESSAGE_HEADER);
 
-		enum class DebugModuleActionResponseMessages : u8{
-			STATS_MESSAGE = 3,
-			PING_RESPONSE = 6,
-			//SET_DISCOVERY_RESPONSE = 8, deprecated
-			LPING_RESPONSE = 9,
-			JOIN_ME_BUFFER_ITEM = 10,
-			EINK_SETANDDRAW_RESPONSE_DEPRECATED = 11,
-			SEND_MAX_MESSAGE_RESPONSE = 16,
-			MEMORY = 19,
-		};
+        #pragma pack(pop)
 
-		DebugModule();
+        void CauseHardfault() const;
 
-		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
+        void CauseStackOverflow() const;
 
-		void ResetToDefaultConfiguration() override final;
+    public:
+        DECLARE_CONFIG_AND_PACKED_STRUCT(DebugModuleConfiguration);
 
-		void TimerEventHandler(u16 passedTimeDs) override final;
+        enum class DebugModuleTriggerActionMessages : u8{
+            //RESET_NODE = 0, Removed as of 21.05.2019
+            RESET_CONNECTION_LOSS_COUNTER = 1,
+            FLOOD_MESSAGE = 2,
+            GET_STATS_MESSAGE = 3,
+            CAUSE_HARDFAULT_MESSAGE = 4,
+            //REQUEST_FORCE_REESTABLISH = 5, deprecated
+            PING = 6,
+            PINGPONG = 7,
+            //SET_DISCOVERY = 8, deprecated
+            LPING = 9,
+            SET_FLOOD_MODE = 10,
+            //FORCE_REESTABLISH = 11, deprecated //Must be sent to a node that is connected to us to force a reestablishment
+            //SET_LIVEREPORTING_DEPRECATED = 12, Removed as of 21.05.2019
+            EINK_SETANDDRAW_DEPRECATED = 13,
+            GET_JOIN_ME_BUFFER = 14,
+            RESET_FLOOD_COUNTER = 15,
+            SEND_MAX_MESSAGE = 16,
+            START_COUNTER = 17,
+            COUNTER = 18,
+            READ_MEMORY = 19,
 
-		void SendStatistics(NodeId receiver) const;
+        };
+
+        enum class DebugModuleActionResponseMessages : u8{
+            STATS_MESSAGE = 3,
+            PING_RESPONSE = 6,
+            //SET_DISCOVERY_RESPONSE = 8, deprecated
+            LPING_RESPONSE = 9,
+            JOIN_ME_BUFFER_ITEM = 10,
+            EINK_SETANDDRAW_RESPONSE_DEPRECATED = 11,
+            SEND_MAX_MESSAGE_RESPONSE = 16,
+            MEMORY = 19,
+        };
+
+        DebugModule();
+
+        void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
+
+        void ResetToDefaultConfiguration() override final;
+
+        void TimerEventHandler(u16 passedTimeDs) override final;
+
+        void SendStatistics(NodeId receiver) const;
 
 #if IS_ACTIVE(BUTTONS)
-		void ButtonHandler(u8 buttonId, u32 holdTimeDs) override final;
+        void ButtonHandler(u8 buttonId, u32 holdTimeDs) override final;
 #endif
 
-		#ifdef TERMINAL_ENABLED
-		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
-		#endif
+        #ifdef TERMINAL_ENABLED
+        TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
+        #endif
 
-		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
+        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
 
-		u32 getPacketsIn();
-		u32 getPacketsOut();
-		
+        u32 getPacketsIn();
+        u32 getPacketsOut();
+        
 };

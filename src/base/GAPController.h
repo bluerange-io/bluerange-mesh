@@ -40,26 +40,26 @@
 class GAPController
 {
 public:
-	static GAPController& getInstance();
-	//Initialize the GAP module
-	void bleConfigureGAP() const;
+    static GAPController& getInstance();
+    //Initialize the GAP module
+    void bleConfigureGAP() const;
 
-	//Connects to a peripheral with the specified address and calls the corresponding callbacks
-	ErrorType connectToPeripheral(const FruityHal::BleGapAddr &address, u16 connectionInterval, u16 timeout) const;
+    //Connects to a peripheral with the specified address and calls the corresponding callbacks
+    ErrorType connectToPeripheral(const FruityHal::BleGapAddr &address, u16 connectionInterval, u16 timeout) const;
 
-	//Encryption
-	void startEncryptingConnection(u16 connectionHandle) const;
+    //Encryption
+    void startEncryptingConnection(u16 connectionHandle) const;
 
-	//Update the connection interval
-	void RequestConnectionParameterUpdate(u16 connectionHandle, u16 minConnectionInterval, u16 maxConnectionInterval, u16 slaveLatency, u16 supervisionTimeout) const;
+    //Update the connection interval
+    void RequestConnectionParameterUpdate(u16 connectionHandle, u16 minConnectionInterval, u16 maxConnectionInterval, u16 slaveLatency, u16 supervisionTimeout) const;
 
 
 
-	//This handler is called with bleEvents from the softdevice
-	void GapDisconnectedEventHandler(const FruityHal::GapDisconnectedEvent& disconnectEvent);
-	void GapConnectedEventHandler(const FruityHal::GapConnectedEvent& connvectedEvent);
-	void GapTimeoutEventHandler(const FruityHal::GapTimeoutEvent& gapTimeoutEvent);
-	void GapSecurityInfoRequestEvenetHandler(const FruityHal::GapSecurityInfoRequestEvent& securityInfoRequestEvent);
-	void GapConnectionSecurityUpdateEventHandler(const FruityHal::GapConnectionSecurityUpdateEvent& connectionSecurityUpdateEvent);
+    //This handler is called with bleEvents from the softdevice
+    void GapDisconnectedEventHandler(const FruityHal::GapDisconnectedEvent& disconnectEvent);
+    void GapConnectedEventHandler(const FruityHal::GapConnectedEvent& connvectedEvent);
+    void GapTimeoutEventHandler(const FruityHal::GapTimeoutEvent& gapTimeoutEvent);
+    void GapSecurityInfoRequestEvenetHandler(const FruityHal::GapSecurityInfoRequestEvent& securityInfoRequestEvent);
+    void GapConnectionSecurityUpdateEventHandler(const FruityHal::GapConnectionSecurityUpdateEvent& connectionSecurityUpdateEvent);
 };
 

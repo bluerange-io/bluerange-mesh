@@ -150,37 +150,37 @@ typedef uint32_t nrf_gpiote_polarity_t;
 typedef uint32_t nrf_uart_baudrate_t;
 
 typedef struct {
-	uint32_t RAM;
-	// Not the original struct, unused by the simulator.
+    uint32_t RAM;
+    // Not the original struct, unused by the simulator.
 } FICR_INFO_Type;
 
 typedef struct {
-	uint32_t dummyValue;
-	// Not the original struct, unused by the simulator.
+    uint32_t dummyValue;
+    // Not the original struct, unused by the simulator.
 } FICR_TEMP_Type;
 
 typedef struct {
-	uint32_t dummyValue;
-	// Not the original struct, unused by the simulator.
+    uint32_t dummyValue;
+    // Not the original struct, unused by the simulator.
 } FICR_NFC_Type;
 
 typedef struct {
-	uint32_t  RESERVED0[4];
-	uint32_t  CODEPAGESIZE;
-	uint32_t  CODESIZE;
-	uint32_t  RESERVED1[18];
-	uint32_t  DEVICEID[2];
-	uint32_t  RESERVED2[6];
-	uint32_t  ER[4];
-	uint32_t  IR[4];
-	uint32_t  DEVICEADDRTYPE;
-	uint32_t  DEVICEADDR[2];
-	uint32_t  RESERVED3[21];
-	FICR_INFO_Type INFO;
-	uint32_t  RESERVED4[185];
-	FICR_TEMP_Type TEMP;
-	uint32_t  RESERVED5[2];
-	FICR_NFC_Type NFC;
+    uint32_t  RESERVED0[4];
+    uint32_t  CODEPAGESIZE;
+    uint32_t  CODESIZE;
+    uint32_t  RESERVED1[18];
+    uint32_t  DEVICEID[2];
+    uint32_t  RESERVED2[6];
+    uint32_t  ER[4];
+    uint32_t  IR[4];
+    uint32_t  DEVICEADDRTYPE;
+    uint32_t  DEVICEADDR[2];
+    uint32_t  RESERVED3[21];
+    FICR_INFO_Type INFO;
+    uint32_t  RESERVED4[185];
+    FICR_TEMP_Type TEMP;
+    uint32_t  RESERVED5[2];
+    FICR_NFC_Type NFC;
 } NRF_FICR_Type;
 
 typedef struct {                                    /*!< UICR Structure                                                        */
@@ -215,72 +215,72 @@ typedef struct {                                    /*!< GPIO Structure         
 //UART Stuff
 typedef enum
 {
-	NRF_GPIO_PIN_NOPULL   = 0,
-	NRF_GPIO_PIN_PULLDOWN = 1,
-	NRF_GPIO_PIN_PULLUP   = 3
+    NRF_GPIO_PIN_NOPULL   = 0,
+    NRF_GPIO_PIN_PULLDOWN = 1,
+    NRF_GPIO_PIN_PULLUP   = 3
 } nrf_gpio_pin_pull_t;
 
 //Sample rates for Lis2dh12 sensor
 typedef enum {
-	LIS2DH12_RATE_0 = 0,		/**< Power down */
-	LIS2DH12_RATE_1 = 1 << 4,	/**< 1 Hz */
-	LIS2DH12_RATE_10 = 2 << 4,	/**< 10 Hz*/
-	LIS2DH12_RATE_25 = 3 << 4,
-	LIS2DH12_RATE_50 = 4 << 4,
-	LIS2DH12_RATE_100 = 5 << 4,
-	LIS2DH12_RATE_200 = 6 << 4,
-	LIS2DH12_RATE_400 = 7 << 4    /** 1k+ rates not implemented */
+    LIS2DH12_RATE_0 = 0,        /**< Power down */
+    LIS2DH12_RATE_1 = 1 << 4,    /**< 1 Hz */
+    LIS2DH12_RATE_10 = 2 << 4,    /**< 10 Hz*/
+    LIS2DH12_RATE_25 = 3 << 4,
+    LIS2DH12_RATE_50 = 4 << 4,
+    LIS2DH12_RATE_100 = 5 << 4,
+    LIS2DH12_RATE_200 = 6 << 4,
+    LIS2DH12_RATE_400 = 7 << 4    /** 1k+ rates not implemented */
 }lis2dh12_sample_rate_t;
 
 typedef enum
 {
-	NRF_UART_HWFC_DISABLED = 0,
-	NRF_UART_HWFC_ENABLED  = 1
+    NRF_UART_HWFC_DISABLED = 0,
+    NRF_UART_HWFC_ENABLED  = 1
 } nrf_uart_hwfc_t;
 
 #undef SD_EVT_IRQn
 typedef enum 
 {
-	SD_EVT_IRQn = 1,
-	UART0_IRQn = 2,
+    SD_EVT_IRQn = 1,
+    UART0_IRQn = 2,
 } IRQn_Type;
 
 typedef enum
 {
-	NRF_UART_EVENT_ERROR = 1, //Not the original value!
-	NRF_UART_EVENT_RXDRDY = 2, //Not the original value!
-	NRF_UART_EVENT_TXDRDY = 4, //Not the original value!
-	NRF_UART_EVENT_RXTO = 8, //Not the original value!
-	NRF_UART_INT_MASK_RXDRDY = 16, //Not the original value!
-	NRF_UART_INT_MASK_ERROR = 32 //Not the original value!
+    NRF_UART_EVENT_ERROR = 1, //Not the original value!
+    NRF_UART_EVENT_RXDRDY = 2, //Not the original value!
+    NRF_UART_EVENT_TXDRDY = 4, //Not the original value!
+    NRF_UART_EVENT_RXTO = 8, //Not the original value!
+    NRF_UART_INT_MASK_RXDRDY = 16, //Not the original value!
+    NRF_UART_INT_MASK_ERROR = 32 //Not the original value!
 } nrf_uart_event_t;
 
 typedef enum
 {
-	NRF_UART_TASK_STARTRX = 1, //Not the original value!
-	NRF_UART_TASK_STARTTX = 2
+    NRF_UART_TASK_STARTRX = 1, //Not the original value!
+    NRF_UART_TASK_STARTTX = 2
 } nrf_uart_task_t;
 
 typedef enum
 {
-	APP_IRQ_PRIORITY_LOW = 2 // Not the original value!
+    APP_IRQ_PRIORITY_LOW = 2 // Not the original value!
 } app_irq_priority_t;
 
 typedef struct 
 {
-	uint32_t ERRORSRC;
-	uint32_t EVENTS_RXDRDY;
-	uint32_t EVENTS_ERROR;
-	uint32_t RXD;
-	uint32_t TXD;
-	uint32_t EVENTS_TXDRDY;
-	//The original NRF implementation has some attributes here, but we dont care about those in the simulator.
+    uint32_t ERRORSRC;
+    uint32_t EVENTS_RXDRDY;
+    uint32_t EVENTS_ERROR;
+    uint32_t RXD;
+    uint32_t TXD;
+    uint32_t EVENTS_TXDRDY;
+    //The original NRF implementation has some attributes here, but we dont care about those in the simulator.
 } NRF_UART_Type;
 
 
 typedef enum
 {
-	NRF_UART_PARITY_EXCLUDED = 1,//Not the original value!
+    NRF_UART_PARITY_EXCLUDED = 1,//Not the original value!
 } nrf_uart_parity_t;
 
 #define NRF_UART_INT_MASK_RXTO 0 //Not the original value!
@@ -353,86 +353,86 @@ typedef void(*bmg250_delay_fptr_t)(uint32_t ms);
 
 typedef struct
 {
-	uint8_t *data;
-	uint16_t length;
-	uint8_t fifo_time_enable;
-	uint8_t fifo_header_enable;
-	uint8_t fifo_data_enable;
-	uint16_t gyro_byte_start_idx;
+    uint8_t *data;
+    uint16_t length;
+    uint8_t fifo_time_enable;
+    uint8_t fifo_header_enable;
+    uint8_t fifo_data_enable;
+    uint16_t gyro_byte_start_idx;
 
-	uint32_t sensor_time;
-	uint8_t skipped_frame_count;
-	uint8_t fifo_down;
+    uint32_t sensor_time;
+    uint8_t skipped_frame_count;
+    uint8_t fifo_down;
 } bmg250_fifo_frame;
 
 typedef struct
 {
-	uint32_t dev_id;
-	uint32_t interface;
-	uint32_t(*read)(uint8_t, uint8_t, uint8_t *, uint8_t);
-	uint32_t(*write)(uint8_t, uint8_t const *, uint8_t);
-	void(*delay_ms)(uint32_t volatile);
-	bmg250_fifo_frame *fifo;
-	uint8_t power_mode;
+    uint32_t dev_id;
+    uint32_t interface;
+    uint32_t(*read)(uint8_t, uint8_t, uint8_t *, uint8_t);
+    uint32_t(*write)(uint8_t, uint8_t const *, uint8_t);
+    void(*delay_ms)(uint32_t volatile);
+    bmg250_fifo_frame *fifo;
+    uint8_t power_mode;
 } bmg250_dev;
 
 
 typedef struct
 {
-	uint8_t odr;
-	uint8_t range;
-	uint8_t bw;
+    uint8_t odr;
+    uint8_t range;
+    uint8_t bw;
 } bmg250_cfg;
 
 typedef struct {
-	int16_t x;
-	int16_t y;
-	int16_t z;
-	uint32_t sensortime;
+    int16_t x;
+    int16_t y;
+    int16_t z;
+    uint32_t sensortime;
 } bmg250_sensor_data;
 
 enum bmg250_int_channel {
-	/*! interrupt Channel 1 */
-	BMG250_INT_CHANNEL_1,
-	/*! interrupt Channel 2 */
-	BMG250_INT_CHANNEL_2
+    /*! interrupt Channel 1 */
+    BMG250_INT_CHANNEL_1,
+    /*! interrupt Channel 2 */
+    BMG250_INT_CHANNEL_2
 };
 
 enum bmg250_int_types {
-	/*! data ready interrupt  */
-	BMG250_DATA_RDY_INT,
-	/*! fifo full interrupt */
-	BMG250_FIFO_FULL_INT,
-	/*! fifo watermark interrupt */
-	BMG250_FIFO_WATERMARK_INT
+    /*! data ready interrupt  */
+    BMG250_DATA_RDY_INT,
+    /*! fifo full interrupt */
+    BMG250_FIFO_FULL_INT,
+    /*! fifo watermark interrupt */
+    BMG250_FIFO_WATERMARK_INT
 };
 
 typedef struct {
-	uint8_t output_en;
-	uint8_t output_mode;
-	uint8_t output_type;
-	uint8_t edge_ctrl;
-	uint8_t input_en;
+    uint8_t output_en;
+    uint8_t output_mode;
+    uint8_t output_type;
+    uint8_t edge_ctrl;
+    uint8_t input_en;
 } bmg250_int_pin_settg;
 
 typedef struct{
-	/*! Interrupt channel */
-	enum bmg250_int_channel int_channel;
-	/*! Select Interrupt */
-	enum bmg250_int_types int_type;
-	/*! FIFO FULL INT 1-enable, 0-disable */
-	bmg250_int_pin_settg int_pin_settg;
-	uint8_t fifo_full_int_en;
-	/*! FIFO WTM INT 1-enable, 0-disable */
-	uint8_t fifo_wtm_int_en;
+    /*! Interrupt channel */
+    enum bmg250_int_channel int_channel;
+    /*! Select Interrupt */
+    enum bmg250_int_types int_type;
+    /*! FIFO FULL INT 1-enable, 0-disable */
+    bmg250_int_pin_settg int_pin_settg;
+    uint8_t fifo_full_int_en;
+    /*! FIFO WTM INT 1-enable, 0-disable */
+    uint8_t fifo_wtm_int_en;
 } bmg250_int_settg;
 
 
 typedef struct
 {
-	uint8_t number_of_fifo_sample;
-	bool fifo_is_empty;
-	bool fifo_watermark_interrupt;
+    uint8_t number_of_fifo_sample;
+    bool fifo_is_empty;
+    bool fifo_watermark_interrupt;
 }fifo_status;
 
 
@@ -457,29 +457,29 @@ typedef void(*nrf_drv_gpiote_evt_handler_t)(nrf_drv_gpiote_pin_t, nrf_gpiote_pol
 
 typedef struct
 {
-	int16_t x;
-	int16_t y;
-	int16_t z;
-	int16_t temp;
+    int16_t x;
+    int16_t y;
+    int16_t z;
+    int16_t temp;
 }TLV493D_data_frame_t;
 
 typedef struct
 {
-	int32_t x;
-	int32_t y;
-	int32_t z;
+    int32_t x;
+    int32_t y;
+    int32_t z;
 } LisSensor;
 typedef struct
 {
-	LisSensor sensor;
+    LisSensor sensor;
 }lis2dh12_sensor_buffer_t;
 
 typedef struct
 {
-	nrf_gpiote_polarity_t sense;
-	nrf_gpio_pin_pull_t   pull;
-	bool                  is_watcher;
-	bool                  hi_accuracy;
+    nrf_gpiote_polarity_t sense;
+    nrf_gpio_pin_pull_t   pull;
+    bool                  is_watcher;
+    bool                  hi_accuracy;
 } nrf_drv_gpiote_in_config_t;
 
 uint32_t TLV493D_A1B6_initialise(int32_t dataPin);
@@ -495,109 +495,109 @@ typedef int32_t(*lis2dh12_write_ptr)(void *, uint8_t, uint8_t*, uint16_t);
 typedef int32_t(*lis2dh12_read_ptr) (void *, uint8_t, uint8_t*, uint16_t);
 
 typedef struct {
-	/** Component mandatory fields **/
-	lis2dh12_write_ptr  write_reg;
-	lis2dh12_read_ptr   read_reg;
-	/** Customizable optional pointer **/
-	void *handle;
+    /** Component mandatory fields **/
+    lis2dh12_write_ptr  write_reg;
+    lis2dh12_read_ptr   read_reg;
+    /** Customizable optional pointer **/
+    void *handle;
 } lis2dh12_ctx_t;
 
 typedef struct {
-	uint8_t not_used_01 : 1;
-	uint8_t i1_overrun : 1;
-	uint8_t i1_wtm : 1;
-	uint8_t not_used_02 : 1;
-	uint8_t i1_zyxda : 1;
-	uint8_t i1_ia2 : 1;
-	uint8_t i1_ia1 : 1;
-	uint8_t i1_click : 1;
+    uint8_t not_used_01 : 1;
+    uint8_t i1_overrun : 1;
+    uint8_t i1_wtm : 1;
+    uint8_t not_used_02 : 1;
+    uint8_t i1_zyxda : 1;
+    uint8_t i1_ia2 : 1;
+    uint8_t i1_ia1 : 1;
+    uint8_t i1_click : 1;
 } lis2dh12_ctrl_reg3_t;
 
 typedef struct {
-	uint8_t not_used_01 : 1;
-	uint8_t int_polarity : 1;
-	uint8_t not_used_02 : 1;
-	uint8_t i2_act : 1;
-	uint8_t i2_boot : 1;
-	uint8_t i2_ia2 : 1;
-	uint8_t i2_ia1 : 1;
-	uint8_t i2_click : 1;
+    uint8_t not_used_01 : 1;
+    uint8_t int_polarity : 1;
+    uint8_t not_used_02 : 1;
+    uint8_t i2_act : 1;
+    uint8_t i2_boot : 1;
+    uint8_t i2_ia2 : 1;
+    uint8_t i2_ia1 : 1;
+    uint8_t i2_click : 1;
 } lis2dh12_ctrl_reg6_t;
 
 typedef struct {
-	uint8_t xlie : 1;
-	uint8_t xhie : 1;
-	uint8_t ylie : 1;
-	uint8_t yhie : 1;
-	uint8_t zlie : 1;
-	uint8_t zhie : 1;
-	uint8_t _6d : 1;
-	uint8_t aoi : 1;
+    uint8_t xlie : 1;
+    uint8_t xhie : 1;
+    uint8_t ylie : 1;
+    uint8_t yhie : 1;
+    uint8_t zlie : 1;
+    uint8_t zhie : 1;
+    uint8_t _6d : 1;
+    uint8_t aoi : 1;
 } lis2dh12_int1_cfg_t;
 
 typedef enum {
-	LIS2DH12_2g = 0,
-	LIS2DH12_4g = 1,
-	LIS2DH12_8g = 2,
-	LIS2DH12_16g = 3,
+    LIS2DH12_2g = 0,
+    LIS2DH12_4g = 1,
+    LIS2DH12_8g = 2,
+    LIS2DH12_16g = 3,
 } lis2dh12_fs_t;
 
 
 typedef enum {
-	LIS2DH12_POWER_DOWN = 0,
-	LIS2DH12_ODR_1Hz = 1,
-	LIS2DH12_ODR_10Hz = 2,
-	LIS2DH12_ODR_25Hz = 3,
-	LIS2DH12_ODR_50Hz = 4,
-	LIS2DH12_ODR_100Hz = 5,
-	LIS2DH12_ODR_200Hz = 6,
-	LIS2DH12_ODR_400Hz = 7,
-	LIS2DH12_ODR_1kHz620_LP = 8,
-	LIS2DH12_ODR_5kHz376_LP = 9,
-	LIS2DH12_ODR_1kHz344_NM_HP = 9,
+    LIS2DH12_POWER_DOWN = 0,
+    LIS2DH12_ODR_1Hz = 1,
+    LIS2DH12_ODR_10Hz = 2,
+    LIS2DH12_ODR_25Hz = 3,
+    LIS2DH12_ODR_50Hz = 4,
+    LIS2DH12_ODR_100Hz = 5,
+    LIS2DH12_ODR_200Hz = 6,
+    LIS2DH12_ODR_400Hz = 7,
+    LIS2DH12_ODR_1kHz620_LP = 8,
+    LIS2DH12_ODR_5kHz376_LP = 9,
+    LIS2DH12_ODR_1kHz344_NM_HP = 9,
 } lis2dh12_odr_t;
 
 typedef enum {
-	LIS2DH12_AGGRESSIVE = 0,
-	LIS2DH12_STRONG = 1,
-	LIS2DH12_MEDIUM = 2,
-	LIS2DH12_LIGHT = 3,
+    LIS2DH12_AGGRESSIVE = 0,
+    LIS2DH12_STRONG = 1,
+    LIS2DH12_MEDIUM = 2,
+    LIS2DH12_LIGHT = 3,
 } lis2dh12_hpcf_t;
 
 typedef enum {
-	LIS2DH12_DISC_FROM_INT_GENERATOR = 0,
-	LIS2DH12_ON_INT1_GEN = 1,
-	LIS2DH12_ON_INT2_GEN = 2,
-	LIS2DH12_ON_TAP_GEN = 4,
-	LIS2DH12_ON_INT1_INT2_GEN = 3,
-	LIS2DH12_ON_INT1_TAP_GEN = 5,
-	LIS2DH12_ON_INT2_TAP_GEN = 6,
-	LIS2DH12_ON_INT1_INT2_TAP_GEN = 7,
+    LIS2DH12_DISC_FROM_INT_GENERATOR = 0,
+    LIS2DH12_ON_INT1_GEN = 1,
+    LIS2DH12_ON_INT2_GEN = 2,
+    LIS2DH12_ON_TAP_GEN = 4,
+    LIS2DH12_ON_INT1_INT2_GEN = 3,
+    LIS2DH12_ON_INT1_TAP_GEN = 5,
+    LIS2DH12_ON_INT2_TAP_GEN = 6,
+    LIS2DH12_ON_INT1_INT2_TAP_GEN = 7,
 } lis2dh12_hp_t;
 
 typedef enum {
-	LIS2DH12_HR_12bit = 0,
-	LIS2DH12_NM_10bit = 1,
-	LIS2DH12_LP_8bit = 2,
+    LIS2DH12_HR_12bit = 0,
+    LIS2DH12_NM_10bit = 1,
+    LIS2DH12_LP_8bit = 2,
 } lis2dh12_op_md_t;
 
 typedef enum {
-	LIS2DH12_BYPASS_MODE = 0,
-	LIS2DH12_FIFO_MODE = 1,
-	LIS2DH12_DYNAMIC_STREAM_MODE = 2,
-	LIS2DH12_STREAM_TO_FIFO_MODE = 3,
+    LIS2DH12_BYPASS_MODE = 0,
+    LIS2DH12_FIFO_MODE = 1,
+    LIS2DH12_DYNAMIC_STREAM_MODE = 2,
+    LIS2DH12_STREAM_TO_FIFO_MODE = 3,
 } lis2dh12_fm_t;
 
 typedef enum {
-	LIS2DH12_NORMAL_WITH_RST = 0,
-	LIS2DH12_REFERENCE_MODE = 1,
-	LIS2DH12_NORMAL = 2,
-	LIS2DH12_AUTORST_ON_INT = 3,
+    LIS2DH12_NORMAL_WITH_RST = 0,
+    LIS2DH12_REFERENCE_MODE = 1,
+    LIS2DH12_NORMAL = 2,
+    LIS2DH12_AUTORST_ON_INT = 3,
 } lis2dh12_hpm_t;
 
 typedef union {
-	int16_t i16bit[3];
-	uint8_t u8bit[6];
+    int16_t i16bit[3];
+    uint8_t u8bit[6];
 } axis3bit16_t;
 
 #define LIS2DH12_FROM_FS_2g_HR_TO_mg(lsb)  lsb
@@ -617,17 +617,17 @@ typedef union {
 #define LIS2DH12_FROM_FS_16g_LP_TO_mg(lsb) lsb
 
 
-#define LIS2DH12_I2C_ADD_L		0x18
-#define LIS2DH12_I2C_ADD_H		0x19
-#define LIS2DH12_ID				0x33
-#define LIS2DH12_CTRL_REG1		0x20
-#define PROPERTY_ENABLE			0x01
-#define PROPERTY_DISABLE		0x00
-#define WATERMARK_LEVEL			0x1E
+#define LIS2DH12_I2C_ADD_L        0x18
+#define LIS2DH12_I2C_ADD_H        0x19
+#define LIS2DH12_ID                0x33
+#define LIS2DH12_CTRL_REG1        0x20
+#define PROPERTY_ENABLE            0x01
+#define PROPERTY_DISABLE        0x00
+#define WATERMARK_LEVEL            0x1E
 int32_t lis2dh12_device_id_get(lis2dh12_ctx_t *ctx, uint8_t *buff);
 int32_t lis2dh12_fifo_mode_set(lis2dh12_ctx_t *ctx, lis2dh12_fm_t val);
 int32_t lis2dh12_write_reg(lis2dh12_ctx_t* ctx, uint8_t reg, uint8_t* data,
-	uint16_t len);
+    uint16_t len);
 int32_t lis2dh12_data_rate_set(lis2dh12_ctx_t *ctx, lis2dh12_odr_t val);
 int32_t lis2dh12_full_scale_set(lis2dh12_ctx_t *ctx, lis2dh12_fs_t val);
 int32_t lis2dh12_operating_mode_set(lis2dh12_ctx_t *ctx, lis2dh12_op_md_t val);
@@ -635,21 +635,21 @@ int32_t lis2dh12_fifo_set(lis2dh12_ctx_t *ctx, uint8_t val);
 int32_t lis2dh12_fifo_mode_set(lis2dh12_ctx_t *ctx, lis2dh12_fm_t val);
 int32_t lis2dh12_fifo_watermark_set(lis2dh12_ctx_t *ctx, uint8_t val);
 int32_t lis2dh12_pin_int1_config_set(lis2dh12_ctx_t *ctx,
-	lis2dh12_ctrl_reg3_t *val);
+    lis2dh12_ctrl_reg3_t *val);
 int32_t lis2dh12_fifo_fth_flag_get(lis2dh12_ctx_t *ctx, uint8_t *val);
 int32_t lis2dh12_fifo_ovr_flag_get(lis2dh12_ctx_t* ctx, uint8_t* val);
 int32_t lis2dh12_fifo_data_level_get(lis2dh12_ctx_t *ctx, uint8_t *val);
 int32_t lis2dh12_acceleration_raw_get(lis2dh12_ctx_t *ctx, uint8_t *buff);
 int32_t lis2dh12_high_pass_int_conf_set(lis2dh12_ctx_t *ctx,
-	lis2dh12_hp_t val);
+    lis2dh12_hp_t val);
 int32_t lis2dh12_int1_gen_threshold_set(lis2dh12_ctx_t *ctx, uint8_t val);
 int32_t lis2dh12_int1_gen_conf_set(lis2dh12_ctx_t *ctx,
-	lis2dh12_int1_cfg_t *val);
+    lis2dh12_int1_cfg_t *val);
 int32_t lis2dh12_pin_int2_config_set(lis2dh12_ctx_t *ctx,
-	lis2dh12_ctrl_reg6_t *val);
+    lis2dh12_ctrl_reg6_t *val);
 
 int32_t lis2dh12_high_pass_bandwidth_set(lis2dh12_ctx_t *ctx,
-	lis2dh12_hpcf_t val);
+    lis2dh12_hpcf_t val);
 
 int32_t lis2dh12_high_pass_mode_set(lis2dh12_ctx_t *ctx, lis2dh12_hpm_t val);
 int32_t lis2dh12_high_pass_on_outputs_set(lis2dh12_ctx_t *ctx, uint8_t val);

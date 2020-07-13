@@ -35,23 +35,23 @@
 #include <array>
 
 enum class ScanJobState : u8{
-	INVALID,
-	ACTIVE,
+    INVALID,
+    ACTIVE,
 };
 
 enum class ScanJobTimeMode : u8 {
-	ENDLESS,
-	TIMED,
+    ENDLESS,
+    TIMED,
 };
 
 typedef struct ScanJob
 {
-	ScanJobTimeMode timeMode;
-	i32				timeLeftDs;
-	u16				interval;
-	u16				window;
-	ScanJobState	state;
-	ScanState		type;
+    ScanJobTimeMode timeMode;
+    i32                timeLeftDs;
+    u16                interval;
+    u16                window;
+    ScanJobState    state;
+    ScanState        type;
 }ScanJob;
 
 //Forward declaration
@@ -64,37 +64,37 @@ class DebugModule;
  */
 class ScanController
 {
-	friend DebugModule;
+    friend DebugModule;
 
 private:
-	FruityHal::BleGapScanParams currentScanParams;
-	bool scanStateOk = true;
-	std::array<ScanJob, 4> jobs{};
+    FruityHal::BleGapScanParams currentScanParams;
+    bool scanStateOk = true;
+    std::array<ScanJob, 4> jobs{};
 
-	void TryConfiguringScanState();
+    void TryConfiguringScanState();
 
 public:
-	ScanController();
-	static ScanController& getInstance();
+    ScanController();
+    static ScanController& getInstance();
 
-	//Job Scheduling
-	ScanJob* AddJob(ScanJob& job);
-	void RefreshJobs();
-	void RemoveJob(ScanJob * p_jobHandle);
-	//Helper for a common use, where an old job should be removed (if set), and
-	//a new one should be created with a given ScanState and ScanJobState.
-	void UpdateJobPointer(ScanJob **outUpdatePtr, ScanState type, ScanJobState state);
+    //Job Scheduling
+    ScanJob* AddJob(ScanJob& job);
+    void RefreshJobs();
+    void RemoveJob(ScanJob * p_jobHandle);
+    //Helper for a common use, where an old job should be removed (if set), and
+    //a new one should be created with a given ScanState and ScanJobState.
+    void UpdateJobPointer(ScanJob **outUpdatePtr, ScanState type, ScanJobState state);
 
-	void TimerEventHandler(u16 passedTimeDs);
+    void TimerEventHandler(u16 passedTimeDs);
 
-	bool ScanEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) const;
+    bool ScanEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) const;
 
-	//Must be called if scanning was stopped by any external procedure
-	void ScanningHasStopped();
+    //Must be called if scanning was stopped by any external procedure
+    void ScanningHasStopped();
 
 #ifdef SIM_ENABLED
-	int GetAmountOfJobs();
-	ScanJob* GetJob(int index);
+    int GetAmountOfJobs();
+    ScanJob* GetJob(int index);
 #endif //SIM_ENABLED
 };
 

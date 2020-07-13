@@ -34,16 +34,16 @@
 class FruitySimServer
 {
 public:
-	FruitySimServer();
-	~FruitySimServer();
+    FruitySimServer();
+    ~FruitySimServer();
 
-	//Call periodically so that the server can process requests
-	void ProcessServerRequests();
+    //Call periodically so that the server can process requests
+    void ProcessServerRequests();
 
 private:
-	int StartServer();
+    int StartServer();
 
-	static std::string GenerateDevicesJson();
-	static std::string GenerateSiteJson();
+    static std::string GenerateDevicesJson();
+    static std::string GenerateSiteJson();
 };
 

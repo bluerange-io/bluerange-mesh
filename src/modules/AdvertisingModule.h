@@ -45,67 +45,67 @@ constexpr int ADVERTISING_MODULE_MAX_MESSAGE_LENGTH = 31;
  */
 class AdvertisingModule: public Module
 {
-	private:
+    private:
 
-		u32 assetMode = false;
+        u32 assetMode = false;
 
-		#pragma pack(push, 1)
-		struct AdvertisingMessage{
-			u8 messageId;
-			u8 forceNonConnectable : 1; //Always send this message non-connectable
-			u8 forceConnectable : 1; //Message is only sent, when it is possible to send it in connectable mode (if we have a free slave connection)
-			u8 reserved : 1;
-			u8 messageLength : 5;
-			std::array<u8, ADVERTISING_MODULE_MAX_MESSAGE_LENGTH> messageData;
-		};
+        #pragma pack(push, 1)
+        struct AdvertisingMessage{
+            u8 messageId;
+            u8 forceNonConnectable : 1; //Always send this message non-connectable
+            u8 forceConnectable : 1; //Message is only sent, when it is possible to send it in connectable mode (if we have a free slave connection)
+            u8 reserved : 1;
+            u8 messageLength : 5;
+            std::array<u8, ADVERTISING_MODULE_MAX_MESSAGE_LENGTH> messageData;
+        };
 
-		//Module configuration that is saved persistently
-		struct AdvertisingModuleConfiguration : ModuleConfiguration{
-			//The interval at which the device advertises
-			//If multiple messages are configured, they will be distributed round robin
-			u16 advertisingIntervalMs;
-			//Number of messages
-			u8 messageCount;
-			i8 txPower;
-			std::array<AdvertisingMessage, ADVERTISING_MODULE_MAX_MESSAGES> messageData;
-			//Insert more persistent config values here
-		};
-		#pragma pack(pop)
+        //Module configuration that is saved persistently
+        struct AdvertisingModuleConfiguration : ModuleConfiguration{
+            //The interval at which the device advertises
+            //If multiple messages are configured, they will be distributed round robin
+            u16 advertisingIntervalMs;
+            //Number of messages
+            u8 messageCount;
+            i8 txPower;
+            std::array<AdvertisingMessage, ADVERTISING_MODULE_MAX_MESSAGES> messageData;
+            //Insert more persistent config values here
+        };
+        #pragma pack(pop)
 
-		std::array<AdvJob*, ADVERTISING_MODULE_MAX_MESSAGES> advJobHandles{};
+        std::array<AdvJob*, ADVERTISING_MODULE_MAX_MESSAGES> advJobHandles{};
 
-		u16 maxMessages = ADVERTISING_MODULE_MAX_MESSAGES; //Save this, so that it can be requested
+        u16 maxMessages = ADVERTISING_MODULE_MAX_MESSAGES; //Save this, so that it can be requested
 
-		//Set all advertising messages at once, the old configuration will be overwritten
-		void SetAdvertisingMessages(u8* data, u16 dataLength);
+        //Set all advertising messages at once, the old configuration will be overwritten
+        void SetAdvertisingMessages(u8* data, u16 dataLength);
 
-		#pragma pack(push)
-		#pragma pack(1)
+        #pragma pack(push)
+        #pragma pack(1)
 
-		typedef struct
-		{
-			u8 debugPacketIdentifier;
-			NodeId senderId;
-			u16 connLossCounter;
-			std::array<NodeId, 4> partners;
-			std::array<i8, 3> rssiVals;
-			std::array<u8, 3> droppedVals;
+        typedef struct
+        {
+            u8 debugPacketIdentifier;
+            NodeId senderId;
+            u16 connLossCounter;
+            std::array<NodeId, 4> partners;
+            std::array<i8, 3> rssiVals;
+            std::array<u8, 3> droppedVals;
 
-		} AdvertisingModuleDebugMessage;
+        } AdvertisingModuleDebugMessage;
 
-		#pragma pack(pop)
+        #pragma pack(pop)
 
 
-	public:
-		DECLARE_CONFIG_AND_PACKED_STRUCT(AdvertisingModuleConfiguration);
+    public:
+        DECLARE_CONFIG_AND_PACKED_STRUCT(AdvertisingModuleConfiguration);
 
-		AdvertisingModule();
+        AdvertisingModule();
 
-		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
+        void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
 
-		void ResetToDefaultConfiguration() override final;
+        void ResetToDefaultConfiguration() override final;
 
-		#ifdef TERMINAL_ENABLED
-		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
-		#endif
+        #ifdef TERMINAL_ENABLED
+        TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
+        #endif
 };

@@ -36,7 +36,7 @@
 #include <type_traits>
 
 typedef struct Aes128Block {
-	uint8_t data[16];
+    uint8_t data[16];
 }Aes128Block;
 
 class Module;
@@ -51,15 +51,15 @@ class RecordStorageEventListener;
 //Because it would not work with an array of pointers, because decltype((dst)[0]) is a reference in that case, not a ptr!
 #define CheckedMemset(dst, val, size) \
 {\
-	static_assert( std::is_pod  <std::remove_pointer<decltype(&((dst)[0]))>::type>::value \
-				|| std::is_union<std::remove_pointer<decltype(&((dst)[0]))>::type>::value, "Tried to call memset on non pod type!"); /*CODE_ANALYZER_IGNORE Just a string.*/ \
-	memset((dst), (val), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemset*/ \
+    static_assert( std::is_pod  <std::remove_pointer<decltype(&((dst)[0]))>::type>::value \
+                || std::is_union<std::remove_pointer<decltype(&((dst)[0]))>::type>::value, "Tried to call memset on non pod type!"); /*CODE_ANALYZER_IGNORE Just a string.*/ \
+    memset((dst), (val), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemset*/ \
 }
 #define CheckedMemcpy(dst, src, size) \
 {\
-	static_assert( std::is_pod  <std::remove_pointer<decltype(&((dst)[0]))>::type>::value \
-				|| std::is_union<std::remove_pointer<decltype(&((dst)[0]))>::type>::value, "Tried to call memcpy on non pod type!"); /*CODE_ANALYZER_IGNORE Just a string.*/ \
-	memcpy((dst), (src), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemcpy*/ \
+    static_assert( std::is_pod  <std::remove_pointer<decltype(&((dst)[0]))>::type>::value \
+                || std::is_union<std::remove_pointer<decltype(&((dst)[0]))>::type>::value, "Tried to call memcpy on non pod type!"); /*CODE_ANALYZER_IGNORE Just a string.*/ \
+    memcpy((dst), (src), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemcpy*/ \
 }
 
 /*
@@ -67,68 +67,68 @@ class RecordStorageEventListener;
  */
 namespace Utility
 {
-	const char serialAlphabet[] = "BCDFGHJKLMNPQRSTVWXYZ123456789";
+    const char serialAlphabet[] = "BCDFGHJKLMNPQRSTVWXYZ123456789";
 
-	//General methods for loading settings
-	u32 GetSettingsPageBaseAddress();
-	RecordStorageResultCode SaveModuleSettingsToFlash(const Module* module, ModuleConfiguration* configurationPointer, const u16 configurationLength, RecordStorageEventListener* listener, u32 userType, u8* userData, u16 userDataLength);
-	RecordStorageResultCode SaveModuleSettingsToFlashWithId(ModuleId moduleId, ModuleConfiguration* configurationPointer, const u16 configurationLength, RecordStorageEventListener* listener, u32 userType, u8* userData, u16 userDataLength);
+    //General methods for loading settings
+    u32 GetSettingsPageBaseAddress();
+    RecordStorageResultCode SaveModuleSettingsToFlash(const Module* module, ModuleConfiguration* configurationPointer, const u16 configurationLength, RecordStorageEventListener* listener, u32 userType, u8* userData, u16 userDataLength);
+    RecordStorageResultCode SaveModuleSettingsToFlashWithId(ModuleId moduleId, ModuleConfiguration* configurationPointer, const u16 configurationLength, RecordStorageEventListener* listener, u32 userType, u8* userData, u16 userDataLength);
 
-	//Serial number and version utilities
-	u32 GetIndexForSerial(const char* serialNumber, bool *didError = nullptr);
-	void GenerateBeaconSerialForIndex(u32 index, char* serialBuffer); //Attention: Serial buffer must be NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH big
-	void GetVersionStringFromInt(const u32 version, char* outputBuffer);
+    //Serial number and version utilities
+    u32 GetIndexForSerial(const char* serialNumber, bool *didError = nullptr);
+    void GenerateBeaconSerialForIndex(u32 index, char* serialBuffer); //Attention: Serial buffer must be NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH big
+    void GetVersionStringFromInt(const u32 version, char* outputBuffer);
 
-	//Random functionality
-	u32 GetRandomInteger(void);
+    //Random functionality
+    u32 GetRandomInteger(void);
 
-	//CRC calculation
-	uint8_t CalculateCrc8(const u8* data, u16 dataLength);
-	uint16_t CalculateCrc16(const uint8_t * p_data, const uint32_t size, const uint16_t * p_crc);
-	u32 CalculateCrc32(const u8* message, const u32 messageLength, u32 previousCrc = 0);
-	u32 CalculateCrc32String(const char* message, u32 previousCrc = 0);
+    //CRC calculation
+    uint8_t CalculateCrc8(const u8* data, u16 dataLength);
+    uint16_t CalculateCrc16(const uint8_t * p_data, const uint32_t size, const uint16_t * p_crc);
+    u32 CalculateCrc32(const u8* message, const u32 messageLength, u32 previousCrc = 0);
+    u32 CalculateCrc32String(const char* message, u32 previousCrc = 0);
 
-	//Encryption Functionality
-	void Aes128BlockEncrypt(const Aes128Block* messageBlock, const Aes128Block* key, Aes128Block* encryptedMessage);
-	void XorWords(const u32* src1, const u32* src2, const u8 numWords, u32* out);
-	void XorBytes(const u8* src1, const u8* src2, const u8 numBytes, u8* out);
+    //Encryption Functionality
+    void Aes128BlockEncrypt(const Aes128Block* messageBlock, const Aes128Block* key, Aes128Block* encryptedMessage);
+    void XorWords(const u32* src1, const u32* src2, const u8 numWords, u32* out);
+    void XorBytes(const u8* src1, const u8* src2, const u8 numBytes, u8* out);
 
-	//Memory modification
-	void swapBytes(u8 *data, const size_t length);//Reverses the direction of bytes according to the length
-	u16 swap_u16( u16 val );
-	u32 swap_u32( u32 val );
-	bool CompareMem(const u8 byte, const u8* data, const u16 dataLength);
+    //Memory modification
+    void swapBytes(u8 *data, const size_t length);//Reverses the direction of bytes according to the length
+    u16 swap_u16( u16 val );
+    u32 swap_u32( u32 val );
+    bool CompareMem(const u8 byte, const u8* data, const u16 dataLength);
 
-	//String manipulation
-	void ToUpperCase(char* str);
+    //String manipulation
+    void ToUpperCase(char* str);
 
-	//Other
-	u16 ByteToAsciiHex(u8 b);
-	u32 ByteFromAsciiHex(char* asciiHex, u8 numChars);
-	void LogRebootJson();
+    //Other
+    u16 ByteToAsciiHex(u8 b);
+    u32 ByteFromAsciiHex(char* asciiHex, u8 numChars);
+    void LogRebootJson();
 
-	bool Contains(const u8* data, const u32 length, const u8 searchValue);
+    bool Contains(const u8* data, const u32 length, const u8 searchValue);
 
-	bool IsPowerOfTwo(u32 val);
-	u32 NextMultipleOf(u32 val, u32 multiple);
+    bool IsPowerOfTwo(u32 val);
+    u32 NextMultipleOf(u32 val, u32 multiple);
 
-	NodeId TerminalArgumentToNodeId(const char* arg, bool* didError = nullptr);
+    NodeId TerminalArgumentToNodeId(const char* arg, bool* didError = nullptr);
 
-	bool IsUnknownRebootReason(RebootReason rebootReason);
+    bool IsUnknownRebootReason(RebootReason rebootReason);
 
-	char* FindLast(char* str, const char* search);
+    char* FindLast(char* str, const char* search);
 
-	//The outDidError varaible can be nullptr, in which case it is ignored.
-	//If it's not set to nullptr, the underlying value must be initialized
-	//with false. The functions only set it to true or don't change it at
-	//all. That way you can use the same variable for several calls.
-	long          StringToLong        (const char *str, bool *outDidError = nullptr);
-	unsigned long StringToUnsignedLong(const char *str, bool *outDidError = nullptr);
-	u8            StringToU8          (const char *str, bool *outDidError = nullptr);
-	u16           StringToU16         (const char *str, bool *outDidError = nullptr);
-	u32           StringToU32         (const char *str, bool *outDidError = nullptr);
-	i8            StringToI8          (const char *str, bool *outDidError = nullptr);
-	i16           StringToI16         (const char *str, bool *outDidError = nullptr);
-	i32           StringToI32         (const char *str, bool *outDidError = nullptr);
+    //The outDidError varaible can be nullptr, in which case it is ignored.
+    //If it's not set to nullptr, the underlying value must be initialized
+    //with false. The functions only set it to true or don't change it at
+    //all. That way you can use the same variable for several calls.
+    long          StringToLong        (const char *str, bool *outDidError = nullptr);
+    unsigned long StringToUnsignedLong(const char *str, bool *outDidError = nullptr);
+    u8            StringToU8          (const char *str, bool *outDidError = nullptr);
+    u16           StringToU16         (const char *str, bool *outDidError = nullptr);
+    u32           StringToU32         (const char *str, bool *outDidError = nullptr);
+    i8            StringToI8          (const char *str, bool *outDidError = nullptr);
+    i16           StringToI16         (const char *str, bool *outDidError = nullptr);
+    i32           StringToI32         (const char *str, bool *outDidError = nullptr);
 }
 

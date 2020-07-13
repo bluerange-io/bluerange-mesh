@@ -43,19 +43,19 @@
  * the ResolverConnection by the correct instance for a connection type.
  */
 class ResolverConnection
-		: public BaseConnection
+        : public BaseConnection
 {
 private:
 public:
-	ResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
+    ResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
 
-	void ConnectionSuccessfulHandler(u16 connectionHandle) override;
+    void ConnectionSuccessfulHandler(u16 connectionHandle) override;
 
-	void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) override;
+    void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) override;
 
-	void PrintStatus() override;
+    void PrintStatus() override;
 
-	bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable) override;
+    bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable) override;
 
 };
 

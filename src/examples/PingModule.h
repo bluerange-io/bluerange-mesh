@@ -37,35 +37,35 @@
  */
 class PingModule: public Module
 {
-	private:
+    private:
 
-		//Module configuration that is saved persistently (size must be multiple of 4)
-		struct PingModuleConfiguration : ModuleConfiguration{
-			//Insert more persistent config values here
-		};
+        //Module configuration that is saved persistently (size must be multiple of 4)
+        struct PingModuleConfiguration : ModuleConfiguration{
+            //Insert more persistent config values here
+        };
 
-		PingModuleConfiguration configuration;
+        PingModuleConfiguration configuration;
 
-		enum PingModuleTriggerActionMessages{
-			TRIGGER_PING=0
-		};
+        enum PingModuleTriggerActionMessages{
+            TRIGGER_PING=0
+        };
 
-		enum PingModuleActionResponseMessages{
-			PING_RESPONSE=0
-		};
+        enum PingModuleActionResponseMessages{
+            PING_RESPONSE=0
+        };
 
-	public:
-		PingModule();
+    public:
+        PingModule();
 
-		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override;
+        void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override;
 
-		void ResetToDefaultConfiguration() override;
+        void ResetToDefaultConfiguration() override;
 
-		void TimerEventHandler(u16 passedTimeDs) override;
+        void TimerEventHandler(u16 passedTimeDs) override;
 
-		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
+        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
 
-		#ifdef TERMINAL_ENABLED
-		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
-		#endif
+        #ifdef TERMINAL_ENABLED
+        TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
+        #endif
 };

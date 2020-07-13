@@ -36,17 +36,17 @@
 class FlashStorageEventListener;
 
 enum class FlashStorageError : u8 {
-	SUCCESS,
-	QUEUE_FULL,
-	FLASH_OPERATION_TIMED_OUT,
-	TRANSACTION_IN_PROGRESS,
-	WRONG_PARAM
+    SUCCESS,
+    QUEUE_FULL,
+    FLASH_OPERATION_TIMED_OUT,
+    TRANSACTION_IN_PROGRESS,
+    WRONG_PARAM
 };
 enum class FlashStorageCommand : u8 {
-	NONE,
-	WRITE_DATA,	//While unsafe by design, the command is still required for massive writes, e.g. the Bootloadersettings.
-	WRITE_AND_CACHE_DATA,
-	ERASE_PAGES,
+    NONE,
+    WRITE_DATA,    //While unsafe by design, the command is still required for massive writes, e.g. the Bootloadersettings.
+    WRITE_AND_CACHE_DATA,
+    ERASE_PAGES,
 };
 
 //Packed, because it might get misaligned in the queue (should be fixed)
@@ -57,30 +57,30 @@ enum class FlashStorageCommand : u8 {
 constexpr int SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER = 16;
 struct FlashStorageTaskItemHeader
 {
-	FlashStorageCommand command;
-	u8 reserved[3];
-	FlashStorageEventListener* callback;
-	u32 userType;
-	u32 extraInfo;
+    FlashStorageCommand command;
+    u8 reserved[3];
+    FlashStorageEventListener* callback;
+    u32 userType;
+    u32 extraInfo;
 };
 STATIC_ASSERT_SIZE(FlashStorageTaskItemHeader, SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER);
 
 constexpr int SIZEOF_FLASH_STORAGE_TASK_ITEM_WRITE_DATA = (SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER + 10);
 struct FlashStorageTaskItemWriteData
 {
-	u32* dataSource;
-	u32* dataDestination;
-	u16 dataLength;
+    u32* dataSource;
+    u32* dataDestination;
+    u16 dataLength;
 };
 STATIC_ASSERT_SIZE(FlashStorageTaskItemWriteData, 10);
 
 constexpr int SIZEOF_FLASH_STORAGE_TASK_ITEM_WRITE_CACHED_DATA = (SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER + 8);
 struct FlashStorageTaskItemWriteCachedData
 {
-	u32* dataDestination;
-	u16 dataLength;
-	u16 reserved;
-	u8 data[1];
+    u32* dataDestination;
+    u16 dataLength;
+    u16 reserved;
+    u8 data[1];
 };
 //We should pay attention that the data pointer is saved at a word aligned address so we can directly write to flash from this pointer
 static_assert(offsetof(FlashStorageTaskItemWriteCachedData, data) % sizeof(u32) == 0, "Payload offset must be word aligned.");
@@ -89,8 +89,8 @@ STATIC_ASSERT_SIZE(FlashStorageTaskItemWriteCachedData, 9);
 constexpr int SIZEOF_FLASH_STORAGE_TASK_ITEM_ERASE_PAGES = (SIZEOF_FLASH_STORAGE_TASK_ITEM_HEADER + 4);
 struct FlashStorageTaskItemErasePages
 {
-	u16 startPage;
-	u16 numPages;
+    u16 startPage;
+    u16 numPages;
 };
 STATIC_ASSERT_SIZE(FlashStorageTaskItemErasePages, 4);
 
@@ -98,13 +98,13 @@ STATIC_ASSERT_SIZE(FlashStorageTaskItemErasePages, 4);
 //TODO: A compact version will only need 1 byte command, 1 byte transactionId, 
 struct FlashStorageTaskItem
 {
-	FlashStorageTaskItemHeader header;
-	union
-	{
-		FlashStorageTaskItemWriteData writeData;
-		FlashStorageTaskItemWriteCachedData writeCachedData;
-		FlashStorageTaskItemErasePages erasePages;
-	} params;
+    FlashStorageTaskItemHeader header;
+    union
+    {
+        FlashStorageTaskItemWriteData writeData;
+        FlashStorageTaskItemWriteCachedData writeCachedData;
+        FlashStorageTaskItemErasePages erasePages;
+    } params;
 };
 #pragma pack(pop)
 
@@ -120,61 +120,61 @@ constexpr int FLASH_STORAGE_QUEUE_SIZE = 2048;
  */
 class FlashStorage
 {
-	private:
-				
-		u32 taskBuffer[FLASH_STORAGE_QUEUE_SIZE / sizeof(u32)] = {};
-		PacketQueue taskQueue;
+    private:
+                
+        u32 taskBuffer[FLASH_STORAGE_QUEUE_SIZE / sizeof(u32)] = {};
+        PacketQueue taskQueue;
 
-		FlashStorageTaskItem* currentTask = nullptr;
-		i8 retryCount = 0;
-		bool retryCallingSoftdevice = false;
+        FlashStorageTaskItem* currentTask = nullptr;
+        i8 retryCount = 0;
+        bool retryCallingSoftdevice = false;
 
-		//Starts or continues to execute flash tasks
-		void ProcessQueue(bool continueCurrentTask);
-		
-		//Drops all task items belonging to a transaction after there was one fail and finally, calls the callback
-		void AbortTransactionInProgress(FlashStorageError errorCode);
+        //Starts or continues to execute flash tasks
+        void ProcessQueue(bool continueCurrentTask);
+        
+        //Drops all task items belonging to a transaction after there was one fail and finally, calls the callback
+        void AbortTransactionInProgress(FlashStorageError errorCode);
 
-		void RemoveExecutingTask();
-		void OnCommandSuccessful();
+        void RemoveExecutingTask();
+        void OnCommandSuccessful();
 
-	public:
-		FlashStorage();
+    public:
+        FlashStorage();
 
-		//Initialize Storage class
-		static FlashStorage& getInstance();
+        //Initialize Storage class
+        static FlashStorage& getInstance();
 
-		void TimerEventHandler(u16 passedTimeDs);
+        void TimerEventHandler(u16 passedTimeDs);
 
-		//Erases a page and calls the callback
-		FlashStorageError ErasePage(u16 page, FlashStorageEventListener* callback, u32 userType, u32 extraInfo = 0);
+        //Erases a page and calls the callback
+        FlashStorageError ErasePage(u16 page, FlashStorageEventListener* callback, u32 userType, u32 extraInfo = 0);
 
-		//Erases multiple pages and then calls teh callback
-		FlashStorageError ErasePages(u16 startPage, u16 numPages, FlashStorageEventListener* callback, u32 userType, u32 extraInfo = 0);
+        //Erases multiple pages and then calls teh callback
+        FlashStorageError ErasePages(u16 startPage, u16 numPages, FlashStorageEventListener* callback, u32 userType, u32 extraInfo = 0);
 
-		//Writes some data that must stay at its source until the callback is called (destination page must be empty)
-		FlashStorageError WriteData(u32* source, u32* destination, u16 length, FlashStorageEventListener* callback, u32 userType, u32 extraInfo = 0);
+        //Writes some data that must stay at its source until the callback is called (destination page must be empty)
+        FlashStorageError WriteData(u32* source, u32* destination, u16 length, FlashStorageEventListener* callback, u32 userType, u32 extraInfo = 0);
 
-		//Caches the data in an internal buffer before saving (destination page must be empty)
-		FlashStorageError CacheAndWriteData(u32 const * source, u32* destination, u16 length, FlashStorageEventListener* callback, u32 userType, u32 extraInfo = 0);
+        //Caches the data in an internal buffer before saving (destination page must be empty)
+        FlashStorageError CacheAndWriteData(u32 const * source, u32* destination, u16 length, FlashStorageEventListener* callback, u32 userType, u32 extraInfo = 0);
 
-		//Return the number of tasks
-		u16 GetNumberOfActiveTasks() const;
+        //Return the number of tasks
+        u16 GetNumberOfActiveTasks() const;
 
-		//This system event handler must be called by the implementation
-		void SystemEventHandler(FruityHal::SystemEvents sys_evt);
+        //This system event handler must be called by the implementation
+        void SystemEventHandler(FruityHal::SystemEvents sys_evt);
 };
 
 class FlashStorageEventListener
 {
 public:
-	FlashStorageEventListener() {};
+    FlashStorageEventListener() {};
 
-	virtual ~FlashStorageEventListener() {};
+    virtual ~FlashStorageEventListener() {};
 
-	//Struct is passed by value so that it can be dequeued before calling this handler
-	//If we passed a reference, this handler would have to clear the item from the TaskQueue
-	virtual void FlashStorageItemExecuted(FlashStorageTaskItem* task, FlashStorageError errorCode) = 0;
+    //Struct is passed by value so that it can be dequeued before calling this handler
+    //If we passed a reference, this handler would have to clear the item from the TaskQueue
+    virtual void FlashStorageItemExecuted(FlashStorageTaskItem* task, FlashStorageError errorCode) = 0;
 };
 
 

@@ -35,53 +35,53 @@ static int disableDebugBreakOnExceptionCounter = 0;
 
 bool Exceptions::getDebugBreakOnException()
 {
-	return disableDebugBreakOnExceptionCounter <= 0;
+    return disableDebugBreakOnExceptionCounter <= 0;
 }
 
 void Exceptions::disableExceptionByIndex(std::type_index index)
 {
-	if (ignoredExceptions.find(index) == ignoredExceptions.end()) {
-		ignoredExceptions.insert({ index, 1 });
-	}
-	else {
-		ignoredExceptions[index]++;
-	}
+    if (ignoredExceptions.find(index) == ignoredExceptions.end()) {
+        ignoredExceptions.insert({ index, 1 });
+    }
+    else {
+        ignoredExceptions[index]++;
+    }
 }
 
 void Exceptions::enableExceptionByIndex(std::type_index index)
 {
-	if (ignoredExceptions.find(index) == ignoredExceptions.end()) {
-		SIMEXCEPTION(MemoryCorruptionException);
-	}
-	else {
-		ignoredExceptions[index]--;
-		if (ignoredExceptions[index] <= 0)
-		{
-			ignoredExceptions.erase(index);
-		}
-	}
+    if (ignoredExceptions.find(index) == ignoredExceptions.end()) {
+        SIMEXCEPTION(MemoryCorruptionException);
+    }
+    else {
+        ignoredExceptions[index]--;
+        if (ignoredExceptions[index] <= 0)
+        {
+            ignoredExceptions.erase(index);
+        }
+    }
 }
 
 bool Exceptions::isExceptionEnabledByIndex(std::type_index index)
 {
-	if (ignoredExceptions.find(index) == ignoredExceptions.end()) {
-		return true;
-	}
-	else {
-		return ignoredExceptions[index] <= 0;
-	}
+    if (ignoredExceptions.find(index) == ignoredExceptions.end()) {
+        return true;
+    }
+    else {
+        return ignoredExceptions[index] <= 0;
+    }
 }
 
 Exceptions::DisableDebugBreakOnException::DisableDebugBreakOnException()
 {
-	disableDebugBreakOnExceptionCounter++;
+    disableDebugBreakOnExceptionCounter++;
 }
 
 Exceptions::DisableDebugBreakOnException::~DisableDebugBreakOnException() noexcept(false)
 {
-	disableDebugBreakOnExceptionCounter--;
-	if (disableDebugBreakOnExceptionCounter < 0)
-	{
-		SIMEXCEPTION(MemoryCorruptionException);
-	}
+    disableDebugBreakOnExceptionCounter--;
+    if (disableDebugBreakOnExceptionCounter < 0)
+    {
+        SIMEXCEPTION(MemoryCorruptionException);
+    }
 }

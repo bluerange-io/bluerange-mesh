@@ -50,13 +50,13 @@
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef unsigned u32;   //This is not defined uint32_t because GCC defines uint32_t as unsigned long, 
-						//which is a problem when working with printf placeholders.
+                        //which is a problem when working with printf placeholders.
 
 //Signed ints
 typedef int8_t i8;
 typedef int16_t i16;
-typedef int i32;		//This is not defined int32_t because GCC defines int32_t as long,
-						//which is a problem when working with printf placeholders.
+typedef int i32;        //This is not defined int32_t because GCC defines int32_t as long,
+                        //which is a problem when working with printf placeholders.
 
 static_assert(sizeof(u8) == 1, "");
 static_assert(sizeof(u16) == 2, "");
@@ -102,106 +102,106 @@ constexpr NodeId NODE_ID_INVALID = 0xFFFF; //Special node id that is used in err
 
 //Different types of supported BLE stacks, specific versions can be added later if necessary
 enum class BleStackType {
-	INVALID = 0,
-	//NRF_SD_130_ANY = 100, //Deprecated as of 09.04.2020
-	NRF_SD_132_ANY = 200,
-	NRF_SD_140_ANY = 300
+    INVALID = 0,
+    //NRF_SD_130_ANY = 100, //Deprecated as of 09.04.2020
+    NRF_SD_132_ANY = 200,
+    NRF_SD_140_ANY = 300
 };
 
 // Chipset group ids. These define what kind of chipset the firmware is running on
 enum class Chipset : NodeId
 {
-	CHIP_INVALID = 0,
-	//CHIP_NRF51 = 20000, //Deprecated as of 09.04.2020
-	CHIP_NRF52 = 20001,
-	CHIP_NRF52840 = 20015,
+    CHIP_INVALID = 0,
+    //CHIP_NRF51 = 20000, //Deprecated as of 09.04.2020
+    CHIP_NRF52 = 20001,
+    CHIP_NRF52840 = 20015,
 };
 
 /*## Key Types #############################################################*/
 //Types of keys used by the mesh and other modules
 enum class FmKeyId : u32
 {
-	ZERO = 0,
-	NODE = 1,
-	NETWORK = 2,
-	BASE_USER = 3,
-	ORGANIZATION = 4,
-	RESTRAINED = 5,
-	USER_DERIVED_START = 10,
-	USER_DERIVED_END = (UINT32_MAX / 2),
+    ZERO = 0,
+    NODE = 1,
+    NETWORK = 2,
+    BASE_USER = 3,
+    ORGANIZATION = 4,
+    RESTRAINED = 5,
+    USER_DERIVED_START = 10,
+    USER_DERIVED_END = (UINT32_MAX / 2),
 };
 
 /*## Modules #############################################################*/
 //The module ids are used to identify a module over the network
 //Numbers below 150 are standard defined, numbers obove this range are free to use for custom modules
 enum class ModuleId : u8 {
-	//Standard modules
-	NODE = 0, // Not a module per se, but why not let it send module messages
-	ADVERTISING_MODULE = 1,
-	SCANNING_MODULE = 2,
-	STATUS_REPORTER_MODULE = 3,
-	DFU_MODULE = 4,
-	ENROLLMENT_MODULE = 5,
-	IO_MODULE = 6,
-	DEBUG_MODULE = 7,
-	CONFIG = 8,
-	//BOARD_CONFIG = 9, //deprecated as of 20.01.2020 (boardconfig is not a module anymore)
-	MESH_ACCESS_MODULE = 10,
-	//MANAGEMENT_MODULE=11, //deprecated as of 22.05.2019
-	TESTING_MODULE = 12,
-	BULK_MODULE = 13,
+    //Standard modules
+    NODE = 0, // Not a module per se, but why not let it send module messages
+    ADVERTISING_MODULE = 1,
+    SCANNING_MODULE = 2,
+    STATUS_REPORTER_MODULE = 3,
+    DFU_MODULE = 4,
+    ENROLLMENT_MODULE = 5,
+    IO_MODULE = 6,
+    DEBUG_MODULE = 7,
+    CONFIG = 8,
+    //BOARD_CONFIG = 9, //deprecated as of 20.01.2020 (boardconfig is not a module anymore)
+    MESH_ACCESS_MODULE = 10,
+    //MANAGEMENT_MODULE=11, //deprecated as of 22.05.2019
+    TESTING_MODULE = 12,
+    BULK_MODULE = 13,
 
-	//M-way Modules
-	CLC_MODULE = 150,
-	VS_MODULE = 151,
-	ENOCEAN_MODULE = 152,
-	ASSET_MODULE = 153,
-	EINK_MODULE = 154,
-	WM_MODULE = 155,
-	ET_MODULE = 156, //Placeholder for Partner
-	MODBUS_MODULE = 157,
+    //M-way Modules
+    CLC_MODULE = 150,
+    VS_MODULE = 151,
+    ENOCEAN_MODULE = 152,
+    ASSET_MODULE = 153,
+    EINK_MODULE = 154,
+    WM_MODULE = 155,
+    ET_MODULE = 156, //Placeholder for Partner
+    MODBUS_MODULE = 157,
 
-	//Other Modules
-	MY_CUSTOM_MODULE = 200,
-	PING_MODULE = 201,
-	TEMPLATE_MODULE = 202,
-	SIG_EXAMPLE_MODULE = 203,
+    //Other Modules
+    MY_CUSTOM_MODULE = 200,
+    PING_MODULE = 201,
+    TEMPLATE_MODULE = 202,
+    SIG_EXAMPLE_MODULE = 203,
 
-	//Invalid Module: 0xFF is the flash memory default and is therefore invalid
-	INVALID_MODULE = 255,
+    //Invalid Module: 0xFF is the flash memory default and is therefore invalid
+    INVALID_MODULE = 255,
 };
 
 
 
 // The reason why the device was rebooted
 enum class RebootReason : u8 {
-	UNKNOWN = 0,
-	HARDFAULT = 1,
-	APP_FAULT = 2,
-	SD_FAULT = 3,
-	PIN_RESET = 4,
-	WATCHDOG = 5,
-	FROM_OFF_STATE = 6,
-	LOCAL_RESET = 7,
-	REMOTE_RESET = 8,
-	ENROLLMENT = 9,
-	PREFERRED_CONNECTIONS = 10,
-	DFU = 11,
-	MODULE_ALLOCATOR_OUT_OF_MEMORY = 12,
-	MEMORY_MANAGEMENT = 13,
-	BUS_FAULT = 14,
-	USAGE_FAULT = 15,
-	ENROLLMENT_REMOVE = 16,
-	FACTORY_RESET_FAILED = 17,
-	FACTORY_RESET_SUCCEEDED_FAILSAFE = 18,
-	SET_SERIAL_SUCCESS = 19,
-	SET_SERIAL_FAILED = 20,
-	SEND_TO_BOOTLOADER = 21,
-	UNKNOWN_BUT_BOOTED = 22,
-	STACK_OVERFLOW = 23,
+    UNKNOWN = 0,
+    HARDFAULT = 1,
+    APP_FAULT = 2,
+    SD_FAULT = 3,
+    PIN_RESET = 4,
+    WATCHDOG = 5,
+    FROM_OFF_STATE = 6,
+    LOCAL_RESET = 7,
+    REMOTE_RESET = 8,
+    ENROLLMENT = 9,
+    PREFERRED_CONNECTIONS = 10,
+    DFU = 11,
+    MODULE_ALLOCATOR_OUT_OF_MEMORY = 12,
+    MEMORY_MANAGEMENT = 13,
+    BUS_FAULT = 14,
+    USAGE_FAULT = 15,
+    ENROLLMENT_REMOVE = 16,
+    FACTORY_RESET_FAILED = 17,
+    FACTORY_RESET_SUCCEEDED_FAILSAFE = 18,
+    SET_SERIAL_SUCCESS = 19,
+    SET_SERIAL_FAILED = 20,
+    SEND_TO_BOOTLOADER = 21,
+    UNKNOWN_BUT_BOOTED = 22,
+    STACK_OVERFLOW = 23,
 
-	USER_DEFINED_START = 200,
-	USER_DEFINED_END = 255,
+    USER_DEFINED_START = 200,
+    USER_DEFINED_END = 255,
 };
 
 /*############ Live Report types ################*/
@@ -209,156 +209,156 @@ enum class RebootReason : u8 {
 //Could be some info, a warning or an error
 
 enum class LiveReportTypes : u8 {
-	LEVEL_ERROR = 0,
-	LEVEL_WARN = 50,
-	HANDSHAKED_MESH_DISCONNECTED = 51, //extra is partnerid, extra2 is appDisconnectReason
-	WARN_GAP_DISCONNECTED = 52, //extra is partnerid, extra2 is hci code
+    LEVEL_ERROR = 0,
+    LEVEL_WARN = 50,
+    HANDSHAKED_MESH_DISCONNECTED = 51, //extra is partnerid, extra2 is appDisconnectReason
+    WARN_GAP_DISCONNECTED = 52, //extra is partnerid, extra2 is hci code
 
-	//########
-	LEVEL_INFO = 100,
-	GAP_CONNECTED_INCOMING = 101, //extra is connHandle, extra2 is 4 bytes of gap addr
-	GAP_TRYING_AS_MASTER = 102, //extra is partnerId, extra2 is 4 bytes of gap addr
-	GAP_CONNECTED_OUTGOING = 103, //extra is connHandle, extra2 is 4 byte of gap addr
-	//Deprecated: GAP_DISCONNECTED = 104,
+    //########
+    LEVEL_INFO = 100,
+    GAP_CONNECTED_INCOMING = 101, //extra is connHandle, extra2 is 4 bytes of gap addr
+    GAP_TRYING_AS_MASTER = 102, //extra is partnerId, extra2 is 4 bytes of gap addr
+    GAP_CONNECTED_OUTGOING = 103, //extra is connHandle, extra2 is 4 byte of gap addr
+    //Deprecated: GAP_DISCONNECTED = 104,
 
-	HANDSHAKE_FAIL = 105, //extra is tempPartnerId, extra2 is handshakeFailCode
-	MESH_CONNECTED = 106, //extra is partnerid, extra2 is asWinner
-	//Deprecated: MESH_DISCONNECTED = 107,
+    HANDSHAKE_FAIL = 105, //extra is tempPartnerId, extra2 is handshakeFailCode
+    MESH_CONNECTED = 106, //extra is partnerid, extra2 is asWinner
+    //Deprecated: MESH_DISCONNECTED = 107,
 
-	//########
-	LEVEL_DEBUG = 150,
-	DECISION_RESULT = 151 //extra is decision type, extra2 is preferredPartner
+    //########
+    LEVEL_DEBUG = 150,
+    DECISION_RESULT = 151 //extra is decision type, extra2 is preferredPartner
 };
 
 enum class LiveReportHandshakeFailCode : u8
 {
-	SUCCESS,
-	SAME_CLUSTERID,
-	NETWORK_ID_MISMATCH,
-	WRONG_DIRECTION,
-	UNPREFERRED_CONNECTION
+    SUCCESS,
+    SAME_CLUSTERID,
+    NETWORK_ID_MISMATCH,
+    WRONG_DIRECTION,
+    UNPREFERRED_CONNECTION
 };
 
 enum class PinsetIdentifier : u16 {
-	UNKNOWN = 0,
-	BME280 = 1, //Barometer
-	LIS2DH12 = 2, //Accelerometer
-	TLV493D = 3, //Magnetometer
-	BMG250 = 4, //Gyroscope
-	GDEWO27W3 = 5, //Eink Display
+    UNKNOWN = 0,
+    BME280 = 1, //Barometer
+    LIS2DH12 = 2, //Accelerometer
+    TLV493D = 3, //Magnetometer
+    BMG250 = 4, //Gyroscope
+    GDEWO27W3 = 5, //Eink Display
 };
 
 struct CustomPins {
-	PinsetIdentifier pinsetIdentifier = PinsetIdentifier::UNKNOWN;
+    PinsetIdentifier pinsetIdentifier = PinsetIdentifier::UNKNOWN;
 };
 
 struct Bme280Pins : CustomPins {
-	i32 misoPin = -1;
-	i32 mosiPin = -1;
-	i32 sckPin = -1;
-	i32 ssPin = -1;
-	i32 sensorEnablePin = -1;
-	bool sensorEnablePinActiveHigh = true;
+    i32 misoPin = -1;
+    i32 mosiPin = -1;
+    i32 sckPin = -1;
+    i32 ssPin = -1;
+    i32 sensorEnablePin = -1;
+    bool sensorEnablePinActiveHigh = true;
 };
 
 struct Tlv493dPins : CustomPins {
-	i32 sckPin = -1;
-	i32 sdaPin = -1;
-	i32 sensorEnablePin = -1;
-	i32 twiEnablePin = -1;
-	bool sensorEnablePinActiveHigh = true;
-	bool twiEnablePinActiveHigh = true;
+    i32 sckPin = -1;
+    i32 sdaPin = -1;
+    i32 sensorEnablePin = -1;
+    i32 twiEnablePin = -1;
+    bool sensorEnablePinActiveHigh = true;
+    bool twiEnablePinActiveHigh = true;
 };
 
 struct Bmg250Pins : CustomPins {
-	i32 sckPin = -1;
-	i32 sdaPin = -1;
-	i32 interrupt1Pin = -1;
-	i32 sensorEnablePin = -1;//-1 if sensor enable pin is not present
-	i32 twiEnablePin = -1; // -1 if twi enable pin is not present
-	bool sensorEnablePinActiveHigh = true;
-	bool twiEnablePinActiveHigh = true;
+    i32 sckPin = -1;
+    i32 sdaPin = -1;
+    i32 interrupt1Pin = -1;
+    i32 sensorEnablePin = -1;//-1 if sensor enable pin is not present
+    i32 twiEnablePin = -1; // -1 if twi enable pin is not present
+    bool sensorEnablePinActiveHigh = true;
+    bool twiEnablePinActiveHigh = true;
 };
 
 struct Lis2dh12Pins : CustomPins {
-	i32 mosiPin = -1;
-	i32 misoPin = -1;
-	i32 sckPin = -1;
-	i32 ssPin = -1;
-	i32 sdaPin = -1;//if lis2dh12 is attached to twi interface then we use only sda and sck pin
-	i32 interrupt1Pin = -1;//FiFo interrupt is on pin 1
-	i32 interrupt2Pin = -1;//movement detection interrupt is on pin 2
-	i32 sensorEnablePin = -1;//if equal to -1 means that enable Pin is not present
-	bool sensorEnablePinActiveHigh = true;
+    i32 mosiPin = -1;
+    i32 misoPin = -1;
+    i32 sckPin = -1;
+    i32 ssPin = -1;
+    i32 sdaPin = -1;//if lis2dh12 is attached to twi interface then we use only sda and sck pin
+    i32 interrupt1Pin = -1;//FiFo interrupt is on pin 1
+    i32 interrupt2Pin = -1;//movement detection interrupt is on pin 2
+    i32 sensorEnablePin = -1;//if equal to -1 means that enable Pin is not present
+    bool sensorEnablePinActiveHigh = true;
 };
 
 struct Gdewo27w3Pins : CustomPins {
-	i32 dcPin = -1;
-	i32 mosiPin = -1;
-	i32 sckPin = -1;
-	i32 ssPin = -1;
-	i32 resPin = -1;
-	i32 busyPin = -1;
-	i32 epdEnablePin = -1;
-	bool epdEnablePinActiveHigh = true;
+    i32 dcPin = -1;
+    i32 mosiPin = -1;
+    i32 sckPin = -1;
+    i32 ssPin = -1;
+    i32 resPin = -1;
+    i32 busyPin = -1;
+    i32 epdEnablePin = -1;
+    bool epdEnablePinActiveHigh = true;
 };
 
 //A struct that combines a data pointer and the accompanying length
 struct SizedData {
-	u8*		data; //Pointer to data
-	u16		length; //Length of Data
+    u8*        data; //Pointer to data
+    u16        length; //Length of Data
 };
 
 template<typename T>
 struct TwoDimStruct
 {
-	T x;
-	T y;
+    T x;
+    T y;
 };
 
 template<typename T>
 struct ThreeDimStruct
 {
-	T x;
-	T y;
-	T z;
+    T x;
+    T y;
+    T z;
 };
 
 // To determine from which location the node config was loaded
 enum class DeviceConfigOrigins : u8 {
-	RANDOM_CONFIG = 0,
-	UICR_CONFIG = 1,
-	TESTDEVICE_CONFIG = 2
+    RANDOM_CONFIG = 0,
+    UICR_CONFIG = 1,
+    TESTDEVICE_CONFIG = 2
 };
 
 // The different kind of nodes supported by FruityMesh
 enum class DeviceType : u8 {
-	INVALID = 0,
-	STATIC = 1, // A normal node that remains static at one position
-	ROAMING = 2, // A node that is moving constantly or often (not implemented)
-	SINK = 3, // A static node that wants to acquire data, e.g. a MeshGateway
-	ASSET = 4, // A roaming node that is sporadically or never connected but broadcasts data
-	LEAF = 5  // A node that will never act as a slave but will only connect as a master (useful for roaming nodes, but no relaying possible)
+    INVALID = 0,
+    STATIC = 1, // A normal node that remains static at one position
+    ROAMING = 2, // A node that is moving constantly or often (not implemented)
+    SINK = 3, // A static node that wants to acquire data, e.g. a MeshGateway
+    ASSET = 4, // A roaming node that is sporadically or never connected but broadcasts data
+    LEAF = 5  // A node that will never act as a slave but will only connect as a master (useful for roaming nodes, but no relaying possible)
 };
 
 // The different terminal modes
 enum class TerminalMode : u8 {
-	JSON = 0, //Interrupt based terminal input and blocking output
-	PROMPT = 1, //blockin in and out with echo and backspace options
-	DISABLED = 2 //Terminal is disabled, no in and output
+    JSON = 0, //Interrupt based terminal input and blocking output
+    PROMPT = 1, //blockin in and out with echo and backspace options
+    DISABLED = 2 //Terminal is disabled, no in and output
 };
 
 //Enrollment states
 enum class EnrollmentState : u8 {
-	NOT_ENROLLED = 0,
-	ENROLLED = 1
+    NOT_ENROLLED = 0,
+    ENROLLED = 1
 };
 
 //These codes are returned from the PreEnrollmentHandler
 enum class PreEnrollmentReturnCode : u8 {
-	DONE = 0, //PreEnrollment of the Module was either not necessary or successfully done
-	WAITING = 1, //PreEnrollment must do asynchronous work and will afterwards call the PreEnrollmentDispatcher
-	FAILED = 2 //PreEnrollment was not successfuly, so enrollment should continue
+    DONE = 0, //PreEnrollment of the Module was either not necessary or successfully done
+    WAITING = 1, //PreEnrollment must do asynchronous work and will afterwards call the PreEnrollmentDispatcher
+    FAILED = 2 //PreEnrollment was not successfuly, so enrollment should continue
 };
 
 //Used for intercepting messages befoure they are routed through the mesh
@@ -368,141 +368,141 @@ constexpr RoutingDecision ROUTING_DECISION_BLOCK_TO_MESH_ACCESS = 0x2;
 
 //Defines the different scanning intervals for each state
 enum class ScanState : u8 {
-	LOW = 0,
-	HIGH = 1,
-	CUSTOM = 2,
+    LOW = 0,
+    HIGH = 1,
+    CUSTOM = 2,
 };
 
 // Mesh discovery states
 enum class DiscoveryState : u8 {
-	INVALID = 0,
-	HIGH = 1, // Scanning and advertising at a high duty cycle
-	LOW = 2, // Scanning and advertising at a low duty cycle
-	OFF = 3, // Scanning and advertising not enabled by the node to save power (Other modules might still advertise or scan)
+    INVALID = 0,
+    HIGH = 1, // Scanning and advertising at a high duty cycle
+    LOW = 2, // Scanning and advertising at a low duty cycle
+    OFF = 3, // Scanning and advertising not enabled by the node to save power (Other modules might still advertise or scan)
 };
 
 //All known Subtypes of BaseConnection supported by the ConnectionManager
 enum class ConnectionType : u8 {
-	INVALID = 0,
-	FRUITYMESH = 1, // A mesh connection
-	APP = 2, // Base class of a customer specific connection (deprecated)
-	CLC_APP = 3,
-	RESOLVER = 4, // Resolver connection used to determine the correct connection
-	MESH_ACCESS = 5, // MeshAccessConnection
+    INVALID = 0,
+    FRUITYMESH = 1, // A mesh connection
+    APP = 2, // Base class of a customer specific connection (deprecated)
+    CLC_APP = 3,
+    RESOLVER = 4, // Resolver connection used to determine the correct connection
+    MESH_ACCESS = 5, // MeshAccessConnection
 };
 
 //This enum defines packet authorization for MeshAccessConnetions
 //First auth is undetermined, then rights decrease until the last entry, biggest entry num has preference always
 enum class MeshAccessAuthorization : u8 {
-	UNDETERMINED = 0, //Packet was not checked by any module
-	WHITELIST = 1, //Packet was whitelisted by a module
-	LOCAL_ONLY = 2, //Packet must only be processed by the receiving node and not by the mesh
-	BLACKLIST = 3, //Packet was blacklisted by a module (This always wins over whitelisted)
+    UNDETERMINED = 0, //Packet was not checked by any module
+    WHITELIST = 1, //Packet was whitelisted by a module
+    LOCAL_ONLY = 2, //Packet must only be processed by the receiving node and not by the mesh
+    BLACKLIST = 3, //Packet was blacklisted by a module (This always wins over whitelisted)
 };
 
 //Led mode that defines what the LED does (mainly for debugging)
 enum class LedMode : u8 {
-	OFF = 0, // Led is off
-	ON = 1, // Led is constantly on
-	CONNECTIONS = 2, // Led blinks red if not connected and green for the number of connections
-	RADIO = 3, // Led shows radio activity
-	CLUSTERING = 4, // Led colour chosen according to clusterId (deprecated)
-	ASSET = 5,
-	CUSTOM = 6, // Led controlled by a specific module
+    OFF = 0, // Led is off
+    ON = 1, // Led is constantly on
+    CONNECTIONS = 2, // Led blinks red if not connected and green for the number of connections
+    RADIO = 3, // Led shows radio activity
+    CLUSTERING = 4, // Led colour chosen according to clusterId (deprecated)
+    ASSET = 5,
+    CUSTOM = 6, // Led controlled by a specific module
 };
 
 //DFU ERROR CODES
 enum class DfuStartDfuResponseCode : u8
 {
-	OK = 0,
-	SAME_VERSION = 1,
-	RUNNING_NEWER_VERSION = 2,
-	ALREADY_IN_PROGRESS = 3,
-	NO_BOOTLOADER = 4,
-	FLASH_BUSY = 5,
-	NOT_ENOUGH_SPACE = 6,
-	CHUNKS_TOO_BIG = 7,
-	MODULE_NOT_AVAILABLE = 8,
-	MODULE_NOT_UPDATABLE = 9,
-	COMPONENT_NOT_UPDATEABLE = 10,
-	MODULE_QUERY_WAITING = 11, //Special code that is used internally if a module queries another controller and continues the process later
-	TOO_MANY_CHUNKS = 12,
+    OK = 0,
+    SAME_VERSION = 1,
+    RUNNING_NEWER_VERSION = 2,
+    ALREADY_IN_PROGRESS = 3,
+    NO_BOOTLOADER = 4,
+    FLASH_BUSY = 5,
+    NOT_ENOUGH_SPACE = 6,
+    CHUNKS_TOO_BIG = 7,
+    MODULE_NOT_AVAILABLE = 8,
+    MODULE_NOT_UPDATABLE = 9,
+    COMPONENT_NOT_UPDATEABLE = 10,
+    MODULE_QUERY_WAITING = 11, //Special code that is used internally if a module queries another controller and continues the process later
+    TOO_MANY_CHUNKS = 12,
 };
 
 enum class NO_DISCARD ErrorType : u32
 {
-	SUCCESS = 0,  ///< Successful command
-	SVC_HANDLER_MISSING = 1,  ///< SVC handler is missing
-	BLE_STACK_NOT_ENABLED = 2,  ///< Ble stack has not been enabled
-	INTERNAL = 3,  ///< Internal Error
-	NO_MEM = 4,  ///< No Memory for operation
-	NOT_FOUND = 5,  ///< Not found
-	NOT_SUPPORTED = 6,  ///< Not supported
-	INVALID_PARAM = 7,  ///< Invalid Parameter
-	INVALID_STATE = 8,  ///< Invalid state, operation disallowed in this state
-	INVALID_LENGTH = 9,  ///< Invalid Length
-	INVALID_FLAGS = 10, ///< Invalid Flags
-	INVALID_DATA = 11, ///< Invalid Data
-	DATA_SIZE = 12, ///< Data size exceeds limit
-	TIMEOUT = 13, ///< Operation timed out
-	NULL_ERROR = 14, ///< Null Pointer
-	FORBIDDEN = 15, ///< Forbidden Operation
-	INVALID_ADDR = 16, ///< Bad Memory Address
-	BUSY = 17, ///< Busy
-	CONN_COUNT = 18, ///< Connection Count exceeded
-	RESOURCES = 19, ///< Not enough resources for operation
-	UNKNOWN = 20,
-	BLE_INVALID_CONN_HANDLE = 101,
-	BLE_INVALID_ATTR_HANDLE = 102,
-	BLE_NO_TX_PACKETS = 103,
-	BLE_INVALID_ROLE = 104,
-	BLE_INVALID_ATTR_TYPE = 105,
-	BLE_SYS_ATTR_MISSING = 106,
-	BLE_INVALID_BLE_ADDR = 107,
+    SUCCESS = 0,  ///< Successful command
+    SVC_HANDLER_MISSING = 1,  ///< SVC handler is missing
+    BLE_STACK_NOT_ENABLED = 2,  ///< Ble stack has not been enabled
+    INTERNAL = 3,  ///< Internal Error
+    NO_MEM = 4,  ///< No Memory for operation
+    NOT_FOUND = 5,  ///< Not found
+    NOT_SUPPORTED = 6,  ///< Not supported
+    INVALID_PARAM = 7,  ///< Invalid Parameter
+    INVALID_STATE = 8,  ///< Invalid state, operation disallowed in this state
+    INVALID_LENGTH = 9,  ///< Invalid Length
+    INVALID_FLAGS = 10, ///< Invalid Flags
+    INVALID_DATA = 11, ///< Invalid Data
+    DATA_SIZE = 12, ///< Data size exceeds limit
+    TIMEOUT = 13, ///< Operation timed out
+    NULL_ERROR = 14, ///< Null Pointer
+    FORBIDDEN = 15, ///< Forbidden Operation
+    INVALID_ADDR = 16, ///< Bad Memory Address
+    BUSY = 17, ///< Busy
+    CONN_COUNT = 18, ///< Connection Count exceeded
+    RESOURCES = 19, ///< Not enough resources for operation
+    UNKNOWN = 20,
+    BLE_INVALID_CONN_HANDLE = 101,
+    BLE_INVALID_ATTR_HANDLE = 102,
+    BLE_NO_TX_PACKETS = 103,
+    BLE_INVALID_ROLE = 104,
+    BLE_INVALID_ATTR_TYPE = 105,
+    BLE_SYS_ATTR_MISSING = 106,
+    BLE_INVALID_BLE_ADDR = 107,
 };
 
 enum class ErrorTypeUnchecked : std::underlying_type<ErrorType>::type {
-	SUCCESS =                 (u32)ErrorType::SUCCESS,
-	SVC_HANDLER_MISSING =     (u32)ErrorType::SVC_HANDLER_MISSING,
-	BLE_STACK_NOT_ENABLED =   (u32)ErrorType::BLE_STACK_NOT_ENABLED,
-	INTERNAL =                (u32)ErrorType::INTERNAL,
-	NO_MEM =                  (u32)ErrorType::NO_MEM,
-	NOT_FOUND =               (u32)ErrorType::NOT_FOUND,
-	NOT_SUPPORTED =           (u32)ErrorType::NOT_SUPPORTED,
-	INVALID_PARAM =           (u32)ErrorType::INVALID_PARAM,
-	INVALID_STATE =           (u32)ErrorType::INVALID_STATE,
-	INVALID_LENGTH =          (u32)ErrorType::INVALID_LENGTH,
-	INVALID_FLAGS =           (u32)ErrorType::INVALID_FLAGS,
-	INVALID_DATA =            (u32)ErrorType::INVALID_DATA,
-	DATA_SIZE =               (u32)ErrorType::DATA_SIZE,
-	TIMEOUT =                 (u32)ErrorType::TIMEOUT,
-	NULL_ERROR =              (u32)ErrorType::NULL_ERROR,
-	FORBIDDEN =               (u32)ErrorType::FORBIDDEN,
-	INVALID_ADDR =            (u32)ErrorType::INVALID_ADDR,
-	BUSY =                    (u32)ErrorType::BUSY,
-	CONN_COUNT =              (u32)ErrorType::CONN_COUNT,
-	RESOURCES =               (u32)ErrorType::RESOURCES,
-	UNKNOWN =                 (u32)ErrorType::UNKNOWN,
-	BLE_INVALID_CONN_HANDLE = (u32)ErrorType::BLE_INVALID_CONN_HANDLE,
-	BLE_INVALID_ATTR_HANDLE = (u32)ErrorType::BLE_INVALID_ATTR_HANDLE,
-	BLE_NO_TX_PACKETS =       (u32)ErrorType::BLE_NO_TX_PACKETS,
-	BLE_INVALID_ROLE =        (u32)ErrorType::BLE_INVALID_ROLE,
-	BLE_INVALID_ATTR_TYPE =   (u32)ErrorType::BLE_INVALID_ATTR_TYPE,
-	BLE_SYS_ATTR_MISSING =    (u32)ErrorType::BLE_SYS_ATTR_MISSING,
-	BLE_INVALID_BLE_ADDR =    (u32)ErrorType::BLE_INVALID_BLE_ADDR,
+    SUCCESS =                 (u32)ErrorType::SUCCESS,
+    SVC_HANDLER_MISSING =     (u32)ErrorType::SVC_HANDLER_MISSING,
+    BLE_STACK_NOT_ENABLED =   (u32)ErrorType::BLE_STACK_NOT_ENABLED,
+    INTERNAL =                (u32)ErrorType::INTERNAL,
+    NO_MEM =                  (u32)ErrorType::NO_MEM,
+    NOT_FOUND =               (u32)ErrorType::NOT_FOUND,
+    NOT_SUPPORTED =           (u32)ErrorType::NOT_SUPPORTED,
+    INVALID_PARAM =           (u32)ErrorType::INVALID_PARAM,
+    INVALID_STATE =           (u32)ErrorType::INVALID_STATE,
+    INVALID_LENGTH =          (u32)ErrorType::INVALID_LENGTH,
+    INVALID_FLAGS =           (u32)ErrorType::INVALID_FLAGS,
+    INVALID_DATA =            (u32)ErrorType::INVALID_DATA,
+    DATA_SIZE =               (u32)ErrorType::DATA_SIZE,
+    TIMEOUT =                 (u32)ErrorType::TIMEOUT,
+    NULL_ERROR =              (u32)ErrorType::NULL_ERROR,
+    FORBIDDEN =               (u32)ErrorType::FORBIDDEN,
+    INVALID_ADDR =            (u32)ErrorType::INVALID_ADDR,
+    BUSY =                    (u32)ErrorType::BUSY,
+    CONN_COUNT =              (u32)ErrorType::CONN_COUNT,
+    RESOURCES =               (u32)ErrorType::RESOURCES,
+    UNKNOWN =                 (u32)ErrorType::UNKNOWN,
+    BLE_INVALID_CONN_HANDLE = (u32)ErrorType::BLE_INVALID_CONN_HANDLE,
+    BLE_INVALID_ATTR_HANDLE = (u32)ErrorType::BLE_INVALID_ATTR_HANDLE,
+    BLE_NO_TX_PACKETS =       (u32)ErrorType::BLE_NO_TX_PACKETS,
+    BLE_INVALID_ROLE =        (u32)ErrorType::BLE_INVALID_ROLE,
+    BLE_INVALID_ATTR_TYPE =   (u32)ErrorType::BLE_INVALID_ATTR_TYPE,
+    BLE_SYS_ATTR_MISSING =    (u32)ErrorType::BLE_SYS_ATTR_MISSING,
+    BLE_INVALID_BLE_ADDR =    (u32)ErrorType::BLE_INVALID_BLE_ADDR,
 };
 
 struct DeviceConfiguration {
-	u32 magicNumber;           // must be set to 0xF07700 when UICR data is available
-	u32 boardType;             // accepts an integer that defines the hardware board that fruitymesh should be running on
-	u32 serialNumber[2];       // Deprecated (since 12.05.2020), should be set to FFF...FFF and is now generated from the serialNumberIndex (2 words)
-	u32 nodeKey[4];            // randomly generated (4 words)
-	u32 manufacturerId;        // set to manufacturer id according to the BLE company identifiers: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
-	u32 defaultNetworkId;      // network id if preenrollment should be used
-	u32 defaultNodeId;         // node id to be used if not enrolled
-	u32 deviceType;            // type of device (sink, mobile, etc,..)
-	u32 serialNumberIndex;     // unique index that represents the serial number
-	u32 networkKey[4];         // default network key if preenrollment should be used (4 words)
+    u32 magicNumber;           // must be set to 0xF07700 when UICR data is available
+    u32 boardType;             // accepts an integer that defines the hardware board that fruitymesh should be running on
+    u32 serialNumber[2];       // Deprecated (since 12.05.2020), should be set to FFF...FFF and is now generated from the serialNumberIndex (2 words)
+    u32 nodeKey[4];            // randomly generated (4 words)
+    u32 manufacturerId;        // set to manufacturer id according to the BLE company identifiers: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
+    u32 defaultNetworkId;      // network id if preenrollment should be used
+    u32 defaultNodeId;         // node id to be used if not enrolled
+    u32 deviceType;            // type of device (sink, mobile, etc,..)
+    u32 serialNumberIndex;     // unique index that represents the serial number
+    u32 networkKey[4];         // default network key if preenrollment should be used (4 words)
 };
 
 //This struct represents the registers as dumped on the stack
@@ -510,13 +510,13 @@ struct DeviceConfiguration {
 #pragma pack(push, 4)
 struct stacked_regs_t
 {
-	uint32_t r0;
-	uint32_t r1;
-	uint32_t r2;
-	uint32_t r3;
-	uint32_t r12;
-	uint32_t lr;
-	uint32_t pc;
-	uint32_t psr;
+    uint32_t r0;
+    uint32_t r1;
+    uint32_t r2;
+    uint32_t r3;
+    uint32_t r12;
+    uint32_t lr;
+    uint32_t pc;
+    uint32_t psr;
 };
 #pragma pack(pop)

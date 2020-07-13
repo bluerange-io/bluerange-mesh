@@ -38,53 +38,53 @@ u32 StackWatcher::disableValue = 0;
 
 void StackWatcher::check()
 {
-	if (stackBase.size() == 0)
-	{
-		//Test is disabled if no stack base is set.
-		return;
-	}
-	if (StackWatcher::disableValue != 0)
-	{
-		return;
-	}
+    if (stackBase.size() == 0)
+    {
+        //Test is disabled if no stack base is set.
+        return;
+    }
+    if (StackWatcher::disableValue != 0)
+    {
+        return;
+    }
 
-	int someDummyStackVariable = 0;
+    int someDummyStackVariable = 0;
 
-	const u32 uncleanedStackSize = (const char*)StackWatcher::stackBase.back() - (const char*)&someDummyStackVariable;
-	const u32 cleanedStackSize = uncleanedStackSize - sizeof(StackBaseSetter);
+    const u32 uncleanedStackSize = (const char*)StackWatcher::stackBase.back() - (const char*)&someDummyStackVariable;
+    const u32 cleanedStackSize = uncleanedStackSize - sizeof(StackBaseSetter);
 
-	if (cleanedStackSize > 10000)
-	{
+    if (cleanedStackSize > 10000)
+    {
 #if !defined(GITHUB_RELEASE) && !defined(__clang__)
-		SIMEXCEPTION(StackOverflowException);
+        SIMEXCEPTION(StackOverflowException);
 #else
-		//The "GITHUB_RELEASE" configuration executes only github featuresets which, by definition, consume much more RAM.
-		//__clang__ has vastly different stack frames and is thus not supported as well. As this is just a sanity check,
-		//supporting one compiler for the pipeline and one for local runs is sufficient.
+        //The "GITHUB_RELEASE" configuration executes only github featuresets which, by definition, consume much more RAM.
+        //__clang__ has vastly different stack frames and is thus not supported as well. As this is just a sanity check,
+        //supporting one compiler for the pipeline and one for local runs is sufficient.
 #endif //GITHUB_RELEASE
-	}
+    }
 }
 
 StackBaseSetter::StackBaseSetter()
 {
-	const int someDummyStackVariable = 0;
-	// Suppressing the following check is okay because we don't dereference the pointer
-	// given to the container anywhere. We just care about value of the pointer itself.
-	// cppcheck-suppress danglingLifetime
-	StackWatcher::stackBase.push_back(&someDummyStackVariable);
+    const int someDummyStackVariable = 0;
+    // Suppressing the following check is okay because we don't dereference the pointer
+    // given to the container anywhere. We just care about value of the pointer itself.
+    // cppcheck-suppress danglingLifetime
+    StackWatcher::stackBase.push_back(&someDummyStackVariable);
 }
 
 StackBaseSetter::~StackBaseSetter()
 {
-	StackWatcher::stackBase.pop_back();
+    StackWatcher::stackBase.pop_back();
 }
 
 StackWatcherDisabler::StackWatcherDisabler()
 {
-	StackWatcher::disableValue++;
+    StackWatcher::disableValue++;
 }
 
 StackWatcherDisabler::~StackWatcherDisabler()
 {
-	StackWatcher::disableValue--;
+    StackWatcher::disableValue--;
 }

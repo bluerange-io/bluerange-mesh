@@ -37,38 +37,38 @@
 //This test checks a normal clustering for the number of packets sent and makes sure that these are
 //not exceeded and that no unnecessary packets are sent
 TEST(TestStatistics, TestNumberClusteringMessagesSent) {
-	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 
-	simConfig.enableSimStatistics = true;
+    simConfig.enableSimStatistics = true;
 
-	//testerConfig.verbose = true;
-	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
-	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9});
-	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-	tester.Start();
+    //testerConfig.verbose = true;
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9});
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
 
-	tester.SimulateUntilClusteringDone(60 * 1000);
+    tester.SimulateUntilClusteringDone(60 * 1000);
 
-	//Calculate the statistic for all messages routed by all nodes summed up
-	PacketStat stat[PACKET_STAT_SIZE];
-	for (u32 i = 0; i < tester.sim->getTotalNodes(); i++) {
-		for (u32 j = 0; j < PACKET_STAT_SIZE; j++) {
-			tester.sim->AddPacketToStats(stat, tester.sim->nodes[i].routedPackets + j);
-		}
-	}
+    //Calculate the statistic for all messages routed by all nodes summed up
+    PacketStat stat[PACKET_STAT_SIZE];
+    for (u32 i = 0; i < tester.sim->getTotalNodes(); i++) {
+        for (u32 j = 0; j < PACKET_STAT_SIZE; j++) {
+            tester.sim->AddPacketToStats(stat, tester.sim->nodes[i].routedPackets + j);
+        }
+    }
 
-	//We check for all known message types with some min and max values
-	checkAndClearStat(stat, MessageType::CLUSTER_WELCOME, 10, 100); //This check surpasses 50 cases. See IOT-3997
-	checkAndClearStat(stat, MessageType::CLUSTER_ACK_1, 10, 50);
-	checkAndClearStat(stat, MessageType::CLUSTER_ACK_2, 10, 50);
-	checkAndClearStat(stat, MessageType::CLUSTER_INFO_UPDATE, 10, 200);
+    //We check for all known message types with some min and max values
+    checkAndClearStat(stat, MessageType::CLUSTER_WELCOME, 10, 100); //This check surpasses 50 cases. See IOT-3997
+    checkAndClearStat(stat, MessageType::CLUSTER_ACK_1, 10, 50);
+    checkAndClearStat(stat, MessageType::CLUSTER_ACK_2, 10, 50);
+    checkAndClearStat(stat, MessageType::CLUSTER_INFO_UPDATE, 10, 200);
 
-	//This check surpassed 400 cases. See IOT-3997
-	checkAndClearStat(stat, MessageType::MODULE_GENERAL, 10, 800, ModuleId::STATUS_REPORTER_MODULE, (u8)StatusReporterModule::StatusModuleGeneralMessages::LIVE_REPORT);
+    //This check surpassed 400 cases. See IOT-3997
+    checkAndClearStat(stat, MessageType::MODULE_GENERAL, 10, 800, ModuleId::STATUS_REPORTER_MODULE, (u8)StatusReporterModule::StatusModuleGeneralMessages::LIVE_REPORT);
 
-	//After checking for all expected messages, the stat should be empty
-	checkStatEmpty(stat);
+    //After checking for all expected messages, the stat should be empty
+    checkStatEmpty(stat);
 }
 
 //#################################### Helpers for Statistic Tests #######################################
@@ -76,32 +76,32 @@ TEST(TestStatistics, TestNumberClusteringMessagesSent) {
 //Helper function that checks a given message type for a maximum count and clears it if it was ok
 void checkAndClearStat(PacketStat* stat, MessageType mt, u32 minCount /*= 0*/, u32 maxCount /*= UINT32_MAX*/, ModuleId moduleId /*= ModuleId::INVALID_MODULE*/, u8 actionType /*= 0*/)
 {
-	for (u32 i = 0; i < PACKET_STAT_SIZE; i++) {
-		PacketStat* entry = stat + i;
-		if (entry->messageType == mt) {
-			if (moduleId == ModuleId::INVALID_MODULE || (moduleId == entry->moduleId && actionType == entry->actionType)) {
-				if (entry->count < minCount) SIMEXCEPTION(IllegalStateException);
-				if (entry->count > maxCount) SIMEXCEPTION(IllegalStateException);
-				entry->messageType = MessageType::INVALID;
-			}
-		}
-	}
+    for (u32 i = 0; i < PACKET_STAT_SIZE; i++) {
+        PacketStat* entry = stat + i;
+        if (entry->messageType == mt) {
+            if (moduleId == ModuleId::INVALID_MODULE || (moduleId == entry->moduleId && actionType == entry->actionType)) {
+                if (entry->count < minCount) SIMEXCEPTION(IllegalStateException);
+                if (entry->count > maxCount) SIMEXCEPTION(IllegalStateException);
+                entry->messageType = MessageType::INVALID;
+            }
+        }
+    }
 }
 
 //Useful for clearing a statistic e.g. after clustering to only check newly sent packets after some action
 void clearStat(PacketStat* stat)
 {
-	for (u32 i = 0; i < PACKET_STAT_SIZE; i++) {
-		PacketStat* entry = stat + i;
-		entry->messageType = MessageType::INVALID;
-	}
+    for (u32 i = 0; i < PACKET_STAT_SIZE; i++) {
+        PacketStat* entry = stat + i;
+        entry->messageType = MessageType::INVALID;
+    }
 }
 
 //After checking and clearing all stat entries we can check if it is empty with this function
 void checkStatEmpty(PacketStat* stat)
 {
-	for (u32 i = 0; i < PACKET_STAT_SIZE; i++) {
-		PacketStat* entry = stat + i;
-		if (entry->messageType != MessageType::INVALID) SIMEXCEPTION(IllegalStateException);
-	}
+    for (u32 i = 0; i < PACKET_STAT_SIZE; i++) {
+        PacketStat* entry = stat + i;
+        if (entry->messageType != MessageType::INVALID) SIMEXCEPTION(IllegalStateException);
+    }
 }

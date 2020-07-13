@@ -47,43 +47,43 @@
 */
 class ConnectionAllocator {
 private:
-	union AnyConnection
-	{
-		AnyConnection* nextConnection;
+    union AnyConnection
+    {
+        AnyConnection* nextConnection;
 
-		MeshConnection meshConnection;
-		ResolverConnection resolverConnection;
-		MeshAccessConnection meshAccessConnection;
+        MeshConnection meshConnection;
+        ResolverConnection resolverConnection;
+        MeshAccessConnection meshAccessConnection;
 #ifndef GITHUB_RELEASE
 #if IS_ACTIVE(CLC_CONN)
-		ClcAppConnection clcAppConnection;
+        ClcAppConnection clcAppConnection;
 #endif
 #endif //GITHUB_RELEASE
-		AnyConnection() { /*do nothing*/ }
-		~AnyConnection() {/*do nothing*/ } //LCOV_EXCL_LINE C++ deletes a destructor by default. MSVC issues a warning for it.
-										  //This surpresses it. However, it is never executed.
-	};
+        AnyConnection() { /*do nothing*/ }
+        ~AnyConnection() {/*do nothing*/ } //LCOV_EXCL_LINE C++ deletes a destructor by default. MSVC issues a warning for it.
+                                          //This surpresses it. However, it is never executed.
+    };
 
-	static constexpr AnyConnection* NO_NEXT_CONNECTION = nullptr;
-	std::array<AnyConnection, TOTAL_NUM_CONNECTIONS + 1> data{};	//Max + one resolver connection.
-	AnyConnection* dataHead = NO_NEXT_CONNECTION;
+    static constexpr AnyConnection* NO_NEXT_CONNECTION = nullptr;
+    std::array<AnyConnection, TOTAL_NUM_CONNECTIONS + 1> data{};    //Max + one resolver connection.
+    AnyConnection* dataHead = NO_NEXT_CONNECTION;
 
-	AnyConnection* allocateMemory();
+    AnyConnection* allocateMemory();
 
 
 public:
-	ConnectionAllocator();
-	static ConnectionAllocator& getInstance();
+    ConnectionAllocator();
+    static ConnectionAllocator& getInstance();
 
 
-	MeshConnection*       allocateMeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, u16 partnerWriteCharacteristicHandle);
-	ResolverConnection*   allocateResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
-	MeshAccessConnection* allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualPartnerId);
+    MeshConnection*       allocateMeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, u16 partnerWriteCharacteristicHandle);
+    ResolverConnection*   allocateResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
+    MeshAccessConnection* allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualPartnerId);
 #if IS_ACTIVE(CLC_CONN)
 #ifndef GITHUB_RELEASE
-	ClcAppConnection*     allocateClcAppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
+    ClcAppConnection*     allocateClcAppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
 #endif //GITHUB_RELEASE
 #endif
 
-	void deallocate(BaseConnection* bc);
+    void deallocate(BaseConnection* bc);
 };

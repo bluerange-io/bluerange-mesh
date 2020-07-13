@@ -50,27 +50,27 @@ constexpr int ASSET_PACKET_RSSI_SEND_THRESHOLD = -88;
 constexpr int SCAN_BUFFERS_SIZE = 10; //Max number of packets that are buffered
 
 enum class GroupingType : u8 {
-	GROUP_BY_ADDRESS =1, 
-	NO_GROUPING      =2,
+    GROUP_BY_ADDRESS =1, 
+    NO_GROUPING      =2,
 };
 
 typedef struct
 {
-	u8 active;
-	GroupingType grouping;
-	FruityHal::BleGapAddr address;
-	i8 minRSSI;
-	i8 maxRSSI;
-	u8 advertisingType;
-	std::array<u8, 31> byteMask;
-	std::array<u8, 31> mandatory;
+    u8 active;
+    GroupingType grouping;
+    FruityHal::BleGapAddr address;
+    i8 minRSSI;
+    i8 maxRSSI;
+    u8 advertisingType;
+    std::array<u8, 31> byteMask;
+    std::array<u8, 31> mandatory;
 
 } scanFilterEntry;
 
 #pragma pack(push, 1)
 //Module configuration that is saved persistently
 struct ScanningModuleConfiguration : ModuleConfiguration{
-	//Insert more persistent config values here
+    //Insert more persistent config values here
 };
 #pragma pack(pop)
 
@@ -85,199 +85,199 @@ struct ScanningModuleConfiguration : ModuleConfiguration{
 class ScanningModule : public Module
 {
 private:
-	static constexpr u16 groupedReportingIntervalDs = 0;
-	/*
-	 * Filters coud be:
-	 * 	- group all filtered packets by address and sum their RSSI and count
-	 * 	- scan for specific packets and send them back
-	 * 	-
-	 *
-	 * */
+    static constexpr u16 groupedReportingIntervalDs = 0;
+    /*
+     * Filters coud be:
+     *     - group all filtered packets by address and sum their RSSI and count
+     *     - scan for specific packets and send them back
+     *     -
+     *
+     * */
 
-	struct RssiContainer
-	{
-		u8 rssi37;
-		u8 rssi38;
-		u8 rssi39;
-		u8 count;
-		u16 channelCount[3];
-	};
+    struct RssiContainer
+    {
+        u8 rssi37;
+        u8 rssi38;
+        u8 rssi39;
+        u8 count;
+        u16 channelCount[3];
+    };
 
-	//Storage for advertising packets
-	struct ScannedAssetTrackingStorage
-	{
-		RssiContainer rssiContainer;
-		u32 serialNumberIndex;
-		NodeId nodeId;
-		u8 speed;
-		u16 pressure;
-		u8 hasFreeInConnection : 1;
-		u8 interestedInConnection : 1;
-		u8 hasSameNetworkId : 1;
-		u8 reservedBits : 5;
-	};
+    //Storage for advertising packets
+    struct ScannedAssetTrackingStorage
+    {
+        RssiContainer rssiContainer;
+        u32 serialNumberIndex;
+        NodeId nodeId;
+        u8 speed;
+        u16 pressure;
+        u8 hasFreeInConnection : 1;
+        u8 interestedInConnection : 1;
+        u8 hasSameNetworkId : 1;
+        u8 reservedBits : 5;
+    };
 
-	std::array<ScannedAssetTrackingStorage, ASSET_PACKET_BUFFER_SIZE> assetPackets{};
+    std::array<ScannedAssetTrackingStorage, ASSET_PACKET_BUFFER_SIZE> assetPackets{};
 
-	typedef struct
-	{
-		FruityHal::BleGapAddr address;
-		u32 rssiSum;
-		u16 count;
-	} scannedPacket;
+    typedef struct
+    {
+        FruityHal::BleGapAddr address;
+        u32 rssiSum;
+        u16 count;
+    } scannedPacket;
 
-	std::array<scanFilterEntry, SCAN_FILTER_NUMBER> scanFilters;
+    std::array<scanFilterEntry, SCAN_FILTER_NUMBER> scanFilters;
 
-	std::array<scannedPacket, SCAN_BUFFERS_SIZE> groupedPackets;
-
-
-
-	//For total message counting
-	//u32 totalMessages;
-	//i32 totalRSSI;
-
-	// Addresses of active devices
-	//uint8_t addressPointer;
-	//std::array<SimpleArray<u8, FH_BLE_GAP_ADDR_LEN>, NUM_ADDRESSES_TRACKED> addresses;
-	//std::array<u32, NUM_ADDRESSES_TRACKED> totalRSSIsPerAddress;
-	//std::array<u32, NUM_ADDRESSES_TRACKED> totalMessagesPerAdress;
-
-	u32 totalMessages;
-	u32 totalRSSI;
+    std::array<scannedPacket, SCAN_BUFFERS_SIZE> groupedPackets;
 
 
-	enum class ScanModuleMessages : u8 {
-		//TOTAL_SCANNED_PACKETS=0,  //Removed as of 21.05.2019
-		//ASSET_TRACKING_PACKET=1,  //Removed as of 24.10.2019
-		ASSET_INS_TRACKING_PACKET = 2,
-	};
 
-	//####### Module specific message structs (these need to be packed)
+    //For total message counting
+    //u32 totalMessages;
+    //i32 totalRSSI;
+
+    // Addresses of active devices
+    //uint8_t addressPointer;
+    //std::array<SimpleArray<u8, FH_BLE_GAP_ADDR_LEN>, NUM_ADDRESSES_TRACKED> addresses;
+    //std::array<u32, NUM_ADDRESSES_TRACKED> totalRSSIsPerAddress;
+    //std::array<u32, NUM_ADDRESSES_TRACKED> totalMessagesPerAdress;
+
+    u32 totalMessages;
+    u32 totalRSSI;
+
+
+    enum class ScanModuleMessages : u8 {
+        //TOTAL_SCANNED_PACKETS=0,  //Removed as of 21.05.2019
+        //ASSET_TRACKING_PACKET=1,  //Removed as of 24.10.2019
+        ASSET_INS_TRACKING_PACKET = 2,
+    };
+
+    //####### Module specific message structs (these need to be packed)
 #pragma pack(push)
 #pragma pack(1)
 
 //Asset Message V2
-	static constexpr int SIZEOF_SCAN_MODULE_TRACKED_ASSET_V2 = 8;
-	typedef struct
-	{
-		u32 assetId : 24;	//Either part of the serialNumberIndex (old assets) or the nodeId
-		i32 rssi37 : 8;		//Compilerhack! MSVC refuses to combine this bitfield with the previous one if we declare it as i8!
-		i8 rssi38;
-		i8 rssi39;
-		u8 speed : 4;
-		u8 hasFreeInConnection : 1;
-		u8 interestedInConnection : 1;
-		u8 hasSameNetworkId : 1;
-		u8 reservedBits : 1;
-		u8 pressure;
-	} trackedAssetV2;
-	STATIC_ASSERT_SIZE(trackedAssetV2, 8);
+    static constexpr int SIZEOF_SCAN_MODULE_TRACKED_ASSET_V2 = 8;
+    typedef struct
+    {
+        u32 assetId : 24;    //Either part of the serialNumberIndex (old assets) or the nodeId
+        i32 rssi37 : 8;        //Compilerhack! MSVC refuses to combine this bitfield with the previous one if we declare it as i8!
+        i8 rssi38;
+        i8 rssi39;
+        u8 speed : 4;
+        u8 hasFreeInConnection : 1;
+        u8 interestedInConnection : 1;
+        u8 hasSameNetworkId : 1;
+        u8 reservedBits : 1;
+        u8 pressure;
+    } trackedAssetV2;
+    STATIC_ASSERT_SIZE(trackedAssetV2, 8);
 
-	typedef struct
-	{
-		connPacketHeader header;
-		trackedAssetV2 trackedAssets[1];
-	} ScanModuleTrackedAssetsV2Message;
+    typedef struct
+    {
+        connPacketHeader header;
+        trackedAssetV2 trackedAssets[1];
+    } ScanModuleTrackedAssetsV2Message;
 
-	struct TrackedAssetInsMessage
-	{
-		NodeId assetNodeId;
-		i8 rssi37;
-		i8 rssi38;
-		i8 rssi39;
-		u8 batteryPower;
-		u16 absolutePositionX;
-		u16 absolutePositionY;
-		u8 pressure;
-		u8 moving : 1;
-		u8 hasFreeInConnection : 1;
-		u8 interestedInConnection : 1;
-		u8 hasSameNetworkId : 1;
-		u8 reservedBits : 4;
-	};
-	STATIC_ASSERT_SIZE(TrackedAssetInsMessage, 12);
+    struct TrackedAssetInsMessage
+    {
+        NodeId assetNodeId;
+        i8 rssi37;
+        i8 rssi38;
+        i8 rssi39;
+        u8 batteryPower;
+        u16 absolutePositionX;
+        u16 absolutePositionY;
+        u8 pressure;
+        u8 moving : 1;
+        u8 hasFreeInConnection : 1;
+        u8 interestedInConnection : 1;
+        u8 hasSameNetworkId : 1;
+        u8 reservedBits : 4;
+    };
+    STATIC_ASSERT_SIZE(TrackedAssetInsMessage, 12);
 
-	//Storage for INS advertising packets
-	struct ScannedAssetInsTrackingStorage
-	{
-		RssiContainer rssiContainer;
-		NodeId assetNodeId;
-		u8 batteryPower;
-		u16 absolutePositionX;
-		u16 absolutePositionY;
-		u16 pressure;
-		u8 moving : 1;
-		u8 hasFreeInConnection : 1;
-		u8 interestedInConnection : 1;
-		u8 hasSameNetworkId : 1;
-		u8 reservedBits : 5;
-	};
+    //Storage for INS advertising packets
+    struct ScannedAssetInsTrackingStorage
+    {
+        RssiContainer rssiContainer;
+        NodeId assetNodeId;
+        u8 batteryPower;
+        u16 absolutePositionX;
+        u16 absolutePositionY;
+        u16 pressure;
+        u8 moving : 1;
+        u8 hasFreeInConnection : 1;
+        u8 interestedInConnection : 1;
+        u8 hasSameNetworkId : 1;
+        u8 reservedBits : 5;
+    };
 
-	std::array<ScannedAssetInsTrackingStorage, ASSET_INS_PACKET_BUFFER_SIZE> assetInsPackets{};
+    std::array<ScannedAssetInsTrackingStorage, ASSET_INS_PACKET_BUFFER_SIZE> assetInsPackets{};
 
-	//####### End of Module specitic messages
+    //####### End of Module specitic messages
 #pragma pack(pop)
 
 
 //Asset packet handling
-	void HandleAssetV2Packets(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent);
-	void HandleAssetInsPackets(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent);
-	bool addTrackedAsset(const advPacketAssetServiceData* packet, i8 rssi);
-	bool addTrackedAssetIns(const advPacketAssetInsServiceData* packet, i8 rssi);
-	void ReceiveTrackedAssets(BaseConnectionSendData* sendData, ScanModuleTrackedAssetsV2Message const * packet) const;
-	void ReceiveTrackedAssetsIns(TrackedAssetInsMessage const * msg, u32 amount, NodeId sender) const;
-	void RssiRunningAverageCalculationInPlace(RssiContainer &container, u8 advertisingChannel, i8 rssi);
+    void HandleAssetV2Packets(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent);
+    void HandleAssetInsPackets(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent);
+    bool addTrackedAsset(const advPacketAssetServiceData* packet, i8 rssi);
+    bool addTrackedAssetIns(const advPacketAssetInsServiceData* packet, i8 rssi);
+    void ReceiveTrackedAssets(BaseConnectionSendData* sendData, ScanModuleTrackedAssetsV2Message const * packet) const;
+    void ReceiveTrackedAssetsIns(TrackedAssetInsMessage const * msg, u32 amount, NodeId sender) const;
+    void RssiRunningAverageCalculationInPlace(RssiContainer &container, u8 advertisingChannel, i8 rssi);
 
-	//Byte muss gesetzt sein, byte darf nicht gesetzt sein, byte ist egal
-	bool setScanFilter(scanFilterEntry* filter);
+    //Byte muss gesetzt sein, byte darf nicht gesetzt sein, byte ist egal
+    bool setScanFilter(scanFilterEntry* filter);
 
-	void SendReport();
+    void SendReport();
 
-	bool isAssetTrackingData(u8* data, u8 dataLength);
-	void resetAssetTrackingTable();
-	void SendTrackedAssets();
-	void SendTrackedAssetsIns();
-	bool isAssetTrackingDataFromiOSDeviceInForegroundMode(u8* data, u8 dataLength);
+    bool isAssetTrackingData(u8* data, u8 dataLength);
+    void resetAssetTrackingTable();
+    void SendTrackedAssets();
+    void SendTrackedAssetsIns();
+    bool isAssetTrackingDataFromiOSDeviceInForegroundMode(u8* data, u8 dataLength);
 
-	bool advertiseDataWasSentFromMobileDevice(u8* data, u8 dataLength);
-	bool advertiseDataFromAndroidDevice(u8* data, u8 dataLength);
-	bool advertiseDataFromiOSDeviceInBackgroundMode(u8* data, u8 dataLength);
-	bool advertiseDataFromiOSDeviceInForegroundMode(u8* data, u8 dataLength);
-	bool advertiseDataFromBeaconWithDifferentNetworkId(u8 *data, u8 dataLength);
+    bool advertiseDataWasSentFromMobileDevice(u8* data, u8 dataLength);
+    bool advertiseDataFromAndroidDevice(u8* data, u8 dataLength);
+    bool advertiseDataFromiOSDeviceInBackgroundMode(u8* data, u8 dataLength);
+    bool advertiseDataFromiOSDeviceInForegroundMode(u8* data, u8 dataLength);
+    bool advertiseDataFromBeaconWithDifferentNetworkId(u8 *data, u8 dataLength);
 
-	bool addressAlreadyTracked(uint8_t* address);
+    bool addressAlreadyTracked(uint8_t* address);
 
-	void resetAddressTable();
-	void resetTotalRSSIsPerAddress();
-	void resetTotalMessagesPerAdress();
-	void updateTotalRssiAndTotalMessagesForDevice(i8 rssi, uint8_t* address);
-	u32 computeTotalRSSI();
+    void resetAddressTable();
+    void resetTotalRSSIsPerAddress();
+    void resetTotalMessagesPerAdress();
+    void updateTotalRssiAndTotalMessagesForDevice(i8 rssi, uint8_t* address);
+    u32 computeTotalRSSI();
 
-	static u8 ConvertServiceDataToMeshMessageSpeed(u8 serviceDataSpeed);
-	u8 ConvertServiceDataToMeshMessagePressure(u16 serviceDataPressure);
+    static u8 ConvertServiceDataToMeshMessageSpeed(u8 serviceDataSpeed);
+    u8 ConvertServiceDataToMeshMessagePressure(u16 serviceDataPressure);
 
 
 public:
-	u16 assetReportingIntervalDs = 0;
+    u16 assetReportingIntervalDs = 0;
 
-	ScanJob * p_scanJob;
+    ScanJob * p_scanJob;
 
-	DECLARE_CONFIG_AND_PACKED_STRUCT(ScanningModuleConfiguration);
+    DECLARE_CONFIG_AND_PACKED_STRUCT(ScanningModuleConfiguration);
 
-	ScanningModule();
+    ScanningModule();
 
-	void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
+    void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
 
-	void ResetToDefaultConfiguration() override final;
+    void ResetToDefaultConfiguration() override final;
 
-	void TimerEventHandler(u16 passedTimeDs) override final;
+    void TimerEventHandler(u16 passedTimeDs) override final;
 
-	virtual void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override final;
+    virtual void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override final;
 
-	void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
+    void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
 
 #ifdef TERMINAL_ENABLED
-	TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
+    TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
 #endif
 };
 

@@ -44,55 +44,55 @@ template<typename T, int N>
 class CircularBuffer
 {
 private:
-	T data[N];
-	i32 rotation = 0;
+    T data[N];
+    i32 rotation = 0;
 
 public:
-	static constexpr int length = N;
+    static constexpr int length = N;
 
-	CircularBuffer()
-	{
-		for (int i = 0; i < N; i++)
-		{
-			data[i] = T();
-		}
-	}
+    CircularBuffer()
+    {
+        for (int i = 0; i < N; i++)
+        {
+            data[i] = T();
+        }
+    }
 
-	T* getRaw()
-	{
-		return data;
-	}
+    T* getRaw()
+    {
+        return data;
+    }
 
-	const T* getRaw() const
-	{
-		return data;
-	}
+    const T* getRaw() const
+    {
+        return data;
+    }
 
-	T& operator[](int index) {
+    T& operator[](int index) {
 #ifdef SIM_ENABLED
-		if (index < 0)
-		{
-			SIMEXCEPTION(IndexOutOfBoundsException); //LCOV_EXCL_LINE assertion
-		}
+        if (index < 0)
+        {
+            SIMEXCEPTION(IndexOutOfBoundsException); //LCOV_EXCL_LINE assertion
+        }
 #endif
-		return data[(index+rotation) % N];
-	}
+        return data[(index+rotation) % N];
+    }
 
-	const T& operator[](int index) const {
+    const T& operator[](int index) const {
 #ifdef SIM_ENABLED
-		if (index < 0)
-		{
-			SIMEXCEPTION(IndexOutOfBoundsException); //LCOV_EXCL_LINE assertion
-		}
+        if (index < 0)
+        {
+            SIMEXCEPTION(IndexOutOfBoundsException); //LCOV_EXCL_LINE assertion
+        }
 #endif
-		return data[(index + rotation) % N];
-	}
+        return data[(index + rotation) % N];
+    }
 
-	i32 getRotation() {
-		return rotation;
-	}
+    i32 getRotation() {
+        return rotation;
+    }
 
-	void setRotation(i32 rotation) {
-		this->rotation = rotation;
-	}
+    void setRotation(i32 rotation) {
+        this->rotation = rotation;
+    }
 };

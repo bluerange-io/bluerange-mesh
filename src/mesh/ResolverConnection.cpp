@@ -42,36 +42,36 @@
  */
 
 ResolverConnection::ResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress)
-	: BaseConnection(id, direction, partnerAddress)
+    : BaseConnection(id, direction, partnerAddress)
 {
-	logt("RCONN", "New Resolver Connection");
+    logt("RCONN", "New Resolver Connection");
 
-	connectionType = ConnectionType::RESOLVER;
+    connectionType = ConnectionType::RESOLVER;
 }
 
 void ResolverConnection::ConnectionSuccessfulHandler(u16 connectionHandle)
 {
-	BaseConnection::ConnectionSuccessfulHandler(connectionHandle);
+    BaseConnection::ConnectionSuccessfulHandler(connectionHandle);
 
-	connectionState = ConnectionState::HANDSHAKING;
+    connectionState = ConnectionState::HANDSHAKING;
 }
 
 void ResolverConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data)
 {
-	logt("RCONN", "Resolving Connection with received data");
+    logt("RCONN", "Resolving Connection with received data");
 
-	//If we receive any data, we use it to resolve the connection type
-	GS->cm.ResolveConnection(this, sendData, data);
+    //If we receive any data, we use it to resolve the connection type
+    GS->cm.ResolveConnection(this, sendData, data);
 }
 
 bool ResolverConnection::SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable)
 {
-	return false;
+    return false;
 };
 
 void ResolverConnection::PrintStatus()
 {
-	const char* directionString = (direction == ConnectionDirection::DIRECTION_IN) ? "IN " : "OUT";
+    const char* directionString = (direction == ConnectionDirection::DIRECTION_IN) ? "IN " : "OUT";
 
-	trace("%s RSV state:%u, Queue:%u-%u(%u), hnd:%u" EOL, directionString, (u32)this->connectionState, (packetSendQueue.readPointer - packetSendQueue.bufferStart), (packetSendQueue.writePointer - packetSendQueue.bufferStart), packetSendQueue._numElements, connectionHandle);
+    trace("%s RSV state:%u, Queue:%u-%u(%u), hnd:%u" EOL, directionString, (u32)this->connectionState, (packetSendQueue.readPointer - packetSendQueue.bufferStart), (packetSendQueue.writePointer - packetSendQueue.bufferStart), packetSendQueue._numElements, connectionHandle);
 }

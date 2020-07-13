@@ -43,93 +43,93 @@ class ConnectionManager;
  */
 class BaseConnectionHandle
 {
-	friend class ConnectionManager;
+    friend class ConnectionManager;
 protected:
-	u32 uniqueConnectionId;
+    u32 uniqueConnectionId;
 
-	//The both cache variables are used to store a previously retrieved
-	//connection for quick access. If the amount of deleted connections
-	//since the last retrieval process has not changed, then we know that
-	//the cached connection must still be valid and can be returned.
-	mutable u32 cacheAmountOfRemovedConnections = 0;
-	mutable BaseConnection* cacheConnection = nullptr;
-	template<typename T>
-	T* GetMutableConnection() const;
+    //The both cache variables are used to store a previously retrieved
+    //connection for quick access. If the amount of deleted connections
+    //since the last retrieval process has not changed, then we know that
+    //the cached connection must still be valid and can be returned.
+    mutable u32 cacheAmountOfRemovedConnections = 0;
+    mutable BaseConnection* cacheConnection = nullptr;
+    template<typename T>
+    T* GetMutableConnection() const;
 
 public:
-	BaseConnectionHandle();
-	explicit BaseConnectionHandle(u32 uniqueConnectionId);
-	explicit BaseConnectionHandle(const BaseConnection& con);
+    BaseConnectionHandle();
+    explicit BaseConnectionHandle(u32 uniqueConnectionId);
+    explicit BaseConnectionHandle(const BaseConnection& con);
 
-	explicit operator bool() const;
-	
-	//These should be used very rarely as they don't provide any form of protection!
-	BaseConnection* GetConnection();
-	const BaseConnection* GetConnection() const;
+    explicit operator bool() const;
+    
+    //These should be used very rarely as they don't provide any form of protection!
+    BaseConnection* GetConnection();
+    const BaseConnection* GetConnection() const;
 
-	bool IsValid() const;
-	bool Exists() const;
+    bool IsValid() const;
+    bool Exists() const;
 
-	bool DisconnectAndRemove(AppDisconnectReason reason);
-	bool IsHandshakeDone();
-	u16 GetConnectionHandle();
-	NodeId GetPartnerId();
-	ConnectionState GetConnectionState();
-	bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable);
-	bool FillTransmitBuffers();
-	FruityHal::BleGapAddr GetPartnerAddress();
-	u32 GetCreationTimeDs();
-	i8 GetAverageRSSI();
-	u16 GetSentUnreliable();
-	u32 GetUniqueConnectionId();
-	PacketQueue* GetPacketSendQueue();
+    bool DisconnectAndRemove(AppDisconnectReason reason);
+    bool IsHandshakeDone();
+    u16 GetConnectionHandle();
+    NodeId GetPartnerId();
+    ConnectionState GetConnectionState();
+    bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable);
+    bool FillTransmitBuffers();
+    FruityHal::BleGapAddr GetPartnerAddress();
+    u32 GetCreationTimeDs();
+    i8 GetAverageRSSI();
+    u16 GetSentUnreliable();
+    u32 GetUniqueConnectionId();
+    PacketQueue* GetPacketSendQueue();
 };
 
 class MeshConnectionHandle : public BaseConnectionHandle
 {
-	friend class ConnectionManager;
+    friend class ConnectionManager;
 private:
 
 public:
-	MeshConnectionHandle();
-	explicit MeshConnectionHandle(u32 uniqueConnectionId);
-	explicit MeshConnectionHandle(const MeshConnection& con);
+    MeshConnectionHandle();
+    explicit MeshConnectionHandle(u32 uniqueConnectionId);
+    explicit MeshConnectionHandle(const MeshConnection& con);
 
-	MeshConnectionHandle& operator=(const MeshConnectionHandle &other) = default;
+    MeshConnectionHandle& operator=(const MeshConnectionHandle &other) = default;
 
-	//These should be used very rarely as they don't provide any form of protection!
-	MeshConnection* GetConnection();
-	const MeshConnection* GetConnection() const;
+    //These should be used very rarely as they don't provide any form of protection!
+    MeshConnection* GetConnection();
+    const MeshConnection* GetConnection() const;
 
-	bool TryReestablishing();
-	ClusterSize GetHopsToSink();
-	bool SetHopsToSink(ClusterSize hops);
-	using BaseConnectionHandle::SendData;
-	bool SendData(BaseConnectionSendData* sendData, u8 const * data);
-	ClusterSize GetConnectedClusterSize();
-	bool HandoverMasterBit();
-	bool HasConnectionMasterBit();
+    bool TryReestablishing();
+    ClusterSize GetHopsToSink();
+    bool SetHopsToSink(ClusterSize hops);
+    using BaseConnectionHandle::SendData;
+    bool SendData(BaseConnectionSendData* sendData, u8 const * data);
+    ClusterSize GetConnectedClusterSize();
+    bool HandoverMasterBit();
+    bool HasConnectionMasterBit();
 };
 
 class MeshAccessConnectionHandle : public BaseConnectionHandle
 {
-	friend class ConnectionManager;
+    friend class ConnectionManager;
 private:
 
 public:
-	MeshAccessConnectionHandle();
-	explicit MeshAccessConnectionHandle(u32 uniqueConnectionId);
-	explicit MeshAccessConnectionHandle(const MeshAccessConnection& con);
+    MeshAccessConnectionHandle();
+    explicit MeshAccessConnectionHandle(u32 uniqueConnectionId);
+    explicit MeshAccessConnectionHandle(const MeshAccessConnection& con);
 
-	MeshAccessConnectionHandle& operator=(const MeshAccessConnectionHandle &other) = default;
+    MeshAccessConnectionHandle& operator=(const MeshAccessConnectionHandle &other) = default;
 
-	//These should be used very rarely as they don't provide any form of protection!
-	MeshAccessConnection* GetConnection();
-	const MeshAccessConnection* GetConnection() const;
+    //These should be used very rarely as they don't provide any form of protection!
+    MeshAccessConnection* GetConnection();
+    const MeshAccessConnection* GetConnection() const;
 
-	bool ShouldSendDataToNodeId(NodeId nodeId) const;
-	bool SendClusterState();
-	NodeId GetVirtualPartnerId();
-	bool KeepAliveFor(u32 timeDs);
-	bool KeepAliveForIfSet(u32 timeDs);
+    bool ShouldSendDataToNodeId(NodeId nodeId) const;
+    bool SendClusterState();
+    NodeId GetVirtualPartnerId();
+    bool KeepAliveFor(u32 timeDs);
+    bool KeepAliveForIfSet(u32 timeDs);
 };

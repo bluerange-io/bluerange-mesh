@@ -47,72 +47,72 @@
 #pragma pack(1)
 typedef struct BoardConfiguration
 {
-	//Board Type (aka. boardId) identifies a PCB with its wiring and configuration
-	//Multiple boards can be added and the correct one is chosen at runtime depending on the UICR boardId
-	//Custom boardTypes should start from 10000
-	uint16_t boardType;
+    //Board Type (aka. boardId) identifies a PCB with its wiring and configuration
+    //Multiple boards can be added and the correct one is chosen at runtime depending on the UICR boardId
+    //Custom boardTypes should start from 10000
+    uint16_t boardType;
 
-	//Default board is pca10031, modify SET_BOARD if different board is required
-	//Or flash config data to UICR
-	int8_t led1Pin;
-	int8_t led2Pin;
-	int8_t led3Pin;
-	//Defines if writing 0 or 1 to an LED turns it on
-	uint8_t ledActiveHigh : 8;
+    //Default board is pca10031, modify SET_BOARD if different board is required
+    //Or flash config data to UICR
+    int8_t led1Pin;
+    int8_t led2Pin;
+    int8_t led3Pin;
+    //Defines if writing 0 or 1 to an LED turns it on
+    uint8_t ledActiveHigh : 8;
 
-	int8_t button1Pin;
-	uint8_t buttonsActiveHigh : 8;
+    int8_t button1Pin;
+    uint8_t buttonsActiveHigh : 8;
 
-	//UART configuration. Set RX-Pin to -1 to disable UART
-	int8_t uartRXPin;
-	int8_t uartTXPin;
-	int8_t uartCTSPin;
-	int8_t uartRTSPin;
-	//Default, can be overridden by boards
-	uint32_t uartBaudRate : 32;
+    //UART configuration. Set RX-Pin to -1 to disable UART
+    int8_t uartRXPin;
+    int8_t uartTXPin;
+    int8_t uartCTSPin;
+    int8_t uartRTSPin;
+    //Default, can be overridden by boards
+    uint32_t uartBaudRate : 32;
 
-	//Display Dimensions
-	uint16_t displayWidth;
-	uint16_t displayHeight;
+    //Display Dimensions
+    uint16_t displayWidth;
+    uint16_t displayHeight;
 
-	//Receiver sensitivity of this device, set from board configs
-	int8_t dBmRX;
-	// This value should be calibrated at 1m distance, set by board configs
-	int8_t calibratedTX;
+    //Receiver sensitivity of this device, set from board configs
+    int8_t dBmRX;
+    // This value should be calibrated at 1m distance, set by board configs
+    int8_t calibratedTX;
 
-	uint8_t lfClockSource;
-	uint8_t lfClockAccuracy;
+    uint8_t lfClockSource;
+    uint8_t lfClockAccuracy;
 
-	int8_t batteryAdcInputPin;
-	int8_t batteryMeasurementEnablePin;
+    int8_t batteryAdcInputPin;
+    int8_t batteryMeasurementEnablePin;
 
-	uint32_t voltageDividerR1;
-	uint32_t voltageDividerR2;
-	uint8_t dcDcEnabled;
+    uint32_t voltageDividerR1;
+    uint32_t voltageDividerR2;
+    uint8_t dcDcEnabled;
 } BoardConfiguration;
 #pragma pack(pop)
 
 #ifdef __cplusplus
-	#ifndef Boardconfig
-	#define Boardconfig (&(Boardconf::getInstance().configuration))
-	#endif
+    #ifndef Boardconfig
+    #define Boardconfig (&(Boardconf::getInstance().configuration))
+    #endif
 #endif //__cplusplus
 
 
 #ifdef __cplusplus
-	class Boardconf
-	{
-		public:
-			Boardconf();
-			static Boardconf& getInstance();
+    class Boardconf
+    {
+        public:
+            Boardconf();
+            static Boardconf& getInstance();
 
-			void Initialize();
-			void ResetToDefaultConfiguration();
-			void (*getCustomPinset)(CustomPins*) = nullptr;
+            void Initialize();
+            void ResetToDefaultConfiguration();
+            void (*getCustomPinset)(CustomPins*) = nullptr;
 
-			BoardConfiguration configuration;
+            BoardConfiguration configuration;
 
-	};
+    };
 #endif //__cplusplus
 
 //Can be used to make the boardconfig available to C

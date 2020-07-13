@@ -34,8 +34,8 @@
 class StackBaseSetter
 {
 public:
-	StackBaseSetter();
-	~StackBaseSetter();
+    StackBaseSetter();
+    ~StackBaseSetter();
 };
 
 //TODO: This class is a work-around by design. We should get rid of it once all of its
@@ -43,19 +43,19 @@ public:
 class StackWatcherDisabler
 {
 public:
-	StackWatcherDisabler();
-	~StackWatcherDisabler();
+    StackWatcherDisabler();
+    ~StackWatcherDisabler();
 };
 
 class StackWatcher
 {
-	friend StackBaseSetter;
-	friend StackWatcherDisabler;
+    friend StackBaseSetter;
+    friend StackWatcherDisabler;
 private:
-	static std::vector<const void*> stackBase;
-	static u32 disableValue;
+    static std::vector<const void*> stackBase;
+    static u32 disableValue;
 
 public:
-	static void check();
+    static void check();
 
 };

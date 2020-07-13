@@ -36,49 +36,49 @@
 
 struct CherrySimRunnerConfig
 {
-	bool enableClusteringTest;
-	bool verbose;
+    bool enableClusteringTest;
+    bool verbose;
 };
 
 class CherrySimRunner : public TerminalPrintListener, public CherrySimEventListener
 {
 public:
-	CherrySim* sim;
-	static CherrySimRunnerConfig CreateDefaultTesterConfiguration();
+    CherrySim* sim;
+    static CherrySimRunnerConfig CreateDefaultTesterConfiguration();
 
-	std::thread terminalReader;
-	bool meshGwCommunication;
+    std::thread terminalReader;
+    bool meshGwCommunication;
 
-	volatile bool running = true;
+    volatile bool running = true;
 
-	static constexpr int32_t MESH_GW_NODE = 1;
+    static constexpr int32_t MESH_GW_NODE = 1;
 
 public:
-	explicit CherrySimRunner(const CherrySimRunnerConfig &runnerConfig, const SimConfiguration &simConfig, bool meshGwCommunication);
+    explicit CherrySimRunner(const CherrySimRunnerConfig &runnerConfig, const SimConfiguration &simConfig, bool meshGwCommunication);
 
-	void Start();
-	bool Simulate();
-	~CherrySimRunner() {};
+    void Start();
+    bool Simulate();
+    ~CherrySimRunner() {};
 
-	void resetSimulator();
-	void resetSimulatorWithNewSeed();
+    void resetSimulator();
+    void resetSimulatorWithNewSeed();
 
 
-	//### Callbacks
-	//Inherited via TerminalPrintListener
-	void TerminalPrintHandler(nodeEntry* currentNode, const char* message) override;
-	//Inherited via CherrySimEventListener
-	void CherrySimEventHandler(const char* eventType) override;
-	void CherrySimBleEventHandler(nodeEntry* currentNode, simBleEvent* simBleEvent, u16 eventSize) override;
+    //### Callbacks
+    //Inherited via TerminalPrintListener
+    void TerminalPrintHandler(nodeEntry* currentNode, const char* message) override;
+    //Inherited via CherrySimEventListener
+    void CherrySimEventHandler(const char* eventType) override;
+    void CherrySimBleEventHandler(nodeEntry* currentNode, simBleEvent* simBleEvent, u16 eventSize) override;
 
-	void TerminalReaderMain();
+    void TerminalReaderMain();
 
-	static SimConfiguration CreateDefaultRunConfiguration();
+    static SimConfiguration CreateDefaultRunConfiguration();
 
 private:
-	bool shouldRestartSim;
-	CherrySimRunnerConfig runnerConfig;
-	SimConfiguration simConfig;
+    bool shouldRestartSim;
+    CherrySimRunnerConfig runnerConfig;
+    SimConfiguration simConfig;
 
 };
 

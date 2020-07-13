@@ -43,90 +43,90 @@ GATTController::GATTController()
 
 void GATTController::Init()
 {
-	//Initialize the nordic service discovery module (we could write that ourselves,...)
-	const ErrorType err = FruityHal::DiscovereServiceInit(GATTController::ServiceDiscoveryDoneDispatcher);
-	if (err != ErrorType::SUCCESS)
-	{
-		logt("ERROR", "Failed to init discovery service, %u", (u32)err);
-	}
+    //Initialize the nordic service discovery module (we could write that ourselves,...)
+    const ErrorType err = FruityHal::DiscovereServiceInit(GATTController::ServiceDiscoveryDoneDispatcher);
+    if (err != ErrorType::SUCCESS)
+    {
+        logt("ERROR", "Failed to init discovery service, %u", (u32)err);
+    }
 }
 
 ErrorType GATTController::DiscoverService(u16 connHandle, const FruityHal::BleGattUuid &p_uuid)
 {
-	logt("GATTCTRL", "Starting Service discovery %04x type %u, connHnd %u", p_uuid.uuid, p_uuid.type, connHandle);
+    logt("GATTCTRL", "Starting Service discovery %04x type %u, connHnd %u", p_uuid.uuid, p_uuid.type, connHandle);
 
-	//Discovery only works for one connection at a time
-	if (FruityHal::DiscoveryIsInProgress()) return ErrorType::BUSY;
+    //Discovery only works for one connection at a time
+    if (FruityHal::DiscoveryIsInProgress()) return ErrorType::BUSY;
 
-	return FruityHal::DiscoverService(connHandle, p_uuid);
+    return FruityHal::DiscoverService(connHandle, p_uuid);
 }
 
 
 
 void GATTController::ServiceDiscoveryDoneDispatcher(FruityHal::BleGattDBDiscoveryEvent *p_evt)
 {
-	logt("GATTCTRL", "DB Discovery Event");
+    logt("GATTCTRL", "DB Discovery Event");
 
-	if(p_evt->type == FruityHal::BleGattDBDiscoveryEventType::COMPLETE){
-		ConnectionManager::getInstance().GATTServiceDiscoveredHandler(p_evt->connHandle, *p_evt);
-	}
+    if(p_evt->type == FruityHal::BleGattDBDiscoveryEventType::COMPLETE){
+        ConnectionManager::getInstance().GATTServiceDiscoveredHandler(p_evt->connHandle, *p_evt);
+    }
 }
 
 //Throws different errors that must be handeled
 ErrorType GATTController::bleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable) const
 {
-	logt("CONN_DATA", "TX Data size is: %d, handles(%d, %d), reliable %d", dataLength, connectionHandle, characteristicHandle, reliable);
+    logt("CONN_DATA", "TX Data size is: %d, handles(%d, %d), reliable %d", dataLength, connectionHandle, characteristicHandle, reliable);
 
-	char stringBuffer[100];
-	Logger::convertBufferToHexString(data, dataLength, stringBuffer, sizeof(stringBuffer));
-	logt("CONN_DATA", "%s", stringBuffer);
+    char stringBuffer[100];
+    Logger::convertBufferToHexString(data, dataLength, stringBuffer, sizeof(stringBuffer));
+    logt("CONN_DATA", "%s", stringBuffer);
 
 
-	//Configure the write parameters with reliable/unreliable, writehandle, etc...
-	FruityHal::BleGattWriteParams writeParameters;
-	CheckedMemset(&writeParameters, 0, sizeof(writeParameters));
-	writeParameters.handle = characteristicHandle;
-	writeParameters.offset = 0;
-	writeParameters.len = dataLength;
-	writeParameters.p_data = data;
+    //Configure the write parameters with reliable/unreliable, writehandle, etc...
+    FruityHal::BleGattWriteParams writeParameters;
+    CheckedMemset(&writeParameters, 0, sizeof(writeParameters));
+    writeParameters.handle = characteristicHandle;
+    writeParameters.offset = 0;
+    writeParameters.len = dataLength;
+    writeParameters.p_data = data;
 
-	if (reliable)
-	{
-		writeParameters.type = FruityHal::BleGattWriteType::WRITE_REQ;
+    if (reliable)
+    {
+        writeParameters.type = FruityHal::BleGattWriteType::WRITE_REQ;
 
-		return FruityHal::BleGattWrite(connectionHandle, writeParameters);
-	}
-	else
-	{
-		writeParameters.type = FruityHal::BleGattWriteType::WRITE_CMD;
+        return FruityHal::BleGattWrite(connectionHandle, writeParameters);
+    }
+    else
+    {
+        writeParameters.type = FruityHal::BleGattWriteType::WRITE_CMD;
 
-		return FruityHal::BleGattWrite(connectionHandle, writeParameters);
-	}
+        return FruityHal::BleGattWrite(connectionHandle, writeParameters);
+    }
 }
 
 //TODO: Rewrite properly
 ErrorType GATTController::bleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength) const
 {
-	logt("CONN_DATA", "hvx Data size is: %d, handles(%d, %d)", dataLength, connectionHandle, characteristicHandle);
+    logt("CONN_DATA", "hvx Data size is: %d, handles(%d, %d)", dataLength, connectionHandle, characteristicHandle);
 
-	char stringBuffer[100];
-	Logger::convertBufferToHexString(data, dataLength, stringBuffer, sizeof(stringBuffer));
-	logt("CONN_DATA", "%s", stringBuffer);
+    char stringBuffer[100];
+    Logger::convertBufferToHexString(data, dataLength, stringBuffer, sizeof(stringBuffer));
+    logt("CONN_DATA", "%s", stringBuffer);
 
 
-	FruityHal::BleGattWriteParams notificationParams;
-	CheckedMemset(&notificationParams, 0, sizeof(notificationParams));
-	notificationParams.handle = characteristicHandle;
-	notificationParams.offset = 0;
-	notificationParams.p_data = data;
-	notificationParams.len = dataLength;
-	notificationParams.type = FruityHal::BleGattWriteType::NOTIFICATION;
+    FruityHal::BleGattWriteParams notificationParams;
+    CheckedMemset(&notificationParams, 0, sizeof(notificationParams));
+    notificationParams.handle = characteristicHandle;
+    notificationParams.offset = 0;
+    notificationParams.p_data = data;
+    notificationParams.len = dataLength;
+    notificationParams.type = FruityHal::BleGattWriteType::NOTIFICATION;
 
-	return FruityHal::BleGattSendNotification(connectionHandle, notificationParams);
+    return FruityHal::BleGattSendNotification(connectionHandle, notificationParams);
 }
 
 GATTController & GATTController::getInstance()
 {
-	return GS->gattController;
+    return GS->gattController;
 }
 

@@ -38,16 +38,16 @@
 
 // ######################### CLASS ############################
 FruityHal::GapConnParamUpdateEvent::GapConnParamUpdateEvent(void const* _evt)
-	:GapEvent(_evt) {}
+    :GapEvent(_evt) {}
 FruityHal::GapEvent::GapEvent(void const* _evt)
-	: BleEvent(_evt) {}
+    : BleEvent(_evt) {}
 u16 FruityHal::GapEvent::getConnectionHandle() const { return 0; } 
 u16 FruityHal::GapConnParamUpdateEvent::getMaxConnectionInterval() const { return 0; } 
 FruityHal::GapRssiChangedEvent::GapRssiChangedEvent(void const* _evt)
-	:GapEvent(_evt) {}
+    :GapEvent(_evt) {}
 i8 FruityHal::GapRssiChangedEvent::getRssi() const { return 0; }
 FruityHal::GapAdvertisementReportEvent::GapAdvertisementReportEvent(void const* _evt)
-	:GapEvent(_evt) {}
+    :GapEvent(_evt) {}
 i8 FruityHal::GapAdvertisementReportEvent::getRssi() const { return 0; }
 const u8 * FruityHal::GapAdvertisementReportEvent::getData() const { return 0; }
 u32 FruityHal::GapAdvertisementReportEvent::getDataLength() const { return 0; } 
@@ -56,46 +56,46 @@ FruityHal::BleGapAddrType FruityHal::GapAdvertisementReportEvent::getPeerAddrTyp
 bool FruityHal::GapAdvertisementReportEvent::isConnectable() const { return false; } 
 FruityHal::BleEvent::BleEvent(void const* _evt) {}
 FruityHal::GapConnectedEvent::GapConnectedEvent(void const* _evt)
-	:GapEvent(_evt) {}
+    :GapEvent(_evt) {}
 FruityHal::GapRole FruityHal::GapConnectedEvent::getRole() const { return FruityHal::GapRole::INVALID; }
 u8 FruityHal::GapConnectedEvent::getPeerAddrType() const { return 0; } 
 u16 FruityHal::GapConnectedEvent::getMinConnectionInterval() const { return 0; } 
 const u8 * FruityHal::GapConnectedEvent::getPeerAddr() const { return 0; }
 FruityHal::GapDisconnectedEvent::GapDisconnectedEvent(void const* _evt)
-	: GapEvent(_evt) {}
+    : GapEvent(_evt) {}
 FruityHal::BleHciError FruityHal::GapDisconnectedEvent::getReason() const { return FruityHal::BleHciError::SUCCESS; }
 FruityHal::GapTimeoutEvent::GapTimeoutEvent(void const* _evt)
-	: GapEvent(_evt) {}
+    : GapEvent(_evt) {}
 FruityHal::GapTimeoutSource FruityHal::GapTimeoutEvent::getSource() const  { return FruityHal::GapTimeoutSource::INVALID; }
 FruityHal::GapSecurityInfoRequestEvent::GapSecurityInfoRequestEvent(void const* _evt)
-	: GapEvent(_evt) {}
+    : GapEvent(_evt) {}
 FruityHal::GapConnectionSecurityUpdateEvent::GapConnectionSecurityUpdateEvent(void const* _evt)
-	: GapEvent(_evt) {}
+    : GapEvent(_evt) {}
 u8 FruityHal::GapConnectionSecurityUpdateEvent::getKeySize() const { return 0; } 
 FruityHal::SecurityLevel FruityHal::GapConnectionSecurityUpdateEvent::getSecurityLevel() const { return FruityHal::SecurityLevel::NO_PERMISSION; }
 FruityHal::SecurityMode FruityHal::GapConnectionSecurityUpdateEvent::getSecurityMode() const { return FruityHal::SecurityMode::NO_PERMISSION; }
 FruityHal::GattcEvent::GattcEvent(void const* _evt)
-	: BleEvent(_evt) {}
+    : BleEvent(_evt) {}
 u16 FruityHal::GattcEvent::getConnectionHandle() const { return 0; } 
 FruityHal::BleGattEror FruityHal::GattcEvent::getGattStatus() const { return FruityHal::BleGattEror::SUCCESS; }
 FruityHal::GattcWriteResponseEvent::GattcWriteResponseEvent(void const* _evt)
-	: GattcEvent(_evt) {}
+    : GattcEvent(_evt) {}
 FruityHal::GattcTimeoutEvent::GattcTimeoutEvent(void const* _evt)
-	: GattcEvent(_evt) {}
+    : GattcEvent(_evt) {}
 FruityHal::GattDataTransmittedEvent::GattDataTransmittedEvent(void const* _evt)
-	:BleEvent(_evt) {}
+    :BleEvent(_evt) {}
 u16 FruityHal::GattDataTransmittedEvent::getConnectionHandle() const { return 0; } 
 bool FruityHal::GattDataTransmittedEvent::isConnectionHandleValid() const { return false; } 
 u32 FruityHal::GattDataTransmittedEvent::getCompleteCount() const { return 0; } 
 FruityHal::GattsWriteEvent::GattsWriteEvent(void const* _evt)
-	: BleEvent(_evt) {}
+    : BleEvent(_evt) {}
 u16 FruityHal::GattsWriteEvent::getAttributeHandle() const { return 0; } 
 bool FruityHal::GattsWriteEvent::isWriteRequest() const { return false; } 
 u16 FruityHal::GattsWriteEvent::getLength() const { return 0; } 
 u16 FruityHal::GattsWriteEvent::getConnectionHandle() const { return 0; } 
 u8 const * FruityHal::GattsWriteEvent::getData() const { return 0; } 
 FruityHal::GattcHandleValueEvent::GattcHandleValueEvent(void const* _evt)
-	:GattcEvent(_evt) {}
+    :GattcEvent(_evt) {}
 u16 FruityHal::GattcHandleValueEvent::getHandle() const { return 0; } 
 u16 FruityHal::GattcHandleValueEvent::getLength() const { return 0; } 
 u8 const * FruityHal::GattcHandleValueEvent::getData() const { return 0; } 

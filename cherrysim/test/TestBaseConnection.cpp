@@ -33,36 +33,36 @@
 
 
 TEST(TestBaseConnection, TestSimpleTransmissions) {
-	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 
-	simConfig.SetToPerfectConditions();
-	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
-	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
-	//testerConfig.verbose = true;
+    simConfig.SetToPerfectConditions();
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    //testerConfig.verbose = true;
 
-	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
-	tester.Start();
-	tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.Start();
+    tester.SimulateUntilClusteringDone(10 * 1000);
 
-	//We modify the MTU of the connection and set it so that it is too small for a normal packet
-	for (int i = 0; i < SIM_MAX_CONNECTION_NUM; i++) {
-		if (tester.sim->nodes[0].state.connections[i].connectionActive) {
-			tester.sim->nodes[0].state.connections[i].connectionMtu = 10;
-		}
-	}
+    //We modify the MTU of the connection and set it so that it is too small for a normal packet
+    for (int i = 0; i < SIM_MAX_CONNECTION_NUM; i++) {
+        if (tester.sim->nodes[0].state.connections[i].connectionActive) {
+            tester.sim->nodes[0].state.connections[i].connectionMtu = 10;
+        }
+    }
 
-	// GATT WRITE ERROR is logged via ERROR tag, which is correct behavior.
-	Exceptions::ExceptionDisabler<ErrorLoggedException> ele;
+    // GATT WRITE ERROR is logged via ERROR tag, which is correct behavior.
+    Exceptions::ExceptionDisabler<ErrorLoggedException> ele;
 
-	//Send a message to node 2
-	tester.SendTerminalCommand(1, "action 2 status get_status");
+    //Send a message to node 2
+    tester.SendTerminalCommand(1, "action 2 status get_status");
 
-	//We check, that the connection gets disconnected
-	tester.SimulateUntilMessageReceived(10 * 1000, 1, "GATT WRITE ERROR");
-	tester.SimulateUntilMessageReceived(10 * 1000, 1, "Deleted MeshConnection");
+    //We check, that the connection gets disconnected
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "GATT WRITE ERROR");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Deleted MeshConnection");
 
-	//We wait until they are connected again
-	tester.SimulateUntilClusteringDone(10 * 1000);
+    //We wait until they are connected again
+    tester.SimulateUntilClusteringDone(10 * 1000);
 }

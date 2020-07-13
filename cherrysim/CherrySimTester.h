@@ -35,100 +35,100 @@ constexpr int MAX_TERMINAL_OUTPUT = 1024;
 
 struct CherrySimTesterConfig
 {
-	bool verbose;
-	int terminalFilter; //Set to -1 for no output, 0 for all nodes or any other number for the terminal of that node
+    bool verbose;
+    int terminalFilter; //Set to -1 for no output, 0 for all nodes or any other number for the terminal of that node
 };
 
 class SimulationMessage
 {
 private:
-	NodeId      nodeId;
-	std::string messagePart;
-	std::string messageComplete = "";
-	bool        found = false;
+    NodeId      nodeId;
+    std::string messagePart;
+    std::string messageComplete = "";
+    bool        found = false;
 
-	bool matches(const std::string &message);
-	void makeFound(const std::string &messageComplete);
-	bool matchesRegex(const std::string &message);
+    bool matches(const std::string &message);
+    void makeFound(const std::string &messageComplete);
+    bool matchesRegex(const std::string &message);
 
 public:
-	SimulationMessage(NodeId nodeId, const std::string& messagePart);
-	bool checkAndSet(const std::string &message, bool useRegex);
-	bool isFound() const;
-	const std::string& getCompleteMessage() const;
-	NodeId getNodeId() const;
+    SimulationMessage(NodeId nodeId, const std::string& messagePart);
+    bool checkAndSet(const std::string &message, bool useRegex);
+    bool isFound() const;
+    const std::string& getCompleteMessage() const;
+    NodeId getNodeId() const;
 };
 
 class CherrySimTester : public TerminalPrintListener, public CherrySimEventListener
 {
 public:
-	CherrySim* sim = nullptr;
+    CherrySim* sim = nullptr;
 
-	//Used for awaiting specific terminal messages
-	std::vector<SimulationMessage>* awaitedTerminalOutputs = nullptr;
-	bool useRegex = false;
-	u16 awaitedMessagePointer = 0;
-	bool awaitedMessagesFound = false;
+    //Used for awaiting specific terminal messages
+    std::vector<SimulationMessage>* awaitedTerminalOutputs = nullptr;
+    bool useRegex = false;
+    u16 awaitedMessagePointer = 0;
+    bool awaitedMessagesFound = false;
 
-	//Used for awaiting specific ble events
-	NodeId awaitedBleEventNodeId = 0;
-	u16 awaitedBleEventEventId = 0;
-	std::array<u8, 1000> awaitedBleEventDataPart = {};
-	u16 awaitedBleEventDataPartLength = 0;
-	bool awaitedBleEventFound = false;
+    //Used for awaiting specific ble events
+    NodeId awaitedBleEventNodeId = 0;
+    u16 awaitedBleEventEventId = 0;
+    std::array<u8, 1000> awaitedBleEventDataPart = {};
+    u16 awaitedBleEventDataPartLength = 0;
+    bool awaitedBleEventFound = false;
 
-	bool appendCrcToMessages = true;
+    bool appendCrcToMessages = true;
 
 private:
-	std::array<char, MAX_TERMINAL_OUTPUT> awaitedMessageResult = { '\0' };
-	CherrySimTesterConfig config = {};
-	SimConfiguration simConfig = {};
-	void _SimulateUntilMessageReceived(int timeoutMs);
-	bool started = false;
+    std::array<char, MAX_TERMINAL_OUTPUT> awaitedMessageResult = { '\0' };
+    CherrySimTesterConfig config = {};
+    SimConfiguration simConfig = {};
+    void _SimulateUntilMessageReceived(int timeoutMs);
+    bool started = false;
 
 public:
-	CherrySimTester(CherrySimTesterConfig testerConfig, SimConfiguration simConfig);
-	
-	//Deleting these as they are currently unused and implmenting
-	//them correctly would create unnecessary overhead for now.
-	CherrySimTester(const CherrySimTester& other) = delete;
-	CherrySimTester(CherrySimTester&& other);
-	CherrySimTester& operator=(const CherrySimTester& other) = delete;
-	CherrySimTester& operator=(CherrySimTester&& other) = delete;
+    CherrySimTester(CherrySimTesterConfig testerConfig, SimConfiguration simConfig);
+    
+    //Deleting these as they are currently unused and implmenting
+    //them correctly would create unnecessary overhead for now.
+    CherrySimTester(const CherrySimTester& other) = delete;
+    CherrySimTester(CherrySimTester&& other);
+    CherrySimTester& operator=(const CherrySimTester& other) = delete;
+    CherrySimTester& operator=(CherrySimTester&& other) = delete;
 
-	~CherrySimTester();
+    ~CherrySimTester();
 
-	static CherrySimTesterConfig CreateDefaultTesterConfiguration();
-	static SimConfiguration CreateDefaultSimConfiguration();
-	//### Starting
-	void Start();
+    static CherrySimTesterConfig CreateDefaultTesterConfiguration();
+    static SimConfiguration CreateDefaultSimConfiguration();
+    //### Starting
+    void Start();
 
-	//### Simulation methods
-	void SimulateUntilClusteringDone(int timeoutMs);
-	void SimulateUntilClusteringDoneWithDifferentNetworkIds(int timeoutMs);
+    //### Simulation methods
+    void SimulateUntilClusteringDone(int timeoutMs);
+    void SimulateUntilClusteringDoneWithDifferentNetworkIds(int timeoutMs);
 
-	void SimulateUntilClusteringDoneWithExpectedNumberOfClusters(int timeoutMs, u32 clusters);
-	void SimulateGivenNumberOfSteps(int steps);
-	void SimulateForGivenTime(int numMilliseconds);
-	void SimulateUntilMessageReceived(int timeoutMs, NodeId nodeId, const char* messagePart, ...);
-	//Simulates until all of the messages in the messages vector are received. N copies of the same message must be received N times.
-	void SimulateUntilMessagesReceived(int timeoutMs, std::vector<SimulationMessage>& messages);
-	void SimulateUntilRegexMessageReceived(int timeoutMs, NodeId nodeId, const char* messagePart, ...);
-	void SimulateUntilRegexMessagesReceived(int timeoutMs, std::vector<SimulationMessage>& messages);
-	void SimulateUntilBleEventReceived(int timeoutMs, NodeId nodeId, u16 eventId, const u8* eventDataPart, u16 eventDataPartLength);
+    void SimulateUntilClusteringDoneWithExpectedNumberOfClusters(int timeoutMs, u32 clusters);
+    void SimulateGivenNumberOfSteps(int steps);
+    void SimulateForGivenTime(int numMilliseconds);
+    void SimulateUntilMessageReceived(int timeoutMs, NodeId nodeId, const char* messagePart, ...);
+    //Simulates until all of the messages in the messages vector are received. N copies of the same message must be received N times.
+    void SimulateUntilMessagesReceived(int timeoutMs, std::vector<SimulationMessage>& messages);
+    void SimulateUntilRegexMessageReceived(int timeoutMs, NodeId nodeId, const char* messagePart, ...);
+    void SimulateUntilRegexMessagesReceived(int timeoutMs, std::vector<SimulationMessage>& messages);
+    void SimulateUntilBleEventReceived(int timeoutMs, NodeId nodeId, u16 eventId, const u8* eventDataPart, u16 eventDataPartLength);
 #ifndef CI_PIPELINE
-	void SimulateForever();
+    void SimulateForever();
 #endif //!CI_PIPELINE
-	void SimulateBroadcastMessage(double x, double y, ble_gap_evt_adv_report_t& advReport, bool ignoreDropProb);
-	void SendTerminalCommand(NodeId nodeId, const char* message, ...);
-	void SendButtonPress(NodeId nodeId, u8 buttonId, u32 holdTimeDs);
-	
-	//### Callbacks
-	//Inherited via TerminalPrintListener
-	void TerminalPrintHandler(nodeEntry* currentNode, const char* message) override;
+    void SimulateBroadcastMessage(double x, double y, ble_gap_evt_adv_report_t& advReport, bool ignoreDropProb);
+    void SendTerminalCommand(NodeId nodeId, const char* message, ...);
+    void SendButtonPress(NodeId nodeId, u8 buttonId, u32 holdTimeDs);
+    
+    //### Callbacks
+    //Inherited via TerminalPrintListener
+    void TerminalPrintHandler(nodeEntry* currentNode, const char* message) override;
 
-	//Inherited via CherrySimEventListener
-	void CherrySimEventHandler(const char* eventType) override;
-	void CherrySimBleEventHandler(nodeEntry* currentNode, simBleEvent* simBleEvent, u16 eventSize) override;
+    //Inherited via CherrySimEventListener
+    void CherrySimEventHandler(const char* eventType) override;
+    void CherrySimBleEventHandler(nodeEntry* currentNode, simBleEvent* simBleEvent, u16 eventSize) override;
 
 };

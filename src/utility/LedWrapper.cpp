@@ -34,47 +34,47 @@
 
 LedWrapper::LedWrapper(i8 io_num, bool active_high)
 {
-	Init(io_num, active_high);
+    Init(io_num, active_high);
 }
 
 LedWrapper::LedWrapper()
 {
-	//Leave uninit
+    //Leave uninit
 }
 
 void LedWrapper::Init(i8 io_num, bool active_high)
 {
-	if(io_num == -1){
-		active = false;
-		return;
-	}
-	active = true;
+    if(io_num == -1){
+        active = false;
+        return;
+    }
+    active = true;
 
-	m_io_pin = io_num;
-	m_active_high = active_high;
-	FruityHal::GpioConfigureOutput(io_num);
-	//Initially disable LED
-	Off();
+    m_io_pin = io_num;
+    m_active_high = active_high;
+    FruityHal::GpioConfigureOutput(io_num);
+    //Initially disable LED
+    Off();
 }
 
 void LedWrapper::On(void)
 {
-	if(!active) return;
-		if(m_active_high) FruityHal::GpioPinSet(m_io_pin);
-		else FruityHal::GpioPinClear(m_io_pin);
+    if(!active) return;
+        if(m_active_high) FruityHal::GpioPinSet(m_io_pin);
+        else FruityHal::GpioPinClear(m_io_pin);
 }
 
 void LedWrapper::Off(void)
 {
-	if(!active) return;
-		if(m_active_high) FruityHal::GpioPinClear(m_io_pin);
-		else FruityHal::GpioPinSet(m_io_pin);
+    if(!active) return;
+        if(m_active_high) FruityHal::GpioPinClear(m_io_pin);
+        else FruityHal::GpioPinSet(m_io_pin);
 }
 
 void LedWrapper::Toggle(void)
 {
-	if(!active) return;
-		FruityHal::GpioPinToggle(m_io_pin);
+    if(!active) return;
+        FruityHal::GpioPinToggle(m_io_pin);
 }
 
 /* EOF */

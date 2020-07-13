@@ -33,87 +33,87 @@
 
 ConnectionAllocator::ConnectionAllocator()
 {
-	for (unsigned i = 0; i < data.size() - 1; i++) {
-		data[i].nextConnection = data.data() + (i + 1);
-	}
-	data[data.size() - 1].nextConnection = NO_NEXT_CONNECTION;
-	dataHead = data.data();
+    for (unsigned i = 0; i < data.size() - 1; i++) {
+        data[i].nextConnection = data.data() + (i + 1);
+    }
+    data[data.size() - 1].nextConnection = NO_NEXT_CONNECTION;
+    dataHead = data.data();
 }
 
 ConnectionAllocator & ConnectionAllocator::getInstance()
 {
-	return GS->connectionAllocator;
+    return GS->connectionAllocator;
 }
 
 ConnectionAllocator::AnyConnection * ConnectionAllocator::allocateMemory()
 {
-	if (dataHead == NO_NEXT_CONNECTION)
-	{
-		SIMEXCEPTION(OutOfMemoryException);                                                       //LCOV_EXCL_LINE assertion
-		GS->logger.logCustomError(CustomErrorTypes::FATAL_CONNECTION_ALLOCATOR_OUT_OF_MEMORY, 0); //LCOV_EXCL_LINE assertion
-		return nullptr;                                                                           //LCOV_EXCL_LINE assertion
-	}
-	AnyConnection* oldHead = dataHead; 
-	static_assert(sizeof(void*) == 4, "Only 32 bit supported!");
-	if (!Utility::CompareMem(0x00, (u8*)oldHead + sizeof(void*), sizeof(AnyConnection) - sizeof(void*))) {
-		SIMEXCEPTION(MemoryCorruptionException); //LCOV_EXCL_LINE assertion
-	}
-	dataHead = dataHead->nextConnection;
-	oldHead->nextConnection = 0;
-	
-	return oldHead;
+    if (dataHead == NO_NEXT_CONNECTION)
+    {
+        SIMEXCEPTION(OutOfMemoryException);                                                       //LCOV_EXCL_LINE assertion
+        GS->logger.logCustomError(CustomErrorTypes::FATAL_CONNECTION_ALLOCATOR_OUT_OF_MEMORY, 0); //LCOV_EXCL_LINE assertion
+        return nullptr;                                                                           //LCOV_EXCL_LINE assertion
+    }
+    AnyConnection* oldHead = dataHead; 
+    static_assert(sizeof(void*) == 4, "Only 32 bit supported!");
+    if (!Utility::CompareMem(0x00, (u8*)oldHead + sizeof(void*), sizeof(AnyConnection) - sizeof(void*))) {
+        SIMEXCEPTION(MemoryCorruptionException); //LCOV_EXCL_LINE assertion
+    }
+    dataHead = dataHead->nextConnection;
+    oldHead->nextConnection = 0;
+    
+    return oldHead;
 }
 
 MeshConnection * ConnectionAllocator::allocateMeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, u16 partnerWriteCharacteristicHandle)
 {
-	MeshConnection* retVal = reinterpret_cast<MeshConnection*>(allocateMemory());
-	new (retVal) MeshConnection(id, direction, partnerAddress, partnerWriteCharacteristicHandle);
-	return retVal;
+    MeshConnection* retVal = reinterpret_cast<MeshConnection*>(allocateMemory());
+    new (retVal) MeshConnection(id, direction, partnerAddress, partnerWriteCharacteristicHandle);
+    return retVal;
 }
 ResolverConnection * ConnectionAllocator::allocateResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress)
 {
-	ResolverConnection* retVal = reinterpret_cast<ResolverConnection*>(allocateMemory());
-	new (retVal) ResolverConnection(id, direction, partnerAddress);
-	return retVal;
+    ResolverConnection* retVal = reinterpret_cast<ResolverConnection*>(allocateMemory());
+    new (retVal) ResolverConnection(id, direction, partnerAddress);
+    return retVal;
 }
 MeshAccessConnection * ConnectionAllocator::allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualPartnerId)
 {
-	MeshAccessConnection* retVal = reinterpret_cast<MeshAccessConnection*>(allocateMemory());
-	new (retVal) MeshAccessConnection(id, direction, partnerAddress, fmKeyId, tunnelType, overwriteVirtualPartnerId);
-	return retVal;
+    MeshAccessConnection* retVal = reinterpret_cast<MeshAccessConnection*>(allocateMemory());
+    new (retVal) MeshAccessConnection(id, direction, partnerAddress, fmKeyId, tunnelType, overwriteVirtualPartnerId);
+    return retVal;
 }
 #if IS_ACTIVE(CLC_CONN)
 #ifndef GITHUB_RELEASE
 ClcAppConnection * ConnectionAllocator::allocateClcAppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress)
 {
-	ClcAppConnection* retVal = reinterpret_cast<ClcAppConnection*>(allocateMemory());
-	new (retVal) ClcAppConnection(id, direction, partnerAddress);
-	return retVal;
+    ClcAppConnection* retVal = reinterpret_cast<ClcAppConnection*>(allocateMemory());
+    new (retVal) ClcAppConnection(id, direction, partnerAddress);
+    return retVal;
 }
 #endif //GITHUB_RELEASE
 #endif
 
 void ConnectionAllocator::deallocate(BaseConnection * bc)
 {
-	if (bc == nullptr) return;
-	if (Utility::CompareMem(0x00, (u8*)bc, sizeof(AnyConnection))) {
-		                                            //Probable reason: You deallocated this connection twice!
-		SIMEXCEPTION(MemoryCorruptionException);    //It is highly likely that a valid connection is not full of zeros.
-		                                            //Remove this check if this assumption ever breaks and was not a bug.
+    if (bc == nullptr) return;
+    if (Utility::CompareMem(0x00, (u8*)bc, sizeof(AnyConnection))) {
+                                                    //Probable reason: You deallocated this connection twice!
+        SIMEXCEPTION(MemoryCorruptionException);    //It is highly likely that a valid connection is not full of zeros.
+                                                    //Remove this check if this assumption ever breaks and was not a bug.
 
-	}
-	if ((void*)bc < data.data() || (void*)bc > data.data() + sizeof(data)) {
-		SIMEXCEPTION(NotFromThisAllocatorException);//The allocator does not know this memory and does not own it! Wherever
-		                                            //you got this connection from, it was not from this allocator!
-	}
+    }
+    if ((void*)bc < data.data() || (void*)bc > data.data() + sizeof(data)) {
+        SIMEXCEPTION(NotFromThisAllocatorException);//The allocator does not know this memory and does not own it! Wherever
+                                                    //you got this connection from, it was not from this allocator!
+    }
 
-	bc->~BaseConnection();
-	// The following is valid as we completely own and manage that memory region inside the
-	// ConnectionAllocator, calling the destructors and constructors (via placement new) manually.
-	// cppcheck-suppress memsetClass
-	CheckedMemset((u8*)bc, 0, sizeof(AnyConnection));
-	
-	AnyConnection* ac = reinterpret_cast<AnyConnection*>(bc);
-	ac->nextConnection = dataHead;
-	dataHead = ac;
+    bc->~BaseConnection();
+    // The following is valid as we completely own and manage that memory region inside the
+    // ConnectionAllocator, calling the destructors and constructors (via placement new) manually.
+    // cppcheck-suppress memsetClass
+    CheckedMemset((u8*)bc, 0, sizeof(AnyConnection));
+    
+    AnyConnection* ac = reinterpret_cast<AnyConnection*>(bc);
+    ac->nextConnection = dataHead;
+    dataHead = ac;
 }

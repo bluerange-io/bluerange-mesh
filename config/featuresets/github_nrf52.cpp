@@ -41,63 +41,63 @@
 
 void setBoardConfiguration_github_nrf52(BoardConfiguration* c)
 {
-	//Additional boards can be put in here to be selected at runtime
-	//BoardConfiguration* c = (BoardConfiguration*)config;
-	//e.g. setBoard_123(c);
+    //Additional boards can be put in here to be selected at runtime
+    //BoardConfiguration* c = (BoardConfiguration*)config;
+    //e.g. setBoard_123(c);
 }
 
 void setFeaturesetConfiguration_github_nrf52(ModuleConfiguration* config, void* module)
 {
-	if (config->moduleId == ModuleId::CONFIG)
-	{
-		Conf::getInstance().defaultLedMode = LedMode::CONNECTIONS;
-		Conf::getInstance().terminalMode = TerminalMode::PROMPT;
-	}
-	else if (config->moduleId == ModuleId::NODE)
-	{
-		//Specifies a default enrollment for the github configuration
-		//This enrollment will be overwritten as soon as the node is either enrolled or the enrollment removed
-		NodeConfiguration* c = (NodeConfiguration*) config;
-		c->enrollmentState = EnrollmentState::ENROLLED;
-		c->networkId = 11;
-		CheckedMemset(c->networkKey, 0x00, 16);
-	}
+    if (config->moduleId == ModuleId::CONFIG)
+    {
+        Conf::getInstance().defaultLedMode = LedMode::CONNECTIONS;
+        Conf::getInstance().terminalMode = TerminalMode::PROMPT;
+    }
+    else if (config->moduleId == ModuleId::NODE)
+    {
+        //Specifies a default enrollment for the github configuration
+        //This enrollment will be overwritten as soon as the node is either enrolled or the enrollment removed
+        NodeConfiguration* c = (NodeConfiguration*) config;
+        c->enrollmentState = EnrollmentState::ENROLLED;
+        c->networkId = 11;
+        CheckedMemset(c->networkKey, 0x00, 16);
+    }
 }
 
 u32 initializeModules_github_nrf52(bool createModule)
 {
-	u32 size = 0;
-	size += GS->InitializeModule<DebugModule>(createModule);
-	size += GS->InitializeModule<StatusReporterModule>(createModule);
-	size += GS->InitializeModule<AdvertisingModule>(createModule);
-	size += GS->InitializeModule<ScanningModule>(createModule);
-	size += GS->InitializeModule<EnrollmentModule>(createModule);
-	size += GS->InitializeModule<IoModule>(createModule);
-	size += GS->InitializeModule<MeshAccessModule>(createModule);
-	return size;
+    u32 size = 0;
+    size += GS->InitializeModule<DebugModule>(createModule);
+    size += GS->InitializeModule<StatusReporterModule>(createModule);
+    size += GS->InitializeModule<AdvertisingModule>(createModule);
+    size += GS->InitializeModule<ScanningModule>(createModule);
+    size += GS->InitializeModule<EnrollmentModule>(createModule);
+    size += GS->InitializeModule<IoModule>(createModule);
+    size += GS->InitializeModule<MeshAccessModule>(createModule);
+    return size;
 }
 
 DeviceType getDeviceType_github_nrf52()
 {
-	return DeviceType::STATIC;
+    return DeviceType::STATIC;
 }
 
 Chipset getChipset_github_nrf52()
 {
-	return Chipset::CHIP_NRF52;
+    return Chipset::CHIP_NRF52;
 }
 
 FeatureSetGroup getFeatureSetGroup_github_nrf52()
 {
-	return FeatureSetGroup::NRF52_MESH;
+    return FeatureSetGroup::NRF52_MESH;
 }
 
 u32 getWatchdogTimeout_github_nrf52()
 {
-	return 32768UL * 60 * 60 * 2;
+    return 32768UL * 60 * 60 * 2;
 }
 
 u32 getWatchdogTimeoutSafeBoot_github_nrf52()
 {
-	return 32768UL * 20UL;
+    return 32768UL * 20UL;
 }

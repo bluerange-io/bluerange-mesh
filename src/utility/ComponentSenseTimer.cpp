@@ -32,25 +32,25 @@
 
 bool ComponentSenseTimer::shouldTrigger(u32 passedTimeDs)
 {
-	timeSinceLastComponentSenseSentDs += passedTimeDs;
-	u32 additionalWaitTime = amountOfRepeatedMessages * amountOfRepeatedMessages;
-	if (additionalWaitTime > TIME_BETWEEN_REPEATS_MAX_DS)
-	{
-		additionalWaitTime = TIME_BETWEEN_REPEATS_MAX_DS;
-	}
+    timeSinceLastComponentSenseSentDs += passedTimeDs;
+    u32 additionalWaitTime = amountOfRepeatedMessages * amountOfRepeatedMessages;
+    if (additionalWaitTime > TIME_BETWEEN_REPEATS_MAX_DS)
+    {
+        additionalWaitTime = TIME_BETWEEN_REPEATS_MAX_DS;
+    }
 
-	if (timeSinceLastComponentSenseSentDs > TIME_BETWEEN_REPEATS_BASE_DS + RANDOM_EVENT_OFFSET_MAX_DS + additionalWaitTime)
-	{
-		timeSinceLastComponentSenseSentDs = Utility::GetRandomInteger() % RANDOM_EVENT_OFFSET_MAX_DS; //Desync nodes to put less load spikes on mesh.
-		amountOfRepeatedMessages++;
-		return true;
-	}
-	return false;
+    if (timeSinceLastComponentSenseSentDs > TIME_BETWEEN_REPEATS_BASE_DS + RANDOM_EVENT_OFFSET_MAX_DS + additionalWaitTime)
+    {
+        timeSinceLastComponentSenseSentDs = Utility::GetRandomInteger() % RANDOM_EVENT_OFFSET_MAX_DS; //Desync nodes to put less load spikes on mesh.
+        amountOfRepeatedMessages++;
+        return true;
+    }
+    return false;
 }
 
 void ComponentSenseTimer::reset()
 {
-	timeSinceLastComponentSenseSentDs = 0;
-	amountOfRepeatedMessages = 0;
+    timeSinceLastComponentSenseSentDs = 0;
+    amountOfRepeatedMessages = 0;
 }
 

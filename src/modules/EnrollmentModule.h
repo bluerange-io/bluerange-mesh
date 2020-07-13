@@ -36,30 +36,30 @@
 #include <MeshAccessModule.h>
 
 enum class EnrollmentModuleSaveActions : u8{ 
-	SAVE_ENROLLMENT_ACTION, 
-	SAVE_REMOVE_ENROLLMENT_ACTION,
-	ERASE_RECORD_STORAGE,
+    SAVE_ENROLLMENT_ACTION, 
+    SAVE_REMOVE_ENROLLMENT_ACTION,
+    ERASE_RECORD_STORAGE,
 };
 
 enum class enrollmentMethods : u8{ 
-	SERIAL_2 = 0, 
-	CHIP_ID = 1, 
-	SERIAL = 2 
+    SERIAL_2 = 0, 
+    CHIP_ID = 1, 
+    SERIAL = 2 
 };
 
 enum class EnrollmentResponseCode : u8 {
-	OK                                   = 0x00,
-	// There are more enroll response codes that are taken from the Flash Storage response codes
-	ALREADY_ENROLLED_WITH_DIFFERENT_DATA = 0x10,
-	PREENROLLMENT_FAILED                 = 0x11,
-	SIG_CONFIGURATION_INVALID            = 0x12,
-	HIGHEST_POSSIBLE_VALUE               = 0xFF,
+    OK                                   = 0x00,
+    // There are more enroll response codes that are taken from the Flash Storage response codes
+    ALREADY_ENROLLED_WITH_DIFFERENT_DATA = 0x10,
+    PREENROLLMENT_FAILED                 = 0x11,
+    SIG_CONFIGURATION_INVALID            = 0x12,
+    HIGHEST_POSSIBLE_VALUE               = 0xFF,
 };
 
 #pragma pack(push, 1)
 //Module configuration that is saved persistently
 struct EnrollmentModuleConfiguration : ModuleConfiguration {
-	u8 buttonRemoveEnrollmentDs;
+    u8 buttonRemoveEnrollmentDs;
 };
 #pragma pack(pop)
 
@@ -67,73 +67,73 @@ struct EnrollmentModuleConfiguration : ModuleConfiguration {
 #pragma pack(push)
 #pragma pack(1)
 
-	constexpr int  SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE_MIN = (8);
-	constexpr int  SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE     = (73);
-	typedef struct
-	{
-		u32 serialNumberIndex;
-		NodeId newNodeId;
-		NetworkId newNetworkId;
-		std::array<u8, 16> newNetworkKey;
-		std::array<u8, 16> newUserBaseKey;
-		std::array<u8, 16> newOrganizationKey;
-		std::array<u8, 16> nodeKey; // Key used to connect to the unenrolled node
-		u8 timeoutSec : 7; //how long to try to connect to the unenrolled node, 0 means default time
-		u8 enrollOnlyIfUnenrolled : 1; //Set to 1 in order to return an error if already enrolled
+    constexpr int  SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE_MIN = (8);
+    constexpr int  SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE     = (73);
+    typedef struct
+    {
+        u32 serialNumberIndex;
+        NodeId newNodeId;
+        NetworkId newNetworkId;
+        std::array<u8, 16> newNetworkKey;
+        std::array<u8, 16> newUserBaseKey;
+        std::array<u8, 16> newOrganizationKey;
+        std::array<u8, 16> nodeKey; // Key used to connect to the unenrolled node
+        u8 timeoutSec : 7; //how long to try to connect to the unenrolled node, 0 means default time
+        u8 enrollOnlyIfUnenrolled : 1; //Set to 1 in order to return an error if already enrolled
 
-	}EnrollmentModuleSetEnrollmentBySerialMessage;
-	STATIC_ASSERT_SIZE(EnrollmentModuleSetEnrollmentBySerialMessage, 73);
+    }EnrollmentModuleSetEnrollmentBySerialMessage;
+    STATIC_ASSERT_SIZE(EnrollmentModuleSetEnrollmentBySerialMessage, 73);
 
-	struct EnrollmentModuleSetNetworkMessage
-	{
-		NetworkId newNetworkId;
-	};
-	STATIC_ASSERT_SIZE(EnrollmentModuleSetNetworkMessage, 2);
+    struct EnrollmentModuleSetNetworkMessage
+    {
+        NetworkId newNetworkId;
+    };
+    STATIC_ASSERT_SIZE(EnrollmentModuleSetNetworkMessage, 2);
 
-	enum class EnrollmentModuleSetNetworkResponse : u8
-	{
-		SUCCESS      = 0,
-		NOT_AN_ASSET = 1,
-		INVALID      = 255,
-	};
+    enum class EnrollmentModuleSetNetworkResponse : u8
+    {
+        SUCCESS      = 0,
+        NOT_AN_ASSET = 1,
+        INVALID      = 255,
+    };
 
-	struct EnrollmentModuleSetNetworkResponseMessage
-	{
-		EnrollmentModuleSetNetworkResponse response;
-	};
+    struct EnrollmentModuleSetNetworkResponseMessage
+    {
+        EnrollmentModuleSetNetworkResponse response;
+    };
 
-	constexpr int SIZEOF_ENROLLMENT_MODULE_REMOVE_ENROLLMENT = (4);
-	struct EnrollmentModuleRemoveEnrollmentMessage
-	{
-		u32 serialNumberIndex;
-	};
-	STATIC_ASSERT_SIZE(EnrollmentModuleRemoveEnrollmentMessage, SIZEOF_ENROLLMENT_MODULE_REMOVE_ENROLLMENT);
+    constexpr int SIZEOF_ENROLLMENT_MODULE_REMOVE_ENROLLMENT = (4);
+    struct EnrollmentModuleRemoveEnrollmentMessage
+    {
+        u32 serialNumberIndex;
+    };
+    STATIC_ASSERT_SIZE(EnrollmentModuleRemoveEnrollmentMessage, SIZEOF_ENROLLMENT_MODULE_REMOVE_ENROLLMENT);
 
-	//Answers
-	struct EnrollmentModuleEnrollmentResponse
-	{
-		u32 serialNumberIndex;
-		EnrollmentResponseCode result;
-	};
-	STATIC_ASSERT_SIZE(EnrollmentModuleEnrollmentResponse, 5);
+    //Answers
+    struct EnrollmentModuleEnrollmentResponse
+    {
+        u32 serialNumberIndex;
+        EnrollmentResponseCode result;
+    };
+    STATIC_ASSERT_SIZE(EnrollmentModuleEnrollmentResponse, 5);
 
-	struct EnrollmentModuleEnrollmentProposalMessage
-	{
-		u32 serialNumberIndex[3];
-	};
-	STATIC_ASSERT_SIZE(EnrollmentModuleEnrollmentProposalMessage, 12);
+    struct EnrollmentModuleEnrollmentProposalMessage
+    {
+        u32 serialNumberIndex[3];
+    };
+    STATIC_ASSERT_SIZE(EnrollmentModuleEnrollmentProposalMessage, 12);
 
-	struct EnrollmentModuleRequestProposalMessage
-	{
-		u32 serialNumberIndices[1]; //More serial Number indices may follow
-	};
-	STATIC_ASSERT_SIZE(EnrollmentModuleRequestProposalMessage, 4);
+    struct EnrollmentModuleRequestProposalMessage
+    {
+        u32 serialNumberIndices[1]; //More serial Number indices may follow
+    };
+    STATIC_ASSERT_SIZE(EnrollmentModuleRequestProposalMessage, 4);
 
-	struct EnrollmentModuleRequestProposalResponse
-	{
-		u32 serialNumberIndex;
-	};
-	STATIC_ASSERT_SIZE(EnrollmentModuleRequestProposalResponse, 4);
+    struct EnrollmentModuleRequestProposalResponse
+    {
+        u32 serialNumberIndex;
+    };
+    STATIC_ASSERT_SIZE(EnrollmentModuleRequestProposalResponse, 4);
 
 #pragma pack(pop)
 //####### Module messages end
@@ -146,136 +146,136 @@ struct EnrollmentModuleConfiguration : ModuleConfiguration {
  */
 class EnrollmentModule: public Module
 {
-	public:
-		enum class EnrollmentModuleTriggerActionMessages : u8{
-			SET_ENROLLMENT_BY_SERIAL   = 0,
-			REMOVE_ENROLLMENT          = 1,
-			//SET_ENROLLMENT_BY_SERIAL = 2, //Deprecated since version 0.7.22
-			SET_NETWORK                = 3,
-			REQUEST_PROPOSALS          = 4,
-		};
+    public:
+        enum class EnrollmentModuleTriggerActionMessages : u8{
+            SET_ENROLLMENT_BY_SERIAL   = 0,
+            REMOVE_ENROLLMENT          = 1,
+            //SET_ENROLLMENT_BY_SERIAL = 2, //Deprecated since version 0.7.22
+            SET_NETWORK                = 3,
+            REQUEST_PROPOSALS          = 4,
+        };
 
-		enum class EnrollmentModuleActionResponseMessages : u8 {
-			ENROLLMENT_RESPONSE        = 0,
-			REMOVE_ENROLLMENT_RESPONSE = 1,
-			ENROLLMENT_PROPOSAL        = 2,
-			SET_NETWORK_RESPONSE       = 3,
-			REQUEST_PROPOSALS_RESPONSE = 4,
-		};
+        enum class EnrollmentModuleActionResponseMessages : u8 {
+            ENROLLMENT_RESPONSE        = 0,
+            REMOVE_ENROLLMENT_RESPONSE = 1,
+            ENROLLMENT_PROPOSAL        = 2,
+            SET_NETWORK_RESPONSE       = 3,
+            REQUEST_PROPOSALS_RESPONSE = 4,
+        };
 
-		void DispatchPreEnrollment(Module* lastModuleCalled, PreEnrollmentReturnCode lastStatus);
+        void DispatchPreEnrollment(Module* lastModuleCalled, PreEnrollmentReturnCode lastStatus);
 
-	private:
-		#pragma pack(push, 1)
-		struct SaveEnrollmentAction {
-			NodeId sender;
-			u8 requestHandle;
-		};
+    private:
+        #pragma pack(push, 1)
+        struct SaveEnrollmentAction {
+            NodeId sender;
+            u8 requestHandle;
+        };
 
-		#pragma pack(pop)
+        #pragma pack(pop)
 
-		enum class EnrollmentStates : u8 {
-			NOT_ENROLLING,
-			PREENROLLMENT_RUNNING,
-			SCANNING,
-			CONNECTING,
-			CONNECTED,
-			MESSAGE_SENT
-		};
+        enum class EnrollmentStates : u8 {
+            NOT_ENROLLING,
+            PREENROLLMENT_RUNNING,
+            SCANNING,
+            CONNECTING,
+            CONNECTED,
+            MESSAGE_SENT
+        };
 
-		//Data for enrolling over mesh access connections
+        //Data for enrolling over mesh access connections
 #pragma pack(push)
 #pragma pack(1)
-		struct TemporaryEnrollmentData{
-			EnrollmentStates state;
-			u16 packetLength;
-			connPacketModule requestHeader;
-			union {
-				EnrollmentModuleSetEnrollmentBySerialMessage requestData;
-				EnrollmentModuleRemoveEnrollmentMessage unenrollData;
-			};
-			u32 endTimeDs;
+        struct TemporaryEnrollmentData{
+            EnrollmentStates state;
+            u16 packetLength;
+            connPacketModule requestHeader;
+            union {
+                EnrollmentModuleSetEnrollmentBySerialMessage requestData;
+                EnrollmentModuleRemoveEnrollmentMessage unenrollData;
+            };
+            u32 endTimeDs;
 
-			u32 uniqueConnId;
-		};
+            u32 uniqueConnId;
+        };
 #pragma pack(pop)
 
-		//While an enrollment request is active, we temporarily save the data here
-		//This can be used for an enrollment request
-		TemporaryEnrollmentData ted;
+        //While an enrollment request is active, we temporarily save the data here
+        //This can be used for an enrollment request
+        TemporaryEnrollmentData ted;
 
 
 
-		//Save a few nearby node serials in this proposal message
-		static constexpr int ENROLLMENT_PROPOSAL_MESSAGE_NUM_ENTRIES = 3;
-		u8 proposalIndexCounter = 0;
-		EnrollmentModuleEnrollmentProposalMessage proposal;
+        //Save a few nearby node serials in this proposal message
+        static constexpr int ENROLLMENT_PROPOSAL_MESSAGE_NUM_ENTRIES = 3;
+        u8 proposalIndexCounter = 0;
+        EnrollmentModuleEnrollmentProposalMessage proposal;
 
-		ScanJob * p_scanJob = nullptr;
+        ScanJob * p_scanJob = nullptr;
 
-		static constexpr u32 REQUEST_PROPOSAL_INDICES_LENGTH = 11;
-		u32 requestProposalIndices[REQUEST_PROPOSAL_INDICES_LENGTH];
-		NodeId reqeustProposalReqeusterNodeId = 0;
-		static constexpr u32 REQUEST_PROPOSAL_TIMEOUT_DS = SEC_TO_DS(60);
-		u32 requestProposalTimestampDs = 0;
-		u8 requestProposalRequestHandle = 0;
+        static constexpr u32 REQUEST_PROPOSAL_INDICES_LENGTH = 11;
+        u32 requestProposalIndices[REQUEST_PROPOSAL_INDICES_LENGTH];
+        NodeId reqeustProposalReqeusterNodeId = 0;
+        static constexpr u32 REQUEST_PROPOSAL_TIMEOUT_DS = SEC_TO_DS(60);
+        u32 requestProposalTimestampDs = 0;
+        u8 requestProposalRequestHandle = 0;
 
-		static constexpr u32 SCAN_TIME_DS = SEC_TO_DS(60);
-		void RefreshScanJob();
+        static constexpr u32 SCAN_TIME_DS = SEC_TO_DS(60);
+        void RefreshScanJob();
 
-		void Enroll(connPacketModule const * packet, u16 packetLength);
+        void Enroll(connPacketModule const * packet, u16 packetLength);
 
-		void EnrollOverMesh(connPacketModule const * packet, u16 packetLength, BaseConnection* connection);
+        void EnrollOverMesh(connPacketModule const * packet, u16 packetLength, BaseConnection* connection);
 
-		void SaveEnrollment(connPacketModule* packet, u16 packetLength);
+        void SaveEnrollment(connPacketModule* packet, u16 packetLength);
 
-		void SaveUnenrollment(connPacketModule* packet, u16 packetLength);
+        void SaveUnenrollment(connPacketModule* packet, u16 packetLength);
 
-		void EnrollmentConnectionConnectedHandler();
+        void EnrollmentConnectionConnectedHandler();
 
-		void EnrollNodeViaMeshAccessConnection(FruityHal::BleGapAddr& addr, const meshAccessServiceAdvMessage* advMessage);
+        void EnrollNodeViaMeshAccessConnection(FruityHal::BleGapAddr& addr, const meshAccessServiceAdvMessage* advMessage);
 
-		void SendEnrollmentResponse(EnrollmentModuleActionResponseMessages responseType, EnrollmentResponseCode result, u8 requestHandle) const;
+        void SendEnrollmentResponse(EnrollmentModuleActionResponseMessages responseType, EnrollmentResponseCode result, u8 requestHandle) const;
 
-		void Unenroll(connPacketModule const * packet, u16 packetLength);
+        void Unenroll(connPacketModule const * packet, u16 packetLength);
 
-		void NotifyNewStableSerialIndexScanned(u32 serialIndex);
+        void NotifyNewStableSerialIndexScanned(u32 serialIndex);
 
-		bool IsSerialIndexInRequestProposalAndRemove(u32 serialIndex);
+        bool IsSerialIndexInRequestProposalAndRemove(u32 serialIndex);
 
-		void SendRequestProposalResponse(u32 serialIndex);
+        void SendRequestProposalResponse(u32 serialIndex);
 
-	public:
-		DECLARE_CONFIG_AND_PACKED_STRUCT(EnrollmentModuleConfiguration);
+    public:
+        DECLARE_CONFIG_AND_PACKED_STRUCT(EnrollmentModuleConfiguration);
 
-		EnrollmentModule();
+        EnrollmentModule();
 
-		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
+        void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
 
-		void ResetToDefaultConfiguration() override final;
+        void ResetToDefaultConfiguration() override final;
 
-		void TimerEventHandler(u16 passedTimeDs) override final;
+        void TimerEventHandler(u16 passedTimeDs) override final;
 
-		void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override final;
+        void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override final;
 
-		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
+        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
 
-		//PreEnrollment
+        //PreEnrollment
 
-		void StoreTemporaryEnrollmentDataAndDispatch(connPacketModule const * packet, u16 packetLength);
+        void StoreTemporaryEnrollmentDataAndDispatch(connPacketModule const * packet, u16 packetLength);
 
-		void PreEnrollmentFailed();
+        void PreEnrollmentFailed();
 
-		//Handlers
+        //Handlers
 #if IS_ACTIVE(BUTTONS)
-		void ButtonHandler(u8 buttonId, u32 holdTimeDs) override final;
+        void ButtonHandler(u8 buttonId, u32 holdTimeDs) override final;
 #endif
 
-		#ifdef TERMINAL_ENABLED
-		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
-		#endif
+        #ifdef TERMINAL_ENABLED
+        TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
+        #endif
 
-		void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override final;
+        void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override final;
 
-		MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) override final;
+        MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) override final;
 };

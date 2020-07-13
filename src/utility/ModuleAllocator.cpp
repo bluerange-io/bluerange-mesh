@@ -32,37 +32,37 @@
 
 ModuleAllocator::ModuleAllocator()
 {
-	// do nothing.
+    // do nothing.
 }
 
 void ModuleAllocator::setMemory(u8 * block, u32 size)
 {
-	if (this->currentDataPtr != nullptr)
-	{
-		SIMEXCEPTION(ModuleAllocatorMemoryAlreadySetException);
-	}
-	this->currentDataPtr = block;
-	this->sizeLeft = size;
-	this->startSize = size;
-	CheckedMemset(block, 0, size);
+    if (this->currentDataPtr != nullptr)
+    {
+        SIMEXCEPTION(ModuleAllocatorMemoryAlreadySetException);
+    }
+    this->currentDataPtr = block;
+    this->sizeLeft = size;
+    this->startSize = size;
+    CheckedMemset(block, 0, size);
 }
 
 u32 ModuleAllocator::getMemorySize()
 {
-	return this->startSize;
+    return this->startSize;
 }
 
 void * ModuleAllocator::allocateMemory(u32 size)
 {
-	if (sizeLeft < size)
-	{
-		SIMEXCEPTION(BufferTooSmallException);
-		GS->node.Reboot(0, RebootReason::MODULE_ALLOCATOR_OUT_OF_MEMORY);
-		return nullptr;
-	}
+    if (sizeLeft < size)
+    {
+        SIMEXCEPTION(BufferTooSmallException);
+        GS->node.Reboot(0, RebootReason::MODULE_ALLOCATOR_OUT_OF_MEMORY);
+        return nullptr;
+    }
 
-	void* retVal = currentDataPtr;
-	currentDataPtr += size;
-	sizeLeft -= size;
-	return retVal;
+    void* retVal = currentDataPtr;
+    currentDataPtr += size;
+    sizeLeft -= size;
+    return retVal;
 }

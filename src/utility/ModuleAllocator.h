@@ -36,21 +36,21 @@
 class ModuleAllocator 
 {
 private:
-	u8 *currentDataPtr = nullptr;
-	u32 sizeLeft = 0;
-	u32 startSize = 0;
+    u8 *currentDataPtr = nullptr;
+    u32 sizeLeft = 0;
+    u32 startSize = 0;
 
 public:
-	ModuleAllocator();
+    ModuleAllocator();
 
-	ModuleAllocator           (const ModuleAllocator&)  = delete;
-	ModuleAllocator           (      ModuleAllocator&&) = delete;
-	ModuleAllocator& operator=(const ModuleAllocator&)  = delete;
-	ModuleAllocator& operator=(      ModuleAllocator&&) = delete;
+    ModuleAllocator           (const ModuleAllocator&)  = delete;
+    ModuleAllocator           (      ModuleAllocator&&) = delete;
+    ModuleAllocator& operator=(const ModuleAllocator&)  = delete;
+    ModuleAllocator& operator=(      ModuleAllocator&&) = delete;
 
-	void setMemory(u8 *block, u32 size);
+    void setMemory(u8 *block, u32 size);
 
-	u32 getMemorySize();
+    u32 getMemorySize();
 
-	void* allocateMemory(u32 size);
+    void* allocateMemory(u32 size);
 };

@@ -31,22 +31,22 @@
 #include "RingIndexGenerator.h"
 
 RingIndexGenerator::RingIndexGenerator(u32 startIndex, u32 arrayLength)
-	:startIndex(startIndex % arrayLength), arrayLength(arrayLength)
+    :startIndex(startIndex % arrayLength), arrayLength(arrayLength)
 {
 }
 
 u32 RingIndexGenerator::Next()
 {
-	if (!HasNext()) {
-		SIMEXCEPTION(IllegalStateException);
-		return 0;
-	}
-	const u32 retVal = (startIndex + localIndex) % arrayLength;
-	localIndex++;
-	return retVal;
+    if (!HasNext()) {
+        SIMEXCEPTION(IllegalStateException);
+        return 0;
+    }
+    const u32 retVal = (startIndex + localIndex) % arrayLength;
+    localIndex++;
+    return retVal;
 }
 
 bool RingIndexGenerator::HasNext() const
 {
-	return localIndex < arrayLength;
+    return localIndex < arrayLength;
 }

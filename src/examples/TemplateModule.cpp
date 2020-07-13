@@ -36,107 +36,107 @@
 constexpr u8 TEMPLATE_MODULE_CONFIG_VERSION = 1;
 
 TemplateModule::TemplateModule()
-	: Module(ModuleId::TEMPLATE_MODULE, "template")
+    : Module(ModuleId::TEMPLATE_MODULE, "template")
 {
-	//Register callbacks n' stuff
+    //Register callbacks n' stuff
 
-	//Save configuration to base class variables
-	//sizeof configuration must be a multiple of 4 bytes
-	configurationPointer = &configuration;
-	configurationLength = sizeof(TemplateModuleConfiguration);
+    //Save configuration to base class variables
+    //sizeof configuration must be a multiple of 4 bytes
+    configurationPointer = &configuration;
+    configurationLength = sizeof(TemplateModuleConfiguration);
 
-	//Set defaults
-	ResetToDefaultConfiguration();
+    //Set defaults
+    ResetToDefaultConfiguration();
 }
 
 void TemplateModule::ResetToDefaultConfiguration()
 {
-	//Set default configuration values
-	configuration.moduleId = moduleId;
-	configuration.moduleActive = true;
-	configuration.moduleVersion = TEMPLATE_MODULE_CONFIG_VERSION;
+    //Set default configuration values
+    configuration.moduleId = moduleId;
+    configuration.moduleActive = true;
+    configuration.moduleVersion = TEMPLATE_MODULE_CONFIG_VERSION;
 
-	//Set additional config values...
+    //Set additional config values...
 
 }
 
 void TemplateModule::ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength)
 {
-	//Version migration can be added here, e.g. if module has version 2 and config is version 1
-	if(migratableConfig->moduleVersion == 1){/* ... */};
+    //Version migration can be added here, e.g. if module has version 2 and config is version 1
+    if(migratableConfig->moduleVersion == 1){/* ... */};
 
-	//Do additional initialization upon loading the config
+    //Do additional initialization upon loading the config
 
 
-	//Start the Module...
+    //Start the Module...
 
 }
 
 void TemplateModule::TimerEventHandler(u16 passedTimeDs)
 {
-	//Do stuff on timer...
+    //Do stuff on timer...
 
 }
 
 #ifdef TERMINAL_ENABLED
 TerminalCommandHandlerReturnType TemplateModule::TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize)
 {
-	//React on commands, return true if handled, false otherwise
-	if(commandArgsSize >= 3 && TERMARGS(2, moduleName))
-	{
-		if(TERMARGS(0, "action"))
-		{
-			if(!TERMARGS(2, moduleName)) return TerminalCommandHandlerReturnType::UNKNOWN;
+    //React on commands, return true if handled, false otherwise
+    if(commandArgsSize >= 3 && TERMARGS(2, moduleName))
+    {
+        if(TERMARGS(0, "action"))
+        {
+            if(!TERMARGS(2, moduleName)) return TerminalCommandHandlerReturnType::UNKNOWN;
 
-			if(commandArgsSize >= 4 && TERMARGS(3, "argument_a"))
-			{
+            if(commandArgsSize >= 4 && TERMARGS(3, "argument_a"))
+            {
 
-			return TerminalCommandHandlerReturnType::SUCCESS;
-			}
-			else if(commandArgsSize >= 4 && TERMARGS(3, "argument_b"))
-			{
+            return TerminalCommandHandlerReturnType::SUCCESS;
+            }
+            else if(commandArgsSize >= 4 && TERMARGS(3, "argument_b"))
+            {
 
-			return TerminalCommandHandlerReturnType::SUCCESS;
-			}
+            return TerminalCommandHandlerReturnType::SUCCESS;
+            }
 
-			return TerminalCommandHandlerReturnType::UNKNOWN;
+            return TerminalCommandHandlerReturnType::UNKNOWN;
 
-		}
-	}
+        }
+    }
 
-	//Must be called to allow the module to get and set the config
-	return Module::TerminalCommandHandler(commandArgs, commandArgsSize);
+    //Must be called to allow the module to get and set the config
+    return Module::TerminalCommandHandler(commandArgs, commandArgsSize);
 }
 #endif
 
 
 void TemplateModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
 {
-	//Must call superclass for handling
-	Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
+    //Must call superclass for handling
+    Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
-	if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-		connPacketModule const * packet = (connPacketModule const *)packetHeader;
+    if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
+        connPacketModule const * packet = (connPacketModule const *)packetHeader;
 
-		//Check if our module is meant and we should trigger an action
-		if(packet->moduleId == moduleId){
-			if(packet->actionType == TemplateModuleTriggerActionMessages::MESSAGE_0){
+        //Check if our module is meant and we should trigger an action
+        if(packet->moduleId == moduleId){
+            if(packet->actionType == TemplateModuleTriggerActionMessages::MESSAGE_0){
 
-			}
-		}
-	}
+            }
+        }
+    }
 
-	//Parse Module responses
-	if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
-		connPacketModule const * packet = (connPacketModule const *)packetHeader;
+    //Parse Module responses
+    if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
+        connPacketModule const * packet = (connPacketModule const *)packetHeader;
 
-		//Check if our module is meant and we should trigger an action
-		if(packet->moduleId == moduleId)
-		{
-			if(packet->actionType == TemplateModuleActionResponseMessages::MESSAGE_0_RESPONSE)
-			{
+        //Check if our module is meant and we should trigger an action
+        if(packet->moduleId == moduleId)
+        {
+            if(packet->actionType == TemplateModuleActionResponseMessages::MESSAGE_0_RESPONSE)
+            {
 
-			}
-		}
-	}
+            }
+        }
+    }
 }

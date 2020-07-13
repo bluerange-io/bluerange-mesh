@@ -38,52 +38,52 @@
  */
 class TemplateModule: public Module
 {
-	private:
+    private:
 
-		//Module configuration that is saved persistently (size must be multiple of 4)
-		struct TemplateModuleConfiguration : ModuleConfiguration{
-			//Insert more persistent config values here
-		};
+        //Module configuration that is saved persistently (size must be multiple of 4)
+        struct TemplateModuleConfiguration : ModuleConfiguration{
+            //Insert more persistent config values here
+        };
 
-		TemplateModuleConfiguration configuration;
+        TemplateModuleConfiguration configuration;
 
-		enum TemplateModuleTriggerActionMessages{
-			MESSAGE_0 = 0
-		};
+        enum TemplateModuleTriggerActionMessages{
+            MESSAGE_0 = 0
+        };
 
-		enum TemplateModuleActionResponseMessages{
-			MESSAGE_0_RESPONSE = 0
-		};
+        enum TemplateModuleActionResponseMessages{
+            MESSAGE_0_RESPONSE = 0
+        };
 
-		/*
-		//####### Module messages (these need to be packed)
-		#pragma pack(push)
-		#pragma pack(1)
+        /*
+        //####### Module messages (these need to be packed)
+        #pragma pack(push)
+        #pragma pack(1)
 
-			#define SIZEOF_TEMPLATE_MODULE_***_MESSAGE 10
-			typedef struct
-			{
-				//Insert values here
+            #define SIZEOF_TEMPLATE_MODULE_***_MESSAGE 10
+            typedef struct
+            {
+                //Insert values here
 
-			}TemplateModule***Message;
+            }TemplateModule***Message;
 
-		#pragma pack(pop)
-		//####### Module messages end
-		*/
+        #pragma pack(pop)
+        //####### Module messages end
+        */
 
 
-	public:
-		TemplateModule();
+    public:
+        TemplateModule();
 
-		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override;
+        void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override;
 
-		void ResetToDefaultConfiguration() override;
+        void ResetToDefaultConfiguration() override;
 
-		void TimerEventHandler(u16 passedTimeDs) override;
+        void TimerEventHandler(u16 passedTimeDs) override;
 
-		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
+        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
 
-		#ifdef TERMINAL_ENABLED
-		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
-		#endif
+        #ifdef TERMINAL_ENABLED
+        TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
+        #endif
 };

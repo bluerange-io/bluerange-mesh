@@ -35,8 +35,8 @@
 #pragma pack(push, 1)
 //Module configuration that is saved persistently
 struct IoModuleConfiguration : ModuleConfiguration {
-	LedMode ledMode;
-	//Insert more persistent config values here
+    LedMode ledMode;
+    //Insert more persistent config values here
 };
 STATIC_ASSERT_SIZE(IoModuleConfiguration, 5);
 #pragma pack(pop)
@@ -47,69 +47,69 @@ STATIC_ASSERT_SIZE(IoModuleConfiguration, 5);
  */
 class IoModule: public Module
 {
-	private:
-		enum class IoModuleTriggerActionMessages : u8{
-			SET_PIN_CONFIG = 0,
-			GET_PIN_CONFIG = 1,
-			GET_PIN_LEVEL = 2,
-			SET_LED = 3 //used to trigger a signaling led
-		};
+    private:
+        enum class IoModuleTriggerActionMessages : u8{
+            SET_PIN_CONFIG = 0,
+            GET_PIN_CONFIG = 1,
+            GET_PIN_LEVEL = 2,
+            SET_LED = 3 //used to trigger a signaling led
+        };
 
-		enum class IoModuleActionResponseMessages : u8{
-			SET_PIN_CONFIG_RESULT = 0,
-			PIN_CONFIG = 1,
-			PIN_LEVEL = 2,
-			SET_LED_RESPONSE = 3
-		};
+        enum class IoModuleActionResponseMessages : u8{
+            SET_PIN_CONFIG_RESULT = 0,
+            PIN_CONFIG = 1,
+            PIN_LEVEL = 2,
+            SET_LED_RESPONSE = 3
+        };
 
-		//Combines a pin and its config
-		static constexpr int SIZEOF_GPIO_PIN_CONFIG = 2;
-		struct gpioPinConfig{
-			u8 pinNumber : 5;
-			u8 direction : 1; //configure pin as either input (0) or output (1) 
-			u8 inputBufferConnected : 1; //disconnect input buffer when port not used to save energy
-			u8 pull : 2; //pull down (1) or up (2) or disable pull (0) on pin (GpioPullMode)
-			u8 driveStrength : 3; // GPIO_PIN_CNF_DRIVE_*
-			u8 sense : 2; // if configured as input sense either high or low level
-			u8 set : 1; // set pin or unset it
-		};
-		STATIC_ASSERT_SIZE(gpioPinConfig, 2);
+        //Combines a pin and its config
+        static constexpr int SIZEOF_GPIO_PIN_CONFIG = 2;
+        struct gpioPinConfig{
+            u8 pinNumber : 5;
+            u8 direction : 1; //configure pin as either input (0) or output (1) 
+            u8 inputBufferConnected : 1; //disconnect input buffer when port not used to save energy
+            u8 pull : 2; //pull down (1) or up (2) or disable pull (0) on pin (GpioPullMode)
+            u8 driveStrength : 3; // GPIO_PIN_CNF_DRIVE_*
+            u8 sense : 2; // if configured as input sense either high or low level
+            u8 set : 1; // set pin or unset it
+        };
+        STATIC_ASSERT_SIZE(gpioPinConfig, 2);
 
 
-		//####### Module messages (these need to be packed)
-		#pragma pack(push)
-		#pragma pack(1)
+        //####### Module messages (these need to be packed)
+        #pragma pack(push)
+        #pragma pack(1)
 
-			static constexpr int SIZEOF_IO_MODULE_SET_LED_MESSAGE = 1;
-			typedef struct
-			{
-				LedMode ledMode;
+            static constexpr int SIZEOF_IO_MODULE_SET_LED_MESSAGE = 1;
+            typedef struct
+            {
+                LedMode ledMode;
 
-			}IoModuleSetLedMessage;
-			STATIC_ASSERT_SIZE(IoModuleSetLedMessage, 1);
+            }IoModuleSetLedMessage;
+            STATIC_ASSERT_SIZE(IoModuleSetLedMessage, 1);
 
-		#pragma pack(pop)
-		//####### Module messages end
+        #pragma pack(pop)
+        //####### Module messages end
 
-		u8 ledBlinkPosition = 0;
+        u8 ledBlinkPosition = 0;
 
-	public:
+    public:
 
-		DECLARE_CONFIG_AND_PACKED_STRUCT(IoModuleConfiguration);
+        DECLARE_CONFIG_AND_PACKED_STRUCT(IoModuleConfiguration);
 
-		LedMode currentLedMode;
+        LedMode currentLedMode;
 
-		IoModule();
+        IoModule();
 
-		void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
+        void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
 
-		void ResetToDefaultConfiguration() override final;
+        void ResetToDefaultConfiguration() override final;
 
-		void TimerEventHandler(u16 passedTimeDs) override final;
+        void TimerEventHandler(u16 passedTimeDs) override final;
 
-		void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
+        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
 
-		#ifdef TERMINAL_ENABLED
-		TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
-		#endif
+        #ifdef TERMINAL_ENABLED
+        TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
+        #endif
 };

@@ -53,121 +53,121 @@ constexpr u16 ATT_HEADER_SIZE = 3;
 
 enum class BleGattSrvcType : u8
 {
-	INVALID          = 0x00,
-	PRIMARY          = 0x01,
-	SECONDARY        = 0x02
+    INVALID          = 0x00,
+    PRIMARY          = 0x01,
+    SECONDARY        = 0x02
 };
 
 enum class BleGattWriteType : u8
 {
-	NOTIFICATION = 0x00,
-	INDICATION   = 0x01,
-	WRITE_REQ    = 0x02,
-	WRITE_CMD    = 0x03
+    NOTIFICATION = 0x00,
+    INDICATION   = 0x01,
+    WRITE_REQ    = 0x02,
+    WRITE_CMD    = 0x03
 };
 
 struct BleGattWriteParams
 {
-	BleGattWriteType  type; 
-	u16               offset;
-	u16               handle;
-	u16               len;
-	u8               *p_data;
+    BleGattWriteType  type; 
+    u16               offset;
+    u16               handle;
+    u16               len;
+    u8               *p_data;
 };
 
 struct BleGattUuid
 {
-	u16    uuid;
-	u8     type;
+    u16    uuid;
+    u8     type;
 };
 
 struct BleGattCharProperties
 {
-	u8 broadcast            :1;
-	u8 read                 :1;
-	u8 writeWithoutResponse :1;
-	u8 write                :1;
-	u8 notify               :1;
-	u8 indicate             :1;
-	u8 authSignedWrite      :1;
+    u8 broadcast            :1;
+    u8 read                 :1;
+    u8 writeWithoutResponse :1;
+    u8 write                :1;
+    u8 notify               :1;
+    u8 indicate             :1;
+    u8 authSignedWrite      :1;
 };
 
 struct BleGattCharExtendedProperties
 {
-	u8 reliableWrite      	:1;
-	u8 writeableAuxiliaries :1;
+    u8 reliableWrite          :1;
+    u8 writeableAuxiliaries :1;
 };
 
 struct BleGattCharPf
 {
-	u8          format;
-	int8_t      exponent;
-	u16         unit;
-	u8          nameSpace;
-	u16         desc;
+    u8          format;
+    int8_t      exponent;
+    u16         unit;
+    u8          nameSpace;
+    u16         desc;
 };
 
 struct BleGattAttributeMetadata
 {
-	BleGapConnSecMode    readPerm;
-	BleGapConnSecMode    writePerm;
-	u8                   variableLength       :1;
-	u8                   valueLocation       :2;
-	u8                   readAuthorization    :1;
-	u8                   writeAuthorization    :1;
+    BleGapConnSecMode    readPerm;
+    BleGapConnSecMode    writePerm;
+    u8                   variableLength       :1;
+    u8                   valueLocation       :2;
+    u8                   readAuthorization    :1;
+    u8                   writeAuthorization    :1;
 };
 
 struct BleGattCharMd
 {
-	BleGattCharProperties            charProperties;
-	BleGattCharExtendedProperties    charExtendedProperties;
-	u8 const                        *p_charUserDescriptor;
-	u16                              charUserDescriptorMaxSize;
-	u16                              charUserDescriptorSize;
-	BleGattCharPf const             *p_charPf;
-	BleGattAttributeMetadata const  *p_userDescriptorMd;
-	BleGattAttributeMetadata const  *p_cccdMd;
-	BleGattAttributeMetadata const  *p_sccdMd;
+    BleGattCharProperties            charProperties;
+    BleGattCharExtendedProperties    charExtendedProperties;
+    u8 const                        *p_charUserDescriptor;
+    u16                              charUserDescriptorMaxSize;
+    u16                              charUserDescriptorSize;
+    BleGattCharPf const             *p_charPf;
+    BleGattAttributeMetadata const  *p_userDescriptorMd;
+    BleGattAttributeMetadata const  *p_cccdMd;
+    BleGattAttributeMetadata const  *p_sccdMd;
 };
 
 struct BleGattAttribute
 {
-	BleGattUuid const               *p_uuid;
-	BleGattAttributeMetadata const  *p_attributeMetadata;
-	u16                              initLen;
-	u16                              initOffset;
-	u16                              maxLen;
-	u8                              *p_value;
+    BleGattUuid const               *p_uuid;
+    BleGattAttributeMetadata const  *p_attributeMetadata;
+    u16                              initLen;
+    u16                              initOffset;
+    u16                              maxLen;
+    u8                              *p_value;
 };
 
 struct BleGattCharHandles
 {
-	u16    valueHandle;
-	u16    userDescriptorHandle;
-	u16    cccdHandle;
-	u16    sccdHandle;
+    u16    valueHandle;
+    u16    userDescriptorHandle;
+    u16    cccdHandle;
+    u16    sccdHandle;
 };
 
 enum class BleGattDBDiscoveryEventType
 {
-	COMPLETE,
-	SERVICE_NOT_FOUND,
+    COMPLETE,
+    SERVICE_NOT_FOUND,
 };
 
 struct BleGattDBDiscoveryCharacteristic
 {
-	BleGattUuid charUUID;
-	u16         handleValue;
-	u16         cccdHandle;
+    BleGattUuid charUUID;
+    u16         handleValue;
+    u16         cccdHandle;
 };
 
 struct BleGattDBDiscoveryEvent
 {
-	u16                              connHandle;
-	BleGattDBDiscoveryEventType      type;
-	BleGattUuid                      serviceUUID;
-	u8                               charateristicsCount;
-	BleGattDBDiscoveryCharacteristic dbChar[6];
+    u16                              connHandle;
+    BleGattDBDiscoveryEventType      type;
+    BleGattUuid                      serviceUUID;
+    u8                               charateristicsCount;
+    BleGattDBDiscoveryCharacteristic dbChar[6];
 };
 
 }

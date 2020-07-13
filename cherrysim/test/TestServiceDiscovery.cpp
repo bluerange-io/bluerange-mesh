@@ -34,25 +34,25 @@
 
 #ifndef GITHUB_RELEASE
 TEST(TestServiceDiscovery, TestIfMeshAccessConnectionIsSetUp) {
-	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.terminalId = 0;
-	//testerConfig.verbose = true;
-	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
-	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
-	simConfig.SetToPerfectConditions();
-	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+    simConfig.SetToPerfectConditions();
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
-	tester.sim->nodes[1].uicr.CUSTOMER[9] = 123; // Change default network id of node 2
+    tester.sim->nodes[1].uicr.CUSTOMER[9] = 123; // Change default network id of node 2
 
-	tester.Start();
+    tester.Start();
 
-	//Wait for establishing mesh access connection
-	tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 2");
-	tester.SimulateForGivenTime(3000);
+    //Wait for establishing mesh access connection
+    tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 2");
+    tester.SimulateForGivenTime(3000);
 
-	//Ask for device info from second node and check if this serial number is received
-	tester.SendTerminalCommand(1, "action 0 status get_device_info");
-	tester.SimulateUntilRegexMessageReceived(1000, 1, "BBBBC");
+    //Ask for device info from second node and check if this serial number is received
+    tester.SendTerminalCommand(1, "action 0 status get_device_info");
+    tester.SimulateUntilRegexMessageReceived(1000, 1, "BBBBC");
 }
 #endif //GITHUB_RELEASE

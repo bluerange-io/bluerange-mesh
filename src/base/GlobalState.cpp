@@ -49,55 +49,55 @@ __attribute__ ((section (".noinit"))) u32 rebootMagicNumber;
 
 GlobalState::GlobalState()
 {
-	//Some initialization
-	ramRetainStructPtr = &ramRetainStruct;
-	ramRetainStructPreviousBootPtr = &ramRetainStructPreviousBoot;
-	rebootMagicNumberPtr = &rebootMagicNumber;
+    //Some initialization
+    ramRetainStructPtr = &ramRetainStruct;
+    ramRetainStructPreviousBootPtr = &ramRetainStructPreviousBoot;
+    rebootMagicNumberPtr = &rebootMagicNumber;
 #if defined(SIM_ENABLED)
-	CheckedMemset(currentEventBuffer, 0, sizeof(currentEventBuffer));
+    CheckedMemset(currentEventBuffer, 0, sizeof(currentEventBuffer));
 #endif
-	if(ramRetainStructPreviousBootPtr->rebootReason != RebootReason::UNKNOWN){
-		u32 crc = Utility::CalculateCrc32((u8*)ramRetainStructPreviousBootPtr, sizeof(RamRetainStruct) - 4);
-		if(crc != ramRetainStructPreviousBootPtr->crc32){
-			CheckedMemset(ramRetainStructPreviousBootPtr, 0x00, sizeof(RamRetainStruct));
-		}
-	}
-	CheckedMemset(scanBuffer, 0, sizeof(scanBuffer));
+    if(ramRetainStructPreviousBootPtr->rebootReason != RebootReason::UNKNOWN){
+        u32 crc = Utility::CalculateCrc32((u8*)ramRetainStructPreviousBootPtr, sizeof(RamRetainStruct) - 4);
+        if(crc != ramRetainStructPreviousBootPtr->crc32){
+            CheckedMemset(ramRetainStructPreviousBootPtr, 0x00, sizeof(RamRetainStruct));
+        }
+    }
+    CheckedMemset(scanBuffer, 0, sizeof(scanBuffer));
 }
 
 uint32_t GlobalState::SetEventHandlers(FruityHal::AppErrorHandler    appErrorHandler)
 {
-	this->appErrorHandler    = appErrorHandler;
-	return 0;
+    this->appErrorHandler    = appErrorHandler;
+    return 0;
 }
 
 void GlobalState::SetUartHandler(FruityHal::UartEventHandler uartEventHandler)
 {
-	this->uartEventHandler = uartEventHandler;
+    this->uartEventHandler = uartEventHandler;
 }
 
 void GlobalState::RegisterApplicationInterruptHandler(FruityHal::ApplicationInterruptHandler handler)
 {
-	if (numApplicationInterruptHandlers >= applicationInterruptHandlers.size())
-	{
-		logt("ERROR", "Could not register application interrupt handler");
-		SIMEXCEPTION(BufferTooSmallException);
-		logger.logCustomError(CustomErrorTypes::FATAL_FAILED_TO_REGISTER_APPLICATION_INTERRUPT_HANDLER, 0);
-		return;
-	}
-	applicationInterruptHandlers[numApplicationInterruptHandlers] = handler;
-	numApplicationInterruptHandlers++;
+    if (numApplicationInterruptHandlers >= applicationInterruptHandlers.size())
+    {
+        logt("ERROR", "Could not register application interrupt handler");
+        SIMEXCEPTION(BufferTooSmallException);
+        logger.logCustomError(CustomErrorTypes::FATAL_FAILED_TO_REGISTER_APPLICATION_INTERRUPT_HANDLER, 0);
+        return;
+    }
+    applicationInterruptHandlers[numApplicationInterruptHandlers] = handler;
+    numApplicationInterruptHandlers++;
 }
 
 void GlobalState::RegisterMainContextHandler(FruityHal::MainContextHandler handler)
 {
-	if (numMainContextHandlers >= mainContextHandlers.size())
-	{
-		logt("ERROR", "Could not register main context handler");
-		SIMEXCEPTION(BufferTooSmallException);
-		logger.logCustomError(CustomErrorTypes::FATAL_FAILED_TO_REGISTER_MAIN_CONTEXT_HANDLER, 0);
-		return;
-	}
-	mainContextHandlers[numMainContextHandlers] = handler;
-	numMainContextHandlers++;
+    if (numMainContextHandlers >= mainContextHandlers.size())
+    {
+        logt("ERROR", "Could not register main context handler");
+        SIMEXCEPTION(BufferTooSmallException);
+        logger.logCustomError(CustomErrorTypes::FATAL_FAILED_TO_REGISTER_MAIN_CONTEXT_HANDLER, 0);
+        return;
+    }
+    mainContextHandlers[numMainContextHandlers] = handler;
+    numMainContextHandlers++;
 }

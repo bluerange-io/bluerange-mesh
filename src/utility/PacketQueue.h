@@ -42,34 +42,34 @@ private:
 
 
 public:
-	//really public
-	PacketQueue(u32* buffer, u16 bufferLength);
-	u8* Reserve(u16 dataLength);
+    //really public
+    PacketQueue(u32* buffer, u16 bufferLength);
+    u8* Reserve(u16 dataLength);
     bool Put(u8* data, u16 dataLength);
-	SizedData PeekNext() const;
-	SizedData PeekNext(u8 pos) const;
-	void DiscardNext();
-	SizedData PeekLast();
-	void DiscardLast();
-	void Clean(void);
+    SizedData PeekNext() const;
+    SizedData PeekNext(u8 pos) const;
+    void DiscardNext();
+    SizedData PeekLast();
+    void DiscardLast();
+    void Clean(void);
 
-	void Print() const;
+    void Print() const;
 
-	u8 packetSendPosition = 0; //Is used to note the position in messages that consist of multiple parts
-	u8 packetSentRemaining = 0; //Is used to check how many have not yet been sent of the ones that have been queued
-	u8 packetFailedToQueueCounter = 0; //Used to store the number of time the packet failed to send
+    u8 packetSendPosition = 0; //Is used to note the position in messages that consist of multiple parts
+    u8 packetSentRemaining = 0; //Is used to check how many have not yet been sent of the ones that have been queued
+    u8 packetFailedToQueueCounter = 0; //Used to store the number of time the packet failed to send
 
-	//private
-	u8* const bufferStart;
-	u8* const bufferEnd;
-	const u16 bufferLength;
+    //private
+    u8* const bufferStart;
+    u8* const bufferEnd;
+    const u16 bufferLength;
 
-	u8* readPointer = nullptr;
-	u8* writePointer = nullptr;
+    u8* readPointer = nullptr;
+    u8* writePointer = nullptr;
 
-	u16 _numElements = 0;
-	
-	u16 numUnsentElements = 0; //Used for marking some packets as already sent (queued in the softdevice)
+    u16 _numElements = 0;
+    
+    u16 numUnsentElements = 0; //Used for marking some packets as already sent (queued in the softdevice)
 };
 
 

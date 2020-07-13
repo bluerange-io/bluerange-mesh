@@ -34,32 +34,32 @@
 #include "Terminal.h"
 
 TEST(TestTerminal, TestTokenizeLine) {
-	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.terminalId = 0;
-	//testerConfig.verbose = true;
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
 
-	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
-	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
-	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-	tester.Start();
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
 
-	for (int i = 0; i < 2; i++)	//There are some direct memory accesses so we just repeat the test once.
-	{
-		NodeIndexSetter setter(0);
-		char line[] = "This will be tokenized! Also with ~some special chars! This !is !one !token!";
-		Terminal::getInstance().TokenizeLine(line, sizeof(line));
-		ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[0], &(line[0 ])); ASSERT_STREQ(&(line[0 ]), "This");
-		ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[1], &(line[5 ])); ASSERT_STREQ(&(line[5 ]), "will");
-		ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[2], &(line[10])); ASSERT_STREQ(&(line[10]), "be");
-		ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[3], &(line[13])); ASSERT_STREQ(&(line[13]), "tokenized!");
-		ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[4], &(line[24])); ASSERT_STREQ(&(line[24]), "Also");
-		ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[5], &(line[29])); ASSERT_STREQ(&(line[29]), "with ~some");
-		ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[6], &(line[40])); ASSERT_STREQ(&(line[40]), "special");
-		ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[7], &(line[48])); ASSERT_STREQ(&(line[48]), "chars!");
-		ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[8], &(line[55])); ASSERT_STREQ(&(line[55]), "This !is !one !token!");
+    for (int i = 0; i < 2; i++)    //There are some direct memory accesses so we just repeat the test once.
+    {
+        NodeIndexSetter setter(0);
+        char line[] = "This will be tokenized! Also with ~some special chars! This !is !one !token!";
+        Terminal::getInstance().TokenizeLine(line, sizeof(line));
+        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[0], &(line[0 ])); ASSERT_STREQ(&(line[0 ]), "This");
+        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[1], &(line[5 ])); ASSERT_STREQ(&(line[5 ]), "will");
+        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[2], &(line[10])); ASSERT_STREQ(&(line[10]), "be");
+        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[3], &(line[13])); ASSERT_STREQ(&(line[13]), "tokenized!");
+        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[4], &(line[24])); ASSERT_STREQ(&(line[24]), "Also");
+        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[5], &(line[29])); ASSERT_STREQ(&(line[29]), "with ~some");
+        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[6], &(line[40])); ASSERT_STREQ(&(line[40]), "special");
+        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[7], &(line[48])); ASSERT_STREQ(&(line[48]), "chars!");
+        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[8], &(line[55])); ASSERT_STREQ(&(line[55]), "This !is !one !token!");
 
 
-	}
+    }
 }
 

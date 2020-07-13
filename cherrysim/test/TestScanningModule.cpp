@@ -38,39 +38,39 @@
 #include "ScanningModule.h"
 
 TEST(TestScanningModule, TestCommands) {
-	CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-	SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-	simConfig.terminalId = 0;
-	//testerConfig.verbose = true;
-	simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
-	simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
-	CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-	tester.Start();
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
 
 
 
-	tester.SimulateUntilClusteringDone(100 * 1000);
+    tester.SimulateUntilClusteringDone(100 * 1000);
 
-	//Creates a asset ble event and later checks if this asset is now tracked by the scanning module.
-	alignas(ble_evt_t) u8 buffer[1024];
-	CheckedMemset(buffer, 0, sizeof(buffer));
-	ble_evt_t& evt = *(ble_evt_t*)buffer;
-	advPacketServiceAndDataHeader* packet = (advPacketServiceAndDataHeader*)evt.evt.gap_evt.params.adv_report.data;
-	advPacketAssetServiceData* assetPacket = (advPacketAssetServiceData*)&packet->data;
-	evt.header.evt_id = BLE_GAP_EVT_ADV_REPORT;
-	evt.evt.gap_evt.params.adv_report.dlen = SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA;
-	evt.evt.gap_evt.params.adv_report.rssi = -45;
-	packet->flags.len = SIZEOF_ADV_STRUCTURE_FLAGS - 1;
-	packet->uuid.len = SIZEOF_ADV_STRUCTURE_UUID16 - 1;
-	packet->data.uuid.type = (u8)BleGapAdType::TYPE_SERVICE_DATA;
-	packet->data.uuid.uuid = MESH_SERVICE_DATA_SERVICE_UUID16;
-	packet->data.messageType = ServiceDataMessageType::STANDARD_ASSET;
-	assetPacket->serialNumberIndex = 10;
-	assetPacket->nodeId = 1337;
+    //Creates a asset ble event and later checks if this asset is now tracked by the scanning module.
+    alignas(ble_evt_t) u8 buffer[1024];
+    CheckedMemset(buffer, 0, sizeof(buffer));
+    ble_evt_t& evt = *(ble_evt_t*)buffer;
+    advPacketServiceAndDataHeader* packet = (advPacketServiceAndDataHeader*)evt.evt.gap_evt.params.adv_report.data;
+    advPacketAssetServiceData* assetPacket = (advPacketAssetServiceData*)&packet->data;
+    evt.header.evt_id = BLE_GAP_EVT_ADV_REPORT;
+    evt.evt.gap_evt.params.adv_report.dlen = SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA;
+    evt.evt.gap_evt.params.adv_report.rssi = -45;
+    packet->flags.len = SIZEOF_ADV_STRUCTURE_FLAGS - 1;
+    packet->uuid.len = SIZEOF_ADV_STRUCTURE_UUID16 - 1;
+    packet->data.uuid.type = (u8)BleGapAdType::TYPE_SERVICE_DATA;
+    packet->data.uuid.uuid = MESH_SERVICE_DATA_SERVICE_UUID16;
+    packet->data.messageType = ServiceDataMessageType::STANDARD_ASSET;
+    assetPacket->serialNumberIndex = 10;
+    assetPacket->nodeId = 1337;
 
-	NodeIndexSetter setter(0);
-	FruityHal::DispatchBleEvents(&evt);
-	tester.SimulateGivenNumberOfSteps(1);
+    NodeIndexSetter setter(0);
+    FruityHal::DispatchBleEvents(&evt);
+    tester.SimulateGivenNumberOfSteps(1);
 
-	//jstodo This test currently doesn't do much. Investigate if it is still needed.
+    //jstodo This test currently doesn't do much. Investigate if it is still needed.
 }

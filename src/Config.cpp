@@ -52,13 +52,13 @@ u32 fruityMeshVersion = FM_VERSION;
 
 Conf::Conf()
 {
-	CheckedMemset(_serialNumber, 0, sizeof(_serialNumber));
-	CheckedMemset(fwGroupIds, 0, sizeof(fwGroupIds));
-	CheckedMemset(defaultNetworkKey, 0, sizeof(defaultNetworkKey));
-	CheckedMemset(defaultUserBaseKey, 0, sizeof(defaultUserBaseKey));
-	CheckedMemset(&staticAccessAddress, 0, sizeof(staticAccessAddress));
+    CheckedMemset(_serialNumber, 0, sizeof(_serialNumber));
+    CheckedMemset(fwGroupIds, 0, sizeof(fwGroupIds));
+    CheckedMemset(defaultNetworkKey, 0, sizeof(defaultNetworkKey));
+    CheckedMemset(defaultUserBaseKey, 0, sizeof(defaultUserBaseKey));
+    CheckedMemset(&staticAccessAddress, 0, sizeof(staticAccessAddress));
 
-	terminalMode = TerminalMode::DISABLED;
+    terminalMode = TerminalMode::DISABLED;
 }
 
 
@@ -67,132 +67,132 @@ Conf::Conf()
 
 void Conf::RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8 * userData, u16 userDataLength)
 {
-	if (userType == (u32)RecordTypeConf::SET_SERIAL)
-	{
-		if (resultCode == RecordStorageResultCode::SUCCESS)
-		{
-			GS->node.Reboot(SEC_TO_DS(1), RebootReason::SET_SERIAL_SUCCESS);
-		}
-		else
-		{
-			//Rebooting in this case is the safest bet. The initialization sequence will just restart by the other side.
-			GS->node.Reboot(SEC_TO_DS(1), RebootReason::SET_SERIAL_FAILED);
-		}
-	}
+    if (userType == (u32)RecordTypeConf::SET_SERIAL)
+    {
+        if (resultCode == RecordStorageResultCode::SUCCESS)
+        {
+            GS->node.Reboot(SEC_TO_DS(1), RebootReason::SET_SERIAL_SUCCESS);
+        }
+        else
+        {
+            //Rebooting in this case is the safest bet. The initialization sequence will just restart by the other side.
+            GS->node.Reboot(SEC_TO_DS(1), RebootReason::SET_SERIAL_FAILED);
+        }
+    }
 }
 
 void Conf::Initialize(bool safeBootEnabled)
 {
-	this->safeBootEnabled = safeBootEnabled;
+    this->safeBootEnabled = safeBootEnabled;
 
-	fwGroupIds[0] = (NodeId)GET_CHIPSET();
-	fwGroupIds[1] = (NodeId)GET_FEATURE_SET_GROUP();
+    fwGroupIds[0] = (NodeId)GET_CHIPSET();
+    fwGroupIds[1] = (NodeId)GET_FEATURE_SET_GROUP();
 
-	//First, fill with default Settings from the codebase
-	LoadDefaults();
+    //First, fill with default Settings from the codebase
+    LoadDefaults();
 
-	//If there is UICR data available, we use it to fill uninitialized parts of the config
-	LoadDeviceConfiguration();
+    //If there is UICR data available, we use it to fill uninitialized parts of the config
+    LoadDeviceConfiguration();
 
-	//Overwrite with settings from the settings page if they exist
-	if (!safeBootEnabled) {
-		LoadSettingsFromFlashWithId(ModuleId::CONFIG, (ModuleConfiguration*)&configuration, sizeof(ConfigConfiguration));
-	}
+    //Overwrite with settings from the settings page if they exist
+    if (!safeBootEnabled) {
+        LoadSettingsFromFlashWithId(ModuleId::CONFIG, (ModuleConfiguration*)&configuration, sizeof(ConfigConfiguration));
+    }
 
-	SET_FEATURESET_CONFIGURATION(&configuration, this);
+    SET_FEATURESET_CONFIGURATION(&configuration, this);
 }
 
 void Conf::LoadDefaults(){
-	configuration.moduleId = ModuleId::CONFIG;
-	configuration.moduleVersion = 4;
-	configuration.moduleActive = true;
-	configuration.reserved = sizeof(ConfigConfiguration);
-	configuration.isSerialNumberIndexOverwritten = false;
-	configuration.overwrittenSerialNumberIndex = 0;
+    configuration.moduleId = ModuleId::CONFIG;
+    configuration.moduleVersion = 4;
+    configuration.moduleActive = true;
+    configuration.reserved = sizeof(ConfigConfiguration);
+    configuration.isSerialNumberIndexOverwritten = false;
+    configuration.overwrittenSerialNumberIndex = 0;
 
-	CheckedMemset(configuration.preferredPartnerIds, 0, sizeof(configuration.preferredPartnerIds));
-	configuration.preferredConnectionMode = PreferredConnectionMode::PENALTY;
-	configuration.amountOfPreferredPartnerIds = 0;
+    CheckedMemset(configuration.preferredPartnerIds, 0, sizeof(configuration.preferredPartnerIds));
+    configuration.preferredConnectionMode = PreferredConnectionMode::PENALTY;
+    configuration.amountOfPreferredPartnerIds = 0;
 
-	terminalMode = TerminalMode::JSON;
-	defaultLedMode = LedMode::CONNECTIONS;
+    terminalMode = TerminalMode::JSON;
+    defaultLedMode = LedMode::CONNECTIONS;
 
-	enableSinkRouting = true;
-	//Check if the BLE stack supports the number of connections and correct if not
+    enableSinkRouting = true;
+    //Check if the BLE stack supports the number of connections and correct if not
 #ifdef SIM_ENABLED
-	totalInConnections = 3;
-	meshMaxInConnections = 2;
+    totalInConnections = 3;
+    meshMaxInConnections = 2;
 #endif
 
-	meshMinConnectionInterval = 12; //FIXME_HAL: 12 units = 15ms (1.25ms steps)
-	meshMaxConnectionInterval = 12; //FIXME_HAL: 12 units = 15ms (1.25ms steps)
+    meshMinConnectionInterval = 12; //FIXME_HAL: 12 units = 15ms (1.25ms steps)
+    meshMaxConnectionInterval = 12; //FIXME_HAL: 12 units = 15ms (1.25ms steps)
 
-	meshScanIntervalHigh = 120; //FIXME_HAL: 120 units = 75ms (0.625ms steps)
-	meshScanWindowHigh = 12; //FIXME_HAL: 12 units = 7.5ms (0.625ms steps)
+    meshScanIntervalHigh = 120; //FIXME_HAL: 120 units = 75ms (0.625ms steps)
+    meshScanWindowHigh = 12; //FIXME_HAL: 12 units = 7.5ms (0.625ms steps)
 
-	meshScanIntervalLow = (u16)MSEC_TO_UNITS(250, CONFIG_UNIT_0_625_MS);
-	meshScanWindowLow = (u16)MSEC_TO_UNITS(3, CONFIG_UNIT_0_625_MS);
+    meshScanIntervalLow = (u16)MSEC_TO_UNITS(250, CONFIG_UNIT_0_625_MS);
+    meshScanWindowLow = (u16)MSEC_TO_UNITS(3, CONFIG_UNIT_0_625_MS);
 
-	//Set defaults for stuff that is loaded from UICR in case that no UICR data is present
-	manufacturerId = MANUFACTURER_ID;
-	Conf::generateRandomSerialAndNodeId();
-	CheckedMemset(configuration.nodeKey, 0x11, 16);
-	defaultNetworkId = 0;
-	CheckedMemset(defaultNetworkKey, 0xFF, 16);
-	CheckedMemset(defaultUserBaseKey, 0xFF, 16);
-	CheckedMemset(&staticAccessAddress.addr, 0xFF, 6);
-	staticAccessAddress.addr_type = FruityHal::BleGapAddrType::INVALID;
-	highToLowDiscoveryTimeSec = 0;
+    //Set defaults for stuff that is loaded from UICR in case that no UICR data is present
+    manufacturerId = MANUFACTURER_ID;
+    Conf::generateRandomSerialAndNodeId();
+    CheckedMemset(configuration.nodeKey, 0x11, 16);
+    defaultNetworkId = 0;
+    CheckedMemset(defaultNetworkKey, 0xFF, 16);
+    CheckedMemset(defaultUserBaseKey, 0xFF, 16);
+    CheckedMemset(&staticAccessAddress.addr, 0xFF, 6);
+    staticAccessAddress.addr_type = FruityHal::BleGapAddrType::INVALID;
+    highToLowDiscoveryTimeSec = 0;
 }
 
 void Conf::LoadDeviceConfiguration(){
-	DeviceConfiguration config;
-	ErrorType err = FruityHal::GetDeviceConfiguration(config);
+    DeviceConfiguration config;
+    ErrorType err = FruityHal::GetDeviceConfiguration(config);
 
-	//If Deviceconfiguration data is available, we fill various variables with the data
-	if (err == ErrorType::SUCCESS) {
-		//If magic number exists, fill Config with valid data from UICR
-		deviceConfigOrigin = DeviceConfigOrigins::UICR_CONFIG;
+    //If Deviceconfiguration data is available, we fill various variables with the data
+    if (err == ErrorType::SUCCESS) {
+        //If magic number exists, fill Config with valid data from UICR
+        deviceConfigOrigin = DeviceConfigOrigins::UICR_CONFIG;
 
-		if(!isEmpty((u8*)config.nodeKey, 16)){
-			CheckedMemcpy(configuration.nodeKey, (u8*)config.nodeKey, 16);
-		}
-		if(config.manufacturerId != EMPTY_WORD) manufacturerId = (u16)config.manufacturerId;
-		if(config.defaultNetworkId != EMPTY_WORD) defaultNetworkId = (u16)config.defaultNetworkId;
-		if(config.defaultNodeId != EMPTY_WORD) defaultNodeId = (u16)config.defaultNodeId;
-		// if(config.deviceType != EMPTY_WORD) deviceType = (deviceTypes)config.deviceType; //deprectated as of 02.07.2019
-		if(config.serialNumberIndex != EMPTY_WORD) serialNumberIndex = (u32)config.serialNumberIndex;
-		else if (config.serialNumber[0] != EMPTY_WORD) {
-			//Legacy uicr serial number support. Might be removed some day.
-			//If you want to remove it, check if any flashed device exist 
-			//and is still in use, that was not flashed with DeviceConfiguration.serialNumberIndex.
-			//If AND ONLY IF this is not the case, you can savely remove it.
-			//WARNING: To not introduce any compatibility issues with older hardware, this does only support the old 5-character serial numbers
-			//The UICR must not contain a serialNumber (should be FFFFFF...) if the serialNumber has more than 5 characters
-			char serialNumber[6];
-			CheckedMemcpy((u8*)serialNumber, (u8*)config.serialNumber, 5);
-			serialNumber[5] = '\0';
-			serialNumberIndex = Utility::GetIndexForSerial(serialNumber);
-		}
+        if(!isEmpty((u8*)config.nodeKey, 16)){
+            CheckedMemcpy(configuration.nodeKey, (u8*)config.nodeKey, 16);
+        }
+        if(config.manufacturerId != EMPTY_WORD) manufacturerId = (u16)config.manufacturerId;
+        if(config.defaultNetworkId != EMPTY_WORD) defaultNetworkId = (u16)config.defaultNetworkId;
+        if(config.defaultNodeId != EMPTY_WORD) defaultNodeId = (u16)config.defaultNodeId;
+        // if(config.deviceType != EMPTY_WORD) deviceType = (deviceTypes)config.deviceType; //deprectated as of 02.07.2019
+        if(config.serialNumberIndex != EMPTY_WORD) serialNumberIndex = (u32)config.serialNumberIndex;
+        else if (config.serialNumber[0] != EMPTY_WORD) {
+            //Legacy uicr serial number support. Might be removed some day.
+            //If you want to remove it, check if any flashed device exist 
+            //and is still in use, that was not flashed with DeviceConfiguration.serialNumberIndex.
+            //If AND ONLY IF this is not the case, you can savely remove it.
+            //WARNING: To not introduce any compatibility issues with older hardware, this does only support the old 5-character serial numbers
+            //The UICR must not contain a serialNumber (should be FFFFFF...) if the serialNumber has more than 5 characters
+            char serialNumber[6];
+            CheckedMemcpy((u8*)serialNumber, (u8*)config.serialNumber, 5);
+            serialNumber[5] = '\0';
+            serialNumberIndex = Utility::GetIndexForSerial(serialNumber);
+        }
 
-		//If no network key is present in UICR but a node key is present, use the node key for both (to migrate settings for old nodes)
-		if(isEmpty((u8*)config.networkKey, 16) && !isEmpty(configuration.nodeKey, 16)){
-			CheckedMemcpy(defaultNetworkKey, configuration.nodeKey, 16);
-		} else {
-			//Otherwise, we use the default network key
-			CheckedMemcpy(defaultNetworkKey, (u8*)config.networkKey, 16);
-		}
-	}
+        //If no network key is present in UICR but a node key is present, use the node key for both (to migrate settings for old nodes)
+        if(isEmpty((u8*)config.networkKey, 16) && !isEmpty(configuration.nodeKey, 16)){
+            CheckedMemcpy(defaultNetworkKey, configuration.nodeKey, 16);
+        } else {
+            //Otherwise, we use the default network key
+            CheckedMemcpy(defaultNetworkKey, (u8*)config.networkKey, 16);
+        }
+    }
 }
 
 u32 Conf::getFruityMeshVersion() const
 {
 #ifdef SIM_ENABLED
-	if (cherrySimInstance->currentNode->fakeDfuVersion != 0 && cherrySimInstance->currentNode->fakeDfuVersionArmed == true) {
-		return cherrySimInstance->currentNode->fakeDfuVersion;
-	}
+    if (cherrySimInstance->currentNode->fakeDfuVersion != 0 && cherrySimInstance->currentNode->fakeDfuVersionArmed == true) {
+        return cherrySimInstance->currentNode->fakeDfuVersion;
+    }
 #endif
-	return fruityMeshVersion;
+    return fruityMeshVersion;
 }
 
 
@@ -200,45 +200,45 @@ u32 Conf::getFruityMeshVersion() const
 
 void Conf::LoadSettingsFromFlashWithId(ModuleId moduleId, ModuleConfiguration* configurationPointer, u16 configurationLength)
 {
-	Conf::LoadSettingsFromFlash(nullptr, moduleId, configurationPointer, configurationLength);
+    Conf::LoadSettingsFromFlash(nullptr, moduleId, configurationPointer, configurationLength);
 }
 
 Conf & Conf::getInstance()
 {
-	return GS->config;
+    return GS->config;
 }
 
 void Conf::LoadSettingsFromFlash(Module* module, ModuleId moduleId, ModuleConfiguration* configurationPointer, u16 configurationLength)
 {
-	if (!safeBootEnabled) {
-		SizedData configData = GS->recordStorage.GetRecordData((u16)moduleId);
+    if (!safeBootEnabled) {
+        SizedData configData = GS->recordStorage.GetRecordData((u16)moduleId);
 
-		//Check if configuration exists and has the correct version, if yes, copy to module configuration struct
-		if (configData.length > SIZEOF_MODULE_CONFIGURATION_HEADER && ((ModuleConfiguration*)configData.data)->moduleVersion == configurationPointer->moduleVersion) {
-			CheckedMemcpy((u8*)configurationPointer, configData.data, configData.length);
+        //Check if configuration exists and has the correct version, if yes, copy to module configuration struct
+        if (configData.length > SIZEOF_MODULE_CONFIGURATION_HEADER && ((ModuleConfiguration*)configData.data)->moduleVersion == configurationPointer->moduleVersion) {
+            CheckedMemcpy((u8*)configurationPointer, configData.data, configData.length);
 
-			logt("CONFIG", "Config for module %u loaded", (u32)moduleId);
+            logt("CONFIG", "Config for module %u loaded", (u32)moduleId);
 
-			if(module != nullptr) module->ConfigurationLoadedHandler(nullptr, 0);
-		}
-		//If the configuration has a different version, we call the migration if it exists
-		else if(configData.length > SIZEOF_MODULE_CONFIGURATION_HEADER){
-			logt("CONFIG", "Flash config for module %u has mismatching version", (u32)moduleId);
+            if(module != nullptr) module->ConfigurationLoadedHandler(nullptr, 0);
+        }
+        //If the configuration has a different version, we call the migration if it exists
+        else if(configData.length > SIZEOF_MODULE_CONFIGURATION_HEADER){
+            logt("CONFIG", "Flash config for module %u has mismatching version", (u32)moduleId);
 
-			if(module != nullptr) module->ConfigurationLoadedHandler((ModuleConfiguration*)configData.data, configData.length);
-		}
-		else {
-			logt("CONFIG", "No flash config for module %u found, using defaults", (u32)moduleId);
+            if(module != nullptr) module->ConfigurationLoadedHandler((ModuleConfiguration*)configData.data, configData.length);
+        }
+        else {
+            logt("CONFIG", "No flash config for module %u found, using defaults", (u32)moduleId);
 
-			if(module != nullptr) module->ConfigurationLoadedHandler(nullptr, 0);
-		}
-	} else {
-		if(module != nullptr) module->ConfigurationLoadedHandler(nullptr, 0);
-	}
+            if(module != nullptr) module->ConfigurationLoadedHandler(nullptr, 0);
+        }
+    } else {
+        if(module != nullptr) module->ConfigurationLoadedHandler(nullptr, 0);
+    }
 }
 
 uint32_t uint_pow(uint32_t base, uint32_t exponent){
-	uint32_t result = 1;
+    uint32_t result = 1;
     while (exponent){
         if (exponent & 1) result *= base;
         exponent /= 2;
@@ -248,79 +248,79 @@ uint32_t uint_pow(uint32_t base, uint32_t exponent){
 }
 
 void Conf::generateRandomSerialAndNodeId(){
-	//Generate a random serial number for testing from the open source testing range (FMBBB - FM999)
-	serialNumberIndex = (FruityHal::GetDeviceId() % (SERIAL_NUMBER_FM_TESTING_RANGE_END - SERIAL_NUMBER_FM_TESTING_RANGE_START)) + SERIAL_NUMBER_FM_TESTING_RANGE_START;
+    //Generate a random serial number for testing from the open source testing range (FMBBB - FM999)
+    serialNumberIndex = (FruityHal::GetDeviceId() % (SERIAL_NUMBER_FM_TESTING_RANGE_END - SERIAL_NUMBER_FM_TESTING_RANGE_START)) + SERIAL_NUMBER_FM_TESTING_RANGE_START;
 
-	defaultNodeId = serialNumberIndex % NODE_ID_DEVICE_BASE_SIZE; //nodeId must stay within valid range
+    defaultNodeId = serialNumberIndex % NODE_ID_DEVICE_BASE_SIZE; //nodeId must stay within valid range
 }
 
 //Tests if a memory region in flash storage is empty (0xFF)
 bool Conf::isEmpty(const u8* mem, u16 numBytes) const{
-	for(u32 i=0; i<numBytes; i++){
-		if(mem[i] != 0xFF) return false;
-	}
-	return true;
+    for(u32 i=0; i<numBytes; i++){
+        if(mem[i] != 0xFF) return false;
+    }
+    return true;
 }
 
 u32 Conf::GetSerialNumberIndex() const
 {
-	if (configuration.isSerialNumberIndexOverwritten) {
-		return configuration.overwrittenSerialNumberIndex;
-	}
-	else {
-		return serialNumberIndex;
-	}
+    if (configuration.isSerialNumberIndexOverwritten) {
+        return configuration.overwrittenSerialNumberIndex;
+    }
+    else {
+        return serialNumberIndex;
+    }
 }
 
 const char * Conf::GetSerialNumber() const
 {
-	Utility::GenerateBeaconSerialForIndex(GetSerialNumberIndex(), _serialNumber);
-	return _serialNumber;
+    Utility::GenerateBeaconSerialForIndex(GetSerialNumberIndex(), _serialNumber);
+    return _serialNumber;
 }
 
 void Conf::SetSerialNumberIndex(u32 serialNumber)
 {
-	if (serialNumber == INVALID_SERIAL_NUMBER_INDEX)
-	{
-		SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
-	}
+    if (serialNumber == INVALID_SERIAL_NUMBER_INDEX)
+    {
+        SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
+    }
 
-	//Already has this serial number
-	if (serialNumber == configuration.overwrittenSerialNumberIndex && configuration.isSerialNumberIndexOverwritten) return;
+    //Already has this serial number
+    if (serialNumber == configuration.overwrittenSerialNumberIndex && configuration.isSerialNumberIndexOverwritten) return;
 
-	configuration.overwrittenSerialNumberIndex = serialNumber;
-	configuration.isSerialNumberIndexOverwritten = true;
+    configuration.overwrittenSerialNumberIndex = serialNumber;
+    configuration.isSerialNumberIndexOverwritten = true;
 
-	RecordStorageResultCode err = Utility::SaveModuleSettingsToFlashWithId(ModuleId::CONFIG, &configuration, sizeof(ConfigConfiguration), this, (u32)RecordTypeConf::SET_SERIAL, nullptr, 0);
-	if (err != RecordStorageResultCode::SUCCESS)
-	{
-		//Rebooting in this case is the safest bet. The initialization sequence will just restart by the other side.
-		GS->node.Reboot(SEC_TO_DS(1), RebootReason::SET_SERIAL_FAILED);
-	}
+    RecordStorageResultCode err = Utility::SaveModuleSettingsToFlashWithId(ModuleId::CONFIG, &configuration, sizeof(ConfigConfiguration), this, (u32)RecordTypeConf::SET_SERIAL, nullptr, 0);
+    if (err != RecordStorageResultCode::SUCCESS)
+    {
+        //Rebooting in this case is the safest bet. The initialization sequence will just restart by the other side.
+        GS->node.Reboot(SEC_TO_DS(1), RebootReason::SET_SERIAL_FAILED);
+    }
 }
 
 const u8 * Conf::GetNodeKey() const
 {
-	return configuration.nodeKey;
+    return configuration.nodeKey;
 }
 
 void Conf::GetRestrainedKey(u8* buffer) const
 {
-	Aes128Block key;
-	CheckedMemcpy(key.data, GetNodeKey(), 16);
+    Aes128Block key;
+    CheckedMemcpy(key.data, GetNodeKey(), 16);
 
-	Aes128Block messageBlock;
-	CheckedMemcpy(messageBlock.data, RESTRAINED_KEY_CLEAR_TEXT, 16);
+    Aes128Block messageBlock;
+    CheckedMemcpy(messageBlock.data, RESTRAINED_KEY_CLEAR_TEXT, 16);
 
-	Aes128Block restrainedKeyBlock;
-	Utility::Aes128BlockEncrypt(&messageBlock, &key, &restrainedKeyBlock);
+    Aes128Block restrainedKeyBlock;
+    Utility::Aes128BlockEncrypt(&messageBlock, &key, &restrainedKeyBlock);
 
-	CheckedMemcpy(buffer, restrainedKeyBlock.data, 16);
+    CheckedMemcpy(buffer, restrainedKeyBlock.data, 16);
 }
 
 void Conf::SetNodeKey(const u8 * key)
 {
-	CheckedMemcpy(configuration.nodeKey, key, 16);
+    CheckedMemcpy(configuration.nodeKey, key, 16);
 
-	Utility::SaveModuleSettingsToFlashWithId(ModuleId::CONFIG, &configuration, sizeof(ConfigConfiguration), nullptr, 0, nullptr, 0);
+    Utility::SaveModuleSettingsToFlashWithId(ModuleId::CONFIG, &configuration, sizeof(ConfigConfiguration), nullptr, 0, nullptr, 0);
 }

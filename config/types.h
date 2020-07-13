@@ -49,17 +49,17 @@ extern "C" {
 
 #if defined(DEBUG) && !defined(SIM_ENABLED)
 #define FRUITYMESH_ERROR_CHECK(ERR_CODE)                          \
-	if ((u32)ERR_CODE != 0)                                       \
-	{                                                             \
-		logt("ERROR", "App error code:%s(%u), file:%s, line:%u", Logger::getGeneralErrorString((ErrorType)ERR_CODE), (u32)ERR_CODE, p_file_name, (u32)line_num); \
-		GS->appErrorHandler((u32)ERR_CODE);                       \
-	}
+    if ((u32)ERR_CODE != 0)                                       \
+    {                                                             \
+        logt("ERROR", "App error code:%s(%u), file:%s, line:%u", Logger::getGeneralErrorString((ErrorType)ERR_CODE), (u32)ERR_CODE, p_file_name, (u32)line_num); \
+        GS->appErrorHandler((u32)ERR_CODE);                       \
+    }
 #else
 #define FRUITYMESH_ERROR_CHECK(ERR_CODE)                          \
-	if ((u32)ERR_CODE != 0)                                       \
-	{                                                             \
-		GS->appErrorHandler((u32)ERR_CODE);                       \
-	}
+    if ((u32)ERR_CODE != 0)                                       \
+    {                                                             \
+        GS->appErrorHandler((u32)ERR_CODE);                       \
+    }
 #endif // defined(DEBUG) && !defined(SIM_ENABLED)
 
 #ifdef SIM_ENABLED
@@ -136,29 +136,29 @@ constexpr u32 REBOOT_MAGIC_NUMBER = 0xE0F7213C;
 // air with a given firmware. For an update, the firmware group ids must match.
 enum class FeatureSetGroup : NodeId
 {
-	INVALID                                               = 0,
-	//These comments are used to parse values with FruityDeploy (do not remove)
-	//                              CHIP_NRF51            = 20000,
-	//                              CHIP_NRF52            = 20001,
-	//                              NRF51_SINK            = 20002, //Deprecated as of 09.04.2020
-	/*FruityDeploy-FeatureSetGroup*/NRF51_MESH            = 20003,
-	/*FruityDeploy-FeatureSetGroup*/NRF52_MESH            = 20004,
-	//                              NRF51_ASSET           = 20005, //Deprecated as of 09.04.2020
-	/*FruityDeploy-FeatureSetGroup*/NRF52_ASSET           = 20006,
-	/*FruityDeploy-FeatureSetGroup*/NRF52_CLC_MESH        = 20007,
-	//                              NRF51_CLC_SINK        = 20008, //Deprecated as of 09.04.2020
-	/*FruityDeploy-FeatureSetGroup*/NRF52_VS_MESH         = 20009,
-	/*FruityDeploy-FeatureSetGroup*/NRF52_VS_SINK         = 20010,
-	/*FruityDeploy-FeatureSetGroup*/NRF52_SINK            = 20011,
-	//                              NRF51_EINK            = 20012, //Deprecated as of 09.04.2020
-	/*FruityDeploy-FeatureSetGroup*/NRF52840_WM_MESH      = 20013,
-	/*FruityDeploy-FeatureSetGroup*/NRF52_PC_BRIDGE       = 20014,
-	//                              CHIP_NRF52840         = 20015,
-	/*FruityDeploy-FeatureSetGroup*/NRF52840_MESH         = 20016,
-	/*FruityDeploy-FeatureSetGroup*/NRF52840_SINK_USB     = 20017,
-	/*FruityDeploy-FeatureSetGroup*/NRF52840_MESH_USB     = 20018,
-	/*FruityDeploy-FeatureSetGroup*/NRF52840_BP_MESH      = 20019,
-	/*FruityDeploy-FeatureSetGroup*/NRF52_EINK            = 20020,
+    INVALID                                               = 0,
+    //These comments are used to parse values with FruityDeploy (do not remove)
+    //                              CHIP_NRF51            = 20000,
+    //                              CHIP_NRF52            = 20001,
+    //                              NRF51_SINK            = 20002, //Deprecated as of 09.04.2020
+    /*FruityDeploy-FeatureSetGroup*/NRF51_MESH            = 20003,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_MESH            = 20004,
+    //                              NRF51_ASSET           = 20005, //Deprecated as of 09.04.2020
+    /*FruityDeploy-FeatureSetGroup*/NRF52_ASSET           = 20006,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_CLC_MESH        = 20007,
+    //                              NRF51_CLC_SINK        = 20008, //Deprecated as of 09.04.2020
+    /*FruityDeploy-FeatureSetGroup*/NRF52_VS_MESH         = 20009,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_VS_SINK         = 20010,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_SINK            = 20011,
+    //                              NRF51_EINK            = 20012, //Deprecated as of 09.04.2020
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_WM_MESH      = 20013,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_PC_BRIDGE       = 20014,
+    //                              CHIP_NRF52840         = 20015,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_MESH         = 20016,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_SINK_USB     = 20017,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_MESH_USB     = 20018,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_BP_MESH      = 20019,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_EINK            = 20020,
 };
 
 //Sets the maximum number of firmware group ids that can be compiled into the firmware
@@ -170,12 +170,12 @@ constexpr u32 MAX_NUM_FW_GROUP_IDS = 2;
 #pragma pack(push)
 #pragma pack(1)
 union VendorSerial {
-	struct {
-		u32 vendorSerialId : 15; //An incrementing range for each vendor
-		u32 vendorId : 16; //Must be set to the vendor id assigned by the Bluetooth SIG, can be set to 0x024D (Mway) for testing and small projects
-		u32 vendorFlag : 1; // Must be set to 1 to indicate a vendor serialNumber
-	} parts;
-	u32 serialIndex;
+    struct {
+        u32 vendorSerialId : 15; //An incrementing range for each vendor
+        u32 vendorId : 16; //Must be set to the vendor id assigned by the Bluetooth SIG, can be set to 0x024D (Mway) for testing and small projects
+        u32 vendorFlag : 1; // Must be set to 1 to indicate a vendor serialNumber
+    } parts;
+    u32 serialIndex;
 };
 STATIC_ASSERT_SIZE(VendorSerial, 4);
 #pragma pack(pop)
@@ -185,13 +185,13 @@ STATIC_ASSERT_SIZE(VendorSerial, 4);
 #pragma pack(1)
 constexpr i32 RAM_PERSIST_STACKSTRACE_SIZE = 4; //Has to be signed as the stacktrace_handler passes an int.
 struct RamRetainStruct {
-	RebootReason rebootReason; // e.g. hardfault, softdevice fault, app fault,...
-	u32 code1;
-	u32 code2;
-	u32 code3;
-	u8 stacktraceSize;
-	u32 stacktrace[RAM_PERSIST_STACKSTRACE_SIZE];
-	u32 crc32;
+    RebootReason rebootReason; // e.g. hardfault, softdevice fault, app fault,...
+    u32 code1;
+    u32 code2;
+    u32 code3;
+    u8 stacktraceSize;
+    u32 stacktrace[RAM_PERSIST_STACKSTRACE_SIZE];
+    u32 crc32;
 };
 STATIC_ASSERT_SIZE(RamRetainStruct, RAM_PERSIST_STACKSTRACE_SIZE * 4 + 18);
 #pragma pack(pop)
@@ -203,13 +203,13 @@ STATIC_ASSERT_SIZE(RamRetainStruct, RAM_PERSIST_STACKSTRACE_SIZE * 4 + 18);
 //have to be aligned on a 4 byte boundary to be able to save them
 constexpr size_t SIZEOF_MODULE_CONFIGURATION_HEADER = 4;
 typedef struct ModuleConfiguration{
-	ModuleId moduleId; //Id of the module, compared upon load and must match
-	u8 moduleVersion; //version of the configuration
-	u8 moduleActive; //Activate or deactivate the module
-	u8 reserved;
-	//IMPORTANT: Each individual module configuration should add a reserved u32 at
-	//its end that is set to 0. Because we can only save data that is a
-	//multiple of 4 bytes. We use this variable to pad the data.
+    ModuleId moduleId; //Id of the module, compared upon load and must match
+    u8 moduleVersion; //version of the configuration
+    u8 moduleActive; //Activate or deactivate the module
+    u8 reserved;
+    //IMPORTANT: Each individual module configuration should add a reserved u32 at
+    //its end that is set to 0. Because we can only save data that is a
+    //multiple of 4 bytes. We use this variable to pad the data.
 } ModuleConfiguration;
 STATIC_ASSERT_SIZE(ModuleConfiguration, SIZEOF_MODULE_CONFIGURATION_HEADER);
 #pragma pack(pop)
@@ -227,47 +227,47 @@ constexpr u32 BOOTLOADER_BITMASK_SIZE = 60;
 
 #ifndef SIM_ENABLED
 // Location of the flash start
-#define FLASH_REGION_START_ADDRESS			0x00000000UL
+#define FLASH_REGION_START_ADDRESS            0x00000000UL
 #endif
 
 // Image types supported by the bootloader or component if a 3rd party device should be updated
 enum class ImageType : u8{
-	SOFTDEVICE = 0,
-	APP        = 1,
-	APP_FORCED = 2,
-	SD_AND_APP = 3,
-	BOOTLOADER = 4,
-	COMPONENT  = 5,
-	INVALID    = 0xFF,
+    SOFTDEVICE = 0,
+    APP        = 1,
+    APP_FORCED = 2,
+    SD_AND_APP = 3,
+    BOOTLOADER = 4,
+    COMPONENT  = 5,
+    INVALID    = 0xFF,
 };
 
 // Struct that contains the bootloader settings share between fruitymesh and bootloader
 struct BootloaderSettings {
-	u32 updatePending; //Should be set to the magic number, don't move!
-	ImageType imageType;
-	u8 reserved[3];
-	u32 sdStartPage;
-	u32 sdNumPages;
-	u32 appStartPage;
-	u32 appNumPages;
-	u32 imageStartPage;
-	u32 imageNumPages;
+    u32 updatePending; //Should be set to the magic number, don't move!
+    ImageType imageType;
+    u8 reserved[3];
+    u32 sdStartPage;
+    u32 sdNumPages;
+    u32 appStartPage;
+    u32 appNumPages;
+    u32 imageStartPage;
+    u32 imageNumPages;
 
-	u32 dfuMasterNodeId;
-	u32 dfuInProgressRequestHandle;
+    u32 dfuMasterNodeId;
+    u32 dfuInProgressRequestHandle;
 
-	u32 dfuFirmwareVersion;
-	u32 dfuNumChunks;
-	u32 dfuChunkSize;
-	u32 dfuImageCRC;
+    u32 dfuFirmwareVersion;
+    u32 dfuNumChunks;
+    u32 dfuChunkSize;
+    u32 dfuImageCRC;
 
-	//ATTENTION: nRF52 has nWrites specified with 181 word writes after which a flash page must be erased
-	u32 chunksStored[BOOTLOADER_BITMASK_SIZE]; //bit sequence of how many CHUNKS have been stored successfully
-	u32 pagesMoved[BOOTLOADER_BITMASK_SIZE]; //bit sequence of how many pages the bootloader has moved so far
+    //ATTENTION: nRF52 has nWrites specified with 181 word writes after which a flash page must be erased
+    u32 chunksStored[BOOTLOADER_BITMASK_SIZE]; //bit sequence of how many CHUNKS have been stored successfully
+    u32 pagesMoved[BOOTLOADER_BITMASK_SIZE]; //bit sequence of how many pages the bootloader has moved so far
 
-	ModuleId moduleId; //Stores the moduleId that handles the update
-	u8 reserved2[3];
-	u32 componentId; //Stores the componentId (if many updateable devices are connected to a module)
+    ModuleId moduleId; //Stores the moduleId that handles the update
+    u8 reserved2[3];
+    u32 componentId; //Stores the componentId (if many updateable devices are connected to a module)
 };
 STATIC_ASSERT_SIZE(BootloaderSettings, (16 + BOOTLOADER_BITMASK_SIZE + BOOTLOADER_BITMASK_SIZE) * sizeof(u32));
 

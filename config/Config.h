@@ -52,7 +52,7 @@ class RecordStorageEventListener;
 #define FM_VERSION_MINOR 8
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 3950
+#define FM_VERSION_PATCH 3960
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -267,217 +267,217 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 
 #ifdef __cplusplus
 enum class PreferredConnectionMode : u8 {
-	// Unpreferred connections...
-	PENALTY = 0,	//		...receive a penalty in cluster score
-	IGNORED = 1		//		...are completly ignored (cluster score is set to zero)
+    // Unpreferred connections...
+    PENALTY = 0,    //        ...receive a penalty in cluster score
+    IGNORED = 1        //        ...are completly ignored (cluster score is set to zero)
 };
 
 class Module;
 class Conf
-	: public RecordStorageEventListener
+    : public RecordStorageEventListener
 {
-	private:
-		void generateRandomSerialAndNodeId();
-		bool isEmpty(const u8* mem, u16 numBytes) const;
+    private:
+        void generateRandomSerialAndNodeId();
+        bool isEmpty(const u8* mem, u16 numBytes) const;
 
-		//Buffer for the serialNumber in ASCII format
-		mutable char _serialNumber[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
-		mutable u32 serialNumberIndex = 0;
-
-
-		enum class RecordTypeConf : u32
-		{
-			SET_SERIAL = 0,
-		};
-
-	public:
-		Conf();
-		static Conf& getInstance();
-
-		bool safeBootEnabled = false;
-
-		void LoadSettingsFromFlash(Module* module, ModuleId moduleId, ModuleConfiguration* configurationPointer, u16 configurationLength);
-		void LoadSettingsFromFlashWithId(ModuleId moduleId, ModuleConfiguration* configurationPointer, u16 configurationLength);
-
-		u32 GetSerialNumberIndex() const;
-		const char* GetSerialNumber() const;
-		void SetSerialNumberIndex(u32 serialNumber);
-
-		const u8* GetNodeKey() const;
-
-		void GetRestrainedKey(u8* buffer) const;
-
-		static constexpr const char* RESTRAINED_KEY_CLEAR_TEXT = "RESTRAINED_KEY00";
-		void SetNodeKey(const u8 *key);
-
-		//The Firmware GroupIds are used to check update compatibility if a firmware update is
-		//requested. First id should be reserved for hardware type (e.g. nrf52)
-		NodeId fwGroupIds[MAX_NUM_FW_GROUP_IDS];
-
-		//################ The following data can use defaults from the code but is
-		//################ overwritten if it exists in the DeviceConfiguration
-		//Not loaded from DeviceConfiguration but set to the place id that the config was loaded from
-		DeviceConfigOrigins deviceConfigOrigin = DeviceConfigOrigins::RANDOM_CONFIG;
-		//According to the BLE company identifiers: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
-		// (loaded from DeviceConfiguration if 0)
-		u16 manufacturerId = 0;
-		//Allows a number of mesh networks to coexist in the same physical space without collision
-		//Allowed range is 0x0000 - 0xFF00 (0 - 65280), others are reserved for special purpose
-		// (loaded from DeviceConfiguration if 0)
-		NetworkId defaultNetworkId = 0;
-		//Default network key if preenrollment should be used  (loaded from DeviceConfiguration if 0)
-		u8 defaultNetworkKey[16];
-		//Default user base key
-		u8 defaultUserBaseKey[16];
-		//The default nodeId after flashing (loaded from DeviceConfiguration if 0)
-		NodeId defaultNodeId = 0;
-		//Used to set a static random BLE address (loaded from DeviceConfiguration if type set to 0xFF)
-		FruityHal::BleGapAddr staticAccessAddress;
-		//##################
-
-		void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
-
-		void Initialize(bool safeBootEnabled);
+        //Buffer for the serialNumber in ASCII format
+        mutable char _serialNumber[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
+        mutable u32 serialNumberIndex = 0;
 
 
-		void LoadDefaults();
-		void LoadDeviceConfiguration();
-		void LoadTestDevices() const;
+        enum class RecordTypeConf : u32
+        {
+            SET_SERIAL = 0,
+        };
 
-		//If in debug mode, the node will run in endless loops when errors occur
-		static constexpr bool debugMode = false;
+    public:
+        Conf();
+        static Conf& getInstance();
 
-		//(0 - 65000) Extended timeout which is used to reconnect a known connection upon connection timeout
-		static constexpr u16 meshExtendedConnectionTimeoutSec = 10;
+        bool safeBootEnabled = false;
 
-		//(0-...) Slave latency in number of connection events
-		static constexpr u16 meshPeripheralSlaveLatency = 0;
+        void LoadSettingsFromFlash(Module* module, ModuleId moduleId, ModuleConfiguration* configurationPointer, u16 configurationLength);
+        void LoadSettingsFromFlashWithId(ModuleId moduleId, ModuleConfiguration* configurationPointer, u16 configurationLength);
 
-		//(20-1024) (100-1024 for non connectable advertising!) Determines advertising interval in units of 0.625 millisecond.
-		static constexpr u16 meshAdvertisingIntervalLow = (u16)MSEC_TO_UNITS(200, CONFIG_UNIT_0_625_MS);
+        u32 GetSerialNumberIndex() const;
+        const char* GetSerialNumber() const;
+        void SetSerialNumberIndex(u32 serialNumber);
 
-		//INITIATING
-		//(20-1024) in 0.625ms units
-		static constexpr u16 meshConnectingScanInterval = 120; //FIXME_HAL: 120 units = 75ms (0.625ms steps)
-		//(2.5-1024) in 0.625ms units
-		static constexpr u16 meshConnectingScanWindow = 60; //FIXME_HAL: 60 units = 37.5ms (0.625ms steps)
-		//(0-...) in seconds
-		static constexpr u16 meshConnectingScanTimeout = 2;
+        const u8* GetNodeKey() const;
 
-		//HANDSHAKE
-		//If the handshake has not finished after this time, the connection will be disconnected
-		static constexpr u16 meshHandshakeTimeoutDs = SEC_TO_DS(4);
+        void GetRestrainedKey(u8* buffer) const;
 
-		/*
-		 * If both conn_sup_timeout and max_conn_interval are specified, then the following constraint applies:
-		 * conn_sup_timeout * 4 > (1 + slave_latency) * max_conn_interval that corresponds to the following
-		 * BT Spec 4.1 Vol 2 Part E, Section 7.8.12 requirement: The Supervision_Timeout in milliseconds shall be
-		 * larger than (1 + Conn_Latency) * Conn_Interval_Max * 2, where Conn_Interval_Max is given in milliseconds.
-		 * https://devzone.nordicsemi.com/question/60/what-is-connection-parameters/
-		 * */
+        static constexpr const char* RESTRAINED_KEY_CLEAR_TEXT = "RESTRAINED_KEY00";
+        void SetNodeKey(const u8 *key);
 
-		 // ########### ADVERTISING ################################################
-		static constexpr u8 advertiseOnChannel37 = 1;
-		static constexpr u8 advertiseOnChannel38 = 1;
-		static constexpr u8 advertiseOnChannel39 = 1;
+        //The Firmware GroupIds are used to check update compatibility if a firmware update is
+        //requested. First id should be reserved for hardware type (e.g. nrf52)
+        NodeId fwGroupIds[MAX_NUM_FW_GROUP_IDS];
 
-		static constexpr bool enableRadioNotificationHandler = false;
+        //################ The following data can use defaults from the code but is
+        //################ overwritten if it exists in the DeviceConfiguration
+        //Not loaded from DeviceConfiguration but set to the place id that the config was loaded from
+        DeviceConfigOrigins deviceConfigOrigin = DeviceConfigOrigins::RANDOM_CONFIG;
+        //According to the BLE company identifiers: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
+        // (loaded from DeviceConfiguration if 0)
+        u16 manufacturerId = 0;
+        //Allows a number of mesh networks to coexist in the same physical space without collision
+        //Allowed range is 0x0000 - 0xFF00 (0 - 65280), others are reserved for special purpose
+        // (loaded from DeviceConfiguration if 0)
+        NetworkId defaultNetworkId = 0;
+        //Default network key if preenrollment should be used  (loaded from DeviceConfiguration if 0)
+        u8 defaultNetworkKey[16];
+        //Default user base key
+        u8 defaultUserBaseKey[16];
+        //The default nodeId after flashing (loaded from DeviceConfiguration if 0)
+        NodeId defaultNodeId = 0;
+        //Used to set a static random BLE address (loaded from DeviceConfiguration if type set to 0xFF)
+        FruityHal::BleGapAddr staticAccessAddress;
+        //##################
 
-		static constexpr bool enableConnectionRSSIMeasurement = true;
-		//Time used for each connectionInterval in 1.25ms steps (Controls throughput)
-		static constexpr u8 gapEventLength = 3;
+        void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
 
-		//When enabling encryption, the mesh handle can only be read through an encrypted connection
-		//And connections will perform an encryption before the handshake
-		static constexpr bool encryptionEnabled = true;
-
-		//If more than # nodes were found, decide immediately
-		static constexpr u8 numNodesForDecision = 4;
-		//If not enough nodes were found, decide after this timeout
-		static constexpr u16 maxTimeUntilDecisionDs = SEC_TO_DS(2);
-		//Switch to low discovery if no other nodes were found for # seconds, set to 0 to disable low discovery state
-		u16 highToLowDiscoveryTimeSec = 0; // if is not configured in featureset, low discovery will be disabled and will always be in high discovery mode
-
-		LedMode defaultLedMode = LedMode::OFF;
-
-		//If set, the node won't send anything via UART if the reboot reason is unknown and it hasn't received anything yet.
-		//This is so because the meshGW bootloader thinks that incomming UART chars are keyboard inputs.
-		bool silentStart = false;
-
-		//Configures whether the terminal will start in interactive mode or not
-		TerminalMode terminalMode : 8;
-
-		bool enableSinkRouting = false;
-		// ########### TIMINGS ################################################
-
-		//Mesh connection parameters (used when a connection is set up)
-		//(7.5-4000) Minimum acceptable connection interval
-		u16 meshMinConnectionInterval = 0;
-		//(7.5-4000) Maximum acceptable connection interval
-		u16 meshMaxConnectionInterval = 0;
-		//(100-32000) Connection supervisory timeout
-		static constexpr u16 meshConnectionSupervisionTimeout = (u16)MSEC_TO_UNITS(1000, CONFIG_UNIT_10_MS);
-
-		//Mesh discovery parameters
-		//DISCOVERY_HIGH
-		//(20-1024) (100-1024 for non connectable advertising!) Determines advertising interval in units of 0.625 millisecond.
-		static constexpr u16 meshAdvertisingIntervalHigh = (u16)MSEC_TO_UNITS(100, CONFIG_UNIT_0_625_MS);
-		//From 4 to 16384 (2.5ms to 10s) in 0.625ms Units
-		u16 meshScanIntervalHigh = 0;
-		//From 4 to 16384 (2.5ms to 10s) in 0.625ms Units
-		u16 meshScanWindowHigh = 0;
+        void Initialize(bool safeBootEnabled);
 
 
-		//DISCOVERY_LOW
-		//(20-1024) Determines scan interval in units of 0.625 millisecond.
-		u16 meshScanIntervalLow = 0;
-		//(2.5-1024) Determines scan window in units of 0.625 millisecond.
-		u16 meshScanWindowLow = 0;
+        void LoadDefaults();
+        void LoadDeviceConfiguration();
+        void LoadTestDevices() const;
+
+        //If in debug mode, the node will run in endless loops when errors occur
+        static constexpr bool debugMode = false;
+
+        //(0 - 65000) Extended timeout which is used to reconnect a known connection upon connection timeout
+        static constexpr u16 meshExtendedConnectionTimeoutSec = 10;
+
+        //(0-...) Slave latency in number of connection events
+        static constexpr u16 meshPeripheralSlaveLatency = 0;
+
+        //(20-1024) (100-1024 for non connectable advertising!) Determines advertising interval in units of 0.625 millisecond.
+        static constexpr u16 meshAdvertisingIntervalLow = (u16)MSEC_TO_UNITS(200, CONFIG_UNIT_0_625_MS);
+
+        //INITIATING
+        //(20-1024) in 0.625ms units
+        static constexpr u16 meshConnectingScanInterval = 120; //FIXME_HAL: 120 units = 75ms (0.625ms steps)
+        //(2.5-1024) in 0.625ms units
+        static constexpr u16 meshConnectingScanWindow = 60; //FIXME_HAL: 60 units = 37.5ms (0.625ms steps)
+        //(0-...) in seconds
+        static constexpr u16 meshConnectingScanTimeout = 2;
+
+        //HANDSHAKE
+        //If the handshake has not finished after this time, the connection will be disconnected
+        static constexpr u16 meshHandshakeTimeoutDs = SEC_TO_DS(4);
+
+        /*
+         * If both conn_sup_timeout and max_conn_interval are specified, then the following constraint applies:
+         * conn_sup_timeout * 4 > (1 + slave_latency) * max_conn_interval that corresponds to the following
+         * BT Spec 4.1 Vol 2 Part E, Section 7.8.12 requirement: The Supervision_Timeout in milliseconds shall be
+         * larger than (1 + Conn_Latency) * Conn_Interval_Max * 2, where Conn_Interval_Max is given in milliseconds.
+         * https://devzone.nordicsemi.com/question/60/what-is-connection-parameters/
+         * */
+
+         // ########### ADVERTISING ################################################
+        static constexpr u8 advertiseOnChannel37 = 1;
+        static constexpr u8 advertiseOnChannel38 = 1;
+        static constexpr u8 advertiseOnChannel39 = 1;
+
+        static constexpr bool enableRadioNotificationHandler = false;
+
+        static constexpr bool enableConnectionRSSIMeasurement = true;
+        //Time used for each connectionInterval in 1.25ms steps (Controls throughput)
+        static constexpr u8 gapEventLength = 3;
+
+        //When enabling encryption, the mesh handle can only be read through an encrypted connection
+        //And connections will perform an encryption before the handshake
+        static constexpr bool encryptionEnabled = true;
+
+        //If more than # nodes were found, decide immediately
+        static constexpr u8 numNodesForDecision = 4;
+        //If not enough nodes were found, decide after this timeout
+        static constexpr u16 maxTimeUntilDecisionDs = SEC_TO_DS(2);
+        //Switch to low discovery if no other nodes were found for # seconds, set to 0 to disable low discovery state
+        u16 highToLowDiscoveryTimeSec = 0; // if is not configured in featureset, low discovery will be disabled and will always be in high discovery mode
+
+        LedMode defaultLedMode = LedMode::OFF;
+
+        //If set, the node won't send anything via UART if the reboot reason is unknown and it hasn't received anything yet.
+        //This is so because the meshGW bootloader thinks that incomming UART chars are keyboard inputs.
+        bool silentStart = false;
+
+        //Configures whether the terminal will start in interactive mode or not
+        TerminalMode terminalMode : 8;
+
+        bool enableSinkRouting = false;
+        // ########### TIMINGS ################################################
+
+        //Mesh connection parameters (used when a connection is set up)
+        //(7.5-4000) Minimum acceptable connection interval
+        u16 meshMinConnectionInterval = 0;
+        //(7.5-4000) Maximum acceptable connection interval
+        u16 meshMaxConnectionInterval = 0;
+        //(100-32000) Connection supervisory timeout
+        static constexpr u16 meshConnectionSupervisionTimeout = (u16)MSEC_TO_UNITS(1000, CONFIG_UNIT_10_MS);
+
+        //Mesh discovery parameters
+        //DISCOVERY_HIGH
+        //(20-1024) (100-1024 for non connectable advertising!) Determines advertising interval in units of 0.625 millisecond.
+        static constexpr u16 meshAdvertisingIntervalHigh = (u16)MSEC_TO_UNITS(100, CONFIG_UNIT_0_625_MS);
+        //From 4 to 16384 (2.5ms to 10s) in 0.625ms Units
+        u16 meshScanIntervalHigh = 0;
+        //From 4 to 16384 (2.5ms to 10s) in 0.625ms Units
+        u16 meshScanWindowHigh = 0;
 
 
-		// ########### CONNECTION ################################################
+        //DISCOVERY_LOW
+        //(20-1024) Determines scan interval in units of 0.625 millisecond.
+        u16 meshScanIntervalLow = 0;
+        //(2.5-1024) Determines scan window in units of 0.625 millisecond.
+        u16 meshScanWindowLow = 0;
 
-		//Transmit Power used as default for this node
-		static constexpr i8 defaultDBmTX = 4;
 
-		//Depending on platform capabilities, we need to set a different amount of
-		//possible connnections, whereas the simulator will need to select that at runtime
-		//Having two meshInConnections allows us to perform clustering more easily and
-		//prevents most denial of service attacks
+        // ########### CONNECTION ################################################
+
+        //Transmit Power used as default for this node
+        static constexpr i8 defaultDBmTX = 4;
+
+        //Depending on platform capabilities, we need to set a different amount of
+        //possible connnections, whereas the simulator will need to select that at runtime
+        //Having two meshInConnections allows us to perform clustering more easily and
+        //prevents most denial of service attacks
 #ifndef SIM_ENABLED
-		static constexpr u8 totalInConnections = 3;
-		static constexpr u8 totalOutConnections = 3;
-		u8 meshMaxInConnections = 2;
-		static constexpr u8 meshMaxOutConnections = 3;
+        static constexpr u8 totalInConnections = 3;
+        static constexpr u8 totalOutConnections = 3;
+        u8 meshMaxInConnections = 2;
+        static constexpr u8 meshMaxOutConnections = 3;
 #else
-		u8 totalInConnections = 3;
-		u8 totalOutConnections = 3;
-		u8 meshMaxInConnections = 2;
-		u8 meshMaxOutConnections = 3;
+        u8 totalInConnections = 3;
+        u8 totalOutConnections = 3;
+        u8 meshMaxInConnections = 2;
+        u8 meshMaxOutConnections = 3;
 #endif // SIM_ENABLED
 
 #ifndef SIM_ENABLED
-		static_assert(totalOutConnections >= meshMaxOutConnections, "meshMaxOutConnections must not be bigger than totalOutConnections");
+        static_assert(totalOutConnections >= meshMaxOutConnections, "meshMaxOutConnections must not be bigger than totalOutConnections");
 #endif
 
-		static constexpr size_t MAX_AMOUNT_PREFERRED_PARTNER_IDS = 8;
+        static constexpr size_t MAX_AMOUNT_PREFERRED_PARTNER_IDS = 8;
 
-		u32 getFruityMeshVersion() const;
+        u32 getFruityMeshVersion() const;
 
 #pragma pack(push)
 #pragma pack(1)
-	struct ConfigConfiguration : ModuleConfiguration {
-		u32 overwrittenSerialNumberIndex;
-		bool isSerialNumberIndexOverwritten : 8;
+    struct ConfigConfiguration : ModuleConfiguration {
+        u32 overwrittenSerialNumberIndex;
+        bool isSerialNumberIndexOverwritten : 8;
 
-		NodeId preferredPartnerIds[MAX_AMOUNT_PREFERRED_PARTNER_IDS];
-		u8 amountOfPreferredPartnerIds;
-		PreferredConnectionMode preferredConnectionMode;
+        NodeId preferredPartnerIds[MAX_AMOUNT_PREFERRED_PARTNER_IDS];
+        u8 amountOfPreferredPartnerIds;
+        PreferredConnectionMode preferredConnectionMode;
 
-		u8 nodeKey[16];
-	};
+        u8 nodeKey[16];
+    };
 #pragma pack(pop)
-	DECLARE_CONFIG_AND_PACKED_STRUCT(ConfigConfiguration);
+    DECLARE_CONFIG_AND_PACKED_STRUCT(ConfigConfiguration);
 };
 #endif // __cplusplus
 
@@ -487,17 +487,17 @@ class Conf
 
 // Linker variables
 #if defined(SIM_ENABLED)
-	extern u32 __application_start_address;
-	extern u32 __application_end_address;
-	extern u32 __application_ram_start_address;
-	extern u32 __start_conn_type_resolvers;
-	extern u32 __stop_conn_type_resolvers;
+    extern u32 __application_start_address;
+    extern u32 __application_end_address;
+    extern u32 __application_ram_start_address;
+    extern u32 __start_conn_type_resolvers;
+    extern u32 __stop_conn_type_resolvers;
 #else
-	extern u32 __application_start_address[]; //Variable is set in the linker script
-	extern u32 __application_end_address[]; //Variable is set in the linker script
-	extern u32 __application_ram_start_address[]; //Variable is set in the linker script
-	extern u32 __start_conn_type_resolvers[];
-	extern u32 __stop_conn_type_resolvers[];
+    extern u32 __application_start_address[]; //Variable is set in the linker script
+    extern u32 __application_end_address[]; //Variable is set in the linker script
+    extern u32 __application_ram_start_address[]; //Variable is set in the linker script
+    extern u32 __start_conn_type_resolvers[];
+    extern u32 __stop_conn_type_resolvers[];
 #endif
 
 //Alright, I know this is bad, but it's for readability....

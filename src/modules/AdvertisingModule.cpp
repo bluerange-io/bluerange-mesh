@@ -43,64 +43,64 @@ constexpr u8 ADVERTISING_MODULE_CONFIG_VERSION = 1;
 //These will be broadcasted periodically
 
 AdvertisingModule::AdvertisingModule()
-	: Module(ModuleId::ADVERTISING_MODULE, "adv")
+    : Module(ModuleId::ADVERTISING_MODULE, "adv")
 {
-	//Register callbacks n' stuff
+    //Register callbacks n' stuff
 
-	//Save configuration to base class variables
-	//sizeof configuration must be a multiple of 4 bytes
-	configurationPointer = &configuration;
-	configurationLength = sizeof(AdvertisingModuleConfiguration);
+    //Save configuration to base class variables
+    //sizeof configuration must be a multiple of 4 bytes
+    configurationPointer = &configuration;
+    configurationLength = sizeof(AdvertisingModuleConfiguration);
 
-	//Set defaults
-	ResetToDefaultConfiguration();
+    //Set defaults
+    ResetToDefaultConfiguration();
 }
 
 void AdvertisingModule::ResetToDefaultConfiguration()
 {
-	//Set default configuration values
-	configuration.moduleId = moduleId;
-	configuration.moduleActive = true;
-	configuration.moduleVersion = ADVERTISING_MODULE_CONFIG_VERSION;
+    //Set default configuration values
+    configuration.moduleId = moduleId;
+    configuration.moduleActive = true;
+    configuration.moduleVersion = ADVERTISING_MODULE_CONFIG_VERSION;
 
-	configuration.advertisingIntervalMs = 100;
-	configuration.messageCount = 0;
-	configuration.txPower = (i8)0xFF; //Set to invalid value
+    configuration.advertisingIntervalMs = 100;
+    configuration.messageCount = 0;
+    configuration.txPower = (i8)0xFF; //Set to invalid value
 
-	SET_FEATURESET_CONFIGURATION(&configuration, this);
+    SET_FEATURESET_CONFIGURATION(&configuration, this);
 }
 
 void AdvertisingModule::ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength)
 {
 #if IS_INACTIVE(GW_SAVE_SPACE)
-	//Start the Module...
-	//Delete previous jobs if they exist
-	for(u32 i=0; i<advJobHandles.size(); i++){
-		if(advJobHandles[i] != nullptr) GS->advertisingController.RemoveJob(advJobHandles[i]);
-	}
+    //Start the Module...
+    //Delete previous jobs if they exist
+    for(u32 i=0; i<advJobHandles.size(); i++){
+        if(advJobHandles[i] != nullptr) GS->advertisingController.RemoveJob(advJobHandles[i]);
+    }
 
-	//Configure Advertising Jobs for all advertising messages
-	for(u32 i=0; i < configuration.messageCount; i++){
-		AdvJob job = {
-			AdvJobTypes::SCHEDULED,
-			3, //Slots
-			0, //Delay
-			MSEC_TO_UNITS(100, CONFIG_UNIT_0_625_MS), //AdvInterval
-			0, //AdvChannel
-			0, //CurrentSlots
-			0, //CurrentDelay
-			FruityHal::BleGapAdvType::ADV_IND, //Advertising Mode
-			{0}, //AdvData
-			0, //AdvDataLength
-			{0}, //ScanData
-			0 //ScanDataLength
-		};
+    //Configure Advertising Jobs for all advertising messages
+    for(u32 i=0; i < configuration.messageCount; i++){
+        AdvJob job = {
+            AdvJobTypes::SCHEDULED,
+            3, //Slots
+            0, //Delay
+            MSEC_TO_UNITS(100, CONFIG_UNIT_0_625_MS), //AdvInterval
+            0, //AdvChannel
+            0, //CurrentSlots
+            0, //CurrentDelay
+            FruityHal::BleGapAdvType::ADV_IND, //Advertising Mode
+            {0}, //AdvData
+            0, //AdvDataLength
+            {0}, //ScanData
+            0 //ScanDataLength
+        };
 
-		CheckedMemcpy(&job.advData, configuration.messageData[i].messageData.data(), configuration.messageData[i].messageLength);
-		job.advDataLength = configuration.messageData[i].messageLength;
+        CheckedMemcpy(&job.advData, configuration.messageData[i].messageData.data(), configuration.messageData[i].messageLength);
+        job.advDataLength = configuration.messageData[i].messageLength;
 
-		advJobHandles[i] = GS->advertisingController.AddJob(job);
-	}
+        advJobHandles[i] = GS->advertisingController.AddJob(job);
+    }
 #endif
 }
 
@@ -108,8 +108,8 @@ void AdvertisingModule::ConfigurationLoadedHandler(ModuleConfiguration* migratab
 #ifdef TERMINAL_ENABLED
 TerminalCommandHandlerReturnType AdvertisingModule::TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize)
 {
-	//Must be called to allow the module to get and set the config
-	return Module::TerminalCommandHandler(commandArgs, commandArgsSize);
+    //Must be called to allow the module to get and set the config
+    return Module::TerminalCommandHandler(commandArgs, commandArgsSize);
 }
 #endif
 
