@@ -314,10 +314,12 @@ CherrySim::CherrySim(const SimConfiguration &simConfig)
         // that we don't accidentally run the same stuff all the time.
         SIMEXCEPTION(IllegalStateException);
 #endif
+        auto replayPath = simConfig.replayPath;
         const std::string replayFileContents = LoadFileContents(simConfig.replayPath.c_str());
         CheckVersionFromReplayRecord(replayFileContents);
         replayRecordEntries = ExtractReplayRecord(replayFileContents);
         this->simConfig = ExtractSimConfigurationFromReplayRecord(replayFileContents);
+        this->simConfig.replayPath = replayPath; //Overwrite the replay path so that we know that we are currently in a replay
     }
     //Set a reference that can be used from fruitymesh if necessary
     cherrySimInstance = this;
@@ -418,15 +420,33 @@ void CherrySim::Init()
 void CherrySim::importDataFromJson()
 {
     simConfig.nodeConfigName.clear();
-    //Load the site json
-    std::ifstream siteJsonStream(simConfig.siteJsonPath);
     json siteJson;
-    siteJsonStream >> siteJson;
-
-    //Load the devices json
-    std::ifstream devicesJsonStream(simConfig.devicesJsonPath);
     json devicesJson;
-    devicesJsonStream >> devicesJson;
+
+    if (simConfig.replayPath != "")
+    {
+        const std::string replayFileContents = LoadFileContents(simConfig.replayPath.c_str());
+        siteJson    = nlohmann::json::parse(ExtractAndCleanReplayToken(replayFileContents, "[!]SITE START:[!]",    "[!]SITE END[!]"));
+        devicesJson = nlohmann::json::parse(ExtractAndCleanReplayToken(replayFileContents, "[!]DEVICES START:[!]", "[!]DEVICES END[!]"));
+    }
+    else
+    {
+        //Load the site json
+        std::ifstream siteJsonStream(simConfig.siteJsonPath);
+        siteJsonStream >> siteJson;
+
+        //Load the devices json
+        std::ifstream devicesJsonStream(simConfig.devicesJsonPath);
+        devicesJsonStream >> devicesJson;
+    }
+
+    if (simConfig.logReplayCommands)
+    {
+        const std::string siteString   = "\n\n\n[!]SITE START:[!]\n\n\n" + siteJson.dump(4) + "\n\n\n[!]SITE END[!]\n\n\n";
+        TerminalPrintHandler(siteString.c_str());
+        const std::string deviceString = "\n\n\n[!]DEVICES START:[!]\n\n\n" + devicesJson.dump(4) + "\n\n\n[!]DEVICES END[!]\n\n\n";
+        TerminalPrintHandler(deviceString.c_str());
+    }
 
     //Get some data from the site
     simConfig.mapWidthInMeters = siteJson["results"][0]["lengthInMeter"];
@@ -475,10 +495,19 @@ void CherrySim::importDataFromJson()
 //This will read the device json and will set all the node positions from it
 void CherrySim::importPositionsFromJson()
 {
-    //Load the devices json
-    std::ifstream devicesJsonStream(simConfig.devicesJsonPath);
     json devicesJson;
-    devicesJsonStream >> devicesJson;
+
+    if (simConfig.replayPath != "")
+    {
+        const std::string replayFileContents = LoadFileContents(simConfig.replayPath.c_str());
+        devicesJson = nlohmann::json::parse(ExtractAndCleanReplayToken(replayFileContents, "[!]DEVICES START:[!]", "[!]DEVICES END[!]"));
+    }
+    else
+    {
+        //Load the devices json
+        std::ifstream devicesJsonStream(simConfig.devicesJsonPath);
+        devicesJsonStream >> devicesJson;
+    }
 
     //Get other data from our devices
     int j = 0;
@@ -672,7 +701,7 @@ std::queue<ReplayRecordEntry> CherrySim::ExtractReplayRecord(const std::string &
     return retVal;
 }
 
-SimConfiguration CherrySim::ExtractSimConfigurationFromReplayRecord(const std::string &fileContents)
+std::string CherrySim::ExtractAndCleanReplayToken(const std::string& fileContents, const std::string& startToken, const std::string& endToken)
 {
     // Lines are dirty. Often they don't look like this:
     // [!]CONFIGURATION START:[!]
@@ -680,12 +709,12 @@ SimConfiguration CherrySim::ExtractSimConfigurationFromReplayRecord(const std::s
     // [36mcherry-sim_1  |[0m [!]CONFIGURATION START:[!]\r
     // This function cleans the lines so that they have the expected form.
 
-    const std::string knownCleanContent = "[!]CONFIGURATION START:[!]";
+    const std::string knownCleanContent = startToken;
     const size_t cleanStart = fileContents.find(knownCleanContent);
     const size_t dirtStart = fileContents.rfind("\n", cleanStart) + 1;
     const std::string dirt = fileContents.substr(dirtStart, cleanStart - dirtStart);
 
-    std::string configurationString = ExtractReplayToken(fileContents, "[!]CONFIGURATION START:[!]", "[!]CONFIGURATION END[!]");
+    std::string configurationString = ExtractReplayToken(fileContents, startToken, endToken);
 
     if (dirt.size() > 0)
     {
@@ -701,8 +730,13 @@ SimConfiguration CherrySim::ExtractSimConfigurationFromReplayRecord(const std::s
             configurationString.erase(dirtPos, 2);
         }
     }
+    return configurationString;
+}
 
-    return nlohmann::json::parse(configurationString);
+SimConfiguration CherrySim::ExtractSimConfigurationFromReplayRecord(const std::string &fileContents)
+{
+    auto jsonString = ExtractAndCleanReplayToken(fileContents, "[!]CONFIGURATION START:[!]", "[!]CONFIGURATION END[!]");
+    return nlohmann::json::parse(jsonString);
 }
 
 void CherrySim::CheckVersionFromReplayRecord(const std::string &fileContents)
@@ -1599,7 +1633,7 @@ void CherrySim::initNode(u32 i)
     //Generate device address based on the id
     nodes[i].address.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
     CheckedMemset(&nodes[i].address.addr, 0x00, 6);
-    CheckedMemcpy(nodes[i].address.addr + 2, &nodes[i].id, 2);
+    CheckedMemcpy(nodes[i].address.addr.data() + 2, &nodes[i].id, 2);
 }
 void CherrySim::SetFeaturesets()
 {
@@ -1942,7 +1976,7 @@ ble_gap_addr_t CherrySim::Convert(const FruityHal::BleGapAddr* address)
 {
     ble_gap_addr_t addr;
     CheckedMemset(&addr, 0x00, sizeof(addr));
-    CheckedMemcpy(addr.addr, address->addr, FH_BLE_GAP_ADDR_LEN);
+    CheckedMemcpy(addr.addr, address->addr.data(), FH_BLE_GAP_ADDR_LEN);
     addr.addr_type = (u8)address->addr_type;
 #ifdef NRF52
     addr.addr_id_peer = 0;
@@ -1954,7 +1988,7 @@ FruityHal::BleGapAddr CherrySim::Convert(const ble_gap_addr_t* p_addr)
 {
     FruityHal::BleGapAddr address;
     CheckedMemset(&address, 0x00, sizeof(address));
-    CheckedMemcpy(address.addr, p_addr->addr, FH_BLE_GAP_ADDR_LEN);
+    CheckedMemcpy(address.addr.data(), p_addr->addr, FH_BLE_GAP_ADDR_LEN);
     address.addr_type = (FruityHal::BleGapAddrType)p_addr->addr_type;
 
     return address;
@@ -3121,12 +3155,14 @@ void CherrySim::SetBleStack(nodeEntry* node)
 bool CherrySim::IsClusteringDone()
 {
     u32 numNoneAssetNodes = getTotalNodes() - getAssetNodes();
+    std::set<ClusterId> clusterIds;
     for (u32 i = 0; i < numNoneAssetNodes; i++) {
+        clusterIds.insert(nodes[i].gs.node.clusterId);
         if ((u32)nodes[i].gs.node.clusterSize != numNoneAssetNodes) {
             return false;
         }
     }
-    return true;
+    return clusterIds.size() == 1;
 }
 
 struct ClusterNetworkPair {

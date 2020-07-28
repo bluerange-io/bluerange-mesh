@@ -51,7 +51,7 @@ FruityHal::GapAdvertisementReportEvent::GapAdvertisementReportEvent(void const* 
 i8 FruityHal::GapAdvertisementReportEvent::getRssi() const { return 0; }
 const u8 * FruityHal::GapAdvertisementReportEvent::getData() const { return 0; }
 u32 FruityHal::GapAdvertisementReportEvent::getDataLength() const { return 0; } 
-const u8 * FruityHal::GapAdvertisementReportEvent::getPeerAddr() const { return 0; }
+FruityHal::BleGapAddrBytes FruityHal::GapAdvertisementReportEvent::getPeerAddr() const { return FruityHal::BleGapAddrBytes(); }
 FruityHal::BleGapAddrType FruityHal::GapAdvertisementReportEvent::getPeerAddrType() const { return FruityHal::BleGapAddrType::PUBLIC; }
 bool FruityHal::GapAdvertisementReportEvent::isConnectable() const { return false; } 
 FruityHal::BleEvent::BleEvent(void const* _evt) {}
@@ -60,7 +60,7 @@ FruityHal::GapConnectedEvent::GapConnectedEvent(void const* _evt)
 FruityHal::GapRole FruityHal::GapConnectedEvent::getRole() const { return FruityHal::GapRole::INVALID; }
 u8 FruityHal::GapConnectedEvent::getPeerAddrType() const { return 0; } 
 u16 FruityHal::GapConnectedEvent::getMinConnectionInterval() const { return 0; } 
-const u8 * FruityHal::GapConnectedEvent::getPeerAddr() const { return 0; }
+FruityHal::BleGapAddrBytes FruityHal::GapConnectedEvent::getPeerAddr() const { return FruityHal::BleGapAddrBytes(); }
 FruityHal::GapDisconnectedEvent::GapDisconnectedEvent(void const* _evt)
     : GapEvent(_evt) {}
 FruityHal::BleHciError FruityHal::GapDisconnectedEvent::getReason() const { return FruityHal::BleHciError::SUCCESS; }

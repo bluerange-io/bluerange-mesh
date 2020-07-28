@@ -42,18 +42,19 @@ struct CherrySimRunnerConfig
 
 class CherrySimRunner : public TerminalPrintListener, public CherrySimEventListener
 {
+private:
+    volatile bool terminalReaderLaunched = false;
+    std::thread terminalReader;
 public:
     CherrySim* sim;
     static CherrySimRunnerConfig CreateDefaultTesterConfiguration();
 
-    std::thread terminalReader;
     bool meshGwCommunication;
 
     volatile bool running = true;
 
     static constexpr int32_t MESH_GW_NODE = 1;
 
-public:
     explicit CherrySimRunner(const CherrySimRunnerConfig &runnerConfig, const SimConfiguration &simConfig, bool meshGwCommunication);
 
     void Start();

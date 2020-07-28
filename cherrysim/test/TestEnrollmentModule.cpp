@@ -144,7 +144,7 @@ TEST(TestEnrollmentModule, TestEnrollmentBasicNewMesh) {
     }
 
 
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(1000 * 1000);
 }
 
 

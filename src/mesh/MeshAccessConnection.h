@@ -141,8 +141,9 @@ public:
     /*############### Handshake ##################*/
     void StartHandshake(FmKeyId fmKeyId);
     void HandshakeANonce(connPacketEncryptCustomStart const * inPacket);
-    void HandshakeSNonce(connPacketEncryptCustomANonce const * inPacket);
-    void HandshakeDone(connPacketEncryptCustomSNonce const * inPacket);
+    void OnANonceReceived(connPacketEncryptCustomANonce const * inPacket);
+    void OnSNonceReceived(connPacketEncryptCustomSNonce const * inPacket);
+    void OnHandshakeComplete();
 
     void SendClusterState();
     void NotifyConnectionStateSubscriber(ConnectionState state) const;

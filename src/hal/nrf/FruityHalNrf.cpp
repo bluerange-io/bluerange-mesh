@@ -911,9 +911,11 @@ u32 FruityHal::GapAdvertisementReportEvent::getDataLength() const
 #endif
 }
 
-const u8 * FruityHal::GapAdvertisementReportEvent::getPeerAddr() const
+FruityHal::BleGapAddrBytes FruityHal::GapAdvertisementReportEvent::getPeerAddr() const
 {
-    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.peer_addr.addr;
+    FruityHal::BleGapAddrBytes retVal{};
+    CheckedMemcpy(retVal.data(), ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.peer_addr.addr, FH_BLE_GAP_ADDR_LEN)
+    return retVal;
 }
 
 FruityHal::BleGapAddrType FruityHal::GapAdvertisementReportEvent::getPeerAddrType() const
@@ -970,9 +972,11 @@ u16 FruityHal::GapConnectedEvent::getMinConnectionInterval() const
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.connected.conn_params.min_conn_interval;
 }
 
-const u8 * FruityHal::GapConnectedEvent::getPeerAddr() const
+FruityHal::BleGapAddrBytes FruityHal::GapConnectedEvent::getPeerAddr() const
 {
-    return (((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.connected.peer_addr.addr);
+    FruityHal::BleGapAddrBytes retVal{};
+    CheckedMemcpy(retVal.data(), ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.connected.peer_addr.addr, FH_BLE_GAP_ADDR_LEN)
+    return retVal;
 }
 
 FruityHal::GapDisconnectedEvent::GapDisconnectedEvent(void const * _evt)
@@ -1197,7 +1201,7 @@ ErrorType FruityHal::SetBleGapAddress(FruityHal::BleGapAddr const &address)
 {
     ble_gap_addr_t addr;
     CheckedMemset(&addr, 0, sizeof(addr));
-    CheckedMemcpy(addr.addr, address.addr, FH_BLE_GAP_ADDR_LEN);
+    CheckedMemcpy(addr.addr, address.addr.data(), FH_BLE_GAP_ADDR_LEN);
     addr.addr_type = (u8)address.addr_type;
     ErrorType err = nrfErrToGeneric(sd_ble_gap_addr_set(&addr));
     logt("FH", "Gap Addr Set (%u)", (u32)err);
@@ -1219,7 +1223,7 @@ FruityHal::BleGapAddr FruityHal::GetBleGapAddress()
     //sd_ble_gap_address_get and sd_ble_gap_addr_get
     FRUITYMESH_ERROR_CHECK(sd_ble_gap_addr_get(&p_addr));
 
-    CheckedMemcpy(retVal.addr, p_addr.addr, FH_BLE_GAP_ADDR_LEN);
+    CheckedMemcpy(retVal.addr.data(), p_addr.addr, FH_BLE_GAP_ADDR_LEN);
     retVal.addr_type = (BleGapAddrType)p_addr.addr_type;
 
     return retVal;
@@ -1387,7 +1391,7 @@ ErrorType FruityHal::BleGapConnect(FruityHal::BleGapAddr const &peerAddress, Ble
     ble_gap_addr_t p_peer_addr;
     CheckedMemset(&p_peer_addr, 0x00, sizeof(p_peer_addr));
     p_peer_addr.addr_type = (u8)peerAddress.addr_type;
-    CheckedMemcpy(p_peer_addr.addr, peerAddress.addr, sizeof(peerAddress.addr));
+    CheckedMemcpy(p_peer_addr.addr, peerAddress.addr.data(), sizeof(peerAddress.addr));
 
     ble_gap_scan_params_t p_scan_params;
     CheckedMemset(&p_scan_params, 0x00, sizeof(p_scan_params));
@@ -3341,7 +3345,6 @@ ErrorType FruityHal::SpiTransfer(u8* const p_toWrite, u8 count, u8* const p_toRe
     u32 retVal = NRF_SUCCESS;
 #ifndef SIM_ENABLED
     NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
-    logt("FH", "Transferring to BME");
 
     if ((NULL == p_toWrite) || (NULL == p_toRead))
     {

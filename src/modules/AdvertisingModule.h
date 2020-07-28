@@ -49,11 +49,21 @@ class AdvertisingModule: public Module
 
         u32 assetMode = false;
 
+        enum class AdvertisingModuleTriggerActionMessages : u8
+        {
+            ADD_MESSAGE = 0,
+        };
+
+        enum class AdvertisingModuleActionResponseMessages : u8
+        {
+            ADD_MESSAGE = 0,
+        };
+
         #pragma pack(push, 1)
         struct AdvertisingMessage{
-            u8 messageId;
-            u8 forceNonConnectable : 1; //Always send this message non-connectable
-            u8 forceConnectable : 1; //Message is only sent, when it is possible to send it in connectable mode (if we have a free slave connection)
+            u8 messageId_deprecated; //Unused but set to some values in old set_config commands. Must not be used!
+            u8 forceNonConnectable_deprecated : 1; //Unused but set to some values in old set_config commands. Must not be used!
+            u8 forceConnectable_deprecated : 1; //Unused but set to some values in old set_config commands. Must not be used!
             u8 reserved : 1;
             u8 messageLength : 5;
             std::array<u8, ADVERTISING_MODULE_MAX_MESSAGE_LENGTH> messageData;
@@ -62,14 +72,31 @@ class AdvertisingModule: public Module
         //Module configuration that is saved persistently
         struct AdvertisingModuleConfiguration : ModuleConfiguration{
             //The interval at which the device advertises
-            //If multiple messages are configured, they will be distributed round robin
-            u16 advertisingIntervalMs;
+            u16 advertisingIntervalMs_deprecated; //Unused but set to some values in old set_config commands. Must not be used!
             //Number of messages
             u8 messageCount;
-            i8 txPower;
+            i8 txPower_deprecated; //Unused but set to some values in old set_config commands. Must not be used!
             std::array<AdvertisingMessage, ADVERTISING_MODULE_MAX_MESSAGES> messageData;
             //Insert more persistent config values here
         };
+
+        struct AddAdvertisingMessageMessage
+        {
+            u8 messageLength;
+            std::array<u8, ADVERTISING_MODULE_MAX_MESSAGE_LENGTH> messageData;
+        };
+        STATIC_ASSERT_SIZE(AddAdvertisingMessageMessage, 32);
+        enum class AddAdvertisingMessageReplyCode : u8
+        {
+            SUCCESS = 0,
+            FULL = 1,
+            RECORD_STORAGE_ERROR = 2,
+        };
+        struct AddAdvertisingMessageReply
+        {
+            AddAdvertisingMessageReplyCode code;
+        };
+        STATIC_ASSERT_SIZE(AddAdvertisingMessageReply, 1);
         #pragma pack(pop)
 
         std::array<AdvJob*, ADVERTISING_MODULE_MAX_MESSAGES> advJobHandles{};
@@ -104,6 +131,9 @@ class AdvertisingModule: public Module
         void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
 
         void ResetToDefaultConfiguration() override final;
+
+        //Receiving
+        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const* packetHeader) override final;
 
         #ifdef TERMINAL_ENABLED
         TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;

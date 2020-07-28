@@ -147,22 +147,19 @@ TEST(TestStatusReporterModule, TestHopsToSinkFixing) {
     // get_erros will collect errors from the node but will also clear them
     tester.SendTerminalCommand(1, "action 2 status get_errors");
     // This must not check for the exact number in "extra" as during meshing and simulation, a different invalid amount of hops may be recorded.
-    //Disabled the following as it is currently broken for some seeds. See: IOT-3991.
-    //tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":2,\"code\":44,\"extra\":");
-
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":2,\"code\":44,\"extra\":");
 
     tester.SendTerminalCommand(1, "action max_hops status keep_alive");
     tester.SimulateForGivenTime(1000 * 10);
-
+    
     tester.SendTerminalCommand(1, "action 2 status get_errors");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,");
 
-    //Disabled the following as it is currently broken for some seeds. See: IOT-3991.
-/*    // We expect that incorrect hops error wont be received as hopsToSink should have been fixed together with first keep_alive message.
+    // We expect that incorrect hops error wont be received as hopsToSink should have been fixed together with first keep_alive message.
     {
         Exceptions::DisableDebugBreakOnException disabler;
         ASSERT_THROW(tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":%u,\"code\":%u", LoggingError::CUSTOM, CustomErrorTypes::FATAL_INCORRECT_HOPS_TO_SINK), TimeoutException);
-    }*/
+    }
 }
 #endif //GITHUB_RELEASE
 

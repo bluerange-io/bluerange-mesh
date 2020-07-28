@@ -675,7 +675,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
                 //Print packet to console
                 StatusReporterModuleDeviceInfoV2Message const * data = (StatusReporterModuleDeviceInfoV2Message const *) (packet->data);
 
-                u8 const * addr = data->accessAddress.addr;
+                FruityHal::BleGapAddrBytes addr = data->accessAddress.addr;
 
                 char serialBuffer[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
                 Utility::GenerateBeaconSerialForIndex(data->serialNumberIndex, serialBuffer);

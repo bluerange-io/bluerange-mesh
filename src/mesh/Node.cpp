@@ -374,7 +374,7 @@ MeshAccessAuthorization Node::CheckMeshAccessPacketAuthorization(BaseConnectionS
             return MeshAccessAuthorization::UNDETERMINED;
         }
     }
-    if (packet->messageType == MessageType::UPDATE_TIMESTAMP)
+    if (packet->messageType == MessageType::UPDATE_TIMESTAMP || packet->messageType == MessageType::TIME_SYNC)
     {
         //Don't allow the time to be set if it's already set and we didn't receive this message via FM_KEY_ID_NETWORK.
         //Note: FM_KEY_ID_NODE is not sufficient, as the time is a property of the mesh by design.
@@ -476,8 +476,13 @@ void Node::MeshConnectionDisconnectedHandler(AppDisconnectReason appDisconnectRe
     //Enable discovery or prolong its state
     KeepHighDiscoveryActive();
 
-    //To be sure we do not have a clusterId clash if we are disconnected, we generate one if we are a single node, doesn't hurt
-    if (clusterSize == 1) clusterId = GenerateClusterID();
+    //To be sure we do not have a clusterId clash if we are disconnected, we generate one if we are a single node, shouldn't hurt
+    //Note that the check has to be based on the amount of MeshConnections, clusterSize is not sufficient as some MeshConnection
+    //might still be handshaking.
+    if (GS->cm.GetConnectionsOfType(ConnectionType::FRUITYMESH, ConnectionDirection::INVALID).count == 0)
+    {
+        clusterId = GenerateClusterID();
+    }
 
     //In either case, we must update our advertising packet
     UpdateJoinMePacket();
@@ -981,6 +986,14 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
             TimeSyncCorrectionReply const * packet = (TimeSyncCorrectionReply const *)packetHeader;
             logt("TSYNC", "Received correction reply! NodeId: %u, Partner: %u", (u32)GS->node.configuration.nodeId, (u32)packet->header.header.sender);
             GS->cm.TimeSyncCorrectionReplyReceivedHandler(*packet);
+        }
+        if (packet->type == TimeSyncType::INTER_NETWORK)
+        {
+            TimeSyncInterNetwork const* packet = (TimeSyncInterNetwork const*)packetHeader;
+            if (GET_DEVICE_TYPE() == DeviceType::ASSET || GS->timeManager.IsTimeSynced() == false)
+            {
+                GS->timeManager.SetTime(*packet);
+            }
         }
     }
 
@@ -1653,7 +1666,7 @@ void Node::GapAdvertisementMessageHandler(const FruityHal::GapAdvertisementRepor
             //Now, we have the space for our packet and we fill it with the latest information
             if (targetBuffer != nullptr && packet->payload.clusterId != this->clusterId)
             {
-                CheckedMemcpy(targetBuffer->addr.addr, advertisementReportEvent.getPeerAddr(), FH_BLE_GAP_ADDR_LEN);
+                targetBuffer->addr.addr = advertisementReportEvent.getPeerAddr();
                 targetBuffer->addr.addr_type = advertisementReportEvent.getPeerAddrType();
                 targetBuffer->advType = advertisementReportEvent.isConnectable() ? FruityHal::BleGapAdvType::ADV_IND : FruityHal::BleGapAdvType::ADV_NONCONN_IND;
                 targetBuffer->rssi = advertisementReportEvent.getRssi();

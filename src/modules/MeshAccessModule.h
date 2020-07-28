@@ -222,7 +222,7 @@ class MeshAccessModule: public Module
         void ReceivedMeshAccessConnectionStateMessage(connPacketModule const * packet, u16 packetLength) const;
         void ReceivedMeshAccessSerialConnectMessage(connPacketModule const * packet, u16 packetLength);
 
-        void ResetSerialConnectAttempt();
+        void ResetSerialConnectAttempt(bool cleanupConnection);
         void SendMeshAccessSerialConnectResponse(MeshAccessSerialConnectError code, NodeId partnerId = 0);
 
         void OnFoundSerialIndexWithAddr(const FruityHal::BleGapAddr& addr, u32 serialNumberIndex);

@@ -120,6 +120,7 @@ enum class AppDisconnectReason : u8 {
     REBOOT = 34,
     EMERGENCY_DISCONNECT_RESET = 35,
     SCHEDULED_REMOVE = 36,
+    SERIAL_CONNECT_TIMEOUT = 37,
 };
 
 

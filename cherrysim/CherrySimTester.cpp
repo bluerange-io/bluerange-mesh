@@ -96,6 +96,13 @@ int main(int argc, char **argv) {
 
         //Do not catch exceptions is useful for debugging (Automatically set to 1 if running on Gitlab)
         ::testing::GTEST_FLAG(catch_exceptions) = 0;
+
+        bool quiet = false;
+        if (quiet)
+        {
+            testing::TestEventListeners& listeners = testing::UnitTest::GetInstance()->listeners();
+            listeners.Release(listeners.default_result_printer());
+        }
     }
     // ###########################
     // Automated testing

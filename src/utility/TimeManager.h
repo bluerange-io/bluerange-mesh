@@ -74,6 +74,7 @@ public:
     TimePoint GetTimePoint();
     void SetTime(u32 syncTime, u32 timeSinceSyncTime, i16 offset, u32 additionalTicks = 0);
     void SetTime(const TimeSyncInitial& timeSyncIntitialMessage);
+    void SetTime(const TimeSyncInterNetwork& timeSyncInterNetwork);
     bool IsTimeSynced() const;
     bool IsTimeCorrected() const;
 
@@ -88,4 +89,5 @@ public:
     void convertTimestampToString(char* buffer);
 
     TimeSyncInitial GetTimeSyncIntialMessage(NodeId receiver) const;
+    TimeSyncInterNetwork GetTimeSyncInterNetworkMessage(NodeId receiver) const;
 };

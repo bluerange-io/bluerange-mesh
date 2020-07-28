@@ -110,7 +110,7 @@ ErrorType ConnectionManager::ConnectAsMaster(NodeId partnerId, FruityHal::BleGap
         StatusReporterModule* statusMod = (StatusReporterModule*)GS->node.GetModuleById(ModuleId::STATUS_REPORTER_MODULE);
         if(statusMod != nullptr){
             u32 addrPart;
-            CheckedMemcpy(&addrPart, address->addr, 4);
+            CheckedMemcpy(&addrPart, address->addr.data(), 4);
             statusMod->SendLiveReport(LiveReportTypes::GAP_TRYING_AS_MASTER, 0, partnerId, addrPart);
         }
 
@@ -647,7 +647,7 @@ void ConnectionManager::RouteMeshData(BaseConnection* connection, BaseConnection
             && packetHeader->messageType != MessageType::UPDATE_TIMESTAMP)
         {
             //Send to all other connections
-            BroadcastMeshData(connection, sendData, data, routingDecision);
+            BroadcastMeshData(connection, sendData, (const u8*)packetHeader, routingDecision);
         }
     }
 }
@@ -699,11 +699,12 @@ bool ConnectionManager::IsReceiverOfNodeId(NodeId nodeId) const
 void ConnectionManager::GapConnectionConnectedHandler(const FruityHal::GapConnectedEvent & connectedEvent)
 {
     ErrorType err;
+    FruityHal::BleGapAddrBytes peerAddr = connectedEvent.getPeerAddr();
 
     StatusReporterModule* statusMod = (StatusReporterModule*)GS->node.GetModuleById(ModuleId::STATUS_REPORTER_MODULE);
     if(statusMod != nullptr){
         u32 addrPart;
-        CheckedMemcpy(&addrPart, connectedEvent.getPeerAddr(), 4);
+        CheckedMemcpy(&addrPart, peerAddr.data(), 4);
 
         if(connectedEvent.getRole() == FruityHal::GapRole::PERIPHERAL){
             statusMod->SendLiveReport(LiveReportTypes::GAP_CONNECTED_INCOMING, 0, connectedEvent.getConnectionHandle(), addrPart);
@@ -716,12 +717,12 @@ void ConnectionManager::GapConnectionConnectedHandler(const FruityHal::GapConnec
     logt("CM", "Connection handle %u success as %s, partner:%02x:%02x:%02x:%02x:%02x:%02x", 
         connectedEvent.getConnectionHandle(), 
         connectedEvent.getRole() == FruityHal::GapRole::CENTRAL ? "Central" : "Peripheral", 
-        connectedEvent.getPeerAddr()[5], 
-        connectedEvent.getPeerAddr()[4],
-        connectedEvent.getPeerAddr()[3], 
-        connectedEvent.getPeerAddr()[2], 
-        connectedEvent.getPeerAddr()[1], 
-        connectedEvent.getPeerAddr()[0]);
+        peerAddr[5], 
+        peerAddr[4],
+        peerAddr[3], 
+        peerAddr[2], 
+        peerAddr[1], 
+        peerAddr[0]);
 
     GS->logger.logCustomCount(CustomErrorTypes::COUNT_CONNECTION_SUCCESS);
 
@@ -800,7 +801,7 @@ void ConnectionManager::GapConnectionConnectedHandler(const FruityHal::GapConnec
         FruityHal::BleGapAddr peerAddress;
         CheckedMemset(&peerAddress, 0, sizeof(peerAddress));
         peerAddress.addr_type = (FruityHal::BleGapAddrType)connectedEvent.getPeerAddrType();
-        CheckedMemcpy(peerAddress.addr, connectedEvent.getPeerAddr(), sizeof(peerAddress.addr));
+        peerAddress.addr = connectedEvent.getPeerAddr();
 
         c = allConnections[id] = ConnectionAllocator::getInstance().allocateResolverConnection(id, ConnectionDirection::DIRECTION_IN, &peerAddress);
         c->ConnectionSuccessfulHandler(connectedEvent.getConnectionHandle());
@@ -1116,7 +1117,7 @@ BaseConnection* ConnectionManager::IsConnectionReestablishment(const FruityHal::
     {
         if (allConnections[i] != nullptr && allConnections[i]->connectionState == ConnectionState::REESTABLISHING)
         {
-            if (memcmp(connectedEvent.getPeerAddr(), allConnections[i]->partnerAddress.addr, 6) == 0
+            if (connectedEvent.getPeerAddr() == allConnections[i]->partnerAddress.addr
                 && (FruityHal::BleGapAddrType)connectedEvent.getPeerAddrType() == allConnections[i]->partnerAddress.addr_type)
             {
                 logt("CM", "Found existing connection id %u", allConnections[i]->connectionId);

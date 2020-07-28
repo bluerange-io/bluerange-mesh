@@ -97,6 +97,24 @@ void TimeManager::SetTime(const TimeSyncInitial & timeSyncIntitialMessage)
     }
 }
 
+void TimeManager::SetTime(const TimeSyncInterNetwork& timeSyncInterNetwork)
+{
+    if (this->counter == 0 || GET_DEVICE_TYPE() == DeviceType::ASSET)
+    {
+        this->syncTime = timeSyncInterNetwork.syncTimeStamp;
+        this->timeSinceSyncTime = timeSyncInterNetwork.timeSincSyncTimeStamp;
+        this->additionalTicks = timeSyncInterNetwork.additionalTicks;
+        this->offset = timeSyncInterNetwork.offset;
+        this->counter++;
+        this->waitingForCorrection = false;
+        this->timeCorrectionReceived = false;
+
+        //We inform the connection manager so that it resends the time sync messages.
+        logt("TSYNC", "Received time by inter mesh! NodeId: %u, Partner: %u", (u32)GS->node.configuration.nodeId, (u32)timeSyncInterNetwork.header.header.sender);
+        GS->cm.ResetTimeSync();
+    }
+}
+
 bool TimeManager::IsTimeSynced() const
 {
     return syncTime != 0;
@@ -104,7 +122,7 @@ bool TimeManager::IsTimeSynced() const
 
 bool TimeManager::IsTimeCorrected() const
 {
-    return timeCorrectionReceived;
+    return (timeCorrectionReceived || !waitingForCorrection) && IsTimeSynced();
 }
 
 void TimeManager::AddTicks(u32 ticks)
@@ -181,7 +199,7 @@ void TimeManager::convertTimestampToString(char * buffer)
 TimeSyncInitial TimeManager::GetTimeSyncIntialMessage(NodeId receiver) const
 {
     TimeSyncInitial retVal;
-    CheckedMemset(&retVal, 0, sizeof(TimeSyncInitial));
+    CheckedMemset(&retVal, 0, sizeof(retVal));
     
     retVal.header.header.messageType = MessageType::TIME_SYNC;
     retVal.header.header.receiver = receiver;
@@ -194,6 +212,24 @@ TimeSyncInitial TimeManager::GetTimeSyncIntialMessage(NodeId receiver) const
     retVal.offset = offset;
     retVal.counter = counter;
     
+    return retVal;
+}
+
+TimeSyncInterNetwork TimeManager::GetTimeSyncInterNetworkMessage(NodeId receiver) const
+{
+    TimeSyncInterNetwork retVal;
+    CheckedMemset(&retVal, 0, sizeof(retVal));
+
+    retVal.header.header.messageType = MessageType::TIME_SYNC;
+    retVal.header.header.receiver = receiver;
+    retVal.header.header.sender = GS->node.configuration.nodeId;
+    retVal.header.type = TimeSyncType::INTER_NETWORK;
+
+    retVal.syncTimeStamp = syncTime;
+    retVal.timeSincSyncTimeStamp = timeSinceSyncTime;
+    retVal.additionalTicks = additionalTicks;
+    retVal.offset = offset;
+
     return retVal;
 }
 

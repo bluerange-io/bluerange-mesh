@@ -324,7 +324,7 @@ void MeshAccessConnection::HandshakeANonce(connPacketEncryptCustomStart const * 
 }
 
 //This method is called by the Central after the ANonce was received
-void MeshAccessConnection::HandshakeSNonce(connPacketEncryptCustomANonce const * inPacket)
+void MeshAccessConnection::OnANonceReceived(connPacketEncryptCustomANonce const * inPacket)
 {
     logt("MACONN", "-- TX SNonce, anonce %u", inPacket->anonce[1]);
 
@@ -386,12 +386,13 @@ void MeshAccessConnection::HandshakeSNonce(connPacketEncryptCustomANonce const *
     NotifyConnectionStateSubscriber(ConnectionState::HANDSHAKE_DONE);
 
     logt("MACONN", "Handshake done as Central");
+
+    OnHandshakeComplete();
 }
 
 //This method is called by the Peripheral after the SNonce was received
-void MeshAccessConnection::HandshakeDone(connPacketEncryptCustomSNonce const * inPacket)
+void MeshAccessConnection::OnSNonceReceived(connPacketEncryptCustomSNonce const * inPacket)
 {
-
     logt("MACONN", "-- TX Handshake Done, snonce %u", encryptionNonce[1]);
 
     // Process Handshake SNonce
@@ -440,6 +441,18 @@ void MeshAccessConnection::HandshakeDone(connPacketEncryptCustomSNonce const * i
     NotifyConnectionStateSubscriber(ConnectionState::HANDSHAKE_DONE);
 
     logt("MACONN", "Handshake done as Peripheral");
+
+    OnHandshakeComplete();
+}
+
+//This method is called by both the Peripheral and the Central after the connectionState was set to HANDSHAKE_DONE for the first time.
+void MeshAccessConnection::OnHandshakeComplete()
+{
+    if (GS->timeManager.IsTimeCorrected())
+    {
+        TimeSyncInterNetwork tsin = GS->timeManager.GetTimeSyncInterNetworkMessage(virtualPartnerId);
+        SendData((u8*)&tsin, sizeof(tsin), DeliveryPriority::LOW, false);
+    }
 }
 
 void MeshAccessConnection::SendClusterState()
@@ -965,10 +978,10 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
     else if(connectionState == ConnectionState::HANDSHAKING)
     {
         if(sendData->dataLength == SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_ANONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_ANONCE){
-            HandshakeSNonce((connPacketEncryptCustomANonce const *) data);
+            OnANonceReceived((connPacketEncryptCustomANonce const *) data);
         }
         else if(sendData->dataLength == SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_SNONCE){
-            HandshakeDone((connPacketEncryptCustomSNonce const *) data);
+            OnSNonceReceived((connPacketEncryptCustomSNonce const *) data);
         } else {
             logt("WARNING", "Wrong handshake packet"); //See: IOT-3820
             DisconnectAndRemove(AppDisconnectReason::INVALID_HANDSHAKE_PACKET);

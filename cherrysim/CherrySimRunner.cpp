@@ -119,6 +119,21 @@ int main(int argc, char** argv) {
 #endif
 
 void CherrySimRunner::TerminalReaderMain() {
+    //Half RAII struct. The boolean is set on the outside before the thread is started.
+    struct TerminalReaderLaunchedSetter
+    {
+        CherrySimRunner* instance = nullptr;
+        explicit TerminalReaderLaunchedSetter(CherrySimRunner* instance)
+        {
+            this->instance = instance;
+        }
+        ~TerminalReaderLaunchedSetter()
+        {
+            instance->terminalReaderLaunched = false;
+        }
+    };
+    TerminalReaderLaunchedSetter trls = TerminalReaderLaunchedSetter(this);
+
     while (true) {
         std::string input;
         try
@@ -211,10 +226,6 @@ CherrySimRunner::CherrySimRunner(const CherrySimRunnerConfig &runnerConfig, cons
 {
     shouldRestartSim = false;
     this->sim = nullptr;
-
-    if (meshGwCommunication) {
-        terminalReader = std::thread(&CherrySimRunner::TerminalReaderMain, this);
-    }
 }
 
 void CherrySimRunner::Start()
@@ -235,6 +246,20 @@ void CherrySimRunner::Start()
         for (u32 i = 0; i < sim->getTotalNodes(); i++) {
             NodeIndexSetter setter(i);
             sim->bootCurrentNode();
+        }
+
+        if (shortLived)
+        {
+            //ShortLived mode is only used for dry runs on the pipeline.
+            //As we don't have a communication partner in that scenario,
+            //we immediately tell that we received some data so that the
+            //simulation starts properly.
+            sim->receivedDataFromMeshGw = true;
+        }
+        if (meshGwCommunication && !terminalReaderLaunched)
+        {
+            terminalReaderLaunched = true;
+            terminalReader = std::thread(&CherrySimRunner::TerminalReaderMain, this);
         }
 
         if (Simulate()) {

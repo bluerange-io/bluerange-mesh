@@ -106,7 +106,7 @@ namespace FruityHal
         i8 getRssi() const;
         const u8* getData() const;
         u32 getDataLength() const;
-        const u8* getPeerAddr() const;
+        BleGapAddrBytes getPeerAddr() const;
         BleGapAddrType getPeerAddrType() const;
         bool isConnectable() const;
     };
@@ -122,7 +122,7 @@ namespace FruityHal
     public:
         explicit GapConnectedEvent(void const * evt);
         GapRole getRole() const;
-        const u8* getPeerAddr() const;
+        BleGapAddrBytes getPeerAddr() const;
         u8 getPeerAddrType() const;
         u16 getMinConnectionInterval() const;
     };

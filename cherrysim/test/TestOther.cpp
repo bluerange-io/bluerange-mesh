@@ -564,7 +564,7 @@ TEST(TestOther, TestConnectionAllocator) {
         else { //alloc
             FruityHal::BleGapAddr addr;
             addr.addr_type = FruityHal::BleGapAddrType::PUBLIC;
-            CheckedMemset(addr.addr, 0, 6);
+            addr.addr = {};
             int type = mt.nextU32(0, 3);
             if (type == 0) 
             {

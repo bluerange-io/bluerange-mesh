@@ -1027,7 +1027,7 @@ extern "C"
     {
         START_OF_FUNCTION();        
         FruityHal::BleGapAddr addr = cherrySimInstance->currentNode->address;
-        CheckedMemcpy(p_addr->addr, addr.addr, BLE_GAP_ADDR_LEN);
+        CheckedMemcpy(p_addr->addr, addr.addr.data(), BLE_GAP_ADDR_LEN);
         p_addr->addr_type = (u8)addr.addr_type;
 
 

@@ -433,7 +433,8 @@ enum class TimeSyncType : u8 {
     INITIAL = 0,
     INITIAL_REPLY = 1,
     CORRECTION = 2,
-    CORRECTION_REPLY = 3
+    CORRECTION_REPLY = 3,
+    INTER_NETWORK = 4, //A special time sync packet intended for syncing time between two networks or a network and an asset.
 };
 
 struct TimeSyncHeader
@@ -452,6 +453,16 @@ struct TimeSyncInitial
     u32 counter;
 };
 STATIC_ASSERT_SIZE(TimeSyncInitial, 24);
+
+struct TimeSyncInterNetwork
+{
+    TimeSyncHeader header;
+    u32 syncTimeStamp;
+    u32 timeSincSyncTimeStamp;
+    u32 additionalTicks;
+    i16 offset;
+};
+STATIC_ASSERT_SIZE(TimeSyncInterNetwork, 20);
 
 struct TimeSyncInitialReply
 {

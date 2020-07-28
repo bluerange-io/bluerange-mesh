@@ -1008,7 +1008,7 @@ void EnrollmentModule::GapAdvertisementReportEventHandler(const FruityHal::GapAd
 
     FruityHal::BleGapAddr addr;
     CheckedMemset(&addr, 0, sizeof(addr));
-    CheckedMemcpy(addr.addr, advertisementReportEvent.getPeerAddr(), FH_BLE_GAP_ADDR_LEN);
+    addr.addr = advertisementReportEvent.getPeerAddr();
     addr.addr_type = advertisementReportEvent.getPeerAddrType();
     const u8* data = advertisementReportEvent.getData();
     u16 dataLength = advertisementReportEvent.getDataLength();

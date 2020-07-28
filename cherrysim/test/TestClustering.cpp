@@ -32,6 +32,7 @@
 #include <CherrySimUtils.h>
 #include <ConnectionManager.h>
 #include <cmath>
+#include <algorithm>
 
 
 //This test fixture is used to run a parametrized test based on the chosen BLE Stack
@@ -46,14 +47,14 @@ FeaturesetAndBleStack prod_mesh_nrf52 = { BleStackType::NRF_SD_132_ANY, "prod_me
 
 
 
-void DoClusteringTestImportedFromJson(const std::string &site, const std::string &device, u32 clusteringIterations, int maxClusteringTimeSec, FeaturesetAndBleStack config)
+void DoClusteringTestImportedFromJson(const std::string &site, const std::string &device, u32 clusteringIterations, int maxClusteringTimeMs, u32 maxMedianClusteringTimeMs, FeaturesetAndBleStack config)
 {
     int clusteringTimeTotalMs = 0;
 
     printf("Test with %s and stack %u" EOL, config.featuresetName.c_str(), (u32)config.bleStack);
+    std::vector<u32> clusteringTimesMs;
 
     for (u32 i = 0; i < clusteringIterations; i++) {
-        printf("ClusterTest Iteration %u" EOL, i);
         CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
         SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
         simConfig.seed = i + 1;
@@ -62,13 +63,23 @@ void DoClusteringTestImportedFromJson(const std::string &site, const std::string
         simConfig.devicesJsonPath = device;
         simConfig.terminalId = -1;
         //testerConfig.verbose = true;
+        printf("ClusterTest Iteration %u, seed %u" EOL, i, simConfig.seed);
 
         simConfig.defaultBleStackType = config.bleStack;
 
         CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
         tester.Start();
-        tester.SimulateUntilClusteringDone(maxClusteringTimeSec* 1000);
+        tester.SimulateUntilClusteringDone(maxClusteringTimeMs);
         clusteringTimeTotalMs += tester.sim->simState.simTimeMs;
+        clusteringTimesMs.push_back(tester.sim->simState.simTimeMs);
+    }
+
+    std::sort(clusteringTimesMs.begin(), clusteringTimesMs.end());
+    u32 clusteringTimeMedianMs = clusteringTimesMs[clusteringTimesMs.size() / 2];
+    if (clusteringTimeMedianMs > maxMedianClusteringTimeMs)
+    {
+        //The median took too long!
+        SIMEXCEPTION(IllegalStateException);
     }
 
     printf("Average clustering time %u seconds" EOL, clusteringTimeTotalMs / clusteringIterations / 1000);
@@ -109,7 +120,8 @@ TEST_P(MultiStackFixture, TestBasicClustering) {
 TEST_P(MultiStackFixture, TestHorizontalSpreadNetwork) {
     std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/horizontalspreadnetwork/site.json";
     std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/horizontalspreadnetwork/devices.json";
-    DoClusteringTestImportedFromJson(site, device, 5, 600, GetParam());
+    constexpr u32 maxRecordedClusteringMedianMs = 39650; //The maximum median recorded over 1000 different seed offsets
+    DoClusteringTestImportedFromJson(site, device, 5, 600 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
 #endif //GITHUB_RELEASE
 
@@ -118,7 +130,8 @@ TEST_P(MultiStackFixture, TestHorizontalSpreadNetwork) {
 TEST_P(MultiStackFixture, TestDenseNetwork) {
     std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/densenetwork/site.json";
     std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/densenetwork/devices.json";
-    DoClusteringTestImportedFromJson(site, device, 1, 60, GetParam());
+    constexpr u32 maxRecordedClusteringMedianMs = 43350; //The maximum median recorded over 1000 different seed offsets
+    DoClusteringTestImportedFromJson(site, device, 5, 60 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
 #endif //GITHUB_RELEASE
 
@@ -127,7 +140,8 @@ TEST_P(MultiStackFixture, TestDenseNetwork) {
 TEST_P(MultiStackFixture, TestStarNetwork) {
     std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/starnetwork/site.json";
     std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/starnetwork/devices.json";
-    DoClusteringTestImportedFromJson(site, device, 5, 45, GetParam());
+    constexpr u32 maxRecordedClusteringMedianMs = 33450; //The maximum median recorded over 1000 different seed offsets
+    DoClusteringTestImportedFromJson(site, device, 5, 90 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
 #endif //GITHUB_RELEASE
 
@@ -136,7 +150,8 @@ TEST_P(MultiStackFixture, TestStarNetwork) {
 TEST_P(MultiStackFixture, TestRowNetwork) {
     std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/rownetwork/site.json";
     std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/rownetwork/devices.json";
-    DoClusteringTestImportedFromJson(site, device, 5, 100, GetParam());
+    constexpr u32 maxRecordedClusteringMedianMs = 44150; //The maximum median recorded over 1000 different seed offsets
+    DoClusteringTestImportedFromJson(site, device, 5, 100 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
 #endif //GITHUB_RELEASE
 
@@ -145,10 +160,8 @@ TEST_P(MultiStackFixture, TestRowNetwork) {
 TEST_P(MultiStackFixture, TestSparseNetwork) {
     std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/sparsenetwork/site.json";
     std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/sparsenetwork/devices.json";
-
-    u32 timeoutSec = 500;
-
-    DoClusteringTestImportedFromJson(site, device, 5, timeoutSec, GetParam());
+    constexpr u32 maxRecordedClusteringMedianMs = 46350; //The maximum median recorded over 1000 different seed offsets
+    DoClusteringTestImportedFromJson(site, device, 5, 500 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
 #endif //GITHUB_RELEASE
 
@@ -157,7 +170,8 @@ TEST_P(MultiStackFixture, TestSparseNetwork) {
 TEST_P(MultiStackFixture, TestSinglePointFailureNetwork) {
     std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/singlepointfailure/site.json";
     std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/singlepointfailure/devices.json";
-    DoClusteringTestImportedFromJson(site, device, 5, 1000, GetParam());
+    constexpr u32 maxRecordedClusteringMedianMs = 48500; //The maximum median recorded over 1000 different seed offsets
+    DoClusteringTestImportedFromJson(site, device, 5, 1000 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
 #endif //GITHUB_RELEASE
 
@@ -424,7 +438,8 @@ TEST(TestClustering, SimulateLongevity_long) {
 
 i32 determineHopsToSink(nodeEntry* node, std::vector<nodeEntry*>& visitedNodes)
 {
-    cherrySimInstance->SetNode(node->id - 1);
+    NodeIndexSetter setter(node->index);
+    visitedNodes.push_back(node);
     if (GET_DEVICE_TYPE() == DeviceType::SINK) {
         return 0;
     }
@@ -433,10 +448,13 @@ i32 determineHopsToSink(nodeEntry* node, std::vector<nodeEntry*>& visitedNodes)
         SoftdeviceConnection* c = &(node->state.connections[i]);
         //Although FruityMesh connections can never run in a circle, SoftdeviceConnections can! Thus we have to store all previously visited nodes to avoid stack overflows.
         if (c->connectionActive && std::find(visitedNodes.begin(), visitedNodes.end(), c->partner) == visitedNodes.end()) {
-            visitedNodes.push_back(node);
-            i32 tmp = determineHopsToSink(c->partner, visitedNodes);
-            if (tmp >= 0) {
-                return tmp + 1;
+            BaseConnection* conn = GS->cm.GetConnectionFromHandle(c->connectionHandle).GetConnection();
+            if (conn && conn->connectionType == ConnectionType::FRUITYMESH && conn->connectionState >= ConnectionState::HANDSHAKE_DONE && conn->connectionState <= ConnectionState::REESTABLISHING_HANDSHAKE)
+            {
+                i32 tmp = determineHopsToSink(c->partner, visitedNodes);
+                if (tmp >= 0) {
+                    return tmp + 1;
+                }
             }
         }
     }

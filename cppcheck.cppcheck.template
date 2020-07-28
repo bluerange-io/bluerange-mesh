@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="1">
+    <builddir>a-cppcheck-build-dir</builddir>
+    <platform>Unspecified</platform>
+    <importproject>PATH_TO_CMAKE_DIRECTORY/CherrySim.sln</importproject>
+    <analyze-all-vs-configs>false</analyze-all-vs-configs>
+    <check-headers>false</check-headers>
+    <check-unused-templates>false</check-unused-templates>
+    <max-ctu-depth>10</max-ctu-depth>
+    <suppressions>
+        <suppression fileName="PATH_TO_FRUITYMESH_REPOSITORY/cherrysim/json.hpp">*</suppression>
+        <suppression fileName="PATH_TO_FRUITYMESH_REPOSITORY/cherrysim/ccm_soft.c">*</suppression>
+        <suppression fileName="PATH_TO_FRUITYMESH_REPOSITORY/src/vendor/ins/*">*</suppression>
+        <suppression fileName="PATH_TO_FRUITYMESH_REPOSITORY/sdk/*">*</suppression>
+        <suppression fileName="PATH_TO_CMAKE_DIRECTORY/_deps/*">*</suppression>
+        <suppression fileName="PATH_TO_CMAKE_DIRECTORY/cherrysim/googletest-src/*">*</suppression>
+        <suppression>missingInclude</suppression>
+        <suppression>cstyleCast</suppression>
+        <suppression>variableScope</suppression>
+        <suppression>shadowVar</suppression>
+        <suppression>noConstructor</suppression>
+        <suppression>unmatchedSuppression</suppression>
+        <suppression>redundantAssignment</suppression>
+        <suppression>unusedVariable</suppression>
+        <suppression>unusedFunction</suppression>
+        <suppression>exceptThrowInDestructor</suppression>
+        <suppression>unreadVariable</suppression>
+        <suppression>shadowArgument</suppression>
+        <suppression>postfixOperator</suppression>
+        <suppression>shadowVariable</suppression>
+        <suppression>knownConditionTrueFalse</suppression>
+        <suppression>virtualCallInConstructor</suppression>
+        <suppression>objectIndex</suppression>
+        <suppression>zerodiv</suppression>
+        <suppression>redundantInitialization</suppression>
+        <suppression>missingOverride</suppression>
+        <suppression>duplicateBreak</suppression>
+        <suppression>shiftTooManyBitsSigned</suppression>
+    </suppressions>
+</project>

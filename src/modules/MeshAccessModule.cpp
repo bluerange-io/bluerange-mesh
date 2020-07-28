@@ -86,7 +86,7 @@ void MeshAccessModule::TimerEventHandler(u16 passedTimeDs)
         if (GS->appTimerDs > meshAccessSerialConnectMessageReceiveTimeDs + meshAccessSerialConnectMessageTimeoutDs)
         {
             SendMeshAccessSerialConnectResponse(MeshAccessSerialConnectError::TIMEOUT_REACHED);
-            ResetSerialConnectAttempt();
+            ResetSerialConnectAttempt(true);
         }
 
         if (meshAccessSerialConnectConnectionId != 0)
@@ -96,9 +96,14 @@ void MeshAccessModule::TimerEventHandler(u16 passedTimeDs)
             {
                 if (conn.GetConnectionState() == ConnectionState::HANDSHAKE_DONE)
                 {
+                    if (meshAccessSerialConnectMessage.nodeIdAfterConnect != 0 &&
+                        meshAccessSerialConnectMessage.nodeIdAfterConnect != conn.GetVirtualPartnerId())
+                    {
+                        SIMEXCEPTION(IllegalStateException);
+                    }
                     conn.KeepAliveFor(SEC_TO_DS(meshAccessSerialConnectMessage.connectionInitialKeepAliveSeconds));
                     SendMeshAccessSerialConnectResponse(MeshAccessSerialConnectError::SUCCESS, conn.GetVirtualPartnerId());
-                    ResetSerialConnectAttempt();
+                    ResetSerialConnectAttempt(false);
                 }
             }
         }
@@ -508,7 +513,7 @@ void MeshAccessModule::ReceivedMeshAccessSerialConnectMessage(connPacketModule c
     {
         SendMeshAccessSerialConnectResponse(MeshAccessSerialConnectError::OVERWRITTEN_BY_OTHER_REQUEST);
     }
-    ResetSerialConnectAttempt();
+    ResetSerialConnectAttempt(true);
     meshAccessSerialConnectMessage = *message;
     if (Utility::CompareMem(0xFF, meshAccessSerialConnectMessage.key, sizeof(meshAccessSerialConnectMessage.key)) 
         && meshAccessSerialConnectMessage.fmKeyId != FmKeyId::NODE /*We shouldn't use our own node key as a key for an outgoing connection...*/)
@@ -521,12 +526,21 @@ void MeshAccessModule::ReceivedMeshAccessSerialConnectMessage(connPacketModule c
     meshAccessSerialConnectRequestHandle = packet->requestHandle;
 }
 
-void MeshAccessModule::ResetSerialConnectAttempt()
+void MeshAccessModule::ResetSerialConnectAttempt(bool cleanupConnection)
 {
     CheckedMemset(&meshAccessSerialConnectMessage, 0, sizeof(meshAccessSerialConnectMessage));
     meshAccessSerialConnectMessageReceiveTimeDs = 0;
     meshAccessSerialConnectSender = 0;
     meshAccessSerialConnectRequestHandle = 0;
+    if (cleanupConnection && meshAccessSerialConnectConnectionId != 0)
+    {
+        MeshAccessConnectionHandle conn = GS->cm.GetMeshAccessConnectionByUniqueId(meshAccessSerialConnectConnectionId);
+        if (conn)
+        {
+            conn.DisconnectAndRemove(AppDisconnectReason::SERIAL_CONNECT_TIMEOUT);
+        }
+    }
+    meshAccessSerialConnectConnectionId = 0;
 }
 
 void MeshAccessModule::SendMeshAccessSerialConnectResponse(MeshAccessSerialConnectError code, NodeId partnerId)
@@ -660,9 +674,9 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
         //Allows us to connect to any node when giving the GAP Address
         FruityHal::BleGapAddr addr;
         CheckedMemset(&addr, 0, sizeof(addr));
-        Logger::parseEncodedStringToBuffer(commandArgs[1], addr.addr, 6);
+        Logger::parseEncodedStringToBuffer(commandArgs[1], addr.addr.data(), 6);
         addr.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
-        Utility::swapBytes(addr.addr, 6);
+        Utility::swapBytes(addr.addr.data(), 6);
 
         FmKeyId fmKeyId = FmKeyId::NETWORK;
         if(commandArgsSize > 2){
@@ -714,8 +728,8 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
 
             //Allows us to connect to any node when giving the GAP Address
             data.targetAddress.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
-            Logger::parseEncodedStringToBuffer(commandArgs[4], data.targetAddress.addr, 6);
-            Utility::swapBytes(data.targetAddress.addr, 6);
+            Logger::parseEncodedStringToBuffer(commandArgs[4], data.targetAddress.addr.data(), 6);
+            Utility::swapBytes(data.targetAddress.addr.data(), 6);
 
             if(commandArgsSize > 5) data.fmKeyId = (FmKeyId)Utility::StringToU32(commandArgs[5]);
             if(commandArgsSize > 6){
@@ -747,8 +761,8 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
 
             //Allows us to connect to any node when giving the GAP Address
             data.targetAddress.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
-            Logger::parseEncodedStringToBuffer(commandArgs[4], data.targetAddress.addr, 6);
-            Utility::swapBytes(data.targetAddress.addr, 6);
+            Logger::parseEncodedStringToBuffer(commandArgs[4], data.targetAddress.addr.data(), 6);
+            Utility::swapBytes(data.targetAddress.addr.data(), 6);
 
             u8 requestHandle = (commandArgsSize > 5) ? Utility::StringToU8(commandArgs[5]) : 0;
 
@@ -849,7 +863,7 @@ void MeshAccessModule::GapAdvertisementReportEventHandler(const FruityHal::GapAd
 #endif
     FruityHal::BleGapAddr addr;
     addr.addr_type = advertisementReportEvent.getPeerAddrType();
-    CheckedMemcpy(addr.addr, advertisementReportEvent.getPeerAddr(), 6);
+    addr.addr = advertisementReportEvent.getPeerAddr();
 
     if (   packet->flags.len == SIZEOF_ADV_STRUCTURE_FLAGS - 1
         && packet->uuid.len == SIZEOF_ADV_STRUCTURE_UUID16 - 1

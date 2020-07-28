@@ -106,6 +106,7 @@ public:
     static std::string LoadFileContents(const char* path);
     static std::string ExtractReplayToken(const std::string &fileContents, const std::string &startToken, const std::string &endToken);
     static std::queue<ReplayRecordEntry> ExtractReplayRecord(const std::string &fileContents);
+    static std::string ExtractAndCleanReplayToken(const std::string& fileContents, const std::string& startToken, const std::string& endToken);
     static SimConfiguration ExtractSimConfigurationFromReplayRecord(const std::string &fileContents);
     static void CheckVersionFromReplayRecord(const std::string &fileContents);
 

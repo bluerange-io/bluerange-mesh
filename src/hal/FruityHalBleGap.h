@@ -34,6 +34,7 @@
  * This file includes platform independent definitions for the BLE GAP layer.
  */
 
+#include <array>
 
 #include "types.h"
 
@@ -116,11 +117,13 @@ enum class BleGapAddrType : u8
     INVALID                       = 0xFF
 };
 
+typedef std::array<u8, FH_BLE_GAP_ADDR_LEN> BleGapAddrBytes;
+
 struct BleGapAddr
 {
 public:
     BleGapAddrType addr_type;
-    u8 addr[FH_BLE_GAP_ADDR_LEN];
+    BleGapAddrBytes addr;
 };
 
 struct BleGapScanParams
