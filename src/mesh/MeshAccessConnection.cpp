@@ -1043,7 +1043,7 @@ void MeshAccessConnection::ReceiveMeshAccessMessageHandler(BaseConnectionSendDat
         auth == MeshAccessAuthorization::UNDETERMINED 
         || auth == MeshAccessAuthorization::BLACKLIST
     ){
-        logt("ERROR", "Packet unauthorized");
+        logt("WARNING", "Packet unauthorized");
         return;
     }
 

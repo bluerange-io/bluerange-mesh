@@ -350,7 +350,18 @@ void Node::HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinn
 MeshAccessAuthorization Node::CheckMeshAccessPacketAuthorization(BaseConnectionSendData * sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction)
 {
     connPacketHeader const * packet = (connPacketHeader const *)data;
-    
+
+    if (
+        (
+            // NOT FmKeyId::NODE as we don't want to leak information from the mesh
+            // that is sent to broadcast if we are only connected with FmKeyId::NODE.
+            fmKeyId == FmKeyId::ORGANIZATION
+         || fmKeyId == FmKeyId::NETWORK
+        )
+        && direction == DataDirection::DIRECTION_OUT)
+    {
+        return MeshAccessAuthorization::WHITELIST;
+    }
     if (   packet->messageType == MessageType::MODULE_RAW_DATA
         || packet->messageType == MessageType::MODULE_RAW_DATA_LIGHT)
     {
