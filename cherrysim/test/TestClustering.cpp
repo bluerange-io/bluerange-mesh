@@ -115,7 +115,14 @@ TEST_P(MultiStackFixture, TestBasicClustering) {
     printf("Average clustering time %d seconds" EOL, clusteringTimeTotalMs / clusteringIterations / 1000);
 }
 
-#ifndef GITHUB_RELEASE
+//Tests that the exemplary devices.json and site.json for the github release still work
+TEST_P(MultiStackFixture, TestGithubExample) {
+    std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/github_example/site.json";
+    std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/github_example/devices.json";
+    // We do not care for the exact clustering time as we only want to test that the jsons are still valid
+    DoClusteringTestImportedFromJson(site, device, 1, 60 * 1000, 100000, GetParam());
+}
+
 /*Nodes in this test are spread horizontally and can be reached by more than one other nodes*/
 TEST_P(MultiStackFixture, TestHorizontalSpreadNetwork) {
     std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/horizontalspreadnetwork/site.json";
@@ -123,9 +130,7 @@ TEST_P(MultiStackFixture, TestHorizontalSpreadNetwork) {
     constexpr u32 maxRecordedClusteringMedianMs = 39650; //The maximum median recorded over 1000 different seed offsets
     DoClusteringTestImportedFromJson(site, device, 5, 600 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
-#endif //GITHUB_RELEASE
 
-#ifndef GITHUB_RELEASE
 /*Nodes in the network are densely arranged (short range) and can reach each other*/
 TEST_P(MultiStackFixture, TestDenseNetwork) {
     std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/densenetwork/site.json";
@@ -133,9 +138,7 @@ TEST_P(MultiStackFixture, TestDenseNetwork) {
     constexpr u32 maxRecordedClusteringMedianMs = 43350; //The maximum median recorded over 1000 different seed offsets
     DoClusteringTestImportedFromJson(site, device, 5, 60 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
-#endif //GITHUB_RELEASE
 
-#ifndef GITHUB_RELEASE
 /*Nodes in the network are arranged according to start topology*/
 TEST_P(MultiStackFixture, TestStarNetwork) {
     std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/starnetwork/site.json";
@@ -143,9 +146,7 @@ TEST_P(MultiStackFixture, TestStarNetwork) {
     constexpr u32 maxRecordedClusteringMedianMs = 33450; //The maximum median recorded over 1000 different seed offsets
     DoClusteringTestImportedFromJson(site, device, 5, 90 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
-#endif //GITHUB_RELEASE
 
-#ifndef GITHUB_RELEASE
 /*Nodes in the network are arranged in line where each node can only reach one other node*/
 TEST_P(MultiStackFixture, TestRowNetwork) {
     std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/rownetwork/site.json";
@@ -153,9 +154,7 @@ TEST_P(MultiStackFixture, TestRowNetwork) {
     constexpr u32 maxRecordedClusteringMedianMs = 44150; //The maximum median recorded over 1000 different seed offsets
     DoClusteringTestImportedFromJson(site, device, 5, 100 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
-#endif //GITHUB_RELEASE
 
-#ifndef GITHUB_RELEASE
 /*Nodes in the network are sparsely arranged and can only reach one or two other nodes */
 TEST_P(MultiStackFixture, TestSparseNetwork) {
     std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/sparsenetwork/site.json";
@@ -163,17 +162,14 @@ TEST_P(MultiStackFixture, TestSparseNetwork) {
     constexpr u32 maxRecordedClusteringMedianMs = 46350; //The maximum median recorded over 1000 different seed offsets
     DoClusteringTestImportedFromJson(site, device, 5, 500 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
-#endif //GITHUB_RELEASE
 
 /*Nodes are densely arranged on left and right side of the network but has only one node in the middle to connect both sides*/
-#ifndef GITHUB_RELEASE
 TEST_P(MultiStackFixture, TestSinglePointFailureNetwork) {
     std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/singlepointfailure/site.json";
     std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/singlepointfailure/devices.json";
     constexpr u32 maxRecordedClusteringMedianMs = 48500; //The maximum median recorded over 1000 different seed offsets
     DoClusteringTestImportedFromJson(site, device, 5, 1000 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
-#endif //GITHUB_RELEASE
 
 TEST(TestClustering, TestClusteringWithManySdBusy) {
     int clusteringTimeTotalMs = 0;

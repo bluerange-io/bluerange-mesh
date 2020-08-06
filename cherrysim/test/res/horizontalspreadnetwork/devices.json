@@ -1,0 +1,176 @@
+{
+	"results": [
+		{
+			"platform": "ASSET",
+			"properties": {
+				"x": -1,
+				"y": -1
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.17759472737249393,
+				"y": 0.23246652996015016,
+				"z": 0,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.38208387466209887,
+				"y": 0.23078903923038935,
+				"z": 0,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.2590287083771432,
+				"y": 0.23092137692517284,
+				"z": 0,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.298164102442075,
+				"y": 0.2313406779611256,
+				"z": 0,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.3406331602425614,
+				"y": 0.23016522933260627,
+				"z": 0,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.42287920874432844,
+				"y": 0.2328655641110851,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.2179027876940823,
+				"y": 0.23216672785713885,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.46389580169547284,
+				"y": 0.23121883263408702,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.49881760323099594,
+				"y": 0.23250499342797343,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.5351944567027186,
+				"y": 0.23250496889883598,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.5693887322701418,
+				"y": 0.23379095798876018,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.6006727929518192,
+				"y": 0.23250496889883598,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.6305018572039705,
+				"y": 0.23379095798876018,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.6588758695199222,
+				"y": 0.23507697160782187,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.690159874694926,
+				"y": 0.23379095798876018,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.7178063055361045,
+				"y": 0.23121888169236193,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.7432701029663104,
+				"y": 0.23121888169236193,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.768006318921743,
+				"y": 0.23250496889883598,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.7963803312376947,
+				"y": 0.23379095798876018,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.8262092844764991,
+				"y": 0.2363630097560209,
+				"onMap": true
+			}
+		}
+	]
+}

@@ -1,0 +1,24 @@
+{
+  "results":[
+  {
+    "platform": "BLENODE",
+    "properties": {
+      "x": 0.2,
+      "y": 0.2,
+      "z": 0,
+      "onMap": true,
+      "cherrySimFeatureSet":"github_nrf52"
+    }
+  },
+  {
+    "platform": "BLENODE",
+    "properties": {
+      "x": 0.7,
+      "y": 0.7,
+      "z": 0,
+      "onMap": true,
+      "cherrySimFeatureSet":"github_nrf52"
+    }
+  }
+]
+}

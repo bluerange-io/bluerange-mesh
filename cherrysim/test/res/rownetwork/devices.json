@@ -1,0 +1,176 @@
+{
+	"results": [
+		{
+			"platform": "ASSET",
+			"properties": {
+				"x": -1,
+				"y": -1
+			}
+		},
+		{
+			"platform": "EDGEROUTER",
+			"properties": {
+				"x": 0.1281222122016186,
+				"y": 0.5038195244772519,
+				"z": 0,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.23875903867950785,
+				"y": 0.554869499707105,
+				"z": 0,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.11788656131219838,
+				"y": 0.17047780472205185,
+				"z": 0,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.22468286953053002,
+				"y": 0.16189474060406073,
+				"z": 0,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.33626794892728945,
+				"y": 0.15557528655756986,
+				"z": 0,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.4417951614482893,
+				"y": 0.154417654066276,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.0723952905471819,
+				"y": 0.327333182886811,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.5752089955216133,
+				"y": 0.9218185954827522,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.8131135395173363,
+				"y": 0.5025719988551512,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.3394869739235165,
+				"y": 0.5745898162755144,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.638504809373088,
+				"y": 0.1630591296583209,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.5439249348399359,
+				"y": 0.16563123048385694,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.7061658900465081,
+				"y": 0.9295349715467716,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.4515278047311037,
+				"y": 0.9115303638845723,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.18452155593130884,
+				"y": 0.9179605055672924,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.3169333913790563,
+				"y": 0.9153887481496809,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.8371223960246887,
+				"y": 0.887095761714476,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.8218439621478808,
+				"y": 0.6851888272001259,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.794197697826722,
+				"y": 0.3289574130184325,
+				"onMap": true
+			}
+		},
+		{
+			"platform": "BLENODE",
+			"properties": {
+				"x": 0.7352672618105397,
+				"y": 0.18106359014569604,
+				"onMap": true
+			}
+		}
+	]
+}
