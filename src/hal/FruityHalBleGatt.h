@@ -34,7 +34,7 @@
  * This file includes platform independent definitions for the BLE GATT layer.
  */
 
-#include <types.h>
+#include <FmTypes.h>
 #include <FruityHalBleGap.h>
 
 // Invalid Attribute Handle
@@ -94,7 +94,7 @@ struct BleGattCharProperties
 
 struct BleGattCharExtendedProperties
 {
-    u8 reliableWrite          :1;
+    u8 reliableWrite        :1;
     u8 writeableAuxiliaries :1;
 };
 

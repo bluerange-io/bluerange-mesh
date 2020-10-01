@@ -34,7 +34,7 @@
 
 #ifdef SIM_ENABLED
 
-#include <types.h>
+#include <FmTypes.h>
 #include <RecordStorage.h>
 
 class TestRecordStorage : public RecordStorageEventListener

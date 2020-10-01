@@ -35,76 +35,108 @@
 #include <array>
 
 // Be sure to check the advertising controller for the maximum number of supported jobs before increasing this
-constexpr int ADVERTISING_MODULE_MAX_MESSAGES = 1;
-constexpr int ADVERTISING_MODULE_MAX_MESSAGE_LENGTH = 31;
+constexpr int BEACONING_MODULE_MAX_MESSAGES = 1;
+constexpr int BEACONING_MODULE_MAX_MESSAGE_LENGTH = 31;
 
 /*
- * The AdvertisingModule is used to broadcast user-data that is not related with
+ * The BeaconingModule is used to broadcast user-data that is not related with
  * the mesh during times where no mesh discovery is ongoing. It is used
  * to broadcast messages to smartphones or other devices from all mesh nodes.
  */
-class AdvertisingModule: public Module
+class BeaconingModule: public Module
 {
     private:
-
-        u32 assetMode = false;
-
-        enum class AdvertisingModuleTriggerActionMessages : u8
+        enum class BeaconingModuleTriggerActionMessages : u8
         {
-            ADD_MESSAGE = 0,
+            ADD_MESSAGE    = 0,
+            SET_MESSAGE    = 1,
+            REMOVE_MESSAGE = 2,
         };
 
-        enum class AdvertisingModuleActionResponseMessages : u8
+        enum class BeaconingModuleActionResponseMessages : u8
         {
-            ADD_MESSAGE = 0,
+            ADD_MESSAGE_RESPONSE    = 0,
+            SET_MESSAGE_RESPONSE    = 1,
+            REMOVE_MESSAGE_RESPONSE = 2,
         };
 
         #pragma pack(push, 1)
-        struct AdvertisingMessage{
+        struct BeaconingMessage{
             u8 messageId_deprecated; //Unused but set to some values in old set_config commands. Must not be used!
             u8 forceNonConnectable_deprecated : 1; //Unused but set to some values in old set_config commands. Must not be used!
             u8 forceConnectable_deprecated : 1; //Unused but set to some values in old set_config commands. Must not be used!
             u8 reserved : 1;
             u8 messageLength : 5;
-            std::array<u8, ADVERTISING_MODULE_MAX_MESSAGE_LENGTH> messageData;
+            std::array<u8, BEACONING_MODULE_MAX_MESSAGE_LENGTH> messageData;
         };
 
         //Module configuration that is saved persistently
-        struct AdvertisingModuleConfiguration : ModuleConfiguration{
+        struct BeaconingModuleConfiguration : ModuleConfiguration{
             //The interval at which the device advertises
             u16 advertisingIntervalMs_deprecated; //Unused but set to some values in old set_config commands. Must not be used!
             //Number of messages
-            u8 messageCount;
+            u8 messageCount_deprecated; //Deprecated as of 24.08.2020. A valid adverisingMessage could also be placed in the middle of all slots. If valid, messageData[slot].messageLength != 0
             i8 txPower_deprecated; //Unused but set to some values in old set_config commands. Must not be used!
-            std::array<AdvertisingMessage, ADVERTISING_MODULE_MAX_MESSAGES> messageData;
+            std::array<BeaconingMessage, BEACONING_MODULE_MAX_MESSAGES> messageData;
             //Insert more persistent config values here
         };
 
-        struct AddAdvertisingMessageMessage
+        struct AddBeaconingMessageMessage
         {
             u8 messageLength;
-            std::array<u8, ADVERTISING_MODULE_MAX_MESSAGE_LENGTH> messageData;
+            std::array<u8, BEACONING_MODULE_MAX_MESSAGE_LENGTH> messageData;
         };
-        STATIC_ASSERT_SIZE(AddAdvertisingMessageMessage, 32);
-        enum class AddAdvertisingMessageReplyCode : u8
+        STATIC_ASSERT_SIZE(AddBeaconingMessageMessage, 32);
+        enum class AddBeaconingMessageResponseCode : u8
         {
             SUCCESS = 0,
             FULL = 1,
             RECORD_STORAGE_ERROR = 2,
         };
-        struct AddAdvertisingMessageReply
+        struct AddBeaconingMessageResponse
         {
-            AddAdvertisingMessageReplyCode code;
+            AddBeaconingMessageResponseCode code;
         };
-        STATIC_ASSERT_SIZE(AddAdvertisingMessageReply, 1);
+        STATIC_ASSERT_SIZE(AddBeaconingMessageResponse, 1);
+
+        struct SetBeaconingMessageMessage
+        {
+            u8 messageLength;
+            u16 slot;
+            std::array<u8, BEACONING_MODULE_MAX_MESSAGE_LENGTH> messageData;
+        };
+        STATIC_ASSERT_SIZE(SetBeaconingMessageMessage, 34);
+        enum class SetBeaconingMessageResponseCode : u8
+        {
+            SUCCESS = 0,
+            SLOT_OUT_OF_RANGE = 1,
+            RECORD_STORAGE_ERROR = 2,
+        };
+        struct SetBeaconingMessageResponse
+        {
+            SetBeaconingMessageResponseCode code;
+        };
+        STATIC_ASSERT_SIZE(SetBeaconingMessageResponse, 1);
+
+        struct RemoveBeaconingMessageMessage
+        {
+            u16 slot;
+        };
+        STATIC_ASSERT_SIZE(RemoveBeaconingMessageMessage, 2);
+        enum class RemoveBeaconingMessageResponseCode : u8
+        {
+            SUCCESS = 0,
+            SLOT_OUT_OF_RANGE = 1,
+            RECORD_STORAGE_ERROR = 2,
+        };
+        struct RemoveBeaconingMessageResponse
+        {
+            RemoveBeaconingMessageResponseCode code;
+        };
+        STATIC_ASSERT_SIZE(RemoveBeaconingMessageResponse, 1);
         #pragma pack(pop)
 
-        std::array<AdvJob*, ADVERTISING_MODULE_MAX_MESSAGES> advJobHandles{};
-
-        u16 maxMessages = ADVERTISING_MODULE_MAX_MESSAGES; //Save this, so that it can be requested
-
-        //Set all advertising messages at once, the old configuration will be overwritten
-        void SetAdvertisingMessages(u8* data, u16 dataLength);
+        std::array<AdvJob*, BEACONING_MODULE_MAX_MESSAGES> advJobHandles{};
 
         #pragma pack(push)
         #pragma pack(1)
@@ -118,22 +150,22 @@ class AdvertisingModule: public Module
             std::array<i8, 3> rssiVals;
             std::array<u8, 3> droppedVals;
 
-        } AdvertisingModuleDebugMessage;
+        } BeaconingModuleDebugMessage;
 
         #pragma pack(pop)
 
 
     public:
-        DECLARE_CONFIG_AND_PACKED_STRUCT(AdvertisingModuleConfiguration);
+        DECLARE_CONFIG_AND_PACKED_STRUCT(BeaconingModuleConfiguration);
 
-        AdvertisingModule();
+        BeaconingModule();
 
-        void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
+        void ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfigLength) override final;
 
         void ResetToDefaultConfiguration() override final;
 
         //Receiving
-        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const* packetHeader) override final;
+        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const* packetHeader) override final;
 
         #ifdef TERMINAL_ENABLED
         TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;

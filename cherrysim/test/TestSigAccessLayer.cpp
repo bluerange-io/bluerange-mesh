@@ -46,8 +46,8 @@ TEST(TestSigAccessLayer, TestGenericModels)
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.sim->findNodeById(1)->gs.logger.enableTag("SIG");
-    tester.sim->findNodeById(1)->gs.logger.enableTag("SIGMODEL");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIG");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIGMODEL");
 
     //Send a sig message (0x23) from nodeid 0x0001 to broadcast 0x0000: senderSigAddress 0x1234, receiverSigAddress 0x000A,
     //opcode "Generic OnOff Set" 0x8202, state 0x01, transaction identifier 0x00
@@ -102,8 +102,8 @@ TEST(TestSigAccessLayer, TestConfigCompositionData)
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.sim->findNodeById(1)->gs.logger.enableTag("SIG");
-    tester.sim->findNodeById(1)->gs.logger.enableTag("SIGMODEL");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIG");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIGMODEL");
 
     //Asks the primary element for the composition data
     tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:08:80:00");
@@ -120,8 +120,8 @@ TEST(TestSigAccessLayer, TestConfigModelPublication)
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.sim->findNodeById(1)->gs.logger.enableTag("SIG");
-    tester.sim->findNodeById(1)->gs.logger.enableTag("SIGMODEL");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIG");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIGMODEL");
 
     //Set publication address (opcode 0x03) of first element to publish address 0x7777 for model 0x1002
     tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:03:0A:00:77:77:00:00:00:00:00:02:10");
@@ -147,8 +147,8 @@ TEST(TestSigAccessLayer, TestConfigModelSubscription)
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.sim->findNodeById(1)->gs.logger.enableTag("SIG");
-    tester.sim->findNodeById(1)->gs.logger.enableTag("SIGMODEL");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIG");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIGMODEL");
 
     //Add a subscription to address 0xC001 for element 1, model 0x1000
     tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:1B:80:0A:00:01:C0:00:10");
@@ -184,24 +184,24 @@ TEST(TestSigAccessLayer, TestDirectMethodAccess)
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.sim->findNodeById(1)->gs.logger.enableTag("SIG");
-    tester.sim->findNodeById(1)->gs.logger.enableTag("SIGMODEL");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIG");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIGMODEL");
 
     tester.SimulateForGivenTime(1000); //Give node some time to boot.
 
 
-    for (u32 i = 0; i < tester.sim->getTotalNodes(); i++)
+    for (u32 i = 0; i < tester.sim->GetTotalNodes(); i++)
     {
         NodeIndexSetter setter(i);
-        ASSERT_EQ(SigAccessLayer::getInstance().nodeAddress, (i + 1) * 10);
+        ASSERT_EQ(SigAccessLayer::GetInstance().nodeAddress, (i + 1) * 10);
     }
 
     {
         NodeIndexSetter setter(0);
         Exceptions::DisableDebugBreakOnException disabler;
-        ASSERT_THROW(SigAccessLayer::getInstance().CreateElement(), SigCreateElementFailedException);
-        ASSERT_THROW(SigAccessLayer::getInstance().ProvisionNode(0x1234), SigProvisioningFailedException);
-        ASSERT_THROW(SigAccessLayer::getInstance().ProvisionNodeWithNodeId(10), SigProvisioningFailedException);
+        ASSERT_THROW(SigAccessLayer::GetInstance().CreateElement(), SigCreateElementFailedException);
+        ASSERT_THROW(SigAccessLayer::GetInstance().ProvisionNode(0x1234), SigProvisioningFailedException);
+        ASSERT_THROW(SigAccessLayer::GetInstance().ProvisionNodeWithNodeId(10), SigProvisioningFailedException);
     }
 }
 
@@ -216,8 +216,8 @@ TEST(TestSigAccessLayer, TestProvisionChangeOnEnrollment)
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.sim->findNodeById(1)->gs.logger.enableTag("SIG");
-    tester.sim->findNodeById(1)->gs.logger.enableTag("SIGMODEL");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIG");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIGMODEL");
 
     tester.SimulateForGivenTime(1000); //Give node some time to boot.
 
@@ -227,7 +227,7 @@ TEST(TestSigAccessLayer, TestProvisionChangeOnEnrollment)
 
     {
         NodeIndexSetter setter(0);
-        ASSERT_EQ(SigAccessLayer::getInstance().nodeAddress, 930); // 930 = nodeId * 10
+        ASSERT_EQ(SigAccessLayer::GetInstance().nodeAddress, 930); // 930 = nodeId * 10
     }
 }
 
@@ -243,8 +243,8 @@ TEST(TestSigAccessLayer, TestPersistenceConfig)
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.sim->findNodeById(1)->gs.logger.enableTag("SIG");
-    tester.sim->findNodeById(1)->gs.logger.enableTag("SIGMODEL");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIG");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIGMODEL");
 
     tester.SimulateForGivenTime(1000); //Give node some time to boot.
 
@@ -294,8 +294,8 @@ TEST(TestSigAccessLayer, TestPersistenceState)
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.sim->findNodeById(1)->gs.logger.enableTag("SIG");
-    tester.sim->findNodeById(1)->gs.logger.enableTag("SIGMODEL");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIG");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIGMODEL");
 
     tester.SimulateForGivenTime(1000); //Give node some time to boot.
 

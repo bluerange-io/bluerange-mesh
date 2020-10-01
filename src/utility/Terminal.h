@@ -34,7 +34,7 @@
 #include <Config.h>
 #include <Boardconfig.h>
 
-#include <types.h>
+#include <FmTypes.h>
 #ifdef SIM_ENABLED
 #include <string>
 #include <queue>
@@ -120,7 +120,7 @@ private:
     void ProcessTerminalCommandHandlerReturnType(TerminalCommandHandlerReturnType handled, i32 commandArgsSize);
 
 public:
-    static Terminal& getInstance();
+    static Terminal& GetInstance();
 
     //After the terminal has been initialized (all transports), this is true
     bool terminalIsInitialized = false;
@@ -145,9 +145,9 @@ public:
 
     void OnJsonLogged(const char* json);
 
-    const char** getCommandArgsPtr();
-    u8 getReadBufferOffset();
-    char* getReadBuffer();
+    const char** GetCommandArgsPtr();
+    u8 GetReadBufferOffset();
+    char* GetReadBuffer();
 
     void EnableCrcChecks();
 #ifdef SIM_ENABLED
@@ -211,9 +211,9 @@ public:
     //###### Other ######
 #ifdef TERMINAL_ENABLED
     //Some sort of logging is used
-    #define log_transport_init() Terminal::getInstance().Init(Terminal::promptAndEchoMode);
-    #define log_transport_putstring(message) Terminal::getInstance().PutString(message)
-    #define log_transport_put(character) Terminal::getInstance().PutChar(character)
+    #define log_transport_init() Terminal::GetInstance().Init(Terminal::promptAndEchoMode);
+    #define log_transport_putstring(message) Terminal::GetInstance().PutString(message)
+    #define log_transport_put(character) Terminal::GetInstance().PutChar(character)
 #else
     //logging is completely disabled
     #define log_transport_init() do{}while(0)

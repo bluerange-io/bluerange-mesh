@@ -150,7 +150,7 @@ void TimeManager::ProcessTicks()
     additionalTicks -= seconds * ticksPerSecond;
 }
 
-void TimeManager::HandleUpdateTimestampMessages(connPacketHeader const * packetHeader, u16 dataLength)
+void TimeManager::HandleUpdateTimestampMessages(ConnPacketHeader const * packetHeader, u16 dataLength)
 {
     if (packetHeader->messageType == MessageType::UPDATE_TIMESTAMP)
     {
@@ -251,7 +251,7 @@ i32 TimePoint::operator-(const TimePoint & other)
     return ticksDifference + secondDifference * ticksPerSecond;
 }
 
-u32 TimePoint::getAdditionalTicks()
+u32 TimePoint::GetAdditionalTicks() const
 {
     return additionalTicks;
 }

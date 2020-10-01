@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include <types.h>
+#include <FmTypes.h>
 #include <Config.h>
 #include <FruityHal.h>
 #include <array>
@@ -119,7 +119,7 @@ public:
     AdvJob* currentActiveJob = nullptr;
     AdvJob* jobToSet = nullptr;
 
-    static AdvertisingController& getInstance();
+    static AdvertisingController& GetInstance();
 
 
     void Initialize();
@@ -131,8 +131,6 @@ public:
     void RemoveJob(AdvJob* jobHandle);
     AdvJob* DetermineCurrentAdvertisingJob();
     void DetermineAndSetAdvertisingJob();
-
-    void DetermineCurrentAdvertisingInterval();
 
     //Change Advertising with Softdevice
     void SetAdvertisingData(AdvJob* job);

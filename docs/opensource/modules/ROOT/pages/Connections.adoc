@@ -21,10 +21,12 @@ enum class ConnectionState{
 
 [#PacketSplitting]
 === Packet Splitting
-Whenever data that is requested to be send is bigger than payload size of 1 packet then that data is splitted into few messages. The header of split message has additional information about index of split message so that full data can be easily and realiably reconstructed. For connections that use the basic packet format with the xref:Specification.adoc#connPacketHeader[connPacketHeader], packet splitting can be used. The _MeshConnection_ and _MeshAccessConnection_ use this.
+Whenever data is sent with a payload size that does not fit into a single MTU (usually 20 bytes) then that data is split into multiple messages. The header of the split message (connPacketSplitHeader) that is prefixed before each of the fragments has additional information. It tells the receiver the index of the message fragment and whether a fragment is the last one so that it can be easily and reliably reconstructed. This mechanism can be used for all connections that rely on the standard FruityMesh packet format. This means that they must use the xref:Specification.adoc#connPacketHeader[connPacketHeader] for all packets and must evaluate the MessageType in the first byte. The xref:MeshConnection.adoc[MeshConnection] and xref:MeshAccessConnection.adoc[MeshAccessConnection] use this packet format.
 
-==== connPacketSplitHeader
-With packet splitting, a wrapper is placed around messages to allow for messages that are longer than the maximum number of bytes that can be placed into a characteristic. Usually, this limit is 20 bytes per write, but may be different if a connection supports a different payload. Cf. the documentation of the connection.
+Splitting and Reassembly is implemented as part of `BaseConnection.cpp` and can be used by any Connection class that subclasses it. It is not mandatory and cannot be used if a different type of packet format is transmitted over these connections. Once data is received that has the `MessageType::Split_WRITE_CMD` or `MessageType::Split_WRITE_CMD_END`, the connPacketSplitHeader will be stripped away and it is placed in a packet reassembly buffer until the full message was received. The message will only be reported to the implementation after it was fully reassembled. If a part was missing, the entire message will be dropped. In case custom encryption was implemented, this will also typically take place after a packet was split into parts and before it will be sent.
+
+==== The connPacketSplitHeader
+With packet splitting, a wrapper is prefixed before every message fragment to allow for messages that are longer than the maximum number of bytes per transmission. Usually, this limit is 20 bytes per write, but may be different if a connection supports a different MTU (see xref:#MtuUpgrade[MTU Upgrade]).
 
 A split packet will have the _messageType_ set to one of these:
 [source,C++]
@@ -39,12 +41,16 @@ A split packet will have the _messageType_ set to one of these:
 |1|u8|splitCounter|Index of the split message, starting with 0 for the first part.
 |===
 
+[#MtuUpgrade]
+=== MTU Upgrade
+Some Connections such as the MeshConnection implement an automated MTU upgrade. Once a connection between two devices was set up, it will have a default MTU of 23 bytes (20 bytes of payload), which is compatible with all devices starting from Bluetooth Standard 4.0. Newer devices might support a higher MTU, which increases the throughput by a lot. To provide a good balance between memory consumption and throughput, FruityMesh has been configured to use an MTU upgrade of up to 63 bytes in `FruityHal::BleGattGetMaxMtu`. This allows us to send packets of up to 60 bytes in a single packet without needing to split them. The MTU upgrade is done during the Handshake and is implemented in `ConnectionManager::RequestDataLengthExtensionAndMtuExchange`. As the upgrade procedure and the packet splitting are implemented in the lower layers of FruityMesh, the user typically does not have to care for this. Optimizing packets to have a total size of less than 20 bytes is still a good idea if possible.
+
 == ResolverConnection
-This connection is instantiated as soon as another device connects to the node, in which case the node is the peripherial. Initially, it is not known whether the other device is a mesh node, a smartphone or something else. The resolver connection will wait until the partner transmits a packet from which it can determine the type of connection that needs to be instantiated. The correct connection is then created and the _ResolverConnection_ is deleted.
+This connection is instantiated as soon as another device connects to the node, in which case the node is the peripherial. Initially, it is not known whether the other device is a mesh node, a smartphone or something else. The resolver connection will wait until the partner transmits a packet from which it can determine the type of connection that needs to be instantiated. The correct connection is then created and the _ResolverConnection_ is deleted. Each Connection needs to implement a ConnTypeResolver where it must return whether it wants to be instantiated or not. Take a look at `MeshConnection::ConnTypeResolver` for some more information.
 
 == MeshConnection
 MeshConnections are initiated by the node and are used to connect between two mesh nodes. They store important information for clustering such as the _clusterId_ and _clusterSize_ of their partner.
 It also implements the handshake for two partners to be connected to the same cluster. It works closely together with the xref:Node.adoc[Node]. They can transfer message of any size as they use xref:Connections.adoc#PacketSplitting[packet splitting].
 
 == MeshAccessConnection
-The MeshAccessConnection is documented to a large extent in the documentation of the xref:MeshAccessModule.adoc[MeshAccessModule].
+The xref:MeshAccessConnection.adoc[MeshAccessConnection] is also documented to a large extent in the documentation of the xref:MeshAccessModule.adoc[MeshAccessModule].

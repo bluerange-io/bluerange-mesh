@@ -28,7 +28,7 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "types.h"
+#include "FmTypes.h"
 
 class ComponentSenseTimer
 {
@@ -40,7 +40,7 @@ private:
     u32 amountOfRepeatedMessages = 0;
 public:
 
-    bool shouldTrigger(u32 passedTimeDs);
-    void reset();
+    bool ShouldTrigger(u32 passedTimeDs);
+    void Reset();
 
 };

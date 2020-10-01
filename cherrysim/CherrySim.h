@@ -38,7 +38,7 @@ into all files in order to rewrite macros and other calls.
 
 #ifdef SIM_ENABLED
 #include <vector>
-#include <types.h>
+#include <FmTypes.h>
 #include <GlobalState.h>
 #include <FruitySimServer.h>
 #include <Terminal.h>
@@ -65,6 +65,7 @@ struct FeaturesetPointers
     FeatureSetGroup(*getFeaturesetGroupPtr)(void) = nullptr;
     void(*setBoardConfigurationPtr)(BoardConfiguration* config) = nullptr;
     void(*setFeaturesetConfigurationPtr)(ModuleConfiguration* config, void* module) = nullptr;
+    void(*setFeaturesetConfigurationVendorPtr)(VendorModuleConfiguration* config, void* module) = nullptr;
     u32(*initializeModulesPtr)(bool createModule) = nullptr;
     DeviceType(*getDeviceTypePtr)(void) = nullptr;
     Chipset(*getChipsetPtr)(void) = nullptr;
@@ -77,7 +78,7 @@ class CherrySim
 {
     friend class NodeIndexSetter;
 private:
-    std::vector<char> nodeEntryBuffer; // As std::vector calls the copy constructor of it's type and nodeEntry has no copy constructor we have to provide the memory like this.
+    std::vector<char> nodeEntryBuffer; // As std::vector calls the copy constructor of it's type and NodeEntry has no copy constructor we have to provide the memory like this.
 public:
     constexpr static float N = 2.5; //Our calibration value for distance calculation
     int globalBreakCounter = 0; //Can be used to increment globally everywhere in sim and break on a specific count
@@ -86,8 +87,8 @@ public:
     volatile bool receivedDataFromMeshGw = false;
     SimConfiguration simConfig; //The current configuration for the simulator
     SimulatorState simState; //The current state of the simulator
-    nodeEntry* currentNode = nullptr; //A pointer to the current node under simulation
-    nodeEntry* nodes = nullptr; //A pointer that points to the memory that holds the complete state of all nodes
+    NodeEntry* currentNode = nullptr; //A pointer to the current node under simulation
+    NodeEntry* nodes = nullptr; //A pointer that points to the memory that holds the complete state of all nodes
     std::string logAccumulator;
 
     CherrySimEventListener* simEventListener = nullptr;
@@ -95,13 +96,13 @@ public:
     int flashToFileWriteCycle = 0;
     static constexpr int flashToFileWriteInterval = 128; // Will write flash to file every flashToFileWriteInterval's simulation step.
 
-    void erasePage(u32 pageAddress);
+    void ErasePage(u32 pageAddress);
 
     std::map<std::string, FeaturesetPointers> featuresetPointers;
 
     std::queue<ReplayRecordEntry> replayRecordEntries;
 
-    nodeEntry* GetNodeEntryBySerialNumber(u32 serialNumber);
+    NodeEntry* GetNodeEntryBySerialNumber(u32 serialNumber);
 
     static std::string LoadFileContents(const char* path);
     static std::string ExtractReplayToken(const std::string &fileContents, const std::string &startToken, const std::string &endToken);
@@ -137,7 +138,7 @@ TESTER_PUBLIC:
     void AnimationStop(u32 serialNumber);
     bool AnimationLoadJsonFromPath(const char* path);
 
-    bool shouldSimIvTrigger(u32 ivMs);
+    bool ShouldSimIvTrigger(u32 ivMs);
 
     void StoreFlashToFile();
     void LoadFlashFromFile();
@@ -146,8 +147,8 @@ TESTER_PUBLIC:
 
 #ifdef GITHUB_RELEASE
     //Used to redirect featuresets on github releases
-    bool isRedirectedFeatureset(const std::string& featureset);
-    std::string redirectFeatureset(const std::string& oldFeatureset);
+    bool IsRedirectedFeatureset(const std::string& featureset);
+    std::string RedirectFeatureset(const std::string& oldFeatureset);
 #endif
 
 public:
@@ -161,29 +162,29 @@ public:
 
     void Init(); //Creates and flashes all nodes
     void SimulateStepForAllNodes(); //Simulates on timestep for all nodes
-    void quitSimulation();
+    void QuitSimulation();
 
     //#### Terminal
     #ifdef TERMINAL_ENABLED
-    TerminalCommandHandlerReturnType TerminalCommandHandler(const std::string& message);
+    TerminalCommandHandlerReturnType TerminalCommandHandler(const std::vector<std::string>& commandArgs);
     #endif // Inherited via TerminalCommandListener
     void RegisterTerminalPrintListener(TerminalPrintListener* callback); // Register a class that will be notified when sth. is printed to the Terminal
     void TerminalPrintHandler(const char* message); //Called for all simulator output
 
     //#### Node Lifecycle
-    u32 getTotalNodes(bool countAgain = false) const; // returns number of all nodes i.e our nodes, vendor nodes and asset nodes
-    u32 getAssetNodes(bool countAgain = false) const; //iterates over all the nodes and calculate the node with device type Asset
-    void initNode(u32 i); // Creates a node with default settings (like manufacturing the hardware)
-    void flashNode(u32 i); // Flashes a node with uicr and settings
-    void bootCurrentNode(); // Starts the node. shutdownCurrentNode() must be called to clean up
-    void resetCurrentNode(RebootReason rebootReason, bool throwException = true); //Resets a node and boots it again (Only call this after node was bootet)
-    void shutdownCurrentNode(); //Deletes the memory allocated by the node during runtime
+    u32 GetTotalNodes(bool countAgain = false) const; // returns number of all nodes i.e our nodes, vendor nodes and asset nodes
+    u32 GetAssetNodes(bool countAgain = false) const; //iterates over all the nodes and calculate the node with device type Asset
+    void InitNode(u32 i); // Creates a node with default settings (like manufacturing the hardware)
+    void FlashNode(u32 i); // Flashes a node with uicr and settings
+    void BootCurrentNode(); // Starts the node. ShutdownCurrentNode() must be called to clean up
+    void ResetCurrentNode(RebootReason rebootReason, bool throwException = true); //Resets a node and boots it again (Only call this after node was bootet)
+    void ShutdownCurrentNode(); //Deletes the memory allocated by the node during runtime
     static void SendUartCommand(NodeId nodeId, const u8* message, u32 messageLength);
 
-    static int chipsetToPageSize(Chipset chipset);
-    static int chipsetToCodeSize(Chipset chipset);
-    static int chipsetToApplicationSize(Chipset chipset);
-    static int chipsetToBootloaderAddr(Chipset chipset);
+    static int ChipsetToPageSize(Chipset chipset);
+    static int ChipsetToCodeSize(Chipset chipset);
+    static int ChipsetToApplicationSize(Chipset chipset);
+    static int ChipsetToBootloaderAddr(Chipset chipset);
 
     void CheckForMultiTensorflowUsage();
 
@@ -194,30 +195,30 @@ public:
     //This section is public so that softdevice calls from c code can access the functions
 
     //Import devices from json or generate a random scenario
-    void importDataFromJson();
-    void importPositionsFromJson();
+    void ImportDataFromJson();
+    void ImportPositionsFromJson();
     void PositionNodesRandomly();
     void LoadPresetNodePositions();
 
     //Flash simulation
-    void simulateFlashCommit();
-    void sim_commit_flash_operations();
-    void sim_commit_some_flash_operations(const uint8_t* failData, uint16_t numMaxEvents);
+    void SimulateFlashCommit();
+    void SimCommitFlashOperations();
+    void SimCommitSomeFlashOperations(const uint8_t* failData, uint16_t numMaxEvents);
 
     //GAP Simulation
-    void simulateBroadcast();
+    void SimulateBroadcast();
     static ble_gap_addr_t Convert(const FruityHal::BleGapAddr* address);
     static FruityHal::BleGapAddr Convert(const ble_gap_addr_t* p_addr);
-    void ConnectMasterToSlave(nodeEntry * master, nodeEntry* slave);
+    void ConnectMasterToSlave(NodeEntry * master, NodeEntry* slave);
     u32 DisconnectSimulatorConnection(SoftdeviceConnection * connection, u32 hciReason, u32 hciReasonPartner);
-    void simulateTimeouts();
+    void SimulateTimeouts();
 
     //UART Simulation
     void SimulateUartInterrupts();
 
     //GATT Simulation
     void SimulateConnections();
-    void SendUnreliableTxCompleteEvent(nodeEntry* node, int connHandle, u8 packetCount);
+    void SendUnreliableTxCompleteEvent(NodeEntry* node, int connHandle, u8 packetCount);
     void GenerateWrite(SoftDeviceBufferedPacket* bufferedPacket);
     void GenerateNotification(SoftDeviceBufferedPacket* bufferedPacket);
 
@@ -228,7 +229,7 @@ public:
     void SimulateMovement();
 
     //Battery usage simulation
-    void simulateBatteryUsage();
+    void SimulateBatteryUsage();
 
     //Service Discovery Simulation
     void StartServiceDiscovery(u16 connHandle, const ble_uuid_t &p_uuid, int discoveryTimeMs);
@@ -240,18 +241,17 @@ public:
 #endif //GITHUB_RELEASE
 
     //Other Simulation
-    void simulateTimer();
-    void simulateWatchDog();
+    void SimulateTimer();
+    void SimulateWatchDog();
 
     void SimulateInterrupts();
 
     //Validity Checking
     void CheckMeshingConsistency();
-    ClusterSize DetermineClusterSizeAndPropagateClusterUpdates(nodeEntry* node, nodeEntry* startNode);
+    ClusterSize DetermineClusterSizeAndPropagateClusterUpdates(NodeEntry* node, NodeEntry* startNode);
 
     //Configuration
-    void SetCustomAdvertisingModuleConfig();
-    void SetBleStack(nodeEntry* node);
+    void SetBleStack(NodeEntry* node);
 
     //Statistics
     void AddPacketToStats(PacketStat* statArray, PacketStat* packet);
@@ -266,19 +266,21 @@ public:
     void ChooseSimulatorTerminal();
 
     float RssiToDistance(int rssi, int calibratedRssi);
-    float GetDistanceBetween(const nodeEntry * nodeA, const nodeEntry * nodeB);
-    float GetReceptionRssi(const nodeEntry * sender, const nodeEntry * receiver);
-    float GetReceptionRssi(const nodeEntry* sender, const nodeEntry* receiver, int8_t senderDbmTx, int8_t senderCalibratedTx);
-    double calculateReceptionProbability(const nodeEntry* sendingNode, const nodeEntry* receivingNode);
+    float GetDistanceBetween(const NodeEntry * nodeA, const NodeEntry * nodeB);
+    float GetReceptionRssi(const NodeEntry* sender, const NodeEntry* receiver);
+    float GetReceptionRssi(const NodeEntry* sender, const NodeEntry* receiver, int8_t senderDbmTx, int8_t senderCalibratedTx);
+    float GetReceptionRssiNoNoise(const NodeEntry* sender, const NodeEntry* receiver);
+    float GetReceptionRssiNoNoise(const NodeEntry* sender, const NodeEntry* receiver, int8_t senderDbmTx, int8_t senderCalibratedTx);
+    uint32_t CalculateReceptionProbability(const NodeEntry* sendingNode, const NodeEntry* receivingNode);
 
-    SoftdeviceConnection* findConnectionByHandle(nodeEntry* node, int connectionHandle);
-    nodeEntry* findNodeById(int id);
-    u8 getNumSimConnections(const nodeEntry* node);
+    SoftdeviceConnection* FindConnectionByHandle(NodeEntry* node, int connectionHandle);
+    NodeEntry* FindNodeById(int id);
+    u8 GetNumSimConnections(const NodeEntry* node);
 
     void FakeVersionOfCurrentNode(u32 version);
 
-    void enableTagForAll(const char* tag);
-    void disableTagForAll(const char* tag);
+    void EnableTagForAll(const char* tag);
+    void DisableTagForAll(const char* tag);
 
     void SetPosition(u32 nodeIndex, float x, float y, float z);
     void AddPosition(u32 nodeIndex, float x, float y, float z);

@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include <types.h>
+#include <FmTypes.h>
 #include <FruityHal.h>
 
 /*
@@ -46,12 +46,12 @@ public:
 
     void Init();
 
-    static GATTController& getInstance();
+    static GATTController& GetInstance();
 
     //FUNCTIONS
 
-    ErrorType bleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable) const;
-    ErrorType bleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength) const;
+    ErrorType BleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable) const;
+    ErrorType BleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength) const;
 
     ErrorType DiscoverService(u16 connHandle, const FruityHal::BleGattUuid &p_uuid);
 

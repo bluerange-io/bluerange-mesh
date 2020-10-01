@@ -35,7 +35,7 @@ Have a look at xref:Class-Structure.adoc[Class Structure] for some more detailed
 There are some utilities in the `/util` folder, for example a python script that opens a putty terminal for all connected serial devices and a Wireshark dissector that can be used together with the nRF Sniffer to inspect the advertising packets.
 
 == Configuring FruityMesh
-Most settings are found in the `fruitymesh/config/` folder in `Config.h`. Module specific settings are kept within the module's header and cpp file.
+Most settings are found in the `fruitymesh/src/` folder in `Config.h` but should be configured in the Featuresets. Module specific settings are kept within the module's header and cpp file.
 
 [#Featuresets]
 == Feature Sets

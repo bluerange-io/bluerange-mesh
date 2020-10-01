@@ -35,7 +35,7 @@
 
 #pragma once
 
-#include <types.h>
+#include <FmTypes.h>
 #include <Config.h>
 #include <FruityHal.h>
 
@@ -68,5 +68,5 @@ void BleStackErrorHandler(u32 id, u32 pc, u32 info);
 void HardFaultErrorHandler(stacked_regs_t* stack);
 
 //Other
-void checkRamRetainStruct();
+void CheckRamRetainStruct();
 

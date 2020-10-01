@@ -34,11 +34,8 @@
 #include <PingModule.h>
 #include <stdlib.h>
 
-constexpr u8 PING_MODULE_CONFIG_VERSION = 1;
-
-
 PingModule::PingModule()
-    : Module(ModuleId::PING_MODULE, "ping")
+    : Module(PING_MODULE_ID, "ping")
 {
     //Register callbacks n' stuff
 
@@ -62,7 +59,7 @@ void PingModule::ResetToDefaultConfiguration()
 
 }
 
-void PingModule::ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength)
+void PingModule::ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfigLength)
 {
     //Do additional initialization upon loading the config
 
@@ -97,7 +94,7 @@ TerminalCommandHandlerReturnType PingModule::TerminalCommandHandler(const char* 
                 PingModuleTriggerActionMessages::TRIGGER_PING,
                 0,
                 data,
-                1,
+                1, //size of payload
                 false
         );
 
@@ -109,17 +106,17 @@ TerminalCommandHandlerReturnType PingModule::TerminalCommandHandler(const char* 
 }
 #endif
 
-void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
+void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader)
 {
     //Must call superclass for handling
     Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
     //Filter trigger_action messages
     if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-        connPacketModule const * packet = (connPacketModule const *)packetHeader;
+        ConnPacketModuleVendor const * packet = (ConnPacketModuleVendor const *)packetHeader;
 
         //Check if our module is meant and we should trigger an action
-        if(packet->moduleId == moduleId){
+        if(packet->moduleId == vendorModuleId && sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE_VENDOR){
             //It's a ping message
             if(packet->actionType == PingModuleTriggerActionMessages::TRIGGER_PING){
 
@@ -145,12 +142,12 @@ void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConn
     }
 
     //Parse Module action_response messages
-    if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
+    if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE && sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE_VENDOR){
 
-        connPacketModule const * packet = (connPacketModule const *)packetHeader;
+        ConnPacketModuleVendor const * packet = (ConnPacketModuleVendor const *)packetHeader;
 
         //Check if our module is meant and we should trigger an action
-        if(packet->moduleId == moduleId)
+        if(packet->moduleId == vendorModuleId)
         {
             //Somebody reported its connections back
             if(packet->actionType == PingModuleActionResponseMessages::PING_RESPONSE){

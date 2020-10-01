@@ -46,7 +46,7 @@ FlashStorage::FlashStorage()
 }
 
 
-FlashStorage & FlashStorage::getInstance()
+FlashStorage & FlashStorage::GetInstance()
 {
     return GS->flashStorage;
 }
@@ -146,7 +146,7 @@ FlashStorageError FlashStorage::CacheAndWriteData(u32 const * source, u32* desti
     else 
     {
         logt("ERROR", "aborted transaction");
-        GS->logger.logCustomError(CustomErrorTypes::FATAL_ABORTED_FLASH_TRANSACTION, 0);
+        GS->logger.LogCustomError(CustomErrorTypes::FATAL_ABORTED_FLASH_TRANSACTION, 0);
 
         return FlashStorageError::QUEUE_FULL;
     }
@@ -203,7 +203,7 @@ void FlashStorage::ProcessQueue(bool continueCurrentTask)
             u16 pageNum = currentTask->params.erasePages.startPage + currentTask->params.erasePages.numPages - 1;
 
             if (pageNum == 0) {
-                GS->logger.logCustomError(CustomErrorTypes::FATAL_PROTECTED_PAGE_ERASE, 1);
+                GS->logger.LogCustomError(CustomErrorTypes::FATAL_PROTECTED_PAGE_ERASE, 1);
                 RemoveExecutingTask();
                 SIMEXCEPTION(IllegalStateException);
                 return;
@@ -251,7 +251,7 @@ void FlashStorage::ProcessQueue(bool continueCurrentTask)
     }
     else {
         logt("ERROR", "Wrong command %u", (u32)currentTask->header.command);
-        GS->logger.logCustomError(CustomErrorTypes::FATAL_WRONG_FLASH_STORAGE_COMMAND, (u16)currentTask->header.command);
+        GS->logger.LogCustomError(CustomErrorTypes::FATAL_WRONG_FLASH_STORAGE_COMMAND, (u16)currentTask->header.command);
         RemoveExecutingTask();
         SIMEXCEPTION(IllegalArgumentException);
     }
@@ -277,7 +277,7 @@ void FlashStorage::SystemEventHandler(FruityHal::SystemEvents systemEvent)
     if(systemEvent == FruityHal::SystemEvents::FLASH_OPERATION_ERROR)
     {
         logt("WARNING", "Flash operation error");
-        GS->logger.logCustomCount(CustomErrorTypes::COUNT_FLASH_OPERATION_ERROR);
+        GS->logger.LogCustomCount(CustomErrorTypes::COUNT_FLASH_OPERATION_ERROR);
 
         if(retryCount > 0)
         {

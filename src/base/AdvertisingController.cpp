@@ -49,7 +49,7 @@ AdvertisingController::AdvertisingController()
     CheckedMemset(&baseGapAddress, 0, sizeof(baseGapAddress));
 }
 
-AdvertisingController & AdvertisingController::getInstance()
+AdvertisingController & AdvertisingController::GetInstance()
 {
     return GS->advertisingController;
 }
@@ -74,7 +74,7 @@ void AdvertisingController::Deactivate()
     const ErrorType err = FruityHal::BleGapAdvStop(handle);
     if (err != ErrorType::SUCCESS)
     {
-        GS->logger.logCustomError(CustomErrorTypes::WARN_ADVERTISING_CONTROLLER_DEACTIVATE_FAILED, (u32)err);
+        GS->logger.LogCustomError(CustomErrorTypes::WARN_ADVERTISING_CONTROLLER_DEACTIVATE_FAILED, (u32)err);
     }
 }
 
@@ -340,7 +340,7 @@ void AdvertisingController::SetAdvertisingData(AdvJob* job)
 
     if(err != ErrorType::SUCCESS){
         char buffer[100];
-        Logger::convertBufferToHexString(job->advData, job->advDataLength, buffer, sizeof(buffer));
+        Logger::ConvertBufferToHexString(job->advData, job->advDataLength, buffer, sizeof(buffer));
 
         logt("ERROR", "Setting Adv data err %u: %s (%u)", (u32)err, buffer, job->advDataLength);
     } else {
@@ -409,7 +409,7 @@ void AdvertisingController::SetAdvertisingState(AdvJob* job)
         }
     }
 
-    if(connectedConnections < Conf::getInstance().totalInConnections){
+    if(connectedConnections < Conf::GetInstance().totalInConnections){
     // When number of connections is not at limit always set connectable advertising. By default set it
     // to indirect, otherwise specific one.
     if (job != nullptr)
@@ -482,7 +482,7 @@ void AdvertisingController::RestartAdvertising()
 
 void AdvertisingController::GapConnectedEventHandler(const FruityHal::GapConnectedEvent & connectedEvent)
 {
-    if (connectedEvent.getRole() == FruityHal::GapRole::PERIPHERAL) {
+    if (connectedEvent.GetRole() == FruityHal::GapRole::PERIPHERAL) {
         //If a peripheral connection got connected, we can only advertise non-connectable, reschedule
         //Also, we must restart because the advertising was stopped automatically
         if (advertisingState == AdvertisingState::ENABLED) {
@@ -494,7 +494,7 @@ void AdvertisingController::GapConnectedEventHandler(const FruityHal::GapConnect
 
 void AdvertisingController::GapDisconnectedEventHandler(const FruityHal::GapDisconnectedEvent & disconnectedEvent)
 {
-    //TODO: Should check if this was a peripheral connection
+    //TODO: Should Check if this was a peripheral connection
     //If a peripheral connection is lost, we can restart advertising in connectable mode
     if (advertisingState == AdvertisingState::ENABLED) {
         if (currentNumJobs > 0) RestartAdvertising();

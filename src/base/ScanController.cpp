@@ -67,7 +67,7 @@ void ScanController::TimerEventHandler(u16 passedTimeDs)
     TryConfiguringScanState();
 }
 
-ScanController & ScanController::getInstance()
+ScanController & ScanController::GetInstance()
 {
     return GS->scanController;
 }
@@ -79,14 +79,14 @@ ScanJob* ScanController::AddJob(ScanJob& job)
     if (job.state == ScanJobState::INVALID) return nullptr;
     if (job.type == ScanState::HIGH)
     {
-        job.interval = Conf::getInstance().meshScanIntervalHigh;
-        job.window = Conf::getInstance().meshScanWindowHigh;
+        job.interval = Conf::GetInstance().meshScanIntervalHigh;
+        job.window = Conf::GetInstance().meshScanWindowHigh;
         job.timeMode = ScanJobTimeMode::ENDLESS;
     }
     else if (job.type == ScanState::LOW)
     {
-        job.interval = Conf::getInstance().meshScanIntervalLow;
-        job.window = Conf::getInstance().meshScanWindowLow;
+        job.interval = Conf::GetInstance().meshScanIntervalLow;
+        job.window = Conf::GetInstance().meshScanWindowLow;
         job.timeMode = ScanJobTimeMode::ENDLESS;
     }
     else if (job.type == ScanState::CUSTOM)
@@ -214,10 +214,10 @@ ScanJob * ScanController::GetJob(int index)
 bool ScanController::ScanEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) const
 {
     //Check if packet is a valid mesh advertising packet
-    const advPacketHeader* packetHeader = (const advPacketHeader*)advertisementReportEvent.getData();
+    const AdvPacketHeader* packetHeader = (const AdvPacketHeader*)advertisementReportEvent.GetData();
 
     if (
-            advertisementReportEvent.getDataLength() >= SIZEOF_ADV_PACKET_HEADER
+            advertisementReportEvent.GetDataLength() >= SIZEOF_ADV_PACKET_HEADER
             && packetHeader->manufacturer.companyIdentifier == MESH_COMPANY_IDENTIFIER
             && packetHeader->meshIdentifier == MESH_IDENTIFIER
             && packetHeader->networkId == GS->node.configuration.networkId

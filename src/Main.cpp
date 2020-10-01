@@ -43,7 +43,7 @@ int main(void)
     //We must make sure that the memory block for allocating modules is aligned on an 8 byte boundary
     //This allows us to support 4 and 8 byte aligned modules
     alignas(8) u8 moduleMemoryBlock[moduleMemoryBlockSize];
-    GS->moduleAllocator.setMemory(moduleMemoryBlock, moduleMemoryBlockSize);
+    GS->moduleAllocator.SetMemory(moduleMemoryBlock, moduleMemoryBlockSize);
     BootModules();
     
     StartFruityMesh();

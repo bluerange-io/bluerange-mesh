@@ -86,7 +86,7 @@ void DoClusteringTestImportedFromJson(const std::string &site, const std::string
 }
 
 TEST_P(MultiStackFixture, TestBasicClustering) {
-    const int maxClusteringTimeMs = 400 * 1000;
+    const int maxClusteringTimeMs = 1000 * 1000;
     const int clusteringIterations = 5;
     int clusteringTimeTotalMs = 0;
 
@@ -117,56 +117,56 @@ TEST_P(MultiStackFixture, TestBasicClustering) {
 
 //Tests that the exemplary devices.json and site.json for the github release still work
 TEST_P(MultiStackFixture, TestGithubExample) {
-    std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/github_example/site.json";
-    std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/github_example/devices.json";
+    std::string site = CherrySimUtils::GetNormalizedPath() + "/test/res/github_example/site.json";
+    std::string device = CherrySimUtils::GetNormalizedPath() + "/test/res/github_example/devices.json";
     // We do not care for the exact clustering time as we only want to test that the jsons are still valid
     DoClusteringTestImportedFromJson(site, device, 1, 60 * 1000, 100000, GetParam());
 }
 
 /*Nodes in this test are spread horizontally and can be reached by more than one other nodes*/
 TEST_P(MultiStackFixture, TestHorizontalSpreadNetwork) {
-    std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/horizontalspreadnetwork/site.json";
-    std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/horizontalspreadnetwork/devices.json";
+    std::string site = CherrySimUtils::GetNormalizedPath() + "/test/res/horizontalspreadnetwork/site.json";
+    std::string device = CherrySimUtils::GetNormalizedPath() + "/test/res/horizontalspreadnetwork/devices.json";
     constexpr u32 maxRecordedClusteringMedianMs = 39650; //The maximum median recorded over 1000 different seed offsets
     DoClusteringTestImportedFromJson(site, device, 5, 600 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
 
 /*Nodes in the network are densely arranged (short range) and can reach each other*/
 TEST_P(MultiStackFixture, TestDenseNetwork) {
-    std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/densenetwork/site.json";
-    std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/densenetwork/devices.json";
+    std::string site = CherrySimUtils::GetNormalizedPath() + "/test/res/densenetwork/site.json";
+    std::string device = CherrySimUtils::GetNormalizedPath() + "/test/res/densenetwork/devices.json";
     constexpr u32 maxRecordedClusteringMedianMs = 43350; //The maximum median recorded over 1000 different seed offsets
     DoClusteringTestImportedFromJson(site, device, 5, 60 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
 
 /*Nodes in the network are arranged according to start topology*/
 TEST_P(MultiStackFixture, TestStarNetwork) {
-    std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/starnetwork/site.json";
-    std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/starnetwork/devices.json";
+    std::string site = CherrySimUtils::GetNormalizedPath() + "/test/res/starnetwork/site.json";
+    std::string device = CherrySimUtils::GetNormalizedPath() + "/test/res/starnetwork/devices.json";
     constexpr u32 maxRecordedClusteringMedianMs = 33450; //The maximum median recorded over 1000 different seed offsets
     DoClusteringTestImportedFromJson(site, device, 5, 90 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
 
 /*Nodes in the network are arranged in line where each node can only reach one other node*/
 TEST_P(MultiStackFixture, TestRowNetwork) {
-    std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/rownetwork/site.json";
-    std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/rownetwork/devices.json";
+    std::string site = CherrySimUtils::GetNormalizedPath() + "/test/res/rownetwork/site.json";
+    std::string device = CherrySimUtils::GetNormalizedPath() + "/test/res/rownetwork/devices.json";
     constexpr u32 maxRecordedClusteringMedianMs = 44150; //The maximum median recorded over 1000 different seed offsets
     DoClusteringTestImportedFromJson(site, device, 5, 100 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
 
 /*Nodes in the network are sparsely arranged and can only reach one or two other nodes */
 TEST_P(MultiStackFixture, TestSparseNetwork) {
-    std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/sparsenetwork/site.json";
-    std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/sparsenetwork/devices.json";
+    std::string site = CherrySimUtils::GetNormalizedPath() + "/test/res/sparsenetwork/site.json";
+    std::string device = CherrySimUtils::GetNormalizedPath() + "/test/res/sparsenetwork/devices.json";
     constexpr u32 maxRecordedClusteringMedianMs = 46350; //The maximum median recorded over 1000 different seed offsets
     DoClusteringTestImportedFromJson(site, device, 5, 500 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
 
 /*Nodes are densely arranged on left and right side of the network but has only one node in the middle to connect both sides*/
 TEST_P(MultiStackFixture, TestSinglePointFailureNetwork) {
-    std::string site = CherrySimUtils::getNormalizedPath() + "/test/res/singlepointfailure/site.json";
-    std::string device = CherrySimUtils::getNormalizedPath() + "/test/res/singlepointfailure/devices.json";
+    std::string site = CherrySimUtils::GetNormalizedPath() + "/test/res/singlepointfailure/site.json";
+    std::string device = CherrySimUtils::GetNormalizedPath() + "/test/res/singlepointfailure/devices.json";
     constexpr u32 maxRecordedClusteringMedianMs = 48500; //The maximum median recorded over 1000 different seed offsets
     DoClusteringTestImportedFromJson(site, device, 5, 1000 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
@@ -182,9 +182,10 @@ TEST(TestClustering, TestClusteringWithManySdBusy) {
         SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
         simConfig.seed = i + 1;
         simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 10 } );
-        simConfig.sdBusyProbability = 0.5;
+        simConfig.sdBusyProbability = UINT32_MAX / 2;
         simConfig.connectionTimeoutProbabilityPerSec = 0;
         simConfig.terminalId = -1;
+        //testerConfig.verbose = true;
 
         CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
         tester.Start();
@@ -224,9 +225,9 @@ TEST_P(MultiStackFixture, TestBasicClusteringWithNodeReset) {
 
         for (u32 j = 0; j < resetTimesPerIteration; j++)
         {
-            u32 numNodesToReset = (u32)((tester.sim->getTotalNodes() / 5) * PSRNG() + 1);
+            u32 numNodesToReset = (u32)(PSRNGINT(0, (tester.sim->GetTotalNodes() / 5)) + 1);
 
-            auto nodeIdsToReset = CherrySimUtils::generateRandomNumbers(1, tester.sim->getTotalNodes(), numNodesToReset);
+            auto nodeIdsToReset = CherrySimUtils::GenerateRandomNumbers(1, tester.sim->GetTotalNodes(), numNodesToReset);
 
             for (auto const nodeId : nodeIdsToReset) {
                 tester.SendTerminalCommand(nodeId, "reset");
@@ -287,9 +288,9 @@ TEST(TestClustering, TestBasicClusteringWithNodeReset_scheduled) {
 
         for (u32 j = 0; j < resetTimesPerIteration; j++)
         {
-            u32 numNodesToReset = (u32)((numNodes / 5) * PSRNG() + 1);
+            u32 numNodesToReset = (u32)(PSRNGINT(0, (numNodes / 5)) + 1);
 
-            auto nodeIdsToReset = CherrySimUtils::generateRandomNumbers(1, numNodes, numNodesToReset);
+            auto nodeIdsToReset = CherrySimUtils::GenerateRandomNumbers(1, numNodes, numNodesToReset);
 
             for (auto const nodeId : nodeIdsToReset) {
                 tester.SendTerminalCommand(nodeId, "reset");
@@ -367,9 +368,9 @@ TEST(TestClustering, TestBasicClusteringWithNodeResetAndConnectionTimeouts_sched
 
         for (u32 j = 0; j < resetTimesPerIteration; j++)
         {
-            u32 numNodesToReset = (u32)(std::ceil(numNodes / 5.0) * PSRNG() + 1);
+            u32 numNodesToReset = (u32)(PSRNGINT(0, std::ceil(numNodes / 5.0)) + 1);
 
-            auto nodeIdsToReset = CherrySimUtils::generateRandomNumbers(1, numNodes, numNodesToReset);
+            auto nodeIdsToReset = CherrySimUtils::GenerateRandomNumbers(1, numNodes, numNodesToReset);
 
             for (auto const nodeId : nodeIdsToReset) {
                 tester.SendTerminalCommand(nodeId, "reset");
@@ -401,7 +402,7 @@ TEST(TestClustering, TestMeshingUnderLoad) {
     tester.Start();
 
     //Instruct all nodes to flood the network using FLOOD_MODE_UNRELIABLE_SPLIT
-    for (u32 i = 0; i < tester.sim->getTotalNodes(); i++) {
+    for (u32 i = 0; i < tester.sim->GetTotalNodes(); i++) {
         tester.SendTerminalCommand(i+1, "action this debug flood 0 4 200");
     }
     tester.SimulateUntilClusteringDone(100 * 1000);
@@ -432,7 +433,7 @@ TEST(TestClustering, SimulateLongevity_long) {
     //if there are any dropped messages
 }
 
-i32 determineHopsToSink(nodeEntry* node, std::vector<nodeEntry*>& visitedNodes)
+i32 determineHopsToSink(NodeEntry* node, std::vector<NodeEntry*>& visitedNodes)
 {
     NodeIndexSetter setter(node->index);
     visitedNodes.push_back(node);
@@ -457,9 +458,9 @@ i32 determineHopsToSink(nodeEntry* node, std::vector<nodeEntry*>& visitedNodes)
     return -1;
 }
 
-i32 determineHopsToSink(nodeEntry* node)
+i32 determineHopsToSink(NodeEntry* node)
 {
-    std::vector<nodeEntry*> visitedNodes;
+    std::vector<NodeEntry*> visitedNodes;
     return determineHopsToSink(node, visitedNodes);
 }
 
@@ -513,9 +514,9 @@ TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
         tester.SimulateForGivenTime(5000);
 
         //Check if all nodes have correctly calculated their hops to the sink
-        for (u32 i = 0; i < tester.sim->getTotalNodes(); i++) {
+        for (u32 i = 0; i < tester.sim->GetTotalNodes(); i++) {
             NodeIndexSetter setter(i);
-            nodeEntry* node = &(tester.sim->nodes[i]);
+            NodeEntry* node = &(tester.sim->nodes[i]);
 
             //Determine the number of hops to the sink according to the simulator connections
             i32 hopsToSink = determineHopsToSink(node);
@@ -611,9 +612,9 @@ TEST(TestClustering, TestInfluceOfNodeWithWrongNetworkKey) {
     while (tester.sim->simState.simTimeMs < 200 * 1000) {
         tester.SimulateForGivenTime(10 * 1000);
 
-        u32 numNodesToReset = (u32)((tester.sim->getTotalNodes() / 2) * PSRNG());
+        u32 numNodesToReset = (u32)(PSRNGINT(0, (tester.sim->GetTotalNodes() / 2)));
 
-        auto nodeIdsToReset = CherrySimUtils::generateRandomNumbers(1, tester.sim->getTotalNodes(), numNodesToReset);
+        auto nodeIdsToReset = CherrySimUtils::GenerateRandomNumbers(1, tester.sim->GetTotalNodes(), numNodesToReset);
 
         for (auto const nodeId : nodeIdsToReset) {
             tester.SendTerminalCommand(nodeId, "reset");

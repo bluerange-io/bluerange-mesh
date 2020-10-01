@@ -5,7 +5,7 @@
 The _MeshAccessModule_ with _ModuleId_ 10 provides a simple way of accessing the mesh through a smartphone, it also provides a way to connect to other meshes or access other devices that support the functionality. It works over unencrypted GAP connections and uses a custom encryption on top to bypass operating system limitations of different devices.
 
 == Functionality
-The _MeshAccessModule_ works in conjunction with the _MeshAccessConnection_. The module provides the necessary services while the connection handles an individual connection after it was set up.
+The _MeshAccessModule_ works in conjunction with the xref:MeshAccessConnection.adoc[MeshAccessConnection]. The module provides the necessary services while the connection handles an individual connection after it was set up.
 
 The _MeshAccessConnection_ is able to handle standard mesh packets - including xref:Connections.adoc#_packet_splitting[packet splitting] - and will relay these packets to receivers in the mesh if security permits it (if the partner authenticated itself with the correct key during the initial encryption procedure). A _MeshAccessConnection_ performs first a security handshake before data can be transmitted. After the handshake passes, a node may transmit information about its cluster and update this information once the cluster changes. Cf. xref:Node.adoc#_clusterinfoupdate[ClusterInfoUpdate] packet for more information.
 
@@ -76,21 +76,24 @@ The enrollment state is broadcast in the flags. If unenrolled, the node service 
 |**11**|-|**Mandatory data**
 |3|Flags|(len, type, flags byte) |4|Service UUID complete|(len, type, 2 byte UUID 0xFE12)
 |4|Service Data header|(len, type, 2 byte UUID 0xFE12)
-|**10**||**CustomDataHeader**
-|2|messageType|0x03 Mesh Configuration and Access Service (with a new
+|**9**||**CustomDataHeader**
+|1|messageType|0x03 Mesh Configuration and Access Service (with a new
 service version, the messageType can be changed.
+|1|reserved|Must be 0
 |2|networkId|Mesh network ID
 |1 bit|isEnrolled|1 if the node is enrolled, 0 otherwise
 |1 bit|isSink|1 if the node is communicating with a MeshGateway, 0 otherwise
 |1 bit|isZeroKeyConnectable|1 if the node is connectable using the zero key, 0 otherwise
 |1 bit|isConnectable|1 if the node currently has unused incoming connections, 0 otherwise
-|1 bit|interestedInConnetion |1 if asset wants to send a component_sense message, 0 otherwise
+|1 bit|interestedInConnection |1 if asset wants to send a component_sense message, 0 otherwise
 |3 bit|reserved|Must be 0
 |4|serialNumberIndex|cf. xref:Specification.adoc[Specification]
-|**3**||**ServiceData**
+|**4**||**ServiceData**
 |1|moduleId0|ID of a module that is available over the mesh access connection (0 for invalid module)
 |1|moduleId1|ID of a module that is available over the mesh access connection (0 for invalid module)
 |1|moduleId2|ID of a module that is available over the mesh access connection (0 for invalid module)
+|||**Everything below is optional! Older versions of FruityMesh (< 0.8.5000) may not support it.**
+|1|deviceType|The device type of the sender. 
 |**7**||**Reserved**|
 |===
 
@@ -116,6 +119,8 @@ To establish a connection, the following steps need to be performed:
 * Peripheral checks encrypted packet, sends encrypted _HandshakeDone_ packet and enables auto encrypt/decrypt
 
 Encryption and MIC calculation uses three AES encryptions at the moment to prevent a discovered packet forgery attack under certain conditions. Future versions of the handshake may employ different encryption.
+
+TIP: The Encryption Handshake is explained in a lot more detail with example data as part of the xref:MeshAccessConnection.adoc[MeshAccessConnection] documentation.
 
 === Encryption
 Once a connection is set to encrypted state - during the initial encryption handshake - all messages must be encrypted with a trailing Message Integrity Check (MIC). The data has the following format:
@@ -195,7 +200,7 @@ where code can have the following values:
 
 |0|SUCCESS|The Connection was successfully opened.
 |1|TIMEOUT_REACHED|It was impossible to build a connection due to a timeout.
-|2|OVERWRITTEN_BY_OTHER_REQUEST|A node never tries to build a connection to more than one node. If the connection is currently in the process of trying to connect to a serial number, but is then interfered by another serial connect message, the first connect attempt is cancelled, notifying the requester with this error code. **NOTE:** This code is not sent if both serial connect messages contain the same values. In such a case, the only thing that changes is that the timeout of the connection is replenished.
+|2|OVERWRITTEN_BY_OTHER_REQUEST|A node never tries to build a connection to more than one node. If the connection is currently in the process of trying to connect to a xref:Specification.adoc#SerialNumbers[serial number], but is then interfered by another serial connect message, the first connect attempt is cancelled, notifying the requester with this error code. **NOTE:** This code is not sent if both serial connect messages contain the same values. In such a case, the only thing that changes is that the timeout of the connection is replenished.
 |===
 
 If the xref:Connections.adoc[connection state changes], the sender of this message is informed about the new state with this message. In this message, the node provides the virtual partner ID that was assigned to the node connected over the _MeshAccessConnection_.
@@ -289,7 +294,7 @@ packet is encrypted before transmission.
 
 === Dead Data
 If a connection receives undecryptable data it informs the connection partner by sending this unencrypted message and resets the handshake. After this happens, the connection does not process any data other than a new handshake. To send more data, the handshake has to be completed successfully.
-This is done in case the Nounces run out of sync between the connection partners. This can happen if the stack, e.g. of a mobile device silently drops packets and does not inform the application.
+This is done in case the Nonces run out of sync between the connection partners. This can happen if the stack, e.g. of a mobile device silently drops packets and does not inform the application.
 
 |===
 |Bytes |Type |Name |Description

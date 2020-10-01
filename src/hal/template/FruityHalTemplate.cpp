@@ -33,7 +33,7 @@
  */
 
 #include "FruityHal.h"
-#include <types.h>
+#include <FmTypes.h>
 
 
 // ######################### CLASS ############################
@@ -41,64 +41,64 @@ FruityHal::GapConnParamUpdateEvent::GapConnParamUpdateEvent(void const* _evt)
     :GapEvent(_evt) {}
 FruityHal::GapEvent::GapEvent(void const* _evt)
     : BleEvent(_evt) {}
-u16 FruityHal::GapEvent::getConnectionHandle() const { return 0; } 
-u16 FruityHal::GapConnParamUpdateEvent::getMaxConnectionInterval() const { return 0; } 
+u16 FruityHal::GapEvent::GetConnectionHandle() const { return 0; } 
+u16 FruityHal::GapConnParamUpdateEvent::GetMaxConnectionInterval() const { return 0; } 
 FruityHal::GapRssiChangedEvent::GapRssiChangedEvent(void const* _evt)
     :GapEvent(_evt) {}
-i8 FruityHal::GapRssiChangedEvent::getRssi() const { return 0; }
+i8 FruityHal::GapRssiChangedEvent::GetRssi() const { return 0; }
 FruityHal::GapAdvertisementReportEvent::GapAdvertisementReportEvent(void const* _evt)
     :GapEvent(_evt) {}
-i8 FruityHal::GapAdvertisementReportEvent::getRssi() const { return 0; }
-const u8 * FruityHal::GapAdvertisementReportEvent::getData() const { return 0; }
-u32 FruityHal::GapAdvertisementReportEvent::getDataLength() const { return 0; } 
-FruityHal::BleGapAddrBytes FruityHal::GapAdvertisementReportEvent::getPeerAddr() const { return FruityHal::BleGapAddrBytes(); }
-FruityHal::BleGapAddrType FruityHal::GapAdvertisementReportEvent::getPeerAddrType() const { return FruityHal::BleGapAddrType::PUBLIC; }
-bool FruityHal::GapAdvertisementReportEvent::isConnectable() const { return false; } 
+i8 FruityHal::GapAdvertisementReportEvent::GetRssi() const { return 0; }
+const u8 * FruityHal::GapAdvertisementReportEvent::GetData() const { return 0; }
+u32 FruityHal::GapAdvertisementReportEvent::GetDataLength() const { return 0; } 
+FruityHal::BleGapAddrBytes FruityHal::GapAdvertisementReportEvent::GetPeerAddr() const { return FruityHal::BleGapAddrBytes(); }
+FruityHal::BleGapAddrType FruityHal::GapAdvertisementReportEvent::GetPeerAddrType() const { return FruityHal::BleGapAddrType::PUBLIC; }
+bool FruityHal::GapAdvertisementReportEvent::IsConnectable() const { return false; } 
 FruityHal::BleEvent::BleEvent(void const* _evt) {}
 FruityHal::GapConnectedEvent::GapConnectedEvent(void const* _evt)
     :GapEvent(_evt) {}
-FruityHal::GapRole FruityHal::GapConnectedEvent::getRole() const { return FruityHal::GapRole::INVALID; }
-u8 FruityHal::GapConnectedEvent::getPeerAddrType() const { return 0; } 
-u16 FruityHal::GapConnectedEvent::getMinConnectionInterval() const { return 0; } 
-FruityHal::BleGapAddrBytes FruityHal::GapConnectedEvent::getPeerAddr() const { return FruityHal::BleGapAddrBytes(); }
+FruityHal::GapRole FruityHal::GapConnectedEvent::GetRole() const { return FruityHal::GapRole::INVALID; }
+u8 FruityHal::GapConnectedEvent::GetPeerAddrType() const { return 0; } 
+u16 FruityHal::GapConnectedEvent::GetMinConnectionInterval() const { return 0; } 
+FruityHal::BleGapAddrBytes FruityHal::GapConnectedEvent::GetPeerAddr() const { return FruityHal::BleGapAddrBytes(); }
 FruityHal::GapDisconnectedEvent::GapDisconnectedEvent(void const* _evt)
     : GapEvent(_evt) {}
-FruityHal::BleHciError FruityHal::GapDisconnectedEvent::getReason() const { return FruityHal::BleHciError::SUCCESS; }
+FruityHal::BleHciError FruityHal::GapDisconnectedEvent::GetReason() const { return FruityHal::BleHciError::SUCCESS; }
 FruityHal::GapTimeoutEvent::GapTimeoutEvent(void const* _evt)
     : GapEvent(_evt) {}
-FruityHal::GapTimeoutSource FruityHal::GapTimeoutEvent::getSource() const  { return FruityHal::GapTimeoutSource::INVALID; }
+FruityHal::GapTimeoutSource FruityHal::GapTimeoutEvent::GetSource() const  { return FruityHal::GapTimeoutSource::INVALID; }
 FruityHal::GapSecurityInfoRequestEvent::GapSecurityInfoRequestEvent(void const* _evt)
     : GapEvent(_evt) {}
 FruityHal::GapConnectionSecurityUpdateEvent::GapConnectionSecurityUpdateEvent(void const* _evt)
     : GapEvent(_evt) {}
-u8 FruityHal::GapConnectionSecurityUpdateEvent::getKeySize() const { return 0; } 
-FruityHal::SecurityLevel FruityHal::GapConnectionSecurityUpdateEvent::getSecurityLevel() const { return FruityHal::SecurityLevel::NO_PERMISSION; }
-FruityHal::SecurityMode FruityHal::GapConnectionSecurityUpdateEvent::getSecurityMode() const { return FruityHal::SecurityMode::NO_PERMISSION; }
+u8 FruityHal::GapConnectionSecurityUpdateEvent::GetKeySize() const { return 0; } 
+FruityHal::SecurityLevel FruityHal::GapConnectionSecurityUpdateEvent::GetSecurityLevel() const { return FruityHal::SecurityLevel::NO_PERMISSION; }
+FruityHal::SecurityMode FruityHal::GapConnectionSecurityUpdateEvent::GetSecurityMode() const { return FruityHal::SecurityMode::NO_PERMISSION; }
 FruityHal::GattcEvent::GattcEvent(void const* _evt)
     : BleEvent(_evt) {}
-u16 FruityHal::GattcEvent::getConnectionHandle() const { return 0; } 
-FruityHal::BleGattEror FruityHal::GattcEvent::getGattStatus() const { return FruityHal::BleGattEror::SUCCESS; }
+u16 FruityHal::GattcEvent::GetConnectionHandle() const { return 0; } 
+FruityHal::BleGattEror FruityHal::GattcEvent::GetGattStatus() const { return FruityHal::BleGattEror::SUCCESS; }
 FruityHal::GattcWriteResponseEvent::GattcWriteResponseEvent(void const* _evt)
     : GattcEvent(_evt) {}
 FruityHal::GattcTimeoutEvent::GattcTimeoutEvent(void const* _evt)
     : GattcEvent(_evt) {}
 FruityHal::GattDataTransmittedEvent::GattDataTransmittedEvent(void const* _evt)
     :BleEvent(_evt) {}
-u16 FruityHal::GattDataTransmittedEvent::getConnectionHandle() const { return 0; } 
-bool FruityHal::GattDataTransmittedEvent::isConnectionHandleValid() const { return false; } 
-u32 FruityHal::GattDataTransmittedEvent::getCompleteCount() const { return 0; } 
+u16 FruityHal::GattDataTransmittedEvent::GetConnectionHandle() const { return 0; } 
+bool FruityHal::GattDataTransmittedEvent::IsConnectionHandleValid() const { return false; } 
+u32 FruityHal::GattDataTransmittedEvent::GetCompleteCount() const { return 0; } 
 FruityHal::GattsWriteEvent::GattsWriteEvent(void const* _evt)
     : BleEvent(_evt) {}
-u16 FruityHal::GattsWriteEvent::getAttributeHandle() const { return 0; } 
-bool FruityHal::GattsWriteEvent::isWriteRequest() const { return false; } 
-u16 FruityHal::GattsWriteEvent::getLength() const { return 0; } 
-u16 FruityHal::GattsWriteEvent::getConnectionHandle() const { return 0; } 
-u8 const * FruityHal::GattsWriteEvent::getData() const { return 0; } 
+u16 FruityHal::GattsWriteEvent::GetAttributeHandle() const { return 0; } 
+bool FruityHal::GattsWriteEvent::IsWriteRequest() const { return false; } 
+u16 FruityHal::GattsWriteEvent::GetLength() const { return 0; } 
+u16 FruityHal::GattsWriteEvent::GetConnectionHandle() const { return 0; } 
+u8 const * FruityHal::GattsWriteEvent::GetData() const { return 0; } 
 FruityHal::GattcHandleValueEvent::GattcHandleValueEvent(void const* _evt)
     :GattcEvent(_evt) {}
-u16 FruityHal::GattcHandleValueEvent::getHandle() const { return 0; } 
-u16 FruityHal::GattcHandleValueEvent::getLength() const { return 0; } 
-u8 const * FruityHal::GattcHandleValueEvent::getData() const { return 0; } 
+u16 FruityHal::GattcHandleValueEvent::GetHandle() const { return 0; } 
+u16 FruityHal::GattcHandleValueEvent::GetLength() const { return 0; } 
+u8 const * FruityHal::GattcHandleValueEvent::GetData() const { return 0; } 
 
 
 // ######################### Ble Stack and Event Handling ############################

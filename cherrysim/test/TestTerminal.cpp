@@ -48,16 +48,16 @@ TEST(TestTerminal, TestTokenizeLine) {
     {
         NodeIndexSetter setter(0);
         char line[] = "This will be tokenized! Also with ~some special chars! This !is !one !token!";
-        Terminal::getInstance().TokenizeLine(line, sizeof(line));
-        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[0], &(line[0 ])); ASSERT_STREQ(&(line[0 ]), "This");
-        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[1], &(line[5 ])); ASSERT_STREQ(&(line[5 ]), "will");
-        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[2], &(line[10])); ASSERT_STREQ(&(line[10]), "be");
-        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[3], &(line[13])); ASSERT_STREQ(&(line[13]), "tokenized!");
-        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[4], &(line[24])); ASSERT_STREQ(&(line[24]), "Also");
-        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[5], &(line[29])); ASSERT_STREQ(&(line[29]), "with ~some");
-        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[6], &(line[40])); ASSERT_STREQ(&(line[40]), "special");
-        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[7], &(line[48])); ASSERT_STREQ(&(line[48]), "chars!");
-        ASSERT_EQ(Terminal::getInstance().getCommandArgsPtr()[8], &(line[55])); ASSERT_STREQ(&(line[55]), "This !is !one !token!");
+        Terminal::GetInstance().TokenizeLine(line, sizeof(line));
+        ASSERT_EQ(Terminal::GetInstance().GetCommandArgsPtr()[0], &(line[0 ])); ASSERT_STREQ(&(line[0 ]), "This");
+        ASSERT_EQ(Terminal::GetInstance().GetCommandArgsPtr()[1], &(line[5 ])); ASSERT_STREQ(&(line[5 ]), "will");
+        ASSERT_EQ(Terminal::GetInstance().GetCommandArgsPtr()[2], &(line[10])); ASSERT_STREQ(&(line[10]), "be");
+        ASSERT_EQ(Terminal::GetInstance().GetCommandArgsPtr()[3], &(line[13])); ASSERT_STREQ(&(line[13]), "tokenized!");
+        ASSERT_EQ(Terminal::GetInstance().GetCommandArgsPtr()[4], &(line[24])); ASSERT_STREQ(&(line[24]), "Also");
+        ASSERT_EQ(Terminal::GetInstance().GetCommandArgsPtr()[5], &(line[29])); ASSERT_STREQ(&(line[29]), "with ~some");
+        ASSERT_EQ(Terminal::GetInstance().GetCommandArgsPtr()[6], &(line[40])); ASSERT_STREQ(&(line[40]), "special");
+        ASSERT_EQ(Terminal::GetInstance().GetCommandArgsPtr()[7], &(line[48])); ASSERT_STREQ(&(line[48]), "chars!");
+        ASSERT_EQ(Terminal::GetInstance().GetCommandArgsPtr()[8], &(line[55])); ASSERT_STREQ(&(line[55]), "This !is !one !token!");
 
 
     }

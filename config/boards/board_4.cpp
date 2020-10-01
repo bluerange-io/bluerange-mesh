@@ -31,9 +31,9 @@
 #include <Boardconfig.h>
 #include <GlobalState.h>
 
-extern void setCustomPins_4(CustomPins* pinConfig);
+void SetCustomPins_4(CustomPins* pinConfig);
 //PCA10040 - nRF52 DK
-void setBoard_4(BoardConfiguration* c)
+void SetBoard_4(BoardConfiguration* c)
 {
     if(c->boardType == 4)
     {
@@ -53,7 +53,7 @@ void setBoard_4(BoardConfiguration* c)
         c->lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_XTAL;
         c->lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_20_PPM;
         c->dcDcEnabled = true;
-        GS->boardconf.getCustomPinset = &setCustomPins_4;
+        GS->boardconf.getCustomPinset = &SetCustomPins_4;
     }
 }
 
@@ -61,7 +61,7 @@ void setBoard_4(BoardConfiguration* c)
 //can be configured. This function is then passed to the function pointer
 //void (*getCustomPinset)(CustomPinset*), defined in BoardConfig.h
 
-void setCustomPins_4(CustomPins* pinConfig){
+void SetCustomPins_4(CustomPins* pinConfig){
     if(pinConfig->pinsetIdentifier == PinsetIdentifier::LIS2DH12){
         Lis2dh12Pins* pins = (Lis2dh12Pins*)pinConfig;
         pins->misoPin = -1;

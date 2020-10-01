@@ -25,7 +25,7 @@
 #include <iostream>
 #include "Exceptions.h"
 
-void MersenneTwister::twistIteration(uint32_t i)
+void MersenneTwister::TwistIteration(uint32_t i)
 {
     uint32_t x = (m_mt[i] & MASK_UPPER) + (m_mt[(i + 1) % N] & MASK_LOWER);
 
@@ -39,11 +39,11 @@ void MersenneTwister::twistIteration(uint32_t i)
     m_mt[i] = m_mt[(i + M) % N] ^ xA;
 }
 
-void MersenneTwister::twist()
+void MersenneTwister::Twist()
 {
     for (uint32_t i = 0; i < N; i++)
     {
-        twistIteration(i);
+        TwistIteration(i);
     }
     m_index = 0;
 }
@@ -54,10 +54,10 @@ MersenneTwister::MersenneTwister()
 
 MersenneTwister::MersenneTwister(uint32_t seed)
 {
-    setSeed(seed);
+    SetSeed(seed);
 }
 
-void MersenneTwister::setSeed(uint32_t seed)
+void MersenneTwister::SetSeed(uint32_t seed)
 {
     seed += MersenneTwister::seedOffset;
     m_seed = seed;
@@ -697,57 +697,52 @@ void MersenneTwister::setSeed(uint32_t seed)
     //Warmup the MersenneTwister.
     for (uint32_t i = 0; i < N; i++)
     {
-        nextU32();
+        NextU32();
     }
 }
 
-double MersenneTwister::nextDouble()
+uint32_t MersenneTwister::NextU32(uint32_t min, uint32_t max)
 {
-    while (true)
+    if (min > max)
     {
-        double retVal = (double)nextU32() / (double)0xFFFFFFFF;
-        if (retVal != 1.0)
-        {
-            return retVal;
-        }
+        SIMEXCEPTION(IllegalArgumentException);
     }
-}
-
-uint32_t MersenneTwister::nextU32(uint32_t min, uint32_t max)
-{
+    if (min == max)
+    {
+        return min;
+    }
     const uint32_t range = max - min + 1;
-    return (uint32_t)(nextDouble() * range) + min;
+    return NextU32() % range + min;
 }
 
-double MersenneTwister::nextDouble(double min, double max)
+bool MersenneTwister::NextPsrng(uint32_t probability)
 {
-    const double range = max - min;
-    return nextDouble() * range + min;
+    if (probability == 0) return false;
+    if (probability == UINT32_MAX) return true;
+    const uint32_t rand = NextU32();
+    return rand < probability;
 }
 
-double MersenneTwister::nextNormal(double mean, double sigma)
+uint32_t MersenneTwister::NextU32()
 {
-    double v1, sx;
-    do {
-        v1 = 2 * nextDouble() - 1;
-        double v2 = 2 * nextDouble() - 1;
-        sx = v1 * v1 + v2 * v2;
-    } while (sx >= 1);
-    
-    double fx = std::sqrt(-2.0 * std::log(sx) / sx);
+    if (MersenneTwisterDisabler::disableLevel > 0)
+    {
+        //The MersenneTwister was called in an unexpected state/location. To find the reason
+        //go through the call stack and search for a created MersenneTwisterDisabler and
+        //analyze why it is forbidden at that location to generate a pseudo random number.
+        //In the past this for example happened in the FruitySimServer. Calling the RNG there
+        //would give unexpected results and change the produced random numbers when looking
+        //at the rendered browser page.
+        SIMEXCEPTION(IllegalStateException);
+    }
 
-    return (fx * v1 * sigma + mean);
-}
-
-uint32_t MersenneTwister::nextU32()
-{
     if (m_seed == 0)
     {
         SIMEXCEPTION(IllegalStateException);
     }
     if (m_index >= N)
     {
-        twist();
+        Twist();
     }
 
     uint32_t x = m_mt[m_index];
@@ -759,4 +754,14 @@ uint32_t MersenneTwister::nextU32()
     x ^= (x >> L);
 
     return x;
+}
+
+MersenneTwisterDisabler::MersenneTwisterDisabler()
+{
+    disableLevel++;
+}
+
+MersenneTwisterDisabler::~MersenneTwisterDisabler()
+{
+    disableLevel--;
 }

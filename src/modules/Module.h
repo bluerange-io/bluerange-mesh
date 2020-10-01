@@ -48,31 +48,29 @@ constexpr int INVALID_U32_CONFIG = 0xFFFFFFFF;
 #include <SigState.h>
 #endif
 
-enum class CapabilityEntryType : u8
-{
-    INVALID = 0,
-    HARDWARE = 1,
-    SOFTWARE = 2,
+//This struct is used to report a list of modules and their state for a node
+#pragma pack(push, 1)
+    struct ModuleInformation {
+        ModuleIdWrapper moduleId;
+        u8 moduleVersion;
+        u8 moduleActive : 1;
+        u8 reserved : 7;
+    };
+    STATIC_ASSERT_SIZE(ModuleInformation, 6);
+#pragma pack(pop)
 
-    NOT_READY = 100,    //The module is currently not ready to report the capability with the provided index but will be in the near future.
+enum class SetConfigResultCodes : u8
+{
+    SUCCESS              = 0, //Something that actually went right
+
+    // => This space was left empty to leave space to use all RecordStorageResultCodes
+
+    NO_CONFIGURATION     = 51, //Module does not have a configuration
+    WRONG_CONFIGURATION  = 52, //Configuration was invalid
+    OTHER_ERROR          = 53, //Other error types are mapped to this generic error
 };
 
-struct CapabilityEntry
-{
-    CapabilityEntryType type;
-    //WARNING: The following values are not guaranteed to have a terminating zero!
-    char manufacturer[32];
-    char modelName[53];
-    char revision[32];
-};
-
-enum class SetActiveReturnValues : u8
-{
-    SUCCESS              = 0,
-    NO_CONFIGURATION     = 1,
-    NO_SUCH_MODULE       = 2,
-    RECORD_STORAGE_ERROR = 3,
-};
+static_assert((u8)RecordStorageResultCode::__END < 50, "RecordStorageResultCodes too big");
 
 class Node;
 
@@ -99,148 +97,179 @@ class Module:
     friend class FruityMesh;
 
 protected:
-        struct ModuleInformation {
-            ModuleId moduleId;
-            u8 moduleVersion;
+    //This must be called in the constructor to reset all values to default
+    virtual void ResetToDefaultConfiguration() = 0;
+
+public:
+    //This funny little construct allows us to represent both a ModuleId and a VendorModuleId
+    //This is the same struct as the ModuleIdWrapper but uses anonymous parts for easier access
+    const union {
+        const struct {
+            const ModuleId moduleId;
+            const u8 subId;
+            const u16 vendorId;
         };
-        STATIC_ASSERT_SIZE(ModuleInformation, 2);
+        const VendorModuleId vendorModuleId;
+    };
 
-        //This must be called in the constructor to reset all values to default
-        virtual void ResetToDefaultConfiguration() = 0;
+    const char* moduleName;
 
+    //The constructor is used to initialize all members and must call ResetToDefaultConfiguration in all subclasses
+    Module(ModuleId moduleId, const char* name);
 
-    public:
-        const ModuleId moduleId;
-        const char* moduleName;
+    //For vendor modules, this constructor must be used instead of the one above
+    Module(VendorModuleId moduleId, const char* name);
 
+    virtual ~Module();
 
-        //The constructor is used to initialize all members and must call ResetToDefaultConfiguration in all subclasses
-        Module(ModuleId moduleId, const char* name);
-        virtual ~Module();
-
-        //These two variables must be set by the submodule in the constructor before loading the configuration
+    //These two variables must be set by the submodule in the constructor before loading the configuration
+    union {
         ModuleConfiguration* configurationPointer;
-        u16 configurationLength;
+        VendorModuleConfiguration* vendorConfigurationPointer;
+    };
+    u16 configurationLength;
 
-        enum class ModuleConfigMessages : u8
-        {
-            SET_CONFIG = 0, 
-            SET_CONFIG_RESULT = 1,
-            SET_ACTIVE = 2, 
-            SET_ACTIVE_RESULT = 3,
-            GET_CONFIG = 4, 
-            CONFIG = 5,
-            GET_MODULE_LIST = 6, 
-            MODULE_LIST = 7
-        };
+    //This is automatically set to the moduleId for core modules, vendor modules must set this to a defined record storage id
+    u16 recordStorageId = RECORD_STORAGE_RECORD_ID_INVALID;
 
-        enum class ModuleSaveAction : u8{
-            SAVE_MODULE_CONFIG_ACTION,
-            PRE_ENROLLMENT_RECORD_DELETE
-        };
+    enum class ModuleConfigMessages : u8
+    {
+        SET_CONFIG = 0, 
+        SET_CONFIG_RESULT = 1,
+        SET_ACTIVE = 2, 
+        SET_ACTIVE_RESULT = 3,
+        GET_CONFIG = 4, 
+        CONFIG = 5,
+        GET_MODULE_LIST = 6, 
+        MODULE_LIST = 7,
+        MODULE_LIST_V2 = 8,
+        GET_CONFIG_ERROR = 9,
+    };
 
-        struct SaveModuleConfigAction {
-            NodeId sender;
-            ModuleId moduleId;
-            u8 requestHandle;
-        };
+    enum class ModuleSaveAction : u8{
+        SAVE_MODULE_CONFIG_ACTION,
+        SET_ACTIVE_CONFIG_ACTION,
+        PRE_ENROLLMENT_RECORD_DELETE
+    };
 
-        //This function is called on the module to load its saved configuration from flash and start
-        void LoadModuleConfigurationAndStart();
+    struct SaveModuleConfigAction {
+        NodeId sender;
+        ModuleIdWrapper moduleId;
+        u8 requestHandle;
+    };
 
-        //Constructs a simple TriggerAction message and sends it
-        ErrorTypeUnchecked SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool loopback) const;
-        ErrorTypeUnchecked SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable) const;
+    //This function is called on the module to load its saved configuration from flash and start
+    void LoadModuleConfigurationAndStart();
+
+    //Constructs a simple TriggerAction message and sends it
+    ErrorTypeUnchecked SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool loopback) const;
+    ErrorTypeUnchecked SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable) const;
 
 
-        //##### Handlers that can be implemented by any module, but are implemented empty here
+    //##### Handlers that can be implemented by any module, but are implemented empty here
 
-        /**
-         * This function is called as soon as the module settings have been loaded or updated.
-         *
-         * If the loaded configuration has a different version than the current moduleVersion it will not
-         * have been copied to the module configuration and a pointer and size of the migratableConfig
-         * are given to the function (otherwise null). The module can do migration itself if it desires so.
-         *
-         * The module must make sure to disable all its tasks once moduleActive is set to false.
-         *
-         * If moduleActive is set to false, this is the only call the module will get, other listeners will be disabled.
-         */
-        virtual void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength){};
+    /**
+     * This function is called as soon as the module settings have been loaded or updated.
+     *
+     * If the loaded configuration has a different version than the current moduleVersion it will not
+     * have been copied to the module configuration and a pointer and size of the migratableConfig
+     * are given to the function (otherwise null). The module can do migration itself if it desires so.
+     *
+     * The module must make sure to disable all its tasks once moduleActive is set to false.
+     *
+     * If moduleActive is set to false, this is the only call the module will get, other listeners will be disabled.
+     */
+    virtual void ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfigLength){};
 
-        //This handler receives all timer events
-        virtual void TimerEventHandler(u16 passedTimeDs){};
+    //This handler receives all timer events
+    virtual void TimerEventHandler(u16 passedTimeDs){};
 
-        //This handler receives all ble events and can act on them
-        virtual void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) {};
-        virtual void GapConnectedEventHandler(const FruityHal::GapConnectedEvent& connectedEvent) {};
-        virtual void GapDisconnectedEventHandler(const FruityHal::GapDisconnectedEvent& disconnectedEvent) {};
-        virtual void GattDataTransmittedEventHandler(const FruityHal::GattDataTransmittedEvent& gattDataTransmittedEvent) {};
+    //This handler receives all ble events and can act on them
+    virtual void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) {};
+    virtual void GapConnectedEventHandler(const FruityHal::GapConnectedEvent& connectedEvent) {};
+    virtual void GapDisconnectedEventHandler(const FruityHal::GapDisconnectedEvent& disconnectedEvent) {};
+    virtual void GattDataTransmittedEventHandler(const FruityHal::GattDataTransmittedEvent& gattDataTransmittedEvent) {};
 
-        //When a mesh connection is connected with handshake and everything or if it is disconnected, the ConnectionManager will call this handler
-        virtual void MeshConnectionChangedHandler(MeshConnection& connection){};
+    //When a mesh connection is connected with handshake and everything or if it is disconnected, the ConnectionManager will call this handler
+    virtual void MeshConnectionChangedHandler(MeshConnection& connection){};
 
-        //This can be used to get access to all routed messages and modify their content, block them or re-route them
-        //A routing decision must be returned and all the routing decisions are ORed together so that a block from one module
-        //will definitely block the message
-        virtual RoutingDecision MessageRoutingInterceptor(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) { return 0; };
+    //This can be used to get access to all routed messages and modify their content, block them or re-route them
+    //A routing decision must be returned and all the routing decisions are ORed together so that a block from one module
+    //will definitely block the message
+    virtual RoutingDecision MessageRoutingInterceptor(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader) { return 0; };
 
-        //This handler receives all connection packets addressed to this node
-        virtual void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader);
+    //This handler receives all connection packets addressed to this node
+    virtual void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader);
 
-        //This handler is called before the node is enrolled, it can return PRE_ENROLLMENT_ codes
-        virtual PreEnrollmentReturnCode PreEnrollmentHandler(connPacketModule* packet, u16 packetLength);
+    //This handler is called before the node is enrolled, it can return PRE_ENROLLMENT_ codes
+    //The enrollment packet that was received with the enrollment data is passed to the handler and can be checked
+    virtual PreEnrollmentReturnCode PreEnrollmentHandler(ConnPacketModule* enrollmentPacket, u16 packetLength);
 
-        virtual void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
+    virtual void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
 
-        //Queries a single capability of a module. If no capability with the given index is available the value INVALID must be returned.
-        //After the first invalid index, no valid indices must follow. To limit the amount of virtual methods, this method is called once
-        //for every capability per capability in the module, thus leading to a time complexity of O(n^2). This means that this method
-        //should not do complex tasks! The firstCall parameter tells the callee if this is the firstCall to the method for the current
-        //Capability retrieval run. This can be used for initialization tasks. Note that testing for "index == 0" is not sufficient as it
-        //is possible that the CapabilityEntryType is NOT_READY, which then later would call the function again with index == 0 but with
-        //firstCall false.
-        virtual CapabilityEntry GetCapability(u32 index, bool firstCall) {
-            CapabilityEntry retVal;
-            retVal.type = CapabilityEntryType::INVALID;
-            return retVal;
-        };
+    //Queries a single capability of a module. If no capability with the given index is available the value INVALID must be returned.
+    //After the first invalid index, no valid indices must follow. To limit the amount of virtual methods, this method is called once
+    //for every capability per capability in the module, thus leading to a time complexity of O(n^2). This means that this method
+    //should not do complex tasks! The firstCall parameter tells the callee if this is the firstCall to the method for the current
+    //Capability retrieval run. This can be used for initialization tasks. Note that testing for "index == 0" is not sufficient as it
+    //is possible that the CapabilityEntryType is NOT_READY, which then later would call the function again with index == 0 but with
+    //firstCall false.
+    virtual CapabilityEntry GetCapability(u32 index, bool firstCall) {
+        CapabilityEntry retVal;
+        retVal.type = CapabilityEntryType::INVALID;
+        return retVal;
+    };
 
 #if IS_ACTIVE(SIG_MESH)
-        //This handler is called once a sig mesh state changes. This is called on all modules for all states so that they can also react
-        //on state changes for elements or models that they have not originally created
-        virtual void SigMeshStateChangedHandler(SigElement* element, SigModel* model, SigState* state) {};
+    //This handler is called once a sig mesh state changes. This is called on all modules for all states so that they can also react
+    //on state changes for elements or models that they have not originally created
+    virtual void SigMeshStateChangedHandler(SigElement* element, SigModel* model, SigState* state) {};
 #endif
 
-        //MeshAccessConnections should only allow authorized packets to be sent into the mesh
-        //This function is called once a packet was received through a meshAccessConnection to
-        //query if the packet can be sent through. It can also be modified by this handler
-        virtual MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction){ return MeshAccessAuthorization::UNDETERMINED; };
+    //MeshAccessConnections should only allow authorized packets to be sent into the mesh
+    //This function is called once a packet was received through a meshAccessConnection to
+    //query if the packet can be sent through. It can also be modified by this handler
+    virtual MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction){ return MeshAccessAuthorization::UNDETERMINED; };
 
-        //This method must be implemented by modules that support component updates
-        //The module must answer weather it wants to accept the update (0) or not (negative result)
-        //If the request is handled asynchronously, the module must return dfu start response QUERY_WAITING and must then manually call ContinueDfuStart
-        virtual DfuStartDfuResponseCode CheckComponentUpdateRequest(connPacketModule const * inPacket, u32 version, ImageType imageType, u8 componentId){ return DfuStartDfuResponseCode::MODULE_NOT_UPDATABLE; };
+    //This method must be implemented by modules that support component updates
+    //The module must answer weather it wants to accept the update (0) or not (negative result)
+    //If the request is handled asynchronously, the module must return dfu start response QUERY_WAITING and must then manually call ContinueDfuStart
+    virtual DfuStartDfuResponseCode CheckComponentUpdateRequest(ConnPacketModule const * inPacket, u32 version, ImageType imageType, u8 componentId){ return DfuStartDfuResponseCode::MODULE_NOT_UPDATABLE; };
 
-        //This method allows a module to update its component
-        //The module must ensure that subsequent calls to this method do not interfere with the update process
-        virtual void StartComponentUpdate(u8 componentId, u8* imagePtr, u32 imageLength){};
+    //This method allows a module to update its component
+    //The module must ensure that subsequent calls to this method do not interfere with the update process
+    virtual void StartComponentUpdate(u8 componentId, u8* imagePtr, u32 imageLength){};
 
-        //The Terminal Command handler is called for all modules with the user input
+    //The Terminal Command handler is called for all modules with the user input
 #ifdef TERMINAL_ENABLED
-        //This method can be implemented by any subclass and will be notified when
-        //a command is entered.
-        virtual TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) /*nonconst*/;
+    //This method can be implemented by any subclass and will be notified when
+    //a command is entered.
+    virtual TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) /*nonconst*/;
 #endif
 
 #if IS_ACTIVE(BUTTONS)
-        virtual void ButtonHandler(u8 buttonId, u32 holdTime) {};
+    virtual void ButtonHandler(u8 buttonId, u32 holdTime) {};
 #endif
 
-        //This method indicates if this module is interested in a mesh access connection that
-        //should be created from a different node to this node. Typically is used by assets
-        //as they are not permanent members of the mesh but regularly have some new sensor values
-        //to publish.
-        virtual bool IsInterestedInMeshAccessConnection() { return false; }
+    //This method indicates if this module is interested in a mesh access connection that
+    //should be created from a different node to this node. Typically is used by assets
+    //as they are not permanent members of the mesh but regularly have some new sensor values
+    //to publish.
+    virtual bool IsInterestedInMeshAccessConnection() { return false; }
+
+private:
+    //####### Module specific message structs (these need to be packed)
+    #pragma pack(push)
+    #pragma pack(1)
+    //This message is used to return a result code for different actions
+    typedef struct
+    {
+        SetConfigResultCodes result;
+
+    } ModuleConfigResultCodeMessage;
+    STATIC_ASSERT_SIZE(ModuleConfigResultCodeMessage, 1);
+    #pragma pack(pop)
+
+    void SendModuleConfigResult(NodeId senderId, ModuleIdWrapper moduleId, ModuleConfigMessages actionType, SetConfigResultCodes result, u8 requestHandle);
 
 };

@@ -40,9 +40,6 @@
 #include "GlobalState.h"
 #include "MeshAccessModule.h"
 
-constexpr u8 STATUS_REPORTER_MODULE_CONFIG_VERSION = 2;
-constexpr u16 STATUS_REPORTER_MODULE_MAX_HOPS = NODE_ID_HOPS_BASE + NODE_ID_HOPS_BASE_SIZE - 1;
-
 StatusReporterModule::StatusReporterModule()
     : Module(ModuleId::STATUS_REPORTER_MODULE, "status")
 {
@@ -76,7 +73,7 @@ void StatusReporterModule::ResetToDefaultConfiguration()
     SET_FEATURESET_CONFIGURATION(&configuration, this);
 }
 
-void StatusReporterModule::ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength)
+void StatusReporterModule::ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfigLength)
 {
     //Start the Module...
 
@@ -131,11 +128,11 @@ void StatusReporterModule::TimerEventHandler(u16 passedTimeDs)
             timeSinceLastPeriodicTimeSendDs = 0;
 
             //todocurrent: Interested in connection
-            constexpr size_t bufferSize = sizeof(componentMessageHeader) + sizeof(GS->timeManager.GetTime());
+            constexpr size_t bufferSize = sizeof(ComponentMessageHeader) + sizeof(GS->timeManager.GetTime());
             alignas(u32) u8 buffer[bufferSize];
             CheckedMemset(buffer, 0x00, sizeof(buffer));
 
-            connPacketComponentMessage *outPacket = (connPacketComponentMessage*)buffer;
+            ConnPacketComponentMessage *outPacket = (ConnPacketComponentMessage*)buffer;
 
             outPacket->componentHeader.header.messageType = MessageType::COMPONENT_SENSE;
             outPacket->componentHeader.header.sender = GS->node.configuration.nodeId;
@@ -198,7 +195,7 @@ void StatusReporterModule::SendDeviceInfoV2(NodeId toNode, u8 requestHandle, Mes
     FruityHal::GetDeviceAddress(data.chipId);
     data.serialNumberIndex = RamConfig->GetSerialNumberIndex();
     data.accessAddress = FruityHal::GetBleGapAddress();
-    data.nodeVersion = GS->config.getFruityMeshVersion();
+    data.nodeVersion = GS->config.GetFruityMeshVersion();
     data.networkId = GS->node.configuration.networkId;
     data.dBmRX = Boardconfig->dBmRX;
     data.dBmTX = Conf::defaultDBmTX;
@@ -308,7 +305,7 @@ void StatusReporterModule::SendRebootReason(NodeId toNode, u8 requestHandle) con
 void StatusReporterModule::SendErrors(NodeId toNode, u8 requestHandle) const{
 
     //Log another error so that we know the uptime of the node when the errors were requested
-    GS->logger.logCustomError(CustomErrorTypes::INFO_ERRORS_REQUESTED, GS->logger.errorLogPosition);
+    GS->logger.LogCustomError(CustomErrorTypes::INFO_ERRORS_REQUESTED, GS->logger.errorLogPosition);
 
     StatusReporterModuleErrorLogEntryMessage data;
     for(int i=0; i< GS->logger.errorLogPosition; i++){
@@ -356,7 +353,7 @@ void StatusReporterModule::SendLiveReport(LiveReportTypes type, u16 requestHandl
 }
 
 void StatusReporterModule::StartConnectionRSSIMeasurement(MeshConnection& connection) const{
-    if (connection.isConnected())
+    if (connection.IsConnected())
     {
         //Reset old values
         connection.lastReportedRssi = 0;
@@ -376,16 +373,16 @@ void StatusReporterModule::StartConnectionRSSIMeasurement(MeshConnection& connec
 
 void StatusReporterModule::GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent & advertisementReportEvent)
 {
-    const u8* data = advertisementReportEvent.getData();
-    u16 dataLength = advertisementReportEvent.getDataLength();
+    const u8* data = advertisementReportEvent.GetData();
+    u16 dataLength = advertisementReportEvent.GetDataLength();
 
-    const advPacketHeader* packetHeader = (const advPacketHeader*)data;
+    const AdvPacketHeader* packetHeader = (const AdvPacketHeader*)data;
 
     if (packetHeader->messageType == ServiceDataMessageType::JOIN_ME_V0)
     {
         if (dataLength == SIZEOF_ADV_PACKET_JOIN_ME)
         {
-            const advPacketJoinMeV0* packet = (const advPacketJoinMeV0*)data;
+            const AdvPacketJoinMeV0* packet = (const AdvPacketJoinMeV0*)data;
 
             bool found = false;
 
@@ -396,7 +393,7 @@ void StatusReporterModule::GapAdvertisementReportEventHandler(const FruityHal::G
                         nodeMeasurements[i].rssiSum = 0;
                     }
                     nodeMeasurements[i].packetCount++;
-                    nodeMeasurements[i].rssiSum += advertisementReportEvent.getRssi();
+                    nodeMeasurements[i].rssiSum += advertisementReportEvent.GetRssi();
                     found = true;
                     break;
                 }
@@ -406,7 +403,7 @@ void StatusReporterModule::GapAdvertisementReportEventHandler(const FruityHal::G
                     if (nodeMeasurements[i].nodeId == 0) {
                         nodeMeasurements[i].nodeId = packet->payload.sender;
                         nodeMeasurements[i].packetCount = 1;
-                        nodeMeasurements[i].rssiSum = advertisementReportEvent.getRssi();
+                        nodeMeasurements[i].rssiSum = advertisementReportEvent.GetRssi();
 
                         break;
                     }
@@ -565,13 +562,13 @@ TerminalCommandHandlerReturnType StatusReporterModule::TerminalCommandHandler(co
 }
 #endif
 
-void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
+void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader)
 {
     //Must call superclass for handling
     Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
     if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-        connPacketModule const * packet = (connPacketModule const *)packetHeader;
+        ConnPacketModule const * packet = (ConnPacketModule const *)packetHeader;
 
         //Check if our module is meant and we should trigger an action
         if(packet->moduleId == moduleId){
@@ -624,14 +621,14 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
                     if (meshconn != nullptr)
                     {
                         //meshconn can be nullptr if the connection for example is a mesh access connection.
-                        u16 hopsToSink = meshconn->getHopsToSink();
+                        u16 hopsToSink = meshconn->GetHopsToSink();
 
                         if (receivedHopsToSink != hopsToSink)
                         {
-                            GS->logger.logCustomError(CustomErrorTypes::FATAL_INCORRECT_HOPS_TO_SINK, ((u32)receivedHopsToSink << 16) | hopsToSink);
+                            GS->logger.LogCustomError(CustomErrorTypes::FATAL_INCORRECT_HOPS_TO_SINK, ((u32)receivedHopsToSink << 16) | hopsToSink);
                             logt("DEBUGMOD", "FATAL receivedHopsToSink: %d", receivedHopsToSink);
-                            logt("DEBUGMOD", "FATAL getHopsToSink: %d", hopsToSink);
-                            meshconn->setHopsToSink(receivedHopsToSink);
+                            logt("DEBUGMOD", "FATAL GetHopsToSink: %d", hopsToSink);
+                            meshconn->SetHopsToSink(receivedHopsToSink);
                         }
                     }
                 }
@@ -658,7 +655,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
     //Parse Module responses
     if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
 
-        connPacketModule const * packet = (connPacketModule const *)packetHeader;
+        ConnPacketModule const * packet = (ConnPacketModule const *)packetHeader;
 
         //Check if our module is meant and we should trigger an action
         if(packet->moduleId == moduleId)
@@ -668,7 +665,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
             if(actionType == StatusModuleActionResponseMessages::ALL_CONNECTIONS)
             {
                 StatusReporterModuleConnectionsMessage const * packetData = (StatusReporterModuleConnectionsMessage const *) (packet->data);
-                logjson("STATUSMOD", "{\"type\":\"connections\",\"nodeId\":%d,\"module\":%d,\"partners\":[%d,%d,%d,%d],\"rssiValues\":[%d,%d,%d,%d]}" SEP, packet->header.sender, (u32)moduleId, packetData->partner1, packetData->partner2, packetData->partner3, packetData->partner4, packetData->rssi1, packetData->rssi2, packetData->rssi3, packetData->rssi4);
+                logjson("STATUSMOD", "{\"type\":\"connections\",\"nodeId\":%d,\"module\":%u,\"partners\":[%d,%d,%d,%d],\"rssiValues\":[%d,%d,%d,%d]}" SEP, packet->header.sender, (u8)ModuleId::STATUS_REPORTER_MODULE, packetData->partner1, packetData->partner2, packetData->partner3, packetData->partner4, packetData->rssi1, packetData->rssi2, packetData->rssi3, packetData->rssi4);
             }
             else if(actionType == StatusModuleActionResponseMessages::DEVICE_INFO_V2)
             {
@@ -680,7 +677,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
                 char serialBuffer[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
                 Utility::GenerateBeaconSerialForIndex(data->serialNumberIndex, serialBuffer);
 
-                logjson_partial("STATUSMOD", "{\"nodeId\":%u,\"type\":\"device_info\",\"module\":%d,", packet->header.sender, (u32)moduleId);
+                logjson_partial("STATUSMOD", "{\"nodeId\":%u,\"type\":\"device_info\",\"module\":%u,", packet->header.sender, (u8)ModuleId::STATUS_REPORTER_MODULE);
                 logjson_partial("STATUSMOD", "\"dBmRX\":%d,\"dBmTX\":%d,\"calibratedTX\":%d,", data->dBmRX, data->dBmTX, data->calibratedTX);
                 logjson_partial("STATUSMOD", "\"deviceType\":%u,\"manufacturerId\":%u,", (u32)data->deviceType, data->manufacturerId);
                 logjson_partial("STATUSMOD", "\"networkId\":%u,\"nodeVersion\":%u,", data->networkId, data->nodeVersion);
@@ -695,7 +692,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
                 //Print packet to console
                 StatusReporterModuleStatusMessage const * data = (StatusReporterModuleStatusMessage const *) (packet->data);
 
-                logjson_partial("STATUSMOD", "{\"nodeId\":%u,\"type\":\"status\",\"module\":%d,", packet->header.sender, (u32)moduleId);
+                logjson_partial("STATUSMOD", "{\"nodeId\":%u,\"type\":\"status\",\"module\":%u,", packet->header.sender, (u8)ModuleId::STATUS_REPORTER_MODULE);
                 logjson_partial("STATUSMOD", "\"batteryInfo\":%u,\"clusterSize\":%u,", data->batteryInfo, data->clusterSize);
                 logjson_partial("STATUSMOD", "\"connectionLossCounter\":%u,\"freeIn\":%u,", data->connectionLossCounter, data->freeIn);
                 logjson_partial("STATUSMOD", "\"freeOut\":%u,\"inConnectionPartner\":%u,", data->freeOut, data->inConnectionPartner);
@@ -705,7 +702,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
             else if(actionType == StatusModuleActionResponseMessages::NEARBY_NODES)
             {
                 //Print packet to console
-                logjson_partial("STATUSMOD", "{\"nodeId\":%u,\"type\":\"nearby_nodes\",\"module\":%u,\"nodes\":[", packet->header.sender, (u32)moduleId);
+                logjson_partial("STATUSMOD", "{\"nodeId\":%u,\"type\":\"nearby_nodes\",\"module\":%u,\"nodes\":[", packet->header.sender, (u8)ModuleId::STATUS_REPORTER_MODULE);
 
                 u16 nodeCount = (sendData->dataLength - SIZEOF_CONN_PACKET_MODULE) / 3;
                 bool first = true;
@@ -726,18 +723,18 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
             }
             else if(actionType == StatusModuleActionResponseMessages::SET_INITIALIZED_RESULT)
             {
-                logjson("STATUSMOD", "{\"type\":\"set_init_result\",\"nodeId\":%u,\"module\":%u}" SEP, packet->header.sender, (u32)moduleId);
+                logjson("STATUSMOD", "{\"type\":\"set_init_result\",\"nodeId\":%u,\"module\":%u}" SEP, packet->header.sender, (u8)ModuleId::STATUS_REPORTER_MODULE);
             }
             else if(actionType == StatusModuleActionResponseMessages::ERROR_LOG_ENTRY)
             {
                 StatusReporterModuleErrorLogEntryMessage const * data = (StatusReporterModuleErrorLogEntryMessage const *) (packet->data);
 
-                logjson_partial("STATUSMOD", "{\"type\":\"error_log_entry\",\"nodeId\":%u,\"module\":%u,", packet->header.sender, (u32)moduleId);
+                logjson_partial("STATUSMOD", "{\"type\":\"error_log_entry\",\"nodeId\":%u,\"module\":%u,", packet->header.sender, (u8)ModuleId::STATUS_REPORTER_MODULE);
 
                 //As the time is currently only 3 byte, use this formula to get the current unix timestamp in UTC: now()  - (now() % (2^24)) + timestamp
                 logjson_partial("STATUSMOD", "\"errType\":%u,\"code\":%u,\"extra\":%u,\"time\":%u", (u32)data->errorType, data->errorCode, data->extraInfo, data->timestamp);
 #if IS_INACTIVE(GW_SAVE_SPACE)
-                logjson_partial("STATUSMOD", ",\"typeStr\":\"%s\",\"codeStr\":\"%s\"", Logger::getErrorLogErrorType((LoggingError)data->errorType), Logger::getErrorLogError((LoggingError)data->errorType, data->errorCode));
+                logjson_partial("STATUSMOD", ",\"typeStr\":\"%s\",\"codeStr\":\"%s\"", Logger::GetErrorLogErrorType((LoggingError)data->errorType), Logger::GetErrorLogError((LoggingError)data->errorType, data->errorCode));
 #endif
                 logjson("STATUSMOD", "}" SEP);
             }
@@ -745,7 +742,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
             {
                 RamRetainStruct const * data = (RamRetainStruct const *) (packet->data);
 
-                logjson_partial("STATUSMOD", "{\"type\":\"reboot_reason\",\"nodeId\":%u,\"module\":%u,", packet->header.sender, (u32)moduleId);
+                logjson_partial("STATUSMOD", "{\"type\":\"reboot_reason\",\"nodeId\":%u,\"module\":%u,", packet->header.sender, (u8)ModuleId::STATUS_REPORTER_MODULE);
                 logjson_partial("STATUSMOD", "\"reason\":%u,\"code1\":%u,\"code2\":%u,\"code3\":%u,\"stack\":[", (u32)data->rebootReason, data->code1, data->code2, data->code3);
                 for(u8 i=0; i<data->stacktraceSize; i++){
                     logjson_partial("STATUSMOD", (i < data->stacktraceSize-1) ? "%x," : "%x", data->stacktrace[i]);
@@ -758,7 +755,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
     //Parse Module general messages
     if(packetHeader->messageType == MessageType::MODULE_GENERAL){
 
-        connPacketModule const * packet = (connPacketModule const *)packetHeader;
+        ConnPacketModule const * packet = (ConnPacketModule const *)packetHeader;
 
         //Check if our module is meant and we should trigger an action
         if(packet->moduleId == moduleId)
@@ -768,14 +765,14 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
             if(actionType == StatusModuleGeneralMessages::LIVE_REPORT)
             {
                 StatusReporterModuleLiveReportMessage const * packetData = (StatusReporterModuleLiveReportMessage const *) (packet->data);
-                logjson("STATUSMOD", "{\"type\":\"live_report\",\"nodeId\":%d,\"module\":%d,\"code\":%u,\"extra\":%u,\"extra2\":%u}" SEP, packet->header.sender, (u32)moduleId, packetData->reportType, packetData->extra, packetData->extra2);
+                logjson("STATUSMOD", "{\"type\":\"live_report\",\"nodeId\":%d,\"module\":%u,\"code\":%u,\"extra\":%u,\"extra2\":%u}" SEP, packet->header.sender, (u8)ModuleId::STATUS_REPORTER_MODULE, packetData->reportType, packetData->extra, packetData->extra2);
             }
         }
     }
 
     if (packetHeader->messageType == MessageType::COMPONENT_ACT && sendData->dataLength >= SIZEOF_CONN_PACKET_COMPONENT_MESSAGE)
     {
-        connPacketComponentMessage const * packet = (connPacketComponentMessage const *)packetHeader;
+        ConnPacketComponentMessage const * packet = (ConnPacketComponentMessage const *)packetHeader;
         if (packet->componentHeader.moduleId == moduleId)
         {
             if (packet->componentHeader.actionType == (u8)ActorMessageActionType::WRITE)
@@ -805,7 +802,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 void StatusReporterModule::MeshConnectionChangedHandler(MeshConnection& connection)
 {
     //New connection has just been made
-    if(connection.handshakeDone()){
+    if(connection.HandshakeDone()){
         //TODO: Implement low and medium rssi sampling with timer handler
         //TODO: disable and enable rssi sampling on existing connections
         if(Conf::enableConnectionRSSIMeasurement){
@@ -820,11 +817,11 @@ void StatusReporterModule::AdcEventHandler()
 {
     StatusReporterModule * p_statusReporterModule = (StatusReporterModule *)GS->node.GetModuleById(ModuleId::STATUS_REPORTER_MODULE);
     if (p_statusReporterModule == nullptr) return;
-    p_statusReporterModule->convertADCtoVoltage();
+    p_statusReporterModule->ConvertADCtoVoltage();
     FruityHal::AdcUninit();
 }
 
-void StatusReporterModule::initBatteryVoltageADC() {
+void StatusReporterModule::InitBatteryVoltageADC() {
 #if IS_ACTIVE(BATTERY_MEASUREMENT)
     //Do not initialize battery checking if board does not support it
     if(Boardconfig->batteryAdcInputPin == -1 || isADCInitialized){
@@ -869,7 +866,7 @@ void StatusReporterModule::initBatteryVoltageADC() {
 }
 void StatusReporterModule::BatteryVoltageADC(){
 #if IS_ACTIVE(BATTERY_MEASUREMENT)
-    initBatteryVoltageADC();
+    InitBatteryVoltageADC();
     //Check if initialization did work
     if(!isADCInitialized || Boardconfig->batteryAdcInputPin == -1) return;
 
@@ -887,7 +884,7 @@ void StatusReporterModule::BatteryVoltageADC(){
 #endif
 }
 
-void StatusReporterModule::convertADCtoVoltage()
+void StatusReporterModule::ConvertADCtoVoltage()
 {
 #if IS_ACTIVE(BATTERY_MEASUREMENT)
     u32 adc_sum_value = 0;
@@ -929,12 +926,12 @@ u16 StatusReporterModule::ExternalVoltageDividerDv(u32 Resistor1, u32 Resistor2)
 
 MeshAccessAuthorization StatusReporterModule::CheckMeshAccessPacketAuthorization(BaseConnectionSendData * sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction)
 {
-    connPacketHeader const * packet = (connPacketHeader const *)data;
+    ConnPacketHeader const * packet = (ConnPacketHeader const *)data;
 
     if (packet->messageType == MessageType::MODULE_TRIGGER_ACTION
         || packet->messageType == MessageType::MODULE_ACTION_RESPONSE)
     {
-        connPacketModule const * mod = (connPacketModule const *)data;
+        ConnPacketModule const * mod = (ConnPacketModule const *)data;
         if (mod->moduleId == moduleId)
         {
             //The Gateway queries get_status and get_device_info through the orga key.
@@ -954,7 +951,7 @@ MeshAccessAuthorization StatusReporterModule::CheckMeshAccessPacketAuthorization
     if (packet->messageType == MessageType::COMPONENT_ACT
         || packet->messageType == MessageType::COMPONENT_SENSE)
     {
-        connPacketComponentMessage const * packet = (connPacketComponentMessage const *)data;
+        ConnPacketComponentMessage const * packet = (ConnPacketComponentMessage const *)data;
         if (packet->componentHeader.moduleId == moduleId)
         {
             return MeshAccessAuthorization::WHITELIST;

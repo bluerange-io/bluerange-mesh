@@ -68,17 +68,17 @@ void GATTController::ServiceDiscoveryDoneDispatcher(FruityHal::BleGattDBDiscover
     logt("GATTCTRL", "DB Discovery Event");
 
     if(p_evt->type == FruityHal::BleGattDBDiscoveryEventType::COMPLETE){
-        ConnectionManager::getInstance().GATTServiceDiscoveredHandler(p_evt->connHandle, *p_evt);
+        ConnectionManager::GetInstance().GATTServiceDiscoveredHandler(p_evt->connHandle, *p_evt);
     }
 }
 
 //Throws different errors that must be handeled
-ErrorType GATTController::bleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable) const
+ErrorType GATTController::BleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable) const
 {
     logt("CONN_DATA", "TX Data size is: %d, handles(%d, %d), reliable %d", dataLength, connectionHandle, characteristicHandle, reliable);
 
     char stringBuffer[100];
-    Logger::convertBufferToHexString(data, dataLength, stringBuffer, sizeof(stringBuffer));
+    Logger::ConvertBufferToHexString(data, dataLength, stringBuffer, sizeof(stringBuffer));
     logt("CONN_DATA", "%s", stringBuffer);
 
 
@@ -105,12 +105,12 @@ ErrorType GATTController::bleWriteCharacteristic(u16 connectionHandle, u16 chara
 }
 
 //TODO: Rewrite properly
-ErrorType GATTController::bleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength) const
+ErrorType GATTController::BleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength) const
 {
     logt("CONN_DATA", "hvx Data size is: %d, handles(%d, %d)", dataLength, connectionHandle, characteristicHandle);
 
     char stringBuffer[100];
-    Logger::convertBufferToHexString(data, dataLength, stringBuffer, sizeof(stringBuffer));
+    Logger::ConvertBufferToHexString(data, dataLength, stringBuffer, sizeof(stringBuffer));
     logt("CONN_DATA", "%s", stringBuffer);
 
 
@@ -125,7 +125,7 @@ ErrorType GATTController::bleSendNotification(u16 connectionHandle, u16 characte
     return FruityHal::BleGattSendNotification(connectionHandle, notificationParams);
 }
 
-GATTController & GATTController::getInstance()
+GATTController & GATTController::GetInstance()
 {
     return GS->gattController;
 }

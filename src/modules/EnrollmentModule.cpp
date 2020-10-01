@@ -77,7 +77,7 @@ void EnrollmentModule::ResetToDefaultConfiguration()
     SET_FEATURESET_CONFIGURATION(&configuration, this);
 }
 
-void EnrollmentModule::ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength)
+void EnrollmentModule::ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfigLength)
 {
     //Do additional initialization upon loading the config
     CheckedMemset(&ted, 0x00, sizeof(TemporaryEnrollmentData));
@@ -168,16 +168,16 @@ TerminalCommandHandlerReturnType EnrollmentModule::TerminalCommandHandler(const 
                     return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
                 }
                 if(commandArgsSize > 7){
-                    Logger::parseEncodedStringToBuffer(commandArgs[7], enrollmentMessage.newNetworkKey.data(), 16);
+                    Logger::ParseEncodedStringToBuffer(commandArgs[7], enrollmentMessage.newNetworkKey.data(), 16);
                 }
                 if(commandArgsSize > 8){
-                    Logger::parseEncodedStringToBuffer(commandArgs[8], enrollmentMessage.newUserBaseKey.data(), 16);
+                    Logger::ParseEncodedStringToBuffer(commandArgs[8], enrollmentMessage.newUserBaseKey.data(), 16);
                 }
                 if(commandArgsSize > 9){
-                    Logger::parseEncodedStringToBuffer(commandArgs[9], enrollmentMessage.newOrganizationKey.data(), 16);
+                    Logger::ParseEncodedStringToBuffer(commandArgs[9], enrollmentMessage.newOrganizationKey.data(), 16);
                 }
                 if(commandArgsSize > 10){
-                    Logger::parseEncodedStringToBuffer(commandArgs[10], enrollmentMessage.nodeKey.data(), 16);
+                    Logger::ParseEncodedStringToBuffer(commandArgs[10], enrollmentMessage.nodeKey.data(), 16);
                 }
                 enrollmentMessage.timeoutSec = commandArgsSize > 11? Utility::StringToU8(commandArgs[11], &didError) : 10;
                 enrollmentMessage.enrollOnlyIfUnenrolled = commandArgsSize > 12 ? Utility::StringToU8(commandArgs[12], &didError) : 0;
@@ -280,7 +280,7 @@ TerminalCommandHandlerReturnType EnrollmentModule::TerminalCommandHandler(const 
 }
 #endif
 
-void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
+void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader)
 {
     //Must call superclass for handling
     Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
@@ -292,7 +292,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
     }
 
     if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-        connPacketModule const * packet = (connPacketModule const *)packetHeader;
+        ConnPacketModule const * packet = (ConnPacketModule const *)packetHeader;
 
         //Check if our module is meant and we should trigger an action
         if(packet->moduleId == moduleId)
@@ -362,7 +362,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
                 
                 if (payloadLength % sizeof(u32) != 0)
                 {
-                    GS->logger.logCustomError(CustomErrorTypes::WARN_REQUEST_PROPOSALS_UNEXPECTED_LENGTH, payloadLength);
+                    GS->logger.LogCustomError(CustomErrorTypes::WARN_REQUEST_PROPOSALS_UNEXPECTED_LENGTH, payloadLength);
                     SIMEXCEPTION(IllegalArgumentException);
                     return;
                 }
@@ -372,7 +372,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
                 if (amountOfProposals > REQUEST_PROPOSAL_INDICES_LENGTH)
                 {
                     amountOfProposals = REQUEST_PROPOSAL_INDICES_LENGTH;
-                    GS->logger.logCustomError(CustomErrorTypes::WARN_REQUEST_PROPOSALS_TOO_LONG, payloadLength);
+                    GS->logger.LogCustomError(CustomErrorTypes::WARN_REQUEST_PROPOSALS_TOO_LONG, payloadLength);
                     SIMEXCEPTION(IllegalArgumentException);
                     //To maintain portability between versions we just clamp too many values,
                     //instead of discarding them completely. So no return at this place!
@@ -405,14 +405,14 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
                         logjson_partial("ENROLLMOD", ", ");
                     }
                 }
-                logjson("ENROLLMOD", "], \"module\":%d,\"requestHandle\":%d}" SEP, (u32)packet->moduleId, (u32)packet->requestHandle);
+                logjson("ENROLLMOD", "], \"module\":%u,\"requestHandle\":%d}" SEP, (u8)ModuleId::ENROLLMENT_MODULE, (u32)packet->requestHandle);
             }
         }
     }
 
     //Parse Module responses
     if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
-        connPacketModule const * packet = (connPacketModule const *)packetHeader;
+        ConnPacketModule const * packet = (ConnPacketModule const *)packetHeader;
 
         //Check if our module is meant and we should trigger an action
         if(packet->moduleId == moduleId)
@@ -453,21 +453,21 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 
                 const char* cmdName = packet->actionType == (u8)EnrollmentModuleActionResponseMessages::ENROLLMENT_RESPONSE ? "enroll_response_serial" : "remove_enroll_response_serial";
 
-                logjson_partial("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"%s\",\"module\":%d,", packet->header.sender, cmdName, (u32)moduleId);
+                logjson_partial("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"%s\",\"module\":%u,", packet->header.sender, cmdName, (u8)ModuleId::ENROLLMENT_MODULE);
                 logjson("ENROLLMOD", "\"requestId\":%u,\"serialNumber\":\"%s\",\"code\":%u}" SEP,  packet->requestHandle, serialNumber, (u32)data->result);
             }
             else if(actionType == EnrollmentModuleActionResponseMessages::ENROLLMENT_PROPOSAL)
             {
                 EnrollmentModuleEnrollmentProposalMessage const * data = (EnrollmentModuleEnrollmentProposalMessage const *)packet->data;
 
-                logjson_partial("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"enroll_proposal\",\"module\":%d,", packet->header.sender, (u32)moduleId);
+                logjson_partial("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"enroll_proposal\",\"module\":%u,", packet->header.sender, (u8)ModuleId::ENROLLMENT_MODULE);
                 logjson("ENROLLMOD", "\"proposals\":[%u,%u,%u]}" SEP, data->serialNumberIndex[0], data->serialNumberIndex[1], data->serialNumberIndex[2]);
             }
             else if (actionType == EnrollmentModuleActionResponseMessages::SET_NETWORK_RESPONSE)
             {
                 EnrollmentModuleSetNetworkResponseMessage const * data = (EnrollmentModuleSetNetworkResponseMessage const *)packet->data;
 
-                logjson("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"set_network_response\",\"code\":%d,\"module\":%d,\"requestHandle\":%d}" SEP, packet->header.sender, (u32)data->response, (u32)packet->moduleId, (u32)packet->requestHandle);
+                logjson("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"set_network_response\",\"code\":%d,\"module\":%u,\"requestHandle\":%d}" SEP, packet->header.sender, (u32)data->response, (u8)ModuleId::ENROLLMENT_MODULE, (u32)packet->requestHandle);
             }
             else if (actionType == EnrollmentModuleActionResponseMessages::REQUEST_PROPOSALS_RESPONSE)
             {
@@ -475,7 +475,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
                 char serialBuffer[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
                 Utility::GenerateBeaconSerialForIndex(data->serialNumberIndex, serialBuffer);
 
-                logjson("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"request_proposals_response\",\"serialNumber\":\"%s\",\"module\":%d,\"requestHandle\":%d}" SEP, packet->header.sender, serialBuffer, (u32)packet->moduleId, (u32)packet->requestHandle);
+                logjson("ENROLLMOD", "{\"nodeId\":%u,\"type\":\"request_proposals_response\",\"serialNumber\":\"%s\",\"module\":%u,\"requestHandle\":%d}" SEP, packet->header.sender, serialBuffer, (u8)ModuleId::ENROLLMENT_MODULE, (u32)packet->requestHandle);
             }
         }
     }
@@ -494,7 +494,7 @@ void EnrollmentModule::RefreshScanJob()
     }
 }
 
-void EnrollmentModule::Enroll(connPacketModule const * packet, u16 packetLength)
+void EnrollmentModule::Enroll(ConnPacketModule const * packet, u16 packetLength)
 {
     EnrollmentModuleSetEnrollmentBySerialMessage const * data = (EnrollmentModuleSetEnrollmentBySerialMessage const *)packet->data;
 
@@ -533,7 +533,7 @@ void EnrollmentModule::Enroll(connPacketModule const * packet, u16 packetLength)
     }
 
 #if IS_ACTIVE(SIG_MESH)
-    if (SigAccessLayer::getInstance().IsEnrollableWithAutoProvisioning() == false)
+    if (SigAccessLayer::GetInstance().IsEnrollableWithAutoProvisioning() == false)
     {
         //The SigAccessLayer uses the nodeId from the enrollment to reserve an address range
         //for its elements. If the configuration of the SigAccessLayer is incorrect (e.g.
@@ -551,9 +551,9 @@ void EnrollmentModule::Enroll(connPacketModule const * packet, u16 packetLength)
 
 }
 
-void EnrollmentModule::SaveEnrollment(connPacketModule* packet, u16 packetLength)
+void EnrollmentModule::SaveEnrollment(ConnPacketModuleStart* packet, u16 packetLength)
 {
-    EnrollmentModuleSetEnrollmentBySerialMessage* data = (EnrollmentModuleSetEnrollmentBySerialMessage*)packet->data;
+    EnrollmentModuleSetEnrollmentBySerialMessage* data = (EnrollmentModuleSetEnrollmentBySerialMessage*)((ConnPacketModule*)packet)->data;
 
     //Save values to persistent config of the node
     GS->node.configuration.enrollmentState = EnrollmentState::ENROLLED;
@@ -603,10 +603,10 @@ void EnrollmentModule::SaveEnrollment(connPacketModule* packet, u16 packetLength
         (u32)EnrollmentModuleSaveActions::SAVE_ENROLLMENT_ACTION,
         (u8*)&userData,
         sizeof(SaveEnrollmentAction),
-        moduleId);
+        Utility::GetWrappedModuleId(moduleId));
 }
 
-void EnrollmentModule::Unenroll(connPacketModule const * packet, u16 packetLength)
+void EnrollmentModule::Unenroll(ConnPacketModule const * packet, u16 packetLength)
 {
     logt("ENROLLMOD", "Unenrolling");
 
@@ -679,7 +679,7 @@ void EnrollmentModule::SendRequestProposalResponse(u32 serialIndex)
     );
 }
 
-void EnrollmentModule::SaveUnenrollment(connPacketModule* packet, u16 packetLength)
+void EnrollmentModule::SaveUnenrollment(ConnPacketModuleStart* packet, u16 packetLength)
 {
 
     GS->node.configuration.enrollmentState = EnrollmentState::NOT_ENROLLED;
@@ -712,12 +712,12 @@ void EnrollmentModule::SaveUnenrollment(connPacketModule* packet, u16 packetLeng
         (u32)EnrollmentModuleSaveActions::SAVE_REMOVE_ENROLLMENT_ACTION,
         (u8*)&userData,
         sizeof(SaveEnrollmentAction),
-        moduleId);
+        Utility::GetWrappedModuleId(moduleId));
 }
 
 #define _____________PRE_ENROLLMENT_____________
 
-void EnrollmentModule::StoreTemporaryEnrollmentDataAndDispatch(connPacketModule const * packet, u16 packetLength)
+void EnrollmentModule::StoreTemporaryEnrollmentDataAndDispatch(ConnPacketModule const * packet, u16 packetLength)
 {
     //Before we can call other modules to tell them that we want to enroll the node,
     //we have to temporarily save the enrollment data until the other module has answered
@@ -754,7 +754,7 @@ void EnrollmentModule::DispatchPreEnrollment(Module* lastModuleCalled, PreEnroll
     for (u32 i = moduleIndex; i < GS->amountOfModules; i++) {
         if (!GS->activeModules[i]->configurationPointer->moduleActive) continue;
 
-        PreEnrollmentReturnCode err = GS->activeModules[i]->PreEnrollmentHandler(&ted.requestHeader, ted.packetLength);
+        PreEnrollmentReturnCode err = GS->activeModules[i]->PreEnrollmentHandler((ConnPacketModule*)&ted.requestHeader, ted.packetLength);
 
         if (err == PreEnrollmentReturnCode::WAITING) {
             // => The module must call the DispatchPreEnrollment function after it has received the result
@@ -773,11 +773,11 @@ void EnrollmentModule::DispatchPreEnrollment(Module* lastModuleCalled, PreEnroll
     logt("ENROLLMOD", "PreEnrollment succeeded");
 
     //First, clear all settings that are stored on the chip
-    RecordStorageResultCode errorCode = GS->recordStorage.LockDownAndClearAllSettings(moduleId, this, (u32)EnrollmentModuleSaveActions::ERASE_RECORD_STORAGE);
+    RecordStorageResultCode errorCode = GS->recordStorage.LockDownAndClearAllSettings(Utility::GetWrappedModuleId(moduleId), this, (u32)EnrollmentModuleSaveActions::ERASE_RECORD_STORAGE);
     if (errorCode != RecordStorageResultCode::SUCCESS)
     {
         logt("WARN", "Could not save because %u", (u32)errorCode);
-        GS->logger.logCustomError(CustomErrorTypes::WARN_ENROLLMENT_LOCK_DOWN_FAILED, (u16)errorCode);
+        GS->logger.LogCustomError(CustomErrorTypes::WARN_ENROLLMENT_LOCK_DOWN_FAILED, (u16)errorCode);
     }
 }
 
@@ -799,7 +799,7 @@ void EnrollmentModule::PreEnrollmentFailed()
 
 #define _____________ENROLLMENT_OVER_MESH_____________
 
-void EnrollmentModule::EnrollOverMesh(connPacketModule const * packet, u16 packetLength, BaseConnection* connection)
+void EnrollmentModule::EnrollOverMesh(ConnPacketModule const * packet, u16 packetLength, BaseConnection* connection)
 {
     logt("ENROLLMOD", "Received Enrollment over the mesh request");
 
@@ -859,8 +859,8 @@ void EnrollmentModule::EnrollOverMesh(connPacketModule const * packet, u16 packe
     //If this data is saved, we will check incoming advertisements if they match
     //If yes, we will connect to the other node and try to enroll it
     CheckedMemset(&ted, 0x00, sizeof(TemporaryEnrollmentData));
-    ted.requestHeader = *packet;
-    ted.requestData = *data;
+    constexpr u32 maxTedDataSize = SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE + sizeof(ConnPacketModuleStart);
+    CheckedMemcpy(&ted.requestHeader, packet, packetLength > maxTedDataSize ? maxTedDataSize : packetLength);
 
     //Set timeout time for enrollment
     ted.endTimeDs = GS->appTimerDs + SEC_TO_DS(data->timeoutSec);
@@ -931,10 +931,9 @@ void EnrollmentModule::EnrollmentConnectionConnectedHandler()
     ted.requestHeader.header.receiver = conn ? conn.GetVirtualPartnerId() : 0;
 
     //Send the enrollment to our partner after we are connected
-    u8 len = SIZEOF_CONN_PACKET_MODULE + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE;
+    constexpr u8 len = SIZEOF_CONN_PACKET_MODULE + SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE;
     DYNAMIC_ARRAY(buffer, len);
-    CheckedMemcpy(buffer, &ted.requestHeader, SIZEOF_CONN_PACKET_MODULE);
-    CheckedMemcpy(buffer + SIZEOF_CONN_PACKET_MODULE, &ted.requestData, SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE);
+    CheckedMemcpy(buffer, &ted.requestHeader, len);
 
     logt("ENROLLMOD", "Sender was %u", ted.requestHeader.header.sender);
 
@@ -982,7 +981,7 @@ void EnrollmentModule::ButtonHandler(u8 buttonId, u32 holdTimeDs)
         //Prepare a packet with the unenrollment
         const u8 len = SIZEOF_CONN_PACKET_MODULE + SIZEOF_ENROLLMENT_MODULE_REMOVE_ENROLLMENT;
         u8 buffer[len];
-        connPacketModule* packet = (connPacketModule*)buffer;
+        ConnPacketModule* packet = (ConnPacketModule*)buffer;
         EnrollmentModuleRemoveEnrollmentMessage* data = (EnrollmentModuleRemoveEnrollmentMessage*)packet->data;
 
         packet->header.messageType = MessageType::MODULE_TRIGGER_ACTION;
@@ -1008,22 +1007,22 @@ void EnrollmentModule::GapAdvertisementReportEventHandler(const FruityHal::GapAd
 
     FruityHal::BleGapAddr addr;
     CheckedMemset(&addr, 0, sizeof(addr));
-    addr.addr = advertisementReportEvent.getPeerAddr();
-    addr.addr_type = advertisementReportEvent.getPeerAddrType();
-    const u8* data = advertisementReportEvent.getData();
-    u16 dataLength = advertisementReportEvent.getDataLength();
+    addr.addr = advertisementReportEvent.GetPeerAddr();
+    addr.addr_type = advertisementReportEvent.GetPeerAddrType();
+    const u8* data = advertisementReportEvent.GetData();
+    u16 dataLength = advertisementReportEvent.GetDataLength();
 
     const meshAccessServiceAdvMessage* message = (const meshAccessServiceAdvMessage*) data;
 
     //Check if this is a connectable mesh access packet
     if (
-        advertisementReportEvent.isConnectable()
-        && dataLength >= SIZEOF_MESH_ACCESS_SERVICE_DATA_ADV_MESSAGE
+        advertisementReportEvent.IsConnectable()
+        && dataLength >= SIZEOF_MESH_ACCESS_SERVICE_DATA_ADV_MESSAGE_LEGACY
         && message->flags.type == (u8)BleGapAdType::TYPE_FLAGS
         && message->serviceUuids.uuid == MESH_SERVICE_DATA_SERVICE_UUID16
         && message->serviceData.data.messageType == ServiceDataMessageType::MESH_ACCESS
     ){
-        if(advertisementReportEvent.getRssi() > STABLE_CONNECTION_RSSI_THRESHOLD){
+        if(advertisementReportEvent.GetRssi() > STABLE_CONNECTION_RSSI_THRESHOLD){
             NotifyNewStableSerialIndexScanned(message->serviceData.serialIndex);
         }
 
@@ -1068,7 +1067,7 @@ void EnrollmentModule::RecordStorageEventHandler(u16 recordId, RecordStorageResu
             GS->node.Reboot(SEC_TO_DS(4), RebootReason::ENROLLMENT);
         } else {
             logt("ERROR", "Could not save because %u", (u32)resultCode);
-            GS->logger.logCustomError(CustomErrorTypes::COUNT_ENROLLMENT_NOT_SAVED, (u16)resultCode);
+            GS->logger.LogCustomError(CustomErrorTypes::COUNT_ENROLLMENT_NOT_SAVED, (u16)resultCode);
         }
     }
     else if (userType == (u32)EnrollmentModuleSaveActions::SAVE_REMOVE_ENROLLMENT_ACTION)
@@ -1091,7 +1090,7 @@ void EnrollmentModule::RecordStorageEventHandler(u16 recordId, RecordStorageResu
             GS->node.Reboot(SEC_TO_DS(1), RebootReason::ENROLLMENT_REMOVE);
         } else {
             logt("ERROR", "Could not save because %u", (u32)resultCode);
-            GS->logger.logCustomError(CustomErrorTypes::COUNT_ENROLLMENT_NOT_SAVED, (u16)resultCode);
+            GS->logger.LogCustomError(CustomErrorTypes::COUNT_ENROLLMENT_NOT_SAVED, (u16)resultCode);
         }
     }
     else if (userType == (u32)EnrollmentModuleSaveActions::ERASE_RECORD_STORAGE)
@@ -1110,22 +1109,22 @@ void EnrollmentModule::RecordStorageEventHandler(u16 recordId, RecordStorageResu
         else
         {
             logt("ERROR", "Could not save because %u", (u32)resultCode);
-            GS->logger.logCustomError(CustomErrorTypes::WARN_ENROLLMENT_ERASE_FAILED, (u16)resultCode);
+            GS->logger.LogCustomError(CustomErrorTypes::WARN_ENROLLMENT_ERASE_FAILED, (u16)resultCode);
         }
     }
 }
 
 MeshAccessAuthorization EnrollmentModule::CheckMeshAccessPacketAuthorization(BaseConnectionSendData * sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction)
 {
-    connPacketHeader const * packet = (connPacketHeader const *)data;
+    ConnPacketHeader const * packet = (ConnPacketHeader const *)data;
 
     //This check has to be done twice. The first check makes sure that we
-    //are allowed to cast to connPacketModule, the second separates between
+    //are allowed to cast to ConnPacketModule, the second separates between
     //both cases.
     if (   packet->messageType == MessageType::MODULE_TRIGGER_ACTION
         || packet->messageType == MessageType::MODULE_ACTION_RESPONSE)
     {
-        connPacketModule const * mod = (connPacketModule const *)data;
+        ConnPacketModule const * mod = (ConnPacketModule const *)data;
         if (mod->moduleId == moduleId)
         {
             if (packet->messageType == MessageType::MODULE_ACTION_RESPONSE)

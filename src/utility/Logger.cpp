@@ -47,12 +47,12 @@ Logger::Logger()
     CheckedMemset(errorLog, 0, sizeof(errorLog));
 }
 
-Logger & Logger::getInstance()
+Logger & Logger::GetInstance()
 {
     return GS->logger;
 }
 
-void Logger::log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJsonEvent, const char* file, i32 line, const char* message, ...)
+void Logger::Log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJsonEvent, const char* file, i32 line, const char* message, ...)
 {
     char mhTraceBuffer[TRACE_BUFFER_SIZE] = {};
 
@@ -107,7 +107,7 @@ void Logger::log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJs
         {
             if (GS->terminal.IsCrcChecksEnabled())
             {
-                Logger::getInstance().log_f(false, false, false, false, "", 0, " CRC: %u" SEP, currentJsonCrc);
+                Logger::GetInstance().Log_f(false, false, false, false, "", 0, " CRC: %u" SEP, currentJsonCrc);
                 currentJsonCrc = 0;
             }
 #ifdef SIM_ENABLED
@@ -122,17 +122,17 @@ void Logger::log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJs
     }
 }
 
-void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...) const
+void Logger::LogTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...) const
 {
 #if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
     if (
             //UART communication (json mode)
             (
-                Conf::getInstance().terminalMode != TerminalMode::PROMPT
+                Conf::GetInstance().terminalMode != TerminalMode::PROMPT
                 && (logEverything || logType == LogType::UART_COMMUNICATION || IsTagEnabled(tag))
             )
             //User interaction (prompt mode)
-            || (Conf::getInstance().terminalMode == TerminalMode::PROMPT
+            || (Conf::GetInstance().terminalMode == TerminalMode::PROMPT
                 && (logEverything || logType == LogType::TRACE || IsTagEnabled(tag))
             )
         )
@@ -145,7 +145,7 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
         vsnprintf(mhTraceBuffer, TRACE_BUFFER_SIZE, message, aptr);
         va_end(aptr);
 
-        if(Conf::getInstance().terminalMode == TerminalMode::PROMPT){
+        if(Conf::GetInstance().terminalMode == TerminalMode::PROMPT){
             if (logType == LogType::LOG_LINE)
             {
                 char tmp[50];
@@ -179,7 +179,7 @@ void Logger::logTag_f(LogType logType, const char* file, i32 line, const char* t
 #endif
 }
 
-void Logger::uart_error_f(UartErrorType type) const
+void Logger::UartError_f(UartErrorType type) const
 {
     switch (type)
     {
@@ -218,7 +218,7 @@ void Logger::uart_error_f(UartErrorType type) const
     }
 }
 
-void Logger::enableTag(const char* tag)
+void Logger::EnableTag(const char* tag)
 {
 #if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
 
@@ -270,9 +270,15 @@ bool Logger::IsTagEnabled(const char* tag) const
     return false;
 }
 
-void Logger::disableTag(const char* tag)
+void Logger::DisableTag(const char* tag)
 {
 #if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
+
+    if (strlen(tag) + 1 > MAX_LOG_TAG_LENGTH) {
+        logt("ERROR", "Too long");                //LCOV_EXCL_LINE assertion
+        SIMEXCEPTION(IllegalArgumentException);   //LCOV_EXCL_LINE assertion
+        return;                                   //LCOV_EXCL_LINE assertion
+    }
 
     char tagUpper[MAX_LOG_TAG_LENGTH];
     strcpy(tagUpper, tag);
@@ -288,7 +294,7 @@ void Logger::disableTag(const char* tag)
 #endif
 }
 
-void Logger::toggleTag(const char* tag)
+void Logger::ToggleTag(const char* tag)
 {
 #if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
     
@@ -331,7 +337,7 @@ void Logger::toggleTag(const char* tag)
 #endif
 }
 
-u32 Logger::getAmountOfEnabledTags()
+u32 Logger::GetAmountOfEnabledTags()
 {
 #if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
     u32 amount = 0;
@@ -344,7 +350,7 @@ u32 Logger::getAmountOfEnabledTags()
 #endif // IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
 }
 
-void Logger::printEnabledTags() const
+void Logger::PrintEnabledTags() const
 {
 #if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
     
@@ -370,18 +376,18 @@ TerminalCommandHandlerReturnType Logger::TerminalCommandHandler(const char* comm
         }
         else if (TERMARGS(1, "none"))
         {
-            disableAll();
+            DisableAll();
         }
         else
         {
-            toggleTag(commandArgs[1]);
+            ToggleTag(commandArgs[1]);
         }
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
     else if (TERMARGS(0, "debugtags"))
     {
-        printEnabledTags();
+        PrintEnabledTags();
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
@@ -390,11 +396,11 @@ TerminalCommandHandlerReturnType Logger::TerminalCommandHandler(const char* comm
         for(int i=0; i<errorLogPosition; i++){
             if(errorLog[i].errorType == LoggingError::HCI_ERROR)
             {
-                trace("HCI %u %s @%u" EOL, errorLog[i].errorCode, Logger::getHciErrorString((FruityHal::BleHciError)errorLog[i].errorCode), errorLog[i].timestamp);
+                trace("HCI %u %s @%u" EOL, errorLog[i].errorCode, Logger::GetHciErrorString((FruityHal::BleHciError)errorLog[i].errorCode), errorLog[i].timestamp);
             }
             else if(errorLog[i].errorType == LoggingError::GENERAL_ERROR)
             {
-                trace("GENERAL %u %s @%u" EOL, errorLog[i].errorCode, Logger::getGeneralErrorString((ErrorType)errorLog[i].errorCode), errorLog[i].timestamp);
+                trace("GENERAL %u %s @%u" EOL, errorLog[i].errorCode, Logger::GetGeneralErrorString((ErrorType)errorLog[i].errorCode), errorLog[i].timestamp);
             } else {
                 trace("CUSTOM %u %u @%u" EOL, (u32)errorLog[i].errorType, errorLog[i].errorCode, errorLog[i].timestamp);
             }
@@ -408,7 +414,7 @@ TerminalCommandHandlerReturnType Logger::TerminalCommandHandler(const char* comm
 }
 #endif
 
-const char* Logger::getErrorLogErrorType(LoggingError type)
+const char* Logger::GetErrorLogErrorType(LoggingError type)
 {
 #if defined(TERMINAL_ENABLED)
     switch (type)
@@ -432,7 +438,7 @@ const char* Logger::getErrorLogErrorType(LoggingError type)
 #endif
 }
 
-const char* Logger::getErrorLogCustomError(CustomErrorTypes type)
+const char* Logger::GetErrorLogCustomError(CustomErrorTypes type)
 {
 #if defined(TERMINAL_ENABLED)
     switch (type)
@@ -459,8 +465,8 @@ const char* Logger::getErrorLogCustomError(CustomErrorTypes type)
         return "WARN_TX_WRONG_DATA";
     case CustomErrorTypes::WARN_RX_WRONG_DATA:
         return "WARN_RX_WRONG_DATA";
-    case CustomErrorTypes::FATAL_CLUSTER_UPDATE_FLOW_MISMATCH:
-        return "FATAL_CLUSTER_UPDATE_FLOW_MISMATCH";
+    case CustomErrorTypes::WARN_CLUSTER_UPDATE_FLOW_MISMATCH:
+        return "WARN_CLUSTER_UPDATE_FLOW_MISMATCH";
     case CustomErrorTypes::WARN_HIGH_PRIO_QUEUE_FULL:
         return "WARN_HIGH_PRIO_QUEUE_FULL";
     case CustomErrorTypes::COUNT_NO_PENDING_CONNECTION:
@@ -582,7 +588,7 @@ const char* Logger::getErrorLogCustomError(CustomErrorTypes type)
 #endif
 }
 
-const char* Logger::getGattStatusErrorString(FruityHal::BleGattEror gattStatusCode)
+const char* Logger::GetGattStatusErrorString(FruityHal::BleGattEror gattStatusCode)
 {
 #if defined(TERMINAL_ENABLED)
     switch (gattStatusCode)
@@ -654,7 +660,7 @@ const char* Logger::getGattStatusErrorString(FruityHal::BleGattEror gattStatusCo
 #endif
 }
 
-const char* Logger::getGeneralErrorString(ErrorType ErrorCode)
+const char* Logger::GetGeneralErrorString(ErrorType ErrorCode)
 {
 #if defined(TERMINAL_ENABLED)
     switch ((u32)ErrorCode)
@@ -714,7 +720,7 @@ const char* Logger::getGeneralErrorString(ErrorType ErrorCode)
 #endif
 }
 
-const char* Logger::getHciErrorString(FruityHal::BleHciError hciErrorCode)
+const char* Logger::GetHciErrorString(FruityHal::BleHciError hciErrorCode)
 {
 #if defined(TERMINAL_ENABLED)
     switch (hciErrorCode)
@@ -805,7 +811,7 @@ const char* Logger::getHciErrorString(FruityHal::BleHciError hciErrorCode)
 #endif
 }
 
-const char* Logger::getErrorLogRebootReason(RebootReason type)
+const char* Logger::GetErrorLogRebootReason(RebootReason type)
 {
 #if defined(TERMINAL_ENABLED)
     switch (type)
@@ -857,21 +863,21 @@ const char* Logger::getErrorLogRebootReason(RebootReason type)
 #endif
 }
 
-const char * Logger::getErrorLogError(LoggingError type, u32 code)
+const char * Logger::GetErrorLogError(LoggingError type, u32 code)
 {
 #if defined(TERMINAL_ENABLED)
     switch (type)
     {
     case LoggingError::GENERAL_ERROR:
-        return getGeneralErrorString((ErrorType)code);
+        return GetGeneralErrorString((ErrorType)code);
     case LoggingError::HCI_ERROR:
-        return getHciErrorString((FruityHal::BleHciError)code);
+        return GetHciErrorString((FruityHal::BleHciError)code);
     case LoggingError::CUSTOM:
-        return getErrorLogCustomError((CustomErrorTypes)code);
+        return GetErrorLogCustomError((CustomErrorTypes)code);
     case LoggingError::GATT_STATUS:
-        return getGattStatusErrorString((FruityHal::BleGattEror)code);
+        return GetGattStatusErrorString((FruityHal::BleGattEror)code);
     case LoggingError::REBOOT:
-        return getErrorLogRebootReason((RebootReason)code);
+        return GetErrorLogRebootReason((RebootReason)code);
     default:
         SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
         return "UNKNOWN_TYPE";
@@ -881,7 +887,7 @@ const char * Logger::getErrorLogError(LoggingError type, u32 code)
 #endif
 }
 
-void Logger::blePrettyPrintAdvData(SizedData advData) const
+void Logger::BlePrettyPrintAdvData(SizedData advData) const
 {
 
     trace("Rx Packet len %d: ", advData.length);
@@ -898,14 +904,14 @@ void Logger::blePrettyPrintAdvData(SizedData advData) const
         fieldData.length = fieldSize - 1;
 
         //Print it
-        Logger::convertBufferToHexString(fieldData.data, fieldData.length, hexString, sizeof(hexString));
+        Logger::ConvertBufferToHexString(fieldData.data, fieldData.length, hexString, sizeof(hexString));
         trace("Type %d, Data %s" EOL, fieldType, hexString);
 
         i += fieldSize + 1;
     }
 }
 
-void Logger::logError(LoggingError errorType, u32 errorCode, u32 extraInfo)
+void Logger::LogError(LoggingError errorType, u32 errorCode, u32 extraInfo)
 {
     errorLog[errorLogPosition].errorType = errorType;
     errorLog[errorLogPosition].errorCode = errorCode;
@@ -916,13 +922,13 @@ void Logger::logError(LoggingError errorType, u32 errorCode, u32 extraInfo)
     if(errorLogPosition < NUM_ERROR_LOG_ENTRIES-1) errorLogPosition++;
 }
 
-void Logger::logCustomError(CustomErrorTypes customErrorType, u32 extraInfo)
+void Logger::LogCustomError(CustomErrorTypes customErrorType, u32 extraInfo)
 {
-    logError(LoggingError::CUSTOM, (u32)customErrorType, extraInfo);
+    LogError(LoggingError::CUSTOM, (u32)customErrorType, extraInfo);
 }
 
 //can be called multiple times and will increment the extra each time this happens
-void Logger::logCount(LoggingError errorType, u32 errorCode)
+void Logger::LogCount(LoggingError errorType, u32 errorCode)
 {
     //Check if the erroLogEntry exists already and increment the extra if yes
     for (u32 i = 0; i < errorLogPosition; i++) {
@@ -942,9 +948,9 @@ void Logger::logCount(LoggingError errorType, u32 errorCode)
     if (errorLogPosition < NUM_ERROR_LOG_ENTRIES - 1) errorLogPosition++;
 }
 
-void Logger::logCustomCount(CustomErrorTypes customErrorType)
+void Logger::LogCustomCount(CustomErrorTypes customErrorType)
 {
-    logCount(LoggingError::CUSTOM, (u32)customErrorType);
+    LogCount(LoggingError::CUSTOM, (u32)customErrorType);
 }
 
 const char* base64Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -963,7 +969,7 @@ void convertBase64Block(const u8 * srcBuffer, u32 blockLength, char* dstBuffer)
     else                dstBuffer[3] = '=';
 }
 
-void Logger::convertBufferToBase64String(const u8 * srcBuffer, u32 srcLength, char * dstBuffer, u16 bufferLength)
+void Logger::ConvertBufferToBase64String(const u8 * srcBuffer, u32 srcLength, char * dstBuffer, u16 bufferLength)
 {
     if (bufferLength == 0) {
         SIMEXCEPTION(BufferTooSmallException); //LCOV_EXCL_LINE assertion
@@ -984,7 +990,7 @@ void Logger::convertBufferToBase64String(const u8 * srcBuffer, u32 srcLength, ch
     dstBuffer[((srcLength + 2) / 3) * 4] = 0;
 }
 
-void Logger::convertBufferToHexString(const u8 * srcBuffer, u32 srcLength, char * dstBuffer, u16 bufferLength)
+void Logger::ConvertBufferToHexString(const u8 * srcBuffer, u32 srcLength, char * dstBuffer, u16 bufferLength)
 {
     CheckedMemset(dstBuffer, 0x00, bufferLength);
 
@@ -1005,18 +1011,18 @@ void Logger::convertBufferToHexString(const u8 * srcBuffer, u32 srcLength, char 
     };
 }
 
-u32 Logger::parseEncodedStringToBuffer(const char * encodedString, u8 * dstBuffer, u16 dstBufferSize, bool *didError)
+u32 Logger::ParseEncodedStringToBuffer(const char * encodedString, u8 * dstBuffer, u16 dstBufferSize, bool *didError)
 {
     auto len = strlen(encodedString);
     if (len >= 4 && encodedString[2] != ':') {
-        return parseBase64StringToBuffer(encodedString, len, dstBuffer, dstBufferSize, didError);
+        return ParseBase64StringToBuffer(encodedString, len, dstBuffer, dstBufferSize, didError);
     }
     else {
-        return parseHexStringToBuffer(encodedString, len, dstBuffer, dstBufferSize, didError);
+        return ParseHexStringToBuffer(encodedString, len, dstBuffer, dstBufferSize, didError);
     }
 }
 
-u32 Logger::parseHexStringToBuffer(const char* hexString, u32 hexStringLength, u8* dstBuffer, u16 dstBufferSize, bool *didError)
+u32 Logger::ParseHexStringToBuffer(const char* hexString, u32 hexStringLength, u8* dstBuffer, u16 dstBufferSize, bool *didError)
 {
     u32 length = (hexStringLength + 1) / 3;
     if(length > dstBufferSize){
@@ -1069,7 +1075,7 @@ u32 parseBase64Block(const char* base64Block, u8 * dstBuffer, u16 dstBufferSize,
     return length;
 }
 
-u32 Logger::parseBase64StringToBuffer(const char * base64String, const u32 base64StringLength, u8 * dstBuffer, u16 dstBufferSize, bool *didError)
+u32 Logger::ParseBase64StringToBuffer(const char * base64String, const u32 base64StringLength, u8 * dstBuffer, u16 dstBufferSize, bool *didError)
 {
     if (base64StringLength % 4 != 0)
     {
@@ -1090,13 +1096,13 @@ u32 Logger::parseBase64StringToBuffer(const char * base64String, const u32 base6
     return amountOfBytes;
 }
 
-void Logger::disableAll()
+void Logger::DisableAll()
 {
     activeLogTags = {};
     logEverything = false;
 }
 
-void Logger::enableAll()
+void Logger::EnableAll()
 {
     logEverything = true;
 }

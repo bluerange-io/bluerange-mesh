@@ -47,10 +47,10 @@ TEST(TestMeshAccessModule, TestCommands) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.sim->findNodeById(1)->gs.logger.enableTag("MACONN");
-    tester.sim->findNodeById(2)->gs.logger.enableTag("MACONN");
-    tester.sim->findNodeById(1)->gs.logger.enableTag("MAMOD");
-    tester.sim->findNodeById(2)->gs.logger.enableTag("MAMOD");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("MACONN");
+    tester.sim->FindNodeById(2)->gs.logger.EnableTag("MACONN");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("MAMOD");
+    tester.sim->FindNodeById(2)->gs.logger.EnableTag("MAMOD");
 
     std::string command = "maconn 00:00:00:02:00:00";
     tester.SendTerminalCommand(1, command.c_str());
@@ -117,15 +117,63 @@ TEST(TestMeshAccessModule, TestAdvertisement) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.sim->findNodeById(1)->gs.logger.enableTag("MAMOD");
-    tester.sim->findNodeById(2)->gs.logger.enableTag("MAMOD");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("MAMOD");
+    tester.sim->FindNodeById(2)->gs.logger.EnableTag("MAMOD");
 
     tester.SendTerminalCommand(1, "malog"); // enable advertisment log reading
     tester.SendTerminalCommand(2, "malog");
 
     //Test if we receive the advertisement packets, once with sink 0, once with sink 1.
-    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "Serial BBBBC, Addr 00:00:00:02:00:00, networkId \\d+, enrolled \\d+, sink 0, connectable \\d+, rssi ");
-    tester.SimulateUntilRegexMessageReceived(10 * 1000, 2, "Serial BBBBB, Addr 00:00:00:01:00:00, networkId \\d+, enrolled \\d+, sink 1, connectable \\d+, rssi ");
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "Serial BBBBC, Addr 00:00:00:02:00:00, networkId \\d+, enrolled \\d+, sink 0, deviceType 1, connectable \\d+, rssi ");
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 2, "Serial BBBBB, Addr 00:00:00:01:00:00, networkId \\d+, enrolled \\d+, sink 1, deviceType 3, connectable \\d+, rssi ");
+}
+#endif //GITHUB_RELEASE
+
+#ifndef GITHUB_RELEASE
+TEST(TestMeshAccessModule, TestAdvertisementLegacy)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("MAMOD");
+    
+    tester.SendTerminalCommand(1, "malog"); // enable advertisment log reading
+    tester.SimulateGivenNumberOfSteps(1);
+    
+    alignas(ble_evt_t) u8 buffer[sizeof(ble_evt_hdr_t) + sizeof(ble_gap_evt_t) - (SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA - SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA_LEGACY)];
+    CheckedMemset(buffer, 0, sizeof(buffer));
+    ble_evt_t& evt = *(ble_evt_t*)buffer;
+    AdvPacketServiceAndDataHeader* packet = (AdvPacketServiceAndDataHeader*)evt.evt.gap_evt.params.adv_report.data;
+    advStructureMeshAccessServiceData* maPacket = (advStructureMeshAccessServiceData*)&packet->data;
+    evt.header.evt_id = BLE_GAP_EVT_ADV_REPORT;
+    evt.evt.gap_evt.params.adv_report.dlen = SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA_LEGACY;
+    evt.evt.gap_evt.params.adv_report.rssi = -45;
+    packet->flags.len = SIZEOF_ADV_STRUCTURE_FLAGS - 1;
+    packet->uuid.len = SIZEOF_ADV_STRUCTURE_UUID16 - 1;
+    packet->data.uuid.type = (u8)BleGapAdType::TYPE_SERVICE_DATA;
+    packet->data.uuid.uuid = MESH_SERVICE_DATA_SERVICE_UUID16;
+    packet->data.messageType = ServiceDataMessageType::MESH_ACCESS;
+    maPacket->networkId = 1337; //Mesh network id
+    maPacket->isEnrolled = 1; // Flag if this beacon is enrolled
+    maPacket->isSink = 0;
+    maPacket->isZeroKeyConnectable = 1;
+    maPacket->IsConnectable = 0;
+    maPacket->interestedInConnetion = 1;
+    maPacket->reserved = 0;
+    maPacket->serialIndex = 829; //SerialNumber index of the beacon
+
+    NodeIndexSetter setter(0);
+    FruityHal::DispatchBleEvents(&evt);
+    tester.SimulateGivenNumberOfSteps(1);
+    // Just execute and check that no illegal memory is accessed via sanitizer.
+    // TODO: If we'd have a function to queue artificial advertisements and locations we could
+    //       queue the legacy packet in there and then wait for the same type of message that
+    //       TestAdvertisement is waiting for.
 }
 #endif //GITHUB_RELEASE
 
@@ -259,7 +307,7 @@ TEST(TestMeshAccessModule, TestSerialConnect) {
     for (u32 i = 0; i < numNodes; i++)
     {
         NodeIndexSetter setter(i);
-        GS->logger.disableTag("ASMOD");
+        GS->logger.DisableTag("ASMOD");
     }
 
     tester.SimulateUntilMessageReceived(100 * 1000, 1, "clusterSize\":%u", amountOfNodesInOwnNetwork); //Simulate a little to let the first 4 nodes connect to each other.
@@ -298,6 +346,41 @@ TEST(TestMeshAccessModule, TestSerialConnect) {
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"serial_connect_response\",\"module\":10,\"nodeId\":4,\"requestHandle\":12,\"code\":0,\"partnerId\":33010}");
     tester.SendTerminalCommand(11, "reset");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":4,\"type\":\"ma_conn_state\",\"module\":10,\"requestHandle\":0,\"partnerId\":33010,\"state\":0}");
+}
+
+TEST(TestMeshAccessModule, TestDiscoveryAlwaysBusy) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+    simConfig.preDefinedPositions = { {0.45, 0.5}, {0.55, 0.5}, {0.5, 0.5} };
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    simConfig.SetToPerfectConditions();
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.sim->nodes[0].uicr.CUSTOMER[9] = 123; // Change default network id of node 0
+    
+    tester.Start();
+
+    tester.SimulateForGivenTime(1000); //Give nodes a bit time to boot up
+
+    for (u32 i = 0; i < tester.sim->GetTotalNodes(); i++)
+    {
+        NodeIndexSetter setter(i);
+        GS->logger.EnableTag("MACONN");
+        tester.sim->currentNode->discoveryAlwaysBusy = true;
+    }
+    
+    // Use network key (2) without specifying it (FF:...:FF)
+    // We don't need to specify it as by default in the simulator all nodes have
+    // the same network key. See TestMeshAccessModule.TestSerialConnect for
+    // the validity of this statement.
+    tester.SendTerminalCommand(1, "action this ma serial_connect BBBBC 2 FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF 33010 100 12");
+    std::vector<SimulationMessage> messages = {
+        SimulationMessage(1, "Deleted Connection, type 5, discR: 0, appDiscR: 1"), // For the central,    the type is MeshAccessConnection(5)
+        SimulationMessage(2, "Deleted Connection, type 4, discR: 0, appDiscR: 1")  // For the peripheral, the type is ResolverConnection(4)
+    };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messages);
 }
 
 TEST(TestMeshAccessModule, TestInfoRetrievalOverOrgaKey) {
@@ -341,3 +424,37 @@ TEST(TestMeshAccessModule, TestInfoRetrievalOverOrgaKey) {
     tester.SimulateUntilMessageReceived(100 * 1000, 2, "Removing ma conn due to SCHEDULED_REMOVE");
 }
 #endif //!GITHUB_RELEASE
+
+TEST(TestMeshAccessModule, TestConnectWithNetworkKey)
+{
+    //Set up a test with two nodes that are close together
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose = true;
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    simConfig.preDefinedPositions = { {0.5, 0.5},{0.6, 0.6} };
+    simConfig.nodeConfigName.insert({ "github_nrf52", 2 });
+    simConfig.SetToPerfectConditions();
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    //Enable some logging to be able to better understand the MeshAccessConnection
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("MACONN");
+    tester.sim->FindNodeById(2)->gs.logger.EnableTag("MACONN");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("MAMOD");
+    tester.sim->FindNodeById(2)->gs.logger.EnableTag("MAMOD");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("CONN_DATA");
+    tester.sim->FindNodeById(2)->gs.logger.EnableTag("CONN_DATA");
+
+    // Change default network id of node 2 so it will not automatically connect to node 1
+    tester.sim->nodes[1].uicr.CUSTOMER[9] = 123;
+
+    tester.Start();
+
+    //Tell node 1 to connect to node 2 using a mesh access connection and the network key (2)
+    //NetworkKey is not given here as both nodes have the same networkKey stored because of the test setup
+    tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 2");
+
+    // We should initially get a message that gives us info about the cluster, size 2 and 1 hop to sink
+    tester.SimulateUntilMessageReceived(5000, 2, "-- TX Handshake Done");
+}

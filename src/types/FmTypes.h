@@ -51,7 +51,7 @@ extern "C" {
 #define FRUITYMESH_ERROR_CHECK(ERR_CODE)                          \
     if ((u32)ERR_CODE != 0)                                       \
     {                                                             \
-        logt("ERROR", "App error code:%s(%u), file:%s, line:%u", Logger::getGeneralErrorString((ErrorType)ERR_CODE), (u32)ERR_CODE, p_file_name, (u32)line_num); \
+        logt("ERROR", "App error code:%s(%u), file:%s, line:%u", Logger::GetGeneralErrorString((ErrorType)ERR_CODE), (u32)ERR_CODE, p_file_name, (u32)line_num); \
         GS->appErrorHandler((u32)ERR_CODE);                       \
     }
 #else
@@ -72,7 +72,7 @@ extern "C" {
 
 #ifdef SIM_ENABLED
 #include "StackWatcher.h"
-#define START_OF_FUNCTION() StackWatcher::check(); if(cherrySimInstance != nullptr) {cherrySimInstance->SimulateInterrupts();}
+#define START_OF_FUNCTION() StackWatcher::Check(); if(cherrySimInstance != nullptr) {cherrySimInstance->SimulateInterrupts();}
 #else
 #define START_OF_FUNCTION
 #endif
@@ -159,6 +159,9 @@ enum class FeatureSetGroup : NodeId
     /*FruityDeploy-FeatureSetGroup*/NRF52840_MESH_USB     = 20018,
     /*FruityDeploy-FeatureSetGroup*/NRF52840_BP_MESH      = 20019,
     /*FruityDeploy-FeatureSetGroup*/NRF52_EINK            = 20020,
+    // Reserved for Cypress (currently on a seperate branch) = 20021,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_ET_MESH         = 20022,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_ET_ASSET        = 20023,
 };
 
 //Sets the maximum number of firmware group ids that can be compiled into the firmware
@@ -212,6 +215,16 @@ typedef struct ModuleConfiguration{
     //multiple of 4 bytes. We use this variable to pad the data.
 } ModuleConfiguration;
 STATIC_ASSERT_SIZE(ModuleConfiguration, SIZEOF_MODULE_CONFIGURATION_HEADER);
+
+//The ModuleConfiguration used for vendor moduls, same comments as above apply
+constexpr size_t SIZEOF_VENDOR_MODULE_CONFIGURATION_HEADER = 8;
+typedef struct VendorModuleConfiguration {
+    VendorModuleId moduleId;
+    u8 moduleVersion;
+    u8 moduleActive;
+    u16 reserved;
+} VendorModuleConfiguration;
+STATIC_ASSERT_SIZE(VendorModuleConfiguration, SIZEOF_VENDOR_MODULE_CONFIGURATION_HEADER);
 #pragma pack(pop)
 
 /*## Bootloader stuff #############################################################*/
@@ -330,8 +343,8 @@ constexpr u32 CONFIG_UNIT_10_MS = 10000
 #define IS_INACTIVE(featureName) (ACTIVATE_##featureName == 0)
 
 //Converts pointer to HEX string array.
-#define PRINT_DEBUG(data, dataSize) DYNAMIC_ARRAY(data##Hex, (dataSize)*3+1); Logger::convertBufferToHexString(data, (dataSize), (char*)data##Hex, (dataSize)*3+1)
+#define PRINT_DEBUG(data, dataSize) DYNAMIC_ARRAY(data##Hex, (dataSize)*3+1); Logger::ConvertBufferToHexString(data, (dataSize), (char*)data##Hex, (dataSize)*3+1)
 
 /*############ Include packet definitions ################*/
-#include <adv_packets.h>
-#include <conn_packets.h>
+#include <AdvertisingMessageTypes.h>
+#include <ConnectionMessageTypes.h>

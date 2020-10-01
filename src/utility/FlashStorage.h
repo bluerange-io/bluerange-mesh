@@ -142,7 +142,7 @@ class FlashStorage
         FlashStorage();
 
         //Initialize Storage class
-        static FlashStorage& getInstance();
+        static FlashStorage& GetInstance();
 
         void TimerEventHandler(u16 passedTimeDs);
 

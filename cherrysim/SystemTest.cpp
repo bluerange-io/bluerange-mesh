@@ -31,13 +31,14 @@
 
 #include <SystemTest.h>
 #include <stdio.h>
-#include <types.h>
+#include <FmTypes.h>
 #include <CherrySim.h>
 #include <FruityMesh.h>
 #include <FruityHalBleGatt.h>
 #include <json.hpp>
 #include <Logger.h>
 #include <fstream>
+#include <limits>
 
 extern "C" {
 #include <app_timer.h>
@@ -305,10 +306,10 @@ extern "C"
             //Was not initialized!
             SIMEXCEPTION(IllegalStateException);
         }
-        gyro->x = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
-        gyro->y = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
-        gyro->z = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
-        gyro->sensortime = cherrySimInstance->simState.rnd.nextU32();
+        gyro->x = (uint16_t)cherrySimInstance->simState.rnd.NextU32();
+        gyro->y = (uint16_t)cherrySimInstance->simState.rnd.NextU32();
+        gyro->z = (uint16_t)cherrySimInstance->simState.rnd.NextU32();
+        gyro->sensortime = cherrySimInstance->simState.rnd.NextU32();
         return BMG250_OK;
     }
 
@@ -386,10 +387,10 @@ extern "C"
             //Was not initialized!
             SIMEXCEPTION(IllegalStateException);
         }
-        out->x = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
-        out->y = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
-        out->z = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
-        out->temp = (uint16_t)cherrySimInstance->simState.rnd.nextU32();
+        out->x = (uint16_t)cherrySimInstance->simState.rnd.NextU32();
+        out->y = (uint16_t)cherrySimInstance->simState.rnd.NextU32();
+        out->z = (uint16_t)cherrySimInstance->simState.rnd.NextU32();
+        out->temp = (uint16_t)cherrySimInstance->simState.rnd.NextU32();
         return 0;
     }
 
@@ -398,7 +399,7 @@ extern "C"
     uint32_t sd_ble_gap_adv_data_set(const uint8_t* p_data, uint8_t dlen, const uint8_t* p_sr_data, uint8_t srdlen)
     {
         START_OF_FUNCTION();
-        if (cherrySimInstance->simConfig.sdBleGapAdvDataSetFailProbability != 0 && PSRNG() < cherrySimInstance->simConfig.sdBleGapAdvDataSetFailProbability) {
+        if (cherrySimInstance->simConfig.sdBleGapAdvDataSetFailProbability != 0 && PSRNG(cherrySimInstance->simConfig.sdBleGapAdvDataSetFailProbability)) {
             printf("Simulated fail for sd_ble_gap_adv_data_set\n");
             return NRF_ERROR_INVALID_STATE;
         }
@@ -454,7 +455,7 @@ extern "C"
     uint32_t sd_ble_gap_adv_start(const ble_gap_adv_params_t* p_adv_params, uint32_t)
     {
         START_OF_FUNCTION();
-        if (PSRNG() < cherrySimInstance->simConfig.sdBusyProbability) {
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
             return NRF_ERROR_BUSY;
         }
 
@@ -635,9 +636,9 @@ extern "C"
             return (int32_t)ErrorType::NULL_ERROR;
         }
         axis3bit16_t* buffer = (axis3bit16_t*)buff;
-        buffer->i16bit[0] = (i16)cherrySimInstance->simState.rnd.nextU32();
-        buffer->i16bit[1] = (i16)cherrySimInstance->simState.rnd.nextU32();
-        buffer->i16bit[2] = (i16)cherrySimInstance->simState.rnd.nextU32();
+        buffer->i16bit[0] = (i16)cherrySimInstance->simState.rnd.NextU32();
+        buffer->i16bit[1] = (i16)cherrySimInstance->simState.rnd.NextU32();
+        buffer->i16bit[2] = (i16)cherrySimInstance->simState.rnd.NextU32();
 
         return (int32_t)ErrorType::SUCCESS;
 
@@ -786,9 +787,9 @@ extern "C"
             SIMEXCEPTION(IllegalStateException);
         }
 
-        return cherrySimInstance->simState.rnd.nextU32();
+        return cherrySimInstance->simState.rnd.NextU32() % (std::numeric_limits<u16>::max() * 512);
     }
-    uint32_t bme280_get_temperature()
+    int32_t bme280_get_temperature()
     {
         START_OF_FUNCTION();
         if (!cherrySimInstance->currentNode->bme280WasInit)
@@ -796,8 +797,7 @@ extern "C"
             //Not initialized!
             SIMEXCEPTION(IllegalStateException);
         }
-
-        return cherrySimInstance->simState.rnd.nextU32();
+        return ((int32_t)cherrySimInstance->simState.rnd.NextU32()) % std::numeric_limits<i16>::max();
     }
     uint32_t bme280_get_humidity()
     {
@@ -808,7 +808,7 @@ extern "C"
             SIMEXCEPTION(IllegalStateException);
         }
 
-        return cherrySimInstance->simState.rnd.nextU32();
+        return cherrySimInstance->simState.rnd.NextU32() % (std::numeric_limits<u8>::max() * 1024);
     }
 
     uint32_t sd_ble_gap_connect(const ble_gap_addr_t* p_peer_addr, const ble_gap_scan_params_t* p_scan_params, const ble_gap_conn_params_t* p_conn_params, uint32_t)
@@ -818,7 +818,7 @@ extern "C"
             return NRF_ERROR_INVALID_STATE;
         }
 
-        if (PSRNG() < cherrySimInstance->simConfig.sdBusyProbability) {
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
             return NRF_ERROR_BUSY;
         }
 
@@ -875,7 +875,7 @@ extern "C"
     {
         START_OF_FUNCTION();
         //Find the connection by its handle
-        SoftdeviceConnection* connection = cherrySimInstance->findConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
+        SoftdeviceConnection* connection = cherrySimInstance->FindConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
 
         return cherrySimInstance->DisconnectSimulatorConnection(connection, BLE_HCI_LOCAL_HOST_TERMINATED_CONNECTION, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
 
@@ -887,11 +887,11 @@ extern "C"
     uint32_t sd_ble_gap_encrypt(uint16_t conn_handle, const ble_gap_master_id_t* p_master_id, const ble_gap_enc_info_t* p_enc_info)
     {
         START_OF_FUNCTION();
-        if (PSRNG() < cherrySimInstance->simConfig.sdBusyProbability) {
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
             return NRF_ERROR_BUSY;
         }
 
-        SoftdeviceConnection* connection = cherrySimInstance->findConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
+        SoftdeviceConnection* connection = cherrySimInstance->FindConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
 
         if (connection == nullptr) {
             return BLE_ERROR_INVALID_CONN_HANDLE;
@@ -923,7 +923,7 @@ extern "C"
     uint32_t sd_ble_gap_sec_info_reply(uint16_t conn_handle, const ble_gap_enc_info_t* p_enc_info, const ble_gap_irk_t* p_id_info, const ble_gap_sign_info_t* p_sign_info)
     {
         START_OF_FUNCTION();
-        SoftdeviceConnection* connection = cherrySimInstance->findConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
+        SoftdeviceConnection* connection = cherrySimInstance->FindConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
 
         if (connection == nullptr) {
             return BLE_ERROR_INVALID_CONN_HANDLE;
@@ -969,7 +969,7 @@ extern "C"
     uint32_t sd_ble_gap_conn_param_update(uint16_t conn_handle, const ble_gap_conn_params_t* p_conn_params)
     {
         START_OF_FUNCTION();
-        if (PSRNG() < cherrySimInstance->simConfig.sdBusyProbability) {
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
             return NRF_ERROR_BUSY;
         }
 
@@ -991,7 +991,7 @@ extern "C"
     uint32_t sd_ble_gap_scan_start(const ble_gap_scan_params_t* p_scan_params)
     {
         START_OF_FUNCTION();
-        if (PSRNG() < cherrySimInstance->simConfig.sdBusyProbability) {
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
             return NRF_ERROR_BUSY;
         }
 
@@ -1008,7 +1008,7 @@ extern "C"
     uint32_t sd_ble_gap_addr_set(const ble_gap_addr_t* p_addr)
     {
         START_OF_FUNCTION();
-        if (PSRNG() < cherrySimInstance->simConfig.sdBusyProbability) {
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
             return NRF_ERROR_BUSY;
         }
 
@@ -1037,7 +1037,7 @@ extern "C"
     uint32_t sd_ble_gap_rssi_start(uint16_t conn_handle, uint8_t threshold_dbm, uint8_t skip_count)
     {
         START_OF_FUNCTION();
-        SoftdeviceConnection* connection = cherrySimInstance->findConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
+        SoftdeviceConnection* connection = cherrySimInstance->FindConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
         if (connection == nullptr) {
             return BLE_ERROR_INVALID_CONN_HANDLE;
         }
@@ -1049,7 +1049,7 @@ extern "C"
     uint32_t sd_ble_gap_rssi_stop(uint16_t conn_handle)
     {
         START_OF_FUNCTION();
-        SoftdeviceConnection* connection = cherrySimInstance->findConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
+        SoftdeviceConnection* connection = cherrySimInstance->FindConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
         if (connection == nullptr) {
             return BLE_ERROR_INVALID_CONN_HANDLE;
         }
@@ -1077,7 +1077,7 @@ extern "C"
 
         if ((p_uuid == nullptr) || (p_handle == nullptr)) return NRF_ERROR_INVALID_PARAM;
 
-        nodeEntry * p_tempNode = cherrySimInstance->currentNode;
+        NodeEntry * p_tempNode = cherrySimInstance->currentNode;
 
         if (p_tempNode->state.servicesCount >= SIM_NUM_SERVICES) return NRF_ERROR_NO_MEM;
         p_tempNode->state.services[p_tempNode->state.servicesCount].uuid = *p_uuid;
@@ -1095,7 +1095,7 @@ extern "C"
 
         if ((p_char_md == nullptr) || (p_attr_char_value == nullptr) || (p_handles == nullptr)) return NRF_ERROR_INVALID_PARAM;
 
-        nodeEntry * p_tempNode = cherrySimInstance->currentNode;
+        NodeEntry * p_tempNode = cherrySimInstance->currentNode;
         ServiceDB_t * p_tempService = nullptr;
 
         for (int i = 0; i < p_tempNode->state.servicesCount; i++)
@@ -1137,6 +1137,11 @@ extern "C"
 
 
         return 0;
+    }
+
+    bool sd_currently_in_discovery() //This function only exists in the simulator!
+    {
+        return cherrySimInstance->currentNode->discoveryAlwaysBusy;
     }
 
     uint32_t sd_ble_gattc_primary_services_discover(uint16_t conn_handle, uint16_t start_handle, const ble_uuid_t* p_srvc_uuid)
@@ -1185,11 +1190,11 @@ extern "C"
     uint32_t sd_ble_gattc_write(uint16_t conn_handle, const ble_gattc_write_params_t* p_write_params)
     {
         START_OF_FUNCTION();
-        if (PSRNG() < cherrySimInstance->simConfig.sdBusyProbability) {
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
             return NRF_ERROR_BUSY;
         }
 
-        SoftdeviceConnection* connection = cherrySimInstance->findConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
+        SoftdeviceConnection* connection = cherrySimInstance->FindConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
         //TODO: maybe log this?
         if (connection == nullptr) {
             return BLE_ERROR_INVALID_CONN_HANDLE;
@@ -1200,7 +1205,7 @@ extern "C"
             return NRF_ERROR_DATA_SIZE;
         }
 
-        nodeEntry* partnerNode = connection->partner;
+        NodeEntry* partnerNode = connection->partner;
         SoftdeviceConnection* partnerConnection = connection->partnerConnection;
 
         //Should not happen, sim connection is always terminated at both ends simultaniously
@@ -1406,7 +1411,7 @@ extern "C"
     {
         START_OF_FUNCTION();
         for (int i = 0; i < length; i++) {
-            p_buff[i] = (u8)(PSRNG() * 256);
+            p_buff[i] = (u8)(PSRNGINT(0, 255));
         }
 
         return 0;
@@ -1461,7 +1466,7 @@ extern "C"
     uint32_t sd_nvic_SystemReset()
     {
         START_OF_FUNCTION();
-        cherrySimInstance->resetCurrentNode(RebootReason::UNKNOWN);
+        cherrySimInstance->ResetCurrentNode(RebootReason::UNKNOWN);
 
         return 0;
     }
@@ -1550,16 +1555,16 @@ extern "C"
 
     uint32_t sd_ble_gatts_hvx(uint16_t conn_handle, ble_gatts_hvx_params_t const *p_hvx_params) {
         START_OF_FUNCTION();
-        if (PSRNG() < cherrySimInstance->simConfig.sdBusyProbability) {
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
             return NRF_ERROR_BUSY;
         }
 
-        SoftdeviceConnection* connection = cherrySimInstance->findConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
+        SoftdeviceConnection* connection = cherrySimInstance->FindConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
         if (connection == nullptr) {
             return BLE_ERROR_INVALID_CONN_HANDLE;
         }
 
-        nodeEntry* partnerNode = connection->partner;
+        NodeEntry* partnerNode = connection->partner;
         SoftdeviceConnection*  partnerConnection = connection->partnerConnection;
 
         //Should not happen, sim connection is always terminated at both ends simultaniously
@@ -1675,7 +1680,7 @@ uint32_t sim_get_stack_type()
 }
 
 
-bool isEmpty(const u8* data, u32 length)
+bool IsEmpty(const u8* data, u32 length)
 {
     for (u32 i = 0; i < length; i++) {
         if (data[0] != 0x00) return false;

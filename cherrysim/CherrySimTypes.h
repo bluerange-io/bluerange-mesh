@@ -28,7 +28,7 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include <types.h>
+#include <FmTypes.h>
 #include <GlobalState.h>
 #include <queue>
 #include <map>
@@ -62,8 +62,8 @@ constexpr int SIM_NUM_CHARS    = 5;
 
 constexpr int PACKET_STAT_SIZE = 10*1024;
 
-#define PSRNG() (cherrySimInstance->simState.rnd.nextDouble())
-#define PSRNGINT(min, max) ((u32)cherrySimInstance->simState.rnd.nextU32(min, max)) //Generates random int from min (inclusive) up to max (inclusive)
+#define PSRNG(prob) (cherrySimInstance->simState.rnd.NextPsrng((prob)))
+#define PSRNGINT(min, max) ((u32)cherrySimInstance->simState.rnd.NextU32(min, max)) //Generates random int from min (inclusive) up to max (inclusive)
 
 //A BLE Event that is sent by the Simulator is wrapped
 struct simBleEvent {
@@ -76,10 +76,10 @@ struct simBleEvent {
 
 
 //A packet that is buffered in the SoftDevice for sending
-struct nodeEntry;
+struct NodeEntry;
 struct SoftDeviceBufferedPacket {
-    nodeEntry* sender;
-    nodeEntry* receiver;
+    NodeEntry* sender;
+    NodeEntry* receiver;
     u16 connHandle;
     u32 globalPacketId;
     u32 queueTimeMs;
@@ -93,14 +93,17 @@ struct SoftDeviceBufferedPacket {
 
 };
 
-constexpr int packetStatCompareBytes = 4;
+#pragma pack(push, 1)
 struct PacketStat {
     MessageType messageType = MessageType::INVALID;
-    ModuleId moduleId = ModuleId::INVALID_MODULE;
+    ModuleIdWrapper moduleId = INVALID_WRAPPED_MODULE_ID;
     u8 actionType = 0;
     u8 isSplit = 0;
     u32 count = 0;
 };
+constexpr int packetStatCompareBytes = sizeof(PacketStat) - sizeof(u32);
+static_assert(sizeof(PacketStat) == 11);
+#pragma pack(pop)
 
 
 //Simulator ble connection representation
@@ -110,8 +113,8 @@ struct SoftdeviceConnection {
     bool connectionActive = false;
     bool connectionEncrypted = false;
     bool rssiMeasurementActive = false;
-    nodeEntry* owningNode = nullptr;
-    nodeEntry* partner = nullptr;
+    NodeEntry* owningNode = nullptr;
+    NodeEntry* partner = nullptr;
     struct SoftdeviceConnection* partnerConnection = nullptr;
     int connectionInterval = 0;
     int connectionMtu = 0;
@@ -216,7 +219,7 @@ struct InterruptSettings
 
 struct FeaturesetPointers;
 
-struct nodeEntry {
+struct NodeEntry {
     u32 index;
     int id;
     float x = 0;
@@ -251,12 +254,13 @@ struct nodeEntry {
     std::map<u32, InterruptSettings> gpioInitializedPins; // Map from pin to settings
     std::queue<u32> interruptQueue;
 
-    bool bmgWasInit        = false;
-    bool twiWasInit        = false;
-    bool Tlv49dA1b6WasInit = false;
-    bool spiWasInit        = false;
-    bool lis2dh12WasInit   = false;
-    bool bme280WasInit     = false;
+    bool bmgWasInit          = false;
+    bool twiWasInit          = false;
+    bool Tlv49dA1b6WasInit   = false;
+    bool spiWasInit          = false;
+    bool lis2dh12WasInit     = false;
+    bool bme280WasInit       = false;
+    bool discoveryAlwaysBusy = false;
 
     u32 lastMovementSimTimeMs = 0;
 
@@ -286,18 +290,10 @@ struct SimulatorState {
 };
 
 struct SimConfiguration {
-    /*
-       _____          _____  ______ ______ _    _ _        _   _   _ 
-      / ____|   /\   |  __ \|  ____|  ____| |  | | |      | | | | | |
-     | |       /  \  | |__) | |__  | |__  | |  | | |      | | | | | |
-     | |      / /\ \ |  _  /|  __| |  __| | |  | | |      | | | | | |
-     | |____ / ____ \| | \ \| |____| |    | |__| | |____  |_| |_| |_|
-      \_____/_/    \_\_|  \_\______|_|     \____/|______| (_) (_) (_)
-    
-    If you change anything in this type, including adding new members,
-    make sure that they are properly translated inside of the to_json
-    and from_json functions below!
-    */
+    // CAREFUL!
+    // If you change anything in this type, including adding new members,
+    // make sure that they are properly translated inside of the to_json
+    // and from_json functions below!
 
     std::map<std::string, int> nodeConfigName;
     uint32_t    seed                               = 0;
@@ -308,18 +304,18 @@ struct SimConfiguration {
     int32_t     terminalId                         = 0; //Enter -1 to disable, 0 for all nodes, or a specific id
     int32_t     simOtherDelay                      = 0; // Enter 1 - 100000 to send sim_other message only each ... simulation steps, this increases the speed significantly
     int32_t     playDelay                          = 0; //Allows us to view the simulation slower than simulated, is added after each step
-    float       interruptProbability               = 0; // The probability that a queued interrupt is simulated.
+    uint32_t    interruptProbability               = 0; // The probability that a queued interrupt is simulated.
     float       connectionTimeoutProbabilityPerSec = 0; //Every minute or so: 0.00001;
-    float       sdBleGapAdvDataSetFailProbability  = 0;// 0.0001; //Simulate fails on setting adv Data
-    float       sdBusyProbability                  = 0; // 0.0001; //Simulates getting back busy errors from softdevice
+    uint32_t    sdBleGapAdvDataSetFailProbability  = 0; // UINT32_MAX * 0.0001; //Simulate fails on setting adv Data
+    uint32_t    sdBusyProbability                  = 0; // UINT32_MAX * 0.0001; //Simulates getting back busy errors from softdevice
     bool        simulateAsyncFlash                 = false;
-    float       asyncFlashCommitTimeProbability    = 0; // 0.0 - 1.0 where 1 is instant commit in the next simulation step
+    uint32_t    asyncFlashCommitTimeProbability    = 0; // 0 - UINT32_MAX where UINT32_MAX is instant commit in the next simulation step
     bool        importFromJson                     = false; //Set to true and specify siteJsonPath and devicesJsonPath to read a scenario from json
     bool        realTime                           = false; //If set to true, the simulator will only tick when the real time clock passed the necessary time. On false: As fast as possible.
-    float       receptionProbabilityVeryClose      = 0.9;
-    float       receptionProbabilityClose          = 0.8;
-    float       receptionProbabilityFar            = 0.5;
-    float       receptionProbabilityVeryFar        = 0.3;
+    uint32_t    receptionProbabilityVeryClose      = UINT32_MAX / 10 * 9;
+    uint32_t    receptionProbabilityClose          = UINT32_MAX / 10 * 8;
+    uint32_t    receptionProbabilityFar            = UINT32_MAX / 10 * 5;
+    uint32_t    receptionProbabilityVeryFar        = UINT32_MAX / 10 * 3;
     std::string siteJsonPath                       = "";
     std::string devicesJsonPath                    = "";
     std::string replayPath                         = ""; //If set, a replay is loaded from this path.
@@ -345,6 +341,7 @@ struct SimConfiguration {
     void SetToPerfectConditions();
 };
 
+//These two functions must be named exactly like they are! They are used by nlohmann::json.
 void to_json(nlohmann::json& j, const SimConfiguration& config);
 void from_json(const nlohmann::json& j, SimConfiguration& config);
 
@@ -355,7 +352,7 @@ public:
     virtual ~CherrySimEventListener() {};
 
     virtual void CherrySimEventHandler(const char* eventType) = 0;
-    virtual void CherrySimBleEventHandler(nodeEntry* currentNode, simBleEvent* simBleEvent, u16 eventSize) = 0;
+    virtual void CherrySimBleEventHandler(NodeEntry* currentNode, simBleEvent* simBleEvent, u16 eventSize) = 0;
 };
 
 //Notifies of Terminal Output
@@ -366,6 +363,6 @@ public:
 
     //This method can be implemented by any subclass and will be notified when
     //a command is entered via uart.
-    virtual void TerminalPrintHandler(nodeEntry* currentNode, const char* message) = 0;
+    virtual void TerminalPrintHandler(NodeEntry* currentNode, const char* message) = 0;
 
 };

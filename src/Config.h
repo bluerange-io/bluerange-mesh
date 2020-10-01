@@ -31,11 +31,17 @@
 /*
  * This file contains the mesh configuration, which is a singleton. Some of the
  * values can be changed at runtime to alter the meshing behaviour.
+ * 
+ * *** ATTENTION! ***
+ * The preferred way to change this configuration is by using a featureset
+ * in which you are able to define all values and they will have precedence over the
+ * values that are defined in this configuration.
+ * *** ATTENTION! ***
  */
 
 #pragma once
 
-#include <types.h>
+#include <FmTypes.h>
 #include "RecordStorage.h"
 #include "Boardconfig.h"
 
@@ -52,7 +58,7 @@ class RecordStorageEventListener;
 #define FM_VERSION_MINOR 8
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 4250
+#define FM_VERSION_PATCH 4830
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -72,36 +78,43 @@ static_assert(FM_VERSION_PATCH >= 0 && FM_VERSION_PATCH <= 9999, "Malformed Patc
 
 #ifdef FEATURESET
 struct ModuleConfiguration;
-#define SET_BOARD_CONFIGURATION XCONCAT(setBoardConfiguration_,FEATURESET)
+#define SET_BOARD_CONFIGURATION XCONCAT(SetBoardConfiguration_,FEATURESET)
 extern void SET_BOARD_CONFIGURATION(BoardConfiguration* config);
-#define SET_FEATURESET_CONFIGURATION XCONCAT(setFeaturesetConfiguration_,FEATURESET)
+#define SET_FEATURESET_CONFIGURATION XCONCAT(SetFeaturesetConfiguration_,FEATURESET)
 extern void SET_FEATURESET_CONFIGURATION(ModuleConfiguration* config, void* module);
-#define INITIALIZE_MODULES XCONCAT(initializeModules_,FEATURESET)
+#define SET_FEATURESET_CONFIGURATION_VENDOR XCONCAT(SetFeaturesetConfigurationVendor_,FEATURESET)
+extern void SET_FEATURESET_CONFIGURATION_VENDOR(VendorModuleConfiguration* config, void* module);
+#define INITIALIZE_MODULES XCONCAT(InitializeModules_,FEATURESET)
 extern u32 INITIALIZE_MODULES(bool createModule);
-#define GET_DEVICE_TYPE XCONCAT(getDeviceType_,FEATURESET)
+#define GET_DEVICE_TYPE XCONCAT(GetDeviceType_,FEATURESET)
 extern DeviceType GET_DEVICE_TYPE();
-#define GET_CHIPSET XCONCAT(getChipset_,FEATURESET)
+#define GET_CHIPSET XCONCAT(GetChipset_,FEATURESET)
 extern Chipset GET_CHIPSET();
-#define GET_FEATURE_SET_GROUP XCONCAT(getFeatureSetGroup_,FEATURESET)
+#define GET_FEATURE_SET_GROUP XCONCAT(GetFeatureSetGroup_,FEATURESET)
 extern FeatureSetGroup GET_FEATURE_SET_GROUP();
-#define GET_WATCHDOG_TIMEOUT XCONCAT(getWatchdogTimeout_,FEATURESET)
+#define GET_WATCHDOG_TIMEOUT XCONCAT(GetWatchdogTimeout_,FEATURESET)
 extern u32 GET_WATCHDOG_TIMEOUT();
-#define GET_WATCHDOG_TIMEOUT_SAFE_BOOT XCONCAT(getWatchdogTimeoutSafeBoot_,FEATURESET)
+#define GET_WATCHDOG_TIMEOUT_SAFE_BOOT XCONCAT(GetWatchdogTimeoutSafeBoot_,FEATURESET)
 extern u32 GET_WATCHDOG_TIMEOUT_SAFE_BOOT();
 #elif defined(SIM_ENABLED)
-#define SET_BOARD_CONFIGURATION(configuration) setBoardConfiguration_CherrySim(configuration);
-#define SET_FEATURESET_CONFIGURATION(configuration, module) setFeaturesetConfiguration_CherrySim(configuration, module);
-#define INITIALIZE_MODULES(createModule) initializeModules_CherrySim((createModule));
-extern DeviceType getDeviceType_CherrySim();
-#define GET_DEVICE_TYPE() getDeviceType_CherrySim()
-extern Chipset getChipset_CherrySim();
-#define GET_CHIPSET() getChipset_CherrySim()
-extern FeatureSetGroup getFeatureSetGroup_CherrySim();
-#define GET_FEATURE_SET_GROUP() getFeatureSetGroup_CherrySim();
-extern u32 getWatchdogTimeout_CherrySim();
-#define GET_WATCHDOG_TIMEOUT() getWatchdogTimeout_CherrySim()
-extern u32 getWatchdogTimeoutSafeBoot_CherrySim();
-#define GET_WATCHDOG_TIMEOUT_SAFE_BOOT() getWatchdogTimeoutSafeBoot_CherrySim()
+#define SET_BOARD_CONFIGURATION(configuration) SetBoardConfiguration_CherrySim(configuration);
+
+//This line should be called in every module to be able to load featureset dependent configuration
+//Use SET_FEATURESET_CONFIGURATION_VENDOR for vendor modules instead
+#define SET_FEATURESET_CONFIGURATION(configuration, module) SetFeaturesetConfiguration_CherrySim(configuration, module);
+#define SET_FEATURESET_CONFIGURATION_VENDOR(configuration, module) SetFeaturesetConfigurationVendor_CherrySim(configuration, module);
+
+#define INITIALIZE_MODULES(createModule) InitializeModules_CherrySim((createModule));
+extern DeviceType GetDeviceType_CherrySim();
+#define GET_DEVICE_TYPE() GetDeviceType_CherrySim()
+extern Chipset GetChipset_CherrySim();
+#define GET_CHIPSET() GetChipset_CherrySim()
+extern FeatureSetGroup GetFeatureSetGroup_CherrySim();
+#define GET_FEATURE_SET_GROUP() GetFeatureSetGroup_CherrySim();
+extern u32 GetWatchdogTimeout_CherrySim();
+#define GET_WATCHDOG_TIMEOUT() GetWatchdogTimeout_CherrySim()
+extern u32 GetWatchdogTimeoutSafeBoot_CherrySim();
+#define GET_WATCHDOG_TIMEOUT_SAFE_BOOT() GetWatchdogTimeoutSafeBoot_CherrySim()
 #else
 static_assert(false, "Featureset was not defined, which is mandatory!");
 #endif
@@ -185,7 +198,8 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 // The manufacturer id used to identify who manufactured the device
 // It must match your company identifier that has to be registered with
 // the bluetooth sig: https://www.bluetooth.org/en-us/specification/assigned-numbers/company-identifiers
-// For production, the preset M-Way identifier can be used
+// For some projects, the preset M-Way identifier can be used for free if the serial number range and the
+// modules use the Vendor range. Consult us if you are unsure
 #ifndef MANUFACTURER_ID
 #define MANUFACTURER_ID 0x024D
 #endif
@@ -277,8 +291,8 @@ class Conf
     : public RecordStorageEventListener
 {
     private:
-        void generateRandomSerialAndNodeId();
-        bool isEmpty(const u8* mem, u16 numBytes) const;
+        void GenerateRandomSerialAndNodeId();
+        bool IsEmpty(const u8* mem, u16 numBytes) const;
 
         //Buffer for the serialNumber in ASCII format
         mutable char _serialNumber[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
@@ -292,12 +306,12 @@ class Conf
 
     public:
         Conf();
-        static Conf& getInstance();
+        static Conf& GetInstance();
 
         bool safeBootEnabled = false;
 
-        void LoadSettingsFromFlash(Module* module, ModuleId moduleId, ModuleConfiguration* configurationPointer, u16 configurationLength);
-        void LoadSettingsFromFlashWithId(ModuleId moduleId, ModuleConfiguration* configurationPointer, u16 configurationLength);
+        void LoadSettingsFromFlash(Module* module, u16 recordId, u8* configurationPointer, u16 configurationLength);
+        RecordStorageResultCode SaveConfigToFlash(RecordStorageEventListener* listener, u32 userType, u8* userData, u16 userDataLength);
 
         u32 GetSerialNumberIndex() const;
         const char* GetSerialNumber() const;
@@ -462,7 +476,7 @@ class Conf
 
         static constexpr size_t MAX_AMOUNT_PREFERRED_PARTNER_IDS = 8;
 
-        u32 getFruityMeshVersion() const;
+        u32 GetFruityMeshVersion() const;
 
 #pragma pack(push)
 #pragma pack(1)
@@ -503,7 +517,7 @@ class Conf
 //Alright, I know this is bad, but it's for readability....
 //And static classes do need a seperate declaration and definition...
 #ifndef Config
-#define RamConfig (&(Conf::getInstance()))
+#define RamConfig (&(Conf::GetInstance()))
 #endif
 
 

@@ -94,9 +94,21 @@ void Conf::Initialize(bool safeBootEnabled)
     //If there is UICR data available, we use it to fill uninitialized parts of the config
     LoadDeviceConfiguration();
 
-    //Overwrite with settings from the settings page if they exist
+    //Overwrite with settings from flash if sth. was stored previously
     if (!safeBootEnabled) {
-        LoadSettingsFromFlashWithId(ModuleId::CONFIG, (ModuleConfiguration*)&configuration, sizeof(ConfigConfiguration));
+        SizedData configData = GS->recordStorage.GetRecordData((u16)ModuleId::CONFIG);
+        ModuleConfiguration* newConfig = (ModuleConfiguration*)configData.data;
+
+        if (
+            configData.length >= SIZEOF_MODULE_CONFIGURATION_HEADER
+            && configData.length <= sizeof(ConfigConfiguration)
+            && newConfig->moduleVersion == configuration.moduleVersion
+            && newConfig->moduleId == configuration.moduleId
+        ){
+            CheckedMemcpy((ModuleConfiguration*)&configuration, configData.data, configData.length);
+
+            logt("CONFIG", "Config loaded from flash");
+        }
     }
 
     SET_FEATURESET_CONFIGURATION(&configuration, this);
@@ -135,7 +147,7 @@ void Conf::LoadDefaults(){
 
     //Set defaults for stuff that is loaded from UICR in case that no UICR data is present
     manufacturerId = MANUFACTURER_ID;
-    Conf::generateRandomSerialAndNodeId();
+    Conf::GenerateRandomSerialAndNodeId();
     CheckedMemset(configuration.nodeKey, 0x11, 16);
     defaultNetworkId = 0;
     CheckedMemset(defaultNetworkKey, 0xFF, 16);
@@ -154,7 +166,7 @@ void Conf::LoadDeviceConfiguration(){
         //If magic number exists, fill Config with valid data from UICR
         deviceConfigOrigin = DeviceConfigOrigins::UICR_CONFIG;
 
-        if(!isEmpty((u8*)config.nodeKey, 16)){
+        if(!IsEmpty((u8*)config.nodeKey, 16)){
             CheckedMemcpy(configuration.nodeKey, (u8*)config.nodeKey, 16);
         }
         if(config.manufacturerId != EMPTY_WORD) manufacturerId = (u16)config.manufacturerId;
@@ -176,7 +188,7 @@ void Conf::LoadDeviceConfiguration(){
         }
 
         //If no network key is present in UICR but a node key is present, use the node key for both (to migrate settings for old nodes)
-        if(isEmpty((u8*)config.networkKey, 16) && !isEmpty(configuration.nodeKey, 16)){
+        if(IsEmpty((u8*)config.networkKey, 16) && !IsEmpty(configuration.nodeKey, 16)){
             CheckedMemcpy(defaultNetworkKey, configuration.nodeKey, 16);
         } else {
             //Otherwise, we use the default network key
@@ -185,7 +197,7 @@ void Conf::LoadDeviceConfiguration(){
     }
 }
 
-u32 Conf::getFruityMeshVersion() const
+u32 Conf::GetFruityMeshVersion() const
 {
 #ifdef SIM_ENABLED
     if (cherrySimInstance->currentNode->fakeDfuVersion != 0 && cherrySimInstance->currentNode->fakeDfuVersionArmed == true) {
@@ -198,46 +210,66 @@ u32 Conf::getFruityMeshVersion() const
 
 #define _____________HELPERS_______________
 
-void Conf::LoadSettingsFromFlashWithId(ModuleId moduleId, ModuleConfiguration* configurationPointer, u16 configurationLength)
-{
-    Conf::LoadSettingsFromFlash(nullptr, moduleId, configurationPointer, configurationLength);
-}
-
-Conf & Conf::getInstance()
+Conf & Conf::GetInstance()
 {
     return GS->config;
 }
 
-void Conf::LoadSettingsFromFlash(Module* module, ModuleId moduleId, ModuleConfiguration* configurationPointer, u16 configurationLength)
+void Conf::LoadSettingsFromFlash(Module* module, u16 recordId, u8* configurationPointer, u16 configurationLength)
 {
+    if (module == nullptr || recordId == RECORD_STORAGE_RECORD_ID_INVALID) return;
+
     if (!safeBootEnabled) {
-        SizedData configData = GS->recordStorage.GetRecordData((u16)moduleId);
+        SizedData configData = GS->recordStorage.GetRecordData((u16)recordId);
 
-        //Check if configuration exists and has the correct version, if yes, copy to module configuration struct
-        if (configData.length > SIZEOF_MODULE_CONFIGURATION_HEADER && ((ModuleConfiguration*)configData.data)->moduleVersion == configurationPointer->moduleVersion) {
-            CheckedMemcpy((u8*)configurationPointer, configData.data, configData.length);
+        ModuleConfiguration* moduleConfig = (ModuleConfiguration*)configData.data;
+        VendorModuleConfiguration* vendorModuleConfig = (VendorModuleConfiguration*)configData.data;
 
-            logt("CONFIG", "Config for module %u loaded", (u32)moduleId);
+        //Check if configuration exists and is valid then copy the configuration and call the handler
+        if (
+            //Configuration for core modules must have a minimum size and must not be bigger than the current configuration and the config version must match
+            (
+                !Utility::IsVendorModuleId(module->moduleId)
+                && configData.length >= SIZEOF_MODULE_CONFIGURATION_HEADER
+                && configData.length <= configurationLength
+                && moduleConfig->moduleVersion == ((ModuleConfiguration*)configurationPointer)->moduleVersion
+                && moduleConfig->moduleId == ((ModuleConfiguration*)configurationPointer)->moduleId
+            )
+            //Same applies to vendor modules
+            || (
+                Utility::IsVendorModuleId(module->vendorModuleId)
+                && configData.length >= SIZEOF_VENDOR_MODULE_CONFIGURATION_HEADER
+                && configData.length <= configurationLength
+                && vendorModuleConfig->moduleVersion == ((VendorModuleConfiguration*)configurationPointer)->moduleVersion
+                && vendorModuleConfig->moduleId == ((VendorModuleConfiguration*)configurationPointer)->moduleId
+            )
+        ){
+            CheckedMemcpy(configurationPointer, configData.data, configData.length);
 
-            if(module != nullptr) module->ConfigurationLoadedHandler(nullptr, 0);
+            logt("CONFIG", "Config for module %s loaded from record %u", Utility::GetModuleIdString(module->vendorModuleId).data(), recordId);
+
+            module->ConfigurationLoadedHandler(nullptr, 0);
         }
         //If the configuration has a different version, we call the migration if it exists
-        else if(configData.length > SIZEOF_MODULE_CONFIGURATION_HEADER){
-            logt("CONFIG", "Flash config for module %u has mismatching version", (u32)moduleId);
+        else if(
+            (!Utility::IsVendorModuleId(module->moduleId) && configData.length >= SIZEOF_MODULE_CONFIGURATION_HEADER)
+            || (Utility::IsVendorModuleId(module->vendorModuleId) && configData.length >= SIZEOF_VENDOR_MODULE_CONFIGURATION_HEADER)
+        ){
+            logt("CONFIG", "Flash config for module %s has mismatching version", Utility::GetModuleIdString(module->vendorModuleId).data());
 
-            if(module != nullptr) module->ConfigurationLoadedHandler((ModuleConfiguration*)configData.data, configData.length);
+            module->ConfigurationLoadedHandler(configData.data, configData.length);
         }
         else {
-            logt("CONFIG", "No flash config for module %u found, using defaults", (u32)moduleId);
+            logt("CONFIG", "No flash config for module %s found, using defaults", Utility::GetModuleIdString(module->vendorModuleId).data());
 
-            if(module != nullptr) module->ConfigurationLoadedHandler(nullptr, 0);
+            module->ConfigurationLoadedHandler(nullptr, 0);
         }
     } else {
-        if(module != nullptr) module->ConfigurationLoadedHandler(nullptr, 0);
+        module->ConfigurationLoadedHandler(nullptr, 0);
     }
 }
 
-uint32_t uint_pow(uint32_t base, uint32_t exponent){
+uint32_t UintPow(uint32_t base, uint32_t exponent){
     uint32_t result = 1;
     while (exponent){
         if (exponent & 1) result *= base;
@@ -247,7 +279,7 @@ uint32_t uint_pow(uint32_t base, uint32_t exponent){
     return result;
 }
 
-void Conf::generateRandomSerialAndNodeId(){
+void Conf::GenerateRandomSerialAndNodeId(){
     //Generate a random serial number for testing from the open source testing range (FMBBB - FM999)
     serialNumberIndex = (FruityHal::GetDeviceId() % (SERIAL_NUMBER_FM_TESTING_RANGE_END - SERIAL_NUMBER_FM_TESTING_RANGE_START)) + SERIAL_NUMBER_FM_TESTING_RANGE_START;
 
@@ -255,7 +287,7 @@ void Conf::generateRandomSerialAndNodeId(){
 }
 
 //Tests if a memory region in flash storage is empty (0xFF)
-bool Conf::isEmpty(const u8* mem, u16 numBytes) const{
+bool Conf::IsEmpty(const u8* mem, u16 numBytes) const{
     for(u32 i=0; i<numBytes; i++){
         if(mem[i] != 0xFF) return false;
     }
@@ -291,7 +323,7 @@ void Conf::SetSerialNumberIndex(u32 serialNumber)
     configuration.overwrittenSerialNumberIndex = serialNumber;
     configuration.isSerialNumberIndexOverwritten = true;
 
-    RecordStorageResultCode err = Utility::SaveModuleSettingsToFlashWithId(ModuleId::CONFIG, &configuration, sizeof(ConfigConfiguration), this, (u32)RecordTypeConf::SET_SERIAL, nullptr, 0);
+    RecordStorageResultCode err = SaveConfigToFlash(this, (u32)RecordTypeConf::SET_SERIAL, nullptr, 0);
     if (err != RecordStorageResultCode::SUCCESS)
     {
         //Rebooting in this case is the safest bet. The initialization sequence will just restart by the other side.
@@ -322,5 +354,10 @@ void Conf::SetNodeKey(const u8 * key)
 {
     CheckedMemcpy(configuration.nodeKey, key, 16);
 
-    Utility::SaveModuleSettingsToFlashWithId(ModuleId::CONFIG, &configuration, sizeof(ConfigConfiguration), nullptr, 0, nullptr, 0);
+    SaveConfigToFlash(nullptr, 0, nullptr, 0);
+}
+
+RecordStorageResultCode Conf::SaveConfigToFlash(RecordStorageEventListener* listener, u32 userType, u8* userData, u16 userDataLength)
+{
+    return GS->recordStorage.SaveRecord((u16)ModuleId::CONFIG, (u8*)&configuration, sizeof(ConfigConfiguration), listener, userType, userData, userDataLength);
 }

@@ -49,8 +49,8 @@ TEST(TestNode, TestCommands) {
     tester.Start();
     tester.SimulateUntilClusteringDone(100 * 1000);
 
-    tester.sim->findNodeById(1)->gs.logger.enableTag("CM");
-    tester.sim->findNodeById(2)->gs.logger.enableTag("CM");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("CM");
+    tester.sim->FindNodeById(2)->gs.logger.EnableTag("CM");
 
     tester.SendTerminalCommand(1, "action 2 node ping");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"ping\",\"nodeId\":2,\"module\":0,\"requestHandle\":0}");
@@ -83,7 +83,7 @@ TEST(TestNode, TestCommands) {
 
     tester.SendTerminalCommand(1, "settime 1337 0");
     tester.SimulateGivenNumberOfSteps(1);
-    ASSERT_EQ(tester.sim->findNodeById(1)->gs.timeManager.GetTime(), 1337);
+    ASSERT_EQ(tester.sim->FindNodeById(1)->gs.timeManager.GetTime(), 1337);
 
     tester.SendTerminalCommand(1, "gettime");
     tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "Time is currently approx. 1970 years, 1 days, 00h:22m:17s,\\d+ ticks");
@@ -110,11 +110,11 @@ TEST(TestNode, TestCommands) {
 
     tester.SendTerminalCommand(1, "stopterm");
     tester.SimulateGivenNumberOfSteps(1);
-    ASSERT_EQ(tester.sim->findNodeById(1)->gs.config.terminalMode, TerminalMode::JSON);
+    ASSERT_EQ(tester.sim->FindNodeById(1)->gs.config.terminalMode, TerminalMode::JSON);
 
     tester.SendTerminalCommand(1, "startterm");
     tester.SimulateGivenNumberOfSteps(1);
-    ASSERT_EQ(tester.sim->findNodeById(1)->gs.config.terminalMode, TerminalMode::PROMPT);
+    ASSERT_EQ(tester.sim->FindNodeById(1)->gs.config.terminalMode, TerminalMode::PROMPT);
 
     tester.SendTerminalCommand(1, "get_modules 2");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"module_list\",\"modules\":");
@@ -169,38 +169,38 @@ TEST(TestNode, TestCommands) {
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"set_preferred_connections_result\",\"nodeId\":2,\"module\":0}");
     ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.amountOfPreferredPartnerIds, 8);
     ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredConnectionMode, PreferredConnectionMode::PENALTY);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[0], 101);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[1], 102);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[2], 103);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[3], 104);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[4], 105);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[5], 106);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[6], 107);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[7], 108);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[0]), 101);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[1]), 102);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[2]), 103);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[3]), 104);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[4]), 105);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[5]), 106);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[6]), 107);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[7]), 108);
     tester.SendTerminalCommand(1, "action 2 node set_preferred_connections ignored 1337 42");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"set_preferred_connections_result\",\"nodeId\":2,\"module\":0}");
     ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.amountOfPreferredPartnerIds, 2);
     ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredConnectionMode, PreferredConnectionMode::IGNORED);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[0], 1337);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[1], 42);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[2], 103);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[3], 104);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[4], 105);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[5], 106);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[6], 107);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[7], 108);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[0]), 1337);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[1]), 42);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[2]), 103);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[3]), 104);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[4]), 105);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[5]), 106);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[6]), 107);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[7]), 108);
     tester.SendTerminalCommand(1, "action 2 node set_preferred_connections ignored");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"set_preferred_connections_result\",\"nodeId\":2,\"module\":0}");
     ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.amountOfPreferredPartnerIds, 0);
     ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredConnectionMode, PreferredConnectionMode::IGNORED);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[0], 1337);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[1], 42);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[2], 103);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[3], 104);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[4], 105);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[5], 106);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[6], 107);
-    ASSERT_EQ(tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[7], 108);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[0]), 1337);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[1]), 42);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[2]), 103);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[3]), 104);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[4]), 105);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[5]), 106);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[6]), 107);
+    ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[7]), 108);
 }
 
 TEST(TestNode, TestCRCValidation)
@@ -327,9 +327,9 @@ TEST(TestNode, TestPreferredConnections) {
     tester.SimulateForGivenTime(20 * 1000);    //Make sure that the nodes rebooted.
     tester.SimulateUntilClusteringDone(100 * 1000);
 
-    for (u32 i = 0; i < tester.sim->getTotalNodes(); i++) {
+    for (u32 i = 0; i < tester.sim->GetTotalNodes(); i++) {
         NodeIndexSetter setter(i);
-        const nodeEntry* node = &(tester.sim->nodes[i]);
+        const NodeEntry* node = &(tester.sim->nodes[i]);
         const MeshConnections conns = node->gs.cm.GetMeshConnections(ConnectionDirection::INVALID);
 
         bool hasLowerIdConnected  = false;
@@ -340,7 +340,7 @@ TEST(TestNode, TestPreferredConnections) {
             hasLowerIdConnected = true; // Not actually true, but he has no lower id to connect to!
             ASSERT_EQ(conns.count, 1);
         }
-        else if (i == tester.sim->getTotalNodes() - 1)
+        else if (i == tester.sim->GetTotalNodes() - 1)
         {
             hasHigherIdConnected = true; //Not actually true, but he has no higher id to connect to!
             ASSERT_EQ(conns.count, 1);
@@ -379,8 +379,8 @@ TEST(TestNode, DISABLED_TestDiscoveryStates) {
 
     //Scan duty when asset tracking job is enabled and cluster is in low discovery
     tester.SimulateForGivenTime(30 * 1000);
-    u16 interval = Conf::getInstance().meshScanIntervalHigh;
-    ASSERT_EQ(MSEC_TO_UNITS(tester.sim->findNodeById(2)->state.scanIntervalMs, CONFIG_UNIT_0_625_MS), interval);
+    u16 interval = Conf::GetInstance().meshScanIntervalHigh;
+    ASSERT_EQ(MSEC_TO_UNITS(tester.sim->FindNodeById(2)->state.scanIntervalMs, CONFIG_UNIT_0_625_MS), interval);
 
     //Switch to High discovery when receive enrollment
     tester.SendTerminalCommand(1, "action 2 enroll basic BBBBF 2 200");
@@ -407,14 +407,15 @@ TEST(TestNode, TestMeshConnectionPacketQueuing) {
     tester.Start();
     tester.SimulateUntilClusteringDone(10 * 1000);
 
-    u8 buffer[100];
+    alignas(4) u8 buffer[100];
+    constexpr u32 padding = 3;
 
-    connPacketHeader* header = (connPacketHeader*)buffer;
+    ConnPacketHeader* header = (ConnPacketHeader*)(buffer + padding);
     header->messageType = MessageType::DATA_1;
     header->sender = 1;
     header->receiver = 2;
 
-    u32* counter = (u32*)(buffer + SIZEOF_CONN_PACKET_HEADER);
+    u32* counter = (u32*)(buffer + SIZEOF_CONN_PACKET_HEADER + padding);
 
     //We send split packets and high prio packets interleaved with each other and check
     //if an exception is thrown by the implementation, we add a counter to the packets
@@ -428,7 +429,7 @@ TEST(TestNode, TestMeshConnectionPacketQueuing) {
             u16 len = 9 + PSRNGINT(0, 35);
 
             char bufferHex[400];
-            Logger::convertBufferToHexString(buffer, len, bufferHex, sizeof(bufferHex));
+            Logger::ConvertBufferToHexString((buffer + padding), len, bufferHex, sizeof(bufferHex));
 
             tester.SendTerminalCommand(1, "rawsend %s", bufferHex);
         }
@@ -438,12 +439,12 @@ TEST(TestNode, TestMeshConnectionPacketQueuing) {
             u16 len = 9;
 
             char bufferHex[400];
-            Logger::convertBufferToHexString(buffer, len, bufferHex, sizeof(bufferHex));
+            Logger::ConvertBufferToHexString((buffer + padding), len, bufferHex, sizeof(bufferHex));
 
             tester.SendTerminalCommand(1, "rawsend_high %s", bufferHex);
         }
 
-        //Make sure that data is really transmitted every one in a while
+        //Make sure that data is really transmitted every once in a while
         if (i>0 && i % 50 == 0) {
             printf("--------------------------------------------" EOL);
             tester.SimulateUntilMessageReceived(10 * 1000, 2, "Got Data packet");
@@ -475,14 +476,15 @@ TEST(TestNode, TestMeshAccessConnectionPacketQueuing) {
     //Wait until connection was set up
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "Received remote mesh data");
     
-    u8 buffer[100];
+    alignas(4) u8 buffer[100];
+    constexpr u32 padding = 3;
 
-    connPacketHeader* header = (connPacketHeader*)buffer;
+    ConnPacketHeader* header = (ConnPacketHeader*)(buffer + padding);
     header->messageType = MessageType::DATA_1;
     header->sender = 1;
     header->receiver = 2001; //virtual partner id
 
-    u32* counter = (u32*)(buffer + SIZEOF_CONN_PACKET_HEADER);
+    u32* counter = (u32*)(buffer + SIZEOF_CONN_PACKET_HEADER + padding);
 
     //We send split packets and high prio packets interleaved with each other and check
     //if an exception is thrown by the implementation, we add a counter to the packets
@@ -496,7 +498,7 @@ TEST(TestNode, TestMeshAccessConnectionPacketQueuing) {
             u16 len = 9 + PSRNGINT(0, 35);
 
             char bufferHex[400];
-            Logger::convertBufferToHexString(buffer, len, bufferHex, sizeof(bufferHex));
+            Logger::ConvertBufferToHexString(buffer + padding, len, bufferHex, sizeof(bufferHex));
 
             tester.SendTerminalCommand(1, "rawsend %s", bufferHex);
         }
@@ -506,7 +508,7 @@ TEST(TestNode, TestMeshAccessConnectionPacketQueuing) {
             u16 len = 9;
 
             char bufferHex[400];
-            Logger::convertBufferToHexString(buffer, len, bufferHex, sizeof(bufferHex));
+            Logger::ConvertBufferToHexString(buffer + padding, len, bufferHex, sizeof(bufferHex));
 
             tester.SendTerminalCommand(1, "rawsend_high %s", bufferHex);
         }
@@ -532,14 +534,17 @@ TEST(TestNode, TestCapabilitySending) {
 
     tester.Start();
     tester.SimulateUntilClusteringDone(10 * 1000);
-    tester.sim->enableTagForAll("VSMOD");
+    tester.sim->EnableTagForAll("VSMOD");
 
     tester.SendTerminalCommand(1, "request_capability 2");
 
-    //Order matters, so we simulate for each message one by one.
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "Capabilities are requested");
-    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":0,\"capabilityType\":2,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"BlueRange Node\",\"revision\":\"\\d+.\\d+.\\d+\"\\}");
-    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"nodeId\":2,\"type\":\"capability_end\",\"amount\":\\d+\\}");
+
+    std::vector<SimulationMessage> msgs = {
+        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":0,\"capabilityType\":2,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"BlueRange Node\",\"revision\":\"\\d+.\\d+.\\d+\"\\}"),
+        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_end\",\"amount\":\\d+\\}"),
+    };
+    tester.SimulateUntilRegexMessagesReceived(100 * 1000, msgs);
 }
 
 TEST(TestNode, TestRapidDisconnections) {
@@ -580,7 +585,7 @@ TEST(TestNode, TestReconnectionPacketQueuing) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.sim->nodes[1].gs.logger.enableTag("DEBUGMOD");
+    tester.sim->nodes[1].gs.logger.EnableTag("DEBUGMOD");
 
     tester.SimulateUntilClusteringDone(10 * 1000);
 
@@ -636,4 +641,27 @@ TEST(TestNode, TestReestablishmentTimesOut) {
     //This should happen after a timeout of currently 10 seconds
     u16 extendedTimeout = tester.sim->nodes[0].gs.config.meshExtendedConnectionTimeoutSec;
     tester.SimulateUntilMessageReceived(extendedTimeout * 1000, 3, "\"clusterSize\":3");
+}
+
+//This tests whether we can correctly build and receive component_act/_sense message with ModuleId or VendorModuleId
+TEST(TestNode, TestComponentSenseAndActWithModuleIdWrapper)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SendTerminalCommand(1, "component_sense this 0 3 0x1111 0x2222 MzM=");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":1,\"type\":\"component_sense\",\"module\":0,\"requestHandle\":0,\"actionType\":3,\"component\":\"0x1111\",\"register\":\"0x2222\",\"payload\":\"MzM=\"}");
+
+    tester.SendTerminalCommand(1, "component_sense this 7 3 0x1111 0x2222 MzM=");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":1,\"type\":\"component_sense\",\"module\":7,\"requestHandle\":0,\"actionType\":3,\"component\":\"0x1111\",\"register\":\"0x2222\",\"payload\":\"MzM=\"}");
+
+    //The vendor moduleId does not necessarily have to exist on our node
+    tester.SendTerminalCommand(1, "component_sense this 0xABCD77F0 3 0x1111 0x2222 MzM=");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":1,\"type\":\"component_sense\",\"module\":\"0xABCD77F0\",\"requestHandle\":0,\"actionType\":3,\"component\":\"0x1111\",\"register\":\"0x2222\",\"payload\":\"MzM=\"}");
+
 }

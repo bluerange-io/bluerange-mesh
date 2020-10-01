@@ -40,17 +40,17 @@ ConnectionAllocator::ConnectionAllocator()
     dataHead = data.data();
 }
 
-ConnectionAllocator & ConnectionAllocator::getInstance()
+ConnectionAllocator & ConnectionAllocator::GetInstance()
 {
     return GS->connectionAllocator;
 }
 
-ConnectionAllocator::AnyConnection * ConnectionAllocator::allocateMemory()
+ConnectionAllocator::AnyConnection * ConnectionAllocator::AllocateMemory()
 {
     if (dataHead == NO_NEXT_CONNECTION)
     {
         SIMEXCEPTION(OutOfMemoryException);                                                       //LCOV_EXCL_LINE assertion
-        GS->logger.logCustomError(CustomErrorTypes::FATAL_CONNECTION_ALLOCATOR_OUT_OF_MEMORY, 0); //LCOV_EXCL_LINE assertion
+        GS->logger.LogCustomError(CustomErrorTypes::FATAL_CONNECTION_ALLOCATOR_OUT_OF_MEMORY, 0); //LCOV_EXCL_LINE assertion
         return nullptr;                                                                           //LCOV_EXCL_LINE assertion
     }
     AnyConnection* oldHead = dataHead; 
@@ -64,36 +64,36 @@ ConnectionAllocator::AnyConnection * ConnectionAllocator::allocateMemory()
     return oldHead;
 }
 
-MeshConnection * ConnectionAllocator::allocateMeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, u16 partnerWriteCharacteristicHandle)
+MeshConnection * ConnectionAllocator::AllocateMeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, u16 partnerWriteCharacteristicHandle)
 {
-    MeshConnection* retVal = reinterpret_cast<MeshConnection*>(allocateMemory());
+    MeshConnection* retVal = reinterpret_cast<MeshConnection*>(AllocateMemory());
     new (retVal) MeshConnection(id, direction, partnerAddress, partnerWriteCharacteristicHandle);
     return retVal;
 }
-ResolverConnection * ConnectionAllocator::allocateResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress)
+ResolverConnection * ConnectionAllocator::AllocateResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress)
 {
-    ResolverConnection* retVal = reinterpret_cast<ResolverConnection*>(allocateMemory());
+    ResolverConnection* retVal = reinterpret_cast<ResolverConnection*>(AllocateMemory());
     new (retVal) ResolverConnection(id, direction, partnerAddress);
     return retVal;
 }
-MeshAccessConnection * ConnectionAllocator::allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualPartnerId)
+MeshAccessConnection * ConnectionAllocator::AllocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualPartnerId)
 {
-    MeshAccessConnection* retVal = reinterpret_cast<MeshAccessConnection*>(allocateMemory());
+    MeshAccessConnection* retVal = reinterpret_cast<MeshAccessConnection*>(AllocateMemory());
     new (retVal) MeshAccessConnection(id, direction, partnerAddress, fmKeyId, tunnelType, overwriteVirtualPartnerId);
     return retVal;
 }
 #if IS_ACTIVE(CLC_CONN)
 #ifndef GITHUB_RELEASE
-ClcAppConnection * ConnectionAllocator::allocateClcAppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress)
+ClcAppConnection * ConnectionAllocator::AllocateClcAppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress)
 {
-    ClcAppConnection* retVal = reinterpret_cast<ClcAppConnection*>(allocateMemory());
+    ClcAppConnection* retVal = reinterpret_cast<ClcAppConnection*>(AllocateMemory());
     new (retVal) ClcAppConnection(id, direction, partnerAddress);
     return retVal;
 }
 #endif //GITHUB_RELEASE
 #endif
 
-void ConnectionAllocator::deallocate(BaseConnection * bc)
+void ConnectionAllocator::Deallocate(BaseConnection * bc)
 {
     if (bc == nullptr) return;
     if (Utility::CompareMem(0x00, (u8*)bc, sizeof(AnyConnection))) {

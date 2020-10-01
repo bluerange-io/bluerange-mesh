@@ -14,7 +14,6 @@ discovery of nearby nodes that also run FruityMesh.
 There are two types of advertising packets used by FruityMesh. One uses the manufacturer specific advertisement structure, the other uses the serviceData advertisement structure.
 
 .Advertising Header With Manufacturer Specific Data
-[cols="1,2,2,3"]
 |===
 |Bytes|Type|Name|Description
 
@@ -40,7 +39,6 @@ The _messageType_ is used to distinguish between different messages. The same _m
 === JOIN_ME Packet (MessageType 1)
 The _JOIN_ME_ packet contains all the information that other nodes can use to determine their best connection partner. The _messageId_ in the header must be set to 1. Future _JOIN_ME_ packets can have a different _messageId_ and different values that can then be used in the Cluster Score Function. The current implementation uses the _clusterSize_ and the number of _freeIn_ and _freeOut_ connections.
 
-[cols="1,2,2,3"]
 |===
 |Bytes| Type| Name| Description
 
@@ -61,7 +59,6 @@ The _JOIN_ME_ packet contains all the information that other nodes can use to de
 === Advertising Packet With Service Data
 Another type of advertising packet used by FruityMesh uses the Service Data Adv Structure. This is important when dealing with mobile devices since some have hardware filtering with no support for manufacturer specific data.
 
-[cols="1,2,2,3"]
 |===
 |Bytes|Type|Name|Description
 
@@ -83,7 +80,6 @@ The mesh uses a number of packets that are sent over connections. Most packets t
 [#connPacketHeader]
 === Connection Packet Header
 .Format of a connPacketHeader
-[cols="1,1,2,3"]
 |===
 |Bytes| Type| Name| Description
 
@@ -92,32 +88,91 @@ The mesh uses a number of packets that are sent over connections. Most packets t
 |2| u16 | _receiverId_ | Node ID of the receiver
 |===
 
+== Modules
+FruityMesh uses a concept of modules to group functionality into different parts. This works together nicely with the featuresets. A user is able to write his own modules that extend the basic functionality of FruityMesh. Each module is identified using a module id. 
+
+[#ModuleIds]
+=== ModuleIds
+There are two types of module ids: the standard *ModuleId* has a size of one byte and is solely used by standardized modules. The *VendorModuleId* on the other hand uses 4 bytes to allow different vendors to develop modules that can run together in a single network without clashing with other modules that were written by different vendors on different nodes in the same mesh network. This is done by including a vendor id as part of the VendorModuleId. This vendor id must be set to the company identifier that can be acquired from the BLE SIG. See https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers/[this page] for instructions on how to get this company identifier and for a complete list of known company identifiers.
+
+VendorModuleIds were not part of FruityMesh prior to version 1.x.x. FruityMesh tries to keep the usage of VendorModuleIds as easy as possible and does most of the work when using VendorModuleIds. Some parts will e.g. use different message types for messages with ModuleId and VendorModuleId and other parts use the ModuleIdWrapper to be able to work with both module id types in the same data structure. As a convention, whenever a ModuleId is printed out as a string, it is printed as a decimal number, e.g. `123`. VendorModuleIds on the other hand are printed as a string like this `"0xABCD01F0"` to make the individual parts easier to read.
+
+To get started, see xref:Implementing-a-Custom-Module.adoc[Implementing a Custom Module].
+
+.ModuleId
+In the implementation, the ModuleId is either used as a single byte or stored using the 4 byte ModuleIdWrapper with the subId and vendorId set to 0. This depends on the implementation of a feature.
+
+.VendorModuleId
+The VendorModuleId is always composed of 4 bytes can be put together using the ModuleIdWrapper.
+|===
+|Bytes|Type|Name|Description
+
+|1|u8|prefix|This must be set to VENDOR_MODULE_ID_RESERVED(0xF0) to be recognized as a VendorModuleId
+|1|u8|subId|The user can use this to specify up to 254 different modules with his vendorId. 0x00 and 0xFF are reserved
+|2|u16|vendorId|The company identifier as assigned by the BLE SIG
+|===
+
 [#connPacketModule]
-=== Module Connection Packet Header
-Modules use an extended message header to guarantee that there are no collisions between different functionality. This extended header is used for the following messageTypes:
+=== Module Packet Header
+Modules use an bigger message header to guarantee that there are no collisions between different functionality. The following describes the format of the header:
 
-.Typical Message Types with extended package header
-[cols="1,2,2"]
-|===
-|MessageType|Name|Description
-
-|51 / 0x33|`MESSAGE_TYPE_MODULE_TRIGGER_ACTION`|A request for a node to perform an action
-|52 / 0x33|`MESSAGE_TYPE_MODULE_ACTION_RESPONSE`|Response message for a previous request
-|53 / 0x33|`MESSAGE_TYPE_MODULE_GENERAL`|An event that does not need a response
-|===
-
-The following describes the format of the extended header:
-
-.Format of a connPacketModule extended header
-[cols="1,2,2,3"]
+.Format of a connPacketModule or connPacketModuleVendor Header
 |===
 |Bytes| Type| Name| Description
 
 |5|xref:#connPacketHeader[connPacketHeader] |_header_| MessageType must be one e.g. of the above.
-|1|u8 |_moduleId_| The id of a module, a module provides different functionality for one specific task.
+|1 or 4|u8 or u32|moduleId or vendorModuleId| Either a ModuleId of a core module or the VendorModuleId of a vendor specific module.
 |1|u8 |_requestHandle_| A handle that can be used e.g. like a counter. Responses will always be returned with the same handle given in the request.
 |1|u8 |_actionType_| This is the type of action that should be executed by the module. An individual list of _subCommands_ is available for each of the _messageTypes_ given above. E.g. there could be a `MODULE_TRIGGER_ACTION` message with the _actionType_ set to 1 (PING) to execute a ping. The response would be a `MODULE_ACTION_RESPONSE` message with the _actionType_ set to 1 (`PING_RESPONSE`).
 |...|u8[] |_data_| additional payload data for the command
+|===
+
+The connPacketModule differs from the connPacketModuleVendor header in the size of the module id. They can be differentiated by checking the first byte, which is set to ModuleId::VENDOR_MODULE_ID_PREFIX (0xF0) in case of a VendorModuleId. While the connPacketModule has a size of 8 bytes, the connPacketModuleVendor needs 11 bytes.
+
+==== Module Packet Header for Actions / Responses and Events
+The most common usage of the connPacketModule header is to provide the possibility to trigger actions, get responses and to fire events. This is a command and response based schema that is very well suited to communicate between different nodes in a mesh network. The following MessageTypes are used for this:
+
+.Module MessageTypes for Actions / Responses and Events
+|===
+|MessageType|Name|Description
+
+|51 / 0x33|MODULE_TRIGGER_ACTION|A request for a node to perform an action
+|52 / 0x34|MODULE_ACTION_RESPONSE|Response message for a previous request
+|53 / 0x35|MODULE_GENERAL|An event that does not need a response
+|===
+
+==== Actuator and Sensor Messages
+Often, FruityMesh must tunnel a different protocol such as Modbus because it is installed on a controller that is attached to a 3rd party controller. In this case, it is necessary to have a tunneling protocol that is generic enough to provide access to all functionality while still allowing a platform or MeshGateway to interpret the received data in a useful manner. This is why we have introduced the `component_sense` and `component_act` message types. You should use them whenever you report sensor data or when you want to write data to the node that should be written to a specific "address".
+
+.Module MessageTypes for Actuators and Sensors
+|===
+|MessageType|Name|Description
+
+|58 / 0x3A|COMPONENT_ACT|A request to trigger an actuator
+|59 / 0x3B|COMPONENT_SENSE|A response from a sensor
+|===
+
+Take a look at the detailed documentation for xref:SensorsAndActuators.adoc[Sensors and Actuators].
+
+==== Raw Data
+Another use-case is to tunnel any kind of data through FruityMesh where the nodes do not need to parse or process the data at all, e.g. a smartphone might want to send data to a MeshGateway or Backend.  This could also be data of an entirely different protocol such as HTTP, etc... This could be a small data packet or a rather large file that needs to be split into several parts. To do this, we have introduced `raw_data` and `raw_data_light` which are documented in a lot of detail at the xref:RawData.adoc[Raw Data] page.
+
+.Module MessageTypes for Raw Data
+|===
+|MessageType|Name|Description
+
+|54 / 0x36|MODULE_RAW_DATA|Used to transmit large files or large amounts of data (acknowledged, similar to TCP)
+|55 / 0x37|MODULE_RAW_DATA_LIGHT|Used to transmit up to "MAX_MESH_PACKET_SIZE" bytes of data (see `Config.h`) (unacknowledged, similar to UDP)
+|===
+
+==== Module Configuration Messages
+Another MessageType is dedicated to configure modules and to get more information about them.
+
+.Module MessageTypes for Configuring Modules
+|===
+|MessageType|Name|Description
+
+|50 / 0x32|MODULE_CONFIG|Used to retrieve or set a module configuration or get more information about modules
 |===
 
 [#NodeIds]
@@ -127,21 +182,20 @@ A NodeId is a way of addressing devices in a network. Each device in a network m
 There are different node ID ranges that are used for different purposes:
 
 .Node ID ranges
-[cols="1,4"]
 |===
-|Node ID|Usage
+|Name|Node ID|Usage
 
-|0| Broadcast address to reach all nodes in a network
-|1...1999| Uniquely address devices (nodes, sinks, ...) given by enrollment
-|2000...19999| Virtual addresses to address smartphones connected to the mesh (dynamically assigned, aka. virtual partner id)
-|20000...20999| Address groups of devices (statically assigned at compile time)
-|30000| Address for the current node itself (similar to localhost)
-|30001...30999| Specify the number of hops that a packet can travel. (30 001 e.g. specifies that the packet must only reach the direct neighbours)
-|31000| Used to send a packet to all sink nodes (see xref:#deviceTypes[Device Types])
-|32000| NodeId given to non-mesh devices that can connect via a MeshAccessConnection (e.g. a Smartphone). This is replaced by a virtual partner id during communication.
-|33000...39999| Assign nodeIds uniquely over multiple meshes for the same organization (used for assets that roam between different networks)
-|65535| Invalid node ID, which is used for internal errors
-|others| All other node IDs are currently reserved
+|NODE_ID_BROADCAST|0| Broadcast address to reach all nodes in a network
+|NODE_ID_DEVICE_BASE|1...1999| Uniquely address devices (nodes, sinks, ...) given by enrollment
+|NODE_ID_VIRTUAL_BASE|2000...19999| Virtual addresses to address smartphones connected to the mesh (dynamically assigned, aka. virtual partner id)
+|NODE_ID_GROUP_BASE|20000...20999| Address groups of devices (statically assigned at compile time)
+|NODE_ID_LOCAL_LOOPBACK|30000| Address for the current node itself (similar to localhost)
+|NODE_ID_HOPS_BASE|30001...30999| Specify the number of hops that a packet can travel. (30 001 e.g. specifies that the packet must only reach the direct neighbours)
+|NODE_ID_SHORTEST_SINK|31000| Used to send a packet to all sink nodes (see xref:#deviceTypes[Device Types])
+|NODE_ID_APP_BASE|32000| NodeId given to non-mesh devices that can connect via a MeshAccessConnection (e.g. a Smartphone). This is replaced by a virtual partner id during communication.
+|NODE_ID_GLOBAL_DEVICE_BASE|33000...39999| Assign nodeIds uniquely over multiple meshes for the same organization (used for assets that roam between different networks)
+|NODE_ID_INVALID|65535| Invalid node ID, which is used for internal errors
+|-|others| All other node IDs are currently reserved
 |===
 
 [#SerialNumbers]
@@ -229,7 +283,6 @@ used.
 There are different device types that are given to nodes with specific functionality:
 
 .List of Device Types
-[cols="1,2,4"]
 |===
 |DeviceType |Name |Description
 
@@ -265,7 +318,6 @@ FruityMesh will boot with random data (random _nodeId_ / _serialNumber_ /
 persistent across reboots as it is generated according to the internal chip id from the FICR. Layout of UICR memory:
 
 .Layout of UICR memory
-[cols="1,1,2,3"]
 |===
 |Offset|Size (Bytes)|Name|Description
 

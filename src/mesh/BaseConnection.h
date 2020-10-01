@@ -31,7 +31,7 @@
 
 #pragma once
 
-#include <types.h>
+#include <FmTypes.h>
 #include <Config.h>
 #include <PacketQueue.h>
 #include <Logger.h>
@@ -121,6 +121,8 @@ enum class AppDisconnectReason : u8 {
     EMERGENCY_DISCONNECT_RESET = 35,
     SCHEDULED_REMOVE = 36,
     SERIAL_CONNECT_TIMEOUT = 37,
+    EN_OCEAN_ENROLLED_AND_IN_MESH = 38,
+    MULTIPLE_MA_ON_ASSET = 39,
 };
 
 
@@ -203,6 +205,9 @@ class BaseConnection
         virtual void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData);
         //Fills the tx buffers of the softdevice with the packets from the packet queue
         virtual void FillTransmitBuffers();
+        //Gets passed the exact same data that was passed to the HAL. If that data was encrypted, the passed data
+        //to this function is encrypted as well (e.g. in the MeshAccessConnection). This means that the data passed
+        //to this function is the same as was returned by ProcessDataBeforeTransmission.
         virtual void DataSentHandler(const u8* data, u16 length) {};
 
         //Handler
@@ -214,7 +219,7 @@ class BaseConnection
         virtual void ConnectionMtuUpgradedHandler(u16 gattPayloadSize);
         //Called when data from a connection is received
         virtual void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) = 0;
-        //Can be called by subclasses to use the connPacketHeader reassembly
+        //Can be called by subclasses to use the ConnPacketHeader reassembly
         u8 const * ReassembleData(BaseConnectionSendData* sendData, u8 const * data);
         SizedData GetSplitData(const BaseConnectionSendData &sendData, u8* data, u8* packetBuffer) const;
 
@@ -237,9 +242,9 @@ class BaseConnection
         u8 GetNextQueueHandle();
 
         //Getter
-        bool isDisconnected() const{ return connectionState == ConnectionState::DISCONNECTED; };
-        bool isConnected() const{ return connectionState >= ConnectionState::CONNECTED; };
-        bool handshakeDone() const{ return connectionState >= ConnectionState::HANDSHAKE_DONE; };
+        bool IsDisconnected() const{ return connectionState == ConnectionState::DISCONNECTED; };
+        bool IsConnected() const{ return connectionState >= ConnectionState::CONNECTED; };
+        bool HandshakeDone() const{ return connectionState >= ConnectionState::HANDSHAKE_DONE; };
 
         //Variables
         u8 connectionId;
@@ -255,7 +260,7 @@ class BaseConnection
 
         //Buffers
         bool bufferFull = false; //Set to true once the softdevice reports that all buffers are full
-        u8 manualPacketsSent = 0; //Used to count the packets manually sent to the softdevice using bleWriteCharacteristic, will be decremented first before packets from the queue are removed. Packets must not be sent while the queue is working
+        u8 manualPacketsSent = 0; //Used to count the packets manually sent to the softdevice using BleWriteCharacteristic, will be decremented first before packets from the queue are removed. Packets must not be sent while the queue is working
 
         //Normal Prio Queue
         u32 packetSendBuffer[PACKET_SEND_BUFFER_SIZE / sizeof(u32)] = {};
@@ -267,7 +272,7 @@ class BaseConnection
 
         u8 packetQueuedHandleCounter = PACKET_QUEUED_HANDLE_COUNTER_START; //Used to assign handles to queued packets
 
-        std::array<u8, PACKET_REASSEMBLY_BUFFER_SIZE> packetReassemblyBuffer{};
+        alignas(4) std::array<u8, PACKET_REASSEMBLY_BUFFER_SIZE> packetReassemblyBuffer{};
         u8 packetReassemblyPosition = 0; //Set to 0 if no reassembly is in progress
 
         //Partner

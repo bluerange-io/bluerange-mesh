@@ -303,7 +303,7 @@ takes more time because of this challenge and response scheme.
 Because of the limited number of bytes that can – and should – be
 transmitted between devices, it is necessary to implement a binary
 communication protocol. All data types and packet declarations can be
-found in _inc/types.h_.
+found in src/base/types/Types.h_.
 
 Some of the most common data types are:
 

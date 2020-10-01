@@ -101,13 +101,13 @@ class IoModule: public Module
 
         IoModule();
 
-        void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
+        void ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfigLength) override final;
 
         void ResetToDefaultConfiguration() override final;
 
         void TimerEventHandler(u16 passedTimeDs) override final;
 
-        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
+        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader) override final;
 
         #ifdef TERMINAL_ENABLED
         TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;

@@ -249,7 +249,7 @@ class DebugModule: public Module
 
         DebugModule();
 
-        void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
+        void ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfigLength) override final;
 
         void ResetToDefaultConfiguration() override final;
 
@@ -265,9 +265,9 @@ class DebugModule: public Module
         TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
         #endif
 
-        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
+        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader) override final;
 
-        u32 getPacketsIn();
-        u32 getPacketsOut();
+        u32 GetPacketsIn();
+        u32 GetPacketsOut();
         
 };

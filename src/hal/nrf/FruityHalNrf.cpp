@@ -37,7 +37,7 @@
 #include <array>
 #include "FruityHal.h"
 #include "FruityMesh.h"
-#include <types.h>
+#include <FmTypes.h>
 #include <GlobalState.h>
 #include <Logger.h>
 #include <ScanController.h>
@@ -793,7 +793,7 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
 
         logt("FH", "Reply MTU Exchange (%u) on conn %u with %u", err, bleEvent.evt.gatts_evt.conn_handle, effectiveMtu);
 
-        ConnectionManager::getInstance().MtuUpdatedHandler(bleEvent.evt.gatts_evt.conn_handle, effectiveMtu);
+        ConnectionManager::GetInstance().MtuUpdatedHandler(bleEvent.evt.gatts_evt.conn_handle, effectiveMtu);
 
         break;
     }
@@ -805,7 +805,7 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
 
         logt("FH", "MTU for hnd %u updated to %u", bleEvent.evt.gattc_evt.conn_handle, effectiveMtu);
 
-        ConnectionManager::getInstance().MtuUpdatedHandler(bleEvent.evt.gattc_evt.conn_handle, effectiveMtu);
+        ConnectionManager::GetInstance().MtuUpdatedHandler(bleEvent.evt.gattc_evt.conn_handle, effectiveMtu);
     }
     break;
 
@@ -855,12 +855,12 @@ FruityHal::GapEvent::GapEvent(void const * _evt)
 {
 }
 
-u16 FruityHal::GapEvent::getConnectionHandle() const
+u16 FruityHal::GapEvent::GetConnectionHandle() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.conn_handle;
 }
 
-u16 FruityHal::GapConnParamUpdateEvent::getMaxConnectionInterval() const
+u16 FruityHal::GapConnParamUpdateEvent::GetMaxConnectionInterval() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.max_conn_interval;
 }
@@ -874,7 +874,7 @@ FruityHal::GapRssiChangedEvent::GapRssiChangedEvent(void const * _evt)
     }
 }
 
-i8 FruityHal::GapRssiChangedEvent::getRssi() const
+i8 FruityHal::GapRssiChangedEvent::GetRssi() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.rssi_changed.rssi;
 }
@@ -888,12 +888,12 @@ FruityHal::GapAdvertisementReportEvent::GapAdvertisementReportEvent(void const *
     }
 }
 
-i8 FruityHal::GapAdvertisementReportEvent::getRssi() const
+i8 FruityHal::GapAdvertisementReportEvent::GetRssi() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.rssi;
 }
 
-const u8 * FruityHal::GapAdvertisementReportEvent::getData() const
+const u8 * FruityHal::GapAdvertisementReportEvent::GetData() const
 {
 #if (SDK == 15)
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.data.p_data;
@@ -902,7 +902,7 @@ const u8 * FruityHal::GapAdvertisementReportEvent::getData() const
 #endif
 }
 
-u32 FruityHal::GapAdvertisementReportEvent::getDataLength() const
+u32 FruityHal::GapAdvertisementReportEvent::GetDataLength() const
 {
 #if (SDK == 15)
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.data.len;
@@ -911,19 +911,19 @@ u32 FruityHal::GapAdvertisementReportEvent::getDataLength() const
 #endif
 }
 
-FruityHal::BleGapAddrBytes FruityHal::GapAdvertisementReportEvent::getPeerAddr() const
+FruityHal::BleGapAddrBytes FruityHal::GapAdvertisementReportEvent::GetPeerAddr() const
 {
     FruityHal::BleGapAddrBytes retVal{};
     CheckedMemcpy(retVal.data(), ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.peer_addr.addr, FH_BLE_GAP_ADDR_LEN)
     return retVal;
 }
 
-FruityHal::BleGapAddrType FruityHal::GapAdvertisementReportEvent::getPeerAddrType() const
+FruityHal::BleGapAddrType FruityHal::GapAdvertisementReportEvent::GetPeerAddrType() const
 {
     return (BleGapAddrType)((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.peer_addr.addr_type;
 }
 
-bool FruityHal::GapAdvertisementReportEvent::isConnectable() const
+bool FruityHal::GapAdvertisementReportEvent::IsConnectable() const
 {
 #if (SDK == 15)
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.type.connectable == 0x01;
@@ -957,22 +957,22 @@ FruityHal::GapConnectedEvent::GapConnectedEvent(void const * _evt)
     }
 }
 
-FruityHal::GapRole FruityHal::GapConnectedEvent::getRole() const
+FruityHal::GapRole FruityHal::GapConnectedEvent::GetRole() const
 {
     return (GapRole)(((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.connected.role);
 }
 
-u8 FruityHal::GapConnectedEvent::getPeerAddrType() const
+u8 FruityHal::GapConnectedEvent::GetPeerAddrType() const
 {
     return (((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.connected.peer_addr.addr_type);
 }
 
-u16 FruityHal::GapConnectedEvent::getMinConnectionInterval() const
+u16 FruityHal::GapConnectedEvent::GetMinConnectionInterval() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.connected.conn_params.min_conn_interval;
 }
 
-FruityHal::BleGapAddrBytes FruityHal::GapConnectedEvent::getPeerAddr() const
+FruityHal::BleGapAddrBytes FruityHal::GapConnectedEvent::GetPeerAddr() const
 {
     FruityHal::BleGapAddrBytes retVal{};
     CheckedMemcpy(retVal.data(), ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.connected.peer_addr.addr, FH_BLE_GAP_ADDR_LEN)
@@ -988,7 +988,7 @@ FruityHal::GapDisconnectedEvent::GapDisconnectedEvent(void const * _evt)
     }
 }
 
-FruityHal::BleHciError FruityHal::GapDisconnectedEvent::getReason() const
+FruityHal::BleHciError FruityHal::GapDisconnectedEvent::GetReason() const
 {
     return (FruityHal::BleHciError)((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.disconnected.reason;
 }
@@ -1002,7 +1002,7 @@ FruityHal::GapTimeoutEvent::GapTimeoutEvent(void const * _evt)
     }
 }
 
-FruityHal::GapTimeoutSource FruityHal::GapTimeoutEvent::getSource() const
+FruityHal::GapTimeoutSource FruityHal::GapTimeoutEvent::GetSource() const
 {
     switch (((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.timeout.src)
     {
@@ -1039,17 +1039,17 @@ FruityHal::GapConnectionSecurityUpdateEvent::GapConnectionSecurityUpdateEvent(vo
     }
 }
 
-u8 FruityHal::GapConnectionSecurityUpdateEvent::getKeySize() const
+u8 FruityHal::GapConnectionSecurityUpdateEvent::GetKeySize() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_sec_update.conn_sec.encr_key_size;
 }
 
-FruityHal::SecurityLevel FruityHal::GapConnectionSecurityUpdateEvent::getSecurityLevel() const
+FruityHal::SecurityLevel FruityHal::GapConnectionSecurityUpdateEvent::GetSecurityLevel() const
 {
     return (FruityHal::SecurityLevel)(((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_sec_update.conn_sec.sec_mode.lv);
 }
 
-FruityHal::SecurityMode FruityHal::GapConnectionSecurityUpdateEvent::getSecurityMode() const
+FruityHal::SecurityMode FruityHal::GapConnectionSecurityUpdateEvent::GetSecurityMode() const
 {
     return (FruityHal::SecurityMode)(((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_sec_update.conn_sec.sec_mode.sm);
 }
@@ -1059,12 +1059,12 @@ FruityHal::GattcEvent::GattcEvent(void const * _evt)
 {
 }
 
-u16 FruityHal::GattcEvent::getConnectionHandle() const
+u16 FruityHal::GattcEvent::GetConnectionHandle() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gattc_evt.conn_handle;
 }
 
-FruityHal::BleGattEror FruityHal::GattcEvent::getGattStatus() const
+FruityHal::BleGattEror FruityHal::GattcEvent::GetGattStatus() const
 {
     return nrfErrToGenericGatt(((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gattc_evt.gatt_status);
 }
@@ -1099,7 +1099,7 @@ FruityHal::GattDataTransmittedEvent::GattDataTransmittedEvent(void const * _evt)
 #endif
 }
 
-u16 FruityHal::GattDataTransmittedEvent::getConnectionHandle() const
+u16 FruityHal::GattDataTransmittedEvent::GetConnectionHandle() const
 {
     if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id == BLE_GATTC_EVT_WRITE_CMD_TX_COMPLETE) {
         return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gattc_evt.conn_handle;
@@ -1111,12 +1111,12 @@ u16 FruityHal::GattDataTransmittedEvent::getConnectionHandle() const
     return -1; //This must never be executed!
 }
 
-bool FruityHal::GattDataTransmittedEvent::isConnectionHandleValid() const
+bool FruityHal::GattDataTransmittedEvent::IsConnectionHandleValid() const
 {
-    return getConnectionHandle() != FruityHal::FH_BLE_INVALID_HANDLE;
+    return GetConnectionHandle() != FruityHal::FH_BLE_INVALID_HANDLE;
 }
 
-u32 FruityHal::GattDataTransmittedEvent::getCompleteCount() const
+u32 FruityHal::GattDataTransmittedEvent::GetCompleteCount() const
 {
     if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id == BLE_GATTC_EVT_WRITE_CMD_TX_COMPLETE) {
         return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gattc_evt.params.write_cmd_tx_complete.count;
@@ -1137,27 +1137,27 @@ FruityHal::GattsWriteEvent::GattsWriteEvent(void const * _evt)
     }
 }
 
-u16 FruityHal::GattsWriteEvent::getAttributeHandle() const
+u16 FruityHal::GattsWriteEvent::GetAttributeHandle() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gatts_evt.params.write.handle;
 }
 
-bool FruityHal::GattsWriteEvent::isWriteRequest() const
+bool FruityHal::GattsWriteEvent::IsWriteRequest() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gatts_evt.params.write.op == BLE_GATTS_OP_WRITE_REQ;
 }
 
-u16 FruityHal::GattsWriteEvent::getLength() const
+u16 FruityHal::GattsWriteEvent::GetLength() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gatts_evt.params.write.len;
 }
 
-u16 FruityHal::GattsWriteEvent::getConnectionHandle() const
+u16 FruityHal::GattsWriteEvent::GetConnectionHandle() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gatts_evt.conn_handle;
 }
 
-u8 const * FruityHal::GattsWriteEvent::getData() const
+u8 const * FruityHal::GattsWriteEvent::GetData() const
 {
     return (u8 const *)((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gatts_evt.params.write.data;
 }
@@ -1171,17 +1171,17 @@ FruityHal::GattcHandleValueEvent::GattcHandleValueEvent(void const * _evt)
     }
 }
 
-u16 FruityHal::GattcHandleValueEvent::getHandle() const
+u16 FruityHal::GattcHandleValueEvent::GetHandle() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gattc_evt.params.hvx.handle;
 }
 
-u16 FruityHal::GattcHandleValueEvent::getLength() const
+u16 FruityHal::GattcHandleValueEvent::GetLength() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gattc_evt.params.hvx.len;
 }
 
-u8 const * FruityHal::GattcHandleValueEvent::getData() const
+u8 const * FruityHal::GattcHandleValueEvent::GetData() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gattc_evt.params.hvx.data;
 }
@@ -1623,7 +1623,7 @@ bool FruityHal::DiscoveryIsInProgress()
     NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
     return halMemory->discoveredServices.discovery_in_progress;
 #else
-    return false;
+    return sd_currently_in_discovery();
 #endif
 }
 
@@ -1640,7 +1640,11 @@ ErrorType FruityHal::BleGattSendNotification(u16 connHandle, BleGattWriteParams 
     else if (params.type == BleGattWriteType::INDICATION) notificationParams.type = BLE_GATT_HVX_INDICATION;
     else return ErrorType::INVALID_PARAM;
     
-    return nrfErrToGeneric(sd_ble_gatts_hvx(connHandle, &notificationParams));
+    ErrorType retVal = nrfErrToGeneric(sd_ble_gatts_hvx(connHandle, &notificationParams));
+
+    logt("FH", "BleGattSendNotification(%u)", (u32)retVal);
+
+    return retVal;
 }
 
 ErrorType FruityHal::BleGattWrite(u16 connHandle, BleGattWriteParams const & params)
@@ -2015,7 +2019,7 @@ extern "C"
     void app_error_handler(uint32_t error_code, uint32_t line_num, const u8 * p_file_name)
     {
         app_error_handler_bare(error_code);
-        logt("ERROR", "App error code:%s(%u), file:%s, line:%u", Logger::getGeneralErrorString((ErrorType)error_code), (u32)error_code, p_file_name, (u32)line_num);
+        logt("ERROR", "App error code:%s(%u), file:%s, line:%u", Logger::GetGeneralErrorString((ErrorType)error_code), (u32)error_code, p_file_name, (u32)line_num);
     }
 
 #ifndef SIM_ENABLED

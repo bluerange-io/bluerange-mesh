@@ -33,12 +33,12 @@
 static std::map<std::type_index, int> ignoredExceptions;
 static int disableDebugBreakOnExceptionCounter = 0;
 
-bool Exceptions::getDebugBreakOnException()
+bool Exceptions::GetDebugBreakOnException()
 {
     return disableDebugBreakOnExceptionCounter <= 0;
 }
 
-void Exceptions::disableExceptionByIndex(std::type_index index)
+void Exceptions::DisableExceptionByIndex(std::type_index index)
 {
     if (ignoredExceptions.find(index) == ignoredExceptions.end()) {
         ignoredExceptions.insert({ index, 1 });
@@ -48,7 +48,7 @@ void Exceptions::disableExceptionByIndex(std::type_index index)
     }
 }
 
-void Exceptions::enableExceptionByIndex(std::type_index index)
+void Exceptions::EnableExceptionByIndex(std::type_index index)
 {
     if (ignoredExceptions.find(index) == ignoredExceptions.end()) {
         SIMEXCEPTION(MemoryCorruptionException);
@@ -62,7 +62,7 @@ void Exceptions::enableExceptionByIndex(std::type_index index)
     }
 }
 
-bool Exceptions::isExceptionEnabledByIndex(std::type_index index)
+bool Exceptions::IsExceptionEnabledByIndex(std::type_index index)
 {
     if (ignoredExceptions.find(index) == ignoredExceptions.end()) {
         return true;

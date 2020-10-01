@@ -118,13 +118,13 @@ void from_json(const nlohmann::json & j, SimConfiguration & config)
 
 void SimConfiguration::SetToPerfectConditions()
 {
-    this->interruptProbability = 1;
+    this->interruptProbability = UINT32_MAX;
     this->connectionTimeoutProbabilityPerSec = 0;
     this->sdBleGapAdvDataSetFailProbability = 0;
     this->sdBusyProbability = 0;
-    this->asyncFlashCommitTimeProbability = 1;
-    this->receptionProbabilityVeryClose = 1;
-    this->receptionProbabilityClose = 1;
-    this->receptionProbabilityFar = 1;
-    this->receptionProbabilityVeryFar = 1;
+    this->asyncFlashCommitTimeProbability = UINT32_MAX;
+    this->receptionProbabilityVeryClose = UINT32_MAX;
+    this->receptionProbabilityClose = UINT32_MAX;
+    this->receptionProbabilityFar = UINT32_MAX;
+    this->receptionProbabilityVeryFar = UINT32_MAX;
 }

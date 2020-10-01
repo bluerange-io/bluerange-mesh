@@ -28,7 +28,7 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "types.h"
+#include "FmTypes.h"
 #include "StackWatcher.h"
 #include "Exceptions.h"
 #include <cstdio> //for std::size_t
@@ -36,7 +36,7 @@
 std::vector<const void*> StackWatcher::stackBase;
 u32 StackWatcher::disableValue = 0;
 
-void StackWatcher::check()
+void StackWatcher::Check()
 {
     if (stackBase.size() == 0)
     {

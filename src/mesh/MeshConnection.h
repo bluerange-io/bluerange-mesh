@@ -74,11 +74,11 @@ class MeshConnection
         //Timestamp and Clustering messages must be sent immediately and are not queued
         //Multiple updates can accumulate in this variable
         //This packet must not be sent during handshakes
-        connPacketClusterInfoUpdate currentClusterInfoUpdatePacket;
+        ConnPacketClusterInfoUpdate currentClusterInfoUpdatePacket;
 
         //Handshake
-        connPacketClusterAck1 clusterAck1Packet;
-        connPacketClusterAck2 clusterAck2Packet;
+        ConnPacketClusterAck1 clusterAck1Packet;
+        ConnPacketClusterAck2 clusterAck2Packet;
 
         //Timing
         TimeSyncState timeSyncState = TimeSyncState::UNSYNCED;
@@ -112,7 +112,7 @@ class MeshConnection
         void ReceiveHandshakePacketHandler(BaseConnectionSendData* sendData, u8 const * data);
         void SendReconnectionHandshakePacket();
         ErrorType SendReconnectionHandshakePacketAfterMtuExchange(); //Pay attention as this might disconnect the connection
-        void ReceiveReconnectionHandshakePacket(connPacketReconnect const * packet);
+        void ReceiveReconnectionHandshakePacket(ConnPacketReconnect const * packet);
 
         bool SendHandshakeMessage(u8* data, u16 dataLength, bool reliable);
 
@@ -146,6 +146,6 @@ class MeshConnection
         bool IsValidMessageType(MessageType type);
 
         //Setter
-        void setHopsToSink(ClusterSize hops);
-        ClusterSize getHopsToSink();
+        void SetHopsToSink(ClusterSize hops);
+        ClusterSize GetHopsToSink();
 };

@@ -41,7 +41,7 @@
 #include <Module.h>
 #include <Node.h>
 #include <StatusReporterModule.h>
-#include <AdvertisingModule.h>
+#include <BeaconingModule.h>
 #include <DebugModule.h>
 #include <ScanningModule.h>
 #include <EnrollmentModule.h>
@@ -50,7 +50,7 @@
 #include <Logger.h>
 #include <LedWrapper.h>
 #include <Utility.h>
-#include <types.h>
+#include <FmTypes.h>
 #include <FlashStorage.h>
 
 #ifndef GITHUB_RELEASE
@@ -111,7 +111,7 @@ void BootFruityMesh()
 #endif //!SIM_ENABLED
 
     //Check for reboot reason
-    checkRamRetainStruct();
+    CheckRamRetainStruct();
 
     //If reboot reason is empty (clean power bootup) or
     bool safeBootEnabled = false;
@@ -134,12 +134,12 @@ void BootFruityMesh()
     FruityHal::SetRetentionRegisterTwo(0x0);
 
     //Instanciate RecordStorage to load the board config
-    RecordStorage::getInstance().Init();
+    RecordStorage::GetInstance().Init();
 
     //Load the board configuration which should then give us all the necessary pins and
     //configuration to proceed initializing everything else
     //Load board configuration from flash only if it is not in safe boot mode
-    Boardconf::getInstance().Initialize();
+    Boardconf::GetInstance().Initialize();
 
     //Configure LED pins as output
     GS->ledRed.Init(Boardconfig->led1Pin, Boardconfig->ledActiveHigh);
@@ -156,75 +156,75 @@ void BootFruityMesh()
     GS->ledBlue.Off();
 
     //Load the configuration from flash only if it is not in safeBoot mode
-    Conf::getInstance().Initialize(safeBootEnabled);
+    Conf::GetInstance().Initialize(safeBootEnabled);
 
 
     //Initialize the UART Terminal
-    Terminal::getInstance().Init();
+    Terminal::GetInstance().Init();
 
     //Initialize ConnectionManager
-    ConnectionManager::getInstance().Init();
+    ConnectionManager::GetInstance().Init();
 #ifdef SIM_ENABLED
     cherrySimInstance->ChooseSimulatorTerminal(); //TODO: Maybe remove
 #endif
 
 #if IS_INACTIVE(GW_SAVE_SPACE)
     //Enable logging for some interesting log tags
-    Logger::getInstance().enableTag("MAIN");
-    Logger::getInstance().enableTag("INS");
-    Logger::getInstance().enableTag("NODE");
-    Logger::getInstance().enableTag("STORAGE");
-    Logger::getInstance().enableTag("FLASH"); //FLASHSTORAGE
-    Logger::getInstance().enableTag("DATA");
-    Logger::getInstance().enableTag("SEC");
-    Logger::getInstance().enableTag("HANDSHAKE");
-//    Logger::getInstance().enableTag("DECISION");
-//    Logger::getInstance().enableTag("DISCOVERY");
-    Logger::getInstance().enableTag("CONN");
-    Logger::getInstance().enableTag("STATES");
-//    Logger::getInstance().enableTag("ADV");
-//    Logger::getInstance().enableTag("SINK");
-//    Logger::getInstance().enableTag("CM");
-    Logger::getInstance().enableTag("DISCONNECT");
-//    Logger::getInstance().enableTag("JOIN");
-    Logger::getInstance().enableTag("GATTCTRL");
-    Logger::getInstance().enableTag("CONN");
-//    Logger::getInstance().enableTag("CONN_DATA");
-    Logger::getInstance().enableTag("MACONN");
-    Logger::getInstance().enableTag("EINK");
-    Logger::getInstance().enableTag("RCONN");
-    Logger::getInstance().enableTag("CONFIG");
-    Logger::getInstance().enableTag("RS");
-//    Logger::getInstance().enableTag("PQ");
-    Logger::getInstance().enableTag("C");
-//    Logger::getInstance().enableTag("FH");
-    Logger::getInstance().enableTag("TEST");
-    Logger::getInstance().enableTag("MODULE");
-    Logger::getInstance().enableTag("STATUSMOD");
-//    Logger::getInstance().enableTag("DEBUGMOD");
-    Logger::getInstance().enableTag("ENROLLMOD");
-//    Logger::getInstance().enableTag("IOMOD");
-//    Logger::getInstance().enableTag("SCANMOD");
-//    Logger::getInstance().enableTag("PINGMOD");
-    Logger::getInstance().enableTag("DFUMOD");
-    Logger::getInstance().enableTag("CLCMOD");
-    Logger::getInstance().enableTag("MAMOD");
-//    Logger::getInstance().enableTag("CLCCOMM");
-//    Logger::getInstance().enableTag("VSMOD");
-    Logger::getInstance().enableTag("VSDBG");
-//    Logger::getInstance().enableTag("VSCOMM");
-    Logger::getInstance().enableTag("ASMOD");
-//    Logger::getInstance().enableTag("GYRO");
-//    Logger::getInstance().enableTag("EVENTS");
-//    Logger::getInstance().enableTag("SC");
-//    Logger::getInstance().enableTag("WMCOMM");
-//    Logger::getInstance().enableTag("WMMOD");
-//    Logger::getInstance().enableTag("BME");
-//    Logger::getInstance().enableTag("ADVS");
+    Logger::GetInstance().EnableTag("MAIN");
+    Logger::GetInstance().EnableTag("INS");
+    Logger::GetInstance().EnableTag("NODE");
+    Logger::GetInstance().EnableTag("STORAGE");
+    Logger::GetInstance().EnableTag("FLASH"); //FLASHSTORAGE
+    Logger::GetInstance().EnableTag("DATA");
+    Logger::GetInstance().EnableTag("SEC");
+    Logger::GetInstance().EnableTag("HANDSHAKE");
+//    Logger::GetInstance().EnableTag("DECISION");
+//    Logger::GetInstance().EnableTag("DISCOVERY");
+    Logger::GetInstance().EnableTag("CONN");
+    Logger::GetInstance().EnableTag("STATES");
+//    Logger::GetInstance().EnableTag("ADV");
+//    Logger::GetInstance().EnableTag("SINK");
+//    Logger::GetInstance().EnableTag("CM");
+    Logger::GetInstance().EnableTag("DISCONNECT");
+//    Logger::GetInstance().EnableTag("JOIN");
+    Logger::GetInstance().EnableTag("GATTCTRL");
+    Logger::GetInstance().EnableTag("CONN");
+//    Logger::GetInstance().EnableTag("CONN_DATA");
+    Logger::GetInstance().EnableTag("MACONN");
+    Logger::GetInstance().EnableTag("EINK");
+    Logger::GetInstance().EnableTag("RCONN");
+    Logger::GetInstance().EnableTag("CONFIG");
+    Logger::GetInstance().EnableTag("RS");
+//    Logger::GetInstance().EnableTag("PQ");
+    Logger::GetInstance().EnableTag("C");
+//    Logger::GetInstance().EnableTag("FH");
+    Logger::GetInstance().EnableTag("TEST");
+    Logger::GetInstance().EnableTag("MODULE");
+    Logger::GetInstance().EnableTag("STATUSMOD");
+//    Logger::GetInstance().EnableTag("DEBUGMOD");
+    Logger::GetInstance().EnableTag("ENROLLMOD");
+//    Logger::GetInstance().EnableTag("IOMOD");
+//    Logger::GetInstance().EnableTag("SCANMOD");
+//    Logger::GetInstance().EnableTag("PINGMOD");
+    Logger::GetInstance().EnableTag("DFUMOD");
+    Logger::GetInstance().EnableTag("CLCMOD");
+    Logger::GetInstance().EnableTag("MAMOD");
+//    Logger::GetInstance().EnableTag("CLCCOMM");
+//    Logger::GetInstance().EnableTag("VSMOD");
+    Logger::GetInstance().EnableTag("VSDBG");
+//    Logger::GetInstance().EnableTag("VSCOMM");
+    Logger::GetInstance().EnableTag("ASMOD");
+//    Logger::GetInstance().EnableTag("GYRO");
+//    Logger::GetInstance().EnableTag("EVENTS");
+//    Logger::GetInstance().EnableTag("SC");
+//    Logger::GetInstance().EnableTag("WMCOMM");
+//    Logger::GetInstance().EnableTag("WMMOD");
+//    Logger::GetInstance().EnableTag("BME");
+//    Logger::GetInstance().EnableTag("ADVS");
 #endif
     
     //Log the reboot reason to our ram log so that it is automatically queried by the sink
-    Logger::getInstance().logError(LoggingError::REBOOT, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1);
+    Logger::GetInstance().LogError(LoggingError::REBOOT, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1);
     
     //If the nordic secure dfu bootloader is enabled, disable it as soon as fruitymesh boots the first time
 #if IS_INACTIVE(GW_SAVE_SPACE)
@@ -283,10 +283,10 @@ void BootFruityMesh()
 #endif
 
     //Initialize GAP and GATT
-    GAPController::getInstance().bleConfigureGAP();
-    GATTController::getInstance().Init();
-    AdvertisingController::getInstance().Initialize();
-    ScanController::getInstance();
+    GAPController::GetInstance().BleConfigureGAP();
+    GATTController::GetInstance().Init();
+    AdvertisingController::GetInstance().Initialize();
+    ScanController::GetInstance();
 
 }
 
@@ -317,11 +317,11 @@ void BootModules()
         && GS->node.configuration.nodeId < NODE_ID_DEVICE_BASE + NODE_ID_DEVICE_BASE_SIZE
         && GET_DEVICE_TYPE() != DeviceType::ASSET)
     {
-        ErrorType err = (ErrorType)SigAccessLayer::getInstance().ProvisionNodeWithNodeId(GS->node.configuration.nodeId);
+        ErrorType err = (ErrorType)SigAccessLayer::GetInstance().ProvisionNodeWithNodeId(GS->node.configuration.nodeId);
         if (err != ErrorType::SUCCESS)
         {
             SIMEXCEPTION(SigProvisioningFailedException);
-            GS->logger.logCustomError(CustomErrorTypes::FATAL_SIG_PROVISIONING_FAILED, 1000);
+            GS->logger.LogCustomError(CustomErrorTypes::FATAL_SIG_PROVISIONING_FAILED, 1000);
         }
     }
 #endif //IS_ACTIVE(SIG_MESH)
@@ -361,7 +361,7 @@ The Event Dispatchers will distribute events to all necessary parts of FruityMes
 void DispatchSystemEvents(FruityHal::SystemEvents sys_evt)
 {
     //Hand system events to new storage class
-    FlashStorage::getInstance().SystemEventHandler(sys_evt);
+    FlashStorage::GetInstance().SystemEventHandler(sys_evt);
 }
 
 //This function dispatches once a Button was pressed for some time
@@ -388,11 +388,11 @@ void DispatchTimerEvents(u16 passedTimeDs)
 
     GS->cm.TimerEventHandler(passedTimeDs);
 
-    FlashStorage::getInstance().TimerEventHandler(passedTimeDs);
+    FlashStorage::GetInstance().TimerEventHandler(passedTimeDs);
 
-    AdvertisingController::getInstance().TimerEventHandler(passedTimeDs);
+    AdvertisingController::GetInstance().TimerEventHandler(passedTimeDs);
 
-    ScanController::getInstance().TimerEventHandler(passedTimeDs);
+    ScanController::GetInstance().TimerEventHandler(passedTimeDs);
 
 #if IS_ACTIVE(SIG_MESH)
     GS->sig.TimerEventHandler(passedTimeDs);
@@ -413,7 +413,7 @@ void DispatchEvent(const FruityHal::GapRssiChangedEvent & e)
 
 void DispatchEvent(const FruityHal::GapAdvertisementReportEvent & e)
 {
-    ScanController::getInstance().ScanEventHandler(e);
+    ScanController::GetInstance().ScanEventHandler(e);
     for (u32 i = 0; i < GS->amountOfModules; i++) {
         if (GS->activeModules[i]->configurationPointer->moduleActive) {
             GS->activeModules[i]->GapAdvertisementReportEventHandler(e);
@@ -423,8 +423,8 @@ void DispatchEvent(const FruityHal::GapAdvertisementReportEvent & e)
 
 void DispatchEvent(const FruityHal::GapConnectedEvent & e)
 {
-    GAPController::getInstance().GapConnectedEventHandler(e);
-    AdvertisingController::getInstance().GapConnectedEventHandler(e);
+    GAPController::GetInstance().GapConnectedEventHandler(e);
+    AdvertisingController::GetInstance().GapConnectedEventHandler(e);
     for (u32 i = 0; i < GS->amountOfModules; i++) {
         if (GS->activeModules[i]->configurationPointer->moduleActive) {
             GS->activeModules[i]->GapConnectedEventHandler(e);
@@ -434,8 +434,8 @@ void DispatchEvent(const FruityHal::GapConnectedEvent & e)
 
 void DispatchEvent(const FruityHal::GapDisconnectedEvent & e)
 {
-    GAPController::getInstance().GapDisconnectedEventHandler(e);
-    AdvertisingController::getInstance().GapDisconnectedEventHandler(e);
+    GAPController::GetInstance().GapDisconnectedEventHandler(e);
+    AdvertisingController::GetInstance().GapDisconnectedEventHandler(e);
     for (u32 i = 0; i < GS->amountOfModules; i++) {
         if (GS->activeModules[i]->configurationPointer->moduleActive) {
             GS->activeModules[i]->GapDisconnectedEventHandler(e);
@@ -445,42 +445,42 @@ void DispatchEvent(const FruityHal::GapDisconnectedEvent & e)
 
 void DispatchEvent(const FruityHal::GapTimeoutEvent & e)
 {
-    GAPController::getInstance().GapTimeoutEventHandler(e);
+    GAPController::GetInstance().GapTimeoutEventHandler(e);
 }
 
 void DispatchEvent(const FruityHal::GapSecurityInfoRequestEvent & e)
 {
-    GAPController::getInstance().GapSecurityInfoRequestEvenetHandler(e);
+    GAPController::GetInstance().GapSecurityInfoRequestEvenetHandler(e);
 }
 
 void DispatchEvent(const FruityHal::GapConnectionSecurityUpdateEvent & e)
 {
-    GAPController::getInstance().GapConnectionSecurityUpdateEventHandler(e);
+    GAPController::GetInstance().GapConnectionSecurityUpdateEventHandler(e);
 }
 
 void DispatchEvent(const FruityHal::GattcWriteResponseEvent & e)
 {
-    ConnectionManager::getInstance().GattcWriteResponseEventHandler(e);
+    ConnectionManager::GetInstance().GattcWriteResponseEventHandler(e);
 }
 
 void DispatchEvent(const FruityHal::GattcTimeoutEvent & e)
 {
-    ConnectionManager::getInstance().GattcTimeoutEventHandler(e);
+    ConnectionManager::GetInstance().GattcTimeoutEventHandler(e);
 }
 
 void DispatchEvent(const FruityHal::GattsWriteEvent & e)
 {
-    ConnectionManager::getInstance().GattsWriteEventHandler(e);
+    ConnectionManager::GetInstance().GattsWriteEventHandler(e);
 }
 
 void DispatchEvent(const FruityHal::GattcHandleValueEvent & e)
 {
-    ConnectionManager::getInstance().GattcHandleValueEventHandler(e);
+    ConnectionManager::GetInstance().GattcHandleValueEventHandler(e);
 }
 
 void DispatchEvent(const FruityHal::GattDataTransmittedEvent & e)
 {
-    ConnectionManager::getInstance().GattDataTransmittedEventHandler(e);
+    ConnectionManager::GetInstance().GattDataTransmittedEventHandler(e);
     for (int i = 0; i < MAX_MODULE_COUNT; i++) {
         if (GS->activeModules[i] != nullptr
             && GS->activeModules[i]->configurationPointer->moduleActive) {
@@ -636,7 +636,7 @@ void HardFaultErrorHandler(stacked_regs_t* stack)
  * After rebooting, we can read that struct to send the error information over the mesh
  * Because the ram might be corrupted upon reset, we also save a crc and clear the struct if it does not match
  */
-void checkRamRetainStruct(){
+void CheckRamRetainStruct(){
     //Check if crc matches and reset reboot reason if not
     if(GS->ramRetainStructPtr->rebootReason != RebootReason::UNKNOWN){
         u32 crc = Utility::CalculateCrc32((u8*)GS->ramRetainStructPtr, sizeof(RamRetainStruct) - 4);

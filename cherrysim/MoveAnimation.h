@@ -34,7 +34,7 @@
 #include <initializer_list>
 #include <string>
 
-#include "types.h"
+#include "FmTypes.h"
 #include "PrimitiveTypes.h"
 
 enum class MoveAnimationType : u32

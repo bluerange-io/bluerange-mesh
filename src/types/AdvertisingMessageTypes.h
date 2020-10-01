@@ -30,12 +30,20 @@
 
 
 /*
- * This file holds some structures that are used to create and parse advertising
- * packets used by the mesh.
+ * This file contains the definitions that are used to create and parse advertising (broadcast)
+ * messages used by FruityMesh.
+ * 
+ * *** ATTENTION ***
+ * These types should not be modified to stay compatible with other FruityMesh nodes.
+ * If a vendor needs to introduce additional advertising messages, they must be sent
+ * under a different company identifier or a different service uuid. The M-Way ranges
+ * must not be used for this purpose to be compatible with future firmware updates.
+ * *** ATTENTION ***
  * */
+
 #pragma once
 
-#include <types.h>
+#include <FmTypes.h>
 
 constexpr u32 ADV_PACKET_MAX_SIZE = 31;
 
@@ -45,11 +53,11 @@ constexpr u32 ADV_PACKET_MAX_SIZE = 31;
 //type across advertising and connection packets if we need to unify these.
 enum class ServiceDataMessageType : u8
 {
-    INVALID        = 0,
-    JOIN_ME_V0     = 0x01,
-    STANDARD_ASSET = 0x02,
-    MESH_ACCESS    = 0x03,
-    INS_ASSET      = 0x04,
+    INVALID      = 0,
+    JOIN_ME_V0   = 0x01,
+    LEGACY_ASSET = 0x02,
+    MESH_ACCESS  = 0x03,
+    ASSET        = 0x04,
 };
 
 //Start packing all these structures
@@ -70,8 +78,8 @@ typedef struct
     u8 len;
     u8 type;
     u8 flags;
-}advStructureFlags;
-STATIC_ASSERT_SIZE(advStructureFlags, SIZEOF_ADV_STRUCTURE_FLAGS);
+}AdvStructureFlags;
+STATIC_ASSERT_SIZE(AdvStructureFlags, SIZEOF_ADV_STRUCTURE_FLAGS);
 
 //BLE AD Type list of 16-bit service UUIDs
 constexpr size_t SIZEOF_ADV_STRUCTURE_UUID16 = 4;
@@ -80,18 +88,18 @@ typedef struct
     u8 len;
     u8 type;
     u16 uuid;
-}advStructureUUID16;
-STATIC_ASSERT_SIZE(advStructureUUID16, SIZEOF_ADV_STRUCTURE_UUID16);
+}AdvStructureUUID16;
+STATIC_ASSERT_SIZE(AdvStructureUUID16, SIZEOF_ADV_STRUCTURE_UUID16);
 
 //Header of service data + our custom messageType
 constexpr size_t SIZEOF_ADV_STRUCTURE_SERVICE_DATA_AND_TYPE = 6;
 typedef struct
 {
-    advStructureUUID16 uuid;
+    AdvStructureUUID16 uuid;
     ServiceDataMessageType messageType; //Message type depending on our custom service
     u8 reserved;
-}advStructureServiceDataAndType;
-STATIC_ASSERT_SIZE(advStructureServiceDataAndType, SIZEOF_ADV_STRUCTURE_SERVICE_DATA_AND_TYPE);
+}AdvStructureServiceDataAndType;
+STATIC_ASSERT_SIZE(AdvStructureServiceDataAndType, SIZEOF_ADV_STRUCTURE_SERVICE_DATA_AND_TYPE);
 
 //BLE AD Type Manufacturer specific data
 constexpr size_t SIZEOF_ADV_STRUCTURE_MANUFACTURER = 4;
@@ -100,18 +108,18 @@ typedef struct
     u8 len;
     u8 type;
     u16 companyIdentifier;
-}advStructureManufacturer;
-STATIC_ASSERT_SIZE(advStructureManufacturer, SIZEOF_ADV_STRUCTURE_MANUFACTURER);
+}AdvStructureManufacturer;
+STATIC_ASSERT_SIZE(AdvStructureManufacturer, SIZEOF_ADV_STRUCTURE_MANUFACTURER);
 
 
 constexpr size_t SIZEOF_ADV_PACKET_SERVICE_AND_DATA_HEADER = (SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_UUID16 + SIZEOF_ADV_STRUCTURE_SERVICE_DATA_AND_TYPE);
 typedef struct
 {
-    advStructureFlags flags;
-    advStructureUUID16 uuid;
-    advStructureServiceDataAndType data;
-}advPacketServiceAndDataHeader;
-STATIC_ASSERT_SIZE(advPacketServiceAndDataHeader, SIZEOF_ADV_PACKET_SERVICE_AND_DATA_HEADER);
+    AdvStructureFlags flags;
+    AdvStructureUUID16 uuid;
+    AdvStructureServiceDataAndType data;
+}AdvPacketServiceAndDataHeader;
+STATIC_ASSERT_SIZE(AdvPacketServiceAndDataHeader, SIZEOF_ADV_PACKET_SERVICE_AND_DATA_HEADER);
 
 
 //####### Advertising packets => Structs #################################################
@@ -121,16 +129,17 @@ STATIC_ASSERT_SIZE(advPacketServiceAndDataHeader, SIZEOF_ADV_PACKET_SERVICE_AND_
 #define SIZEOF_ADV_PACKET_HEADER (SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_MANUFACTURER + SIZEOF_ADV_PACKET_STUFF_AFTER_MANUFACTURER) //11 byte
 typedef struct
 {
-    advStructureFlags flags;
-    advStructureManufacturer manufacturer;
+    AdvStructureFlags flags;
+    AdvStructureManufacturer manufacturer;
     u8 meshIdentifier;
     NetworkId networkId;
     ServiceDataMessageType messageType;
-}advPacketHeader;
-STATIC_ASSERT_SIZE(advPacketHeader, 11);
+}AdvPacketHeader;
+STATIC_ASSERT_SIZE(AdvPacketHeader, 11);
 
 // ==> This leaves us with 20 bytes payload that are saved in the manufacturer specific data field
 
+// ######## JOIN_ME Advertising Packet #########
 
 //JOIN_ME packet that is used for cluster discovery
 //TODO: Add  the current discovery mode/length,... which would allow other nodes to determine
@@ -154,25 +163,34 @@ typedef struct
     u16 hopsToSink; //Number of hops to the shortest sink
     u16 meshWriteHandle; //The GATT handle for the mesh communication characteristic
     ClusterId ackField;//Contains the acknowledgement from another node for the slave connection procedure
-}advPacketPayloadJoinMeV0;
-STATIC_ASSERT_SIZE(advPacketPayloadJoinMeV0, 20);
+}AdvPacketPayloadJoinMeV0;
+STATIC_ASSERT_SIZE(AdvPacketPayloadJoinMeV0, 20);
 
-//####### Flooding packet #################################################
 /*
- * This packet is used to send information over the advertising channels in
- * a flooding manner. This is very inefficient and only one packet can be sent at once
- */
+ * Explanation:
+The JOIN_ME packet can have a number of different fields that contain different information.
+The version number indicates the JOIN_ME packet type
+This information can then be used in the clusterScore function to build clusters based
+on different criteria
+ * */
+#define SIZEOF_ADV_PACKET_JOIN_ME (SIZEOF_ADV_PACKET_HEADER + SIZEOF_ADV_PACKET_PAYLOAD_JOIN_ME_V0)
+typedef struct
+{
+    AdvPacketHeader header;
+    AdvPacketPayloadJoinMeV0 payload;
+}AdvPacketJoinMeV0;
+STATIC_ASSERT_SIZE(AdvPacketJoinMeV0, 31);
 
 //####### Asset Tracking #################################################
 
 #pragma pack(push)
 #pragma pack(1)
 //Service Data (max. 24 byte)
-#define SIZEOF_ADV_STRUCTURE_ASSET_INS_SERVICE_DATA 24
-struct advPacketAssetInsServiceData
+#define SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA 24
+struct AdvPacketAssetServiceData
 {
     //6 byte header
-    advStructureServiceDataAndType data;
+    AdvStructureServiceDataAndType data;
 
     //1 byte flags
     u8 gyroscopeAvailable : 1;
@@ -180,28 +198,30 @@ struct advPacketAssetInsServiceData
     u8 moving : 1;
     u8 hasFreeInConnection : 1;
     u8 interestedInConnection : 1;
-    u8 reservedBits : 3;
+    u8 positionValid : 1;
+    u8 reservedBits : 2;
 
-    //9 byte assetData
+    //8 byte assetData
     u16 assetNodeId;
     u8 batteryPower; //0xFF = not available
-    u16 absolutePositionX; //0xFFFF = not available
-    u16 absolutePositionY; //0xFFFF = not available
-    u16 pressure; //0xFFFF = not available
+    u16 absolutePositionX;
+    u16 absolutePositionY;
+    u8 pressure; //0xFF = not available
     
     NetworkId networkId;
-    //6 bytes reserved
-    //NOTE: It might be a good idea to use 4 bytes for a serial number as
-    //      that could be used to speed up the serial_connect time.
-    u8 reserved[6]; //Must be set to 0
+    u32 serialNumberIndex;
+
+    u8 reservedForTimeOrCounter[3]; //This is reserved for some kind of replay protection. DO NOT USE FOR ANYTHING ELSE! We need AT LEAST 3 bytes for this!
 };
-STATIC_ASSERT_SIZE(advPacketAssetInsServiceData, SIZEOF_ADV_STRUCTURE_ASSET_INS_SERVICE_DATA);
+STATIC_ASSERT_SIZE(AdvPacketAssetServiceData, SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA);
 
 //Service Data (max. 24 byte)
-#define SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA 24
-struct advPacketAssetServiceData
+#define SIZEOF_ADV_STRUCTURE_LEGACY_ASSET_SERVICE_DATA 24
+//Legacy support! This message is no longer sent out by our new assets, however old assets
+//must still be supported and thus this message must still be scannable.
+struct AdvPacketLegacyAssetServiceData
 {
-    advStructureServiceDataAndType data;
+    AdvStructureServiceDataAndType data;
 
     //1 byte capabilities
     u8 advertisingChannel : 2; // 0 = not available, 1=37, 2=38, 3=39
@@ -225,28 +245,10 @@ struct advPacketAssetServiceData
 
     u8 reserved2[2];
 };
-STATIC_ASSERT_SIZE(advPacketAssetServiceData, SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA);
+STATIC_ASSERT_SIZE(AdvPacketLegacyAssetServiceData, SIZEOF_ADV_STRUCTURE_LEGACY_ASSET_SERVICE_DATA);
 
 #pragma pack(pop)
 
-
-//####### Further definitions #################################################
-
-/*
- * Explanation:
-The JOIN_ME packet can have a number of different fields that contain different information.
-The version number indicates the JOIN_ME packet type
-This information can then be used in the clusterScore function to build clusters based
-on different criteria
- * */
-
-#define SIZEOF_ADV_PACKET_JOIN_ME (SIZEOF_ADV_PACKET_HEADER + SIZEOF_ADV_PACKET_PAYLOAD_JOIN_ME_V0)
-typedef struct
-{
-    advPacketHeader header;
-    advPacketPayloadJoinMeV0 payload;
-}advPacketJoinMeV0;
-STATIC_ASSERT_SIZE(advPacketJoinMeV0, 31);
 
 //End Packing
 #pragma pack(pop)

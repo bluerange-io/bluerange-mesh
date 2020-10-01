@@ -31,7 +31,6 @@
 #include "Utility.h"
 #include "CherrySimTester.h"
 #include "CherrySimUtils.h"
-#include "adv_packets.h"
 #ifndef GITHUB_RELEASE
 #include "AssetModule.h"
 #endif //GITHUB_RELEASE
@@ -55,16 +54,16 @@ TEST(TestScanningModule, TestCommands) {
     alignas(ble_evt_t) u8 buffer[1024];
     CheckedMemset(buffer, 0, sizeof(buffer));
     ble_evt_t& evt = *(ble_evt_t*)buffer;
-    advPacketServiceAndDataHeader* packet = (advPacketServiceAndDataHeader*)evt.evt.gap_evt.params.adv_report.data;
-    advPacketAssetServiceData* assetPacket = (advPacketAssetServiceData*)&packet->data;
+    AdvPacketServiceAndDataHeader* packet = (AdvPacketServiceAndDataHeader*)evt.evt.gap_evt.params.adv_report.data;
+    AdvPacketLegacyAssetServiceData* assetPacket = (AdvPacketLegacyAssetServiceData*)&packet->data;
     evt.header.evt_id = BLE_GAP_EVT_ADV_REPORT;
-    evt.evt.gap_evt.params.adv_report.dlen = SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA;
+    evt.evt.gap_evt.params.adv_report.dlen = SIZEOF_ADV_STRUCTURE_LEGACY_ASSET_SERVICE_DATA;
     evt.evt.gap_evt.params.adv_report.rssi = -45;
     packet->flags.len = SIZEOF_ADV_STRUCTURE_FLAGS - 1;
     packet->uuid.len = SIZEOF_ADV_STRUCTURE_UUID16 - 1;
     packet->data.uuid.type = (u8)BleGapAdType::TYPE_SERVICE_DATA;
     packet->data.uuid.uuid = MESH_SERVICE_DATA_SERVICE_UUID16;
-    packet->data.messageType = ServiceDataMessageType::STANDARD_ASSET;
+    packet->data.messageType = ServiceDataMessageType::LEGACY_ASSET;
     assetPacket->serialNumberIndex = 10;
     assetPacket->nodeId = 1337;
 

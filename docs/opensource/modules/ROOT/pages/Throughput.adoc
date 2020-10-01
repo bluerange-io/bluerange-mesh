@@ -10,7 +10,7 @@ Updating the PHY to 2Mbit did result in serious problems with these settings as 
 
 The scan interval and window were increased so that the scan does rarely interrupt the connections, while still being able to pick up a high number of advertisements during its increased and uninterrupted scan window.
 
-Using packet splitting will result in significant throughput reduction and an increased latency as packets need to be reassembled on each node. Using a higher MTU has to be implemented to reduce the performance hit by packet splitting. Increasing the MTU will not affect the throughput of packets with a size of 20 byte.
+Using packet splitting results in significant throughput reduction and an increased latency as packets need to be reassembled on each node. Using a higher MTU has been implemented to reduce the performance hit by packet splitting (See xref:Connections.adoc#MtuUpgrade[MTU Upgrade]). Increasing the MTU does not affect the throughput of packets with a size of 20 byte.
 
 === Measurement Results
 

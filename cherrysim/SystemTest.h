@@ -72,6 +72,8 @@
 
 #include <debugbreak.h>
 
+//NOTE: As this files simulates Vendor APIs, it is not following our Conventions.
+
 //FIXME: This was used to wrap some problematic areas in the code that could not be compiled by VS
 #define SIM_PROBLEM
 
@@ -134,6 +136,7 @@ extern "C" {
 #define ACTIVATE_ASSET_MODULE 1
 #define ACTIVATE_VS_MODULE 1
 #define ACTIVATE_WM_MODULE 1
+#define ACTIVATE_BP_MODULE 1
 #define ACTIVATE_MODBUS_MODULE 1
 #define ACTIVATE_MODBUS_COMM 1
 #define ACTIVATE_INS 1
@@ -678,7 +681,7 @@ uint32_t bme280_set_interval(uint32_t);
 uint32_t bme280_read_reg(uint32_t);
 uint32_t bme280_read_measurements();
 uint32_t bme280_get_pressure();
-uint32_t bme280_get_temperature();
+int32_t bme280_get_temperature();
 uint32_t bme280_get_humidity();
 
 #define SIM_MAX_FLASH_SIZE (4096 * 128)
@@ -762,6 +765,7 @@ uint32_t sd_ecb_block_encrypt(nrf_ecb_hal_data_t * p_ecb_data);
 uint32_t sd_ble_opt_set(uint32_t opt_id, ble_opt_t const *p_opt);
 uint32_t sd_power_reset_reason_clr(uint32_t p);
 uint32_t sd_ble_gattc_descriptors_discover(uint16_t conn_handle, ble_gattc_handle_range_t const *p_handle_range);
+bool     sd_currently_in_discovery(); //This function only exists in the simulator!
 
 uint32_t NVIC_SystemReset();
 
@@ -778,14 +782,16 @@ uint32_t sim_get_stack_type();
 
 //Configuration
 struct ModuleConfiguration;
+struct VendorModuleConfiguration;
 #ifdef __cplusplus
-void setBoardConfiguration_CherrySim(struct BoardConfiguration* config);
+void SetBoardConfiguration_CherrySim(struct BoardConfiguration* config);
 #endif
-void setFeaturesetConfiguration_CherrySim(struct ModuleConfiguration* config, void* module);
-uint32_t initializeModules_CherrySim(bool createModule);
+void SetFeaturesetConfiguration_CherrySim(struct ModuleConfiguration* config, void* module);
+void SetFeaturesetConfigurationVendor_CherrySim(struct VendorModuleConfiguration* config, void* module);
+uint32_t InitializeModules_CherrySim(bool createModule);
 
 //Helpers
-bool isEmpty(const uint8_t* data, uint32_t length);
+bool IsEmpty(const uint8_t* data, uint32_t length);
 
 #ifdef __cplusplus
 }

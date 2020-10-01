@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include <types.h>
+#include <FmTypes.h>
 #include <BaseConnection.h>
 
 class MeshAccessModule;
@@ -52,7 +52,7 @@ enum class MeshAccessTunnelType: u8
 #pragma pack(1)
 struct DeadDataMessage
 {
-    connPacketHeader header;
+    ConnPacketHeader header;
     u8 magicNumber[8];
 };
 constexpr u8 deadDataMagicNumber[] = { 0xDE, 0xAD, 0xDA, 0xDA, 0x00, 0xFF, 0x77, 0x33 };
@@ -140,9 +140,9 @@ public:
 
     /*############### Handshake ##################*/
     void StartHandshake(FmKeyId fmKeyId);
-    void HandshakeANonce(connPacketEncryptCustomStart const * inPacket);
-    void OnANonceReceived(connPacketEncryptCustomANonce const * inPacket);
-    void OnSNonceReceived(connPacketEncryptCustomSNonce const * inPacket);
+    void HandshakeANonce(ConnPacketEncryptCustomStart const * inPacket);
+    void OnANonceReceived(ConnPacketEncryptCustomANonce const * inPacket);
+    void OnSNonceReceived(ConnPacketEncryptCustomSNonce const * inPacket);
     void OnHandshakeComplete();
 
     void SendClusterState();
@@ -171,10 +171,11 @@ public:
     /*############### Handler ##################*/
     void ConnectionSuccessfulHandler(u16 connectionHandle) override final;
     void GATTServiceDiscoveredHandler(FruityHal::BleGattDBDiscoveryEvent &evt) override final;
+    void DataSentHandler(const u8* data, u16 length) override final;
 
     void PrintStatus() override final;
 
-    u32 getAmountOfCorruptedMessaged();
+    u32 GetAmountOfCorruptedMessaged();
 
     // Keeps this connection alive for at least timeDs. If no scheduled removal time is set yet, this
     // it setting the scheduled removal time. If a scheduled removal time is already set, this method

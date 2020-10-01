@@ -29,39 +29,68 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <types.h>
+#include <FmTypes.h>
 #include <FlashStorage.h>
 
 #if IS_ACTIVE(SIG_MESH)
 #include <SigConfig.h>
 #endif //IS_ACTIVE(SIG_MESH)
 
- /*## RecordIds #############################################################*/
- // The modules use their moduleId as a recordId, records outside this range can be used
- // for other types of storage
+ /*## RecordStorage RecordIds #############################################################*/
+ // ATTENTION:
+ // As the RecordStorage does not have a system such as e.g. file paths, we must make sure
+ // that different parts of our implementation don't clash with their usage of the record storage Ids
 
- //Specific Record Ids
+// ############ RECORD IDS 0 - 499 #############
+// Record Storage Ids 0 - 256 are used to store ModuleConfigurations for FruityMesh Core Modules
+// The modules use their moduleId as a recordId
+constexpr u16 RECORD_STORAGE_RECORD_ID_MODULE_CONFIG_BASE = 0;
+
+// ############ RECORD IDS 500 - 999 #############
+// The recordIds from 500 to 999 are used to store the ModuleConfiguration of VendorModules
+// The developer must make sure that the record id does not change between different versions
+// of a featureset and that the ids are uniquely assigned to the vendor modules
+// This constant will never change and can be used as a base
+constexpr u16 RECORD_STORAGE_RECORD_ID_VENDOR_MODULE_CONFIG_BASE = 500;
+constexpr u16 RECORD_STORAGE_RECORD_ID_VENDOR_MODULE_CONFIG_MAX = 999;
+
+// ############ RECORD IDS 1000 - 1999 #############
+// A number of ids for special use-cases
 constexpr u16 RECORD_STORAGE_RECORD_ID_UPDATE_STATUS = 1000; //Stores the done status of an update
 constexpr u16 RECORD_STORAGE_RECORD_ID_UICR_REPLACEMENT = 1001; //Can be used, if UICR can not be flashed, e.g. when updating another beacon with different firmware
 constexpr u16 RECORD_STORAGE_RECORD_ID_DEPRECATED = 1002; //Was used to store fake positions for nodes to modify the incoming events
 
-constexpr u16 RECORD_STORAGE_RECORD_ID_SIG_AMOUNT = 256;  //The maximum amount of record ids reserverd for sig
-#if IS_ACTIVE(SIG_MESH)
-static_assert(SIG_MAX_NUM_ELEMENTS <= RECORD_STORAGE_RECORD_ID_SIG_AMOUNT, "Not enough record ids for all elements!");
-#endif //IS_ACTIVE(SIG_MESH)
+// ############ RECORD IDS 2000 - 2999 #############
+// A range that is used to store settings for the SIG mesh implementation
 constexpr u16 RECORD_STORAGE_RECORD_ID_SIG_CONFIG_BASE = 2000; //This + the SIG elements localIndex is the record ID for the config of the element
+constexpr u16 RECORD_STORAGE_RECORD_ID_SIG_AMOUNT = 256;  //The maximum amount of record ids reserved for storage of SIG Mesh objects
+
+//This currently uses a range for sig_config and another range with the same size for sig states
 constexpr u16 RECORD_STORAGE_RECORD_ID_SIG_CONFIG_LAST = RECORD_STORAGE_RECORD_ID_SIG_CONFIG_BASE + RECORD_STORAGE_RECORD_ID_SIG_AMOUNT - 1;
 constexpr u16 RECORD_STORAGE_RECORD_ID_SIG_STATES_BASE = RECORD_STORAGE_RECORD_ID_SIG_CONFIG_LAST + 1;
 constexpr u16 RECORD_STORAGE_RECORD_ID_SIG_STATES_LAST = RECORD_STORAGE_RECORD_ID_SIG_STATES_BASE + RECORD_STORAGE_RECORD_ID_SIG_AMOUNT - 1;
 
+#if IS_ACTIVE(SIG_MESH)
+static_assert(SIG_MAX_NUM_ELEMENTS <= RECORD_STORAGE_RECORD_ID_SIG_AMOUNT, "Not enough record ids for all elements!");
+#endif //IS_ACTIVE(SIG_MESH)
+
+// ############ RECORD IDS 3000 - 49999 #############
+// This range is reserved for other core functionality
+
+// ############ RECORD IDS 50000 - 65534 #############
+// This range can be freely used by the user for custom storage of records
+constexpr u16 RECORD_STORAGE_RECORD_ID_USER_BASE = 50000;
+
+// ############ RECORD IDS 0xFFFF #############
+// Invalid record storage id
 constexpr u16 RECORD_STORAGE_RECORD_ID_INVALID = 0xFFFF;
 
-constexpr u16 RECORD_STORAGE_ACTIVE_PAGE_MAGIC_NUMBER = 0xAC71;
 
+ /*## Other constants #############################################################*/
+constexpr u16 RECORD_STORAGE_ACTIVE_PAGE_MAGIC_NUMBER = 0xAC71;
 constexpr int RECORD_STORAGE_INVALIDATION_MASK = 0xFFFF0000;
 
 class RecordStorageEventListener;
-
 
 enum class RecordStorageOperationType : u8
 {
@@ -176,6 +205,8 @@ enum class RecordStorageResultCode : u8
     NO_SPACE                 = 3,
     RECORD_STORAGE_LOCK_DOWN = 4, //The best action for a module that receives this is to discard the write access completely.
     INTERNAL_ERROR           = 5, //Not used by the RecordStorage itself but can be used by users of the RecordStorage if they return this enum.
+
+    __END                    = 5, //When adding values to the enum, increment this
 };
 
 enum class RecordStoragePageState : u8
@@ -254,7 +285,7 @@ class RecordStorage : public FlashStorageEventListener
         constexpr static u8 LOCK_DOWN_RETRY_MAX = 10;
         u8 lockDownRetryCounter = 0;
         //Only the module that is responsible for the lockdown is allowed to open up the record storage again.
-        ModuleId lockDownModuleId = ModuleId::INVALID_MODULE;
+        ModuleIdWrapper lockDownModuleId = INVALID_WRAPPED_MODULE_ID;
 
     public:
         RecordStorage();
@@ -262,20 +293,20 @@ class RecordStorage : public FlashStorageEventListener
         bool IsInit();
 
         //Initialize Storage class
-        static RecordStorage& getInstance();
+        static RecordStorage& GetInstance();
 
         //Stores a record (Operation is queued)
-        RecordStorageResultCode SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, ModuleId lockDownModule = ModuleId::INVALID_MODULE);
+        RecordStorageResultCode SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, ModuleIdWrapper lockDownModule = INVALID_WRAPPED_MODULE_ID);
         //Allows to cache some information until store completes
-        RecordStorageResultCode SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength, ModuleId lockDownModule = ModuleId::INVALID_MODULE);
+        RecordStorageResultCode SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength, ModuleIdWrapper lockDownModule = INVALID_WRAPPED_MODULE_ID);
         //Removes a record (Operation is queued)
-        RecordStorageResultCode DeactivateRecord(u16 recordId, RecordStorageEventListener * callback, u32 userType, ModuleId lockDownModule = ModuleId::INVALID_MODULE);
+        RecordStorageResultCode DeactivateRecord(u16 recordId, RecordStorageEventListener * callback, u32 userType, ModuleIdWrapper lockDownModule = INVALID_WRAPPED_MODULE_ID);
         //Retrieves a record
         RecordStorageRecord* GetRecord(u16 recordId) const;
         //Retrieves the data of a record
         SizedData GetRecordData(u16 recordId) const;
         //Resets all settings
-        RecordStorageResultCode LockDownAndClearAllSettings(ModuleId responsibleModuleForLockDown, RecordStorageEventListener * callback, u32 userType);
+        RecordStorageResultCode LockDownAndClearAllSettings(ModuleIdWrapper responsibleModuleForLockDown, RecordStorageEventListener * callback, u32 userType);
         
         //Listener
         void FlashStorageItemExecuted(FlashStorageTaskItem* task, FlashStorageError errorCode) override;

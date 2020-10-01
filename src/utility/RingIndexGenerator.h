@@ -29,7 +29,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "types.h"
+#include "FmTypes.h"
 
 /*
 * Generates indices for working with arrays in a ring like fashion.

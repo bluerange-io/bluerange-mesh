@@ -331,7 +331,7 @@ TEST(TestMoveAnimation, TestBuildUpViaCommands) {
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2 });
     simConfig.simTickDurationMs = 10; //Test highly depends on simulation time per tick, so better be explicit.
     simConfig.preDefinedPositions = { {0, 0}, {0, 0} };
-    simConfig.verbose = true;
+    //simConfig.verbose = true;
 
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();

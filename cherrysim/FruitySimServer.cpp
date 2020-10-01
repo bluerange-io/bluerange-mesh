@@ -45,6 +45,7 @@
 #include <CherrySimUtils.h>
 #include <Node.h>
 #include <MeshConnection.h>
+#include "MersenneTwister.h"
 
 #ifdef __unix
 #include <sys/types.h>
@@ -98,6 +99,7 @@ FruitySimServer::FruitySimServer()
 
 int FruitySimServer::StartServer()
 {
+    MersenneTwisterDisabler disabler;
 #if defined(SIM_SERVER_PRESENT)
 #ifdef _WIN32
     //Initialize Winsock
@@ -152,7 +154,7 @@ int FruitySimServer::StartServer()
         }
         else {
             //Serve static files, no directories supported, only some mimetypes work, hacky approach
-            std::string fileName = CherrySimUtils::getNormalizedPath() + "/";
+            std::string fileName = CherrySimUtils::GetNormalizedPath() + "/";
 
             if (strstr(req->uri, ".png") != nullptr)
             {
@@ -207,8 +209,11 @@ FruitySimServer::~FruitySimServer()
 #endif // SIM_SERVER_PRESENT
 }
 
+//In the inspector of the debugger, you can call "cherrySimInstance->server->ProcessServerRequests()" to be able
+//to view the current state of the simulation while it is halted at a breakpoint
 void FruitySimServer::ProcessServerRequests()
 {
+    MersenneTwisterDisabler disabler;
 #if defined(SIM_SERVER_PRESENT)
     event_base_loop(eventBase, EVLOOP_NONBLOCK);
 #endif // SIM_SERVER_PRESENT
@@ -217,6 +222,7 @@ void FruitySimServer::ProcessServerRequests()
 #if defined(SIM_SERVER_PRESENT)
 std::string FruitySimServer::GenerateSiteJson()
 {
+    MersenneTwisterDisabler disabler;
     json site;
 
     site["heightInMeter"] = cherrySimInstance->simConfig.mapHeightInMeters;
@@ -231,11 +237,12 @@ std::string FruitySimServer::GenerateSiteJson()
 #if defined(SIM_SERVER_PRESENT)
 std::string FruitySimServer::GenerateDevicesJson()
 {
+    MersenneTwisterDisabler disabler;
     json devices;
     devices["status"] = "success";
-    for (unsigned int i = 0; i < cherrySimInstance->getTotalNodes(); i++) {
+    for (unsigned int i = 0; i < cherrySimInstance->GetTotalNodes(); i++) {
         NodeIndexSetter nodeIndexSetter(i);
-        nodeEntry* node = &cherrySimInstance->nodes[i];
+        NodeEntry* node = &cherrySimInstance->nodes[i];
         json device;
 
         //Get the only handshaked inConnection
@@ -267,10 +274,10 @@ std::string FruitySimServer::GenerateDevicesJson()
         bool partnerHasMB = false;
 
         if (inConnection != nullptr) {
-            SoftdeviceConnection* foundSoftdeviceConnection = cherrySimInstance->findConnectionByHandle(node, inConnection->connectionHandle);
+            SoftdeviceConnection* foundSoftdeviceConnection = cherrySimInstance->FindConnectionByHandle(node, inConnection->connectionHandle);
             //We must check if the simulator connection still exists as it might have been cleaned up already
             if (foundSoftdeviceConnection != nullptr) {
-                nodeEntry* partnerNode = foundSoftdeviceConnection->partner;
+                NodeEntry* partnerNode = foundSoftdeviceConnection->partner;
                 MeshConnections conn = partnerNode->gs.cm.GetMeshConnections(ConnectionDirection::DIRECTION_OUT);
                 for (int k = 0; k < conn.count; k++) {
                     if (conn.handles[k] && conn.handles[k].GetConnectionHandle() == inConnection->connectionHandle) {
@@ -288,8 +295,8 @@ std::string FruitySimServer::GenerateDevicesJson()
 
         //FIXME: This mixes fruitymesh and simulator connections, but should only use simulator data
         if (inConnection != nullptr) {
-            SoftdeviceConnection* sdInConn = cherrySimInstance->findConnectionByHandle(node, inConnection->connectionHandle);
-            if (sdInConn != nullptr) device["inConnectionRssi"] = (int)cherrySimInstance->GetReceptionRssi(node, sdInConn->partner);
+            SoftdeviceConnection* sdInConn = cherrySimInstance->FindConnectionByHandle(node, inConnection->connectionHandle);
+            if (sdInConn != nullptr) device["inConnectionRssi"] = (int)cherrySimInstance->GetReceptionRssiNoNoise(node, sdInConn->partner);
         }
         else {
             device["inConnectionRssi"] = 0;
@@ -298,7 +305,7 @@ std::string FruitySimServer::GenerateDevicesJson()
 
         char advData[200];
         if (node->state.advertisingActive) {
-            Logger::convertBufferToHexString(node->state.advertisingData, node->state.advertisingDataLength, advData, sizeof(advData));
+            Logger::ConvertBufferToHexString(node->state.advertisingData, node->state.advertisingDataLength, advData, sizeof(advData));
         }
         else {
             sprintf(advData, "Not advertising");

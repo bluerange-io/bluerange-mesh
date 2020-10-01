@@ -34,7 +34,7 @@
 
 #pragma once
 
-#include "types.h"
+#include "FmTypes.h"
 
 namespace FruityHal
 {

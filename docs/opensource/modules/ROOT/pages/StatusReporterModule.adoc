@@ -117,7 +117,7 @@ changing often, e.g. only after a firmware update or an enrollment.
 |8 |xref:Specification.adoc#connPacketModule[connPacketModule] |header|*messageType:* MODULE_ACTION_RESPONSE(52), *actionType:* DEVICE_INFO_V2(10)
 |2 |u16 |manufacturerId |ID according to Bluetooth SIG Assigned numbers
 company identifiers
-|4 |u32 |serialNumberIndex |Index of the serial number, can be converted
+|4 |u32 |serialNumberIndex |Index of the xref:Specification.adoc#SerialNumbers[serial number], can be converted
 with alphabet
 |8 |u64 |chipId |A unique ID of the nRF chip
 |7 ||gapAddress |1 byte address type, 6 byte BLE address

@@ -45,11 +45,11 @@ constexpr int MAX_LOG_TAG_LENGTH = 11;
 //Errors are saved in RAM and can be requested through the mesh
 
 enum class LoggingError : u8 {
-    GENERAL_ERROR = 0, //Defined in "types.h" (ErrorType)
+    GENERAL_ERROR = 0, //Defined in "FmTypes.h" (ErrorType)
     HCI_ERROR = 1, //Defined in "FruityHalError.h" (BleHciError)
     CUSTOM = 2, //Defined below (CustomErrorTypes)
     GATT_STATUS = 3, //Defined in "FruityHalError.h" (BleGattEror)
-    REBOOT = 4 //Defined below (RebootReason)
+    REBOOT = 4, //Defined below (RebootReason)
 };
 
 //There are a number of different error types (by convention)
@@ -70,7 +70,7 @@ enum class CustomErrorTypes : u8 {
     WARN_GATT_WRITE_ERROR = 10,
     WARN_TX_WRONG_DATA = 11,
     WARN_RX_WRONG_DATA = 12,
-    FATAL_CLUSTER_UPDATE_FLOW_MISMATCH = 13,
+    WARN_CLUSTER_UPDATE_FLOW_MISMATCH = 13,
     WARN_HIGH_PRIO_QUEUE_FULL = 14,
     COUNT_NO_PENDING_CONNECTION = 15,
     FATAL_HANDLE_PACKET_SENT_ERROR = 16,
@@ -130,6 +130,7 @@ enum class CustomErrorTypes : u8 {
     FATAL_SIG_PROVISIONING_FAILED = 70,
     FATAL_SIG_ELEMENT_CREATION_FAILED = 71,
     FATAL_SIG_STORAGE_ERROR = 72,
+    COUNT_RECEIVED_INVALID_FRUITY_MESH_PACKET = 73,
 };
 
 #ifdef _MSC_VER
@@ -159,10 +160,10 @@ private:
 
 public:
     Logger();
-    static Logger& getInstance();
+    static Logger& GetInstance();
 
     //TODO: We could save ram if we pack this
-    struct errorLogEntry {
+    struct ErrorLogEntry {
         LoggingError errorType;
         u32 extraInfo;
         u32 errorCode;
@@ -170,7 +171,7 @@ public:
     };
 
     static constexpr int NUM_ERROR_LOG_ENTRIES = 100;
-    errorLogEntry errorLog[NUM_ERROR_LOG_ENTRIES];
+    ErrorLogEntry errorLog[NUM_ERROR_LOG_ENTRIES];
     u8 errorLogPosition = 0;
 
     bool logEverything = false;
@@ -198,52 +199,52 @@ public:
 #else
 #define CheckPrintfFormating(...) /*do nothing*/
 #endif
-    void log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJsonEvent, const char* file, i32 line, const char* message, ...) CheckPrintfFormating(8, 9);
-    void logTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...) const CheckPrintfFormating(6, 7);
+    void Log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJsonEvent, const char* file, i32 line, const char* message, ...) CheckPrintfFormating(8, 9);
+    void LogTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...) const CheckPrintfFormating(6, 7);
 #undef CheckPrintfFormating
 
-    void logError(LoggingError errorType, u32 errorCode, u32 extraInfo);
-    void logCustomError(CustomErrorTypes customErrorType, u32 extraInfo);
-    void logCount(LoggingError errorType, u32 errorCode);
-    void logCustomCount(CustomErrorTypes customErrorType);
+    void LogError(LoggingError errorType, u32 errorCode, u32 extraInfo);
+    void LogCustomError(CustomErrorTypes customErrorType, u32 extraInfo);
+    void LogCount(LoggingError errorType, u32 errorCode);
+    void LogCustomCount(CustomErrorTypes customErrorType);
 
-    void uart_error_f(UartErrorType type) const;
+    void UartError_f(UartErrorType type) const;
 
-    void disableAll();
-    void enableAll();
+    void DisableAll();
+    void EnableAll();
 
     //These functions are used to enable/disable a debug tag, it will then be printed to the output
-    void enableTag(const char* tag);
+    void EnableTag(const char* tag);
     bool IsTagEnabled(const char* tag) const;
-    void disableTag(const char* tag);
-    void toggleTag(const char* tag);
+    void DisableTag(const char* tag);
+    void ToggleTag(const char* tag);
 
-    u32 getAmountOfEnabledTags();
+    u32 GetAmountOfEnabledTags();
 
     //The print function provides an overview over the active debug tags
-    void printEnabledTags() const;
+    void PrintEnabledTags() const;
 
     #ifdef TERMINAL_ENABLED
     TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize);
     #endif
 
-    static const char* getErrorLogErrorType(LoggingError type);
-    static const char* getErrorLogCustomError(CustomErrorTypes type);
-    static const char* getGattStatusErrorString(FruityHal::BleGattEror gattStatusCode);
-    static const char* getGeneralErrorString(ErrorType nrfErrorCode);
-    static const char* getHciErrorString(FruityHal::BleHciError hciErrorCode);
-    static const char* getErrorLogRebootReason(RebootReason type);
-    static const char* getErrorLogError(LoggingError type, u32 code);
+    static const char* GetErrorLogErrorType(LoggingError type);
+    static const char* GetErrorLogCustomError(CustomErrorTypes type);
+    static const char* GetGattStatusErrorString(FruityHal::BleGattEror gattStatusCode);
+    static const char* GetGeneralErrorString(ErrorType nrfErrorCode);
+    static const char* GetHciErrorString(FruityHal::BleHciError hciErrorCode);
+    static const char* GetErrorLogRebootReason(RebootReason type);
+    static const char* GetErrorLogError(LoggingError type, u32 code);
 
     //Other printing functions
-    void blePrettyPrintAdvData(SizedData advData) const;
-    static void convertBufferToBase64String(const u8* srcBuffer, u32 srcLength, char* dstBuffer, u16 bufferLength);
-    static void convertBufferToHexString   (const u8* srcBuffer, u32 srcLength, char* dstBuffer, u16 bufferLength);
+    void BlePrettyPrintAdvData(SizedData advData) const;
+    static void ConvertBufferToBase64String(const u8* srcBuffer, u32 srcLength, char* dstBuffer, u16 bufferLength);
+    static void ConvertBufferToHexString   (const u8* srcBuffer, u32 srcLength, char* dstBuffer, u16 bufferLength);
 public:
-    static u32 parseEncodedStringToBuffer(const char* encodedString, u8* dstBuffer, u16 dstBufferSize, bool *didError = nullptr);
+    static u32 ParseEncodedStringToBuffer(const char* encodedString, u8* dstBuffer, u16 dstBufferSize, bool *didError = nullptr);
 private:
-    static u32 parseHexStringToBuffer(const char* hexString, u32 hexStringLength, u8* dstBuffer, u16 dstBufferSize, bool *didError);
-    static u32 parseBase64StringToBuffer(const char* base64String, u32 base64StringLength, u8* dstBuffer, u16 dstBufferSize, bool *didError);
+    static u32 ParseHexStringToBuffer(const char* hexString, u32 hexStringLength, u8* dstBuffer, u16 dstBufferSize, bool *didError);
+    static u32 ParseBase64StringToBuffer(const char* base64String, u32 base64StringLength, u8* dstBuffer, u16 dstBufferSize, bool *didError);
 };
 
 /*
@@ -253,12 +254,12 @@ private:
 //Used for UART communication between node and attached pc
 #if IS_ACTIVE(JSON_LOGGING)
 //TODO: The skip_event macros are currently a workaround that should be removed once a proper solution to avoid
-//endless recursions with JSONHandlers has been found. The same applies to the skipJsonEvent parameter of log_f
-#define logjson(tag, message, ...) Logger::getInstance().log_f(false, true, true, false, "", 0, message, ##__VA_ARGS__)
-#define logjson_skip_event(tag, message, ...) Logger::getInstance().log_f(false, true, true, true, "", 0, message, ##__VA_ARGS__)
-#define logjson_partial(tag, message, ...) Logger::getInstance().log_f(false, true, false, false, "", 0, message, ##__VA_ARGS__)
-#define logjson_partial_skip_event(tag, message, ...) Logger::getInstance().log_f(false, true, false, true, "", 0, message, ##__VA_ARGS__)
-#define logjson_error(type) Logger::getInstance().uart_error_f(type)
+//endless recursions with JSONHandlers has been found. The same applies to the skipJsonEvent parameter of Log_f
+#define logjson(tag, message, ...) Logger::GetInstance().Log_f(false, true, true, false, "", 0, message, ##__VA_ARGS__)
+#define logjson_skip_event(tag, message, ...) Logger::GetInstance().Log_f(false, true, true, true, "", 0, message, ##__VA_ARGS__)
+#define logjson_partial(tag, message, ...) Logger::GetInstance().Log_f(false, true, false, false, "", 0, message, ##__VA_ARGS__)
+#define logjson_partial_skip_event(tag, message, ...) Logger::GetInstance().Log_f(false, true, false, true, "", 0, message, ##__VA_ARGS__)
+#define logjson_error(type) Logger::GetInstance().UartError_f(type)
 #else
 #define logjson(tag, message, ...) do{}while(0)
 #define logjson_skip_event(tag, message, ...) do{}while(0)
@@ -269,18 +270,18 @@ private:
 
 //Currently, tracing is always enabled if we have a terminal
 #if defined(TERMINAL_ENABLED) && IS_ACTIVE(TRACE)
-#define trace(message, ...) Logger::getInstance().log_f(false, false, true, false, "", 0, message, ##__VA_ARGS__)
+#define trace(message, ...) Logger::GetInstance().Log_f(false, false, true, false, "", 0, message, ##__VA_ARGS__)
 #else
 #define trace(message, ...) do{}while(0)
 #endif
 
 #if IS_ACTIVE(LOGGING)
-#define logs(message, ...) Logger::getInstance().log_f(true, false, true, false, __FILE_S__, __LINE__, message, ##__VA_ARGS__)
-#define logt(tag, message, ...) Logger::getInstance().logTag_f(Logger::LogType::LOG_LINE, __FILE_S__, __LINE__, tag, message, ##__VA_ARGS__)
-#define TO_BASE64(data, dataSize) DYNAMIC_ARRAY(data##Hex, (dataSize)*3+1); Logger::convertBufferToBase64String(data, (dataSize), (char*)data##Hex, (dataSize)*3+1)
-#define TO_BASE64_2(data, dataSize) Logger::convertBufferToBase64String(data, (dataSize), (char*)data##Hex, (dataSize)*3+1)
-#define TO_HEX(data, dataSize) DYNAMIC_ARRAY(data##Hex, (dataSize)*3+1); Logger::convertBufferToHexString(data, (dataSize), (char*)data##Hex, (dataSize)*3+1)
-#define TO_HEX_2(data, dataSize) Logger::convertBufferToHexString(data, (dataSize), (char*)data##Hex, (dataSize)*3+1)
+#define logs(message, ...) Logger::GetInstance().Log_f(true, false, true, false, __FILE_S__, __LINE__, message, ##__VA_ARGS__)
+#define logt(tag, message, ...) Logger::GetInstance().LogTag_f(Logger::LogType::LOG_LINE, __FILE_S__, __LINE__, tag, message, ##__VA_ARGS__)
+#define TO_BASE64(data, dataSize) DYNAMIC_ARRAY(data##Hex, (dataSize)*3+1); Logger::ConvertBufferToBase64String(data, (dataSize), (char*)data##Hex, (dataSize)*3+1)
+#define TO_BASE64_2(data, dataSize) Logger::ConvertBufferToBase64String(data, (dataSize), (char*)data##Hex, (dataSize)*3+1)
+#define TO_HEX(data, dataSize) DYNAMIC_ARRAY(data##Hex, (dataSize)*3+1); Logger::ConvertBufferToHexString(data, (dataSize), (char*)data##Hex, (dataSize)*3+1)
+#define TO_HEX_2(data, dataSize) Logger::ConvertBufferToHexString(data, (dataSize), (char*)data##Hex, (dataSize)*3+1)
 
 #else //ACTIVATE_LOGGING
 

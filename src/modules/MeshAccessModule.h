@@ -48,23 +48,34 @@ typedef struct MeshAccessServiceStruct
 #pragma pack(push)
 #pragma pack(1)
 //Service Data (max. 24 byte)
-constexpr int SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA = 16;
+constexpr int SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA_LEGACY = 16; //The definition has changed on 30.07.2020.
+constexpr int SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA = 24;
 typedef struct
 {
-    advStructureServiceDataAndType data;
+    AdvStructureServiceDataAndType data;
 
     NetworkId networkId; //Mesh network id
     u8 isEnrolled : 1; // Flag if this beacon is enrolled
     u8 isSink : 1;
     u8 isZeroKeyConnectable : 1;
-    u8 isConnectable : 1;
+    u8 IsConnectable : 1;
     u8 interestedInConnetion : 1;
     u8 reserved : 3;
     u32 serialIndex; //SerialNumber index of the beacon
     std::array<ModuleId, 3> moduleIds; //Additional subServices offered with their data
 
+    // CAREFUL!
+    // The following data is potentially sliced off in older versions of this adv struct!
+    // Make sure that a received packet is at least SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA
+    // big before using these values!
+    struct
+    {
+        DeviceType deviceType;
+        u8 reserved[3];
+        u8 reservedForEncryption[4];
+    } potentiallySlicedOff;
 }advStructureMeshAccessServiceData;
-STATIC_ASSERT_SIZE(advStructureMeshAccessServiceData, 16);
+STATIC_ASSERT_SIZE(advStructureMeshAccessServiceData, 24);
 
 typedef struct
 {
@@ -76,15 +87,16 @@ typedef struct
 STATIC_ASSERT_SIZE(advStructureMeshAccessServiceSubServiceData, 2);
 
 
-constexpr int SIZEOF_MESH_ACCESS_SERVICE_DATA_ADV_MESSAGE = (SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_UUID16 + SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA);
+constexpr int SIZEOF_MESH_ACCESS_SERVICE_DATA_ADV_MESSAGE_LEGACY = (SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_UUID16 + SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA_LEGACY);
+constexpr int SIZEOF_MESH_ACCESS_SERVICE_DATA_ADV_MESSAGE        = (SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_UUID16 + SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA);
 typedef struct
 {
-    advStructureFlags flags;
-    advStructureUUID16 serviceUuids;
+    AdvStructureFlags flags;
+    AdvStructureUUID16 serviceUuids;
     advStructureMeshAccessServiceData serviceData;
 
 }meshAccessServiceAdvMessage;
-STATIC_ASSERT_SIZE(meshAccessServiceAdvMessage, 23);
+STATIC_ASSERT_SIZE(meshAccessServiceAdvMessage, SIZEOF_MESH_ACCESS_SERVICE_DATA_ADV_MESSAGE);
 
 #pragma pack(pop)
 
@@ -217,10 +229,10 @@ class MeshAccessModule: public Module
         u8 meshAccessSerialConnectRequestHandle = 0;
         u32 meshAccessSerialConnectConnectionId = 0;
 
-        void ReceivedMeshAccessConnectMessage(connPacketModule const * packet, u16 packetLength) const;
-        void ReceivedMeshAccessDisconnectMessage(connPacketModule const * packet, u16 packetLength) const;
-        void ReceivedMeshAccessConnectionStateMessage(connPacketModule const * packet, u16 packetLength) const;
-        void ReceivedMeshAccessSerialConnectMessage(connPacketModule const * packet, u16 packetLength);
+        void ReceivedMeshAccessConnectMessage(ConnPacketModule const * packet, u16 packetLength) const;
+        void ReceivedMeshAccessDisconnectMessage(ConnPacketModule const * packet, u16 packetLength) const;
+        void ReceivedMeshAccessConnectionStateMessage(ConnPacketModule const * packet, u16 packetLength) const;
+        void ReceivedMeshAccessSerialConnectMessage(ConnPacketModule const * packet, u16 packetLength);
 
         void ResetSerialConnectAttempt(bool cleanupConnection);
         void SendMeshAccessSerialConnectResponse(MeshAccessSerialConnectError code, NodeId partnerId = 0);
@@ -232,7 +244,7 @@ class MeshAccessModule: public Module
         MeshAccessModule();
         void UpdateMeshAccessBroadcastPacket(u16 advIntervalMs = 0);
 
-        void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
+        void ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfigLength) override final;
 
         void ResetToDefaultConfiguration() override final;
 
@@ -249,7 +261,7 @@ class MeshAccessModule: public Module
         MeshAccessAuthorization CheckAuthorizationForAll(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) const;
 
         //Messages
-        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
+        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader) override final;
         void MeshAccessMessageReceivedHandler(MeshAccessConnection* connection, BaseConnectionSendData* sendData, u8* data) const;
 
         #ifdef TERMINAL_ENABLED

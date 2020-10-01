@@ -59,12 +59,12 @@ void IoModule::ResetToDefaultConfiguration()
     configuration.moduleVersion = IO_MODULE_CONFIG_VERSION;
 
     //Set additional config values...
-    configuration.ledMode = Conf::getInstance().defaultLedMode;
+    configuration.ledMode = Conf::GetInstance().defaultLedMode;
 
     SET_FEATURESET_CONFIGURATION(&configuration, this);
 }
 
-void IoModule::ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength)
+void IoModule::ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfigLength)
 {
     //Do additional initialization upon loading the config
     currentLedMode = configuration.ledMode;
@@ -89,7 +89,7 @@ void IoModule::TimerEventHandler(u16 passedTimeDs)
     else if (currentLedMode == LedMode::CONNECTIONS)
     {
         //Calculate the current blink step
-        ledBlinkPosition = (ledBlinkPosition + 1) % (((GS->config.meshMaxInConnections + Conf::getInstance().meshMaxOutConnections) + 2) * 2);
+        ledBlinkPosition = (ledBlinkPosition + 1) % (((GS->config.meshMaxInConnections + Conf::GetInstance().meshMaxOutConnections) + 2) * 2);
 
         //No Connections: Red blinking, Connected: Green blinking for connection count
 
@@ -97,11 +97,11 @@ void IoModule::TimerEventHandler(u16 passedTimeDs)
         u8 countHandshakeDone = 0;
         for(u32 i=0; i< conns.count; i++){
             BaseConnection *conn = conns.handles[i].GetConnection();
-            if(conn != nullptr && conn->handshakeDone()) countHandshakeDone++;
+            if(conn != nullptr && conn->HandshakeDone()) countHandshakeDone++;
         }
         
         u8 i = ledBlinkPosition / 2;
-        if(i < (Conf::getInstance().meshMaxInConnections + Conf::getInstance().meshMaxOutConnections)){
+        if(i < (Conf::GetInstance().meshMaxInConnections + Conf::GetInstance().meshMaxOutConnections)){
             if(ledBlinkPosition % 2 == 0){
                 //No connections
                 if (conns.count == 0){ GS->ledRed.On(); }
@@ -110,7 +110,7 @@ void IoModule::TimerEventHandler(u16 passedTimeDs)
                 //Connected and handshake not done
                 else if(i < conns.count) { GS->ledBlue.On(); }
                 //A free connection
-                else if(i < (GS->config.meshMaxInConnections + Conf::getInstance().meshMaxOutConnections)) {  }
+                else if(i < (GS->config.meshMaxInConnections + Conf::GetInstance().meshMaxOutConnections)) {  }
             } else {
                 GS->ledRed.Off();
                 GS->ledGreen.Off();
@@ -193,7 +193,7 @@ TerminalCommandHandlerReturnType IoModule::TerminalCommandHandler(const char* co
 
                 if(TERMARGS(4, "on")) data.ledMode= LedMode::ON;
                 else if(TERMARGS(4, "cluster")) data.ledMode = LedMode::CLUSTERING;
-                else data.ledMode = Conf::getInstance().defaultLedMode == LedMode::OFF ? LedMode::OFF : LedMode::CONNECTIONS;
+                else data.ledMode = Conf::GetInstance().defaultLedMode == LedMode::OFF ? LedMode::OFF : LedMode::CONNECTIONS;
 
                 u8 requestHandle = commandArgsSize >= 6 ? Utility::StringToU8(commandArgs[5]) : 0;
 
@@ -220,13 +220,13 @@ TerminalCommandHandlerReturnType IoModule::TerminalCommandHandler(const char* co
 //void IoModule::ParseTerminalInputList(string commandName, vector<string> commandArgs)
 
 
-void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
+void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader)
 {
     //Must call superclass for handling
     Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
     if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-        connPacketModule const * packet = (connPacketModule const *)packetHeader;
+        ConnPacketModule const * packet = (ConnPacketModule const *)packetHeader;
         u16 dataFieldLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE;
 
         //Check if our module is meant and we should trigger an action
@@ -294,7 +294,7 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
 
     //Parse Module responses
     if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
-        connPacketModule const * packet = (connPacketModule const *)packetHeader;
+        ConnPacketModule const * packet = (ConnPacketModule const *)packetHeader;
 
         //Check if our module is meant and we should trigger an action
         if(packet->moduleId == moduleId)
@@ -302,12 +302,12 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
             IoModuleActionResponseMessages actionType = (IoModuleActionResponseMessages)packet->actionType;
             if(actionType == IoModuleActionResponseMessages::SET_PIN_CONFIG_RESULT)
             {
-                logjson_partial("MODULE", "{\"nodeId\":%u,\"type\":\"set_pin_config_result\",\"module\":%u,", packet->header.sender, (u32)packet->moduleId);
+                logjson_partial("MODULE", "{\"nodeId\":%u,\"type\":\"set_pin_config_result\",\"module\":%u,", packet->header.sender, (u8)ModuleId::IO_MODULE);
                 logjson("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, 0);
             }
             else if(actionType == IoModuleActionResponseMessages::SET_LED_RESPONSE)
             {
-                logjson_partial("MODULE", "{\"nodeId\":%u,\"type\":\"set_led_result\",\"module\":%u,", packet->header.sender, (u32)packet->moduleId);
+                logjson_partial("MODULE", "{\"nodeId\":%u,\"type\":\"set_led_result\",\"module\":%u,", packet->header.sender, (u8)ModuleId::IO_MODULE);
                 logjson("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, 0);
             }
         }

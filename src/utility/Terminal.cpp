@@ -41,6 +41,8 @@
 #include <condition_variable>
 #include <chrono>
 #include <iostream>
+#include <sstream>
+#include <fstream>
 static std::mutex terminalMutex;
 #endif
 
@@ -100,11 +102,11 @@ void Terminal::Init()
     //UART
 
 #if IS_ACTIVE(UART)
-    if(Conf::getInstance().terminalMode != TerminalMode::DISABLED){
-        UartEnable(Conf::getInstance().terminalMode == TerminalMode::PROMPT);
+    if(Conf::GetInstance().terminalMode != TerminalMode::DISABLED){
+        UartEnable(Conf::GetInstance().terminalMode == TerminalMode::PROMPT);
     }
     GS->SetUartHandler([]()->void {
-        Terminal::getInstance().UartInterruptHandler();
+        Terminal::GetInstance().UartInterruptHandler();
     });
 #endif
 #if IS_ACTIVE(SEGGER_RTT)
@@ -118,9 +120,9 @@ void Terminal::Init()
 
 #if IS_INACTIVE(GW_SAVE_SPACE)
     char versionString[15];
-    Utility::GetVersionStringFromInt(GS->config.getFruityMeshVersion(), versionString);
+    Utility::GetVersionStringFromInt(GS->config.GetFruityMeshVersion(), versionString);
 
-    if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
+    if (Conf::GetInstance().terminalMode == TerminalMode::PROMPT)
     {
         //Send Escape sequence
         log_transport_put(27); //ESC
@@ -162,7 +164,7 @@ void Terminal::ProcessTerminalCommandHandlerReturnType(TerminalCommandHandlerRet
     //Output result
     if (handled == TerminalCommandHandlerReturnType::UNKNOWN)
     {
-        if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
+        if (Conf::GetInstance().terminalMode == TerminalMode::PROMPT)
         {
             log_transport_putstring("Command not found:");
             for (u32 i = 0; i < (u8)commandArgsSize; i++)
@@ -187,14 +189,14 @@ void Terminal::ProcessTerminalCommandHandlerReturnType(TerminalCommandHandlerRet
     }
     else if (handled == TerminalCommandHandlerReturnType::SUCCESS)
     {
-        if (Conf::getInstance().terminalMode == TerminalMode::JSON)
+        if (Conf::GetInstance().terminalMode == TerminalMode::JSON)
         {
             logjson_error(Logger::UartErrorType::SUCCESS);
         }
     }
     else if (handled == TerminalCommandHandlerReturnType::WRONG_ARGUMENT)
     {
-        if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
+        if (Conf::GetInstance().terminalMode == TerminalMode::PROMPT)
         {
             log_transport_putstring("Wrong Arguments" EOL);
         }
@@ -208,7 +210,7 @@ void Terminal::ProcessTerminalCommandHandlerReturnType(TerminalCommandHandlerRet
     }
     else if (handled == TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS)
     {
-        if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
+        if (Conf::GetInstance().terminalMode == TerminalMode::PROMPT)
         {
             log_transport_putstring("Not enough arguments" EOL);
         }
@@ -222,7 +224,7 @@ void Terminal::ProcessTerminalCommandHandlerReturnType(TerminalCommandHandlerRet
     }
     else if (handled == TerminalCommandHandlerReturnType::INTERNAL_ERROR)
     {
-        if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
+        if (Conf::GetInstance().terminalMode == TerminalMode::PROMPT)
         {
             log_transport_putstring("Internal Terminal Command Error" EOL);
         }
@@ -238,7 +240,7 @@ void Terminal::ProcessTerminalCommandHandlerReturnType(TerminalCommandHandlerRet
 #if IS_INACTIVE(SAVE_SPACE)
     else if (handled == TerminalCommandHandlerReturnType::WARN_DEPRECATED)
     {
-        if (Conf::getInstance().terminalMode == TerminalMode::PROMPT)
+        if (Conf::GetInstance().terminalMode == TerminalMode::PROMPT)
         {
             log_transport_putstring("Warning: Command is marked deprecated!" EOL);
         }
@@ -250,7 +252,7 @@ void Terminal::ProcessTerminalCommandHandlerReturnType(TerminalCommandHandlerRet
 #endif
 }
 
-Terminal & Terminal::getInstance()
+Terminal & Terminal::GetInstance()
 {
     return GS->terminal;
 }
@@ -305,17 +307,17 @@ void Terminal::OnJsonLogged(const char * json)
 #endif
 }
 
-const char ** Terminal::getCommandArgsPtr()
+const char ** Terminal::GetCommandArgsPtr()
 {
     return commandArgsPtr;
 }
 
-u8 Terminal::getReadBufferOffset()
+u8 Terminal::GetReadBufferOffset()
 {
     return readBufferOffset;
 }
 
-char * Terminal::getReadBuffer()
+char * Terminal::GetReadBuffer()
 {
     return readBuffer;
 }
@@ -357,6 +359,17 @@ void Terminal::CheckAndProcessLine()
 #endif
 }
 
+static void OnCrcInvalid()
+{
+    if (Conf::GetInstance().terminalMode == TerminalMode::PROMPT) {
+        log_transport_putstring("CRC invalid!" EOL);
+    }
+    else {
+        logjson_error(Logger::UartErrorType::CRC_INVALID);
+    }
+    SIMEXCEPTION(CRCInvalidException);
+}
+
 //Processes a line (give to all handlers and print response)
 void Terminal::ProcessLine(char* line)
 {
@@ -374,19 +387,13 @@ void Terminal::ProcessLine(char* line)
         const u32 expectedCrc = Utility::CalculateCrc32String(line);
         if (didError || passedCrc != expectedCrc)
         {
-            if (Conf::getInstance().terminalMode == TerminalMode::PROMPT) {
-                log_transport_putstring("CRC invalid!" EOL);
-            }
-            else {
-                logjson_error(Logger::UartErrorType::CRC_INVALID);
-            }
-            SIMEXCEPTION(CRCInvalidException);
+            OnCrcInvalid();
             return;
         }
     }
     else if (crcChecksEnabled)
     {
-        if (Conf::getInstance().terminalMode == TerminalMode::PROMPT) {
+        if (Conf::GetInstance().terminalMode == TerminalMode::PROMPT) {
             log_transport_putstring("CRC missing!" EOL);
         }
         else {
@@ -400,7 +407,7 @@ void Terminal::ProcessLine(char* line)
     u16 size = (u16)strlen(line);
     i32 commandArgsSize = TokenizeLine(line, size);
     if (commandArgsSize < 0) {
-        if (Conf::getInstance().terminalMode == TerminalMode::PROMPT) {
+        if (Conf::GetInstance().terminalMode == TerminalMode::PROMPT) {
             log_transport_putstring("Too many arguments!" EOL);
         }
         else {
@@ -410,7 +417,7 @@ void Terminal::ProcessLine(char* line)
     }
 
     //Call all callbacks
-    TerminalCommandHandlerReturnType handled = Logger::getInstance().TerminalCommandHandler(commandArgsPtr, (u8)commandArgsSize);
+    TerminalCommandHandlerReturnType handled = Logger::GetInstance().TerminalCommandHandler(commandArgsPtr, (u8)commandArgsSize);
 
     
     for(u32 i=0; i<GS->amountOfModules; i++){
@@ -486,7 +493,7 @@ void Terminal::UartEnable(bool promptAndEchoMode)
 //Checks whether a character is waiting on the input line
 void Terminal::UartCheckAndProcessLine(){
     //Check if a line is available
-    if(Conf::getInstance().terminalMode == TerminalMode::PROMPT)
+    if(Conf::GetInstance().terminalMode == TerminalMode::PROMPT)
     {
         if (FruityHal::UartCheckInputAvailable())
         {
@@ -512,13 +519,13 @@ void Terminal::UartCheckAndProcessLine(){
     }
 #if IS_INACTIVE(GW_SAVE_SPACE)
     else if(strcmp(readBuffer, "startterm") == 0){
-        Conf::getInstance().terminalMode = TerminalMode::PROMPT;
+        Conf::GetInstance().terminalMode = TerminalMode::PROMPT;
         UartEnable(true);
         return;
     }
 #endif
     else if(strcmp(readBuffer, "stopterm") == 0){
-        Conf::getInstance().terminalMode = TerminalMode::JSON;
+        Conf::GetInstance().terminalMode = TerminalMode::JSON;
         UartEnable(false);
         return;
     }
@@ -532,7 +539,7 @@ void Terminal::UartCheckAndProcessLine(){
     lineToReadAvailable = false;
 
     //Re-enable Read interrupt after line was processed
-    if(Conf::getInstance().terminalMode != TerminalMode::PROMPT){
+    if(Conf::GetInstance().terminalMode != TerminalMode::PROMPT){
         FruityHal::UartEnableReadInterrupt();
     }
 }
@@ -611,7 +618,7 @@ void Terminal::UartReadLineBlocking()
 void Terminal::UartPutStringBlockingWithTimeout(const char* message)
 {
     if(!uartActive) return;
-    if(Conf::getInstance().silentStart && 
+    if(Conf::GetInstance().silentStart && 
         !receivedProcessableLine && 
         GS->ramRetainStructPreviousBootPtr->rebootReason == RebootReason::UNKNOWN &&
         Utility::IsUnknownRebootReason(GS->ramRetainStructPtr->rebootReason)) return;
@@ -746,7 +753,7 @@ void Terminal::SeggerRttPutChar(char character)
 //############################ STDIO
 #define ________________STDIO___________________
 #if IS_ACTIVE(STDIO)
-#if !defined(_WIN32) && !defined(CHERRYSIM_TESTER_ENABLED)
+#if !defined(_WIN32)
 static int _kbhit(void)
 {
     int ch = getch();
@@ -812,11 +819,23 @@ bool Terminal::GetNextTerminalQueueEntry(TerminalCommandQueueEntry & out)
     }
 }
 
+std::vector<std::string> tokenize(const std::string& message)
+{
+    std::vector<std::string> retVal;
+    std::istringstream stringStream(message);
+    std::string token;
+    while (std::getline(stringStream, token, ' '))
+    {
+        retVal.push_back(token);
+    }
+    return retVal;
+}
+
 void Terminal::StdioCheckAndProcessLine()
 {
     if (cherrySimInstance->simConfig.terminalId != cherrySimInstance->currentNode->id && cherrySimInstance->simConfig.terminalId != 0) return;
 
-#if ((defined(__unix) || defined(_WIN32)) && !defined(CHERRYSIM_TESTER_ENABLED))
+#if ((defined(__unix) || defined(_WIN32)))
     if(!meshGwCommunication && _kbhit() != 0){ //FIXME: Not supported by eclipse console
         printf("mhTerm: ");
         std::string line = ReadStdioLine();
@@ -850,7 +869,30 @@ void Terminal::StdioCheckAndProcessLine()
             //This way, sim commands don't have to follow the same simulated
             //restrictions like command length and amount of tokens.
             std::cout << "SIM COMMAND: " << message << std::endl;
-            TerminalCommandHandlerReturnType handled = cherrySimInstance->TerminalCommandHandler(message.c_str());
+            std::vector<std::string> tokens = tokenize(message);
+            if (tokens[tokens.size() - 2] == "CRC:")
+            {
+                bool didError = false;
+                const u32 passedCrc = Utility::StringToU32(tokens[tokens.size() - 1].data(), &didError);
+                tokens.pop_back();
+                tokens.pop_back();
+                u32 expectedCrc = 0;
+                for (size_t i = 0; i < tokens.size(); i++)
+                {
+                    expectedCrc = Utility::CalculateCrc32String(tokens[i].data(), expectedCrc);
+                    if (i != tokens.size() - 1)
+                    {
+                        expectedCrc = Utility::CalculateCrc32String(" ", expectedCrc);
+                    }
+                }
+                if (didError || passedCrc != expectedCrc)
+                {
+                    OnCrcInvalid();
+                    return;
+                }
+            }
+
+            TerminalCommandHandlerReturnType handled = cherrySimInstance->TerminalCommandHandler(tokens);
             ProcessTerminalCommandHandlerReturnType(handled, 0);
         }
         else

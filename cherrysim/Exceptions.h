@@ -50,6 +50,7 @@ CREATEEXCEPTIONINHERITING(CRCInvalidException                                   
 CREATEEXCEPTIONINHERITING(WrongCommandParameterException                            , IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(TooFewParameterException                                  , IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(MessageTooLongException                                   , IllegalArgumentException);
+CREATEEXCEPTIONINHERITING(MessageTooSmallException                                  , IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(TooManyArgumentsException                                 , IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(IndexOutOfBoundsException                                 , IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(CommandTooLongException                                   , IllegalArgumentException);
@@ -58,20 +59,22 @@ CREATEEXCEPTIONINHERITING(NumberStringNotInRangeException                       
 CREATEEXCEPTIONINHERITING(MoreThanOneTerminalCommandHandlerReactedOnCommandException, IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(UnknownJsonEntryException                                 , IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(IllegalParameterException                                 , IllegalArgumentException);
+CREATEEXCEPTIONINHERITING(NotAValidMessageTypeException                             , IllegalArgumentException);
+CREATEEXCEPTIONINHERITING(IllegalFruityMeshPacketException                          , IllegalArgumentException);
 
 CREATEEXCEPTION(IllegalStateException);
-CREATEEXCEPTIONINHERITING(ZeroOnNonPodTypeException               , IllegalStateException);
-CREATEEXCEPTIONINHERITING(UartNotSetException                     , IllegalStateException);
-CREATEEXCEPTIONINHERITING(ReceivedWrongTimeSyncPaketException     , IllegalStateException);
-CREATEEXCEPTIONINHERITING(ModuleAllocatorMemoryAlreadySetException, IllegalStateException);
-CREATEEXCEPTIONINHERITING(ErrorCodeUnknownException               , IllegalStateException);
-CREATEEXCEPTIONINHERITING(RecordStorageIsLockedDownException      , IllegalStateException);
-CREATEEXCEPTIONINHERITING(StackOverflowException                  , IllegalStateException);
-CREATEEXCEPTIONINHERITING(AccessToRemovedConnectionException      , IllegalStateException);
-CREATEEXCEPTIONINHERITING(InternalTerminalCommandErrorException   , IllegalStateException);
-CREATEEXCEPTIONINHERITING(FileException                           , IllegalStateException);
-CREATEEXCEPTIONINHERITING(SigProvisioningFailedException          , IllegalStateException);
-CREATEEXCEPTIONINHERITING(SigCreateElementFailedException         , IllegalStateException);
+CREATEEXCEPTIONINHERITING(ZeroOnNonPodTypeException                , IllegalStateException);
+CREATEEXCEPTIONINHERITING(UartNotSetException                      , IllegalStateException);
+CREATEEXCEPTIONINHERITING(ReceivedWrongTimeSyncPacketException     , IllegalStateException);
+CREATEEXCEPTIONINHERITING(ModuleAllocatorMemoryAlreadySetException , IllegalStateException);
+CREATEEXCEPTIONINHERITING(ErrorCodeUnknownException                , IllegalStateException);
+CREATEEXCEPTIONINHERITING(RecordStorageIsLockedDownException       , IllegalStateException);
+CREATEEXCEPTIONINHERITING(StackOverflowException                   , IllegalStateException);
+CREATEEXCEPTIONINHERITING(AccessToRemovedConnectionException       , IllegalStateException);
+CREATEEXCEPTIONINHERITING(InternalTerminalCommandErrorException    , IllegalStateException);
+CREATEEXCEPTIONINHERITING(FileException                            , IllegalStateException);
+CREATEEXCEPTIONINHERITING(SigProvisioningFailedException           , IllegalStateException);
+CREATEEXCEPTIONINHERITING(SigCreateElementFailedException          , IllegalStateException);
 
 CREATEEXCEPTION(BufferException);
 CREATEEXCEPTIONINHERITING(TriedToReadEmptyBufferException         , BufferException);
@@ -83,14 +86,13 @@ CREATEEXCEPTIONINHERITING(RequiredFlashTooBigException            , BufferExcept
 CREATEEXCEPTIONINHERITING(DataToCacheTooBigException              , BufferException);
 CREATEEXCEPTIONINHERITING(PacketStatBufferSizeNotEnough, BufferException);
 
-CREATEEXCEPTION(PaketException);
-CREATEEXCEPTIONINHERITING(PaketTooSmallException           , PaketException);
-CREATEEXCEPTIONINHERITING(PaketTooBigException             , PaketException);
-CREATEEXCEPTIONINHERITING(IllegalSenderException           , PaketException);
-CREATEEXCEPTIONINHERITING(GotUnsupportedActionTypeException, PaketException);
-CREATEEXCEPTIONINHERITING(SplitMissingException            , PaketException);
-CREATEEXCEPTIONINHERITING(PacketTooBigException            , PaketException);
-CREATEEXCEPTIONINHERITING(SplitNotInMTUException           , PaketException);
+CREATEEXCEPTION(PacketException);
+CREATEEXCEPTIONINHERITING(PacketTooSmallException           , PacketException);
+CREATEEXCEPTIONINHERITING(PacketTooBigException             , PacketException);
+CREATEEXCEPTIONINHERITING(IllegalSenderException            , PacketException);
+CREATEEXCEPTIONINHERITING(GotUnsupportedActionTypeException , PacketException);
+CREATEEXCEPTIONINHERITING(SplitMissingException             , PacketException);
+CREATEEXCEPTIONINHERITING(SplitNotInMTUException            , PacketException);
 
 CREATEEXCEPTION(NodeDidNotRestartException);
 CREATEEXCEPTION(BLEStackError);
@@ -104,7 +106,7 @@ CREATEEXCEPTION(WatchdogTriggeredException);
 CREATEEXCEPTION(SafeBootTriggeredException);
 CREATEEXCEPTION(MessageTypeInvalidException);
 CREATEEXCEPTION(IllegalAdvertismentStateException);
-CREATEEXCEPTION(MalformedPaketException);
+CREATEEXCEPTION(MalformedPacketException);
 CREATEEXCEPTION(NotImplementedException);
 CREATEEXCEPTION(CorruptOrOutdatedSavefile);
 CREATEEXCEPTION(ZeroTimeoutNotSupportedException);
@@ -116,16 +118,16 @@ CREATEEXCEPTION(ErrorLoggedException);
 
 namespace Exceptions {
 
-    void disableExceptionByIndex(std::type_index index);
-    void enableExceptionByIndex(std::type_index index);
-    bool isExceptionEnabledByIndex(std::type_index index);
+    void DisableExceptionByIndex(std::type_index index);
+    void EnableExceptionByIndex(std::type_index index);
+    bool IsExceptionEnabledByIndex(std::type_index index);
 
     template<typename T>
-    bool isExceptionEnabled() {
-        return isExceptionEnabledByIndex(std::type_index(typeid(T)));
+    bool IsExceptionEnabled() {
+        return IsExceptionEnabledByIndex(std::type_index(typeid(T)));
     }
 
-    bool getDebugBreakOnException();
+    bool GetDebugBreakOnException();
     class DisableDebugBreakOnException {
     public:
         DisableDebugBreakOnException();
@@ -136,11 +138,11 @@ namespace Exceptions {
     class ExceptionDisabler {
     public:
         ExceptionDisabler() {
-            disableExceptionByIndex(std::type_index(typeid(T)));
+            DisableExceptionByIndex(std::type_index(typeid(T)));
         }
 
         ~ExceptionDisabler() {
-            enableExceptionByIndex(std::type_index(typeid(T)));
+            EnableExceptionByIndex(std::type_index(typeid(T)));
         }
     };
 }
@@ -148,7 +150,7 @@ namespace Exceptions {
 #define SIMEXCEPTIONFORCE(T) \
     {\
         printf("Exception occured: " #T " " __FILE__ " %d\n", __LINE__); \
-        if(Exceptions::getDebugBreakOnException()) {\
+        if(Exceptions::GetDebugBreakOnException()) {\
             debug_break(); \
         }\
         throw T(); \
@@ -156,7 +158,7 @@ namespace Exceptions {
 
 #define SIMEXCEPTION(T) \
     {\
-        if(Exceptions::isExceptionEnabled<T>()) {\
+        if(Exceptions::IsExceptionEnabled<T>()) {\
             SIMEXCEPTIONFORCE(T); \
         }\
         else \

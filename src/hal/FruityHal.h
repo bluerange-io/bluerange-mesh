@@ -32,7 +32,7 @@
 
 
 //TODO: types.h should not include references to nrf sdk
-#include <types.h>
+#include <FmTypes.h>
 #include <PortFeatures.h>
 #include <FruityHalError.h>
 #include <FruityHalBleTypes.h>
@@ -82,33 +82,33 @@ namespace FruityHal
     protected:
         explicit GapEvent(void const * evt);
     public:
-        u16 getConnectionHandle() const;
+        u16 GetConnectionHandle() const;
     };
 
     class GapConnParamUpdateEvent : public GapEvent 
     {
     public:
         explicit GapConnParamUpdateEvent(void const * evt);
-        u16 getMaxConnectionInterval() const;
+        u16 GetMaxConnectionInterval() const;
     };
 
     class GapRssiChangedEvent : public GapEvent
     {
     public:
         explicit GapRssiChangedEvent(void const * evt);
-        i8 getRssi() const;
+        i8 GetRssi() const;
     };
 
     class GapAdvertisementReportEvent : public GapEvent
     {
     public:
         explicit GapAdvertisementReportEvent(void const * evt);
-        i8 getRssi() const;
-        const u8* getData() const;
-        u32 getDataLength() const;
-        BleGapAddrBytes getPeerAddr() const;
-        BleGapAddrType getPeerAddrType() const;
-        bool isConnectable() const;
+        i8 GetRssi() const;
+        const u8* GetData() const;
+        u32 GetDataLength() const;
+        BleGapAddrBytes GetPeerAddr() const;
+        BleGapAddrType GetPeerAddrType() const;
+        bool IsConnectable() const;
     };
 
     enum class GapRole : u8 {
@@ -121,17 +121,17 @@ namespace FruityHal
     {
     public:
         explicit GapConnectedEvent(void const * evt);
-        GapRole getRole() const;
-        BleGapAddrBytes getPeerAddr() const;
-        u8 getPeerAddrType() const;
-        u16 getMinConnectionInterval() const;
+        GapRole GetRole() const;
+        BleGapAddrBytes GetPeerAddr() const;
+        u8 GetPeerAddrType() const;
+        u16 GetMinConnectionInterval() const;
     };
 
     class GapDisconnectedEvent : public GapEvent
     {
     public:
         explicit GapDisconnectedEvent(void const * evt);
-        FruityHal::BleHciError getReason() const;
+        FruityHal::BleHciError GetReason() const;
     };
 
     enum class GapTimeoutSource : u8
@@ -148,7 +148,7 @@ namespace FruityHal
     {
     public:
         explicit GapTimeoutEvent(void const * evt);
-        GapTimeoutSource getSource() const;
+        GapTimeoutSource GetSource() const;
     };
 
     class GapSecurityInfoRequestEvent : public GapEvent
@@ -178,17 +178,17 @@ namespace FruityHal
     {
     public:
         explicit GapConnectionSecurityUpdateEvent(void const * evt);
-        u8 getKeySize() const;
-        SecurityLevel getSecurityLevel() const;
-        SecurityMode getSecurityMode() const;
+        u8 GetKeySize() const;
+        SecurityLevel GetSecurityLevel() const;
+        SecurityMode GetSecurityMode() const;
     };
 
     class GattcEvent : public BleEvent
     {
     public:
         explicit GattcEvent(void const * evt);
-        u16 getConnectionHandle() const;
-        FruityHal::BleGattEror getGattStatus() const;
+        u16 GetConnectionHandle() const;
+        FruityHal::BleGattEror GetGattStatus() const;
     };
 
     class GattcWriteResponseEvent : public GattcEvent
@@ -208,9 +208,9 @@ namespace FruityHal
     public:
         explicit GattDataTransmittedEvent(void const * evt);
 
-        u16 getConnectionHandle() const;
-        bool isConnectionHandleValid() const;
-        u32 getCompleteCount() const;
+        u16 GetConnectionHandle() const;
+        bool IsConnectionHandleValid() const;
+        u32 GetCompleteCount() const;
     };
 
     class GattsWriteEvent : public BleEvent
@@ -218,11 +218,11 @@ namespace FruityHal
     public:
         explicit GattsWriteEvent(void const * evt);
 
-        u16 getAttributeHandle() const;
-        bool isWriteRequest() const;
-        u16 getLength() const;
-        u16 getConnectionHandle() const;
-        u8 const * getData() const;
+        u16 GetAttributeHandle() const;
+        bool IsWriteRequest() const;
+        u16 GetLength() const;
+        u16 GetConnectionHandle() const;
+        u8 const * GetData() const;
     };
 
     class GattcHandleValueEvent : public GattcEvent
@@ -230,9 +230,9 @@ namespace FruityHal
     public:
         explicit GattcHandleValueEvent(void const * evt);
 
-        u16 getHandle() const;
-        u16 getLength() const;
-        u8 const * getData() const;
+        u16 GetHandle() const;
+        u16 GetLength() const;
+        u8 const * GetData() const;
 
     };
 

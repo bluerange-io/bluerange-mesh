@@ -1,6 +1,7 @@
 /Debug/
 /Release/
 _build/
+build/
 /Makefile.local
 /logs/
 /Debug52/
@@ -69,6 +70,9 @@ packages/
 
 # cmake
 cmake_build*
+
+# Gitlab
+TestReplay.log
 
 # Flash storage files
 *TestFlashStorageFile.bin

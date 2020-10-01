@@ -272,7 +272,7 @@ TEST(TestUtility, TestSwapBytes)
         u8 toSwap[] = { 100, 10, 20, 50, 20 };
         u8 swapped[] = { 20, 50, 20, 10, 100 };
 
-        Utility::swapBytes(toSwap, 5);
+        Utility::SwapBytes(toSwap, 5);
 
         for (size_t i = 0; i < sizeof(toSwap) / sizeof(*toSwap); i++)
         {
@@ -285,7 +285,7 @@ TEST(TestUtility, TestSwapBytes)
         u8 toSwap[] = { 100, 10, 20,  50 };
         u8 swapped[] = { 50, 20, 10, 100 };
 
-        Utility::swapBytes(toSwap, 4);
+        Utility::SwapBytes(toSwap, 4);
 
         for (int i = 0; i < 4; i++)
         {
@@ -315,4 +315,64 @@ TEST(TestUtility, TestToUpperCase)
     strcpy(data, "APPLE");  Utility::ToUpperCase(data); ASSERT_STREQ(data, "APPLE");
     strcpy(data, "BaNaNa"); Utility::ToUpperCase(data); ASSERT_STREQ(data, "BANANA");
     strcpy(data, "9 kiwi"); Utility::ToUpperCase(data); ASSERT_STREQ(data, "9 KIWI");
+}
+
+TEST(TestUtility, TestConfigurableBackOff)
+{
+    bool result = false;
+
+    u32 backOffIvsDs[] = { SEC_TO_DS(30), SEC_TO_DS(1 * 60), SEC_TO_DS(2 * 60), SEC_TO_DS(30 * 60) };
+
+    //appTimer changed from 200 to 499, Interval counting was stated at 200
+    //Should NOT TRIGGER as we did not approach the first interval yet
+    result = Utility::ShouldBackOffIvTrigger(499, 300, 200, backOffIvsDs, sizeof(backOffIvsDs));
+    ASSERT_EQ(result, 0);
+
+    //appTimer changed from 200 to 500, Interval counting was stated at 200
+    //Should TRIGGER as we exactly hit the first interval of 300
+    result = Utility::ShouldBackOffIvTrigger(500, 300, 200, backOffIvsDs, sizeof(backOffIvsDs));
+    ASSERT_EQ(result, 1);
+
+    //appTimer changed from 201 to 501, Interval counting was stated at 200
+    //Should TRIGGER as we exceeded the first interval of 300
+    result = Utility::ShouldBackOffIvTrigger(501, 300, 200, backOffIvsDs, sizeof(backOffIvsDs));
+    ASSERT_EQ(result, 1);
+
+    //appTimer changed from 600 to 700, Interval counting was stated at 200
+    //Should NOT TRIGGER as the first interval should only trigger once we are at 200 startTime + 300 at which the interval should trigger
+    result = Utility::ShouldBackOffIvTrigger(700, 100, 200, backOffIvsDs, sizeof(backOffIvsDs));
+    ASSERT_EQ(result, 0);
+
+    //appTimer changed from 600 to 700
+    //Should NOT TRIGGER as the second interval at 600 was already hit the last time when the timer was at 600
+    result = Utility::ShouldBackOffIvTrigger(700, 100, 0, backOffIvsDs, sizeof(backOffIvsDs));
+    ASSERT_EQ(result, 0);
+
+    //appTimer changed from 500 to 700
+    //Should TRIGGER as the second interval at 600 is hit inbetween
+    result = Utility::ShouldBackOffIvTrigger(700, 200, 0, backOffIvsDs, sizeof(backOffIvsDs));
+    ASSERT_EQ(result, 1);
+
+    u32 passedTimeDs = 2;
+    u32 startTimeDs = Utility::INVALID_BACKOFF_START_TIME;
+
+    u32 TEST_START_TIME = 500;
+
+    //We simulate an appTimer that always increases by 2 deciseconds
+    //It should trigger at some points, but only once at these points
+    for (u32 appTimerDs = 0; appTimerDs < SEC_TO_DS(30 * 60) + 1000; appTimerDs += passedTimeDs)
+    {
+
+        if (appTimerDs == TEST_START_TIME) startTimeDs = appTimerDs;
+
+        result = Utility::ShouldBackOffIvTrigger(appTimerDs, passedTimeDs, startTimeDs, backOffIvsDs, sizeof(backOffIvsDs));
+
+        if (appTimerDs == TEST_START_TIME + SEC_TO_DS(30)) ASSERT_EQ(result, 1);
+        else if (appTimerDs == TEST_START_TIME + SEC_TO_DS(1 * 60)) ASSERT_EQ(result, 1);
+        else if (appTimerDs == TEST_START_TIME + SEC_TO_DS(2 * 60)) ASSERT_EQ(result, 1);
+        else if (appTimerDs == TEST_START_TIME + SEC_TO_DS(30 * 60)) ASSERT_EQ(result, 1);
+        else ASSERT_EQ(result, 0);
+
+        //printf("AppTimerDs %u, PassedTimeDs %u, Trigger %u" EOL, appTimerDs, passedTimeDs, result);
+    }
 }

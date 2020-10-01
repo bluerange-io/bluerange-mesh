@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
     {
         ::testing::GTEST_FLAG(break_on_failure) = true;
 
-        //If we only want to execute specific tests, we can specify them here
+        //If we only want to execute specific tests, we can specify them here, default: *:-*_scheduled*:*_long*
         ::testing::GTEST_FLAG(filter) = "*:-*_scheduled*:*_long*";
 
         //Do not catch exceptions is useful for debugging (Automatically set to 1 if running on Gitlab)
@@ -225,13 +225,13 @@ SimConfiguration CherrySimTester::CreateDefaultSimConfiguration()
     simConfig.simOtherDelay = 1; // Enter 1 - 100000 to send sim_other message only each ... simulation steps, this increases the speed significantly
     simConfig.playDelay = 0; //Allows us to view the simulation slower than simulated, is added after each step
     
-    simConfig.interruptProbability = 0.1f;
+    simConfig.interruptProbability = UINT32_MAX / 10;
 
-    simConfig.connectionTimeoutProbabilityPerSec = 0; //Every minute or so: 0.00001;
-    simConfig.sdBleGapAdvDataSetFailProbability = 0;// 0.0001; //Simulate fails on setting adv Data
-    simConfig.sdBusyProbability = 0.01;// 0.0001; //Simulates getting back busy errors from softdevice
+    simConfig.connectionTimeoutProbabilityPerSec = 0; //Every minute or so: UINT32_MAX * 0.00001;
+    simConfig.sdBleGapAdvDataSetFailProbability = 0;  // UINT32_MAX * 0.0001; //Simulate fails on setting adv Data
+    simConfig.sdBusyProbability = UINT32_MAX / 100;   // UINT32_MAX * 0.0001; //Simulates getting back busy errors from softdevice
     simConfig.simulateAsyncFlash = true;
-    simConfig.asyncFlashCommitTimeProbability = 0.9;
+    simConfig.asyncFlashCommitTimeProbability = UINT32_MAX / 10 * 9;
 
     simConfig.importFromJson = false;
     simConfig.siteJsonPath = "C:\\Users\\MariusHeil\\Desktop\\testsite.json";
@@ -297,12 +297,12 @@ void CherrySimTester::Start()
     }
 
     //Boot up all nodes
-    for (u32 i = 0; i < sim->getTotalNodes(); i++) {
+    for (u32 i = 0; i < sim->GetTotalNodes(); i++) {
 #ifdef GITHUB_RELEASE
-        sim->nodes[i].nodeConfiguration = sim->redirectFeatureset(sim->nodes[i].nodeConfiguration);
+        sim->nodes[i].nodeConfiguration = sim->RedirectFeatureset(sim->nodes[i].nodeConfiguration);
 #endif
         NodeIndexSetter setter(i);
-        sim->bootCurrentNode();
+        sim->BootCurrentNode();
     }
 
     started = true;
@@ -344,13 +344,13 @@ void CherrySimTester::SimulateBroadcastMessage(double x, double y, ble_gap_evt_a
 
     sim->currentNode->x = (float)x;
     sim->currentNode->y = (float)y;
-    u32 numNoneAssetNodes = sim->getTotalNodes() - sim->getAssetNodes();
+    u32 numNoneAssetNodes = sim->GetTotalNodes() - sim->GetAssetNodes();
     for (u32 i = 0; i < numNoneAssetNodes; i++) {
         //If the other node is scanning
         if (sim->nodes[i].state.scanningActive) {
             //If the random value hits the probability, the event is sent
-            double probability = sim->calculateReceptionProbability(sim->currentNode, &(sim->nodes[i]));
-            if (PSRNG() < probability || ignoreDropProb) {
+            uint32_t probability = sim->CalculateReceptionProbability(sim->currentNode, &(sim->nodes[i]));
+            if (PSRNG(probability) || ignoreDropProb) {
                 simBleEvent s;
                 s.globalId = sim->simState.globalEventIdCounter++;
                 s.bleEvent.header.evt_id = BLE_GAP_EVT_ADV_REPORT;
@@ -513,7 +513,7 @@ void CherrySimTester::SendTerminalCommand(NodeId nodeId, const char* message, ..
     const u32 crc = Utility::CalculateCrc32String(originalCommand.c_str());
     const std::string crcCommand = originalCommand + std::string(" CRC: ") + std::to_string(crc);
     if (nodeId == 0) {
-        for (u32 i = 0; i < sim->getTotalNodes(); i++) {
+        for (u32 i = 0; i < sim->GetTotalNodes(); i++) {
             NodeIndexSetter setter(i);
             if (!GS->terminal.terminalIsInitialized) {
                 //you have not activated the terminal of that node either through the config or through the sim config
@@ -529,7 +529,7 @@ void CherrySimTester::SendTerminalCommand(NodeId nodeId, const char* message, ..
             }
             GS->terminal.PutIntoTerminalCommandQueue(commandToSend, false);
         }
-    } else if (nodeId > 0 && nodeId < sim->getTotalNodes() + 1) {
+    } else if (nodeId > 0 && nodeId < sim->GetTotalNodes() + 1) {
         NodeIndexSetter setter(nodeId - 1);
         if (!GS->terminal.terminalIsInitialized) {
             //you have not activated the terminal of that node either through the config or through the sim config
@@ -563,7 +563,7 @@ void CherrySimTester::SendButtonPress(NodeId nodeId, u8 buttonId, u32 holdTimeDs
 
 //########################### Callbacks ###############################
 
-void CherrySimTester::TerminalPrintHandler(nodeEntry* currentNode, const char* message)
+void CherrySimTester::TerminalPrintHandler(NodeEntry* currentNode, const char* message)
 {
     //Send to console
     if (config.verbose && (config.terminalFilter == 0 || config.terminalFilter == currentNode->id)) {
@@ -582,10 +582,10 @@ void CherrySimTester::TerminalPrintHandler(nodeEntry* currentNode, const char* m
         awaitedMessageResult[awaitedMessagePointer - 1] = '\0';
         std::vector<SimulationMessage>& awaited = *this->awaitedTerminalOutputs;
         for (unsigned int i = 0; i < awaited.size(); i++) {
-            if (!awaited[i].isFound()) {
-                if (sim->currentNode->id == awaited[i].getNodeId())
+            if (!awaited[i].IsFound()) {
+                if (sim->currentNode->id == awaited[i].GetNodeId())
                 {
-                    if (awaited[i].checkAndSet(awaitedMessageResult.data(), useRegex))
+                    if (awaited[i].CheckAndSet(awaitedMessageResult.data(), useRegex))
                     {
                         break; //A received message should validate only one awaited message.
                     }
@@ -593,13 +593,13 @@ void CherrySimTester::TerminalPrintHandler(nodeEntry* currentNode, const char* m
             }
         }
         
-        awaitedMessagesFound = std::all_of(awaited.begin(), awaited.end(), [](const SimulationMessage& sm) {return sm.isFound(); });
+        awaitedMessagesFound = std::all_of(awaited.begin(), awaited.end(), [](const SimulationMessage& sm) {return sm.IsFound(); });
         
         awaitedMessagePointer = 0;
     }
 }
 
-void CherrySimTester::CherrySimBleEventHandler(nodeEntry* currentNode, simBleEvent* simBleEvent, u16 eventSize)
+void CherrySimTester::CherrySimBleEventHandler(NodeEntry* currentNode, simBleEvent* simBleEvent, u16 eventSize)
 {
     if (
         (awaitedBleEventNodeId == 0 || currentNode->gs.node.configuration.nodeId == awaitedBleEventNodeId)
@@ -638,16 +638,16 @@ SimulationMessage::SimulationMessage(NodeId nodeId, const std::string& messagePa
 {
 }
 
-bool SimulationMessage::checkAndSet(const std::string & message, bool useRegex)
+bool SimulationMessage::CheckAndSet(const std::string & message, bool useRegex)
 {
     if (found) {
         SIMEXCEPTION(IllegalStateException); //The message was already found!
     }
 
     if (
-        (useRegex && matchesRegex(message)) || 
-        (!useRegex && matches(message))) {
-        makeFound(message);
+        (useRegex && MatchesRegex(message)) || 
+        (!useRegex && Matches(message))) {
+        MakeFound(message);
         return true;
     }
     else {
@@ -655,12 +655,12 @@ bool SimulationMessage::checkAndSet(const std::string & message, bool useRegex)
     }
 }
 
-bool SimulationMessage::isFound() const
+bool SimulationMessage::IsFound() const
 {
     return found;
 }
 
-const std::string& SimulationMessage::getCompleteMessage() const
+const std::string& SimulationMessage::GetCompleteMessage() const
 {
     if (!found) {
         SIMEXCEPTION(IllegalStateException); //Message was not found yet!
@@ -668,17 +668,17 @@ const std::string& SimulationMessage::getCompleteMessage() const
     return messageComplete;
 }
 
-NodeId SimulationMessage::getNodeId() const
+NodeId SimulationMessage::GetNodeId() const
 {
     return nodeId;
 }
 
-bool SimulationMessage::matches(const std::string & message)
+bool SimulationMessage::Matches(const std::string & message)
 {
     return message.find(messagePart) != std::string::npos;
 }
 
-void SimulationMessage::makeFound(const std::string & messageComplete)
+void SimulationMessage::MakeFound(const std::string & messageComplete)
 {
     this->messageComplete = messageComplete;
     size_t crcLoc = this->messageComplete.find(" CRC: ");
@@ -689,7 +689,7 @@ void SimulationMessage::makeFound(const std::string & messageComplete)
     found = true;
 }
 
-bool SimulationMessage::matchesRegex(const std::string & message)
+bool SimulationMessage::MatchesRegex(const std::string & message)
 {
     std::regex reg(messagePart);
     return std::regex_search(message, reg);

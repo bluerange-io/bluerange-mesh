@@ -114,7 +114,7 @@ image:vscode_project.png[vscode project]
 
 TIP: If there are popups that ask you to allow Intellisense to be configured or if you want to use the compiler_commands.json file for configuring IntelliSense, click yes to have better indexing and code navigation support. This is mentioned up front as these popups might disappear fast. Don't worry, they will pop up again at some time.
 
-First, you have to select the Kit by clicking on "No Kit Selected" in the bottom bar of VsCode. You need to choose the installed GCC ARM Embedded 4.9 toolchain.
+First, you have to select the Kit by clicking on "No Kit Selected" in the bottom bar of VsCode. You need to choose the installed GCC ARM Embedded 4.9 toolchain. If it does not show up in that list, make sure that you have added the gcc arm embedded directory to your path.
 
 image:vscode_kit.png[kit selection]
 
@@ -135,11 +135,11 @@ You can now continue with the xref:#GetStarted[Get Started] section.
 === Option 2: Manual CMake Project Configuration
 If you want to build FruityMesh on the command line, use the following instructions. Further explanation can be found under xref:BuildingWithCmake.adoc[Building With CMake]
 
-Open a commandline in `<fruitymesh>/_build/commandline` and execute the following command within that directory. Make sure to replace the path to GCC to fit your installation (use forward slashes "*/*"):
+Open a command line in `<fruitymesh>/_build/commandline` and execute the following command within that directory. Make sure to replace the path to GCC to fit your installation (use forward slashes "*/*"):
 
 `cmake "../../" -DBUILD_FEATURESETS=ON -DGCC_PATH="C:/<yourpath>/gcc-arm-none-eabi-4_9" -G "Unix Makefiles"`
 
-WARNING: The GCC_PATH must be specified using forward slashes "*/*", not backward slashes "*\*", otherwhise cmake will complain about `Invalid character escape '\m'`. You have to delete all files in your build directory before executing the command again to solve the issue! In case of other errors, make sure to have a look at xref:BuildingWithCmake.adoc#Troubleshooting[Building With CMake]
+WARNING: The GCC_PATH must be specified using forward slashes "*/*", not backward slashes "*\*", otherwhise cmake will complain about `Invalid character escape '\m'`. You have to delete all files in your build directory before executing the command again to solve the issue! In case of other errors, make sure to have a look at xref:BuildingWithCMake.adoc#Troubleshooting[Building With CMake]
 
 Next, from the same directory, execute the following command:
 

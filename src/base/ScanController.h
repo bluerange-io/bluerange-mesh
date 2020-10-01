@@ -31,7 +31,7 @@
 #pragma once
 
 
-#include <types.h>
+#include <FmTypes.h>
 #include <array>
 
 enum class ScanJobState : u8{
@@ -47,11 +47,11 @@ enum class ScanJobTimeMode : u8 {
 typedef struct ScanJob
 {
     ScanJobTimeMode timeMode;
-    i32                timeLeftDs;
-    u16                interval;
-    u16                window;
+    i32             timeLeftDs;
+    u16             interval;
+    u16             window;
     ScanJobState    state;
-    ScanState        type;
+    ScanState       type;
 }ScanJob;
 
 //Forward declaration
@@ -75,7 +75,7 @@ private:
 
 public:
     ScanController();
-    static ScanController& getInstance();
+    static ScanController& GetInstance();
 
     //Job Scheduling
     ScanJob* AddJob(ScanJob& job);

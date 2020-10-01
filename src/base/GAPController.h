@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "types.h"
+#include "FmTypes.h"
 #include "FruityHal.h"
 
 /*
@@ -40,15 +40,15 @@
 class GAPController
 {
 public:
-    static GAPController& getInstance();
+    static GAPController& GetInstance();
     //Initialize the GAP module
-    void bleConfigureGAP() const;
+    void BleConfigureGAP() const;
 
     //Connects to a peripheral with the specified address and calls the corresponding callbacks
-    ErrorType connectToPeripheral(const FruityHal::BleGapAddr &address, u16 connectionInterval, u16 timeout) const;
+    ErrorType ConnectToPeripheral(const FruityHal::BleGapAddr &address, u16 connectionInterval, u16 timeout) const;
 
     //Encryption
-    void startEncryptingConnection(u16 connectionHandle) const;
+    void StartEncryptingConnection(u16 connectionHandle) const;
 
     //Update the connection interval
     void RequestConnectionParameterUpdate(u16 connectionHandle, u16 minConnectionInterval, u16 maxConnectionInterval, u16 slaveLatency, u16 supervisionTimeout) const;

@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include <types.h>
+#include <FmTypes.h>
 
 /*
  * The packet queue implements a circular buffer for sending packets of varying

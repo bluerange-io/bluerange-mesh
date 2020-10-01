@@ -29,7 +29,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "types.h"
+#include "FmTypes.h"
 constexpr static u32 ticksPerSecond = 32768; // The amount of ticks it takes for one second to pass. Platform dependent!
 
 class TimePoint {
@@ -44,7 +44,7 @@ public:
     i32 operator-(const TimePoint& other);
     TimePoint& operator=(const TimePoint& other) = default;
 
-    u32 getAdditionalTicks();
+    u32 GetAdditionalTicks() const;
 };
 
 
@@ -82,7 +82,7 @@ public:
     void AddCorrection(u32 ticks);
     void ProcessTicks();
     
-    void HandleUpdateTimestampMessages(connPacketHeader const * packetHeader, u16 dataLength);
+    void HandleUpdateTimestampMessages(ConnPacketHeader const * packetHeader, u16 dataLength);
 
     //Trivial implementation for converting the timestamp in human readable format
     //This does not pay respect to any leap seconds, gap years, whatever

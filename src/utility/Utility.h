@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include <types.h>
+#include <FmTypes.h>
 #include <Config.h>
 #include <Module.h>
 #include <type_traits>
@@ -38,6 +38,10 @@
 typedef struct Aes128Block {
     uint8_t data[16];
 }Aes128Block;
+
+//A type so that we are able to return all kinds of moduleId as a string for printing
+//Contains either a moduleId: 123 or a VendorModuleId including quotes and \0 terminator: "0x12345678"
+typedef std::array<char, 13> ModuleIdString;
 
 class Module;
 class RecordStorageEventListener;
@@ -72,12 +76,23 @@ namespace Utility
     //General methods for loading settings
     u32 GetSettingsPageBaseAddress();
     RecordStorageResultCode SaveModuleSettingsToFlash(const Module* module, ModuleConfiguration* configurationPointer, const u16 configurationLength, RecordStorageEventListener* listener, u32 userType, u8* userData, u16 userDataLength);
-    RecordStorageResultCode SaveModuleSettingsToFlashWithId(ModuleId moduleId, ModuleConfiguration* configurationPointer, const u16 configurationLength, RecordStorageEventListener* listener, u32 userType, u8* userData, u16 userDataLength);
 
     //Serial number and version utilities
     u32 GetIndexForSerial(const char* serialNumber, bool *didError = nullptr);
     void GenerateBeaconSerialForIndex(u32 index, char* serialBuffer); //Attention: Serial buffer must be NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH big
     void GetVersionStringFromInt(const u32 version, char* outputBuffer);
+
+    //ModuleId stuff
+    bool IsVendorModuleId(ModuleId moduleId);
+    bool IsVendorModuleId(ModuleIdWrapper moduleId);
+
+    ModuleIdWrapper GetWrappedModuleId(u16 vendorId, u8 subId);
+    ModuleIdWrapper GetWrappedModuleId(ModuleId moduleId);
+
+    ModuleId GetModuleId(ModuleIdWrapper wrappedModuleId);
+
+    ModuleIdWrapper GetWrappedModuleIdFromTerminal(const char* commandArg, bool* didError = nullptr);
+    ModuleIdString GetModuleIdString(ModuleIdWrapper wrappedModuleId);
 
     //Random functionality
     u32 GetRandomInteger(void);
@@ -94,9 +109,9 @@ namespace Utility
     void XorBytes(const u8* src1, const u8* src2, const u8 numBytes, u8* out);
 
     //Memory modification
-    void swapBytes(u8 *data, const size_t length);//Reverses the direction of bytes according to the length
-    u16 swap_u16( u16 val );
-    u32 swap_u32( u32 val );
+    void SwapBytes(u8 *data, const size_t length);//Reverses the direction of bytes according to the length
+    u16 SwapU16( u16 val );
+    u32 SwapU32( u32 val );
     bool CompareMem(const u8 byte, const u8* data, const u16 dataLength);
 
     //String manipulation
@@ -118,6 +133,14 @@ namespace Utility
 
     char* FindLast(char* str, const char* search);
 
+    static constexpr u32 INVALID_BACKOFF_START_TIME = UINT32_MAX;
+    bool ShouldBackOffIvTrigger(u32 timerDs, u16 passedTimeDs, u32 startTimeDs, const u32* backOffIvsDs, u16 backOffIvsSize);
+
+    u16 ToAlignedU16(const void* ptr);
+    i16 ToAlignedI16(const void* ptr);
+    u32 ToAlignedU32(const void* ptr);
+    i32 ToAlignedI32(const void* ptr);
+
     //The outDidError varaible can be nullptr, in which case it is ignored.
     //If it's not set to nullptr, the underlying value must be initialized
     //with false. The functions only set it to true or don't change it at
@@ -130,5 +153,13 @@ namespace Utility
     i8            StringToI8          (const char *str, bool *outDidError = nullptr);
     i16           StringToI16         (const char *str, bool *outDidError = nullptr);
     i32           StringToI32         (const char *str, bool *outDidError = nullptr);
+
+    template<typename T>
+    T Clamp(T val, T minValue, T maxValue)
+    {
+        if (val < minValue) return minValue;
+        if (val > maxValue) return maxValue;
+        return val;
+    }
 }
 

@@ -23,7 +23,7 @@ FruityMesh can be seen both as a mesh and as a complete framework to make develo
 * Multiplexing of different ScanJobs using the xref:ScanController.adoc[ScanController]
 * Runtime xref:BoardConfig.adoc[Board Configurations] so that the same firmware can run on multiple boards
 * Using xref:Developers.adoc#Featuresets[Featuresets], you can easily compile different firmware configurations from the same source code
-* Predefined xref:Specification.adoc#UICR[UICR] structure that allows easy production of nodes with different serial numbers and settings
+* Predefined xref:Specification.adoc#UICR[UICR] structure that allows easy production of nodes with different xref:Specification.adoc#SerialNumbers[serial numbers] and settings
 * Small and highly optimized firmware size. It is modular and can be easily configured through the featureset
 * Abstraction from the BLE stack using our xref:FruityHal.adoc[FruityHal]
 * Lots of source code comments and easily understandable method and variable names (see source code ;-))

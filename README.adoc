@@ -12,7 +12,7 @@ FruityMesh is the reference implementation of the **BlueRange** initiative. It w
 
 You can find the most up to date documentation here:
 
-https://www.bluerange.io/docs/fruitymesh/index.html[Documentation]
+https://www.bluerange.io/docs/bluerange-firmware/index.html[Documentation]
 
 You can also have a look in the `docs` folder for a version of the documentation that matches a certain commit.
 |===

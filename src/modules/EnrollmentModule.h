@@ -189,7 +189,7 @@ class EnrollmentModule: public Module
         struct TemporaryEnrollmentData{
             EnrollmentStates state;
             u16 packetLength;
-            connPacketModule requestHeader;
+            ConnPacketModuleStart requestHeader;
             union {
                 EnrollmentModuleSetEnrollmentBySerialMessage requestData;
                 EnrollmentModuleRemoveEnrollmentMessage unenrollData;
@@ -198,6 +198,9 @@ class EnrollmentModule: public Module
 
             u32 uniqueConnId;
         };
+        //Make sure the union data follows immediately after the requestHeader. This allows us to cast the requestHeader from a ConnPacketModuleStart into a ConnPacketModule.
+        static_assert(offsetof(TemporaryEnrollmentData, requestHeader) + sizeof(TemporaryEnrollmentData::requestHeader) == offsetof(TemporaryEnrollmentData, requestData ), "Wrong packing in TemporaryEnrollmentData");
+        static_assert(offsetof(TemporaryEnrollmentData, requestHeader) + sizeof(TemporaryEnrollmentData::requestHeader) == offsetof(TemporaryEnrollmentData, unenrollData), "Wrong packing in TemporaryEnrollmentData");
 #pragma pack(pop)
 
         //While an enrollment request is active, we temporarily save the data here
@@ -223,13 +226,13 @@ class EnrollmentModule: public Module
         static constexpr u32 SCAN_TIME_DS = SEC_TO_DS(60);
         void RefreshScanJob();
 
-        void Enroll(connPacketModule const * packet, u16 packetLength);
+        void Enroll(ConnPacketModule const * packet, u16 packetLength);
 
-        void EnrollOverMesh(connPacketModule const * packet, u16 packetLength, BaseConnection* connection);
+        void EnrollOverMesh(ConnPacketModule const * packet, u16 packetLength, BaseConnection* connection);
 
-        void SaveEnrollment(connPacketModule* packet, u16 packetLength);
+        void SaveEnrollment(ConnPacketModuleStart* packet, u16 packetLength);
 
-        void SaveUnenrollment(connPacketModule* packet, u16 packetLength);
+        void SaveUnenrollment(ConnPacketModuleStart* packet, u16 packetLength);
 
         void EnrollmentConnectionConnectedHandler();
 
@@ -237,7 +240,7 @@ class EnrollmentModule: public Module
 
         void SendEnrollmentResponse(EnrollmentModuleActionResponseMessages responseType, EnrollmentResponseCode result, u8 requestHandle) const;
 
-        void Unenroll(connPacketModule const * packet, u16 packetLength);
+        void Unenroll(ConnPacketModule const * packet, u16 packetLength);
 
         void NotifyNewStableSerialIndexScanned(u32 serialIndex);
 
@@ -250,7 +253,7 @@ class EnrollmentModule: public Module
 
         EnrollmentModule();
 
-        void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
+        void ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfigLength) override final;
 
         void ResetToDefaultConfiguration() override final;
 
@@ -258,11 +261,11 @@ class EnrollmentModule: public Module
 
         void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override final;
 
-        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
+        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader) override final;
 
         //PreEnrollment
 
-        void StoreTemporaryEnrollmentDataAndDispatch(connPacketModule const * packet, u16 packetLength);
+        void StoreTemporaryEnrollmentDataAndDispatch(ConnPacketModule const * packet, u16 packetLength);
 
         void PreEnrollmentFailed();
 

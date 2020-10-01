@@ -61,16 +61,12 @@ public:
     bool Simulate();
     ~CherrySimRunner() {};
 
-    void resetSimulator();
-    void resetSimulatorWithNewSeed();
-
-
     //### Callbacks
     //Inherited via TerminalPrintListener
-    void TerminalPrintHandler(nodeEntry* currentNode, const char* message) override;
+    void TerminalPrintHandler(NodeEntry* currentNode, const char* message) override;
     //Inherited via CherrySimEventListener
     void CherrySimEventHandler(const char* eventType) override;
-    void CherrySimBleEventHandler(nodeEntry* currentNode, simBleEvent* simBleEvent, u16 eventSize) override;
+    void CherrySimBleEventHandler(NodeEntry* currentNode, simBleEvent* simBleEvent, u16 eventSize) override;
 
     void TerminalReaderMain();
 

@@ -109,7 +109,7 @@ void Node::ResetToDefaultConfiguration()
     SET_FEATURESET_CONFIGURATION(&configuration, this);
 }
 
-void Node::ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength)
+void Node::ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfigLength)
 {
     //We must now decide if we want to overwrite some unset persistent config values with defaults
     if(configuration.nodeId == 0) configuration.nodeId = RamConfig->defaultNodeId;
@@ -263,7 +263,7 @@ void Node::HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinn
         statusMod->SendLiveReport(LiveReportTypes::MESH_CONNECTED, 0, connection->partnerId, completedAsWinner);
     }
 
-    GS->logger.logCustomCount(CustomErrorTypes::COUNT_HANDSHAKE_DONE);
+    GS->logger.LogCustomCount(CustomErrorTypes::COUNT_HANDSHAKE_DONE);
 
     //We delete the joinMe packet of this node from the join me buffer
     for (u32 i = 0; i < joinMePackets.size(); i++)
@@ -289,8 +289,8 @@ void Node::HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinn
         connection->connectedClusterSize = 1;
 
         //Broadcast cluster update to other connections
-        connPacketClusterInfoUpdate outPacket;
-        CheckedMemset((u8*)&outPacket, 0x00, sizeof(connPacketClusterInfoUpdate));
+        ConnPacketClusterInfoUpdate outPacket;
+        CheckedMemset((u8*)&outPacket, 0x00, sizeof(ConnPacketClusterInfoUpdate));
 
         outPacket.payload.clusterSizeChange = 1;
         outPacket.payload.connectionMasterBitHandover = 0;
@@ -349,7 +349,7 @@ void Node::HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinn
 
 MeshAccessAuthorization Node::CheckMeshAccessPacketAuthorization(BaseConnectionSendData * sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction)
 {
-    connPacketHeader const * packet = (connPacketHeader const *)data;
+    ConnPacketHeader const * packet = (ConnPacketHeader const *)data;
 
     if (
         (
@@ -417,7 +417,7 @@ MeshAccessAuthorization Node::CheckMeshAccessPacketAuthorization(BaseConnectionS
 //    //Disconnect the hanging connection
 //    BaseConnections conn = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
 //    for(int i=0; i<conn.count; i++){
-//        if(conn.connections[i]->isConnected() && !conn.connections[i]->handshakeDone()){
+//        if(conn.connections[i]->IsConnected() && !conn.connections[i]->HandshakeDone()){
 //            u32 handshakeTimePassed = GS->appTimerDs - conn.connections[i]->handshakeStartedDs;
 //            logt("HANDSHAKE", "Disconnecting conn %u, timePassed:%u", conn.connections[i]->connectionId, handshakeTimePassed);
 //            conn.connections[i]->Disconnect();
@@ -466,8 +466,8 @@ void Node::MeshConnectionDisconnectedHandler(AppDisconnectReason appDisconnectRe
             this->clusterSize -= connectedClusterSize;
 
             // Inform the rest of the cluster of our new size
-            connPacketClusterInfoUpdate packet;
-            CheckedMemset((u8*)&packet, 0x00, sizeof(connPacketClusterInfoUpdate));
+            ConnPacketClusterInfoUpdate packet;
+            CheckedMemset((u8*)&packet, 0x00, sizeof(ConnPacketClusterInfoUpdate));
 
             packet.payload.clusterSizeChange = -connectedClusterSize;
 
@@ -509,7 +509,7 @@ void Node::MeshConnectionDisconnectedHandler(AppDisconnectReason appDisconnectRe
 }
 
 //Handles incoming cluster info update
-void Node::ReceiveClusterInfoUpdate(MeshConnection* connection, connPacketClusterInfoUpdate const * packet)
+void Node::ReceiveClusterInfoUpdate(MeshConnection* connection, ConnPacketClusterInfoUpdate const * packet)
 {
     //Check if next expected counter matches, if not, this clusterUpdate was a duplicate and we ignore it (might happen during reconnection)
     if (connection->nextExpectedClusterUpdateCounter == packet->payload.counter) {
@@ -518,16 +518,16 @@ void Node::ReceiveClusterInfoUpdate(MeshConnection* connection, connPacketCluste
     else {
         //This must not happen normally, only in rare cases where the connection is reestablished and the remote node receives a duplicate of the cluster update message
         SIMSTATCOUNT("ClusterUpdateCountMismatch");
-        logt("ERROR", "Next expected ClusterUpdateCounter did not match");
-        GS->logger.logCustomError(CustomErrorTypes::FATAL_CLUSTER_UPDATE_FLOW_MISMATCH, connection->partnerId);
+        logt("WARNING", "Next expected ClusterUpdateCounter did not match");
+        GS->logger.LogCustomError(CustomErrorTypes::WARN_CLUSTER_UPDATE_FLOW_MISMATCH, connection->partnerId);
         return;
     }
 
     SIMSTATCOUNT("ClusterUpdateCount");
 
     //Prepare cluster update packet for other connections
-    connPacketClusterInfoUpdate outPacket;
-    CheckedMemset((u8*)&outPacket, 0x00, sizeof(connPacketClusterInfoUpdate));
+    ConnPacketClusterInfoUpdate outPacket;
+    CheckedMemset((u8*)&outPacket, 0x00, sizeof(ConnPacketClusterInfoUpdate));
     outPacket.payload.clusterSizeChange = packet->payload.clusterSizeChange;
 
 
@@ -605,17 +605,17 @@ bool Node::HasAllMasterBits() const {
 
 
 //Saves a cluster update for all connections (except the one that caused it)
-//This update will then be sent by a connection as soon as the connection is ready (handshakeDone)
-void Node::SendClusterInfoUpdate(MeshConnection* ignoreConnection, connPacketClusterInfoUpdate* packet) const
+//This update will then be sent by a connection as soon as the connection is ready (HandshakeDone)
+void Node::SendClusterInfoUpdate(MeshConnection* ignoreConnection, ConnPacketClusterInfoUpdate* packet) const
 {
     MeshConnections conn = GS->cm.GetMeshConnections(ConnectionDirection::INVALID);
     for (u32 i = 0; i < conn.count; i++) {
         if (!conn.handles[i]) continue;
 
         //Get the current packet
-        connPacketClusterInfoUpdate* currentPacket = &(conn.handles[i].GetConnection()->currentClusterInfoUpdatePacket);
+        ConnPacketClusterInfoUpdate* currentPacket = &(conn.handles[i].GetConnection()->currentClusterInfoUpdatePacket);
 
-        if(!conn.handles[i].GetConnection()->isConnected()) continue;
+        if(!conn.handles[i].GetConnection()->IsConnected()) continue;
 
         //We currently update the hops to sink at all times
         currentPacket->payload.hopsToSink = GS->cm.GetMeshHopsToShortestSink(conn.handles[i].GetConnection());
@@ -642,11 +642,11 @@ void Node::SendClusterInfoUpdate(MeshConnection* ignoreConnection, connPacketClu
         }
     }
 
-    //TODO: If we call fillTransmitBuffers after a timeout, they would accumulate more,...
-    GS->cm.fillTransmitBuffers();
+    //TODO: If we call FillTransmitBuffers after a timeout, they would accumulate more,...
+    GS->cm.FillTransmitBuffers();
 }
 
-void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
+void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader)
 {
     //Must call superclass for handling
     Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
@@ -658,10 +658,9 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
         case MessageType::CLUSTER_INFO_UPDATE:
             if (
                     connection != nullptr
-                    && connection->connectionType == ConnectionType::FRUITYMESH
-                    && sendData->dataLength >= SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE)
+                    && connection->connectionType == ConnectionType::FRUITYMESH)
             {
-                connPacketClusterInfoUpdate const * packet = (connPacketClusterInfoUpdate const *) packetHeader;
+                ConnPacketClusterInfoUpdate const * packet = (ConnPacketClusterInfoUpdate const *) packetHeader;
                 logt("HANDSHAKE", "IN <= %d CLUSTER_INFO_UPDATE sizeChange:%d, hop:%d", connection->partnerId, packet->payload.clusterSizeChange, packet->payload.hopsToSink);
                 ReceiveClusterInfoUpdate((MeshConnection*)connection, packet);
 
@@ -669,9 +668,8 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
             break;
 #if IS_INACTIVE(SAVE_SPACE)
         case MessageType::UPDATE_CONNECTION_INTERVAL:
-            if(sendData->dataLength == SIZEOF_CONN_PACKET_UPDATE_CONNECTION_INTERVAL)
             {
-                connPacketUpdateConnectionInterval const * packet = (connPacketUpdateConnectionInterval const *) packetHeader;
+                ConnPacketUpdateConnectionInterval const * packet = (ConnPacketUpdateConnectionInterval const *) packetHeader;
 
                 GS->cm.SetMeshConnectionInterval(packet->newInterval);
             }
@@ -684,7 +682,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 
     if(packetHeader->messageType == MessageType::MODULE_CONFIG)
     {
-        connPacketModule const * packet = (connPacketModule const *) packetHeader;
+        ConnPacketModule const * packet = (ConnPacketModule const *) packetHeader;
 
         if(packet->actionType == (u8)Module::ModuleConfigMessages::GET_MODULE_LIST)
         {
@@ -692,22 +690,17 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 
         }
 #if IS_INACTIVE(SAVE_SPACE)
-        else if(packet->actionType == (u8)Module::ModuleConfigMessages::MODULE_LIST)
+        else if(packet->actionType == (u8)Module::ModuleConfigMessages::MODULE_LIST_V2)
         {
             logjson_partial("MODULE", "{\"nodeId\":%u,\"type\":\"module_list\",\"modules\":[", packet->header.sender);
 
-            u16 moduleCount = (sendData->dataLength - SIZEOF_CONN_PACKET_MODULE) / 4;
-            for(int i=0; i<moduleCount; i++){
-                ModuleId moduleId;
-                u8 version = 0, active = 0;
-                CheckedMemcpy(&moduleId, packet->data + i*4+0, 1);
-                CheckedMemcpy(&version, packet->data + i*4+2, 1);
-                CheckedMemcpy(&active, packet->data + i*4+3, 1);
+            u16 moduleCount = (sendData->dataLength - SIZEOF_CONN_PACKET_MODULE) / sizeof(ModuleInformation);
+            for(int i = 0; i < moduleCount; i++)
+            {
+                const ModuleInformation* info = (const ModuleInformation*)(packet->data + i * sizeof(ModuleInformation));
 
-                if(i > 0){
-                    logjson_partial("MODULE", ",");
-                }
-                logjson_partial("MODULE", "{\"id\":%u,\"version\":%u,\"active\":%u}", (u32)moduleId, version, active);
+                if(i > 0){ logjson_partial("MODULE", ","); }
+                logjson_partial("MODULE", "{\"id\":%s,\"version\":%u,\"active\":%u}", Utility::GetModuleIdString(info->moduleId).data(), info->moduleVersion, info->moduleActive);
             }
             logjson("MODULE", "]}" SEP);
         }
@@ -716,7 +709,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 
 
     if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-        connPacketModule const * packet = (connPacketModule const *)packetHeader;
+        ConnPacketModule const * packet = (ConnPacketModule const *)packetHeader;
 
         //Check if our module is meant and we should trigger an action
         if(packet->moduleId == ModuleId::NODE){
@@ -850,13 +843,13 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
                         response.code = EmergencyDisconnectErrorCode::SUCCESS;
 
                         connToDisconnect.DisconnectAndRemove(AppDisconnectReason::EMERGENCY_DISCONNECT);
-                        GS->logger.logCustomError(CustomErrorTypes::INFO_EMERGENCY_DISCONNECT_SUCCESSFUL, 0);
+                        GS->logger.LogCustomError(CustomErrorTypes::INFO_EMERGENCY_DISCONNECT_SUCCESSFUL, 0);
 
                         //TODO: Blacklist other node for a short time
                     }
                     else {
                         response.code = EmergencyDisconnectErrorCode::CANT_DISCONNECT_ANYBODY;
-                        GS->logger.logCustomCount(CustomErrorTypes::COUNT_EMERGENCY_CONNECTION_CANT_DISCONNECT_ANYBODY);
+                        GS->logger.LogCustomCount(CustomErrorTypes::COUNT_EMERGENCY_CONNECTION_CANT_DISCONNECT_ANYBODY);
                         logt("WARNING", "WOULD DISCONNECT NOBODY");
                     }
                 }
@@ -891,9 +884,9 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
                     GS->config.configuration.preferredPartnerIds[i] = message->preferredPartnerIds[i];
                 }
 
-                Utility::SaveModuleSettingsToFlashWithId(ModuleId::CONFIG, &(GS->config.configuration), sizeof(Conf::ConfigConfiguration), nullptr, 0, nullptr, 0);
+                GS->config.SaveConfigToFlash(nullptr, 0, nullptr, 0);
 
-                //Reboot is the savest way to make sure that we reevaluate all the possible connection partners.
+                //Reboot is the safest way to make sure that we reevaluate all the possible connection partners.
                 Reboot(SEC_TO_DS(10), RebootReason::PREFERRED_CONNECTIONS);
 
                 SendModuleActionMessage(
@@ -910,17 +903,17 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
     }
 
     if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
-        connPacketModule const * packet = (connPacketModule const *)packetHeader;
+        ConnPacketModule const * packet = (ConnPacketModule const *)packetHeader;
         //Check if our module is meant and we should trigger an action
         if(packet->moduleId == ModuleId::NODE){
 
             if (packet->actionType == (u8)NodeModuleActionResponseMessages::SET_DISCOVERY_RESULT)
             {
-                logjson("NODE", "{\"type\":\"set_discovery_result\",\"nodeId\":%d,\"module\":%d}" SEP, packetHeader->sender, (u32)ModuleId::NODE);
+                logjson("NODE", "{\"type\":\"set_discovery_result\",\"nodeId\":%d,\"module\":%u}" SEP, packetHeader->sender, (u32)ModuleId::NODE);
             }
             else if (packet->actionType == (u8)NodeModuleActionResponseMessages::PING)
             {
-                logjson("NODE", "{\"type\":\"ping\",\"nodeId\":%d,\"module\":%d,\"requestHandle\":%u}" SEP, packetHeader->sender, (u32)ModuleId::NODE, packet->requestHandle);
+                logjson("NODE", "{\"type\":\"ping\",\"nodeId\":%d,\"module\":%u,\"requestHandle\":%u}" SEP, packetHeader->sender, (u32)ModuleId::NODE, packet->requestHandle);
             }
             else if (packet->actionType == (u8)NodeModuleActionResponseMessages::START_GENERATE_LOAD_RESULT)
             {
@@ -935,13 +928,13 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
                 }
                 else if (msg->code == EmergencyDisconnectErrorCode::CANT_DISCONNECT_ANYBODY)
                 {
-                    GS->logger.logCustomError(CustomErrorTypes::WARN_EMERGENCY_DISCONNECT_PARTNER_COULDNT_DISCONNECT_ANYBODY, 0);
+                    GS->logger.LogCustomError(CustomErrorTypes::WARN_EMERGENCY_DISCONNECT_PARTNER_COULDNT_DISCONNECT_ANYBODY, 0);
                 }
                 ResetEmergencyDisconnect();
             }
             else if (packet->actionType == (u8)NodeModuleActionResponseMessages::SET_PREFERRED_CONNECTIONS_RESULT)
             {
-                logjson("NODE", "{\"type\":\"set_preferred_connections_result\",\"nodeId\":%d,\"module\":%d}" SEP, packetHeader->sender, (u32)ModuleId::NODE);
+                logjson("NODE", "{\"type\":\"set_preferred_connections_result\",\"nodeId\":%d,\"module\":%u}" SEP, packetHeader->sender, (u32)ModuleId::NODE);
             }
         }
     }
@@ -1009,175 +1002,220 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
     }
 
     if (packetHeader->messageType == MessageType::MODULE_RAW_DATA) {
-        RawDataHeader const * packet = (RawDataHeader const *)packetHeader;
-        //Check if our module is meant
-        if (packet->moduleId == moduleId) {
-            const RawDataActionType actionType = (RawDataActionType)packet->actionType;
-            if (actionType == RawDataActionType::START && sendData->dataLength >= sizeof(RawDataStart))
-            {
-                RawDataStart packet = *(RawDataStart const *)packetHeader;
+        RawDataHeader const* packet = (RawDataHeader const*)packetHeader;
+        RawDataHeaderVendor const* packetVendor = (RawDataHeaderVendor const*)packetHeader;
 
-                logjson("DEBUG",
-                    "{"
-                        "\"nodeId\":%u,"
-                        "\"type\":\"raw_data_start\","
-                        "\"module\":%u,"
-                        "\"numChunks\":%u,"
-                        "\"protocol\":%u,"
-                        "\"fmKeyId\":%u,"
-                        "\"requestHandle\":%u"
-                    "}" SEP,
-                    packet.header.connHeader.sender,
-                    (u32)moduleId,
-                    packet.numChunks,
-                    packet.protocolId,
-                    packet.fmKeyId,
-                    packet.header.requestHandle
-                );
-            }
-            else if (actionType == RawDataActionType::START_RECEIVED && sendData->dataLength >= sizeof(RawDataStartReceived))
-            {
-                RawDataStartReceived packet = *(RawDataStartReceived const *)packetHeader;
+        NodeId senderId = 0;
+        ModuleIdWrapper moduleId = 0;
+        u8 requestHandle = 0;
+        RawDataActionType actionType = RawDataActionType::START;
 
-                logjson("DEBUG",
-                    "{"
-                        "\"nodeId\":%u,"
-                        "\"type\":\"raw_data_start_received\","
-                        "\"module\":%u,"
-                        "\"requestHandle\":%u"
-                    "}" SEP,
-                    packet.header.connHeader.sender,
-                    (u32)moduleId,
-                    packet.header.requestHandle
-                );
-            }
-            else if (actionType == RawDataActionType::ERROR_T && sendData->dataLength >= sizeof(RawDataError))
-            {
-                const RawDataError* packet = (RawDataError const *)packetHeader;
-                logjson("DEBUG",
-                    "{"
-                        "\"nodeId\":%u,"
-                        "\"type\":\"raw_data_error\","
-                        "\"module\":%u,"
-                        "\"error\":%u,"
-                        "\"destination\":%u,"
-                        "\"requestHandle\":%u"
-                    "}" SEP,
-                    packet->header.connHeader.sender,
-                    (u32)moduleId,
-                    (u32)packet->type,
-                    (u32)packet->destination,
-                    (u32)packet->header.requestHandle
-                );
-            }
-            else if (actionType == RawDataActionType::CHUNK)
-            {
-                RawDataChunk const * packet = (RawDataChunk const *)packetHeader;
-                if (CHECK_MSG_SIZE(packet, packet->payload, 1, sendData->dataLength))
-                {
-                    const u32 payloadLength = sendData->dataLength - sizeof(RawDataChunk) + 1;
-                    char payload[250];
-                    if (payloadLength * 4 / 3 >= sizeof(payload) - 1) {
-                        SIMEXCEPTION(BufferTooSmallException); //LCOV_EXCL_LINE assertion
-                    }
-                    Logger::convertBufferToBase64String(packet->payload, payloadLength, payload, sizeof(payload));
+        const u8* payloadPtr = nullptr;
+        u16 payloadLength = 0;
 
-                    logjson("DEBUG",
-                        "{"
-                            "\"nodeId\":%u,"
-                            "\"type\":\"raw_data_chunk\","
-                            "\"module\":%u,"
-                            "\"chunkId\":%u,"
-                            "\"payload\":\"%s\","
-                            "\"requestHandle\":%u"
-                        "}" SEP,
-                        packet->header.connHeader.sender,
-                        (u32)moduleId,
-                        packet->chunkId,
-                        payload,
-                        packet->header.requestHandle
-                    );
-                }
-                else
-                {
-                    SIMEXCEPTION(PaketTooSmallException);  //LCOV_EXCL_LINE assertion
-                }
-            }
-            else if (actionType == RawDataActionType::REPORT && sendData->dataLength >= sizeof(RawDataReport))
-            {
-                RawDataReport const * packet = (RawDataReport const *)packetHeader;
-
-                char missingsBuffer[200] = "[";
-                bool successfulTransmission = true;
-                for (u32 i = 0; i < sizeof(packet->missings) / sizeof(packet->missings[0]); i++)
-                {
-                    if (packet->missings[i] != 0)
-                    {
-                        char singleMissingBuffer[50];
-                        snprintf(singleMissingBuffer, sizeof(singleMissingBuffer), "%u", packet->missings[i]);
-
-                        if (!successfulTransmission) 
-                        {
-                            strcat(missingsBuffer, ",");
-                        }
-                        strcat(missingsBuffer, singleMissingBuffer);
-
-                        successfulTransmission = false;
-                    }
-                }
-
-                strcat(missingsBuffer, "]");
-
-
-                logjson("DEBUG",
-                    "{"
-                        "\"nodeId\":%u,"
-                        "\"type\":\"raw_data_report\","
-                        "\"module\":%u,"
-                        "\"missing\":%s,"
-                        "\"requestHandle\":%u"
-                    "}" SEP,
-                    packet->header.connHeader.sender,
-                    (u32)moduleId,
-                    missingsBuffer,
-                    packet->header.requestHandle
-                );
-            }
-            else
-            {
-                SIMEXCEPTION(GotUnsupportedActionTypeException); //LCOV_EXCL_LINE assertion
-            }
+        if (!Utility::IsVendorModuleId(packet->moduleId)) {
+            senderId = packet->connHeader.sender;
+            moduleId = Utility::GetWrappedModuleId(packet->moduleId);
+            requestHandle = packet->requestHandle;
+            actionType = packet->actionType;
+            payloadPtr = ((const u8*)packet) + sizeof(RawDataHeader);
+            payloadLength = sendData->dataLength - sizeof(RawDataHeader);
         }
-    }
-    else if (packetHeader->messageType == MessageType::MODULE_RAW_DATA_LIGHT)
-    {
-        RawDataLight const * packet = (RawDataLight const *)packetHeader;
-        if (CHECK_MSG_SIZE(packet, packet->payload, 1, sendData->dataLength))
+        else {
+            senderId = packetVendor->connHeader.sender;
+            moduleId = packetVendor->moduleId;
+            requestHandle = packetVendor->requestHandle;
+            actionType = packetVendor->actionType;
+            payloadPtr = ((const u8*)packet) + sizeof(RawDataHeaderVendor);
+            payloadLength = sendData->dataLength - sizeof(RawDataHeaderVendor);
+        }
+
+        if (actionType == RawDataActionType::START && payloadLength >= sizeof(RawDataStartPayload))
         {
-            const u32 payloadLength = sendData->dataLength - sizeof(RawDataLight) + 1;
-            char payload[250];
-            Logger::convertBufferToBase64String(packet->payload, payloadLength, payload, sizeof(payload));
+            const RawDataStartPayload* packet = (const RawDataStartPayload*)payloadPtr;
+
+            logjson("NODE",
+                "{"
+                    "\"nodeId\":%u,"
+                    "\"type\":\"raw_data_start\","
+                    "\"module\":%s,"
+                    "\"numChunks\":%u,"
+                    "\"protocol\":%u,"
+                    "\"fmKeyId\":%u,"
+                    "\"requestHandle\":%u"
+                "}" SEP,
+                senderId,
+                Utility::GetModuleIdString(moduleId).data(),
+                packet->numChunks,
+                packet->protocolId,
+                packet->fmKeyId,
+                requestHandle
+            );
+        }
+        else if (actionType == RawDataActionType::START_RECEIVED)
+        {
+            logjson("NODE",
+                "{"
+                    "\"nodeId\":%u,"
+                    "\"type\":\"raw_data_start_received\","
+                    "\"module\":%s,"
+                    "\"requestHandle\":%u"
+                "}" SEP,
+                senderId,
+                Utility::GetModuleIdString(moduleId).data(),
+                requestHandle
+            );
+        }
+        else if (actionType == RawDataActionType::ERROR_T && payloadLength >= sizeof(RawDataErrorPayload))
+        {
+            const RawDataErrorPayload* packet = (const RawDataErrorPayload*)payloadPtr;
+
+            logjson("NODE",
+                "{"
+                    "\"nodeId\":%u,"
+                    "\"type\":\"raw_data_error\","
+                    "\"module\":%s,"
+                    "\"error\":%u,"
+                    "\"destination\":%u,"
+                    "\"requestHandle\":%u"
+                "}" SEP,
+                senderId,
+                Utility::GetModuleIdString(moduleId).data(),
+                (u32)packet->error,
+                (u32)packet->destination,
+                requestHandle
+            );
+        }
+        else if (actionType == RawDataActionType::CHUNK && payloadLength >= SIZEOF_RAW_DATA_CHUNK_PAYLOAD)
+        {
+            const RawDataChunkPayload* packet = (const RawDataChunkPayload*)payloadPtr;
+
+            char payloadString[250];
+            Logger::ConvertBufferToBase64String(packet->payload, payloadLength - SIZEOF_RAW_DATA_CHUNK_PAYLOAD, payloadString, sizeof(payloadString));
+
+            logjson("NODE",
+                "{"
+                    "\"nodeId\":%u,"
+                    "\"type\":\"raw_data_chunk\","
+                    "\"module\":%s,"
+                    "\"chunkId\":%u,"
+                    "\"payload\":\"%s\","
+                    "\"requestHandle\":%u"
+                "}" SEP,
+                senderId,
+                Utility::GetModuleIdString(moduleId).data(),
+                packet->chunkId,
+                payloadString,
+                requestHandle
+            );
+        }
+        else if (actionType == RawDataActionType::REPORT && payloadLength >= sizeof(RawDataReportPayload))
+        {
+            const RawDataReportPayload* packet = (const RawDataReportPayload*)payloadPtr;
+
+            char missingsBuffer[200] = "[";
+            bool successfulTransmission = true;
+            for (u32 i = 0; i < sizeof(packet->missings) / sizeof(packet->missings[0]); i++)
+            {
+                if (packet->missings[i] != 0)
+                {
+                    char singleMissingBuffer[50];
+                    snprintf(singleMissingBuffer, sizeof(singleMissingBuffer), "%u", packet->missings[i]);
+
+                    if (!successfulTransmission) 
+                    {
+                        strcat(missingsBuffer, ",");
+                    }
+                    strcat(missingsBuffer, singleMissingBuffer);
+
+                    successfulTransmission = false;
+                }
+            }
+
+            strcat(missingsBuffer, "]");
 
             logjson("DEBUG",
                 "{"
                     "\"nodeId\":%u,"
-                    "\"type\":\"raw_data_light\","
-                    "\"module\":%u,"
-                    "\"protocol\":%u,"
-                    "\"payload\":\"%s\","
+                    "\"type\":\"raw_data_report\","
+                    "\"module\":%s,"
+                    "\"missing\":%s,"
                     "\"requestHandle\":%u"
                 "}" SEP,
-                packet->connHeader.sender,
-                (u32)moduleId,
-                (u32)packet->protocolId,
-                payload,
-                packet->requestHandle
+                senderId,
+                Utility::GetModuleIdString(moduleId).data(),
+                missingsBuffer,
+                requestHandle
+            );
+        }
+        else if (actionType == RawDataActionType::REPORT_DESIRED)
+        {
+            logjson("NODE",
+                "{"
+                "\"nodeId\":%u,"
+                "\"type\":\"raw_data_report_desired\","
+                "\"module\":%s,"
+                "\"requestHandle\":%u"
+                "}" SEP,
+                senderId,
+                Utility::GetModuleIdString(moduleId).data(),
+                requestHandle
             );
         }
         else
         {
-            SIMEXCEPTION(PaketTooSmallException); //LCOV_EXCL_LINE assertion
+            SIMEXCEPTION(GotUnsupportedActionTypeException); //LCOV_EXCL_LINE assertion
         }
+    }
+    else if (packetHeader->messageType == MessageType::MODULE_RAW_DATA_LIGHT)
+    {
+        NodeId senderId = 0;
+        ModuleIdWrapper moduleId = INVALID_WRAPPED_MODULE_ID;
+        RawDataProtocol protocolId = RawDataProtocol::UNSPECIFIED;
+        const u8* payloadPtr = nullptr;
+        u16 payloadLength = 0;
+        u8 requestHandle = 0;
+
+        const RawDataLight* packet = (const RawDataLight*)packetHeader;
+        const RawDataLightVendor* packetVendor = (const RawDataLightVendor*)packetHeader;
+
+        if(!Utility::IsVendorModuleId(packet->moduleId)){
+            senderId = packet->connHeader.sender;
+            moduleId = Utility::GetWrappedModuleId(packet->moduleId);
+            requestHandle = packet->requestHandle;
+            protocolId = packet->protocolId;
+            payloadPtr = packet->payload;
+            payloadLength = sendData->dataLength - SIZEOF_RAW_DATA_LIGHT_PACKET;
+        } else if(sendData->dataLength >= SIZEOF_RAW_DATA_LIGHT_VENDOR_PACKET){
+            senderId = packetVendor->connHeader.sender;
+            moduleId = packetVendor->moduleId;
+            requestHandle = packetVendor->requestHandle;
+            protocolId = packetVendor->protocolId;
+            payloadPtr = packetVendor->payload;
+            payloadLength = sendData->dataLength - SIZEOF_RAW_DATA_LIGHT_VENDOR_PACKET;
+        } else {
+            SIMEXCEPTION(PacketTooSmallException); //LCOV_EXCL_LINE assertion
+        }
+
+        char payloadString[MAX_MESH_PACKET_SIZE];
+        Logger::ConvertBufferToBase64String(payloadPtr, payloadLength, payloadString, sizeof(payloadString));
+
+        logjson("DEBUG",
+            "{"
+                "\"nodeId\":%u,"
+                "\"type\":\"raw_data_light\","
+                "\"module\":%s,"
+                "\"protocol\":%u,"
+                "\"payload\":\"%s\","
+                "\"requestHandle\":%u"
+            "}" SEP,
+            senderId,
+            Utility::GetModuleIdString(moduleId).data(),
+            (u32)protocolId,
+            payloadString,
+            requestHandle
+        );
+        
     }
     else if (packetHeader->messageType == MessageType::CAPABILITY)
     {
@@ -1222,7 +1260,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
                 }
                 else
                 {
-                    SIMEXCEPTION(PaketTooSmallException); //LCOV_EXCL_LINE assertion
+                    SIMEXCEPTION(PacketTooSmallException); //LCOV_EXCL_LINE assertion
                 }
             }
             else if (header->actionType == CapabilityActionType::END)
@@ -1242,54 +1280,95 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
                 }
                 else
                 {
-                    SIMEXCEPTION(PaketTooSmallException); //LCOV_EXCL_LINE assertion
+                    SIMEXCEPTION(PacketTooSmallException); //LCOV_EXCL_LINE assertion
                 }
             }
         }
         else
         {
-            SIMEXCEPTION(PaketTooSmallException); //LCOV_EXCL_LINE assertion
+            SIMEXCEPTION(PacketTooSmallException); //LCOV_EXCL_LINE assertion
         }
     }
 
-    else if (packetHeader->messageType == MessageType::COMPONENT_SENSE)
+    else if (packetHeader->messageType == MessageType::COMPONENT_SENSE && sendData->dataLength >= SIZEOF_COMPONENT_MESSAGE_HEADER)
     {
-        connPacketComponentMessage const * packet = (connPacketComponentMessage const *)packetHeader;
+        ModuleIdWrapper moduleId = INVALID_WRAPPED_MODULE_ID;
 
-        char payload[200];
-        u8 payloadLength = sendData->dataLength - sizeof(packet->componentHeader);
-        Logger::convertBufferToBase64String(packet->payload,  payloadLength, payload, sizeof(payload));
-        logjson("NODE",
-            "{"
-                "\"nodeId\":%u,"
-                "\"type\":\"component_sense\","
-                "\"module\":%u,"
-                "\"requestHandle\":%u,"
-                "\"actionType\":%u,"
-                "\"component\":\"0x%04X\","
-                "\"register\":\"0x%04X\","
-                "\"payload\":\"%s\""
+        const char* messageTypeString = packetHeader->messageType == MessageType::COMPONENT_SENSE ? "component_sense" : "component_act";
+        
+        NodeId senderId;
+        u8 requestHandle;
+        u8 actionType;
+        u16 component;
+        u16 registerAddress;
+        char payloadString[200];
+
+        const ComponentMessageHeader* componentHeader = (const ComponentMessageHeader*)packetHeader;
+
+        //We must first check if the first byte indicates a ModuleId or a VendorModuleId
+        if (!Utility::IsVendorModuleId(componentHeader->moduleId))
+        {
+            const ConnPacketComponentMessage* data = (const ConnPacketComponentMessage*)packetHeader;
+
+            moduleId = Utility::GetWrappedModuleId(componentHeader->moduleId);
+
+            senderId = data->componentHeader.header.sender;
+            requestHandle = data->componentHeader.requestHandle;
+            actionType = data->componentHeader.actionType;
+            component = data->componentHeader.component;
+            registerAddress = data->componentHeader.registerAddress;
+
+            u16 payloadLength = sendData->dataLength - sizeof(data->componentHeader);
+            Logger::ConvertBufferToBase64String(data->payload, payloadLength, payloadString, sizeof(payloadString));
+
+        }
+        else if(Utility::IsVendorModuleId(componentHeader->moduleId) && sendData->dataLength >= SIZEOF_COMPONENT_MESSAGE_HEADER_VENDOR)
+        {
+            const ConnPacketComponentMessageVendor* data = (const ConnPacketComponentMessageVendor*)packetHeader;
+
+            moduleId = (ModuleIdWrapper)data->componentHeader.moduleId;
+
+            senderId = data->componentHeader.header.sender;
+            requestHandle = data->componentHeader.requestHandle;
+            actionType = data->componentHeader.actionType;
+            component = data->componentHeader.component;
+            registerAddress = data->componentHeader.registerAddress;
+
+            u16 payloadLength = sendData->dataLength - sizeof(data->componentHeader);
+            Logger::ConvertBufferToBase64String(data->payload, payloadLength, payloadString, sizeof(payloadString));
+        }
+        else {
+            return;
+        }
+
+        logjson("NODE", "{\"nodeId\":%u,"
+            "\"type\":\"%s\","
+            "\"module\":%s,"
+            "\"requestHandle\":%u,"
+            "\"actionType\":%u,"
+            "\"component\":\"0x%04X\","
+            "\"register\":\"0x%04X\","
+            "\"payload\":\"%s\""
             "}" SEP,
-        packet->componentHeader.header.sender,
-        (u32)packet->componentHeader.moduleId,
-        packet->componentHeader.requestHandle,
-        packet->componentHeader.actionType,
-        packet->componentHeader.component,
-        packet->componentHeader.registerAddress,
-        payload);
 
-        Logger::convertBufferToHexString(packet->payload, payloadLength, payload, sizeof(payload));
-        logt("DEBUG", "component_sense as HEX: %s", payload);
+            senderId,
+            messageTypeString,
+            Utility::GetModuleIdString(moduleId).data(),
+            requestHandle,
+            actionType,
+            component,
+            registerAddress,
+            payloadString);
 
     }
 
     else if (packetHeader->messageType == MessageType::COMPONENT_ACT)
     {
-        connPacketComponentMessage const* packet = (connPacketComponentMessage const*)packetHeader;
+        ConnPacketComponentMessage const* packet = (ConnPacketComponentMessage const*)packetHeader;
 
         char payload[50];
         u8 payloadLength = sendData->dataLength - sizeof(packet->componentHeader);
-        Logger::convertBufferToHexString(packet->payload, payloadLength, payload, sizeof(payload));
+        Logger::ConvertBufferToHexString(packet->payload, payloadLength, payload, sizeof(payload));
         logt("NODE", "component_act payload = %s", payload);
     }
 #if IS_ACTIVE(SIG_MESH)
@@ -1319,7 +1398,7 @@ void Node::UpdateJoinMePacket() const
 
     u8* buffer = meshAdvJobHandle->advData;
 
-    advPacketHeader* advPacket = (advPacketHeader*)buffer;
+    AdvPacketHeader* advPacket = (AdvPacketHeader*)buffer;
     advPacket->flags.len = SIZEOF_ADV_STRUCTURE_FLAGS-1; //minus length field itself
     advPacket->flags.type = (u8)BleGapAdType::TYPE_FLAGS;
     advPacket->flags.flags = FH_BLE_GAP_ADV_FLAG_LE_GENERAL_DISC_MODE | FH_BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED;
@@ -1333,7 +1412,7 @@ void Node::UpdateJoinMePacket() const
     advPacket->messageType = ServiceDataMessageType::JOIN_ME_V0;
 
     //Build a JOIN_ME packet and set it in the advertisement data
-    advPacketPayloadJoinMeV0* packet = (advPacketPayloadJoinMeV0*)(buffer+SIZEOF_ADV_PACKET_HEADER);
+    AdvPacketPayloadJoinMeV0* packet = (AdvPacketPayloadJoinMeV0*)(buffer+SIZEOF_ADV_PACKET_HEADER);
     packet->sender = configuration.nodeId;
     packet->clusterId = this->clusterId;
     packet->clusterSize = this->clusterSize;
@@ -1435,7 +1514,7 @@ Node::DecisionStruct Node::DetermineBestClusterAvailable(void)
             FruityHal::BleGapAddr address = bestClusterAsMaster->addr;
 
             //Choose a different connection interval for leaf nodes
-            u16 connectionIv = Conf::getInstance().meshMinConnectionInterval;
+            u16 connectionIv = Conf::GetInstance().meshMinConnectionInterval;
             if(bestClusterAsMaster->payload.deviceType == DeviceType::LEAF){
                 connectionIv = MSEC_TO_UNITS(90, CONFIG_UNIT_1_25_MS);
             }
@@ -1656,31 +1735,31 @@ void Node::GapAdvertisementMessageHandler(const FruityHal::GapAdvertisementRepor
 {
     if (GET_DEVICE_TYPE() == DeviceType::ASSET) return;
 
-    const u8* data = advertisementReportEvent.getData();
-    u16 dataLength = advertisementReportEvent.getDataLength();
+    const u8* data = advertisementReportEvent.GetData();
+    u16 dataLength = advertisementReportEvent.GetDataLength();
 
-    const advPacketHeader* packetHeader = (const advPacketHeader*) data;
+    const AdvPacketHeader* packetHeader = (const AdvPacketHeader*) data;
 
     if (packetHeader->messageType == ServiceDataMessageType::JOIN_ME_V0)
     {
         if (dataLength == SIZEOF_ADV_PACKET_JOIN_ME)
         {
-            GS->logger.logCustomCount(CustomErrorTypes::COUNT_JOIN_ME_RECEIVED);
+            GS->logger.LogCustomCount(CustomErrorTypes::COUNT_JOIN_ME_RECEIVED);
 
-            const advPacketJoinMeV0* packet = (const advPacketJoinMeV0*) data;
+            const AdvPacketJoinMeV0* packet = (const AdvPacketJoinMeV0*) data;
 
             logt("DISCOVERY", "JOIN_ME: sender:%u, clusterId:%x, clusterSize:%d, freeIn:%u, freeOut:%u, ack:%u", packet->payload.sender, packet->payload.clusterId, packet->payload.clusterSize, packet->payload.freeMeshInConnections, packet->payload.freeMeshOutConnections, packet->payload.ackField);
 
             //Look through the buffer and determine a space where we can put the packet in
-            joinMeBufferPacket* targetBuffer = findTargetBuffer(packet);
+            joinMeBufferPacket* targetBuffer = FindTargetBuffer(packet);
 
             //Now, we have the space for our packet and we fill it with the latest information
             if (targetBuffer != nullptr && packet->payload.clusterId != this->clusterId)
             {
-                targetBuffer->addr.addr = advertisementReportEvent.getPeerAddr();
-                targetBuffer->addr.addr_type = advertisementReportEvent.getPeerAddrType();
-                targetBuffer->advType = advertisementReportEvent.isConnectable() ? FruityHal::BleGapAdvType::ADV_IND : FruityHal::BleGapAdvType::ADV_NONCONN_IND;
-                targetBuffer->rssi = advertisementReportEvent.getRssi();
+                targetBuffer->addr.addr = advertisementReportEvent.GetPeerAddr();
+                targetBuffer->addr.addr_type = advertisementReportEvent.GetPeerAddrType();
+                targetBuffer->advType = advertisementReportEvent.IsConnectable() ? FruityHal::BleGapAdvType::ADV_IND : FruityHal::BleGapAdvType::ADV_NONCONN_IND;
+                targetBuffer->rssi = advertisementReportEvent.GetRssi();
                 targetBuffer->receivedTimeDs = GS->appTimerDs;
 
                 targetBuffer->payload = packet->payload;
@@ -1690,7 +1769,7 @@ void Node::GapAdvertisementMessageHandler(const FruityHal::GapAdvertisementRepor
 
 }
 
-joinMeBufferPacket* Node::findTargetBuffer(const advPacketJoinMeV0* packet)
+joinMeBufferPacket* Node::FindTargetBuffer(const AdvPacketJoinMeV0* packet)
 {
     joinMeBufferPacket* targetBuffer = nullptr;
 
@@ -1773,7 +1852,7 @@ joinMeBufferPacket* Node::findTargetBuffer(const advPacketJoinMeV0* packet)
 void Node::ChangeState(DiscoveryState newState)
 {
     if (currentDiscoveryState == newState || stateMachineDisabled || GET_DEVICE_TYPE() == DeviceType::ASSET){
-        currentStateTimeoutDs = (currentDiscoveryState == newState) ? SEC_TO_DS((u32)Conf::getInstance().highToLowDiscoveryTimeSec) : currentStateTimeoutDs;
+        currentStateTimeoutDs = (currentDiscoveryState == newState) ? SEC_TO_DS((u32)Conf::GetInstance().highToLowDiscoveryTimeSec) : currentStateTimeoutDs;
         return;
     }
 
@@ -1786,8 +1865,8 @@ void Node::ChangeState(DiscoveryState newState)
         //Reset no nodes found counter
         noNodesFoundCounter = 0;
 
-        currentStateTimeoutDs = SEC_TO_DS((u32)Conf::getInstance().highToLowDiscoveryTimeSec);
-        nextDiscoveryState = Conf::getInstance().highToLowDiscoveryTimeSec == 0 ? DiscoveryState::INVALID : DiscoveryState::LOW;
+        currentStateTimeoutDs = SEC_TO_DS((u32)Conf::GetInstance().highToLowDiscoveryTimeSec);
+        nextDiscoveryState = Conf::GetInstance().highToLowDiscoveryTimeSec == 0 ? DiscoveryState::INVALID : DiscoveryState::LOW;
 
         //Reconfigure the advertising and scanning jobs
         if (meshAdvJobHandle != nullptr){
@@ -1864,7 +1943,7 @@ void Node::TimerEventHandler(u16 passedTimeDs)
             {
                 //We reset all the emergency disconnect values and try again after emergencyDisconnectTimerTriggerDs
                 ResetEmergencyDisconnect();
-                GS->logger.logCustomError(CustomErrorTypes::WARN_COULD_NOT_CREATE_EMERGENCY_DISCONNECT_VALIDATION_CONNECTION, bestCluster->payload.clusterId);
+                GS->logger.LogCustomError(CustomErrorTypes::WARN_COULD_NOT_CREATE_EMERGENCY_DISCONNECT_VALIDATION_CONNECTION, bestCluster->payload.clusterId);
             }
         }
         else if (emergencyDisconnectTimerDs >= emergencyDisconnectTimerTriggerDs)
@@ -1889,7 +1968,7 @@ void Node::TimerEventHandler(u16 passedTimeDs)
                 ResetEmergencyDisconnect();
                 //This can happen in very rare conditions where several nodes enter the emergency state at the same time
                 //and report their emergency to the same node.
-                GS->logger.logCustomError(CustomErrorTypes::WARN_UNEXPECTED_REMOVAL_OF_EMERGENCY_DISCONNECT_VALIDATION_CONNECTION, 0);
+                GS->logger.LogCustomError(CustomErrorTypes::WARN_UNEXPECTED_REMOVAL_OF_EMERGENCY_DISCONNECT_VALIDATION_CONNECTION, 0);
             }
         }
     }
@@ -1932,7 +2011,7 @@ void Node::TimerEventHandler(u16 passedTimeDs)
         }
     }
 
-    if((disconnectTimestampDs !=0 && GS->appTimerDs >= disconnectTimestampDs + SEC_TO_DS(TIME_BEFORE_DISCOVERY_MESSAGE_SENT_SEC))&& Conf::getInstance().highToLowDiscoveryTimeSec != 0){
+    if((disconnectTimestampDs !=0 && GS->appTimerDs >= disconnectTimestampDs + SEC_TO_DS(TIME_BEFORE_DISCOVERY_MESSAGE_SENT_SEC))&& Conf::GetInstance().highToLowDiscoveryTimeSec != 0){
         logt("NODE","High Discovery message being sent after disconnect");
         //Message is broadcasted when connnection is lost to change the state to High Discovery
             u8 discoveryState = (u8)DiscoveryState::HIGH;
@@ -2056,7 +2135,7 @@ void Node::KeepHighDiscoveryActive()
 
     //Reset the state in discovery high, if anything in the cluster configuration changed
     if(currentDiscoveryState == DiscoveryState::HIGH){
-        currentStateTimeoutDs = SEC_TO_DS(Conf::getInstance().highToLowDiscoveryTimeSec);
+        currentStateTimeoutDs = SEC_TO_DS(Conf::GetInstance().highToLowDiscoveryTimeSec);
     } else {
         ChangeState(DiscoveryState::HIGH);
     }
@@ -2120,12 +2199,22 @@ Module* Node::GetModuleById(ModuleId id) const
     return nullptr;
 }
 
+Module* Node::GetModuleById(VendorModuleId id) const
+{
+    for(u32 i=0; i<GS->amountOfModules; i++){
+        if(GS->activeModules[i]->vendorModuleId == id){
+            return GS->activeModules[i];
+        }
+    }
+    return nullptr;
+}
+
 void Node::PrintStatus(void) const
 {
     const FruityHal::BleGapAddr addr = FruityHal::GetBleGapAddress();
 
     trace("**************" EOL);
-    trace("Node %s (nodeId: %u) vers: %u, NodeKey: %02X:%02X:....:%02X:%02X" EOL EOL, RamConfig->GetSerialNumber(), configuration.nodeId, GS->config.getFruityMeshVersion(),
+    trace("Node %s (nodeId: %u) vers: %u, NodeKey: %02X:%02X:....:%02X:%02X" EOL EOL, RamConfig->GetSerialNumber(), configuration.nodeId, GS->config.GetFruityMeshVersion(),
             RamConfig->GetNodeKey()[0], RamConfig->GetNodeKey()[1], RamConfig->GetNodeKey()[14], RamConfig->GetNodeKey()[15]);
     SetTerminalTitle();
     trace("Mesh clusterSize:%u, clusterId:%u" EOL, clusterSize, clusterId);
@@ -2151,7 +2240,7 @@ void Node::SetTerminalTitle() const
 {
 #if IS_ACTIVE(SET_TERMINAL_TITLE)
     //Change putty terminal title
-    if(Conf::getInstance().terminalMode == TerminalMode::PROMPT) trace("\033]0;Node %u (%s) ClusterSize:%d (%x), [%u, %u, %u, %u]\007",
+    if(Conf::GetInstance().terminalMode == TerminalMode::PROMPT) trace("\033]0;Node %u (%s) ClusterSize:%d (%x), [%u, %u, %u, %u]\007",
             configuration.nodeId,
             RamConfig->serialNumber,
             clusterSize, clusterId,
@@ -2392,7 +2481,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         Reboot(1, RebootReason::LOCAL_RESET);
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-#endif
+#endif //IS_INACTIVE(CLC_GW_SAVE_SPACE)
     /************* NODE ***************/
     //Get a full status of the node
 #if IS_INACTIVE(GW_SAVE_SPACE)
@@ -2402,10 +2491,10 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-    //Allows us to send arbitrary mesh packets
+    //Allows us to send arbitrary mesh packets (not to be confused with the raw data protocol)
     else if (TERMARGS(0, "rawsend") && commandArgsSize > 1) {
         DYNAMIC_ARRAY(buffer, 200);
-        u32 len = Logger::parseEncodedStringToBuffer(commandArgs[1], buffer, 200);
+        u32 len = Logger::ParseEncodedStringToBuffer(commandArgs[1], buffer, 200);
 
         //TODO: We could optionally allow to specify delivery priority and reliability
 
@@ -2418,7 +2507,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
     //MUST NOT BE USED EXCEPT FOR TESTING
     else if (TERMARGS(0, "rawsend_high") && commandArgsSize > 1) {
         DYNAMIC_ARRAY(buffer, 200);
-        u32 len = Logger::parseEncodedStringToBuffer(commandArgs[1], buffer, 200);
+        u32 len = Logger::ParseEncodedStringToBuffer(commandArgs[1], buffer, 200);
 
         //Because the implementation doesn't easily allow us to send WRITE_REQ to all connections, we have to work around that
         BaseConnections conns = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
@@ -2439,181 +2528,236 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-#endif
-#endif
-    else if (commandArgsSize >= 5 && commandArgsSize <= 6 && TERMARGS(0, "raw_data_light"))
+
+#endif //SIM_ENABLED
+#endif //IS_INACTIVE(GW_SAVE_SPACE)
+
+    // ################# Raw Data Protocol #######################
+    //Sends a small packet that can have different protocol types
+    //raw_data_light [receiverId] [destinationModule] [protocolId] [payload] {requestHandle = 0}
+    else if (commandArgsSize >= 5 && TERMARGS(0, "raw_data_light"))
     {
-        //Command description
-        //Index               0           1                2               3           4            5       
-        //Name        raw_data_light [receiverId] [destinationModule] [protocolId] [payload] {requestHandle}
-        //Type             string        u16              u8               u8      hexstring       u8       
-
-        alignas(RawDataLight) u8 buffer[120 + sizeof(RawDataLight)];
+        u8 buffer[MAX_MESH_PACKET_SIZE];
         CheckedMemset(&buffer, 0, sizeof(buffer));
-        RawDataLight& packet = (RawDataLight&)buffer;
 
-        if (commandArgsSize >= 6)
-        {
-            packet.requestHandle = Utility::StringToU8(commandArgs[5]);
-        }
+        NodeId receiverId = Utility::TerminalArgumentToNodeId(commandArgs[1]);
+        ModuleIdWrapper moduleId = Utility::GetWrappedModuleIdFromTerminal(commandArgs[2]);
+        RawDataProtocol protocolId = static_cast<RawDataProtocol>(Utility::StringToU8(commandArgs[3]));
 
-        packet.connHeader.messageType = MessageType::MODULE_RAW_DATA_LIGHT;
-        packet.connHeader.sender = configuration.nodeId;
-        packet.connHeader.receiver = Utility::TerminalArgumentToNodeId(commandArgs[1]);
+        bool didError = false;
+        u16 payloadLength = Logger::ParseEncodedStringToBuffer(commandArgs[4], buffer, sizeof(buffer), &didError);
+        if(didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
 
-        packet.moduleId = (ModuleId)Utility::StringToU8(commandArgs[2]);
-        packet.protocolId = static_cast<RawDataProtocol>(Utility::StringToU8(commandArgs[3]));
+        u8 requestHandle = commandArgsSize >= 6 ? Utility::StringToU8(commandArgs[5]) : 0;
 
-        u32 payloadLength = Logger::parseEncodedStringToBuffer(commandArgs[4], packet.payload, sizeof(buffer) - sizeof(RawDataLight) + 1);
 
-        //Let's do some sanity checks!
-        if (payloadLength == 0)    //Nothing to send
-            return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
-
-        GS->cm.SendMeshMessage(
+        GS->cm.SendModuleActionMessage(
+            MessageType::MODULE_RAW_DATA_LIGHT,
+            moduleId,
+            receiverId,
+            (u8)protocolId,
+            requestHandle,
             buffer,
-            sizeof(RawDataLight) - 1 + payloadLength,
-            DeliveryPriority::LOW
-            );
+            payloadLength,
+            false,
+            true
+        );
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
     //Send some large data that is split over a few messages
-    else if(commandArgsSize >= 5 && commandArgsSize <= 6 && TERMARGS(0, "raw_data_start"))
+    //raw_data_start [receiverId] [destinationModule] [numChunks] [protocolId] {requestHandle = 0}
+    else if(commandArgsSize >= 5 && TERMARGS(0, "raw_data_start"))
     {
-        //Command description
-        //Index            0              1                2               3           4             5
-        //Name        raw_data_start [receiverId] [destinationModule] [numChunks] [protocolId] {requestHandle}
-        //Type          string           u16              u8              u24          u8            u8
+        bool didError = false;
+        RawDataStartPayload data;
+        CheckedMemset(&data, 0x00, sizeof(data));
 
-        RawDataStart paket;
-        CheckedMemset(&paket, 0, sizeof(paket));
-        if (!CreateRawHeader(&paket.header, RawDataActionType::START, commandArgs, commandArgsSize >= 6 ? commandArgs[5] : nullptr))
-            return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+        NodeId receiverId = Utility::TerminalArgumentToNodeId(commandArgs[1], &didError);
+        ModuleIdWrapper moduleId = Utility::GetWrappedModuleIdFromTerminal(commandArgs[2], &didError);
 
-        paket.numChunks   = Utility::StringToU32(commandArgs[3]);
-        paket.protocolId = (u32)static_cast<RawDataProtocol>(Utility::StringToU8(commandArgs[4]));
+        data.numChunks = Utility::StringToU32(commandArgs[3], &didError);
+        data.protocolId = (u32)static_cast<RawDataProtocol>(Utility::StringToU8(commandArgs[4], &didError));
+        data.fmKeyId = 0; //TODO: IOT-1465
 
-        //paket.reserved;    Leave zero
+        u8 requestHandle = commandArgsSize >= 6 ? Utility::StringToU8(commandArgs[5], &didError) : 0;
 
-        GS->cm.SendMeshMessage(
-            (u8*)&paket,
-            sizeof(RawDataStart),
-            DeliveryPriority::LOW
+        if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+
+        GS->cm.SendModuleActionMessage(
+            MessageType::MODULE_RAW_DATA,
+            moduleId,
+            receiverId,
+            (u8)RawDataActionType::START,
+            requestHandle,
+            (u8*)&data,
+            sizeof(data),
+            false,
+            true
+        );
+
+        return TerminalCommandHandlerReturnType::SUCCESS;
+    }
+    //raw_data_error [receiverId] [destinationModule] [errorCode] [destination] {requestHandle = 0}
+    else if (commandArgsSize >= 5 && TERMARGS(0, "raw_data_error"))
+    {
+        bool didError = false;
+        RawDataErrorPayload data;
+        CheckedMemset(&data, 0x00, sizeof(data));
+
+        NodeId receiverId = Utility::TerminalArgumentToNodeId(commandArgs[1], &didError);
+        ModuleIdWrapper moduleId = Utility::GetWrappedModuleIdFromTerminal(commandArgs[2], &didError);
+
+        data.error = (RawDataErrorType)Utility::StringToU8(commandArgs[3], &didError);
+        data.destination = (RawDataErrorDestination)Utility::StringToU8(commandArgs[4], &didError);
+
+        u8 requestHandle = commandArgsSize >= 6 ? Utility::StringToU8(commandArgs[5], &didError) : 0;
+
+        if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+
+        GS->cm.SendModuleActionMessage(
+            MessageType::MODULE_RAW_DATA,
+            moduleId,
+            receiverId,
+            (u8)RawDataActionType::ERROR_T,
+            requestHandle,
+            (u8*)&data,
+            sizeof(data),
+            false,
+            true
+            );
+
+        return TerminalCommandHandlerReturnType::SUCCESS;
+
+    }
+    //raw_data_start_received [receiverId] [destinationModule] {requestHandle = 0}
+    else if (commandArgsSize >= 3 && TERMARGS(0, "raw_data_start_received"))
+    {
+        bool didError = false;
+        
+        NodeId receiverId = Utility::TerminalArgumentToNodeId(commandArgs[1], &didError);
+        ModuleIdWrapper moduleId = Utility::GetWrappedModuleIdFromTerminal(commandArgs[2], &didError);
+
+        u8 requestHandle = commandArgsSize >= 4 ? Utility::StringToU8(commandArgs[3], &didError) : 0;
+
+        if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+
+        GS->cm.SendModuleActionMessage(
+            MessageType::MODULE_RAW_DATA,
+            moduleId,
+            receiverId,
+            (u8)RawDataActionType::START_RECEIVED,
+            requestHandle,
+            nullptr,
+            0,
+            false,
+            true
             );
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-    else if (commandArgsSize >= 5 && commandArgsSize <= 6 && TERMARGS(0, "raw_data_error"))
+    //raw_data_chunk [receiverId] [destinationModule] [chunkId] [payload] {requestHandle = 0}
+    else if (commandArgsSize >= 5 && TERMARGS(0, "raw_data_chunk"))
     {
-        //Command description
-        //Index               0            1               2                3           4              5
-        //Name        raw_data_error [receiverId] [destinationModule] [errorCode] [destination] {requestHandle}
-        //Type             string         u16             u8               u8          u8             u8
-        
         bool didError = false;
 
-        NodeId                  receiver                =                          Utility::TerminalArgumentToNodeId(commandArgs[1]);
-        ModuleId                moduleId                = (ModuleId)               Utility::StringToU8 (commandArgs[2], &didError);
-        RawDataErrorType        rawDataErrorType        = (RawDataErrorType)       Utility::StringToU8 (commandArgs[3], &didError);
-        RawDataErrorDestination rawDataErrorDestination = (RawDataErrorDestination)Utility::StringToU8 (commandArgs[4], &didError);
-
-        u8 requestHandle = 0;
-        if (commandArgsSize >= 6) 
-        {
-            requestHandle = Utility::StringToU8(commandArgs[5], &didError);
-        }
-
-        if (didError || receiver == NODE_ID_INVALID) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
-
-        SendRawError(receiver, moduleId, rawDataErrorType, rawDataErrorDestination,    requestHandle);
-
-        return TerminalCommandHandlerReturnType::SUCCESS;
-
-    }
-    else if (commandArgsSize >= 3 && commandArgsSize <= 4 && TERMARGS(0, "raw_data_start_received"))
-    {
-        //Command description
-        //Index                  0                 1                2                 3
-        //Name        raw_data_start_received [receiverId] [destinationModule] {requestHandle}
-        //Type                string              u16              u8                 u8
-
-        RawDataStartReceived paket;
-        CheckedMemset(&paket, 0, sizeof(paket));
-        if (!CreateRawHeader(&paket.header, RawDataActionType::START_RECEIVED, commandArgs, commandArgsSize >= 4 ? commandArgs[3] : nullptr))
-            return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
-
-        GS->cm.SendMeshMessage(
-            (u8*)&paket,
-            sizeof(RawDataStartReceived),
-            DeliveryPriority::LOW
-            );
-
-        return TerminalCommandHandlerReturnType::SUCCESS;
-    }
-    else if (commandArgsSize >= 5 && commandArgsSize <= 6 && TERMARGS(0, "raw_data_chunk"))
-    {
-        //Command description
-        //Index               0           1                2              3         4            5       
-        //Name        raw_data_chunk [receiverId] [destinationModule] [chunkId] [payload] {requestHandle}
-        //Type             string        u16              u8             u24    hexstring       u8       
-
-        alignas(RawDataChunk) u8 buffer[120 + sizeof(RawDataChunk)];
+        u8 buffer[MAX_MESH_PACKET_SIZE - sizeof(RawDataHeaderVendor)];
         CheckedMemset(&buffer, 0, sizeof(buffer));
-        RawDataChunk& packet = (RawDataChunk&)buffer;
-        if (!CreateRawHeader(&packet.header, RawDataActionType::CHUNK, commandArgs, commandArgsSize >= 6 ? commandArgs[5] : nullptr))
-            return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+        RawDataChunkPayload* data = (RawDataChunkPayload*)buffer;
 
-        packet.chunkId = Utility::StringToU32(commandArgs[3]);
-        //paket.reserved;    Leave zero
+        NodeId receiverId = Utility::TerminalArgumentToNodeId(commandArgs[1], &didError);
+        ModuleIdWrapper moduleId = Utility::GetWrappedModuleIdFromTerminal(commandArgs[2], &didError);
+        data->chunkId = Utility::StringToU32(commandArgs[3], &didError);
+        u32 payloadLength = Logger::ParseEncodedStringToBuffer(commandArgs[4], data->payload, sizeof(buffer) - SIZEOF_RAW_DATA_CHUNK_PAYLOAD);
+        u8 requestHandle = commandArgsSize >= 6 ? Utility::StringToU8(commandArgs[5], &didError) : 0;
 
-        u32 payloadLength = Logger::parseEncodedStringToBuffer(commandArgs[4], packet.payload, sizeof(buffer) - sizeof(RawDataChunk) + 1);
+        if (payloadLength == 0 || didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
 
-        //Let's do some sanity checks!
-        if (payloadLength == 0)    //Nothing to send
-            return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
-        if (((strlen(commandArgs[4]) + 1) / 3) > MAX_RAW_CHUNK_SIZE)    //Msg too long
-            return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
-
-        GS->cm.SendMeshMessage(
+        GS->cm.SendModuleActionMessage(
+            MessageType::MODULE_RAW_DATA,
+            moduleId,
+            receiverId,
+            (u8)RawDataActionType::CHUNK,
+            requestHandle,
             buffer,
-            sizeof(RawDataChunk) - 1 + payloadLength,
-            DeliveryPriority::LOW
+            SIZEOF_RAW_DATA_CHUNK_PAYLOAD + payloadLength,
+            false,
+            true
             );
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-    else if (commandArgsSize >= 4 && commandArgsSize <= 5 && TERMARGS(0, "raw_data_report"))
+    //raw_data_report [receiverId] [destinationModuleId] [missingChunkIds] {requestHandle = 0}
+    else if (commandArgsSize >= 4 && TERMARGS(0, "raw_data_report"))
     {
-        RawDataReport paket;
-        CheckedMemset(&paket, 0, sizeof(paket));
-        if (!CreateRawHeader(&paket.header, RawDataActionType::REPORT, commandArgs, commandArgsSize >= 5 ? commandArgs[4] : nullptr))
-            return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+        bool didError = false;
+        RawDataReportPayload data;
+        CheckedMemset(&data, 0x00, sizeof(data));
 
-        if (strcmp(commandArgs[3], "-") != 0) 
+        NodeId receiverId = Utility::TerminalArgumentToNodeId(commandArgs[1], &didError);
+        ModuleIdWrapper moduleId = Utility::GetWrappedModuleIdFromTerminal(commandArgs[2], &didError);
+
+        //Parse the string of missing chunk ids which is comma seperated, such as e.g. 1,2,3
+        if (strcmp(commandArgs[3], "-") != 0)
         {
             const char* readPtr = commandArgs[3];
-            paket.missings[0] = strtoul(readPtr, nullptr, 0);
+            data.missings[0] = strtoul(readPtr, nullptr, 0);
             int missingIndex = 1;
             while (*readPtr != '\0')
             {
                 if (*readPtr == ',')
                 {
-                    if (missingIndex == sizeof(paket.missings) / sizeof(paket.missings[0])) //Too many missings
+                    if (missingIndex == sizeof(data.missings) / sizeof(data.missings[0])) //Too many missings
                     {
                         return TerminalCommandHandlerReturnType::WRONG_ARGUMENT; //LCOV_EXCL_LINE assertion
                     }
-                    paket.missings[missingIndex] = strtoul(readPtr + 1, nullptr, 0);
+                    data.missings[missingIndex] = strtoul(readPtr + 1, nullptr, 0);
                     missingIndex++;
                 }
                 readPtr++;
             }
-                }
+        }
 
-        GS->cm.SendMeshMessage(
-            (u8*)&paket,
-            sizeof(RawDataReport),
-            DeliveryPriority::LOW
+        u8 requestHandle = commandArgsSize >= 5 ? Utility::StringToU8(commandArgs[4], &didError) : 0;
+
+        if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+
+        GS->cm.SendModuleActionMessage(
+            MessageType::MODULE_RAW_DATA,
+            moduleId,
+            receiverId,
+            (u8)RawDataActionType::REPORT,
+            requestHandle,
+            (u8*)&data,
+            sizeof(data),
+            false,
+            true
+            );
+
+        return TerminalCommandHandlerReturnType::SUCCESS;
+    }
+    //raw_data_report_desired [receiverId] [destinationModuleId] {requestHandle = 0}
+    else if (commandArgsSize >= 3 && TERMARGS(0, "raw_data_report_desired"))
+    {
+        bool didError = false;
+
+        NodeId receiverId = Utility::TerminalArgumentToNodeId(commandArgs[1], &didError);
+        ModuleIdWrapper moduleId = Utility::GetWrappedModuleIdFromTerminal(commandArgs[2], &didError);
+
+        u8 requestHandle = commandArgsSize >= 4 ? Utility::StringToU8(commandArgs[3], &didError) : 0;
+
+        if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+
+        GS->cm.SendModuleActionMessage(
+            MessageType::MODULE_RAW_DATA,
+            moduleId,
+            receiverId,
+            (u8)RawDataActionType::REPORT_DESIRED,
+            requestHandle,
+            nullptr,
+            0,
+            false,
+            true
             );
 
         return TerminalCommandHandlerReturnType::SUCCESS;
@@ -2668,13 +2812,13 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
     }
     else if (TERMARGS(0, "startterm"))
     {
-        Conf::getInstance().terminalMode = TerminalMode::PROMPT;
+        Conf::GetInstance().terminalMode = TerminalMode::PROMPT;
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
 #endif
     else if (TERMARGS(0, "stopterm"))
     {
-        Conf::getInstance().terminalMode = TerminalMode::JSON;
+        Conf::GetInstance().terminalMode = TerminalMode::JSON;
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
 
@@ -2695,7 +2839,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
     else if (TERMARGS(0, "set_node_key") && commandArgsSize == 2)
     {
         u8 key[16];
-        const u32 length = Logger::parseEncodedStringToBuffer(commandArgs[1], key, sizeof(key));
+        const u32 length = Logger::ParseEncodedStringToBuffer(commandArgs[1], key, sizeof(key));
         
         if (length != 16) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
 
@@ -2710,37 +2854,15 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
     /************* Debug commands ***************/
     else if (TERMARGS(0,"component_sense") && commandArgsSize >= 7)
     {
-        u8 buffer[200];
-        connPacketComponentMessage* message = (connPacketComponentMessage*)buffer;
-        message->componentHeader.header.messageType = MessageType::COMPONENT_SENSE;
-        message->componentHeader.header.sender = configuration.nodeId;
-        message->componentHeader.header.receiver = Utility::TerminalArgumentToNodeId(commandArgs[1]);
-        message->componentHeader.moduleId = (ModuleId)strtoul(commandArgs[2], nullptr, 0);
-        message->componentHeader.actionType = (u8)strtoul(commandArgs[3], nullptr, 0);
-        message->componentHeader.component = (u16)strtoul(commandArgs[4], nullptr, 0);
-        message->componentHeader.registerAddress = (u16)strtoul(commandArgs[5], nullptr, 0);
-        u8 length = Logger::parseEncodedStringToBuffer(commandArgs[6], message->payload, sizeof(buffer) - SIZEOF_COMPONENT_MESSAGE_HEADER);
-        message->componentHeader.requestHandle = (u8)((commandArgsSize > 7) ? strtoul(commandArgs[7], nullptr, 0) : 0);
+        SendComponentMessageFromTerminal(MessageType::COMPONENT_SENSE, commandArgs, commandArgsSize);
 
-        SendComponentMessage(*message, length);
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
 
     else if (TERMARGS(0,"component_act") && commandArgsSize >= 7)
     {
-        u8 buffer[200];
-        connPacketComponentMessage* message = (connPacketComponentMessage*)buffer;
-        message->componentHeader.header.messageType = MessageType::COMPONENT_ACT;
-        message->componentHeader.header.sender = configuration.nodeId;
-        message->componentHeader.header.receiver = Utility::TerminalArgumentToNodeId(commandArgs[1]);
-        message->componentHeader.moduleId = (ModuleId)strtoul(commandArgs[2], nullptr, 0);
-        message->componentHeader.actionType = (u8)strtoul(commandArgs[3], nullptr, 0);
-        message->componentHeader.component = (u16)strtoul(commandArgs[4], nullptr, 0);
-        message->componentHeader.registerAddress = (u16)strtoul(commandArgs[5], nullptr, 0);
-        message->componentHeader.requestHandle = (u8)((commandArgsSize > 7) ? strtoul(commandArgs[7], nullptr, 0) : 0);
-        u8 length = Logger::parseEncodedStringToBuffer(commandArgs[6], message->payload, sizeof(buffer) - SIZEOF_COMPONENT_MESSAGE_HEADER);
+        SendComponentMessageFromTerminal(MessageType::COMPONENT_ACT, commandArgs, commandArgsSize);
 
-        SendComponentMessage(*message, length);
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
 #if IS_INACTIVE(SAVE_SPACE)
@@ -2757,7 +2879,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
         const u8 dataLength = 145;
         u8 _packet[dataLength];
-        connPacketHeader* packet = (connPacketHeader*)_packet;
+        ConnPacketHeader* packet = (ConnPacketHeader*)_packet;
         packet->messageType = MessageType::DATA_1;
         packet->receiver = 0;
         packet->sender = configuration.nodeId;
@@ -2827,7 +2949,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         NodeId nodeId = Utility::StringToU16(commandArgs[1]);
         u16 newConnectionInterval = Utility::StringToU16(commandArgs[2]);
 
-        connPacketUpdateConnectionInterval packet;
+        ConnPacketUpdateConnectionInterval packet;
         packet.header.messageType = MessageType::UPDATE_CONNECTION_INTERVAL;
         packet.header.sender = GS->node.configuration.nodeId;
         packet.header.receiver = nodeId;
@@ -2853,7 +2975,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
         NodeId receiver = Utility::TerminalArgumentToNodeId(commandArgs[1]);
 
-        connPacketModule packet;
+        ConnPacketModule packet;
         packet.header.messageType = MessageType::MODULE_CONFIG;
         packet.header.sender = configuration.nodeId;
         packet.header.receiver = receiver;
@@ -2889,34 +3011,86 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
     //Must be called to allow the module to get and set the config
     return Module::TerminalCommandHandler(commandArgs, commandArgsSize);
 }
+
+ErrorTypeUnchecked Node::SendComponentMessageFromTerminal(MessageType componentMessageType, const char* commandArgs[], u8 commandArgsSize)
+{        
+    ModuleIdWrapper moduleId = (ModuleIdWrapper)Utility::StringToU32(commandArgs[2]);
+
+    u8 buffer[200];
+    u16 payloadLength = 0;
+    u16 totalLength;
+
+    //We use a different packet format with an additional 3 bytes in case of a vendor module id
+    if(Utility::IsVendorModuleId(moduleId))
+    {
+        ConnPacketComponentMessageVendor* message = (ConnPacketComponentMessageVendor*)buffer;
+        message->componentHeader.header.messageType = componentMessageType;
+        message->componentHeader.header.sender = configuration.nodeId;
+        message->componentHeader.header.receiver = Utility::TerminalArgumentToNodeId(commandArgs[1]);
+        message->componentHeader.moduleId = (VendorModuleId)moduleId;
+        message->componentHeader.actionType = (u8)strtoul(commandArgs[3], nullptr, 0);
+        message->componentHeader.component = (u16)strtoul(commandArgs[4], nullptr, 0);
+        message->componentHeader.registerAddress = (u16)strtoul(commandArgs[5], nullptr, 0);
+        message->componentHeader.requestHandle = (u8)((commandArgsSize > 7) ? strtoul(commandArgs[7], nullptr, 0) : 0);
+        payloadLength = Logger::ParseEncodedStringToBuffer(commandArgs[6], message->payload, sizeof(buffer) - SIZEOF_COMPONENT_MESSAGE_HEADER_VENDOR);
+        totalLength = SIZEOF_CONN_PACKET_COMPONENT_MESSAGE_VENDOR + payloadLength;
+    }
+    else
+    {
+        ConnPacketComponentMessage* message = (ConnPacketComponentMessage*)buffer;
+        message->componentHeader.header.messageType = componentMessageType;
+        message->componentHeader.header.sender = configuration.nodeId;
+        message->componentHeader.header.receiver = Utility::TerminalArgumentToNodeId(commandArgs[1]);
+        message->componentHeader.moduleId = Utility::GetModuleId(moduleId);
+        message->componentHeader.actionType = (u8)strtoul(commandArgs[3], nullptr, 0);
+        message->componentHeader.component = (u16)strtoul(commandArgs[4], nullptr, 0);
+        message->componentHeader.registerAddress = (u16)strtoul(commandArgs[5], nullptr, 0);
+        message->componentHeader.requestHandle = (u8)((commandArgsSize > 7) ? strtoul(commandArgs[7], nullptr, 0) : 0);
+        payloadLength = Logger::ParseEncodedStringToBuffer(commandArgs[6], message->payload, sizeof(buffer) - SIZEOF_COMPONENT_MESSAGE_HEADER);
+        totalLength = SIZEOF_CONN_PACKET_COMPONENT_MESSAGE + payloadLength;
+    }
+
+    GS->cm.SendMeshMessage(
+        buffer,
+        totalLength,
+        DeliveryPriority::LOW);
+
+    return ErrorTypeUnchecked::SUCCESS;
+}
+
 #endif
 
 inline void Node::SendModuleList(NodeId toNode, u8 requestHandle) const
 {
-    u8 buffer[SIZEOF_CONN_PACKET_MODULE + (MAX_MODULE_COUNT + 1) * 4];
-    CheckedMemset(buffer, 0, sizeof(buffer));
+    u16 bufferLength = GS->amountOfModules * sizeof(ModuleInformation);
+    DYNAMIC_ARRAY(buffer, bufferLength);
+    CheckedMemset(buffer, 0, bufferLength);
 
-    connPacketModule* outPacket = (connPacketModule*) buffer;
-    outPacket->header.messageType = MessageType::MODULE_CONFIG;
-    outPacket->header.sender = configuration.nodeId;
-    outPacket->header.receiver = toNode;
+    //Iterate through all active modules to extract the necessary information
+    for(u32 i = 0; i < GS->amountOfModules; i++)
+    {
+        ModuleInformation* info = (ModuleInformation*)(buffer + i * sizeof(ModuleInformation));
 
-    outPacket->moduleId = ModuleId::NODE;
-    outPacket->requestHandle = requestHandle;
-    outPacket->actionType = (u8)Module::ModuleConfigMessages::MODULE_LIST;
-
-    for(u32 i = 0; i<GS->amountOfModules; i++){
-        //TODO: can we do this better? the data region is unaligned in memory
-            CheckedMemcpy(outPacket->data + i*4, &GS->activeModules[i]->configurationPointer->moduleId, 1);
-            CheckedMemcpy(outPacket->data + i*4 + 2, &GS->activeModules[i]->configurationPointer->moduleVersion, 1);
-            CheckedMemcpy(outPacket->data + i*4 + 3, &GS->activeModules[i]->configurationPointer->moduleActive, 1);
+        if(!Utility::IsVendorModuleId(GS->activeModules[i]->moduleId)){
+            info->moduleId = Utility::GetWrappedModuleId(GS->activeModules[i]->moduleId);
+            info->moduleVersion = GS->activeModules[i]->configurationPointer->moduleVersion;
+            info->moduleActive = GS->activeModules[i]->configurationPointer->moduleActive;
+        } else {
+            info->moduleId = GS->activeModules[i]->vendorModuleId;
+            info->moduleVersion = GS->activeModules[i]->vendorConfigurationPointer->moduleVersion;
+            info->moduleActive = GS->activeModules[i]->vendorConfigurationPointer->moduleActive;
+        }
     }
 
-    GS->cm.SendMeshMessage(
-            (u8*)outPacket,
-            SIZEOF_CONN_PACKET_MODULE + (MAX_MODULE_COUNT+1)*4,
-            DeliveryPriority::LOW
-            );
+    SendModuleActionMessage(
+        MessageType::MODULE_CONFIG,
+        toNode,
+        (u8)Module::ModuleConfigMessages::MODULE_LIST_V2,
+        requestHandle,
+        buffer,
+        bufferLength,
+        false
+    );
 }
 
 
@@ -2936,36 +3110,6 @@ bool Node::IsPreferredConnection(NodeId id) const
     return false;
 }
 
-void Node::SendRawError(NodeId receiver, ModuleId moduleId, RawDataErrorType type, RawDataErrorDestination destination, u8 requestHandle) const
-{
-    RawDataError paket;
-    CheckedMemset(&paket, 0, sizeof(paket));
-
-    paket.header.connHeader.messageType = MessageType::MODULE_RAW_DATA;
-    paket.header.connHeader.sender = configuration.nodeId;
-    paket.header.connHeader.receiver = receiver;
-
-    paket.header.moduleId = moduleId;
-    paket.header.actionType = RawDataActionType::ERROR_T;
-    paket.header.requestHandle = requestHandle;
-
-    paket.type = type;
-    paket.destination = destination;
-
-    GS->cm.SendMeshMessage(
-        (u8*)&paket,
-        sizeof(RawDataError),
-        DeliveryPriority::LOW
-        );
-}
-
-void Node::SendComponentMessage(connPacketComponentMessage& message, u16 payloadSize)
-{
-    GS->cm.SendMeshMessage((u8*)&message, SIZEOF_CONN_PACKET_COMPONENT_MESSAGE + payloadSize, DeliveryPriority::LOW);
-}
-
-
-
 bool Node::CreateRawHeader(RawDataHeader* outVal, RawDataActionType type, const char* commandArgs[], const char* requestHandle) const
 {
     if (requestHandle != nullptr)
@@ -2977,7 +3121,14 @@ bool Node::CreateRawHeader(RawDataHeader* outVal, RawDataActionType type, const 
     outVal->connHeader.sender = configuration.nodeId;
     outVal->connHeader.receiver = Utility::TerminalArgumentToNodeId(commandArgs[1]);
 
-    outVal->moduleId = (ModuleId)Utility::StringToU8(commandArgs[2]);
+    ModuleIdWrapper moduleId = Utility::GetWrappedModuleIdFromTerminal(commandArgs[2]);
+    
+    if(Utility::IsVendorModuleId(moduleId)){
+        logt("ERROR", "raw data currently not implemented for vendor modules");
+        return false;
+    }
+
+    outVal->moduleId = Utility::GetModuleId(moduleId);
     outVal->actionType = type;
 
 

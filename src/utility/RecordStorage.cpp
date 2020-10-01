@@ -91,7 +91,7 @@ bool RecordStorage::IsInit()
     return isInit;
 }
 
-RecordStorage & RecordStorage::getInstance()
+RecordStorage & RecordStorage::GetInstance()
 {
     return GS->recordStorage;
 }
@@ -101,7 +101,7 @@ RecordStorage & RecordStorage::getInstance()
 # A call will be queued first, and will then be executed
 ######################### */
 
-RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, ModuleId lockDownModule)
+RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, ModuleIdWrapper lockDownModule)
 {
     if (recordStorageLockDown && lockDownModule != lockDownModuleId)
     {
@@ -111,7 +111,7 @@ RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 da
     return RecordStorage::SaveRecord(recordId, data, dataLength, callback, userType, nullptr, 0, lockDownModule);
 }
 
-RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength, ModuleId lockDownModule)
+RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength, ModuleIdWrapper lockDownModule)
 {
     if (recordStorageLockDown && lockDownModule != lockDownModuleId)
     {
@@ -126,6 +126,7 @@ RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 da
         op->op.type = (u8)RecordStorageOperationType::SAVE_RECORD;
         op->op.callback = callback;
         op->op.userType = userType;
+        op->op.userDataLength = userDataLength;
         op->stage = RecordStorageSaveStage::FIRST_STAGE;
         op->recordId = recordId;
         op->dataLength = dataLength;
@@ -140,7 +141,7 @@ RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 da
     }
 }
 
-RecordStorageResultCode RecordStorage::DeactivateRecord(u16 recordId, RecordStorageEventListener* callback, u32 userType, ModuleId lockDownModule)
+RecordStorageResultCode RecordStorage::DeactivateRecord(u16 recordId, RecordStorageEventListener* callback, u32 userType, ModuleIdWrapper lockDownModule)
 {
     if (recordStorageLockDown && lockDownModule != lockDownModuleId)
     {
@@ -250,7 +251,7 @@ void RecordStorage::SaveRecordInternal(SaveRecordOperation& op)
         }
         else {
             logt("ERROR", "no space in RS");
-            GS->logger.logCustomError(CustomErrorTypes::FATAL_NO_RECORDSTORAGE_SPACE_LEFT, recordLength);
+            GS->logger.LogCustomError(CustomErrorTypes::FATAL_NO_RECORDSTORAGE_SPACE_LEFT, recordLength);
 
             for (u32 i = 0; i < RECORD_STORAGE_NUM_PAGES; i++) {
                 RecordStoragePage& page = getPage(i);
@@ -300,7 +301,7 @@ void RecordStorage::DeactivateRecordInternal(DeactivateRecordOperation& op)
     }
 }
 
-RecordStorageResultCode RecordStorage::LockDownAndClearAllSettings(ModuleId responsibleModuleForShutDown, RecordStorageEventListener * callback, u32 userType)
+RecordStorageResultCode RecordStorage::LockDownAndClearAllSettings(ModuleIdWrapper responsibleModuleForShutDown, RecordStorageEventListener * callback, u32 userType)
 {
     //Check if we already have locked down
     if (recordStorageLockDown)
@@ -501,7 +502,7 @@ void RecordStorage::DefragmentPage(RecordStoragePage& pageToDefragment, bool for
         }
         if (defragmentSwapPage == nullptr)
         {
-            GS->logger.logCustomError(CustomErrorTypes::FATAL_RECORD_STORAGE_COULD_NOT_FIND_SWAP_PAGE, 0);
+            GS->logger.LogCustomError(CustomErrorTypes::FATAL_RECORD_STORAGE_COULD_NOT_FIND_SWAP_PAGE, 0);
             defragmentationStage = DefragmentationStage::NO_DEFRAGMENTATION;
             SIMEXCEPTION(IllegalStateException);
             return;
@@ -568,12 +569,12 @@ void RecordStorage::DefragmentPage(RecordStoragePage& pageToDefragment, bool for
 
         //Currently, we do not support more than 65000 erase cycles
         if (maxVersionCounter == UINT16_MAX) {
-            GS->logger.logCustomError(CustomErrorTypes::FATAL_RECORD_STORAGE_ERASE_CYCLES_HIGH, (u32)maxVersionCounter);
+            GS->logger.LogCustomError(CustomErrorTypes::FATAL_RECORD_STORAGE_ERASE_CYCLES_HIGH, (u32)maxVersionCounter);
             SIMEXCEPTION(IllegalStateException);
             return;
         }
         else if (maxVersionCounter >= UINT16_MAX) {
-            GS->logger.logCustomError(CustomErrorTypes::WARN_RECORD_STORAGE_ERASE_CYCLES_HIGH, (u32)maxVersionCounter);
+            GS->logger.LogCustomError(CustomErrorTypes::WARN_RECORD_STORAGE_ERASE_CYCLES_HIGH, (u32)maxVersionCounter);
             SIMEXCEPTION(IllegalStateException);
         }
 
@@ -627,7 +628,18 @@ void RecordStorage::ExecuteCallback(RecordStorageOperation & op, RecordStorageRe
         if (op.type == (u8)RecordStorageOperationType::SAVE_RECORD)
         {
             SaveRecordOperation* sop = (SaveRecordOperation*)&op;
-            op.callback->RecordStorageEventHandler(sop->recordId, code, op.userType, ((u8*)&op) + SIZEOF_RECORD_STORAGE_SAVE_RECORD_OP + sop->dataLength, op.userDataLength);
+            if (op.userDataLength > 0)
+            {
+                // Make sure the user data is 4 byte aligned. That way the user can give
+                // us any struct of alignment <= 4 without problems.
+                DYNAMIC_ARRAY(buffer, op.userDataLength);
+                CheckedMemcpy(buffer, ((u8*)&op) + SIZEOF_RECORD_STORAGE_SAVE_RECORD_OP + sop->dataLength, op.userDataLength)
+                op.callback->RecordStorageEventHandler(sop->recordId, code, op.userType, buffer, op.userDataLength);
+            }
+            else
+            {
+                op.callback->RecordStorageEventHandler(sop->recordId, code, op.userType, nullptr, 0);
+            }
         }
         else if (op.type == (u8)RecordStorageOperationType::DEACTIVATE_RECORD)
         {
@@ -820,7 +832,7 @@ bool RecordStorage::IsRecordValid(const RecordStoragePage& page, RecordStorageRe
     //Check if CRC is valid
     if(Utility::CalculateCrc8(((const u8*)record) + sizeof(u16), record->recordLength - 2) != record->crc){
         logt("ERROR", "crc %u not matching %u", record->crc, Utility::CalculateCrc8(((const u8*)record) + sizeof(u16), record->recordLength - 2));
-        GS->logger.logCustomError(CustomErrorTypes::FATAL_RECORD_CRC_WRONG, record->recordId);
+        GS->logger.LogCustomError(CustomErrorTypes::FATAL_RECORD_CRC_WRONG, record->recordId);
 
         return false;
     }

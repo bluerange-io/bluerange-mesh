@@ -61,6 +61,7 @@ BaseConnection::BaseConnection(u8 id, ConnectionDirection direction, FruityHal::
 
 BaseConnection::~BaseConnection()
 {
+    logt("CONN", "Deleted Connection, type %u, discR: %u, appDiscR: %u", (u32)this->connectionType, (u32)this->disconnectionReason, (u32)this->appDisconnectionReason);
     GS->amountOfRemovedConnections++;
     GS->cm.NotifyDeleteConnection();
 }
@@ -145,7 +146,7 @@ bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8 const 
         GS->cm.droppedMeshPackets++;
         droppedPackets++;
 
-        GS->logger.logCustomCount(CustomErrorTypes::COUNT_DROPPED_PACKETS);
+        GS->logger.LogCustomCount(CustomErrorTypes::COUNT_DROPPED_PACKETS);
 
         //TODO: Error handling: What should happen when the queue is full?
         //Currently, additional packets are dropped
@@ -168,7 +169,7 @@ void BaseConnection::FillTransmitBuffers()
     BaseConnectionSendData sendDataStruct;
     BaseConnectionSendData* sendData = &sendDataStruct;
 
-    while(isConnected() && connectionState != ConnectionState::REESTABLISHING && connectionState != ConnectionState::REESTABLISHING_HANDSHAKE)
+    while(IsConnected() && connectionState != ConnectionState::REESTABLISHING && connectionState != ConnectionState::REESTABLISHING_HANDSHAKE)
     {
         //Check if there is important data from the subclass to be sent
         if(packetSendQueue.packetSendPosition == 0){
@@ -191,7 +192,7 @@ void BaseConnection::FillTransmitBuffers()
         if (activeQueue->_numElements < activeQueue->numUnsentElements) {
             logt("ERROR", "Fail: Queue numElements");
             SIMEXCEPTION(IllegalStateException);
-            GS->logger.logCustomError(CustomErrorTypes::FATAL_QUEUE_NUM_MISMATCH, (u16)(activeQueue == &packetSendQueue));
+            GS->logger.LogCustomError(CustomErrorTypes::FATAL_QUEUE_NUM_MISMATCH, (u16)(activeQueue == &packetSendQueue));
 
             GS->cm.ForceDisconnectAllConnections(AppDisconnectReason::QUEUE_NUM_MISMATCH);
             return;
@@ -221,7 +222,7 @@ void BaseConnection::FillTransmitBuffers()
 
         if(sentData.length == 0){
             logt("ERROR", "Packet processing failed");
-            GS->logger.logCustomError(CustomErrorTypes::FATAL_PACKET_PROCESSING_FAILED, partnerId);
+            GS->logger.LogCustomError(CustomErrorTypes::FATAL_PACKET_PROCESSING_FAILED, partnerId);
             DisconnectAndRemove(AppDisconnectReason::INVALID_PACKET);
             return;
         }
@@ -229,7 +230,7 @@ void BaseConnection::FillTransmitBuffers()
         //Send the packet to the SoftDevice
         if(sendData->deliveryOption == DeliveryOption::WRITE_REQ)
         {
-            err = GS->gattController.bleWriteCharacteristic(
+            err = GS->gattController.BleWriteCharacteristic(
                     connectionHandle,
                     sendData->characteristicHandle,
                     sentData.data,
@@ -238,7 +239,7 @@ void BaseConnection::FillTransmitBuffers()
         }
         else if(sendData->deliveryOption == DeliveryOption::WRITE_CMD)
         {
-            err = GS->gattController.bleWriteCharacteristic(
+            err = GS->gattController.BleWriteCharacteristic(
                     connectionHandle,
                     sendData->characteristicHandle,
                     sentData.data,
@@ -247,7 +248,7 @@ void BaseConnection::FillTransmitBuffers()
         }
         else
         {
-            err = GS->gattController.bleSendNotification(
+            err = GS->gattController.BleSendNotification(
                     connectionHandle,
                     sendData->characteristicHandle,
                     sentData.data,
@@ -280,7 +281,7 @@ void BaseConnection::FillTransmitBuffers()
             }
             logt(tag, "GATT WRITE ERROR 0x%x on handle %u", (u32)err, connectionHandle);
 
-            GS->logger.logCustomError(CustomErrorTypes::WARN_GATT_WRITE_ERROR, (u32)err);
+            GS->logger.LogCustomError(CustomErrorTypes::WARN_GATT_WRITE_ERROR, (u32)err);
 
             HandlePacketQueuingFail(*activeQueue, sendDataPacked, (u32)err);
 
@@ -368,7 +369,7 @@ void BaseConnection::HandlePacketSent(u8 sentUnreliable, u8 sentReliable)
             logt("ERROR", "Fail: Queue");
             SIMEXCEPTION(IllegalStateException);
 
-            GS->logger.logCustomError(CustomErrorTypes::FATAL_HANDLE_PACKET_SENT_ERROR, partnerId);
+            GS->logger.LogCustomError(CustomErrorTypes::FATAL_HANDLE_PACKET_SENT_ERROR, partnerId);
         }
 
         //Check if a split packet should be acknowledged
@@ -465,7 +466,7 @@ void BaseConnection::PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, 
 SizedData BaseConnection::GetSplitData(const BaseConnectionSendData &sendData, u8* data, u8* packetBuffer) const
 {
     SizedData result;
-    connPacketSplitHeader* resultHeader = (connPacketSplitHeader*) packetBuffer;
+    ConnPacketSplitHeader* resultHeader = (ConnPacketSplitHeader*) packetBuffer;
     
     //If we do not have to split the data, return data unmodified
     if(sendData.dataLength <= connectionPayloadSize){
@@ -492,7 +493,7 @@ SizedData BaseConnection::GetSplitData(const BaseConnectionSendData &sendData, u
         }
 
         char stringBuffer[100];
-        Logger::convertBufferToHexString(result.data, result.length, stringBuffer, sizeof(stringBuffer));
+        Logger::ConvertBufferToHexString(result.data, result.length, stringBuffer, sizeof(stringBuffer));
         logt("CONN_DATA", "SPLIT_END_%u: %s", resultHeader->splitCounter, stringBuffer);
 
     } else {
@@ -507,7 +508,7 @@ SizedData BaseConnection::GetSplitData(const BaseConnectionSendData &sendData, u
         result.length = connectionPayloadSize;
 
         char stringBuffer[100];
-        Logger::convertBufferToHexString(result.data, result.length, stringBuffer, sizeof(stringBuffer));
+        Logger::ConvertBufferToHexString(result.data, result.length, stringBuffer, sizeof(stringBuffer));
         logt("CONN_DATA", "SPLIT_%u: %s", resultHeader->splitCounter, stringBuffer);
     }
 
@@ -517,10 +518,10 @@ SizedData BaseConnection::GetSplitData(const BaseConnectionSendData &sendData, u
 #define _________________RECEIVING_________________
 
 //A reassembly function that can reassemble split packets, can be used from subclasses
-//Must use connPacketHeader for all packets
+//Must use ConnPacketHeader for all packets
 u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 const * data)
 {
-    connPacketSplitHeader const * packetHeader = (connPacketSplitHeader const *)data;
+    ConnPacketSplitHeader const * packetHeader = (ConnPacketSplitHeader const *)data;
 
     //If reassembly is not needed, return packet without modifying
     if(packetHeader->splitMessageType != MessageType::SPLIT_WRITE_CMD && packetHeader->splitMessageType != MessageType::SPLIT_WRITE_CMD_END){
@@ -539,7 +540,7 @@ u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 c
     //Check if reassembly buffer limit is reached
     if(sendData->dataLength - (u32)SIZEOF_CONN_PACKET_SPLIT_HEADER + packetReassemblyPosition > packetReassemblyBuffer.size()){
         logt("ERROR", "Packet too big for reassembly");
-        GS->logger.logCustomError(CustomErrorTypes::FATAL_PACKET_TOO_BIG, sendData->dataLength);
+        GS->logger.LogCustomError(CustomErrorTypes::FATAL_PACKET_TOO_BIG, sendData->dataLength);
         packetReassemblyPosition = 0;
         currentMessageIsMissingASplit = true;
         SIMEXCEPTION(PacketTooBigException);
@@ -550,7 +551,7 @@ u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 c
 
     //Check if a packet was missing inbetween
     if(packetReassemblyPosition != packetReassemblyDestination){
-        GS->logger.logCustomError(CustomErrorTypes::WARN_SPLIT_PACKET_MISSING, (packetReassemblyDestination - packetReassemblyPosition));
+        GS->logger.LogCustomError(CustomErrorTypes::WARN_SPLIT_PACKET_MISSING, (packetReassemblyDestination - packetReassemblyPosition));
         packetReassemblyPosition = 0;
         currentMessageIsMissingASplit = true;
         SIMEXCEPTION(SplitMissingException);
@@ -559,7 +560,7 @@ u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 c
 
     //Intermediate packets must always be a full MTU
     if(packetHeader->splitMessageType == MessageType::SPLIT_WRITE_CMD && sendData->dataLength != connectionPayloadSize){
-        GS->logger.logCustomError(CustomErrorTypes::WARN_SPLIT_PACKET_NOT_IN_MTU, sendData->dataLength);
+        GS->logger.LogCustomError(CustomErrorTypes::WARN_SPLIT_PACKET_NOT_IN_MTU, sendData->dataLength);
         packetReassemblyPosition = 0;
         currentMessageIsMissingASplit = true;
         SIMEXCEPTION(SplitNotInMTUException);
@@ -570,7 +571,7 @@ u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 c
     CheckedMemcpy(
         packetReassemblyBuffer.data() + packetReassemblyDestination,
         data + SIZEOF_CONN_PACKET_SPLIT_HEADER,
-        sendData->dataLength);
+        sendData->dataLength - SIZEOF_CONN_PACKET_SPLIT_HEADER);
 
     packetReassemblyPosition += sendData->dataLength - SIZEOF_CONN_PACKET_SPLIT_HEADER;
 
@@ -624,7 +625,7 @@ void BaseConnection::GapReconnectionSuccessfulHandler(const FruityHal::GapConnec
     connectionMtu = MAX_DATA_SIZE_PER_WRITE;
     connectionPayloadSize = MAX_DATA_SIZE_PER_WRITE;
 
-    connectionHandle = connectedEvent.getConnectionHandle();
+    connectionHandle = connectedEvent.GetConnectionHandle();
 
     connectionState = ConnectionState::HANDSHAKE_DONE;
 }
@@ -646,7 +647,7 @@ void BaseConnection::GATTServiceDiscoveredHandler(FruityHal::BleGattDBDiscoveryE
 bool BaseConnection::GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason)
 {
     //Reason?
-    logt("CONN", "Disconnected %u from connId:%u, HCI:%u %s", partnerId, connectionId, (u32)hciDisconnectReason, Logger::getHciErrorString((FruityHal::BleHciError)hciDisconnectReason));
+    logt("CONN", "Disconnected %u from connId:%u, HCI:%u %s", partnerId, connectionId, (u32)hciDisconnectReason, Logger::GetHciErrorString((FruityHal::BleHciError)hciDisconnectReason));
 
     this->disconnectionReason = (FruityHal::BleHciError)hciDisconnectReason;
     this->disconnectedTimestampDs = GS->appTimerDs;
@@ -725,7 +726,7 @@ void BaseConnection::PrintQueueInfo()
         for (int k = 0; k < queue->_numElements; k++) {
             SizedData data = queue->PeekNext(k);
             BaseConnectionSendDataPacked* sendData = (BaseConnectionSendDataPacked*)data.data;
-            connPacketHeader* header = (connPacketHeader*)(data.data + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
+            ConnPacketHeader* header = (ConnPacketHeader*)(data.data + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
 
             const char* type = "INVALID";
             if (sendData->deliveryOption == (u8)DeliveryOption::WRITE_CMD) type = "WRITE_CMD";

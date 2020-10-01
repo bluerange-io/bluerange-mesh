@@ -53,6 +53,10 @@ TEST(TestRawData, TestRawDataLight) {
     tester.SendTerminalCommand(1, "raw_data_light 2 0 1 abcdeQ== 3");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_light\",\"module\":0,\"protocol\":1,\"payload\":\"abcdeQ==\",\"requestHandle\":3}");
 
+    //Test sending raw_data_light for a vendor module
+    tester.SendTerminalCommand(1, "raw_data_light 2 0xABCD01F0 1 abcdeQ==");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_light\",\"module\":\"0xABCD01F0\",\"protocol\":1,\"payload\":\"abcdeQ==\",\"requestHandle\":0}");
+
     {
         std::string buffer = "";
         for (int i = 0; i < 40; i++)
@@ -81,23 +85,31 @@ TEST(TestRawData, TestSimpleTransmissions) {
 
     tester.SendTerminalCommand(1, "raw_data_start 2 0 128 2");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_start\",\"module\":0,\"numChunks\":128,\"protocol\":2,\"fmKeyId\":0,\"requestHandle\":0}");
-    tester.SendTerminalCommand(1, "raw_data_start 2 0 128 2 12");
-    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_start\",\"module\":0,\"numChunks\":128,\"protocol\":2,\"fmKeyId\":0,\"requestHandle\":12}");
+    tester.SendTerminalCommand(1, "raw_data_start 2 1 128 2 12");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_start\",\"module\":1,\"numChunks\":128,\"protocol\":2,\"fmKeyId\":0,\"requestHandle\":12}");
+    tester.SendTerminalCommand(1, "raw_data_start 2 0xABCD01F0 128 2 12");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_start\",\"module\":\"0xABCD01F0\",\"numChunks\":128,\"protocol\":2,\"fmKeyId\":0,\"requestHandle\":12}");
 
     tester.SendTerminalCommand(1, "raw_data_start_received 2 0");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_start_received\",\"module\":0,\"requestHandle\":0}");
-    tester.SendTerminalCommand(1, "raw_data_start_received 2 0 12");
-    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_start_received\",\"module\":0,\"requestHandle\":12}");
+    tester.SendTerminalCommand(1, "raw_data_start_received 2 1 12");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_start_received\",\"module\":1,\"requestHandle\":12}");
+    tester.SendTerminalCommand(1, "raw_data_start_received 2 0xABCD01F0 12");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_start_received\",\"module\":\"0xABCD01F0\",\"requestHandle\":12}");
 
     tester.SendTerminalCommand(1, "raw_data_chunk 2 0 42 abcdeQ==");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_chunk\",\"module\":0,\"chunkId\":42,\"payload\":\"abcdeQ==\",\"requestHandle\":0}");
-    tester.SendTerminalCommand(1, "raw_data_chunk 2 0 42 abcdeQ== 12");
-    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_chunk\",\"module\":0,\"chunkId\":42,\"payload\":\"abcdeQ==\",\"requestHandle\":12}");
+    tester.SendTerminalCommand(1, "raw_data_chunk 2 1 42 abcdeQ== 12");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_chunk\",\"module\":1,\"chunkId\":42,\"payload\":\"abcdeQ==\",\"requestHandle\":12}");
+    tester.SendTerminalCommand(1, "raw_data_chunk 2 0xABCD01F0 42 abcdeQ== 12");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_chunk\",\"module\":\"0xABCD01F0\",\"chunkId\":42,\"payload\":\"abcdeQ==\",\"requestHandle\":12}");
 
     tester.SendTerminalCommand(1, "raw_data_report 2 0 -");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_report\",\"module\":0,\"missing\":[],\"requestHandle\":0}");
-    tester.SendTerminalCommand(1, "raw_data_report 2 0 11");
-    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_report\",\"module\":0,\"missing\":[11],\"requestHandle\":0}");
+    tester.SendTerminalCommand(1, "raw_data_report 2 0xABCD01F0 -");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_report\",\"module\":\"0xABCD01F0\",\"missing\":[],\"requestHandle\":0}");
+    tester.SendTerminalCommand(1, "raw_data_report 2 1 11");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_report\",\"module\":1,\"missing\":[11],\"requestHandle\":0}");
     tester.SendTerminalCommand(1, "raw_data_report 2 0 11,31");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_report\",\"module\":0,\"missing\":[11,31],\"requestHandle\":0}");
     tester.SendTerminalCommand(1, "raw_data_report 2 0 11,31,66");
@@ -108,13 +120,26 @@ TEST(TestRawData, TestSimpleTransmissions) {
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_report\",\"module\":0,\"missing\":[11],\"requestHandle\":12}");
     tester.SendTerminalCommand(1, "raw_data_report 2 0 11,31 12");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_report\",\"module\":0,\"missing\":[11,31],\"requestHandle\":12}");
-    tester.SendTerminalCommand(1, "raw_data_report 2 0 11,31,66 12");
-    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_report\",\"module\":0,\"missing\":[11,31,66],\"requestHandle\":12}");
+    tester.SendTerminalCommand(1, "raw_data_report 2 1 11,31,66 12");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_report\",\"module\":1,\"missing\":[11,31,66],\"requestHandle\":12}");
+    tester.SendTerminalCommand(1, "raw_data_report 2 0xABCD01F0 11,31,66 12");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_report\",\"module\":\"0xABCD01F0\",\"missing\":[11,31,66],\"requestHandle\":12}");
+
+    tester.SendTerminalCommand(1, "raw_data_report_desired 2 13");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_report_desired\",\"module\":13,\"requestHandle\":0}");
+    tester.SendTerminalCommand(1, "raw_data_report_desired 2 0xABCD11F0");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_report_desired\",\"module\":\"0xABCD11F0\",\"requestHandle\":0}");
+    tester.SendTerminalCommand(1, "raw_data_report_desired 2 11 12");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_report_desired\",\"module\":11,\"requestHandle\":12}");
+    tester.SendTerminalCommand(1, "raw_data_report_desired 2 0xABCD01F0 12");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_report_desired\",\"module\":\"0xABCD01F0\",\"requestHandle\":12}");
 
     tester.SendTerminalCommand(1, "raw_data_error 2 0 1 1");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_error\",\"module\":0,\"error\":1,\"destination\":1,\"requestHandle\":0}");
-    tester.SendTerminalCommand(1, "raw_data_error 2 0 1 3 12");
-    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_error\",\"module\":0,\"error\":1,\"destination\":3,\"requestHandle\":12}");
+    tester.SendTerminalCommand(1, "raw_data_error 2 1 1 3 12");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_error\",\"module\":1,\"error\":1,\"destination\":3,\"requestHandle\":12}");
+    tester.SendTerminalCommand(1, "raw_data_error 2 0xABCD01F0 1 3 12");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_error\",\"module\":\"0xABCD01F0\",\"error\":1,\"destination\":3,\"requestHandle\":12}");
 }
 
 TEST(TestRawData, TestSimpleTransmissionsViaMeshAccess) {
@@ -219,6 +244,7 @@ TEST(TestRawData, TestRandomTransmissions) {
 
     for (int repeat = 0; repeat < 3; repeat++) {
         CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+        //testerConfig.verbose = true;
         SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
         simConfig.sdBusyProbability = 0;
         simConfig.seed = repeat + 1;
@@ -228,23 +254,23 @@ TEST(TestRawData, TestRandomTransmissions) {
         CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
         tester.Start();
-        tester.SimulateUntilClusteringDone(100 * 1000);
+        tester.SimulateUntilClusteringDone(1000 * 1000);
         u8 payloadBuffer[120];
 
         for (int transmission = 0; transmission < 50; transmission++) {
-            int sender   = tester.sim->simState.rnd.nextU32(1, numNodes);
-            int receiver = tester.sim->simState.rnd.nextU32(1, numNodes);
+            int sender   = tester.sim->simState.rnd.NextU32(1, numNodes);
+            int receiver = tester.sim->simState.rnd.NextU32(1, numNodes);
 
             std::string command = "";
             command = "raw_data_chunk " + std::to_string(receiver) + " 0 42 ";
-            int length = tester.sim->simState.rnd.nextU32(1, 60);
+            int length = tester.sim->simState.rnd.NextU32(1, 60);
             
             for (int i = 0; i < length; i++) {
-                payloadBuffer[i] = tester.sim->simState.rnd.nextU32(0, 255);
+                payloadBuffer[i] = tester.sim->simState.rnd.NextU32(0, 255);
             }
 
             char base64Buffer[1024];
-            Logger::convertBufferToBase64String(payloadBuffer, length, base64Buffer, sizeof(base64Buffer));
+            Logger::ConvertBufferToBase64String(payloadBuffer, length, base64Buffer, sizeof(base64Buffer));
 
             tester.SendTerminalCommand(sender, (command + base64Buffer).c_str());
             tester.SimulateUntilMessageReceived(10 * 1000, receiver, base64Buffer);

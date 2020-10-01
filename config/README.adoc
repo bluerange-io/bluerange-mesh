@@ -1,0 +1,3 @@
+= Configuration
+
+The typical way to configure FruityMesh is to create a board configuration for each of your hardware boards and a featureset for each of your different builds with different functionality. Read more about this in the developer documentation.

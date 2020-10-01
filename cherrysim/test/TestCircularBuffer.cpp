@@ -29,7 +29,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
 #include "CircularBuffer.h"
-#include "types.h"
+#include "FmTypes.h"
 #include <Utility.h>
 TEST(CircularBuffer, TestLength) {
     {
@@ -62,15 +62,15 @@ TEST(TestCircularBuffer, TestCircularAccess) {
 TEST(TestCircularBuffer, TestCircularAccessInRotation) {
     CircularBuffer<int, 10> arr;
     i32 rotation = 2;
-    arr.setRotation(rotation);
+    arr.SetRotation(rotation);
 
-    ASSERT_EQ(arr.getRotation(), rotation);
+    ASSERT_EQ(arr.GetRotation(), rotation);
 
     for (int i = 0; i < arr.length; i++)
     {
         arr[i] = i;
     }
-    arr.setRotation(0);
+    arr.SetRotation(0);
     ASSERT_EQ(arr[0], 8);
     ASSERT_EQ(arr[1], 9);
 }

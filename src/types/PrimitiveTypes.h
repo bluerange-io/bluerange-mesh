@@ -105,7 +105,7 @@ enum class BleStackType {
     INVALID = 0,
     //NRF_SD_130_ANY = 100, //Deprecated as of 09.04.2020
     NRF_SD_132_ANY = 200,
-    NRF_SD_140_ANY = 300
+    NRF_SD_140_ANY = 300,
 };
 
 // Chipset group ids. These define what kind of chipset the firmware is running on
@@ -133,11 +133,15 @@ enum class FmKeyId : u32
 
 /*## Modules #############################################################*/
 //The module ids are used to identify a module over the network
-//Numbers below 150 are standard defined, numbers obove this range are free to use for custom modules
+//Modules MUST NOT be created within this range
+//For experimenting, the section for "Other Modules" can be used, but no guarantee
+//for any future changes to this section is made and the moduleIds will clash as soon
+//as nodes of other vendors are used within the same network
+//Use the VendorModuleId for a future proof and supported way of implementing modules
 enum class ModuleId : u8 {
     //Standard modules
     NODE = 0, // Not a module per se, but why not let it send module messages
-    ADVERTISING_MODULE = 1,
+    BEACONING_MODULE = 1,
     SCANNING_MODULE = 2,
     STATUS_REPORTER_MODULE = 3,
     DFU_MODULE = 4,
@@ -151,7 +155,7 @@ enum class ModuleId : u8 {
     TESTING_MODULE = 12,
     BULK_MODULE = 13,
 
-    //M-way Modules
+    //M-Way Modules
     CLC_MODULE = 150,
     VS_MODULE = 151,
     ENOCEAN_MODULE = 152,
@@ -160,18 +164,50 @@ enum class ModuleId : u8 {
     WM_MODULE = 155,
     ET_MODULE = 156, //Placeholder for Partner
     MODBUS_MODULE = 157,
+    BP_MODULE = 158,
 
-    //Other Modules
+    //Other Modules, this range can be used for experimenting but must not be used if FruityMesh
+    //nodes are to be used in a network with nodes of different vendors as their moduleIds will clash
     MY_CUSTOM_MODULE = 200,
-    PING_MODULE = 201,
-    TEMPLATE_MODULE = 202,
+    //PING_MODULE = 201, Deprecated as of 26.08.2020, now uses a VendorModuleId
+    //VENDOR_TEMPLATE_MODULE = 202, Deprecated as of 20.08.2020, now uses a VendorModuleId
     SIG_EXAMPLE_MODULE = 203,
+
+    //The VendorModuleId was introduced to have a range of moduleIds that do not clash
+    //between different vendors
+    VENDOR_MODULE_ID_PREFIX = 240, //0xF0
+
+    //The in between space is reserved for later extensions, e.g. of the vendor module ids
 
     //Invalid Module: 0xFF is the flash memory default and is therefore invalid
     INVALID_MODULE = 255,
 };
 
+//The vendor module id is a future proof way of implementing modules that will not clash
+//if different nodes of different vendors are used within one network
+typedef u32 VendorModuleId;
+constexpr u32 INVALID_VENDOR_MODULE_ID = 0xFFFFFFFFUL;
 
+//This is used to specify either a VendorModuleId or a ModuleId when offering functionality that must be available for both types
+//Using a u32 and the conversion methods in the Utility class makes it simpler than working with the below union/struct
+typedef u32 ModuleIdWrapper;
+constexpr u32 INVALID_WRAPPED_MODULE_ID = 0xFFFFFFFFUL;
+
+//The ModuleIdWrapper is used to build a wrapped module id
+//This wrapper is mostly inteded for internal usage, use the appropriate Methods from the Utility class
+#pragma pack(push, 1)
+typedef union {
+    struct {
+        ModuleId prefix; //For a VendorModuleId, the prefix must be set to VENDOR_MODULE_ID_PREFIX; for a ModuleId it must be lower than this value
+        u8 subId; // For a VendorModuleId, the subId is used to create a number of different modules for each vendor; for a ModuleId, this must be set to 0xFF
+        u16 vendorId; // For a VendorModuleId, the vendor id must be set to the company identifier given by the BLE SIG (see https://www.bluetooth.com/de/specifications/assigned-numbers/company-identifiers/); for a ModuleId, this must be 0xFFFF
+    };
+    ModuleIdWrapper wrappedModuleId; //This is used to access the full 4 byte VendorModuleId
+} ModuleIdWrapperUnion;
+static_assert(sizeof(ModuleIdWrapperUnion) == 4, "You have a weird compiler");
+#pragma pack(pop)
+
+constexpr VendorModuleId GET_VENDOR_MODULE_ID(u16 vendorId, u8 subId) { return ( ((u8)ModuleId::VENDOR_MODULE_ID_PREFIX) | ((u8)subId << 8) | ((u16)vendorId << 16) ); }
 
 // The reason why the device was rebooted
 enum class RebootReason : u8 {
@@ -227,7 +263,7 @@ enum class LiveReportTypes : u8 {
 
     //########
     LEVEL_DEBUG = 150,
-    DECISION_RESULT = 151 //extra is decision type, extra2 is preferredPartner
+    DECISION_RESULT = 151, //extra is decision type, extra2 is preferredPartner
 };
 
 enum class LiveReportHandshakeFailCode : u8
@@ -236,7 +272,7 @@ enum class LiveReportHandshakeFailCode : u8
     SAME_CLUSTERID,
     NETWORK_ID_MISMATCH,
     WRONG_DIRECTION,
-    UNPREFERRED_CONNECTION
+    UNPREFERRED_CONNECTION,
 };
 
 enum class PinsetIdentifier : u16 {
@@ -328,7 +364,7 @@ struct ThreeDimStruct
 enum class DeviceConfigOrigins : u8 {
     RANDOM_CONFIG = 0,
     UICR_CONFIG = 1,
-    TESTDEVICE_CONFIG = 2
+    TESTDEVICE_CONFIG = 2,
 };
 
 // The different kind of nodes supported by FruityMesh
@@ -338,27 +374,27 @@ enum class DeviceType : u8 {
     ROAMING = 2, // A node that is moving constantly or often (not implemented)
     SINK = 3, // A static node that wants to acquire data, e.g. a MeshGateway
     ASSET = 4, // A roaming node that is sporadically or never connected but broadcasts data
-    LEAF = 5  // A node that will never act as a slave but will only connect as a master (useful for roaming nodes, but no relaying possible)
+    LEAF = 5,  // A node that will never act as a slave but will only connect as a master (useful for roaming nodes, but no relaying possible)
 };
 
 // The different terminal modes
 enum class TerminalMode : u8 {
     JSON = 0, //Interrupt based terminal input and blocking output
     PROMPT = 1, //blockin in and out with echo and backspace options
-    DISABLED = 2 //Terminal is disabled, no in and output
+    DISABLED = 2, //Terminal is disabled, no in and output
 };
 
 //Enrollment states
 enum class EnrollmentState : u8 {
     NOT_ENROLLED = 0,
-    ENROLLED = 1
+    ENROLLED = 1,
 };
 
 //These codes are returned from the PreEnrollmentHandler
 enum class PreEnrollmentReturnCode : u8 {
     DONE = 0, //PreEnrollment of the Module was either not necessary or successfully done
     WAITING = 1, //PreEnrollment must do asynchronous work and will afterwards call the PreEnrollmentDispatcher
-    FAILED = 2 //PreEnrollment was not successfuly, so enrollment should continue
+    FAILED = 2, //PreEnrollment was not successfuly, so enrollment should continue
 };
 
 //Used for intercepting messages befoure they are routed through the mesh

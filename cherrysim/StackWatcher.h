@@ -56,6 +56,6 @@ private:
     static u32 disableValue;
 
 public:
-    static void check();
+    static void Check();
 
 };

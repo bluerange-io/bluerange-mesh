@@ -59,7 +59,7 @@ TEST(TestOther, BatteryTest)
     tester.SimulateForGivenTime(10000);
 
     //Log the battery usage
-    for (u32 i = 0; i < tester.sim->getTotalNodes(); i++) {
+    for (u32 i = 0; i < tester.sim->GetTotalNodes(); i++) {
         u32 usageMicroAmpere = tester.sim->nodes[i].nanoAmperePerMsTotal / tester.sim->simState.simTimeMs;
         printf("Average Battery usage for node %d was %u uA" EOL, tester.sim->nodes[i].id, usageMicroAmpere);
     }
@@ -86,7 +86,7 @@ TEST(TestOther, TestRebootReason)
 
     //After a successful boot, the node should no longer report RebootReason::UNKNOWN but RebootReason::UNKNOWN_BUT_BOOTED
     NodeIndexSetter setter(0);
-    tester.sim->resetCurrentNode(RebootReason::UNKNOWN, false);
+    tester.sim->ResetCurrentNode(RebootReason::UNKNOWN, false);
     tester.SendTerminalCommand(1, "action this status get_rebootreason");
     tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"type\":\"reboot_reason\",\"nodeId\":1,\"module\":3,\"reason\":22");
 }
@@ -158,57 +158,22 @@ TEST(TestOther, TestMersenneTwister)
     if (MersenneTwister::seedOffset != 0) return;
 
     MersenneTwister mt(1337);
-    ASSERT_EQ(mt.nextU32(),  925434190);
-    ASSERT_EQ(mt.nextU32(), 2254002994);
-    ASSERT_EQ(mt.nextU32(), 1395119812);
-    ASSERT_EQ(mt.nextU32(), 2371922542);
-    ASSERT_EQ(mt.nextU32(), 3640162417);
-    ASSERT_EQ(mt.nextU32(), 2749074956);
-    ASSERT_EQ(mt.nextU32(), 1787397407);
-    ASSERT_EQ(mt.nextU32(), 4225313503);
-    ASSERT_EQ(mt.nextU32(), 3241982240);
-    ASSERT_EQ(mt.nextU32(), 1472171253);
-    ASSERT_EQ(mt.nextU32(), 2121405432);
-    ASSERT_EQ(mt.nextU32(), 1377883891);
-    ASSERT_EQ(mt.nextU32(), 1980689950);
-    ASSERT_EQ(mt.nextU32(), 3770806467);
-    ASSERT_EQ(mt.nextU32(),  942187188);
-    ASSERT_EQ(mt.nextU32(), 2388923659);
-    
-    constexpr double absError = 0.0000001;
-    ASSERT_NEAR(mt.nextDouble(), 0.77857393905952898550, absError);
-    ASSERT_NEAR(mt.nextDouble(), 0.83728753725003624009, absError);
-    ASSERT_NEAR(mt.nextDouble(), 0.75865255313894075506, absError);
-    ASSERT_NEAR(mt.nextDouble(), 0.70004192010966170834, absError);
-    ASSERT_NEAR(mt.nextDouble(), 0.38702423111233491548, absError);
-    ASSERT_NEAR(mt.nextDouble(), 0.05048523425368713763, absError);
-    ASSERT_NEAR(mt.nextDouble(), 0.88371499206025971862, absError);
-    ASSERT_NEAR(mt.nextDouble(), 0.82417572122630100573, absError);
-    ASSERT_NEAR(mt.nextDouble(), 0.60965852500164385841, absError);
-    ASSERT_NEAR(mt.nextDouble(), 0.25276847073174280034, absError);
-    ASSERT_NEAR(mt.nextDouble(), 0.80804901076668156357, absError);
-    ASSERT_NEAR(mt.nextDouble(), 0.35418293912759585274, absError);
-    ASSERT_NEAR(mt.nextDouble(), 0.87011821704686576062, absError);
-    ASSERT_NEAR(mt.nextDouble(), 0.10800669647473998269, absError);
-    ASSERT_NEAR(mt.nextDouble(), 0.27135816618598956884, absError);
-    ASSERT_NEAR(mt.nextDouble(), 0.11747449359797744461, absError);
-
-    ASSERT_NEAR(mt.nextNormal(0, 1), -0.69007468996965992680, absError);
-    ASSERT_NEAR(mt.nextNormal(0, 1),  0.01847854599906653336, absError);
-    ASSERT_NEAR(mt.nextNormal(0, 1), -0.08598573702356976378, absError);
-    ASSERT_NEAR(mt.nextNormal(0, 1), -1.46714106647728614874, absError);
-    ASSERT_NEAR(mt.nextNormal(0, 1), -1.19394233129765936496, absError);
-    ASSERT_NEAR(mt.nextNormal(0, 1),  1.54959570095519039157, absError);
-    ASSERT_NEAR(mt.nextNormal(0, 1), -0.11635656863292163921, absError);
-    ASSERT_NEAR(mt.nextNormal(0, 1),  0.28050492217541966866, absError);
-    ASSERT_NEAR(mt.nextNormal(0, 1), -0.96963115696261492626, absError);
-    ASSERT_NEAR(mt.nextNormal(0, 1), -1.65447258893284998571, absError);
-    ASSERT_NEAR(mt.nextNormal(0, 1), -0.48786563959213696817, absError);
-    ASSERT_NEAR(mt.nextNormal(0, 1),  1.93553395567380848163, absError);
-    ASSERT_NEAR(mt.nextNormal(0, 1),  0.72087865836957598642, absError);
-    ASSERT_NEAR(mt.nextNormal(0, 1), -0.85007881892821879344, absError);
-    ASSERT_NEAR(mt.nextNormal(0, 1), -1.14644746062572022716, absError);
-    ASSERT_NEAR(mt.nextNormal(0, 1), -0.47953409475142472207, absError);
+    ASSERT_EQ(mt.NextU32(),  925434190);
+    ASSERT_EQ(mt.NextU32(), 2254002994);
+    ASSERT_EQ(mt.NextU32(), 1395119812);
+    ASSERT_EQ(mt.NextU32(), 2371922542);
+    ASSERT_EQ(mt.NextU32(), 3640162417);
+    ASSERT_EQ(mt.NextU32(), 2749074956);
+    ASSERT_EQ(mt.NextU32(), 1787397407);
+    ASSERT_EQ(mt.NextU32(), 4225313503);
+    ASSERT_EQ(mt.NextU32(), 3241982240);
+    ASSERT_EQ(mt.NextU32(), 1472171253);
+    ASSERT_EQ(mt.NextU32(), 2121405432);
+    ASSERT_EQ(mt.NextU32(), 1377883891);
+    ASSERT_EQ(mt.NextU32(), 1980689950);
+    ASSERT_EQ(mt.NextU32(), 3770806467);
+    ASSERT_EQ(mt.NextU32(),  942187188);
+    ASSERT_EQ(mt.NextU32(), 2388923659);
 }
 
 //This test should check if two different configurations can be applied to two nodes using the simulator
@@ -268,10 +233,10 @@ TEST(TestOther, TestJsonConfigSerialization)
     simConfig->asyncFlashCommitTimeProbability = 16;
     simConfig->importFromJson = true;
     simConfig->realTime = true;
-    simConfig->receptionProbabilityVeryClose = 1.1;
-    simConfig->receptionProbabilityClose = 1.2;
-    simConfig->receptionProbabilityFar = 1.3;
-    simConfig->receptionProbabilityVeryFar = 1.4;
+    simConfig->receptionProbabilityVeryClose = 11;
+    simConfig->receptionProbabilityClose = 12;
+    simConfig->receptionProbabilityFar = 13;
+    simConfig->receptionProbabilityVeryFar = 14;
     new (&simConfig->siteJsonPath) std::string;
     simConfig->siteJsonPath = "aaa";
     new (&simConfig->devicesJsonPath) std::string;
@@ -326,16 +291,16 @@ TEST(TestOther, TestJsonConfigSerialization)
     ASSERT_EQ(copy.playDelay, 10);
     ASSERT_EQ(copy.interruptProbability, 11);
     ASSERT_NEAR(copy.connectionTimeoutProbabilityPerSec, 12, 0.01);
-    ASSERT_NEAR(copy.sdBleGapAdvDataSetFailProbability, 13, 0.01);
-    ASSERT_NEAR(copy.sdBusyProbability, 14, 0.01);
+    ASSERT_EQ(copy.sdBleGapAdvDataSetFailProbability, 13);
+    ASSERT_EQ(copy.sdBusyProbability, 14);
     ASSERT_EQ(copy.simulateAsyncFlash, true);
-    ASSERT_NEAR(copy.asyncFlashCommitTimeProbability, 16, 0.01);
+    ASSERT_EQ(copy.asyncFlashCommitTimeProbability, 16);
     ASSERT_EQ(copy.importFromJson, true);
     ASSERT_EQ(copy.realTime, true);
-    ASSERT_NEAR(simConfig->receptionProbabilityVeryClose, 1.1, 0.01);
-    ASSERT_NEAR(simConfig->receptionProbabilityClose, 1.2, 0.01);
-    ASSERT_NEAR(simConfig->receptionProbabilityFar, 1.3, 0.01);
-    ASSERT_NEAR(simConfig->receptionProbabilityVeryFar, 1.4, 0.01);
+    ASSERT_EQ(simConfig->receptionProbabilityVeryClose, 11);
+    ASSERT_EQ(simConfig->receptionProbabilityClose, 12);
+    ASSERT_EQ(simConfig->receptionProbabilityFar, 13);
+    ASSERT_EQ(simConfig->receptionProbabilityVeryFar, 14);
     ASSERT_EQ(copy.siteJsonPath, "aaa");
     ASSERT_EQ(copy.devicesJsonPath, "bbb");
     ASSERT_EQ(copy.replayPath, "path");
@@ -446,6 +411,25 @@ TEST(TestOther, TestReplay)
 }
 #endif //GITHUB_RELEASE
 
+TEST(TestOther, TestSimCommandCrc)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose = true;
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 1;
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+    tester.SimulateGivenNumberOfSteps(1);
+    tester.SendTerminalCommand(1, "sim animation create geofence-move-inside CRC: 2393378599"); //Correct CRC
+    tester.SimulateGivenNumberOfSteps(1); //Test that no exception occures.
+    tester.SendTerminalCommand(1, "sim animation create geofence-move-inside-2 CRC: 1337"); //Incorrect CRC
+    {
+        Exceptions::DisableDebugBreakOnException disabler;
+        ASSERT_THROW(tester.SimulateGivenNumberOfSteps(1), CRCInvalidException);
+    }
+}
+
 //This test should check if two different configurations can be applied to two nodes using the simulator
 TEST(TestOther, SinkInMesh)
 {
@@ -459,7 +443,7 @@ TEST(TestOther, SinkInMesh)
 
     tester.Start();
 
-    tester.SimulateUntilClusteringDone(100 * 1000);
+    tester.SimulateUntilClusteringDone(1000 * 1000);
 
     //TODO: check that configurations were used
 }
@@ -549,38 +533,38 @@ TEST(TestOther, TestConnectionAllocator) {
     tester.Start();
 
     MersenneTwister mt;
-    mt.setSeed(1);
+    mt.SetSeed(1);
 
     std::vector<BaseConnection*> conns;
     NodeIndexSetter setter(0);
 
     for (int i = 0; i < 10000; i++) 
     {
-        if ((mt.nextU32(0, 1) && conns.size() > 0) || conns.size() == TOTAL_NUM_CONNECTIONS) { //dealloc
-            int index = mt.nextU32(0, conns.size() - 1);
-            ConnectionAllocator::getInstance().deallocate(conns[index]);
+        if ((mt.NextU32(0, 1) && conns.size() > 0) || conns.size() == TOTAL_NUM_CONNECTIONS) { //dealloc
+            int index = mt.NextU32(0, conns.size() - 1);
+            ConnectionAllocator::GetInstance().Deallocate(conns[index]);
             conns.erase(conns.begin() + index);
         }
         else { //alloc
             FruityHal::BleGapAddr addr;
             addr.addr_type = FruityHal::BleGapAddrType::PUBLIC;
             addr.addr = {};
-            int type = mt.nextU32(0, 3);
+            int type = mt.NextU32(0, 3);
             if (type == 0) 
             {
-                conns.push_back(ConnectionAllocator::getInstance().allocateClcAppConnection(0, ConnectionDirection::DIRECTION_IN, &addr));
+                conns.push_back(ConnectionAllocator::GetInstance().AllocateClcAppConnection(0, ConnectionDirection::DIRECTION_IN, &addr));
             }
             else if (type == 1) 
             {
-                conns.push_back(ConnectionAllocator::getInstance().allocateMeshAccessConnection(0, ConnectionDirection::DIRECTION_IN, &addr, FmKeyId::ZERO, MeshAccessTunnelType::INVALID, 0));
+                conns.push_back(ConnectionAllocator::GetInstance().AllocateMeshAccessConnection(0, ConnectionDirection::DIRECTION_IN, &addr, FmKeyId::ZERO, MeshAccessTunnelType::INVALID, 0));
             }
             else if (type == 2) 
             {
-                conns.push_back(ConnectionAllocator::getInstance().allocateMeshConnection(0, ConnectionDirection::DIRECTION_IN, &addr, 0));
+                conns.push_back(ConnectionAllocator::GetInstance().AllocateMeshConnection(0, ConnectionDirection::DIRECTION_IN, &addr, 0));
             }
             else 
             {
-                conns.push_back(ConnectionAllocator::getInstance().allocateResolverConnection(0, ConnectionDirection::DIRECTION_IN, &addr));
+                conns.push_back(ConnectionAllocator::GetInstance().AllocateResolverConnection(0, ConnectionDirection::DIRECTION_IN, &addr));
             }
         }
     }
@@ -609,7 +593,7 @@ TEST(TestOther, TestMultiMessageSimulation) {
     tester.SimulateUntilMessagesReceived(10 * 1000, msgs);
 
     for (unsigned i = 0; i < msgs.size(); i++) {
-        std::string completeMsg = msgs[i].getCompleteMessage();
+        std::string completeMsg = msgs[i].GetCompleteMessage();
         if (completeMsg.find("### Handshake starting ###") == std::string::npos && completeMsg.find("Handshake done") == std::string::npos) {
             FAIL() << "Did not receive complete live report message.";
         }
@@ -680,7 +664,7 @@ TEST(TestOther, TestTimeSync) {
     tester.SimulateUntilClusteringDone(1000 * 1000);
 
     //Test that all connections are unsynced
-    for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
+    for (u32 i = 1; i <= tester.sim->GetTotalNodes(); i++) {
         tester.SendTerminalCommand(i, "status");
         tester.SimulateUntilMessageReceived(100 * 1000, i, "tSync:0");
     }
@@ -690,12 +674,12 @@ TEST(TestOther, TestTimeSync) {
     tester.SimulateForGivenTime(60 * 1000);
 
     //Test that all connections are synced
-    for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
+    for (u32 i = 1; i <= tester.sim->GetTotalNodes(); i++) {
         tester.SendTerminalCommand(i, "status");
         tester.SimulateUntilMessageReceived(1000, i, "tSync:2");
     }
 
-    for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
+    for (u32 i = 1; i <= tester.sim->GetTotalNodes(); i++) {
         tester.SendTerminalCommand(i, "gettime");
         tester.SimulateUntilMessageReceived(100 * 1000, i, "Time is currently approx. 2019 years");
     }
@@ -713,7 +697,7 @@ TEST(TestOther, TestTimeSync) {
 
 
     //Reset most of the nodes (not node 1)
-    for (u32 i = 2; i <= tester.sim->getTotalNodes(); i++)
+    for (u32 i = 2; i <= tester.sim->GetTotalNodes(); i++)
     {
         tester.SendTerminalCommand(1, "action %d node reset", i);
         tester.SimulateGivenNumberOfSteps(1);
@@ -727,13 +711,13 @@ TEST(TestOther, TestTimeSync) {
     tester.SimulateForGivenTime(60 * 1000);
 
     //Make sure that the reset worked.
-    for (u32 i = 2; i <= tester.sim->getTotalNodes(); i++)
+    for (u32 i = 2; i <= tester.sim->GetTotalNodes(); i++)
     {
         ASSERT_EQ(tester.sim->nodes[i - 1].restartCounter, 2);
     }
 
     //Check that the time has been correctly sent to each node again.
-    for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
+    for (u32 i = 1; i <= tester.sim->GetTotalNodes(); i++) {
         tester.SendTerminalCommand(i, "gettime");
         tester.SimulateUntilMessageReceived(100 * 1000, i, "Time is currently approx. 2019 years");
     }
@@ -742,7 +726,7 @@ TEST(TestOther, TestTimeSync) {
     tester.SendTerminalCommand(1, "settime 2960262597 0");
     tester.SimulateForGivenTime(60 * 1000);
 
-    for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
+    for (u32 i = 1; i <= tester.sim->GetTotalNodes(); i++) {
         tester.SendTerminalCommand(i, "gettime");
         tester.SimulateUntilMessageReceived(100 * 1000, i, "Time is currently approx. 2063 years");
     }
@@ -752,7 +736,7 @@ TEST(TestOther, TestTimeSync) {
 
     tester.SimulateForGivenTime(60 * 1000);
 
-    for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
+    for (u32 i = 1; i <= tester.sim->GetTotalNodes(); i++) {
         tester.SendTerminalCommand(i, "gettime");
         tester.SimulateUntilMessageReceived(100 * 1000, i, "Time is currently approx. 2009 years");
     }
@@ -761,7 +745,7 @@ TEST(TestOther, TestTimeSync) {
     tester.SendTerminalCommand(1, "settime 7200 60");
     tester.SimulateForGivenTime(60 * 1000);
 
-    for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
+    for (u32 i = 1; i <= tester.sim->GetTotalNodes(); i++) {
         tester.SendTerminalCommand(i, "gettime");
         tester.SimulateUntilMessageReceived(100 * 1000, i, "Time is currently approx. 1970 years, 1 days, 03h");
     }
@@ -770,7 +754,7 @@ TEST(TestOther, TestTimeSync) {
     tester.SendTerminalCommand(1, "settime 7200 -60");
     tester.SimulateForGivenTime(60 * 1000);
 
-    for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
+    for (u32 i = 1; i <= tester.sim->GetTotalNodes(); i++) {
         tester.SendTerminalCommand(i, "gettime");
         tester.SimulateUntilMessageReceived(100 * 1000, i, "Time is currently approx. 1970 years, 1 days, 01h");
     }
@@ -779,7 +763,7 @@ TEST(TestOther, TestTimeSync) {
     tester.SendTerminalCommand(1, "settime 7200 -10000");
     tester.SimulateForGivenTime(60 * 1000);
 
-    for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
+    for (u32 i = 1; i <= tester.sim->GetTotalNodes(); i++) {
         tester.SendTerminalCommand(i, "gettime");
         tester.SimulateUntilMessageReceived(100 * 1000, i, "Time is currently approx. 1970 years, 1 days, 02h");
     }
@@ -801,7 +785,7 @@ TEST(TestOther, TestTimeSyncDuration_long) {
     tester.SimulateForGivenTime(150 * 1000);
 
     //Test that all connections are synced
-    for (u32 i = 1; i <= tester.sim->getTotalNodes(); i++) {
+    for (u32 i = 1; i <= tester.sim->GetTotalNodes(); i++) {
         tester.SendTerminalCommand(i, "status");
         tester.SimulateUntilMessageReceived(100, i, "tSync:2");
     }
@@ -810,7 +794,7 @@ TEST(TestOther, TestTimeSyncDuration_long) {
     u32 maxTime = 0;
 
 
-    for (u32 i = 0; i < tester.sim->getTotalNodes(); i++)
+    for (u32 i = 0; i < tester.sim->GetTotalNodes(); i++)
     {
         u32 time = tester.sim->nodes[i].gs.timeManager.GetTime();
         if (time < minTime) minTime = time;
@@ -840,26 +824,26 @@ TEST(TestOther, TestRestrainedKeyGeneration) {
 
     tester.SendTerminalCommand(1, "set_node_key 00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF");
     tester.SimulateGivenNumberOfSteps(1);
-    Conf::getInstance().GetRestrainedKey(restrainedKeyBuffer);
-    Logger::convertBufferToHexString(restrainedKeyBuffer, 16, restrainedKeyHexBuffer, sizeof(restrainedKeyHexBuffer));
+    Conf::GetInstance().GetRestrainedKey(restrainedKeyBuffer);
+    Logger::ConvertBufferToHexString(restrainedKeyBuffer, 16, restrainedKeyHexBuffer, sizeof(restrainedKeyHexBuffer));
     ASSERT_STREQ("2A:FC:35:99:4C:86:11:48:58:4C:C6:D9:EE:D4:A2:B6", restrainedKeyHexBuffer);
 
     tester.SendTerminalCommand(1, "set_node_key FF:EE:DD:CC:BB:AA:99:88:77:66:55:44:33:22:11:00");
     tester.SimulateGivenNumberOfSteps(1);
-    Conf::getInstance().GetRestrainedKey(restrainedKeyBuffer);
-    Logger::convertBufferToHexString(restrainedKeyBuffer, 16, restrainedKeyHexBuffer, sizeof(restrainedKeyHexBuffer));
+    Conf::GetInstance().GetRestrainedKey(restrainedKeyBuffer);
+    Logger::ConvertBufferToHexString(restrainedKeyBuffer, 16, restrainedKeyHexBuffer, sizeof(restrainedKeyHexBuffer));
     ASSERT_STREQ("9E:63:8B:94:65:85:91:99:A9:74:7D:A7:40:7C:DD:B3", restrainedKeyHexBuffer);
 
     tester.SendTerminalCommand(1, "set_node_key DE:AD:BE:EF:DE:AD:BE:EF:DE:AD:BE:EF:DE:AD:BE:EF");
     tester.SimulateGivenNumberOfSteps(1);
-    Conf::getInstance().GetRestrainedKey(restrainedKeyBuffer);
-    Logger::convertBufferToHexString(restrainedKeyBuffer, 16, restrainedKeyHexBuffer, sizeof(restrainedKeyHexBuffer));
+    Conf::GetInstance().GetRestrainedKey(restrainedKeyBuffer);
+    Logger::ConvertBufferToHexString(restrainedKeyBuffer, 16, restrainedKeyHexBuffer, sizeof(restrainedKeyHexBuffer));
     ASSERT_STREQ("3C:58:54:FC:29:96:00:59:B7:80:6B:4C:78:49:8B:27", restrainedKeyHexBuffer);
 
     tester.SendTerminalCommand(1, "set_node_key 00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F");
     tester.SimulateGivenNumberOfSteps(1);
-    Conf::getInstance().GetRestrainedKey(restrainedKeyBuffer);
-    Logger::convertBufferToHexString(restrainedKeyBuffer, 16, restrainedKeyHexBuffer, sizeof(restrainedKeyHexBuffer));
+    Conf::GetInstance().GetRestrainedKey(restrainedKeyBuffer);
+    Logger::ConvertBufferToHexString(restrainedKeyBuffer, 16, restrainedKeyHexBuffer, sizeof(restrainedKeyHexBuffer));
     ASSERT_STREQ("60:AB:54:BB:F5:1C:3F:77:FA:BC:80:4C:E0:F4:78:58", restrainedKeyHexBuffer);
 }
 
@@ -1029,23 +1013,23 @@ TEST(TestOther, TestWatchdog) {
 
 
 #ifndef GITHUB_RELEASE
-extern void setBoard_3(BoardConfiguration *c);
-extern void setBoard_4(BoardConfiguration *c);
-extern void setBoard_9(BoardConfiguration *c);
-extern void setBoard_10(BoardConfiguration *c);
-extern void setBoard_11(BoardConfiguration *c);
-extern void setBoard_12(BoardConfiguration *c);
-extern void setBoard_13(BoardConfiguration *c);
-extern void setBoard_14(BoardConfiguration *c);
-extern void setBoard_16(BoardConfiguration *c);
-extern void setBoard_17(BoardConfiguration *c);
-extern void setBoard_18(BoardConfiguration *c);
-extern void setBoard_19(BoardConfiguration *c);
-extern void setBoard_20(BoardConfiguration *c);
-extern void setBoard_21(BoardConfiguration *c);
-extern void setBoard_22(BoardConfiguration *c);
-extern void setBoard_23(BoardConfiguration* c);
-extern void setBoard_24(BoardConfiguration* c);
+extern void SetBoard_3(BoardConfiguration *c);
+extern void SetBoard_4(BoardConfiguration *c);
+extern void SetBoard_9(BoardConfiguration *c);
+extern void SetBoard_10(BoardConfiguration *c);
+extern void SetBoard_11(BoardConfiguration *c);
+extern void SetBoard_12(BoardConfiguration *c);
+extern void SetBoard_13(BoardConfiguration *c);
+extern void SetBoard_14(BoardConfiguration *c);
+extern void SetBoard_16(BoardConfiguration *c);
+extern void SetBoard_17(BoardConfiguration *c);
+extern void SetBoard_18(BoardConfiguration *c);
+extern void SetBoard_19(BoardConfiguration *c);
+extern void SetBoard_20(BoardConfiguration *c);
+extern void SetBoard_21(BoardConfiguration *c);
+extern void SetBoard_22(BoardConfiguration *c);
+extern void SetBoard_23(BoardConfiguration* c);
+extern void SetBoard_24(BoardConfiguration* c);
 
 TEST(TestOther, TestBoards) {
     //Executes all setBoard configs to make sure none of them crashes anything.
@@ -1065,57 +1049,57 @@ TEST(TestOther, TestBoards) {
     BoardConfiguration c;
 
     c.boardType = 3;
-    setBoard_3(&c);
+    SetBoard_3(&c);
 
     c.boardType = 4;
-    setBoard_4(&c);
+    SetBoard_4(&c);
 
     c.boardType = 9;
-    setBoard_9(&c);
+    SetBoard_9(&c);
 
     u8 buffer[1000] = {};
     NRF_UICR->CUSTOMER[1] = (u32)buffer;
     c.boardType = 10;
-    setBoard_10(&c);
+    SetBoard_10(&c);
 
     c.boardType = 11;
-    setBoard_11(&c);
+    SetBoard_11(&c);
 
     c.boardType = 12;
-    setBoard_12(&c);
+    SetBoard_12(&c);
 
     c.boardType = 13;
-    setBoard_13(&c);
+    SetBoard_13(&c);
 
     c.boardType = 14;
-    setBoard_14(&c);
+    SetBoard_14(&c);
 
     c.boardType = 16;
-    setBoard_16(&c);
+    SetBoard_16(&c);
 
     c.boardType = 17;
-    setBoard_17(&c);
+    SetBoard_17(&c);
 
     c.boardType = 18;
-    setBoard_18(&c);
+    SetBoard_18(&c);
 
     c.boardType = 19;
-    setBoard_19(&c);
+    SetBoard_19(&c);
 
     c.boardType = 20;
-    setBoard_20(&c);
+    SetBoard_20(&c);
 
     c.boardType = 21;
-    setBoard_21(&c);
+    SetBoard_21(&c);
 
     c.boardType = 22;
-    setBoard_22(&c);
+    SetBoard_22(&c);
 
     c.boardType = 23;
-    setBoard_23(&c);
+    SetBoard_23(&c);
 
     c.boardType = 24;
-    setBoard_24(&c);
+    SetBoard_24(&c);
 }
 #endif //GITHUB_RELEASE
 
@@ -1171,55 +1155,100 @@ TEST(TestOther, TestRingIndexGenerator) {
     }
 }
 
-TEST(TestOther, TestStringConvertions) {
-    Exceptions::ExceptionDisabler<NotANumberStringException> Nanse;
-    Exceptions::ExceptionDisabler<NumberStringNotInRangeException> Nsnir;
+TEST(TestOther, TestStringConversions) {
+    ASSERT_EQ(Utility::StringToI8(  "0"), 0);
+    ASSERT_EQ(Utility::StringToI8( "00"), 0);
+    ASSERT_EQ(Utility::StringToI8("000"), 0);
+    ASSERT_EQ(Utility::StringToI8(  "1"), 1);
+    ASSERT_EQ(Utility::StringToI8( "01"), 1);
+    ASSERT_EQ(Utility::StringToI8("001"), 1);
+    ASSERT_EQ(Utility::StringToI8(  "13"), 13);
+    ASSERT_EQ(Utility::StringToI8( "013"), 13);
+    ASSERT_EQ(Utility::StringToI8("0013"), 13);
+    ASSERT_EQ(Utility::StringToI8(  "-0"), 0);
+    ASSERT_EQ(Utility::StringToI8( "-00"), 0);
+    ASSERT_EQ(Utility::StringToI8("-000"), 0);
+    ASSERT_EQ(Utility::StringToI8(  "-1"), -1);
+    ASSERT_EQ(Utility::StringToI8( "-01"), -1);
+    ASSERT_EQ(Utility::StringToI8("-001"), -1);
+    ASSERT_EQ(Utility::StringToI8(  "-13"), -13);
+    ASSERT_EQ(Utility::StringToI8( "-013"), -13);
+    ASSERT_EQ(Utility::StringToI8("-0013"), -13);
+
+    ASSERT_EQ(Utility::StringToU8(  "0"), 0);
+    ASSERT_EQ(Utility::StringToU8( "00"), 0);
+    ASSERT_EQ(Utility::StringToU8("000"), 0);
+    ASSERT_EQ(Utility::StringToU8(  "1"), 1);
+    ASSERT_EQ(Utility::StringToU8( "01"), 1);
+    ASSERT_EQ(Utility::StringToU8("001"), 1);
+    ASSERT_EQ(Utility::StringToU8(  "13"), 13);
+    ASSERT_EQ(Utility::StringToU8( "013"), 13);
+    ASSERT_EQ(Utility::StringToU8("0013"), 13);
 
     ASSERT_EQ(Utility::StringToI8("127"), 127);
     ASSERT_EQ(Utility::StringToI16("127"), 127);
     ASSERT_EQ(Utility::StringToI32("127"), 127);
-    ASSERT_EQ(Utility::StringToI8("128"), 0);
+    {
+        Exceptions::ExceptionDisabler<NumberStringNotInRangeException> Nsnir;
+        ASSERT_EQ(Utility::StringToI8("128"), 0);
+    }
     ASSERT_EQ(Utility::StringToI16("128"), 128);
     ASSERT_EQ(Utility::StringToI32("128"), 128);
     ASSERT_EQ(Utility::StringToI8("-128"), -128);
     ASSERT_EQ(Utility::StringToI16("-128"), -128);
     ASSERT_EQ(Utility::StringToI32("-128"), -128);
-    ASSERT_EQ(Utility::StringToI8("-129"), 0);
+    {
+        Exceptions::ExceptionDisabler<NumberStringNotInRangeException> Nsnir;
+        ASSERT_EQ(Utility::StringToI8("-129"), 0);
+    }
     ASSERT_EQ(Utility::StringToI16("-129"), -129);
     ASSERT_EQ(Utility::StringToI32("-129"), -129);
 
     ASSERT_EQ(Utility::StringToU8("255"), 255);
     ASSERT_EQ(Utility::StringToU16("255"), 255);
     ASSERT_EQ(Utility::StringToU32("255"), 255);
-    ASSERT_EQ(Utility::StringToU8("256"), 0);
+    {
+        Exceptions::ExceptionDisabler<NumberStringNotInRangeException> Nsnir;
+        ASSERT_EQ(Utility::StringToU8("256"), 0);
+    }
     ASSERT_EQ(Utility::StringToU16("256"), 256);
     ASSERT_EQ(Utility::StringToU32("256"), 256);
-    ASSERT_EQ(Utility::StringToU8("70000"), 0);
-    ASSERT_EQ(Utility::StringToU16("70000"), 0);
+    {
+        Exceptions::ExceptionDisabler<NumberStringNotInRangeException> Nsnir;
+        ASSERT_EQ(Utility::StringToU8("70000"), 0);
+        ASSERT_EQ(Utility::StringToU16("70000"), 0);
+    }
     ASSERT_EQ(Utility::StringToU32("70000"), 70000);
 
-    bool didError = false;
-    ASSERT_EQ(Utility::StringToU8("255", &didError), 255);
-    ASSERT_FALSE(didError);
-    ASSERT_EQ(Utility::StringToU16("255", &didError), 255);
-    ASSERT_FALSE(didError);
-    ASSERT_EQ(Utility::StringToU32("255", &didError), 255);
-    ASSERT_FALSE(didError);
-    ASSERT_EQ(Utility::StringToU8("256", &didError), 0);
-    ASSERT_TRUE(didError);
-    didError = false;
-    ASSERT_EQ(Utility::StringToU16("256", &didError), 256);
-    ASSERT_FALSE(didError);
-    ASSERT_EQ(Utility::StringToU32("256", &didError), 256);
-    ASSERT_FALSE(didError);
-    ASSERT_EQ(Utility::StringToU8("70000", &didError), 0);
-    ASSERT_TRUE(didError);
-    didError = false;
-    ASSERT_EQ(Utility::StringToU16("70000", &didError), 0);
-    ASSERT_TRUE(didError);
-    didError = false;
-    ASSERT_EQ(Utility::StringToU32("70000", &didError), 70000);
-    ASSERT_FALSE(didError);
+
+    ASSERT_EQ(Utility::StringToU32("0x0A"), 10);
+
+    {
+        Exceptions::ExceptionDisabler<NotANumberStringException> Nanse;
+        Exceptions::ExceptionDisabler<NumberStringNotInRangeException> Nsnir;
+        bool didError = false;
+        ASSERT_EQ(Utility::StringToU8("255", &didError), 255);
+        ASSERT_FALSE(didError);
+        ASSERT_EQ(Utility::StringToU16("255", &didError), 255);
+        ASSERT_FALSE(didError);
+        ASSERT_EQ(Utility::StringToU32("255", &didError), 255);
+        ASSERT_FALSE(didError);
+        ASSERT_EQ(Utility::StringToU8("256", &didError), 0);
+        ASSERT_TRUE(didError);
+        didError = false;
+        ASSERT_EQ(Utility::StringToU16("256", &didError), 256);
+        ASSERT_FALSE(didError);
+        ASSERT_EQ(Utility::StringToU32("256", &didError), 256);
+        ASSERT_FALSE(didError);
+        ASSERT_EQ(Utility::StringToU8("70000", &didError), 0);
+        ASSERT_TRUE(didError);
+        didError = false;
+        ASSERT_EQ(Utility::StringToU16("70000", &didError), 0);
+        ASSERT_TRUE(didError);
+        didError = false;
+        ASSERT_EQ(Utility::StringToU32("70000", &didError), 70000);
+        ASSERT_FALSE(didError);
+    }
 }
 
 #ifndef GITHUB_RELEASE
@@ -1257,7 +1286,7 @@ TEST(TestOther, TestSimulatorFlashToFileStorage) {
                 "action 0 enroll basic BBBBD 3 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0 0",
             };
 
-            ASSERT_EQ(messages.size(), tester.sim->getTotalNodes());
+            ASSERT_EQ(messages.size(), tester.sim->GetTotalNodes());
 
             for (size_t nodeIndex = 0; nodeIndex < messages.size(); nodeIndex++) {
                 for (int i = 0; i < 10; i++) {
@@ -1295,8 +1324,8 @@ TEST(TestOther, TestConnectionSupervisionTimeoutWillDisconnect) {
 
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
-    tester.sim->findNodeById(1)->gs.logger.enableTag("C");
-    tester.sim->findNodeById(2)->gs.logger.enableTag("C");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("C");
+    tester.sim->FindNodeById(2)->gs.logger.EnableTag("C");
 
     tester.SimulateUntilClusteringDone(10 * 1000);
 
@@ -1320,8 +1349,8 @@ TEST(TestOther, TestConnectionSupervisionTimeoutWontDisconnect) {
 
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
-    tester.sim->findNodeById(1)->gs.logger.enableTag("C");
-    tester.sim->findNodeById(2)->gs.logger.enableTag("C");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("C");
+    tester.sim->FindNodeById(2)->gs.logger.EnableTag("C");
 
     tester.SimulateUntilClusteringDone(10 * 1000);
 

@@ -35,6 +35,9 @@
 
 #include <Terminal.h>
 
+constexpr u8 STATUS_REPORTER_MODULE_CONFIG_VERSION = 2;
+constexpr u16 STATUS_REPORTER_MODULE_MAX_HOPS = NODE_ID_HOPS_BASE + NODE_ID_HOPS_BASE_SIZE - 1;
+
 constexpr size_t BATTERY_SAMPLES_IN_BUFFER = 1; //Number of SAADC samples in RAM before returning a SAADC event. For low power SAADC set this constant to 1. Otherwise the EasyDMA will be enabled for an extended time which consumes high current.
 
 enum class StatusReporterModuleComponent :u16 {
@@ -221,10 +224,10 @@ private:
         void StartConnectionRSSIMeasurement(MeshConnection& connection) const;
 
         static void AdcEventHandler();
-        void initBatteryVoltageADC();
+        void InitBatteryVoltageADC();
         void BatteryVoltageADC();
 
-        void convertADCtoVoltage();
+        void ConvertADCtoVoltage();
 
         bool periodicTimeSendWasActivePreviousTimerEventHandler = false;
         u32 periodicTimeSendStartTimestampDs = 0;
@@ -232,7 +235,7 @@ private:
         constexpr static u32 TIME_BETWEEN_PERIODIC_TIME_SENDS_DS = SEC_TO_DS(5);
         u32 timeSinceLastPeriodicTimeSendDs = 0;
         NodeId periodicTimeSendReceiver = 0;
-        decltype(componentMessageHeader::requestHandle) periodicTimeSendRequestHandle = 0;
+        decltype(ComponentMessageHeader::requestHandle) periodicTimeSendRequestHandle = 0;
         bool IsPeriodicTimeSendActive();
 
     public:
@@ -244,7 +247,7 @@ private:
 
         StatusReporterModule();
 
-        void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override final;
+        void ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfigLength) override final;
 
         void ResetToDefaultConfiguration() override final;
 
@@ -254,7 +257,7 @@ private:
         TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
         #endif
 
-        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override final;
+        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader) override final;
 
         void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override final;
 

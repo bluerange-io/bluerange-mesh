@@ -28,7 +28,7 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "types.h"
+#include "FmTypes.h"
 
 /* 
 *  A stack allocator that gives memory to module allocations.
@@ -48,9 +48,9 @@ public:
     ModuleAllocator& operator=(const ModuleAllocator&)  = delete;
     ModuleAllocator& operator=(      ModuleAllocator&&) = delete;
 
-    void setMemory(u8 *block, u32 size);
+    void SetMemory(u8 *block, u32 size);
 
-    u32 getMemorySize();
+    u32 GetMemorySize();
 
-    void* allocateMemory(u32 size);
+    void* AllocateMemory(u32 size);
 };

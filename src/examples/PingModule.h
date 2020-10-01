@@ -32,6 +32,9 @@
 
 #include <Module.h>
 
+constexpr VendorModuleId PING_MODULE_ID = GET_VENDOR_MODULE_ID(0xABCD, 2);
+constexpr u8 PING_MODULE_CONFIG_VERSION = 1;
+
 /*
  * The PinModule is a sample implementation of a module for showcasing FruityMesh.
  */
@@ -57,13 +60,13 @@ class PingModule: public Module
     public:
         PingModule();
 
-        void ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength) override;
+        void ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfigLength) override;
 
         void ResetToDefaultConfiguration() override;
 
         void TimerEventHandler(u16 passedTimeDs) override;
 
-        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader) override;
+        void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader) override;
 
         #ifdef TERMINAL_ENABLED
         TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;

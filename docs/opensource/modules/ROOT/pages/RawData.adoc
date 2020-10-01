@@ -168,6 +168,31 @@ Or in cases where the transmission was successful:
 }
 ----
 
+==== Send Report Desired
+`raw_data_report_desired [receiverId] [destinationModuleId] {requestHandle = 0}`
+
+The "Report Desired" message is an optional message that can speed up transmissions in cases where the current last chunk was dropped. It is send from the sender to the receiver, indicating that the sender wishes to get a raw_data_report from the receiver. The receiver however may completely ignore this message, completely relying on the timeouts. The sender may also never send it, also completely relying on the timeouts.
+
+[cols="2,2,4"]
+|===
+|Command Parameter | Type | Description
+
+|receiverId | u16 | The node ID that this message should be sent to
+|destinationModuleId | u8 | The module ID is used for giving context to this message. If the transmission should only be printed on the receiver and otherwise be ignored by the firmware, it must be set to 0.
+|requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions (Default: 0)
+|===
+
+If received by a JSON-capable device, the _raw_data_report_desired_ is printed out like this:
+[source,javascript]
+----
+{
+	"nodeId":5,
+	"type":"raw_data_report_desired",
+	"module":4,
+	"requestHandle":0
+}
+----
+
 
 ==== Send Error
 `raw_data_error [receiverId] [destinationModuleId] [errorCode] [destination] {requestHandle = 0}`
@@ -301,6 +326,15 @@ The mesh message is documented xref:#RawDataLightMessage[here].
 
 |8 |xref:Specification.adoc#connPacketModule[connPacketModule]| Conn Packet Module | Message Type = 54, Action Type = 3.
 |12|u32[3]                                  | missings           | The IDs of the missing chunks.
+|===
+
+=== Raw Data Report Desired Message
+
+[cols="1,2,2,3"]
+|===
+|Bytes |Type| Name| Description
+
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule]| Conn Packet Module | Message Type = 54, Action Type = 5.
 |===
 
 [#RawDataLightMessage]

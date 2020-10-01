@@ -68,7 +68,7 @@ u8* PacketQueue::Reserve(u16 dataLength)
 
     if(dataLength + 10 > bufferLength){
         logt("ERROR", "Too big");                                                                    //LCOV_EXCL_LINE assertion
-        GS->logger.logCustomError(CustomErrorTypes::FATAL_PACKETQUEUE_PACKET_TOO_BIG, dataLength);    //LCOV_EXCL_LINE assertion
+        GS->logger.LogCustomError(CustomErrorTypes::FATAL_PACKETQUEUE_PACKET_TOO_BIG, dataLength);    //LCOV_EXCL_LINE assertion
         SIMEXCEPTION(IllegalArgumentException);                                                        //LCOV_EXCL_LINE assertion
         return nullptr;                                                                                //LCOV_EXCL_LINE assertion
     }

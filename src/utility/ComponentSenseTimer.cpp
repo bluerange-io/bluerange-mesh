@@ -30,7 +30,7 @@
 #include "ComponentSenseTimer.h"
 #include "Utility.h"
 
-bool ComponentSenseTimer::shouldTrigger(u32 passedTimeDs)
+bool ComponentSenseTimer::ShouldTrigger(u32 passedTimeDs)
 {
     timeSinceLastComponentSenseSentDs += passedTimeDs;
     u32 additionalWaitTime = amountOfRepeatedMessages * amountOfRepeatedMessages;
@@ -48,7 +48,7 @@ bool ComponentSenseTimer::shouldTrigger(u32 passedTimeDs)
     return false;
 }
 
-void ComponentSenseTimer::reset()
+void ComponentSenseTimer::Reset()
 {
     timeSinceLastComponentSenseSentDs = 0;
     amountOfRepeatedMessages = 0;

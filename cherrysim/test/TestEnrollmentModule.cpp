@@ -75,7 +75,7 @@ TEST(TestEnrollmentModule, TestFactoryReset) {
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     //testerConfig.verbose = true;
     simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
-    simConfig.asyncFlashCommitTimeProbability = 1.0f;
+    simConfig.asyncFlashCommitTimeProbability = UINT32_MAX;
     simConfig.SetToPerfectConditions();
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
@@ -190,7 +190,7 @@ TEST(TestEnrollmentModule, TestEnrollmentBasicExistingMesh) {
         tester.SimulateGivenNumberOfSteps(100);
     }
 
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(1000 * 1000);
 }
 
 TEST(TestEnrollmentModule, TestEnrollmentBasicExistingMeshLong) {
@@ -236,7 +236,7 @@ TEST(TestEnrollmentModule, TestEnrollmentBasicExistingMeshLong) {
     }
 
 
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(1000 * 1000);
 }
 
 TEST(TestEnrollmentModule, TestReceivingEnrollmentOverMeshResponses) {
@@ -324,6 +324,9 @@ TEST(TestEnrollmentModule, TestEnrollmentMultipleTimes) {
     }
 }
 
+
+//This test is disabled on Github because the github featureset set overwrites the networkid
+#ifndef GITHUB_RELEASE
 TEST(TestEnrollmentModule, TestRequestProposals) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
@@ -348,7 +351,7 @@ TEST(TestEnrollmentModule, TestRequestProposals) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
     //Set all the networkids except the middle ones to 0.
-    for (u32 i = 2; i < tester.sim->getTotalNodes(); i++)
+    for (u32 i = 2; i < tester.sim->GetTotalNodes(); i++)
     {
         tester.sim->nodes[i].uicr.CUSTOMER[9] = 0;
     }
@@ -356,7 +359,7 @@ TEST(TestEnrollmentModule, TestRequestProposals) {
     tester.Start();
 
     //Make sure node 0 and 1 are connected.
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "clusterSize\":2");
+    tester.SimulateUntilClusteringDoneWithExpectedNumberOfClusters(1000 * 1000, 9);
 
     tester.SendTerminalCommand(1, "action 0 enroll request_proposals BBBBD BBBBF BBBBG");
     std::vector<SimulationMessage> messages = {
@@ -390,3 +393,4 @@ TEST(TestEnrollmentModule, TestRequestProposals) {
     };
     tester.SimulateUntilMessagesReceived(10 * 1000, messages);
 }
+#endif

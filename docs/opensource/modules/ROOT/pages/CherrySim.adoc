@@ -24,7 +24,7 @@ CherrySim uses a header file _SystemTest.h_ that is force-included before all ot
 
 CherrySim works with only one instance and is able to simulate many instances of FruityMesh. Hence FruityMesh must be written in a way that the code itself has no state variables. No global or functional static variables are allowed. Every variable that needs to be saved from one function call to the next needs to be a part of class since CherrySim creates instances of classes for every node. The `GlobalState.cpp` is used to store the whole state of a node and CherrySim switches the pointer to the currently simulated node for each simulation step.
 
-CherrySim gives each node a different serial numbers starting at `BBBBB` and incrementing. Every forth byte of the node key, starting with the first byte is equal to the serial number index + 1. So for example, `BBBBB` has the node key `01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00`, `BBBBC` has the node key `02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00` and so on. By default, all nodes have the same networkId and networkKey so that they are in the same mesh network. If this is not desired, the simulated UICR can be overwritten or the nodes can be enrolled using the standard enrollment command. Default featuresets are given to each node but the featureset can also be individually configured for each node.
+CherrySim gives each node a different xref:Specification.adoc#SerialNumbers[serial numbers] starting at `BBBBB` and incrementing. Every forth byte of the node key, starting with the first byte is equal to the xref:Specification.adoc#SerialNumbers[serial number] index + 1. So for example, `BBBBB` has the node key `01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00`, `BBBBC` has the node key `02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00` and so on. By default, all nodes have the same networkId and networkKey so that they are in the same mesh network. If this is not desired, the simulated UICR can be overwritten or the nodes can be enrolled using the standard enrollment command. Default featuresets are given to each node but the featureset can also be individually configured for each node.
 
 [#Visualization]
 == Visualization
@@ -72,7 +72,7 @@ The following commands change positions of nodes.
 ----
 sim set_position [serial] [x] [y] [z] //e.g. sim set_position BBBBD 0.5 0.21 1.7
 ----
-Sets the position (in meters) in the virtual environment of the node with the serial number BBBBD to (0.5 / 0.21 / 1.7). Stops the animation of the given node, if one is playing. Note: The third axis is the height axis.
+Sets the position (in meters) in the virtual environment of the node with the xref:Specification.adoc#SerialNumbers[serial number] BBBBD to (0.5 / 0.21 / 1.7). Stops the animation of the given node, if one is playing. Note: The third axis is the height axis.
 
 [source,c++]
 ----
@@ -84,7 +84,7 @@ Same as set_position, but relative to the normalized simulated environment dimen
 ----
 sim add_position [serial] [x] [y] [z] //e.g. sim add_position BBBBD -0.17 0.23 12
 ----
-Adds to the position (in meters) in the virtual environment of the node with the serial number BBBBD. Stops the animation of the given node, if one is playing. Note: The third axis is the height axis.
+Adds to the position (in meters) in the virtual environment of the node with the xref:Specification.adoc#SerialNumbers[serial number] BBBBD. Stops the animation of the given node, if one is playing. Note: The third axis is the height axis.
 
 [source,c++]
 ----
@@ -180,7 +180,7 @@ Where name is the name of the animation that is currently playing or the string 
 ----
 sim animation start [serial] [name] //e.g. sim animation start BBCBC my_animation
 ----
-Starts an animation with the name "name" of the node with the given serial number.
+Starts an animation with the name "name" of the node with the given xref:Specification.adoc#SerialNumbers[serial number].
 
 NOTE: Once an animation has been started on a node, changing the animation with any command has no effect on the animation currently playing on the node. Changes to an animation only have an effect on future animation start commands.
 
@@ -188,7 +188,7 @@ NOTE: Once an animation has been started on a node, changing the animation with 
 ----
 sim animation stop [serial] //e.g. sim animation stop BBCBC
 ----
-Stops an animation on the node with the given serial number.
+Stops an animation on the node with the given xref:Specification.adoc#SerialNumbers[serial number].
 
 [source,c++]
 ----

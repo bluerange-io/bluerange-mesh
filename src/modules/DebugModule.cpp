@@ -90,7 +90,7 @@ void DebugModule::ResetToDefaultConfiguration()
     SET_FEATURESET_CONFIGURATION(&configuration, this);
 }
 
-void DebugModule::ConfigurationLoadedHandler(ModuleConfiguration* migratableConfig, u16 migratableConfigLength)
+void DebugModule::ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfigLength)
 {
     //Do additional initialization upon loading the config
 
@@ -531,8 +531,8 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
             else receiverId = NODE_ID_BROADCAST;
         }
 
-        connPacketData1 data;
-        CheckedMemset(&data, 0x00, sizeof(connPacketData1));
+        ConnPacketData1 data;
+        CheckedMemset(&data, 0x00, sizeof(ConnPacketData1));
 
         data.header.messageType = MessageType::DATA_1;
         data.header.sender = GS->node.configuration.nodeId;
@@ -559,7 +559,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
     {
         u8 checkvar = 1;
         logjson("NODE", "{\"stack\":%u}" SEP, (u32)(&checkvar - 0x20000000));
-        logt("NODE", "Module usage: %u" SEP, GS->moduleAllocator.getMemorySize());
+        logt("NODE", "Module usage: %u" SEP, GS->moduleAllocator.GetMemorySize());
 
         return TerminalCommandHandlerReturnType::SUCCESS;
 
@@ -599,7 +599,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
             for(u32 i=0; i<blockSize/bufferSize; i++)
             {
                 CheckedMemcpy(buffer, (u8*)(block*blockSize+i*bufferSize + offset), bufferSize);
-                Logger::convertBufferToHexString(buffer, bufferSize, (char*)charBuffer, bufferSize*3+1);
+                Logger::ConvertBufferToHexString(buffer, bufferSize, (char*)charBuffer, bufferSize*3+1);
                 trace("0x%08X: %s" EOL,(block*blockSize)+i*bufferSize + offset, charBuffer);
             }
         }
@@ -633,7 +633,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
         u32 errorCode = Utility::StringToU32(commandArgs[1]);
         u16 extra = Utility::StringToU16(commandArgs[2]);
 
-        GS->logger.logError(LoggingError::CUSTOM, errorCode, extra);
+        GS->logger.LogError(LoggingError::CUSTOM, errorCode, extra);
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
@@ -644,7 +644,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
         u32 recordId = Utility::StringToU32(commandArgs[1]);
 
         u8 buffer[50];
-        u16 len = Logger::parseEncodedStringToBuffer(commandArgs[2], buffer, 50);
+        u16 len = Logger::ParseEncodedStringToBuffer(commandArgs[2], buffer, 50);
 
         GS->recordStorage.SaveRecord(recordId, buffer, len, nullptr, 0);
 
@@ -687,7 +687,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
         //parameter 1: r=reliable, u=unreliable, b=both
         //parameter 2: count
 
-        connPacketData1 data;
+        ConnPacketData1 data;
         data.header.messageType = MessageType::DATA_1;
         data.header.sender = GS->node.configuration.nodeId;
         data.header.receiver = 0;
@@ -764,7 +764,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
         char buffer[150];
 
         for (u32 i = 0; i < advCtrl->currentNumJobs; i++) {
-            Logger::convertBufferToHexString(advCtrl->jobs[i].advData, advCtrl->jobs[i].advDataLength, buffer, sizeof(buffer));
+            Logger::ConvertBufferToHexString(advCtrl->jobs[i].advData, advCtrl->jobs[i].advDataLength, buffer, sizeof(buffer));
             trace("Job type:%u, slots:%u, iv:%u, advData:%s" EOL, (u32)advCtrl->jobs[i].type, advCtrl->jobs[i].slots, advCtrl->jobs[i].advertisingInterval, buffer);
         }
 
@@ -817,7 +817,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
     {
         u32 addr = strtoul(commandArgs[1], nullptr, 10) + FLASH_REGION_START_ADDRESS;
         u8 buffer[200];
-        u16 dataLength = Logger::parseEncodedStringToBuffer(commandArgs[2], buffer, 200);
+        u16 dataLength = Logger::ParseEncodedStringToBuffer(commandArgs[2], buffer, 200);
 
 
         GS->flashStorage.CacheAndWriteData((u32*)buffer, (u32*)addr, dataLength, nullptr, 0);
@@ -846,7 +846,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
     }
     if (TERMARGS(0, "filltx"))
     {
-        GS->cm.fillTransmitBuffers();
+        GS->cm.FillTransmitBuffers();
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
@@ -870,7 +870,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
         u32 destAddr = Utility::StringToU32(commandArgs[1]) + FLASH_REGION_START_ADDRESS;
 
         u32 buffer[16];
-        u16 len = Logger::parseEncodedStringToBuffer(commandArgs[2], (u8*)buffer, 64);
+        u16 len = Logger::ParseEncodedStringToBuffer(commandArgs[2], (u8*)buffer, 64);
 
         GS->flashStorage.CacheAndWriteData(buffer, (u32*)destAddr, len, nullptr, 0);
 
@@ -903,14 +903,14 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 }
 #endif
 
-void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
+void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader)
 {
     //Must call superclass for handling
     Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
     //Check if this request is meant for modules in general
     if (packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION) {
-        connPacketModule const * packet = (connPacketModule const *)packetHeader;
+        ConnPacketModule const * packet = (ConnPacketModule const *)packetHeader;
         DebugModuleTriggerActionMessages actionType = (DebugModuleTriggerActionMessages)packet->actionType;
 
         //Check if our module is meant and we should trigger an action
@@ -1000,7 +1000,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
                 CheckedMemset(&response, 0x00, sizeof(response));
 
                 response.address = data->address;
-                u8* memoryAddress = (u8*)data->address + FLASH_REGION_START_ADDRESS;
+                u8* memoryAddress = (u8*)(FLASH_REGION_START_ADDRESS + data->address);
                 CheckedMemcpy(response.data, memoryAddress, data->length);
 
                 SendModuleActionMessage(
@@ -1166,16 +1166,16 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
         }
     }
     else if (packetHeader->messageType == MessageType::DATA_1) {
-        if (sendData->dataLength >= SIZEOF_CONN_PACKET_HEADER + 3) //We do not need the full data paket, just the bytes that we read
+        if (sendData->dataLength >= SIZEOF_CONN_PACKET_HEADER + 3) //We do not need the full data packet, just the bytes that we read
         {
-            connPacketData1 const * packet = (connPacketData1 const *)packetHeader;
+            ConnPacketData1 const * packet = (ConnPacketData1 const *)packetHeader;
             NodeId partnerId = connection == nullptr ? 0 : connection->partnerId;
 
             logt("DATA", "IN <= %d ################## Got Data packet %d:%d:%d (len:%d,%s) ##################", partnerId, packet->payload.data[0], packet->payload.data[1], packet->payload.data[2], sendData->dataLength, sendData->deliveryOption == DeliveryOption::WRITE_REQ ? "r" : "u");
         }
     }
     else if (packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE) {
-        connPacketModule const * packet = (connPacketModule const *)packetHeader;
+        ConnPacketModule const * packet = (ConnPacketModule const *)packetHeader;
         DebugModuleActionResponseMessages actionType = (DebugModuleActionResponseMessages)packet->actionType;
 
         //Check if our module is meant
@@ -1200,6 +1200,10 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
                 //logjson("DEBUGMOD", "{\"type\":\"ping_response\",\"passedTime\":%u}" SEP, timePassedMs);
             }
             else if (actionType == DebugModuleActionResponseMessages::SEND_MAX_MESSAGE_RESPONSE) {
+                if (sendData->dataLength != MAX_MESH_PACKET_SIZE) {
+                    logt("ERROR", "Packet has an invalid size");
+                }
+
                 DebugModuleSendMaxMessageResponse const * message = (DebugModuleSendMaxMessageResponse const *)packet->data;
                 u32 i;
                 for (i = 0; i < sizeof(message->data); i++){
@@ -1222,7 +1226,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
                 DYNAMIC_ARRAY(buffer, bufferLength);
                 CheckedMemset(buffer, 0x00, bufferLength);
 
-                Logger::convertBufferToHexString(message->data, memoryLength, (char*)buffer, bufferLength);
+                Logger::ConvertBufferToHexString(message->data, memoryLength, (char*)buffer, bufferLength);
 
                 logjson("DEBUGMOD", "{\"nodeId\":%u,\"type\":\"memory\",\"address\":%u,\"data\":\"%s\"}" SEP,
                     packet->header.sender,
@@ -1262,12 +1266,12 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
     }
 }
 
-u32 DebugModule::getPacketsIn()
+u32 DebugModule::GetPacketsIn()
 {
     return packetsIn;
 }
 
-u32 DebugModule::getPacketsOut()
+u32 DebugModule::GetPacketsOut()
 {
     return packetsOut;
 }

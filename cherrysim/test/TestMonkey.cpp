@@ -161,7 +161,7 @@ const std::vector<std::string> templates{
 
 const std::string& getRandomEntry(MersenneTwister& rand, const std::vector<std::string> &vec, i32 indexOverride) {
     if (indexOverride >= 0) return vec[indexOverride];
-    return vec[rand.nextU32(0, vec.size() - 1)];
+    return vec[rand.NextU32(0, vec.size() - 1)];
 }
 
 std::string fillStringPlaceholder(MersenneTwister& rand, const std::string& command, const std::string& placeholder, const std::vector<std::string>& possibleReplacements) {
@@ -201,7 +201,7 @@ std::string fillNumberPlaceholder(MersenneTwister& rand, const std::string& comm
         int iEnd = std::stoi(sEnd);
 
         std::string replacement = "";
-        replacement += std::to_string(rand.nextU32(iStart, iEnd));
+        replacement += std::to_string(rand.NextU32(iStart, iEnd));
 
         std::string retVal = command;
         retVal.replace(startIndex, endIndex - startIndex + 3, replacement);
@@ -250,7 +250,7 @@ std::string fillArbitraryPlaceholder(MersenneTwister& rand, std::string& command
             prevSep = separatorInices[i] + 1;
         }
 
-        std::string replacement = possibleReplacements[rand.nextU32(0, possibleReplacements.size() - 1)];
+        std::string replacement = possibleReplacements[rand.NextU32(0, possibleReplacements.size() - 1)];
 
         std::string retVal = command;
         retVal.replace(startIndex, endIndex - startIndex + 3, replacement);
@@ -290,23 +290,21 @@ std::vector<std::string> tokenizeString(const std::string &command) {
 }
 
 void corruptTokenizedVectorInPlace(MersenneTwister& rand, std::vector<std::string> &tokens) {
-    double action = rand.nextDouble(0, 1);
-
-    if (action >= 0.5 && tokens.size() > 1) {
+    if (rand.NextPsrng(UINT32_MAX / 2) && tokens.size() > 1) {
         //Remove a token!
-        int index = rand.nextU32(1, tokens.size() - 1);
+        int index = rand.NextU32(1, tokens.size() - 1);
         auto iter = tokens.begin() + index;
         tokens.erase(iter);
     }
     else {
         //Add a token!    
-        int index = rand.nextU32(1, tokens.size());
+        int index = rand.NextU32(1, tokens.size());
         auto iter = tokens.begin() + index;
-        std::string token = std::to_string(rand.nextU32(0, 10));
+        std::string token = std::to_string(rand.NextU32(0, 10));
         tokens.insert(iter, token);
     }
 
-    if (rand.nextDouble(0, 1) > 0.5) {    //X% chance to corrupt the already corrupted vector again.
+    if (rand.NextPsrng(UINT32_MAX / 2)) {
         corruptTokenizedVectorInPlace(rand, tokens);
     }
 }
@@ -343,7 +341,7 @@ std::vector<CommandWithTarget> CreateCommands(int amount, u32 seed, u32 amountOf
         if (!onlyValidCommands) {
             command = corruptCommand(monkeyRand, command);
         }
-        int target = monkeyRand.nextU32(0, amountOfNodes);
+        int target = monkeyRand.NextU32(0, amountOfNodes);
         retVal.push_back({command, target, 1});
     }
     return retVal;

@@ -24,6 +24,17 @@
 
 #include <stdint.h>
 
+
+
+
+class MersenneTwisterDisabler {
+public:
+    static inline int disableLevel = 0;
+
+    MersenneTwisterDisabler();
+    ~MersenneTwisterDisabler();
+};
+
 class MersenneTwister
 {
 private:
@@ -47,8 +58,8 @@ private:
     uint32_t m_mt[N]{};
     uint32_t m_seed = 0;
 
-    void twistIteration(uint32_t i);
-    void twist();
+    void TwistIteration(uint32_t i);
+    void Twist();
 
 public:
     static inline uint32_t seedOffset = 0;
@@ -56,14 +67,13 @@ public:
     MersenneTwister();
     explicit MersenneTwister(uint32_t seed);
 
-    void setSeed(uint32_t seed);
+    void SetSeed(uint32_t seed);
 
-    uint32_t nextU32();
-    double nextDouble();
+    uint32_t NextU32();
 
-    uint32_t nextU32(uint32_t min, uint32_t max);
-    double nextDouble(double min, double max);
-    double nextNormal(double mean, double sigma);
+    uint32_t NextU32(uint32_t min, uint32_t max);
+
+    bool NextPsrng(uint32_t probability);
 };
 
 

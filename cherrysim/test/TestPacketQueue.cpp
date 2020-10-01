@@ -28,7 +28,7 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
-#include <types.h>
+#include <FmTypes.h>
 #include <CherrySimTester.h>
 #include <PacketQueue.h>
 #include <Utility.h>

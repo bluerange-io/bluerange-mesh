@@ -39,7 +39,7 @@
 
 #include <Utility.h>
 
-GAPController & GAPController::getInstance()
+GAPController & GAPController::GetInstance()
 {
     return GS->gapController;
 }
@@ -52,7 +52,7 @@ GAPController & GAPController::getInstance()
 //        Device name
 //        Appearance
 //        Peripheral Preferred Connection Parameters
-void GAPController::bleConfigureGAP() const{
+void GAPController::BleConfigureGAP() const{
     ErrorType err = ErrorType::SUCCESS;
     //Set up an open link write permission
     //There are multiple security modes defined in the BLE spec
@@ -73,8 +73,8 @@ void GAPController::bleConfigureGAP() const{
     FruityHal::BleGapConnParams gapConnectionParams;
     CheckedMemset(&gapConnectionParams, 0, sizeof(gapConnectionParams));
 
-    gapConnectionParams.minConnInterval = Conf::getInstance().meshMinConnectionInterval;
-    gapConnectionParams.maxConnInterval = Conf::getInstance().meshMaxConnectionInterval;
+    gapConnectionParams.minConnInterval = Conf::GetInstance().meshMinConnectionInterval;
+    gapConnectionParams.maxConnInterval = Conf::GetInstance().meshMaxConnectionInterval;
     gapConnectionParams.slaveLatency = Conf::meshPeripheralSlaveLatency;
     gapConnectionParams.connSupTimeout = Conf::meshConnectionSupervisionTimeout;
     err = FruityHal::BleGapConnectionPreferredParamsSet(gapConnectionParams);
@@ -82,7 +82,7 @@ void GAPController::bleConfigureGAP() const{
 }
 
 //Connect to a specific peripheral
-ErrorType GAPController::connectToPeripheral(const FruityHal::BleGapAddr &address, u16 connectionInterval, u16 timeout) const
+ErrorType GAPController::ConnectToPeripheral(const FruityHal::BleGapAddr &address, u16 connectionInterval, u16 timeout) const
 {
     ErrorType err = ErrorType::SUCCESS;
 
@@ -104,7 +104,7 @@ ErrorType GAPController::connectToPeripheral(const FruityHal::BleGapAddr &addres
     err = FruityHal::BleGapConnect(address, scanParams, connectionParams);
     if(err != ErrorType::SUCCESS){
         logt("WARNING", "GATT connect fail %d", (u8)err);
-        GS->logger.logCustomCount(CustomErrorTypes::COUNT_GATT_CONNECT_FAILED);
+        GS->logger.LogCustomCount(CustomErrorTypes::COUNT_GATT_CONNECT_FAILED);
         //Just ignore it, the connection will not happen
         return err;
     }
@@ -116,8 +116,8 @@ ErrorType GAPController::connectToPeripheral(const FruityHal::BleGapAddr &addres
 
 void GAPController::GapDisconnectedEventHandler(const FruityHal::GapDisconnectedEvent & disconnectEvent)
 {
-    logt("C", "Disconnected device %d", (u8)disconnectEvent.getReason());
-    ConnectionManager::getInstance().GapConnectionDisconnectedHandler(disconnectEvent);
+    logt("C", "Disconnected device %d", (u8)disconnectEvent.GetReason());
+    ConnectionManager::GetInstance().GapConnectionDisconnectedHandler(disconnectEvent);
 }
 
 void GAPController::GapConnectedEventHandler(const FruityHal::GapConnectedEvent & connvectedEvent)
@@ -125,14 +125,14 @@ void GAPController::GapConnectedEventHandler(const FruityHal::GapConnectedEvent 
     logt("C", "Connected device");
 
     //Connection stops advertising
-    ConnectionManager::getInstance().GapConnectionConnectedHandler(connvectedEvent);
+    ConnectionManager::GetInstance().GapConnectionConnectedHandler(connvectedEvent);
 }
 
 void GAPController::GapTimeoutEventHandler(const FruityHal::GapTimeoutEvent& gapTimeoutEvent)
 {
-    if (gapTimeoutEvent.getSource() == FruityHal::GapTimeoutSource::CONNECTION)
+    if (gapTimeoutEvent.GetSource() == FruityHal::GapTimeoutSource::CONNECTION)
     {
-        ConnectionManager::getInstance().GapConnectingTimeoutHandler(gapTimeoutEvent);
+        ConnectionManager::GetInstance().GapConnectingTimeoutHandler(gapTimeoutEvent);
     }
 }
 
@@ -155,7 +155,7 @@ void GAPController::GapSecurityInfoRequestEvenetHandler(const FruityHal::GapSecu
 
         //Reply  with our stored key
         const ErrorType err = FruityHal::BleGapSecInfoReply(
-            securityInfoRequestEvent.getConnectionHandle(),
+            securityInfoRequestEvent.GetConnectionHandle(),
             &key, //This is our stored long term key
             nullptr, //We do not have an identity resolving key
             nullptr //We do not have signing info
@@ -163,7 +163,7 @@ void GAPController::GapSecurityInfoRequestEvenetHandler(const FruityHal::GapSecu
 
         if (err != ErrorType::SUCCESS)
         {
-            GS->logger.logCustomError(CustomErrorTypes::WARN_GAP_SEC_INFO_REPLY_FAILED, (u32)err);
+            GS->logger.LogCustomError(CustomErrorTypes::WARN_GAP_SEC_INFO_REPLY_FAILED, (u32)err);
         }
 
         logt("SEC", "SEC_INFO_REQUEST received, replying with key %02x:%02x:%02x...%02x:%02x", 
@@ -171,10 +171,10 @@ void GAPController::GapSecurityInfoRequestEvenetHandler(const FruityHal::GapSecu
     }
     else {
         logt("SEC", "No Encryption available");
-        const ErrorType err = FruityHal::Disconnect(securityInfoRequestEvent.getConnectionHandle(), FruityHal::BleHciError::REMOTE_USER_TERMINATED_CONNECTION);
+        const ErrorType err = FruityHal::Disconnect(securityInfoRequestEvent.GetConnectionHandle(), FruityHal::BleHciError::REMOTE_USER_TERMINATED_CONNECTION);
         if (err != ErrorType::SUCCESS)
         {
-            GS->logger.logCustomError(CustomErrorTypes::WARN_GAP_SEC_DISCONNECT_FAILED, (u32)err);
+            GS->logger.LogCustomError(CustomErrorTypes::WARN_GAP_SEC_DISCONNECT_FAILED, (u32)err);
         }
     }
 }
@@ -182,17 +182,17 @@ void GAPController::GapSecurityInfoRequestEvenetHandler(const FruityHal::GapSecu
 void GAPController::GapConnectionSecurityUpdateEventHandler(const FruityHal::GapConnectionSecurityUpdateEvent &connectionSecurityUpdateEvent)
 {
     //This event tells us that the security keys are now in use
-    u8 keySize = connectionSecurityUpdateEvent.getKeySize();
+    u8 keySize = connectionSecurityUpdateEvent.GetKeySize();
 
-    FruityHal::SecurityLevel level = connectionSecurityUpdateEvent.getSecurityLevel();
-    FruityHal::SecurityMode securityMode = connectionSecurityUpdateEvent.getSecurityMode();
+    FruityHal::SecurityLevel level = connectionSecurityUpdateEvent.GetSecurityLevel();
+    FruityHal::SecurityMode securityMode = connectionSecurityUpdateEvent.GetSecurityMode();
 
     logt("SEC", "Connection key is now %u bytes, level %u, securityMode %u", keySize, (u8)level, (u8)securityMode);
 
-    ConnectionManager::getInstance().GapConnectionEncryptedHandler(connectionSecurityUpdateEvent);
+    ConnectionManager::GetInstance().GapConnectionEncryptedHandler(connectionSecurityUpdateEvent);
 }
 
-void GAPController::startEncryptingConnection(u16 connectionHandle) const
+void GAPController::StartEncryptingConnection(u16 connectionHandle) const
 {
     //Key identification data
     //We do not need a key identification currently, because we only have one

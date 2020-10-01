@@ -106,7 +106,7 @@ TEST_F(TestRecordStorage, TestCleanup) {
 
     RepairPages();
 
-    cherrySimInstance->sim_commit_flash_operations();
+    cherrySimInstance->SimCommitFlashOperations();
 
     //Check if success
     for (int i = 0; i < numPages; i++) {
@@ -130,7 +130,7 @@ TEST_F(TestRecordStorage, TestCleanup) {
 
     RepairPages();
 
-    cherrySimInstance->sim_commit_flash_operations();
+    cherrySimInstance->SimCommitFlashOperations();
 
     //Check if success
     for (int i = 0; i < numPages; i++) {
@@ -155,7 +155,7 @@ TEST_F(TestRecordStorage, TestCleanup) {
     
     RepairPages();
 
-    cherrySimInstance->sim_commit_flash_operations();
+    cherrySimInstance->SimCommitFlashOperations();
 
     //Check if success
     for (int i = 1; i < numPages; i++) {
@@ -183,7 +183,7 @@ TEST_F(TestRecordStorage, TestSave) {
     CheckedMemset(startPage, 0xff, numPages*FruityHal::GetCodePageSize());
     RepairPages();
 
-    cherrySimInstance->sim_commit_flash_operations();
+    cherrySimInstance->SimCommitFlashOperations();
 
     logt("WARNING", "---- TEST SAVE ----");
 
@@ -191,7 +191,7 @@ TEST_F(TestRecordStorage, TestSave) {
     u8 data[] = { 1,2,3,4,5,6,7,8 };
     GS->recordStorage.SaveRecord(1, data, 8, nullptr,0);
 
-    cherrySimInstance->sim_commit_flash_operations();
+    cherrySimInstance->SimCommitFlashOperations();
 
     SizedData dataB = GS->recordStorage.GetRecordData(1);
 
@@ -204,7 +204,7 @@ TEST_F(TestRecordStorage, TestSave) {
     u8 data2[] = { 1,2,3,4,5,6,7,8 };
     GS->recordStorage.SaveRecord(2, data2, 8, nullptr, 0);
 
-    cherrySimInstance->sim_commit_flash_operations();
+    cherrySimInstance->SimCommitFlashOperations();
 
     SizedData data2B = GS->recordStorage.GetRecordData(2);
 
@@ -219,7 +219,7 @@ TEST_F(TestRecordStorage, TestSave) {
     u8 data3[] = { 1,2,3,4 };
     GS->recordStorage.SaveRecord(1, data, 4, nullptr, 0);
 
-    cherrySimInstance->sim_commit_flash_operations();
+    cherrySimInstance->SimCommitFlashOperations();
 
     SizedData data3B = GS->recordStorage.GetRecordData(1);
 
@@ -241,7 +241,7 @@ TEST_F(TestRecordStorage, TestRandomSingleRecordUpdates) {
     CheckedMemset(startPage, 0xff, numPages*FruityHal::GetCodePageSize());
     RepairPages();
 
-    cherrySimInstance->sim_commit_flash_operations();
+    cherrySimInstance->SimCommitFlashOperations();
 
     //Save record 1
     u8 data[500];
@@ -254,7 +254,7 @@ TEST_F(TestRecordStorage, TestRandomSingleRecordUpdates) {
 
         GS->recordStorage.SaveRecord(8, data, length, nullptr, 0);
 
-        cherrySimInstance->sim_commit_flash_operations();
+        cherrySimInstance->SimCommitFlashOperations();
 
         //Check if we can read back the correct record
         SizedData dataB = GS->recordStorage.GetRecordData(8);
@@ -307,7 +307,7 @@ TEST_F(TestRecordStorage, TestDeactivateRecord) {
     CheckedMemset(startPage, 0xff, numPages*FruityHal::GetCodePageSize());
     RepairPages();
 
-    cherrySimInstance->sim_commit_flash_operations();
+    cherrySimInstance->SimCommitFlashOperations();
 
     logt("WARNING", "---- TEST DEACTIVATE RECORD ----");
 
@@ -325,7 +325,7 @@ TEST_F(TestRecordStorage, TestDeactivateRecord) {
     GS->recordStorage.DeactivateRecord(5, nullptr, 0);
 
     //Committing done after all three steps are queued to test async
-    cherrySimInstance->sim_commit_flash_operations();
+    cherrySimInstance->SimCommitFlashOperations();
 
     //Record must still be valid
     RecordStorageRecord* record = GS->recordStorage.GetRecord(5);
@@ -343,7 +343,7 @@ TEST_F(TestRecordStorage, TestDeactivateRecord) {
     //Defragment the page
     DefragmentPage(usedPage, false);
 
-    cherrySimInstance->sim_commit_flash_operations();
+    cherrySimInstance->SimCommitFlashOperations();
 
     //There should be no record on that page anymore
     RecordStorageRecord* firstRecord = (RecordStorageRecord*)usedPage->data;
@@ -371,7 +371,7 @@ TEST_F(TestRecordStorage, TestFlashBusy) {
     CheckedMemset(startPage, 0xff, numPages*FruityHal::GetCodePageSize());
     RepairPages();
 
-    cherrySimInstance->sim_commit_flash_operations();
+    cherrySimInstance->SimCommitFlashOperations();
 
     logt("WARNING", "---- TEST SINGLE FLASH BUSY FAIL WILL WORK ----");
 
@@ -382,7 +382,7 @@ TEST_F(TestRecordStorage, TestFlashBusy) {
     GS->recordStorage.SaveRecord(5, data, 8, this, 1);
 
     u8 failData[] = { 1,0,0,0,0,0,0,0,0,0 };
-    cherrySimInstance->sim_commit_some_flash_operations(failData, 10);
+    cherrySimInstance->SimCommitSomeFlashOperations(failData, 10);
 
     RecordStorageRecord* record = GS->recordStorage.GetRecord(5);
     if (!IsRecordValid(usedPage, record))
@@ -395,7 +395,7 @@ TEST_F(TestRecordStorage, TestFlashBusy) {
     GS->recordStorage.SaveRecord(6, data, 8, this, 2);
 
     u8 failData2[] = { 1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0 };
-    cherrySimInstance->sim_commit_some_flash_operations(failData2, sizeof(failData2));
+    cherrySimInstance->SimCommitSomeFlashOperations(failData2, sizeof(failData2));
 
     RecordStorageRecord* record2 = GS->recordStorage.GetRecord(6);
     if (!IsRecordValid(usedPage, record2))
@@ -413,7 +413,7 @@ TEST_F(TestRecordStorage, TestAsyncQueuing) {
     CheckedMemset(startPage, 0xff, numPages*FruityHal::GetCodePageSize());
     RepairPages(); 
 
-    cherrySimInstance->sim_commit_flash_operations();
+    cherrySimInstance->SimCommitFlashOperations();
 
     logt("WARNING", "---- TEST ASYNC QUEUING ----");
 
@@ -448,7 +448,7 @@ TEST_F(TestRecordStorage, TestAsyncQueuing) {
     logt("WARNING", "Queued %u items", i);
 
     //Committing done after all three steps are queued to test async
-    cherrySimInstance->sim_commit_flash_operations();
+    cherrySimInstance->SimCommitFlashOperations();
 
     //Record 2 must not be deactivated
     if (GS->recordStorage.GetRecord(2) == nullptr) {
@@ -498,7 +498,7 @@ TEST_F(TestRecordStorage, TestRandomMultiRecordUpdates) {
         GS->recordStorage.SaveRecord(randomRecordId, data, length, nullptr, 0);
 
 
-        cherrySimInstance->sim_commit_flash_operations();
+        cherrySimInstance->SimCommitFlashOperations();
 
         //Check if we can read all records back in their latest version
         for (int i = 0; i < MULTI_RECORD_TEST_NUM_RECORD_IDS; i++) {

@@ -47,6 +47,7 @@ endif::[]
 ** xref:fruitymesh::EnrollmentModule.adoc[EnrollmentModule]
 ** xref:fruitymesh::IoModule.adoc[IoModule]
 ** xref:fruitymesh::MeshAccessModule.adoc[MeshAccessModule]
+** xref:fruitymesh::MeshAccessConnection.adoc[MeshAccessConnection]
 ** xref:fruitymesh::ScanningModule.adoc[ScanningModule]
 ** xref:fruitymesh::StatusReporterModule.adoc[StatusReportModule]
 
@@ -64,5 +65,3 @@ endif::[]
 * Tutorials
 ** xref:fruitymesh::Tutorials.adoc[Tutorial Overview]
 ** xref:fruitymesh::Implementing-a-Custom-Module.adoc[Implementing a Custom Module]
-
-* xref:fruitymesh::FAQ.adoc[FAQ]

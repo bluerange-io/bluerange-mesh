@@ -35,7 +35,7 @@ ModuleAllocator::ModuleAllocator()
     // do nothing.
 }
 
-void ModuleAllocator::setMemory(u8 * block, u32 size)
+void ModuleAllocator::SetMemory(u8 * block, u32 size)
 {
     if (this->currentDataPtr != nullptr)
     {
@@ -47,12 +47,12 @@ void ModuleAllocator::setMemory(u8 * block, u32 size)
     CheckedMemset(block, 0, size);
 }
 
-u32 ModuleAllocator::getMemorySize()
+u32 ModuleAllocator::GetMemorySize()
 {
     return this->startSize;
 }
 
-void * ModuleAllocator::allocateMemory(u32 size)
+void * ModuleAllocator::AllocateMemory(u32 size)
 {
     if (sizeLeft < size)
     {

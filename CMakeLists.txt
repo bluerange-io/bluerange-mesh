@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16.3 FATAL_ERROR)
 
 if("${CMAKE_BINARY_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
-  message(FATAL_ERROR "In-Source Build is prohibited. Please execute cmake from a different directory, e.g. the build directory. NOTE: Delete everything that was just created by CMake: CMakeFiles & CMakeCache.txt")
+  message(FATAL_ERROR "In-Source Build is prohibited. Please execute cmake from a different directory, e.g. the build directory. NOTE: Delete everything that was just created by CMake. Best to use git reset --hard to reset the repository in a state how it was cloned, otherwhise this error might persist.")
 endif()
 
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type")

@@ -34,7 +34,7 @@
 #include "Logger.h"
 
 //This is a macro rather than a function so that SIMEXCEPTION still has access to the LINE.
-#define DEFAULT_CONNECTION_HANDLE_ERROR_HANDLING() Logger::getInstance().logCustomCount(CustomErrorTypes::COUNT_ACCESS_TO_REMOVED_CONNECTION); SIMEXCEPTION(AccessToRemovedConnectionException);
+#define DEFAULT_CONNECTION_HANDLE_ERROR_HANDLING() Logger::GetInstance().LogCustomCount(CustomErrorTypes::COUNT_ACCESS_TO_REMOVED_CONNECTION); SIMEXCEPTION(AccessToRemovedConnectionException);
 
 template<typename T>
  T* BaseConnectionHandle::GetMutableConnection() const
@@ -112,7 +112,7 @@ bool BaseConnectionHandle::IsHandshakeDone()
     BaseConnection* con = GetConnection();
     if (con)
     {
-        return con->handshakeDone();
+        return con->HandshakeDone();
     }
     else
     {
@@ -314,7 +314,7 @@ ClusterSize MeshConnectionHandle::GetHopsToSink()
     MeshConnection* con = GetConnection();
     if (con)
     {
-        return con->getHopsToSink();
+        return con->GetHopsToSink();
     }
     else
     {
@@ -328,7 +328,7 @@ bool MeshConnectionHandle::SetHopsToSink(ClusterSize hops)
     MeshConnection* con = GetConnection();
     if (con)
     {
-        con->setHopsToSink(hops);
+        con->SetHopsToSink(hops);
         return true;
     }
     else

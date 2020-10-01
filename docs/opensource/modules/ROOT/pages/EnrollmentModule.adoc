@@ -4,13 +4,13 @@
 
 The _EnrollmentModule_ has _ModuleId_ 5. New nodes are normally flashed without a `networkId` assigned (set to 0). This means they will not connect to a mesh as long as they are not enrolled. The term enrolled is used in synonym with provisioned or commisioned.
 
-In order to assign a node to a mesh, the user has to give a `networkId`, the `networkKey` and a unique `nodeId` for this mesh. This can be done by a MeshGateway or a dedicated enrollment app. The enrollment packet should be sent to the broadcast address 0 and must contain to serial number of the node to be enrolled.
+In order to assign a node to a mesh, the user has to give a `networkId`, the `networkKey` and a unique `nodeId` for this mesh. This can be done by a MeshGateway or a dedicated enrollment app. The enrollment packet should be sent to the broadcast address 0 and must contain to xref:Specification.adoc#SerialNumbers[serial number] of the node to be enrolled.
 
 == Functionality
 
 === Enrolling Over The Mesh
 
-The _EnrollmentModule_ supports enrollments over the mesh. A normal enrollment message is sent as a broadcast through the mesh together with the `nodeKey` of the node that should be enrolled. All receiving nodes of this message try - at a certain random percentage - to scan for this node. They temporarily store the enrollment data and connect to the node once it is found and enroll it. Also, at a certain random percentage, the node sends an enrollment proposal through the mesh that contains some nearby serial numbers that the MeshGateway might like to enroll.
+The _EnrollmentModule_ supports enrollments over the mesh. A normal enrollment message is sent as a broadcast through the mesh together with the `nodeKey` of the node that should be enrolled. All receiving nodes of this message try - at a certain random percentage - to scan for this node. They temporarily store the enrollment data and connect to the node once it is found and enroll it. Also, at a certain random percentage, the node sends an enrollment proposal through the mesh that contains some nearby xref:Specification.adoc#SerialNumbers[serial numbers] that the MeshGateway might like to enroll.
 
 If the message is sent to a specific `nodeId`, this node will try to scan for the other node with a 100 percent probability. This is useful if the nodes position is already known, e.g. by parsing an enrollment proposal.
 
@@ -90,7 +90,7 @@ action 0 enroll set_network 12
 ----
 
 === Requesting specific proposals
-In some situations (e.g. when the nodes are placed in a line) it can be helpful to specifically query which node sees which serial numbers before sending the enrollment. Therefore, it is possible to send the request_proposals message with several serialNumbers that are then temporarily stored on the target node. The target node will respond with a proposal message as soon as it receives a broadcast message of one of the nodes to be enrolled.
+In some situations (e.g. when the nodes are placed in a line) it can be helpful to specifically query which node sees which xref:Specification.adoc#SerialNumbers[serial numbers] before sending the enrollment. Therefore, it is possible to send the request_proposals message with several xref:Specification.adoc#SerialNumbers[serial numbers] that are then temporarily stored on the target node. The target node will respond with a proposal message as soon as it receives a broadcast message of one of the nodes to be enrolled.
 [source, C++]
 ----
 //Query which node sees which serial numbers
@@ -102,7 +102,7 @@ action 0 enroll request_proposals BBBBD BBBBF BBBBG BBBBH BBBBJ BBBBK BBBBL BBBB
 action 0 enroll request_proposals BBZ3F ZZZZZ ZFGBB
 ----
 
-The nodes then scan for one minute if they see any of the specified serial numbers. Upon arrival, the message is answered with the following JSON (1 JSON per serial number):
+The nodes then scan for one minute if they see any of the specified xref:Specification.adoc#SerialNumbers[serial numbers]. Upon arrival, the message is answered with the following JSON (1 JSON per xref:Specification.adoc#SerialNumbers[serial number]):
 [source]
 ----
 {
@@ -138,7 +138,7 @@ actionType: SET_ENROLLMENT
 |===
 |Bytes|Type|Description
 |8|xref:Specification.adoc#connPacketModule[connPacketModule]|
-|4|serialNumberIndex|Index of the serial number to be enrolled
+|4|serialNumberIndex|Index of the xref:Specification.adoc#SerialNumbers[serial number] to be enrolled
 |2|newNodeId|The new node id that should be assigned to this node (Set to 0 to leave unchanged)
 |2|newNetworkId|The new network id to be assigned (Set to 0 to leave unchanged)
 |16|newNetworkKey|The network encryption key to be used (Set to 000....000 to leave unchanged)
@@ -166,20 +166,20 @@ actionType: `ENROLLMENT_RESPONSE`
 |===
 |Bytes|Type|Description
 |8|xref:Specification.adoc#connPacketModule[connPacketModule]|
-|4|serialNumberIndex|Index of the serial number that was enrolled
+|4|serialNumberIndex|Index of the xref:Specification.adoc#SerialNumbers[serial number] that was enrolled
 |1|result|See above for possible result codes
 |===
 ==== Response
-Randomly and if available, a node might respond with an enrollment proposal that contains a number of nearby serialNumberIndexes. If the MeshGateway wants to enroll one of these nodes, it can send a directed message to this node to enroll the other nearby node. If a serialNumberIndex is 0, there were not enough nodes around or not yet scanned.
+Randomly and if available, a node might respond with an enrollment proposal that contains a number of nearby xref:Specification.adoc#SerialNumbers[serialNumberIndexes]. If the MeshGateway wants to enroll one of these nodes, it can send a directed message to this node to enroll the other nearby node. If a xref:Specification.adoc#SerialNumbers[serialNumberIndex] is 0, there were not enough nodes around or not yet scanned.
 
 actionType: `ENROLLMENT_PROPOSAL`
 [cols="1,2,3"]
 |===
 |Bytes|Type|Description
 |8|xref:Specification.adoc#connPacketModule[connPacketModule]	|
-|4|serialNumberIndex[0]|nearby node serial number index
-|4|serialNumberIndex[1]|nearby node serial number index
-|4|serialNumberIndex[2]|nearby node serial number index
+|4|serialNumberIndex[0]|nearby node xref:Specification.adoc#SerialNumbers[serial number index]
+|4|serialNumberIndex[1]|nearby node xref:Specification.adoc#SerialNumbers[serial number index]
+|4|serialNumberIndex[2]|nearby node xref:Specification.adoc#SerialNumbers[serial number index]
 |===
 
 === Remove an Enrollment
@@ -189,7 +189,7 @@ actionType: `REMOVE_ENROLLMENT`
 |===
 |Bytes|Type|Description
 |8|xref:Specification.adoc#connPacketModule[connPacketModule]	|
-|4|serialNumberIndex|Index of the serial number to be enrolled
+|4|serialNumberIndex|Index of the xref:Specification.adoc#SerialNumbers[serial number] to be enrolled
 |===
 ==== Response
 The result of removing an enrollment:
@@ -205,7 +205,7 @@ actionType: `REMOVE_ENROLLMENT_RESPONSE`
 |===
 |Bytes|Type|Description
 |8|xref:Specification.adoc#connPacketModule[connPacketModule]|
-|4|serialNumberIndex|Index of the serial number that was enrolled
+|4|serialNumberIndex|Index of the xref:Specification.adoc#SerialNumbers[serial number] that was enrolled
 |1|result|See above for possible result codes
 |===
 
@@ -216,7 +216,7 @@ actionType: `REQUEST_PROPOSALS (4)`
 |===
 |Bytes|Type|Description
 |8|xref:Specification.adoc#connPacketModule[connPacketModule]	|
-|4 - 44|serialNumberIndices|Up to 11 serial indices.
+|4 - 44|serialNumberIndices|Up to 11 xref:Specification.adoc#SerialNumbers[serial indices].
 |===
 ==== Response
 actionType: `REQUEST_PROPOSALS_RESPONSE (4)`
@@ -224,5 +224,5 @@ actionType: `REQUEST_PROPOSALS_RESPONSE (4)`
 |===
 |Bytes|Type|Description
 |8|xref:Specification.adoc#connPacketModule[connPacketModule]|
-|4|serialNumberIndex|The serial index that was possible to scan.
+|4|serialNumberIndex|The xref:Specification.adoc#SerialNumbers[serial index] that was possible to scan.
 |===

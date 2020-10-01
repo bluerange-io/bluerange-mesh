@@ -45,15 +45,15 @@ TEST(TestLogger, TestTags) {
 
     NodeIndexSetter setter(0);
     auto tag = "TEST123";
-    ASSERT_FALSE(Logger::getInstance().IsTagEnabled(tag));
-    Logger::getInstance().enableTag(tag);
-    ASSERT_TRUE (Logger::getInstance().IsTagEnabled(tag));
-    Logger::getInstance().disableTag(tag);
-    ASSERT_FALSE(Logger::getInstance().IsTagEnabled(tag));
-    Logger::getInstance().toggleTag(tag);
-    ASSERT_TRUE (Logger::getInstance().IsTagEnabled(tag));
-    Logger::getInstance().toggleTag(tag);
-    ASSERT_FALSE(Logger::getInstance().IsTagEnabled(tag));
+    ASSERT_FALSE(Logger::GetInstance().IsTagEnabled(tag));
+    Logger::GetInstance().EnableTag(tag);
+    ASSERT_TRUE (Logger::GetInstance().IsTagEnabled(tag));
+    Logger::GetInstance().DisableTag(tag);
+    ASSERT_FALSE(Logger::GetInstance().IsTagEnabled(tag));
+    Logger::GetInstance().ToggleTag(tag);
+    ASSERT_TRUE (Logger::GetInstance().IsTagEnabled(tag));
+    Logger::GetInstance().ToggleTag(tag);
+    ASSERT_FALSE(Logger::GetInstance().IsTagEnabled(tag));
 }
 
 TEST(TestLogger, TestParseHexStringToBuffer) 
@@ -63,7 +63,7 @@ TEST(TestLogger, TestParseHexStringToBuffer)
         u8 buffer[1024];
         u8 prediction[] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF };
 
-        ASSERT_EQ(Logger::parseEncodedStringToBuffer(string, buffer, sizeof(buffer)), 16);
+        ASSERT_EQ(Logger::ParseEncodedStringToBuffer(string, buffer, sizeof(buffer)), 16);
         for (size_t i = 0; i < sizeof(prediction); i++)
         {
             ASSERT_EQ(buffer[i], prediction[i]);
@@ -75,7 +75,7 @@ TEST(TestLogger, TestParseHexStringToBuffer)
         u8 buffer[1024];
         u8 prediction[] = { 0xAA };
 
-        ASSERT_EQ(Logger::parseEncodedStringToBuffer(string, buffer, sizeof(buffer)), 1);
+        ASSERT_EQ(Logger::ParseEncodedStringToBuffer(string, buffer, sizeof(buffer)), 1);
         for (size_t i = 0; i < sizeof(prediction); i++)
         {
             ASSERT_EQ(buffer[i], prediction[i]);
@@ -86,7 +86,7 @@ TEST(TestLogger, TestParseHexStringToBuffer)
         auto string = "";
         u8 buffer[1024] = {};
 
-        ASSERT_EQ(Logger::parseEncodedStringToBuffer(string, buffer, sizeof(buffer)), 0);
+        ASSERT_EQ(Logger::ParseEncodedStringToBuffer(string, buffer, sizeof(buffer)), 0);
         for (size_t i = 0; i < sizeof(buffer); i++)
         {
             ASSERT_EQ(buffer[i], 0);
@@ -125,48 +125,48 @@ TEST(TestLogger, TestBase64StringToBuffer)
     CheckedMemset(buffer, 0, sizeof(buffer));
 
     base64 = "Qg==";
-    ASSERT_EQ(Logger::parseEncodedStringToBuffer(base64.c_str(), buffer, sizeof(buffer)), 1);
+    ASSERT_EQ(Logger::ParseEncodedStringToBuffer(base64.c_str(), buffer, sizeof(buffer)), 1);
     ASSERT_STREQ((char*)buffer, "B");
     CheckedMemset(buffer, 0, sizeof(buffer));
 
     base64 = "QlI=";
-    ASSERT_EQ(Logger::parseEncodedStringToBuffer(base64.c_str(), buffer, sizeof(buffer)), 2);
+    ASSERT_EQ(Logger::ParseEncodedStringToBuffer(base64.c_str(), buffer, sizeof(buffer)), 2);
     ASSERT_STREQ((char*)buffer, "BR");
     CheckedMemset(buffer, 0, sizeof(buffer));
 
     base64 = "QlJU";
-    ASSERT_EQ(Logger::parseEncodedStringToBuffer(base64.c_str(), buffer, sizeof(buffer)), 3);
+    ASSERT_EQ(Logger::ParseEncodedStringToBuffer(base64.c_str(), buffer, sizeof(buffer)), 3);
     ASSERT_STREQ((char*)buffer, "BRT");
     CheckedMemset(buffer, 0, sizeof(buffer));
 
     base64 = "QlJUQw==";
-    ASSERT_EQ(Logger::parseEncodedStringToBuffer(base64.c_str(), buffer, sizeof(buffer)), 4);
+    ASSERT_EQ(Logger::ParseEncodedStringToBuffer(base64.c_str(), buffer, sizeof(buffer)), 4);
     ASSERT_STREQ((char*)buffer, "BRTC");
     CheckedMemset(buffer, 0, sizeof(buffer));
 
     base64 = "QlJUQ1I=";
-    ASSERT_EQ(Logger::parseEncodedStringToBuffer(base64.c_str(), buffer, sizeof(buffer)), 5);
+    ASSERT_EQ(Logger::ParseEncodedStringToBuffer(base64.c_str(), buffer, sizeof(buffer)), 5);
     ASSERT_STREQ((char*)buffer, "BRTCR");
     CheckedMemset(buffer, 0, sizeof(buffer));
 
     base64 = "QlJUQ1I=";
-    ASSERT_EQ(Logger::parseEncodedStringToBuffer(base64.c_str(), buffer, 5), 5);
+    ASSERT_EQ(Logger::ParseEncodedStringToBuffer(base64.c_str(), buffer, 5), 5);
     ASSERT_STREQ((char*)buffer, "BRTCR");
     CheckedMemset(buffer, 0, sizeof(buffer));
 
     {
         Exceptions::DisableDebugBreakOnException disable;
         base64 = "Malformed";
-        ASSERT_THROW(Logger::parseEncodedStringToBuffer(base64.c_str(), buffer, sizeof(buffer)), IllegalArgumentException);
+        ASSERT_THROW(Logger::ParseEncodedStringToBuffer(base64.c_str(), buffer, sizeof(buffer)), IllegalArgumentException);
         CheckedMemset(buffer, 0, sizeof(buffer));
 
         base64 = "TooBig==";
-        ASSERT_THROW(Logger::parseEncodedStringToBuffer(base64.c_str(), buffer, 0), BufferTooSmallException);
+        ASSERT_THROW(Logger::ParseEncodedStringToBuffer(base64.c_str(), buffer, 0), BufferTooSmallException);
         ASSERT_STREQ((char*)buffer, "");
         CheckedMemset(buffer, 0, sizeof(buffer));
 
         base64 = "VGhpcyBpcyB0b28gbG9uZyBidXQgcGFydHMgd2lsbCByZW1haW4gLSBvaCBoaSB0aGVyZSB5b3UgY2xldmVyIGd1eSEgIDotKQ==";
-        ASSERT_THROW(Logger::parseEncodedStringToBuffer(base64.c_str(), buffer, 34), BufferTooSmallException);
+        ASSERT_THROW(Logger::ParseEncodedStringToBuffer(base64.c_str(), buffer, 34), BufferTooSmallException);
         ASSERT_STREQ((char*)buffer, "This is too long but parts will re");
     }
 
@@ -174,34 +174,34 @@ TEST(TestLogger, TestBase64StringToBuffer)
     char encodeBuffer[1024];
 
     data = "B";
-    Logger::convertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
+    Logger::ConvertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
     ASSERT_STREQ(encodeBuffer, "Qg==");
 
     data = "BR";
-    Logger::convertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
+    Logger::ConvertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
     ASSERT_STREQ(encodeBuffer, "QlI=");
 
     data = "BRT";
-    Logger::convertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
+    Logger::ConvertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
     ASSERT_STREQ(encodeBuffer, "QlJU");
 
     data = "BRTC";
-    Logger::convertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
+    Logger::ConvertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
     ASSERT_STREQ(encodeBuffer, "QlJUQw==");
 
     data = "BRTCR";
-    Logger::convertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
+    Logger::ConvertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, sizeof(encodeBuffer));
     ASSERT_STREQ(encodeBuffer, "QlJUQ1I=");
 
     {
         Exceptions::DisableDebugBreakOnException disable;
         data = "BRTCR";
-        ASSERT_THROW(Logger::convertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, 5), BufferTooSmallException);
+        ASSERT_THROW(Logger::ConvertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, 5), BufferTooSmallException);
 
         Exceptions::ExceptionDisabler<BufferTooSmallException> btsDisabler;
         data = "BRTCR";
         fillMemoryGuard((u8*)(encodeBuffer + 5), sizeof(encodeBuffer) - 5);
-        Logger::convertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, 5);
+        Logger::ConvertBufferToBase64String((const u8*)data.c_str(), data.size(), encodeBuffer, 5);
         checkMemoryGuard((const u8*)(encodeBuffer + 5), sizeof(encodeBuffer) - 5);
         ASSERT_STREQ(encodeBuffer, "QlJU");
     }
@@ -234,10 +234,10 @@ TEST(TestLogger, TestBase64StringToBuffer)
     for (u32 i = 0; i < 1024 * 2; i++) {
         u32 dataLength = (i + 1) % 1024;
         for (u32 k = 0; k < dataLength; k++) {
-            td.dataBuffer[k] = (u8)mt.nextU32(0, 255);
+            td.dataBuffer[k] = (u8)mt.NextU32(0, 255);
         }
-        Logger::convertBufferToBase64String(td.dataBuffer, dataLength, td.base64Buffer, sizeof(td.base64Buffer));
-        Logger::parseEncodedStringToBuffer(td.base64Buffer, td.endBuffer, sizeof(td.endBuffer));
+        Logger::ConvertBufferToBase64String(td.dataBuffer, dataLength, td.base64Buffer, sizeof(td.base64Buffer));
+        Logger::ParseEncodedStringToBuffer(td.base64Buffer, td.endBuffer, sizeof(td.endBuffer));
 
         for (u32 k = 0; k < dataLength; k++) {
             if (td.dataBuffer[k] != td.endBuffer[k]) {

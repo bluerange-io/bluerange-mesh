@@ -34,7 +34,7 @@
 #endif
 #include<Utility.h>
 #include <cstring>
-#include "types.h"
+#include "FmTypes.h"
 
 template<typename T, int N>
 
@@ -58,12 +58,12 @@ public:
         }
     }
 
-    T* getRaw()
+    T* GetRaw()
     {
         return data;
     }
 
-    const T* getRaw() const
+    const T* GetRaw() const
     {
         return data;
     }
@@ -88,11 +88,11 @@ public:
         return data[(index + rotation) % N];
     }
 
-    i32 getRotation() {
+    i32 GetRotation() {
         return rotation;
     }
 
-    void setRotation(i32 rotation) {
+    void SetRotation(i32 rotation) {
         this->rotation = rotation;
     }
 };

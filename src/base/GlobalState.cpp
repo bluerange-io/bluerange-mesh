@@ -82,7 +82,7 @@ void GlobalState::RegisterApplicationInterruptHandler(FruityHal::ApplicationInte
     {
         logt("ERROR", "Could not register application interrupt handler");
         SIMEXCEPTION(BufferTooSmallException);
-        logger.logCustomError(CustomErrorTypes::FATAL_FAILED_TO_REGISTER_APPLICATION_INTERRUPT_HANDLER, 0);
+        logger.LogCustomError(CustomErrorTypes::FATAL_FAILED_TO_REGISTER_APPLICATION_INTERRUPT_HANDLER, 0);
         return;
     }
     applicationInterruptHandlers[numApplicationInterruptHandlers] = handler;
@@ -95,7 +95,7 @@ void GlobalState::RegisterMainContextHandler(FruityHal::MainContextHandler handl
     {
         logt("ERROR", "Could not register main context handler");
         SIMEXCEPTION(BufferTooSmallException);
-        logger.logCustomError(CustomErrorTypes::FATAL_FAILED_TO_REGISTER_MAIN_CONTEXT_HANDLER, 0);
+        logger.LogCustomError(CustomErrorTypes::FATAL_FAILED_TO_REGISTER_MAIN_CONTEXT_HANDLER, 0);
         return;
     }
     mainContextHandlers[numMainContextHandlers] = handler;

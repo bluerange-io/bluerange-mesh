@@ -47,16 +47,16 @@ private:
     std::string messageComplete = "";
     bool        found = false;
 
-    bool matches(const std::string &message);
-    void makeFound(const std::string &messageComplete);
-    bool matchesRegex(const std::string &message);
+    bool Matches(const std::string &message);
+    void MakeFound(const std::string &messageComplete);
+    bool MatchesRegex(const std::string &message);
 
 public:
     SimulationMessage(NodeId nodeId, const std::string& messagePart);
-    bool checkAndSet(const std::string &message, bool useRegex);
-    bool isFound() const;
-    const std::string& getCompleteMessage() const;
-    NodeId getNodeId() const;
+    bool CheckAndSet(const std::string &message, bool useRegex);
+    bool IsFound() const;
+    const std::string& GetCompleteMessage() const;
+    NodeId GetNodeId() const;
 };
 
 class CherrySimTester : public TerminalPrintListener, public CherrySimEventListener
@@ -125,10 +125,10 @@ public:
     
     //### Callbacks
     //Inherited via TerminalPrintListener
-    void TerminalPrintHandler(nodeEntry* currentNode, const char* message) override;
+    void TerminalPrintHandler(NodeEntry* currentNode, const char* message) override;
 
     //Inherited via CherrySimEventListener
     void CherrySimEventHandler(const char* eventType) override;
-    void CherrySimBleEventHandler(nodeEntry* currentNode, simBleEvent* simBleEvent, u16 eventSize) override;
+    void CherrySimBleEventHandler(NodeEntry* currentNode, simBleEvent* simBleEvent, u16 eventSize) override;
 
 };

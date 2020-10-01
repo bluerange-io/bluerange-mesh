@@ -64,7 +64,7 @@ class Module;
 
 #ifndef SIM_ENABLED
 #ifndef GS
-#define GS (&(GlobalState::getInstance()))
+#define GS (&(GlobalState::GetInstance()))
 #endif
 #endif
 
@@ -77,7 +77,7 @@ class GlobalState
     public:
         GlobalState();
 #ifndef SIM_ENABLED
-        static GlobalState& getInstance() {
+        static GlobalState& GetInstance() {
             return instance;
         }
         static GlobalState instance;
@@ -136,7 +136,7 @@ class GlobalState
         u32 amountOfModules = 0;
         Module* activeModules[MAX_MODULE_COUNT] = {};
         template<typename T>
-        u32 InitializeModule(bool createModule)
+        u32 InitializeModule(bool createModule, u16 recordId = RECORD_STORAGE_RECORD_ID_INVALID)
         {
             static_assert(alignof(T) == 4 || alignof(T) == 8, "This code assumes that the alignment of all modules either 4 or 8 (continue reading in comment)");
             // Modules that are compiled with double support will have an alignment of 8, while others only have an alignment of 4
@@ -149,10 +149,20 @@ class GlobalState
                 if (amountOfModules >= MAX_MODULE_COUNT) {
                     SIMEXCEPTION(TooManyModulesException);
                 }
-                void *memoryBlock = moduleAllocator.allocateMemory(paddedSize);
+                void *memoryBlock = moduleAllocator.AllocateMemory(paddedSize);
                 if (memoryBlock != nullptr)
                 {
                     activeModules[amountOfModules] = new (memoryBlock) T();
+
+                    // FruityMesh core modules use their moduleId as a record storage id, vendor modules must specify the id themselves
+                    if (Utility::IsVendorModuleId(activeModules[amountOfModules]->moduleId)) {
+                        if (recordId < RECORD_STORAGE_RECORD_ID_VENDOR_MODULE_CONFIG_BASE || recordId > RECORD_STORAGE_RECORD_ID_VENDOR_MODULE_CONFIG_MAX) {
+                            recordId = RECORD_STORAGE_RECORD_ID_INVALID;
+                            logt("ERROR", "Invalid recordId");
+                        }
+                        activeModules[amountOfModules]->recordStorageId = recordId;
+                    }
+
                     amountOfModules++;
                 }
             }

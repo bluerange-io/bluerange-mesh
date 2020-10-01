@@ -28,15 +28,15 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <types.h>
+#include <FmTypes.h>
 #include <Boardconfig.h>
 #include <Config.h>
 #include <GlobalState.h>
 #include <RecordStorage.h>
 
-extern void setBoard_4(BoardConfiguration* c);
-extern void setBoard_18(BoardConfiguration* c);
-extern void setBoard_19(BoardConfiguration* c);
+extern void SetBoard_4(BoardConfiguration* c);
+extern void SetBoard_18(BoardConfiguration* c);
+extern void SetBoard_19(BoardConfiguration* c);
 
 void* fmBoardConfigPtr;
 
@@ -82,12 +82,12 @@ void Boardconf::ResetToDefaultConfiguration()
     configuration.dcDcEnabled = false;
 
     //Now, we load all Default boards (nRf Development kits)
-    setBoard_4(&configuration);
-    setBoard_18(&configuration);
+    SetBoard_4(&configuration);
+    SetBoard_18(&configuration);
 
 #ifdef SIM_ENABLED
 #ifndef GITHUB_RELEASE
-    setBoard_19(&configuration);
+    SetBoard_19(&configuration);
 #endif //GITHUB_RELEASE
 #endif
 
@@ -96,7 +96,7 @@ void Boardconf::ResetToDefaultConfiguration()
     SET_BOARD_CONFIGURATION(&configuration);
 }
 
-Boardconf & Boardconf::getInstance()
+Boardconf & Boardconf::GetInstance()
 {
     return GS->boardconf;
 }

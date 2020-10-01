@@ -46,11 +46,11 @@ TEST(TestDebugModule, TestCommands) {
     tester.Start();
     tester.SimulateUntilClusteringDone(10 * 1000);
 
-    tester.sim->findNodeById(1)->gs.logger.enableTag("DEBUGMOD");
-    tester.sim->findNodeById(1)->gs.logger.enableTag("WATCHDOG");
-    tester.sim->findNodeById(1)->gs.logger.enableTag("PQ");
-    tester.sim->findNodeById(2)->gs.logger.enableTag("DEBUGMOD");
-    tester.sim->findNodeById(1)->gs.logger.enableTag("DEBUG");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("DEBUGMOD");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("WATCHDOG");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("PQ");
+    tester.sim->FindNodeById(2)->gs.logger.EnableTag("DEBUGMOD");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("DEBUG");
 
     tester.SendTerminalCommand(1, "action 2 debug send_max_message");
     tester.SimulateUntilMessageReceived(10* 1000, 1, "{\"nodeId\":2,\"type\":\"send_max_message_response\", \"correctValues\":192, \"expectedCorrectValues\":192}");
@@ -58,8 +58,8 @@ TEST(TestDebugModule, TestCommands) {
     tester.SendTerminalCommand(1, "data 2");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "IN <= 1 ################## Got Data packet");
 
-    tester.sim->findNodeById(2)->gs.logger.enableTag("DEBUGMOD");
-    tester.sim->findNodeById(2)->gs.logger.enableTag("DEBUG");
+    tester.sim->FindNodeById(2)->gs.logger.EnableTag("DEBUGMOD");
+    tester.sim->FindNodeById(2)->gs.logger.EnableTag("DEBUG");
 
     tester.SimulateUntilClusteringDone(100 * 1000);
 
@@ -94,7 +94,7 @@ TEST(TestDebugModule, TestCommands) {
     tester.SimulateForGivenTime(100 * 1000);
 
     NodeIndexSetter setter(0);
-    ASSERT_GT(static_cast<DebugModule*>(tester.sim->findNodeById(1)->gs.node.GetModuleById(ModuleId::DEBUG_MODULE))->getPacketsIn(), (u32)95);
+    ASSERT_GT(static_cast<DebugModule*>(tester.sim->FindNodeById(1)->gs.node.GetModuleById(ModuleId::DEBUG_MODULE))->GetPacketsIn(), (u32)95);
 
     tester.SendTerminalCommand(1, "action 2 debug ping 1 r");
     tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "p \\d+ ms");

@@ -49,8 +49,8 @@ TEST(TestStatusReporterModule, TestCommands) {
 
     tester.SimulateUntilClusteringDone(100 * 1000);
 
-    tester.sim->findNodeById(1)->gs.logger.enableTag("DEBUGMOD");
-    tester.sim->findNodeById(2)->gs.logger.enableTag("DEBUGMOD");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("DEBUGMOD");
+    tester.sim->FindNodeById(2)->gs.logger.EnableTag("DEBUGMOD");
 
     tester.SendTerminalCommand(1, "action 2 status get_status");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"status\",\"module\":3");
@@ -93,7 +93,7 @@ TEST(TestStatusReporterModule, TestPeriodicTimeSend) {
     tester.Start();
 
     tester.SimulateUntilClusteringDone(10 * 1000);
-    tester.sim->findNodeById(2)->gs.logger.enableTag("STATUSMOD");
+    tester.sim->FindNodeById(2)->gs.logger.EnableTag("STATUSMOD");
 
     //Send a write command
     tester.SendTerminalCommand(1, "component_act 2 3 1 0xABCD 0x1234 01 13");
@@ -118,13 +118,13 @@ TEST(TestStatusReporterModule, TestHopsToSinkFixing) {
 
     tester.SimulateUntilClusteringDone(1000 * 1000);
 
-    for (int i = 1; i <= 6; i++) tester.sim->findNodeById(i)->gs.logger.enableTag("DEBUGMOD");
+    for (int i = 1; i <= 6; i++) tester.sim->FindNodeById(i)->gs.logger.EnableTag("DEBUGMOD");
 
     NodeIndexSetter setter(1);
-    MeshConnections inConnections = tester.sim->findNodeById(2)->gs.cm.GetMeshConnections(ConnectionDirection::DIRECTION_IN);
-    MeshConnections outConnections = tester.sim->findNodeById(2)->gs.cm.GetMeshConnections(ConnectionDirection::DIRECTION_OUT);
-    u16 invalidHops = tester.sim->getTotalNodes() + 10; // a random value that is not possible to be correct
-    u16 validHops   = tester.sim->getTotalNodes() -  1;    // initialize to max number of hops
+    MeshConnections inConnections = tester.sim->FindNodeById(2)->gs.cm.GetMeshConnections(ConnectionDirection::DIRECTION_IN);
+    MeshConnections outConnections = tester.sim->FindNodeById(2)->gs.cm.GetMeshConnections(ConnectionDirection::DIRECTION_OUT);
+    u16 invalidHops = tester.sim->GetTotalNodes() + 10; // a random value that is not possible to be correct
+    u16 validHops   = tester.sim->GetTotalNodes() -  1;    // initialize to max number of hops
 
     // set all inConnections for node 2 to invalid and find the one with least hops to sink
     for (int i = 0; i < inConnections.count; i++) {
@@ -179,7 +179,7 @@ TEST(TestStatusReporterModule, TestConnectionRssiReportingWithoutNoise) {
 
     tester.SimulateGivenNumberOfSteps(100);
 
-    int rssiCalculated = (int)tester.sim->GetReceptionRssi(tester.sim->findNodeById(1), tester.sim->findNodeById(2));
+    int rssiCalculated = (int)tester.sim->GetReceptionRssi(tester.sim->FindNodeById(1), tester.sim->FindNodeById(2));
 
     tester.SendTerminalCommand(1, "action 1 status get_connections");
 
@@ -190,7 +190,7 @@ TEST(TestStatusReporterModule, TestConnectionRssiReportingWithoutNoise) {
 
     tester.SimulateUntilMessagesReceived(10 * 100, message);
 
-    const std::string messageComplete = message[0].getCompleteMessage();
+    const std::string messageComplete = message[0].GetCompleteMessage();
 
     //parse rssi value
     auto j = json::parse(messageComplete);
@@ -232,7 +232,7 @@ TEST(TestStatusReporterModule, TestConnectionRssiReportingWithNoise) {
 
     tester.SimulateGivenNumberOfSteps(100);
 
-    int rssiCalculated = (int)tester.sim->GetReceptionRssi(tester.sim->findNodeById(1), tester.sim->findNodeById(2));
+    int rssiCalculated = (int)tester.sim->GetReceptionRssi(tester.sim->FindNodeById(1), tester.sim->FindNodeById(2));
 
     tester.SendTerminalCommand(1, "action 1 status get_connections");
 
@@ -243,7 +243,7 @@ TEST(TestStatusReporterModule, TestConnectionRssiReportingWithNoise) {
 
     tester.SimulateUntilMessagesReceived(10 * 100, message);
 
-    const std::string messageComplete = message[0].getCompleteMessage();
+    const std::string messageComplete = message[0].GetCompleteMessage();
 
     //parse rssi value
     auto j = json::parse(messageComplete);

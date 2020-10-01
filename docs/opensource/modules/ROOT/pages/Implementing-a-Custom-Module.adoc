@@ -1,60 +1,35 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
-== Implementing a Custom Module
+= Implementing a Custom Module
 
-This tutorial guides you through the process of creating a new
-FruityMesh module. You'll implement a PingModule that allows you to ping a
-node and get its response. You'd normally implement ping functionality
-into the StatusReporter oder DebugModule, which is where it belongs, but
-the use-case acts as a good and easy example for building your own
-module. You can find the finished files in the folder `src/examples` or
-you can just follow the tutorial.
+This tutorial guides you through the process of creating a new FruityMesh module. You'll implement a PingModule that allows you to ping a node and get its response. You'd normally implement ping functionality into the Node, StatusReporter or DebugModule, which is where it belongs, but the use-case acts as a good and easy example for building your own module. You can find the finished files in the folder `src/examples` or you can just follow the tutorial.
 
-=== What Is A Module?
+== What Is A Module?
 
-Modules are used to structure functionality that doesn't directly
-interfer with the mesh-logic. Modules extend the `Module` class. Each
-module has the possibility to save a *persistent configuration*. It can
-be loaded or unloaded and it is possible to decide which modules are
-part of the firmware during compile time. A module can choose to
-register a *UART listener* and react on commands, it can also *output
-to UART* for logging or communication purposes. It can also *send data
-packets* through the mesh and *receive data*.
+Modules are used to structure functionality that doesn't directly interfere with the mesh-logic. Modules extend the `Module` class. Each module has the possibility to save a *persistent configuration* in flash. It can be loaded or unloaded and it is possible to decide which modules are part of the firmware during compile time through a *featureset*. A module can choose to register a *UART listener* and react on commands or *output to UART* for logging or communication purposes. It can also *send data packets* through the mesh and *receive data*.
 
-Here is an overview over some of the handlers that it can use:
+There are two types of modules, the core modules that belong to FruityMesh and VendorModules, that allow every developer to extend the functionality with custom code.
 
-* *ConfigurationLoadedHandler*: Is called when a new Module
-configuration is loaded.
-* *TimerEventHandler*: Is called at a fixed interval to do periodic
-tasks.
-* *BleHandlers*: Several handlers that are called when low level ble events
-occur.
-* *MeshMessageReceivedEventHandler*: Delivers data that has been sent
-over the mesh.
+Here is an overview over some of the handlers that a Module can use:
+
+* *ConfigurationLoadedHandler*: Is called when a new Module configuration is loaded.
+* *TimerEventHandler*: Is called at a fixed interval to do periodic tasks.
+* Differene *Ble Event Handlers*: Several handlers that are called when low level ble events occur.
+* *MeshMessageReceivedEventHandler*: Delivers data that has been sent over the mesh.
 * *TerminalCommandHandler*: Gets called when data is received over UART.
 
-=== Creating A Ping Module
+For a full list, check the `Module.h` file.
 
-The following guide outlines the steps to implement a simple module that
-can ping another node over the network and parse the response.
+== Creating A Ping Module
 
-==== Step 1
+The following guide outlines the steps to implement a simple module that can ping another node over the network and parse the response.
 
-First, clone the `TemplateModule.cpp` and `TemplateModule.h` file from 
-the `src/examples` directory into `src/modules/PingModule.cpp` and 
-`src/modules/PingModule.h`. You need to refactor the method names and
-some other variables. Use the search function and look for the string
-"template" anywhere in these two files and rename them accordingly.
+=== Step 1
 
-==== Step 2
+First, copy and rename the `VendorTemplateModule.cpp` and `VendorTemplateModule.h` file from  the `src/examples` directory into `src/modules/PingModule.cpp` and  `src/modules/PingModule.h`. You need to refactor the method names and some other variables. Use the search function and look for the string `template` everywhere in these two files and rename everything (e.g. "VendorTemplateModule", "VENDOR_TEMPLATE_MODULE", ....) accordingly to "PingModule" or "PING_MODULE" while keeping the lower and upper case writing.
 
-Activate your module by instantiating it in the featureset
-`config/featuresets/github_nrf52.cpp` where all the other modules are instantiated.
-You might need to increase the MAX_MODULE_COUNT in `config/Config.h`.
-Your PingModule Constructor needs a ModuleId for instantiation. All
-Module IDs are specified in types.h (enum ModuleId) as well. An
-enum entry is already reserved under the section "Other Modules", see
-`PING_MODULE=201`. If you would like to create another module you'd have
-to add the ModuleId to this enum.
+=== Step 2
+
+Activate your module by instantiating it in the featureset `config/featuresets/github_nrf52.cpp` where all the other modules are instantiated. You might need to increase the MAX_MODULE_COUNT in `src/base/GlobalState.h` if the compiler complains. Your PingModule constructor needs a VendorModuleId for instantiation. All core moduleIds are specified in types.h (enum ModuleId) but you need to use a VendorModuleId. You should have created a constant with the name `PING_MODULE_ID` while renaming everything. You can use `GET_VENDOR_MODULE_ID(0xABCD, 2)` to assign a VendorModuleId. You can also replace 0xABCD with your https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers/[company identifier] if you already have one.
 
 The initialization inside the featureset may look like this:
 
@@ -63,34 +38,23 @@ The initialization inside the featureset may look like this:
 size += GS->InitializeModule<PingModule>(createModule);
 ----
 
-, just like the other modules in that file. Note that you have to add
-the return value of `InitializeModule` to the size of all modules and 
-pass it the boolean `createModule` so that the firmware is able to 
-determine how much memory must be allocated for all the modules.
+You have to add the return value of `InitializeModule` to the size of all modules and pass the boolean parameter `createModule` so that the firmware is able to  determine how much memory must be allocated for all the modules.
 
-You should also include the new `"PingModule.h"`.
+You should also add an include to the newly `"PingModule.h"` file.
 
-Once the module's .cpp file is in the modules folder, it will automatically be included in the compilation.
+Once the module's .cpp file is in the vendor folder, it will automatically be included in the compilation by the `CMakeLists.txt` in the parent directory.
 
-==== Step 3
+=== Step 3
 
-Now go ahead and try to compile the binary and flash it to a device.
-Connect via terminal and input *get_modules this*. You should now see a
-list of modules and the ID of your new Ping module should be part of it.
+Now go ahead and try to compile the binary and flash it to a device. Connect a serial terminal as mentioned in xref:Quick-Start.adoc[Quick Start] and input *get_modules this*. You should now see a list of modules and the ID of your new Ping module should be part of it.
 
 It doesn't do much yet. You will now add more functionality.
 
-==== Step 4
+=== Step 4
 
-Your PingModule does already overwrite a few of the methods in its
-base-class. One of these is the TerminalCommandHandler. It is kept
-simple for this tutorial and only implements the ping command so
-that it can be triggered via a locally connected terminal. (It would
-also be possible to trigger a remote node to send a ping and communicate
-the result back to another node).
+Your PingModule does already overwrite a few of the methods in its base-class. One of these is the TerminalCommandHandler. It is kept simple for this tutorial and only implements the ping command so that it can be triggered via a locally connected terminal. (It would also be possible to trigger a remote node to send a ping and communicate the result back to another node).
 
-In the TerminalCommandHandler, add the following lines to the beginning
-of the function:
+In the TerminalCommandHandler, add the following lines to the beginning of the function:
 
 [source,C++]
 ----
@@ -105,29 +69,17 @@ if(TERMARGS(0, "pingmod")){
 }
 ----
 
-The command name and command arguments should be in lowercase letters to
-be consistent with other commands.
+The command name and command arguments should be in lowercase letters to be consistent with other commands.
 
-Next, flash it to your device again and watch if it reacts on your
-pingmod command. If it does not, make sure you are using the logtag
-"PINGMOD" and you either enable it by writing *debug pingmod* in the
-terminal first, or you enable the logtag by default in FruityMesh.cpp.
+Next, flash it to your device again and watch if it reacts on your pingmod command. If it does not, make sure you are using the logtag "PINGMOD" and you either enable it by writing *debug pingmod* in the terminal first, or you enable the logtag by default in FruityMesh.cpp.
 
 image:tutorial-pingmod.png[pingmod_1]
 
-==== Step 5
+=== Step 5
 
-Now that the module is reacting to our command, you are ready to send the ping
-packet. Because this is going to be a very simple message, we will use a
-predefined message format called xref:Specification.adoc#connPacketModule[connPacketModule]. This packet is
-intended to be used for triggering actions and for responding to these
-triggers. It has a special message header that contains the moduleId and
-an actionType. This will ensure that they do not interfere with mesh
-messages or messages from other modules.
+Now that the module is reacting to our command, you are ready to send the ping packet. We will use a predefined message format called xref:Specification.adoc#connPacketModuleVendor[connPacketModuleVendor]. This packet is intended to be used for triggering actions and for responding to these triggers. It has a special message header that contains the VendorModuleId and an actionType. This will ensure that they do not interfere with mesh messages or messages from other modules.
 
-To keep our module messages organized, add an enum that contains
-all of our messages in the `private:` section of our `PingModule.h`
-file:
+To keep our module messages organized, add an enum that contains all of our messages in the `private:` section of our `PingModule.h` file:
 
 [source,C++]
 ----
@@ -136,8 +88,7 @@ enum PingModuleTriggerActionMessages{
 };
 ----
 
-Next, add the code that is responsible for sending this packet to the
-other node. The previously written code now looks like this:
+Next, add the code that is responsible for sending this packet to the other node. The previously written code now looks like this:
 
 [source,C++]
 ----
@@ -157,7 +108,7 @@ if(TERMARGS(0, "pingmod")){
             PingModuleTriggerActionMessages::TRIGGER_PING,
             0,
             data,
-            1,
+            1, //size of payload
             false
     );
 
@@ -165,25 +116,13 @@ if(TERMARGS(0, "pingmod")){
 }
 ----
 
-This code creates a buffer of 1 byte and fills in some data (123). This
-data is not necessary for a ping and is only added for illustration
-purposes. The message is sent as a ModuleMessage with the moduleId
-automatically added by the `SendModuleActionMessage` method. The
-actionType is TRIGGER_PING. The message type
-`MessageType::MODULE_TRIGGER_ACTION` is used for sending messages that
-await a response.
+This code creates a buffer of 1 byte and fills in some data (123). This data is not necessary for a ping and is only added for illustration purpose. The message is sent as a ModuleMessage with the VendorModuleId automatically added by the `SendModuleActionMessage` method. The actionType is TRIGGER_PING. The message type `MessageType::MODULE_TRIGGER_ACTION` is used for sending messages that await a response.
 
-The ConnectionManager (cm) will handle the transmission of this packet,
-it will copy the packet to its buffer and queue the packet transmission.
-It is important to pass the size of payload (1). The last parameter is
-used to specify that this packet should be transmitted by using
-BLE-unacknowledged packet transmission (WRITE_CMD).
+The ConnectionManager will handle the transmission of this packet, it will copy the packet to its buffer and queue the packet transmission. It is important to pass the size of the payload (1). The last parameter is used to specify that this packet should be transmitted by using BLE-unacknowledged packet transmission (WRITE_CMD) which should always be used.
 
-==== Step 6
+=== Step 6
 
-Next, you will check if the packet arrived at its destination.
-Implement the MeshMessageReceivedEventHandler in the PingModule.
-It looks like this:
+Next, you will check if the packet arrived at its destination. Implement the MeshMessageReceivedEventHandler in the PingModule. It looks like this:
 
 [source,C++]
 ----
@@ -193,11 +132,11 @@ void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConn
     Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
     //Filter trigger_action messages
-    if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-        connPacketModule* packet = (connPacketModule*)packetHeader;
+    if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION && sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE_VENDOR){
+        connPacketModuleVendor* packet = (connPacketModuleVendor*)packetHeader;
 
         //Check if our module is meant and we should trigger an action
-        if(packet->moduleId == moduleId){
+        if(packet->moduleId == vendorModuleId){
             //It's a ping message
             if(packet->actionType == PingModuleTriggerActionMessages::TRIGGER_PING){
 
@@ -211,33 +150,23 @@ void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConn
 }
 ----
 
-In the `PingModule.h`, you must now also add the definition for this
-handler or uncomment it.
+In `PingModule.h`, you must now also add the definition for this handler or uncomment it.
 
-You can now perform a simple test by flashing this new firmware on your
-development board again. There is a simple trick that allows you to test
-the functionality with a single node by pinging the node itself:
+You can now perform a simple test by flashing this new firmware on your development board again. There is a simple trick that allows you to test the functionality with a single node by pinging the node itself:
 
 image:tutorial-pingmod2.png[pingmod_2]
 
-The ConnectionManager will parse the packet and will route it back to
-the MeshMessageReceived without broadcasting it because the nodeId is
-the same as its own. As you can see, the packet triggered the
-appropriate action in the node.
+The ConnectionManager will parse the packet and will route it back to the `MeshMessageReceivedHandler` without broadcasting it because the nodeId is the same as its own. As you can see, the packet triggered the appropriate action in the node.
 
-==== Step 7
+=== Step 7
 
-With this working, you should now perform a test with two different
-nodes. Flash both of them, connect with two terminals and watch how the
-packet is delivered:
+With this working, you should now perform a test with two different nodes. Flash both of them, connect with two terminals and watch how the packet is delivered:
 
 image:tutorial-pingmod3.png[pingmod_3]
 
-==== Step 8
+=== Step 8
 
-Now, a proper ping message should, well, ... pong. That's why there is a need
-for a return packet. Go to `PingModule.h` and add another enum that contains
-action responses:
+Now, a proper ping message should, well, ... pong. That's why there is a need for a return packet. Go to `PingModule.h` and add another enum that contains action responses:
 
 [source,C++]
 ----
@@ -250,17 +179,17 @@ Then, go back to your .cpp file and insert this updated code:
 
 [source,C++]
 ----
-void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
+void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
 {
     //Must call superclass for handling
     Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
     //Filter trigger_action messages
     if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-        connPacketModule* packet = (connPacketModule*)packetHeader;
+        connPacketModuleVendor const * packet = (connPacketModuleVendor const *)packetHeader;
 
         //Check if our module is meant and we should trigger an action
-        if(packet->moduleId == moduleId){
+        if(packet->moduleId == vendorModuleId && sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE_VENDOR){
             //It's a ping message
             if(packet->actionType == PingModuleTriggerActionMessages::TRIGGER_PING){
 
@@ -286,12 +215,12 @@ void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConn
     }
 
     //Parse Module action_response messages
-    if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE){
+    if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE && sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE_VENDOR){
 
-        connPacketModule* packet = (connPacketModule*)packetHeader;
+        connPacketModuleVendor const * packet = (connPacketModuleVendor const *)packetHeader;
 
         //Check if our module is meant and we should trigger an action
-        if(packet->moduleId == moduleId)
+        if(packet->moduleId == vendorModuleId)
         {
             //Somebody reported its connections back
             if(packet->actionType == PingModuleActionResponseMessages::PING_RESPONSE){
@@ -302,24 +231,14 @@ void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConn
 }
 ----
 
-This code sends a response to the ping request, includes the data that
-came with the initial request and adds some more data. Also, it adds
-another condition that checks for the reply to the ping request and
-prints it out on the terminal.
+This code sends a response to the ping request, includes the data that came with the initial request and adds some more data. Also, it adds another condition that checks for the reply to the ping request and prints it out on the terminal.
 
-==== Step 9
+=== Final Step
 
-That's it. You should now be able to ping any node in the mesh network
-and see its response. The intermediate nodes will automatically route
-all traffic without having to know what kind of message it is.
+That's it. You should now be able to ping any node in the mesh network and see its response. The intermediate nodes will automatically route all traffic without having to know what kind of message it is. This means that you can have different modules on each node in the network and they will still be interoperable.
 
 image:tutorial-pingmod4.png[pingmod_4]
 
-You would probably want to use a counter with the ping message to
-generate a handle for a ping. Then, you'd be able to calculate the time
-that it took for the packet to come back through the mesh. And as inidicated
-in the beginning, you would not necessarily want to create new module for
-pinging other nodes but you'd have that functionality in a core module.
+You would probably want to use a counter with the ping message to generate a handle for a ping. Then, you'd be able to calculate the time that it took for the packet to come back through the mesh. And as indicated in the beginning, you would not necessarily want to create a new module for pinging other nodes but you'd have that functionality in a core module. Make sure to take a look at the appTimer and time syncing capabilities of FruityMesh if you want to extend your module with more functionality.
 
-This concludes the tutorial. Have fun implementing new modules for
-your FruityMesh!
+This concludes the tutorial. Have fun implementing new modules for FruityMesh!

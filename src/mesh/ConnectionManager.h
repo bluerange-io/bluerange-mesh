@@ -96,10 +96,10 @@ TESTER_PUBLIC:
 public:
     ConnectionManager();
     void Init();
-    static ConnectionManager& getInstance();
+    static ConnectionManager& GetInstance();
 
     //This method is called when empty buffers are available and there is data to send
-    void fillTransmitBuffers() const;
+    void FillTransmitBuffers() const;
 
     u8 freeMeshInConnections = 0;
     u8 freeMeshOutConnections = 0;
@@ -121,7 +121,7 @@ public:
     MeshAccessConnections GetMeshAccessConnections(ConnectionDirection direction) const;
     BaseConnections GetConnectionsOfType(ConnectionType connectionType, ConnectionDirection direction) const;
 
-    i8 getFreeConnectionSpot() const;
+    i8 GetFreeConnectionSpot() const;
 
     bool HasFreeConnection(ConnectionDirection direction) const;
 
@@ -139,7 +139,12 @@ public:
     //Functions used for sending messages
     void SendMeshMessage(u8* data, u16 dataLength, DeliveryPriority priority) const;
 
+    //Send a message with a ConnPacketModule header by using a ModuleId
     ErrorTypeUnchecked SendModuleActionMessage(MessageType messageType, ModuleId moduleId, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool lookback) const;
+    
+    //Send a message with a ConnPacketModuleVendor header by using a VendorModuleId
+    //This method will check and moduleId parameter and will send a ConnPacketModule instead if the given id is not a VendorModuleId
+    ErrorTypeUnchecked SendModuleActionMessage(MessageType messageType, VendorModuleId moduleId, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool lookback) const;
 
     void BroadcastMeshPacket(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable) const;
 
@@ -149,9 +154,14 @@ public:
     //Whether or not the node should receive and dispatch messages that are sent to the given nodeId
     bool IsReceiverOfNodeId(NodeId nodeId) const;
 
+    //Can be used to do basic checks on packet to see if it is a valid FruityMesh packet
+    bool IsValidFruityMeshPacket(const u8* data, u16 dataLength) const;
+
+    static u32 MessageTypeToMinimumPacketSize(MessageType messageType);
+
     //Call this to dispatch a message to the node and all modules, this method will perform some basic
     //checks first, e.g. if the receiver matches
-    void DispatchMeshMessage(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packet, bool checkReceiver) const;
+    void DispatchMeshMessage(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packet, bool checkReceiver) const;
 
     //Internal use only, do not use
     //Can send packets as WRITE_REQ (required for some internal functionality) but can lead to problems with the SoftDevice

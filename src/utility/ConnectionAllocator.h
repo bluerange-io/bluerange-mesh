@@ -68,22 +68,22 @@ private:
     std::array<AnyConnection, TOTAL_NUM_CONNECTIONS + 1> data{};    //Max + one resolver connection.
     AnyConnection* dataHead = NO_NEXT_CONNECTION;
 
-    AnyConnection* allocateMemory();
+    AnyConnection* AllocateMemory();
 
 
 public:
     ConnectionAllocator();
-    static ConnectionAllocator& getInstance();
+    static ConnectionAllocator& GetInstance();
 
 
-    MeshConnection*       allocateMeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, u16 partnerWriteCharacteristicHandle);
-    ResolverConnection*   allocateResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
-    MeshAccessConnection* allocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualPartnerId);
+    MeshConnection*       AllocateMeshConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, u16 partnerWriteCharacteristicHandle);
+    ResolverConnection*   AllocateResolverConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
+    MeshAccessConnection* AllocateMeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualPartnerId);
 #if IS_ACTIVE(CLC_CONN)
 #ifndef GITHUB_RELEASE
-    ClcAppConnection*     allocateClcAppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
+    ClcAppConnection*     AllocateClcAppConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress);
 #endif //GITHUB_RELEASE
 #endif
 
-    void deallocate(BaseConnection* bc);
+    void Deallocate(BaseConnection* bc);
 };

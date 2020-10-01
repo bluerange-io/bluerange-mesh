@@ -35,7 +35,7 @@
 #include <filesystem>
 #endif
 
-std::set<int> CherrySimUtils::generateRandomNumbers(const int min, const int max, const unsigned int count)
+std::set<int> CherrySimUtils::GenerateRandomNumbers(const int min, const int max, const unsigned int count)
 {
     if (!(min < max) || ((int)count > max - min)) SIMEXCEPTION(IllegalArgumentException); //Wrong parameters
 
@@ -49,7 +49,7 @@ std::set<int> CherrySimUtils::generateRandomNumbers(const int min, const int max
     return numbers;
 }
 
-std::string CherrySimUtils::getNormalizedPath()
+std::string CherrySimUtils::GetNormalizedPath()
 {
 #ifdef __GNUC__
     //Unfortunately the sanitizer goes wild for std::filesystem::path on our used GCC version, so we have to do it by hand...

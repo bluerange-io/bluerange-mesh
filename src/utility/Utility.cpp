@@ -49,14 +49,10 @@ u32 Utility::GetSettingsPageBaseAddress()
 
 RecordStorageResultCode Utility::SaveModuleSettingsToFlash(const Module* module, ModuleConfiguration* configurationPointer, const u16 configurationLength, RecordStorageEventListener* listener, u32 userType, u8* userData, u16 userDataLength)
 {
-    return Utility::SaveModuleSettingsToFlashWithId(module->moduleId, configurationPointer, configurationLength, listener, userType, userData, userDataLength);
-}
+    if (module == nullptr || module->recordStorageId == RECORD_STORAGE_RECORD_ID_INVALID) return RecordStorageResultCode::INTERNAL_ERROR;
 
-RecordStorageResultCode Utility::SaveModuleSettingsToFlashWithId(ModuleId moduleId, ModuleConfiguration * configurationPointer, const u16 configurationLength, RecordStorageEventListener * listener, u32 userType, u8 * userData, u16 userDataLength)
-{
-    return GS->recordStorage.SaveRecord((u16)moduleId, (u8*)configurationPointer, configurationLength, listener, userType, userData, userDataLength);
+    return GS->recordStorage.SaveRecord(module->recordStorageId, (u8*)configurationPointer, configurationLength, listener, userType, userData, userDataLength);
 }
-
 
 u32 Utility::GetRandomInteger(void)
 {
@@ -75,12 +71,97 @@ u32 Utility::GetRandomInteger(void)
 //major.minor.patch - 111.222.4444
 void Utility::GetVersionStringFromInt(const u32 version, char* outputBuffer)
 {
-    u16 major = version / 10000000;
-    u16 minor = (version - 10000000 * major) / 10000;
-    u16 patch = (version - 10000000 * major - 10000 * minor);
+    u16 major = version / 10000000UL;
+    u16 minor = (version - 10000000UL * major) / 10000UL;
+    u16 patch = (version - 10000000UL * major - 10000UL * minor);
 
     snprintf(outputBuffer, 15, "%u.%u.%u", major, minor, patch);
 
+}
+
+bool Utility::IsVendorModuleId(ModuleId moduleId)
+{
+    return IsVendorModuleId(GetWrappedModuleId(moduleId));
+}
+
+bool Utility::IsVendorModuleId(ModuleIdWrapper moduleId)
+{
+    if (GetModuleId(moduleId) == ModuleId::VENDOR_MODULE_ID_PREFIX) return true;
+    else return false;
+}
+
+ModuleIdWrapper Utility::GetWrappedModuleId(u16 vendorId, u8 subId)
+{
+    ModuleIdWrapperUnion wrappedModuleId;
+
+    wrappedModuleId.prefix = ModuleId::VENDOR_MODULE_ID_PREFIX;
+    wrappedModuleId.subId = subId;
+    wrappedModuleId.vendorId = vendorId;
+
+    return wrappedModuleId.wrappedModuleId;
+}
+
+ModuleIdWrapper Utility::GetWrappedModuleId(ModuleId moduleId)
+{
+    ModuleIdWrapperUnion wrappedModuleId;
+
+    wrappedModuleId.prefix = moduleId;
+    wrappedModuleId.subId = 0xFF;
+    wrappedModuleId.vendorId = 0xFFFF;
+
+    return wrappedModuleId.wrappedModuleId;
+}
+
+ModuleId Utility::GetModuleId(ModuleIdWrapper wrappedModuleId)
+{
+    ModuleIdWrapperUnion wrapper;
+
+    wrapper.wrappedModuleId = wrappedModuleId;
+
+    return wrapper.prefix;
+}
+
+//This converts a module id string from the terminal into a ModuleIdWrapper, the input can either be
+//a module name such as: status; it can be a decimal number for standard modules such as: 123;
+//it can also be a hex number for vendor modules such as: 0xABCD01F0
+ModuleIdWrapper Utility::GetWrappedModuleIdFromTerminal(const char* commandArg, bool* didError)
+{
+    if (commandArg != nullptr)
+    {
+        //First, we try to convert the moduleId to a number (either from hex or from decimal)
+        bool didErrorInt = false;
+        ModuleIdWrapper moduleId = Utility::StringToU32(commandArg, &didErrorInt);
+
+        //In case it was not possible to convert it to a number, we check the string against all of our available modules
+        if (didErrorInt)
+        {
+            for (u32 i = 0; i < GS->amountOfModules; i++) {
+                if (strcmp(GS->activeModules[i]->moduleName, commandArg) == 0) return GS->activeModules[i]->vendorModuleId;
+            }
+        }
+        else {
+            if (moduleId < UINT8_MAX) return GetWrappedModuleId((ModuleId)moduleId);
+            else return moduleId;
+        }
+    }
+
+    if(didError != nullptr) *didError = true;
+    return INVALID_WRAPPED_MODULE_ID;
+}
+
+//ATTENTION, you need to access .data() when using this with printf!
+ModuleIdString Utility::GetModuleIdString(ModuleIdWrapper wrappedModuleId)
+{
+    ModuleIdString out;
+
+    if (IsVendorModuleId(wrappedModuleId)) {
+        sprintf(out.data(), "\"0x%08X\"", wrappedModuleId);
+    }
+    else {
+        sprintf(out.data(), "%u", (u8)Utility::GetModuleId(wrappedModuleId));
+    }
+
+    return out;
 }
 
 int ipow(int base, int exp)
@@ -89,6 +170,7 @@ int ipow(int base, int exp)
     while (exp){
         if (exp & 1) result *= base;
         exp >>= 1;
+        if (!exp) break; // Strictly speaking this does not make a difference for the return value. However, it fixes a signed integer overflow error of base found by the sanitizers.
         base *= base;
     }
     return result;
@@ -240,33 +322,49 @@ char * Utility::FindLast(char * str, const char * search)
     return retVal;
 }
 
+const char* IgnoreZeroPrefix(const char* str)
+{
+    //We do not remove leading zeros on hex numbers
+    if (str[0] == '0' && str[1] == 'x') return str;
+
+    //We remove leading zeros for other stuff, e.g. binary numbers
+    while (str[0] == '0' && str[1] != '\0') str++;
+    return str;
+}
+
 long Utility::StringToLong(const char *str, bool *outDidError)
 {
     static_assert(sizeof(long) >= sizeof(i32), "This function is used to parse strings to variables of size i32. Thus long must be at least as big.");
     char *endPtr = nullptr;
+    //We store the negativity of the number manually as we don't want to rely on the behavior of strtol as it interprets trailing zeros
+    //as octet numbers, something that seems to be not expected by most of our FW devs. See IOT-4166.
+    const bool isNegative = str[0] == '-';
+    if (isNegative) str++;
+    str = IgnoreZeroPrefix(str);
 
     const long retVal = strtol(str, &endPtr, 0);
     if (endPtr == str || *endPtr != '\0')
     {
-        if (outDidError != nullptr) *outDidError = true;
-        SIMEXCEPTION(NotANumberStringException);
+        if (outDidError == nullptr) { SIMEXCEPTION(NotANumberStringException); }
+        else { *outDidError = true; }
         return 0;
     }
 
-    return retVal;
+    return isNegative ? -retVal : retVal;
 }
 
 unsigned long Utility::StringToUnsignedLong(const char * str, bool *outDidError)
 {
     static_assert(sizeof(unsigned long) >= sizeof(u32), "This function is used to parse strings to variables of size u32. Thus unsigned long must be at least as big.");
     char *endPtr = nullptr;
+    str = IgnoreZeroPrefix(str);
 
     const unsigned long retVal = strtoul(str, &endPtr, 0);
     if (endPtr == str || (*endPtr != '\0' && *endPtr != '\r' && *endPtr != '\n'))
     {
-        if (outDidError != nullptr) *outDidError = true;
+        if (outDidError == nullptr) { SIMEXCEPTION(NotANumberStringException); }
+        else { *outDidError = true; }
         logt("WARN", "Tried to interpret the none number string \"%s\" as a number", str);
-        SIMEXCEPTION(NotANumberStringException);
         return 0;
     }
 
@@ -279,8 +377,9 @@ static T StringToU(const char *str, bool *outDidError)
     const unsigned long retVal = Utility::StringToUnsignedLong(str, outDidError);
     if (retVal > std::numeric_limits<T>::max())
     {
-        if (outDidError != nullptr) *outDidError = true;
-        SIMEXCEPTION(NumberStringNotInRangeException);
+        //In case no pointer to didError was given, we should throw an exception
+        if (outDidError == nullptr) { SIMEXCEPTION(NumberStringNotInRangeException); }
+        else { *outDidError = true; }
         return 0;
     }
     return retVal;
@@ -307,8 +406,8 @@ static T StringToI(const char *str, bool *outDidError)
     const long retVal = Utility::StringToLong(str, outDidError);
     if (retVal > std::numeric_limits<T>::max() || retVal < std::numeric_limits<T>::min())
     {
-        if (outDidError != nullptr) *outDidError = true;
-        SIMEXCEPTION(NumberStringNotInRangeException);
+        if (outDidError == nullptr) { SIMEXCEPTION(NumberStringNotInRangeException); }
+        else { *outDidError = true; }
         return 0;
     }
     return retVal;
@@ -420,7 +519,7 @@ void Utility::XorBytes(const u8* src1, const u8* src2, const u8 numBytes, u8* ou
     }
 }
 
-void Utility::swapBytes(u8 *data, const size_t length)
+void Utility::SwapBytes(u8 *data, const size_t length)
 {
     u8 *p = data;
     size_t lo, hi;
@@ -432,12 +531,12 @@ void Utility::swapBytes(u8 *data, const size_t length)
     }
 }
 
-u16 Utility::swap_u16( u16 val )
+u16 Utility::SwapU16( u16 val )
 {
     return (val << 8) | (val >> 8 );
 }
 
-u32 Utility::swap_u32( u32 val )
+u32 Utility::SwapU32( u32 val )
 {
     val = ((val << 8) & 0xFF00FF00 ) | ((val >> 8) & 0xFF00FF );
     return (val << 16) | (val >> 16);
@@ -449,3 +548,43 @@ void Utility::XorWords(const u32* src1, const u32* src2, const u8 numWords, u32*
     }
 }
 
+//This method can be used to implement a configurable back off timer, take a look at TestUtility to see how it is used
+bool Utility::ShouldBackOffIvTrigger(u32 timerDs, u16 passedTimeDs, u32 startTimeDs, const u32* backOffIvsDs, u16 backOffIvsSize)
+{
+    if (startTimeDs == INVALID_BACKOFF_START_TIME) return false;
+
+    for (u32 i = 0; i < backOffIvsSize / sizeof(u32); i++)
+    {
+        u32 intervalDs = backOffIvsDs[i];
+        if (timerDs - startTimeDs - passedTimeDs < intervalDs && timerDs - startTimeDs >= intervalDs) return true;
+    }
+    return false;
+}
+
+u16 Utility::ToAlignedU16(const void* ptr)
+{
+    u16 retVal = 0;
+    CheckedMemcpy(&retVal, ptr, sizeof(retVal));
+    return retVal;
+}
+
+i16 Utility::ToAlignedI16(const void* ptr)
+{
+    i16 retVal = 0;
+    CheckedMemcpy(&retVal, ptr, sizeof(retVal));
+    return retVal;
+}
+
+u32 Utility::ToAlignedU32(const void* ptr)
+{
+    u32 retVal = 0;
+    CheckedMemcpy(&retVal, ptr, sizeof(retVal));
+    return retVal;
+}
+
+i32 Utility::ToAlignedI32(const void* ptr)
+{
+    i32 retVal = 0;
+    CheckedMemcpy(&retVal, ptr, sizeof(retVal));
+    return retVal;
+}

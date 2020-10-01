@@ -1,0 +1,121 @@
+= Beaconing Module (ID 1)
+The former AdvertisingModule has been renamed to BeaconingModule to clear up confusion about its functionality and its naming similarity with the AdvertisingController. The short name of the Module is still adv to keep compatibility with the earlier naming of the BeaconingModule.
+
+== Purpose
+The _BeaconingModule_ with _ModuleId_ 1 allows the user to configure a number of advertising/beaconing messages to be sent periodically. It is possible to send iBeacon messages, EddyStone messages and other custom advertising messages without the need to update the firmware. Using FruityMesh in conjunction with a MeshGateway, a fully managed beacon infrastructure can be established.
+
+The _BeaconingModule_ is only intended for beaconing messages that can subsequently be configured over the mesh. Take a look at the xref:AdvertisingController.adoc[AdvertisingController] documentation for how to schedule advertising messages in your implementation.
+
+== Functionality
+The _BeaconingModule_ is currently configured by setting its persistent configuration. At the moment, it allows one message to be broadcast at a time and doesn't cycle through different messages. Message cycling can however be easily implemented since the mesh framework already supports this.
+
+== Add an advertising job
+
+`action [nodeId] adv add [Hex/Base64-String up to 31 byte] {requestHandle}`
+
+The node with the given nodeId will advertise the given advertising message on success together with all other advertising messages that were either configured through a different module or through the BeaconingModule. Note that only valid broadcast messages are actually advertised. Others are rejected by our HAL.
+
+Example (adding an iBeacon message)
+
+[source,C++]
+----
+action 123 adv add 02:01:06:1A:FF:4C:00:02:15:F0:01:8B:9B:75:09:4C:31:A9:05:1A:27:D3:9C:00:3C:EA:60:00:32:81:00:00 13
+----
+
+The response acknowledges the receipt with this command:
+
+[source,Javascript]
+----
+{
+    "type":"adv_add_response,
+    "nodeId":123,
+    "module":1,
+    "requestHandle":13,
+    "code":0
+}
+----
+
+where "code" can have the following values:
+
+[cols="1,2,5"]
+|===
+|Code|Name|Description
+
+|0|SUCCESS|The node successfully advertises the data and stored it in its persistent storage.
+|1|FULL|Too many adveritings have been stored in the node. To clear the advertisings you can reenroll the node.
+|2|RECORD_STORAGE_ERROR|The node was unable to persist the adv data. It is advertising it only until the next reboot.
+|===
+
+== Set an advertising job
+
+`action [nodeId] adv set [slot] [Hex/Base64-String up to 31 byte] {requestHandle}`
+
+The node with the given nodeId will advertise the given advertising message on success together with all other advertising messages that were either configured through a different module or through the BeaconingModule. Note that only valid broadcast messages are actually advertised. Others are rejected by our HAL.
+
+Example (setting an iBeacon message)
+
+[source,C++]
+----
+action 123 adv set 0 02:01:06:1A:FF:4C:00:02:15:F0:01:8B:9B:75:09:4C:31:A9:05:1A:27:D3:9C:00:3C:EA:60:00:32:81:00:00 13
+----
+
+The response acknowledges the receipt with this command:
+
+[source,Javascript]
+----
+{
+    "type":"adv_set_response",
+    "nodeId":123,
+    "module":1,
+    "requestHandle":13,
+    "code":0
+}
+----
+
+where "code" can have the following values:
+
+[cols="1,2,5"]
+|===
+|Code|Name|Description
+
+|0|SUCCESS|The node successfully advertises the data and stored it in its persistent storage.
+|1|SLOT_OUT_OF_RANGE|The given slot is outside the range of possible slots.
+|2|RECORD_STORAGE_ERROR|The node was unable to persist the adv data. It is advertising it only until the next reboot.
+|===
+
+== Remove an advertising job
+
+`action [nodeId] adv remove [slot] {requestHandle}`
+
+Clears an advertisement slot. The node with the given nodeId will no longer advertise data in this slot. If this slot is already cleared, the command silently succeeds.
+
+Example
+
+[source,C++]
+----
+action 123 adv remove 0 13
+----
+
+The response acknowledges the receipt with this command:
+
+[source,Javascript]
+----
+{
+    "type":"adv_remove_response",
+    "nodeId":123,
+    "module":1,
+    "requestHandle":13,
+    "code":0
+}
+----
+
+where "code" can have the following values:
+
+[cols="1,2,5"]
+|===
+|Code|Name|Description
+
+|0|SUCCESS|The node successfully advertises the data and stored it in its persistent storage.
+|1|SLOT_OUT_OF_RANGE|The given slot is outside the range of possible slots.
+|2|RECORD_STORAGE_ERROR|The node was unable to persist the adv data. It will continue to advertise the old message after a reboot.
+|===

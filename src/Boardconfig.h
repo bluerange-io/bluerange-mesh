@@ -94,7 +94,7 @@ typedef struct BoardConfiguration
 
 #ifdef __cplusplus
     #ifndef Boardconfig
-    #define Boardconfig (&(Boardconf::getInstance().configuration))
+    #define Boardconfig (&(Boardconf::GetInstance().configuration))
     #endif
 #endif //__cplusplus
 
@@ -104,7 +104,7 @@ typedef struct BoardConfiguration
     {
         public:
             Boardconf();
-            static Boardconf& getInstance();
+            static Boardconf& GetInstance();
 
             void Initialize();
             void ResetToDefaultConfiguration();

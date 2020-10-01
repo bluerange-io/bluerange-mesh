@@ -158,7 +158,7 @@ void CherrySimRunner::TerminalReaderMain() {
         }
 
         sim->receivedDataFromMeshGw = true;
-        sim->findNodeById(MESH_GW_NODE)->gs.terminal.PutIntoTerminalCommandQueue(input, false);
+        sim->FindNodeById(MESH_GW_NODE)->gs.terminal.PutIntoTerminalCommandQueue(input, false);
     }
 }
 
@@ -192,13 +192,13 @@ SimConfiguration CherrySimRunner::CreateDefaultRunConfiguration()
     simConfig.simOtherDelay = 1; // Enter 1 - 100000 to send sim_other message only each ... simulation steps, this increases the speed significantly
     simConfig.playDelay = 10; //Allows us to view the simulation slower than simulated, is added after each step
 
-    simConfig.interruptProbability = 0.1f;
+    simConfig.interruptProbability = UINT32_MAX / 10;
 
-    simConfig.connectionTimeoutProbabilityPerSec = 0;// 0.00001; //Every minute or so: 0.00001, randomly generates timout events for connections and disconnects them;
-    simConfig.sdBleGapAdvDataSetFailProbability = 0;// 0.0001; //Simulate fails on setting adv Data in the softdevice
-    simConfig.sdBusyProbability = 0.01;// 0.0001; //Simulates getting back busy errors from the softdevice
+    simConfig.connectionTimeoutProbabilityPerSec = 0;// UINT32_MAX * 0.00001; //Every minute or so: 0.00001, randomly generates timout events for connections and disconnects them;
+    simConfig.sdBleGapAdvDataSetFailProbability = 0;// UINT32_MAX * 0.0001; //Simulate fails on setting adv Data in the softdevice
+    simConfig.sdBusyProbability = UINT32_MAX / 100;// UINT32_MAX * 0.0001; //Simulates getting back busy errors from the softdevice
     simConfig.simulateAsyncFlash = true; //Simulates asynchronous flash operations, rather then sending the ACK immediately
-    simConfig.asyncFlashCommitTimeProbability = 0.9;
+    simConfig.asyncFlashCommitTimeProbability = UINT32_MAX / 10 * 9;
 
     simConfig.importFromJson = false; //Set to true in order to not generate nodes
     simConfig.siteJsonPath = "testsite.json";
@@ -243,9 +243,9 @@ void CherrySimRunner::Start()
 
 
         //Boot up all nodes
-        for (u32 i = 0; i < sim->getTotalNodes(); i++) {
+        for (u32 i = 0; i < sim->GetTotalNodes(); i++) {
             NodeIndexSetter setter(i);
-            sim->bootCurrentNode();
+            sim->BootCurrentNode();
         }
 
         if (shortLived)
@@ -287,20 +287,20 @@ bool CherrySimRunner::Simulate()
             //Store the average clustering time for reference
             SIMSTATAVG("ClusteringTestTimeAvgSec", sim->simState.simTimeMs / 1000);
 
-            if (PSRNG() < 0.4) {
+            if (PSRNG(UINT32_MAX / 10 * 4)) {
                 printf("Clustering seed %u" EOL, simConfig.seed);
                 sim->simConfig.seed++;
                 return false;
             }
             else {
-                u32 numNoneAssetNodes = sim->getTotalNodes() - sim->getAssetNodes();
-                u32 numNodesToReset = (u32)(std::ceil(numNoneAssetNodes / 5.0) * PSRNG() + 1);
-                auto nodeIndizesToReset = CherrySimUtils::generateRandomNumbers(0, numNoneAssetNodes - 1, numNodesToReset);
+                u32 numNoneAssetNodes = sim->GetTotalNodes() - sim->GetAssetNodes();
+                u32 numNodesToReset = (u32)(PSRNG(std::ceil(numNoneAssetNodes / 5.0)) + 1);
+                auto nodeIndizesToReset = CherrySimUtils::GenerateRandomNumbers(0, numNoneAssetNodes - 1, numNodesToReset);
 
                 for (auto const nodeIdx : nodeIndizesToReset) {
                     NodeIndexSetter setter(nodeIdx);
                     try {
-                        sim->resetCurrentNode(RebootReason::UNKNOWN);
+                        sim->ResetCurrentNode(RebootReason::UNKNOWN);
                     }
                     catch (NodeSystemResetException& e) {
                         //Nothing to do
@@ -334,7 +334,7 @@ bool CherrySimRunner::Simulate()
 
 //########################### Callbacks ###############################
 
-void CherrySimRunner::TerminalPrintHandler(nodeEntry* currentNode, const char* message)
+void CherrySimRunner::TerminalPrintHandler(NodeEntry* currentNode, const char* message)
 {
     if (runnerConfig.verbose) {
         //Send to console
@@ -347,7 +347,7 @@ void CherrySimRunner::CherrySimEventHandler(const char* eventType)
 
 }
 
-void CherrySimRunner::CherrySimBleEventHandler(nodeEntry* currentNode, simBleEvent* simBleEvent, u16 eventSize)
+void CherrySimRunner::CherrySimBleEventHandler(NodeEntry* currentNode, simBleEvent* simBleEvent, u16 eventSize)
 {
 
 }
