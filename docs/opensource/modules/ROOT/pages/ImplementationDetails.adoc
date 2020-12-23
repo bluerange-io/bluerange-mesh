@@ -1,0 +1,56 @@
+= Implementation Details
+
+The following is an unordered list of in depth documentation of various bits of FruityMesh.
+
+== Time Sync
+Time syncing is documented here:
+
+* https://www.bluerange.io/docs/fruitymesh/Features.html#_time_synchronisation
+* https://www.bluerange.io/docs/fruitymesh/Node.html#TimeSynchronization
+
+Once the time was set by some external device (e.g. Bluerange Gateway / Smartphone) the time is shared in the mesh by 4 different types of messages: The initial, initial_reply, correction, and correction_reply. These 4 messages build up the "time handshake". The time handshake is performed after the initial connection handshake. It is possible that other data is being sent through the connection before the time syncing starts. The time information consists of a unix timestamp at which the initial syncing time was sent in the mesh, a unix time offset that shows how much time passed since the time was synced, a time offset to set a local time, additional ticks to store time information that is smaller than a second, and a counter that indicates how often a time sharing sequence was overwritten by some new time. The counter is necessary so that we are always able to adjust the time in both directions. Bigger counters will always trump lower counters and so the newly set time will always propagate through the mesh, even if it was already set to any other time. All this information is sent from one node that has time information to another. The other node then accepts that it received the time with an initial_reply message. The sender of the initial measures the time it took between putting the initial message into the queue and actually sending it out (careful: it does NOT measure the time it took until the initial_reply came back! That information is irrelevant for time syncing). This is because putting data into the queue and sending it out can take some time, creating a small offset. This offset would accumulate over several hops and would make our time syncing more inaccurate. To avoid this issue, the time it took between queueing and sending is sent out in the correction message so that the receiver of the correction packet can adjust its time to counteract the inaccuracy. Once this is done, the receiver sends out a correction_reply, indicating that it is now fully synced. The receiver will then continue and does the same as the sender with all its connections.
+
+If two nodes are connected and both of them already have a synced time the node with the higher counter will set the time of the other node. If both have the same counter value none will sync the other.
+
+The time syncing described above is only performed for MeshConnections. There is another time syncing mechanism for MeshAccessConnections however, the inter_network time syncing. The inter_network time syncing only sends out an initial time sync packet, without acknowledgement or correction. Nodes only accept this time if they are assets or don't have any time. The inter_network time syncing is performed after a successful MA handshake. As such, the mesh will automatically sync the time again if there was a complete power outage but some battery powered asset is in reach and a connection to this asset is established.
+
+[#QualityOfService]
+== Quality of Service
+
+Each module is able to give a message a priority via the virtual `GetPriorityOfMessage` function. At time of writing these priorities can be `VITAL`, `HIGH`, `MEDIUM`, and `LOW`. The highest priority (the one closest to `VITAL`) is picked across all modules. If every module returns `INVALID` (a special value in the `DeliveryPriority` enum), `MEDIUM` is picked as the final priority of that message.
+
+If any `VITAL` message is queued, it is always sent out next. Note that if a previous message was started (that is, some split has been sent) but is not fully sent out yet, it is first fully transmitted, no matter which priority it has.
+
+Once no `VITAL` message is left anymore, the other queues are processed in the order of `HIGH`, `MEDIUM`, and then `LOW`. To avoid starvation issues, lower priority queues are able to send out some messages even if higher priorities are currently full. To achieve this, a new system was introduced: The "priority droplets". 
+
+Priority droplets are counters that every queue (except `VITAL`) has. If a queue has some message left and is picked as the queue that sends out this message next, it increments the priority droplet counter. Once this droplet counter reaches a certain threshold (see `AMOUNT_OF_PRIORITY_DROPLETS_UNTIL_OVERFLOW`), the droplet counter is set to zero and the next queue that has some message is picked instead. It then increases its priority droplet counter as well, until a queue is found that has messages and does not have a too high priority droplet counter.
+
+The following table shows the amount of messages sent out per queue for some `AMOUNT_OF_PRIORITY_DROPLETS_UNTIL_OVERFLOW` values, assuming all queues are permanently full, except the `VITAL` queue, which is permanently empty.
+
+|===
+|AMOUNT_OF_PRIORITY_DROPLETS_UNTIL_OVERFLOW|high|medium|low
+|1 |57.1429%|28.5714%|14.2857%
+|*2* |*69.2308%*|*23.0769%*|*7.69231%*
+|3 |76.1905%|19.0476%|4.76190%
+|4 |80.6452%|16.1290%|3.22580%
+|5 |83.7209%|13.9535%|2.32558%
+|6 |85.9649%|12.2807%|1.75439%
+|7 |87.6712%|10.9589%|1.36986%
+|8 |89.0110%|9.89011%|1.09890%
+|9 |90.0901%|9.00901%|0.90090%
+|10|90.9774%|8.27068%|0.75188%
+|===
+
+In case you are wondering why e.g. the first case isn't (50%/25%/12.5%): The three numbers have to add up to 100%. The remainder of 12.5% has to again be distributed across the three queues, giving another remainder. Calculating this often enough gives us the above values.
+
+By default, the firmware uses a value of 2 for `AMOUNT_OF_PRIORITY_DROPLETS_UNTIL_OVERFLOW`.
+
+In addition to sending out higher priorities more frequently, lower priority queues are only allowed to allocate new chunks if all higher priority queues of the same connection can allocate an additional chunk as well. This way, lower priority queues have a little less memory available than higher priority queues. If e.g. only the low prio queue tries to allocate chunks, it can allocate all chunks except 3. If the vital prio will then allocate a chunk, the medium prio will not be able to allocate another chunk, but the high prio is still able to allocate one.
+
+NOTE: The throughput of one priority level is much, much higher if the queues with a higher priority are empty.
+
+NOTE: The `VITAL` queue does not use priority droplets! It is always sending out next if there is anything to send.
+
+WARNING: Modules should avoid giving anything the priority `VITAL`. This priority level is reserved for very few and small mesh vital messages which make sure that the mesh behaves correctly.
+
+One can introduce new priority levels simply by adding new entries to the `DeliveryPriority` enum and adjusting the `AMOUNT_OF_SEND_QUEUE_PRIORITIES` value accordingly. Caution should be taken hover as every priority level reserves a data chunk for every connection. Thus, introducing more priority levels reduces the amount of data that can fit into every queue of every priority level.

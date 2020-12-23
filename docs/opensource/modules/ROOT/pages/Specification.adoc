@@ -6,12 +6,11 @@ this page and ongoing discussions will show whether some of these
 specifications should be changed.
 
 == Advertising Packets
-FruityMesh uses a number of advertising packets,
-the most important one being the _JOIN_ME_ packet that is used for
-discovery of nearby nodes that also run FruityMesh.
+FruityMesh uses a number of advertising packets, the most important one being the _JOIN_ME_ packet that is used for discovery of nearby nodes that also run FruityMesh.
+
+There are two types of advertising packets used by FruityMesh. One uses the manufacturer specific advertisement structure, the other uses the serviceData advertisement structure. Some devices such as iOS devices have a better reception rate when using the serviceData structure.
 
 === Advertising Packet with Manufacturer Specific Data
-There are two types of advertising packets used by FruityMesh. One uses the manufacturer specific advertisement structure, the other uses the serviceData advertisement structure.
 
 .Advertising Header With Manufacturer Specific Data
 |===
@@ -36,6 +35,7 @@ The network identifier can be changed by the user. In combination with the _netw
 ==== Message Type
 The _messageType_ is used to distinguish between different messages. The same _messageType_ definitions are used for advertising packets and for connection packets. This allows us to send the same message over another "transport" if desired and compatible with the message format.
 
+[#JoinMe]
 === JOIN_ME Packet (MessageType 1)
 The _JOIN_ME_ packet contains all the information that other nodes can use to determine their best connection partner. The _messageId_ in the header must be set to 1. Future _JOIN_ME_ packets can have a different _messageId_ and different values that can then be used in the Cluster Score Function. The current implementation uses the _clusterSize_ and the number of _freeIn_ and _freeOut_ connections.
 
@@ -56,6 +56,7 @@ The _JOIN_ME_ packet contains all the information that other nodes can use to de
 |4| ClusterId |_ackField_| Contains the acknowledgement from another node for the slave connection procedure
 |===
 
+[#ServiceDataBroadcastHeader]
 === Advertising Packet With Service Data
 Another type of advertising packet used by FruityMesh uses the Service Data Adv Structure. This is important when dealing with mobile devices since some have hardware filtering with no support for manufacturer specific data.
 
@@ -71,8 +72,20 @@ Another type of advertising packet used by FruityMesh uses the Service Data Adv 
 
 |===
 
+==== List of MessageTypes for Service Data Advertisements
+Below is a list of all messages that we have currently openly specified. These all use the M-Way Solutions GmbH Service UUID 0xFE12 and the messageType is determined by checking the first two bytes of the Service Data payload.
+
+|===
+|Message Type|Description
+
+|0x01|Placeholder for xref:#JoinMe[JOIN_ME Packet] (Currently based on Manufacturer Data)
+|0x02|Legacy Asset Tracking Broadcast (Deprecated for new type 0x04)
+|0x03|xref:MeshAccessModule.adoc#MeshAccessBroadcast[MeshAccess Broadcast]
+|0x04|xref:AssetModule.adoc#AssetBroadcast[Asset Tracking Broadcast]
+|===
+
 === Other Advertising Packets
-FruityMesh can be used to distribute all advertising packets that conform to the BLE specification. These can be Eddystone, iBeacon or any other kind of advertising messages. These are however not essential for FruityMesh itself and are therefore not documented here. Have a look at the <<AdvertisingModule.adoc#,AdvertisingModule>> for more information.
+FruityMesh can be used to distribute all advertising packets that conform to the BLE specification. These can be Eddystone, iBeacon or any other kind of advertising messages. These are however not essential for FruityMesh itself and are therefore not documented here. Have a look at the xref:BeaconingModule.adoc[BeaconingModule] for more information.
 
 == Connection Packets
 The mesh uses a number of packets that are sent over connections. Most packets that are sent over connections must have this header. There are some exceptions to this (e.g. split packets use a two byte message header for less overhead. The _messageType_ is used to identify if the _connPacketHeader_ is used or not.
@@ -303,25 +316,17 @@ For more explanation, see xref:Concepts.adoc#deviceTypes[Device Types].
 
 [#UICR]
 == UICR
-The UICR is a special persistant storage that is used to store
-factory defaults once a node is flashed. The NRF_UICR->CUSTOMER area is
-used to store the data on nRF chips.
+The UICR is a special persistant storage that is used to store factory defaults once a node is flashed. The NRF_UICR->CUSTOMER area is used to store the data on nRF chips.
 
-If you want to store a serial number, _nodeKey_, etc. for a node, you
-must write the UICR during flashing. The NRF_UICR->CUSTOMER area is used
-for that purpose and starts at 0x10001080. You can use
-http://srecord.sourceforge.net/[srec_cat] to produce a .hex file
-containing the desired UICR data. This can then be merged with the SoftDevice and Application or you can flash each one separately.
+If you want to store a serial number, _nodeKey_, etc. for a node, you must write the UICR during flashing. The NRF_UICR->CUSTOMER area is used for that purpose and starts at 0x10001080. You can use http://srecord.sourceforge.net/[srec_cat] to produce a .hex file containing the desired UICR data. This can then be merged with the SoftDevice and Application or you can flash each one separately. For detailed instructions, see our xref:Developers.adoc#UICR[Developers chapter].
 
-FruityMesh will boot with random data (random _nodeId_ / _serialNumber_ /
-...) if no data is present in the UICR. The data will however be
-persistent across reboots as it is generated according to the internal chip id from the FICR. Layout of UICR memory:
+FruityMesh will boot with random data (random _nodeId_ / _serialNumber_ / ...) if no data is present in the UICR. The data will however be persistent across reboots as it is generated according to the internal chip id from the FICR. Layout of UICR memory:
 
 .Layout of UICR memory
 |===
 |Offset|Size (Bytes)|Name|Description
 
-|0|4|MAGIC_NUMBER|Must be set to 0xF07700 when UICR data is available
+|0|4|MAGIC_NUMBER|Must be set to 0x00F07700 when UICR data is available
 |4|4|BOARD_TYPE|Accepts an integer that defines the hardware board that FruityMesh should be running on (_boardId_, a.k.a. _boardType_)
 |8|8|SERIAL_NUMBER|Deprecated: This contained the given serial number as ASCII (zero terminated) but is not used anymore (since 12.05.2020). Must now be set to FFFF....FFFF. The serial number is instead calculated from the SERIAL_NUMBER_INDEX
 |16|16|NODE_KEY|Should be securely and randomly generated

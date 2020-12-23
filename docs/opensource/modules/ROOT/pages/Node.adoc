@@ -52,6 +52,22 @@ The reason can have the following values:
 
 The reboot reason is also stored in the error log
 
+== Capability Retrieval
+The capability retrieval command helps a user (e.g. the Bluerange Gateway) to find out what some node in the mesh is capable of. Such a capability can be for example if it is a regent lamp and if so, how many heads and sensors are connected to it. A node can return an arbitrary amount of capabilities, each in its own message. A single capability consists of the following data:
+
+* *CapabilityEntryType* - Whether if the capability describes some kind of hardware (e.g. a lamp) or some software (e.g. the firmware version of the lamp).
+* *Manufacturer* - Human readable ASCII String of up to 32 chars, describing who built this piece of hardware/software.
+* *ModelName* - Human readable ASCII String of up to 53 chars, containing the name of the capability.
+* *Revision* - Human readable ASCII String of up to 32 chars, the "value" of the capability. Often it is used as the version, but it can also be the amount of something (e.g. the amount of lamps connected to this node). As such, the interpretation of this field is highly dependent on the capability.
+
+NOTE: None of the *Manufacturer*, *ModelName*, or *Revision* fields are zero terminated strings. They must always be copied in their entirety.
+
+Each module in the firmware has a function with the following header: `CapabilityEntry GetCapability(u32 index, bool firstCall)`. The function is called with consecutive indices, starting with 0 for every module. If the module has a capability for this index available, it should be returned accordingly. If none is available with the given index, the `CapabilityEntryType::INVALID` must be returned. No other valid capabilities may follow after the first invalid index. For some capabilities, some connected vendor controller has to be queried first. In such a case, the capability is not yet ready, but may become ready in the future. `CapabilityEntryType::NOT_READY` is returned in these cases. The function will be called again with the same index shortly. For some modules it is important to know if this was the first call of the current capability retrieval. If the first capability of the module would return `CapabilityEntryType::NOT_READY`, the module cannot distinguish between the first call solely based on the index. For such cases, the bool `firstCall` is passed as well.
+
+NOTE: Every module has its own distinct local capability index range which always starts with 0.
+
+NOTE: The Capability Retrieval has room for some future improvement and a version 2. We could loosen up the strict restrictions of 32/53/32 chars per field and instead add the restriction of 115 (32 + 53 + 32 - 2) chars in total, shared among the three fields, adding either a header that describes the length of the first two entries or zero terminate them. This could also speed up capability retrieval as smaller messages need to be transferred. If this implementation is worth it however is now clear. Capability retrieval is already quite complex for the firmware (e.g. we have to wait for the response of some controllers). In addition, capability retrieval is not intended to be used very often, only during the first setup of the system.
+
 == Terminal Commands
 
 === Getting Basic Information (Local Command)
@@ -105,9 +121,18 @@ The response acknowledges the receipt of the command.
 {"type":"set_discovery_result","nodeId":123,"module":0}
 ----
 
+[#RemoteReset]
+=== Resetting Nodes
+Sometimes it is necessary to reset one or all nodes connected to a mesh at once. The reset command can be used for this purpose. After receiving the command, each node waits a predefined time before performing a reset. This time can be defined and is set to 10 seconds by default. This ensures that the packet is sent to all nodes before the reset process starts.
+[source, C++]
+----
+//Receiving nodes will reset within a few seconds
+action [nodeId] node reset {waitSeconds}
+----
+
 === Ping a node
 
-`action [nodeId] node ping {requestHandle}`
+`action [nodeId] node ping \{requestHandle}`
 
 Pings the given nodeId. Once received, a ping response is sent back.
 
@@ -129,7 +154,7 @@ The response acknowledges the receipt of these commands.
 
 === Generating Load
 
-`action [nodeId] node generate_load [target] [size] [amountOfMessages] [timeBetweenMessagesDs] {requestHandle}`
+`action [nodeId] node generate_load [target] [size] [amountOfMessages] [timeBetweenMessagesDs] \{requestHandle}`
 
 Can be used to put message load on the mesh, mainly for measuring and debug purposes of installations (thus not part of the DebugModule). After the node with nodeId receives this message it will send messages with a payload of size every timeBetweenMessagesDs to the target until it sent a total of amountOfMessages.
 
@@ -231,6 +256,29 @@ The response acknowledges the receipt of the command.
 [source,Javascript]
 ----
 {"type":"set_preferred_connections_result","nodeId":123,"module":0}
+----
+
+=== Setting number of enrolled nodes 
+
+`action [nodeId] node set_enrolled_nodes {number of nodes in network}`
+
+Sets a number of nodes in current network. When network reaches size defined by this command it will enter idle discovery mode. It means it will consume much less energy while still being able to connect new nodes if needed. To reset this feature simply set enrolled nodes to 0.
+
+NOTE: If size of the network will increase over the value of enrolled nodes it will be assumed that configuration is no longer valid and enrolled nodes will be set to 0. Care is taken to allow bigger network during clustering.
+
+Examples
+
+[source,C++]
+----
+//E.g. Sets the number of enrolled nodes to 8. This value is send directly to node 1, but will be auto-distributed to other nodes.
+action 1 node set_enrolled_nodes 8
+----
+
+The response acknowledges the receipt of the command.
+
+[source,Javascript]
+----
+{"type":"set_enrolled_nodes","nodeId":8,"module":0,"enrolled_nodes":8}
 ----
 
 === Sensor and Actuator Messages

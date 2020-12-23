@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -50,8 +50,8 @@ public:
 
     //FUNCTIONS
 
-    ErrorType BleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable) const;
-    ErrorType BleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength) const;
+    ErrorType BleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, MessageLength dataLength, bool reliable) const;
+    ErrorType BleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, MessageLength dataLength) const;
 
     ErrorType DiscoverService(u16 connHandle, const FruityHal::BleGattUuid &p_uuid);
 

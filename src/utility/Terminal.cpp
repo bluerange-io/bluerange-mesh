@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -382,13 +382,17 @@ void Terminal::ProcessLine(char* line)
         crcChecksEnabled = true; // In case we restarted but our meshGw did not yet process the reboot message, we just enable crcChecks if we find some CRC.
         crcLocation[0] = '\0'; // Cut off the CRC part from the rest of the message.
         crcLocation += 6; // The length of " CRC: "
-        bool didError = false;
-        const u32 passedCrc   = Utility::StringToU32(crcLocation, &didError);
-        const u32 expectedCrc = Utility::CalculateCrc32String(line);
-        if (didError || passedCrc != expectedCrc)
+        const bool isSkipped = strcmp(crcLocation, "skip") == 0;
+        if (!isSkipped)
         {
-            OnCrcInvalid();
-            return;
+            bool didError = false;
+            const u32 passedCrc = Utility::StringToU32(crcLocation, &didError);
+            const u32 expectedCrc = Utility::CalculateCrc32String(line);
+            if (didError || passedCrc != expectedCrc)
+            {
+                OnCrcInvalid();
+                return;
+            }
         }
     }
     else if (crcChecksEnabled)
@@ -640,9 +644,13 @@ void Terminal::UartInterruptHandler()
 {
     if(!uartActive) return;
 
+    //If a line was already read, we have to wait until it got processed
+    if(lineToReadAvailable) return;
+
     //Checks if an error occured
     if (FruityHal::IsUartErroredAndClear())
     {
+        GS->logger.LogCustomCount(CustomErrorTypes::COUNT_UART_RX_ERROR, 1);
         readBufferOffset = 0;
     }
 

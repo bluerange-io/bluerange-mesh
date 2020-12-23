@@ -33,7 +33,7 @@ raw_data_start_received | The sender must send the _raw_data_start_ again after 
 |===
 
 ==== Transmission Start
-`raw_data_start [receiverId] [destinationModuleId] [numChunks] [protocolId] {requestHandle = 0}`
+`raw_data_start [receiverId] [destinationModuleId] [numChunks] [protocolId] \{requestHandle = 0}`
 
 This command starts a raw data transmission. The payload shall be sent using _raw_data_chunk_ messages.
 
@@ -76,7 +76,7 @@ If received by a device with a terminal, _raw_data_start_ is printed out like th
 ----
 
 ==== Accept Transmission
-`raw_data_start_received [receiverId] [destinationModuleId] {requestHandle = 0}`
+`raw_data_start_received [receiverId] [destinationModuleId] \{requestHandle = 0}`
 
 Once a _raw_data_start_ is received, the receiver shall send the sender a _raw_data_start_received_ message.
 
@@ -102,7 +102,7 @@ If received by a JSON-capable device, the _raw_data_start_ is printed out like t
 ----
 
 ==== Subsequent Chunk Messages
-`raw_data_chunk [receiverId] [destinationModuleId] [chunkId] [payloadHex] {requestHandle = 0}`
+`raw_data_chunk [receiverId] [destinationModuleId] [chunkId] [payloadHex] \{requestHandle = 0}`
 
 Once a raw transmission has been started, the appropriate number of chunks should follow in the correct order. Once the last chunk is received by the receiver, it is possible to reassemble and parse the whole message. The _moduleId_ is present in all chunks so that they can be assigned to the correct stream and to avoid clashes between different modules. A module can send intermittent data streams if is uses different request handles.
 
@@ -131,7 +131,7 @@ If received by a JSON-capable device, the _raw_data_start_ is printed out like t
 ----
 
 ==== Send Report
-`raw_data_report [receiverId] [destinationModuleId] [MissingChunkIds] {requestHandle = 0}`
+`raw_data_report [receiverId] [destinationModuleId] [MissingChunkIds] \{requestHandle = 0}`
 
 Once the last chunk is received, the receiver sends this message to the sender, indicating either a successful transmission (empty missing chunk IDs) or informs the sender about missing chunk IDs.
 
@@ -169,7 +169,7 @@ Or in cases where the transmission was successful:
 ----
 
 ==== Send Report Desired
-`raw_data_report_desired [receiverId] [destinationModuleId] {requestHandle = 0}`
+`raw_data_report_desired [receiverId] [destinationModuleId] \{requestHandle = 0}`
 
 The "Report Desired" message is an optional message that can speed up transmissions in cases where the current last chunk was dropped. It is send from the sender to the receiver, indicating that the sender wishes to get a raw_data_report from the receiver. The receiver however may completely ignore this message, completely relying on the timeouts. The sender may also never send it, also completely relying on the timeouts.
 
@@ -195,14 +195,15 @@ If received by a JSON-capable device, the _raw_data_report_desired_ is printed o
 
 
 ==== Send Error
-`raw_data_error [receiverId] [destinationModuleId] [errorCode] [destination] {requestHandle = 0}`
+`raw_data_error [receiverId] [destinationModuleId] [errorCode] [destination] \{requestHandle = 0}`
 
-This command indicates that some error occurred and the transmission must be closed. Will is sent to the receiver as well as the sender.
+This command indicates that some error occurred and the transmission must be closed. The packet will be sent to the receiver as well as the sender.
 
 [cols="1,2,4"]
 |===
 |Error Code | Name | Meaning
 
+| 0 | Reserved |
 | 1 | Unexpected end of transmission | Three timeouts happened without receiving a message from the transmission partner.
 | 2 | Not in a transmission | A _raw_data_chunk_ or _raw_data_report_ was received without an open transmission.
 | 3 | Malformed Message | A message was received which was malformed and did not fit any other error code.
@@ -210,7 +211,7 @@ This command indicates that some error occurred and the transmission must be clo
 | 5 | Malformed GZIP | The receiver got all chunks but could could not unpack the GZIP.
 | 6 | Malformed Type | Thrown in case of a GZIP communication. The unpacking worked, but the provided type inside the GZIP JSIN was unknown.
 | 7 | Invalid Chunk ID | The given chunk ID was out of range.
-| 0, 4 - 199 | Reserved | Not yet used
+| 8 - 199 | Reserved | Not yet used
 | 200 - 255 | User defined | May be different in each implementation.
 |===
 
@@ -241,7 +242,7 @@ If received by a JSON-capable device, the _raw_data_error_ is printed out like t
 Sending messages that fit into a single mesh packet can be done by using raw_data_light with minimal overhead and almost no implementation effort.
 
 === Terminal Command
-`raw_data_light [receiverId] [destinationModuleId] [protocolId] [payload] {requestHandle = 0}`
+`raw_data_light [receiverId] [destinationModuleId] [protocolId] [payload] \{requestHandle = 0}`
 
 Sends a single chunk of arbitrary data to the receiver. There is no guarantee that the message is transmitted if the mesh is in the process of restructuring or busy. The sender should provide some resending logic if desired.
 

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -78,6 +78,11 @@ class DebugModule: public Module
         u32 packetsOut;
         u32 packetsIn;
 
+        //Flood counter + time calc
+        u32 firstFloodPacketMs = 0;
+        u32 autoFloodSum = 0;
+        u32 lastFloodPacketMs = 0;
+
         //Variables for counter mode
         NodeId counterDestinationId = 0;
         u16 counterMessagesPer10Sec = 0;
@@ -92,6 +97,12 @@ class DebugModule: public Module
         u16 pingCount;
         u16 pingCountResponses;
         bool syncTest;
+
+#ifdef SIM_ENABLED
+        u32 queueFloodCounterLow    = 0;
+        u32 queueFloodCounterMedium = 0;
+        u32 queueFloodCounterHigh   = 0;
+#endif
 
         #pragma pack(push)
         #pragma pack(1)
@@ -148,9 +159,9 @@ class DebugModule: public Module
             u16 packetsIn;
             u16 packetsOut;
 
-            u8 chunkData[21]; // This chunk is only there to bloat the message to such a size, that it has to be split.
+            u8 chunkData[66]; // This chunk is only there to bloat the message to such a size, that it has to be split.
         } DebugModuleFloodMessage;
-        STATIC_ASSERT_SIZE(DebugModuleFloodMessage, 25);
+        STATIC_ASSERT_SIZE(DebugModuleFloodMessage, 70);
 
 
         static constexpr int SIZEOF_DEBUG_MODULE_SET_FLOOD_MODE_MESSAGE = 7;
@@ -245,6 +256,10 @@ class DebugModule: public Module
             EINK_SETANDDRAW_RESPONSE_DEPRECATED = 11,
             SEND_MAX_MESSAGE_RESPONSE = 16,
             MEMORY = 19,
+            QUEUE_FLOOD_RESPONSE_LOW = 20,
+            QUEUE_FLOOD_RESPONSE_MEDIUM = 21,
+            QUEUE_FLOOD_RESPONSE_HIGH = 22,
+            QUEUE_FLOOD_RESPONSE_VITAL = 23,
         };
 
         DebugModule();
@@ -269,5 +284,15 @@ class DebugModule: public Module
 
         u32 GetPacketsIn();
         u32 GetPacketsOut();
+
+#ifdef SIM_ENABLED
+        void SendQueueFloodMessage(DeliveryPriority prio);
+        void SendQueueFloodMessages();
+        u32 GetQueueFloodCounterLow();
+        u32 GetQueueFloodCounterMedium();
+        u32 GetQueueFloodCounterHigh();
+        //Priority
+        virtual DeliveryPriority GetPriorityOfMessage(const u8* data, MessageLength size) override;
+#endif
         
 };

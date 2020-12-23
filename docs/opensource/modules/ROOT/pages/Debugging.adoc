@@ -9,6 +9,12 @@ Using this information it is possible to get the source code line where the erro
 
 TIP: The address must be given as a hex value, otherwise _addr2line_ doesn't print a valid result. FruityMesh must have been compiled with debug information using `-g`.
 
+If the line is not given and you just get sth. like *??:?*, you can also use readelf or any online elf parser such as e.g. link:http://www.sunshine2k.de/coding/javascript/onlineelfviewer/onlineelfviewer.html[this one].
+
+ <gccDir>\bin\arm-none-eabi-readelf -a <fruitymeshDir>\_build\debug\NRF51_BOARD\FruityMesh.out
+
+This will give you a list of addresses and sizes of where different methods are located in the binary. You can try to find an address that is a bit lower than the reported error address. Then check if your address is within the size of that method and you will know that the issue happened within this method.
+
 == Reading Flash Of A Broken FruityMesh Node
 
 In order to analyze a broken node, the flash and UICR can be read back. A good idea is to first read back UICR and flash and then compare the .hex with either the last .hex flashed onto this beacon (from the _fruitydeploy_ beacon directory) or flash the beacon again and read it back.
@@ -60,3 +66,13 @@ The nRF sniffer is used with Wireshark. A custom dissector for FruityMesh _JOIN_
 The nRF Sniffer doesn't work with an updated Segger firmware. It is necessary to flash the Segger firmeware JLink_V498c onto the beacon with `JLinkConfig.exe`, option: replace firmware. Afterwards, the sniffer should work together with the fixed sniffer application received by Nordic Semiconductor.
 
 If the fixed sniffer application does not find the beacon, open the buggy official version until the beacon is found, then close it and reopen the fixed version.
+
+== Segger Virtual Com Port (VCOM)
+A few words on the virtual COM port offered by some Segger debugger chips such as the on-board chips on the Nordic Development Kits: A few pins of the nRF controller are directly connected to some pins of the Segger debugger chip. The Segger chip will decode the UART signal and will then send it over USB to a host computer using a virtual com port. While this is a nice feature that means you do not have to use a dedicated UART-USB converter, such as an FTDI chip, it is very error prone because of the implementation in the Segger chip.
+
+Problems that we have experienced so far:
+
+* If you send data without flow control and then switch flow control on, you must disconnect the board from power before you can send this data through. Apparently the Segger chip blocks the flow control in this case.
+* If you do not use flow control, many characters will get lost when sending a lot of data
+* If you use flow control e.g. a 1Mbit/s and send a lot of data, the Segger chip will raise the flow control lines half of the time and will severely limit the throughput
+* Even with flow control enabled, characters will be lost at high speeds. This was confirmed with a logic analyzer.

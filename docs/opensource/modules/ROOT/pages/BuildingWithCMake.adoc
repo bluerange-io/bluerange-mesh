@@ -40,3 +40,32 @@ Once the native build files are created, it is possible to create all the execut
 2. (For Simulator) If several visual studio versions are installed (e.g. 2017 + 2019), make sure that you are starting the solution file with the correct visual studio version.
 3. (For Simulator & Firmware) "Invalid character escape": If you pass any paths with white spaces you have to put them into quotation marks. If cmake still complains about wrong escape chars you have to remove all the cache files.
 4. In case this error happens: "CMake Error at CMakeLists.txt:4 (message): In-Source Build is prohibited. Please execute cmake from a different directory". Please make sure that the entire repository is clean in the same state that you cloned it (e.g. use git reset --hard) before trying to build again.
+
+[#cmakeStructure]
+== CMake structure overview
+CMake Projects are often structured into libraries and executables. This is (mostly) not the case for FruityMesh however, because as it turned out, splitting the project into libraries increases the hex file size by quite a lot without giving us actual benefits. Due to this we have decided to compile everything and link everything individually per featureset/simulator instance. Each featurset as well as simulator configuration (tester/runner) is an individual executable. To avoid adding all the files to each target by hand, all the targets are stored in several lists. Currently the following lists exist (not all publicly available):
+
+* *ALL_TARGETS* - Every target
+* *NATIVE_TARGETS* - Only targets that are the product of a single feature set. Most of them run on actual hardware, though there are exceptions to this like prod_mesh_arm which is intended only to check that the HAL abstracts all vendor specific code out.
+* *SDK_14_TARGETS* - Targets for the nrf52832.
+* *SDK_15_TARGETS* - Targets for the nrf52840.
+* *ASSET_TARGETS* - All assets, both classical, development, and INS.
+* *BP_TARGETS* - Belparts targets.
+* *CLC_TARGETS* - Regent targets.
+* *VS_TARGETS* - Vossloh targets.
+* *WM_TARGETS* - Waldmann targets.
+* *EINK_TARGETS* - Eink targets.
+* *VIRTUAL_COM_TARGETS* - Targets with virtual com port functionality.
+* *ARM_TARGETS* - Currently only prod_mesh_arm.
+* *SIMULATOR_TARGETS* - Only targets that run in the simulator. At time of writing these are cherrySim_tester and cherrySim_runner.
+
+To simplify the work with these lists several macros are defined in CMake/MultiTargetCommands.cmake. Most of them just apply a single function on all targets in a given list.
+
+Each featureset has its own cmake file which is located in fruitymesh/config/featureset/NAME.cmake. The only mandatory job of these is to set the platform of a featureset (commonly the first line in these files). Currently available platforms are: *NRF52832*, *NRF52840*, and *ARM*. In addition to this mandatory step, the featureset cmake files may add additional files and configs. Sets of such files and configs and somehow belong together (e.g. adding the Eink capability) are grouped for reusability in fruitymesh/config/featuresets/CMakeFragments. The featureset cmake file can also set some special variables. These are:
+
+[#allowMalloc]
+* *set(ALLOW_MALLOC 1)* - Allows malloc and new functionality to be compiled in the firmware. *CAREFUL*: This does NOT mean that malloc and new are allowed to be called! This was required for TensorFlow in the INS featureset. When compiled with a special flag TensorFlow guarantees that malloc/new is not used. However, they still link to it.
+* *set(FAIL_ON_SIZE_TOO_BIG 0)* - Does not fail compilation if the firmware is too big for updates (but does print a warning). Useful for development featuresets. In addition this feature is currently used for NRF52840 featuresets as a work around.
+
+== ONLY_FEATURESET
+When generating the project files with CMake for building a featureset, it is possible to set the "ONLY_FEATURESET" parameter. If set, only the given featureset (the one that is stored in this parameter) will be generated. There are some advantages to this, for example the generated Makefile shows the done percentage more clearly. If all featuresets are generated, the shown percentage jump in steps of 20, while if only one featureset it generated, the percentage is smoothly rising from one percentage to the next. Another advantage is better intellisense code hints in visual studio code. For example, it indicates better which areas are currently disabled by an `#ifdef`.

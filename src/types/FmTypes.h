@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -37,6 +37,7 @@
 
  /*## General types for convenience #############################################################*/
 #include "PrimitiveTypes.h"
+#include <type_traits>
 
 extern "C" {
 
@@ -162,6 +163,15 @@ enum class FeatureSetGroup : NodeId
     // Reserved for Cypress (currently on a seperate branch) = 20021,
     /*FruityDeploy-FeatureSetGroup*/NRF52_ET_MESH         = 20022,
     /*FruityDeploy-FeatureSetGroup*/NRF52_ET_ASSET        = 20023,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_ET_ASSET2       = 20024,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_ET_ASSET3       = 20025,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_VS_CONVERTER    = 20026,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_ASSET_INS    = 20027,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_EINK         = 20028,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_SINK_GITHUB     = 20029,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_MESH_GITHUB     = 20030,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_DEV_GITHUB      = 20031,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_DEV_GITHUB   = 20032,
 };
 
 //Sets the maximum number of firmware group ids that can be compiled into the firmware

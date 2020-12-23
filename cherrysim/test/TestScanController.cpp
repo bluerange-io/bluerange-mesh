@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -47,7 +47,7 @@ static void simulateAndCheckWindow(int simulate_time, int window, CherrySimTeste
     ASSERT_EQ(tester.sim->currentNode->state.scanWindowMs, window);
 }
 
-static ScanJob * AddJob(ScanJob &scan_job, CherrySimTester &tester)
+static ScanJob * AddJob(ScanJob &scan_job, const CherrySimTester &tester)
 {
     ScanJob * p_job;
     NodeIndexSetter setter(0);
@@ -55,13 +55,13 @@ static ScanJob * AddJob(ScanJob &scan_job, CherrySimTester &tester)
     return p_job;
 }
 
-static void RemoveJob(ScanJob * p_scan_job, CherrySimTester &tester)
+static void RemoveJob(ScanJob * p_scan_job, const CherrySimTester &tester)
 {
     NodeIndexSetter setter(0);
     tester.sim->currentNode->gs.scanController.RemoveJob(p_scan_job);
 }
 
-static void ForceStopAllScanJobs(CherrySimTester &tester)
+static void ForceStopAllScanJobs(const CherrySimTester &tester)
 {
     NodeIndexSetter setter(0);
     for (int i = 0; i < tester.sim->currentNode->gs.scanController.GetAmountOfJobs(); i++)

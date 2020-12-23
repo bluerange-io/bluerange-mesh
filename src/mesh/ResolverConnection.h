@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -55,7 +55,7 @@ public:
 
     void PrintStatus() override;
 
-    bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable) override;
+    bool SendData(u8 const * data, MessageLength dataLength, bool reliable) override;
 
 };
 

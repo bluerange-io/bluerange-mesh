@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -467,8 +467,8 @@ const char* Logger::GetErrorLogCustomError(CustomErrorTypes type)
         return "WARN_RX_WRONG_DATA";
     case CustomErrorTypes::WARN_CLUSTER_UPDATE_FLOW_MISMATCH:
         return "WARN_CLUSTER_UPDATE_FLOW_MISMATCH";
-    case CustomErrorTypes::WARN_HIGH_PRIO_QUEUE_FULL:
-        return "WARN_HIGH_PRIO_QUEUE_FULL";
+    case CustomErrorTypes::WARN_VITAL_PRIO_QUEUE_FULL:
+        return "WARN_VITAL_PRIO_QUEUE_FULL";
     case CustomErrorTypes::COUNT_NO_PENDING_CONNECTION:
         return "COUNT_NO_PENDING_CONNECTION";
     case CustomErrorTypes::FATAL_HANDLE_PACKET_SENT_ERROR:
@@ -579,6 +579,22 @@ const char* Logger::GetErrorLogCustomError(CustomErrorTypes type)
         return "FATAL_FAILED_TO_REGISTER_APPLICATION_INTERRUPT_HANDLER";
     case CustomErrorTypes::FATAL_FAILED_TO_REGISTER_MAIN_CONTEXT_HANDLER:
         return "FATAL_FAILED_TO_REGISTER_MAIN_CONTEXT_HANDLER";
+    case CustomErrorTypes::COUNT_GENERATED_SPLIT_PACKETS:
+        return "COUNT_GENERATED_SPLIT_PACKETS";
+    case CustomErrorTypes::COUNT_RECEIVED_SPLIT_OVER_MESH_ACCESS:
+        return "COUNT_RECEIVED_SPLIT_OVER_MESH_ACCESS";
+    case CustomErrorTypes::COUNT_TOTAL_RECEIVED_MESSAGES:
+        return "COUNT_TOTAL_RECEIVED_MESSAGES";
+    case CustomErrorTypes::COUNT_RECEIVED_MESSAGES:
+        return "COUNT_RECEIVED_MESSAGES";
+    case CustomErrorTypes::FATAL_ILLEGAL_PROCCESS_BUFFER_LENGTH:
+        return "FATAL_ILLEGAL_PROCCESS_BUFFER_LENGTH";
+    case CustomErrorTypes::FATAL_QUEUE_ORIGINS_FULL:
+        return "FATAL_QUEUE_ORIGINS_FULL";
+    case CustomErrorTypes::COUNT_UART_RX_ERROR:
+        return "COUNT_UART_RX_ERROR";
+    case CustomErrorTypes::INFO_UNUSED_STACK_BYTES:
+        return "INFO_UNUSED_STACK_BYTES";
     default:
         SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
         return "UNKNOWN_ERROR";
@@ -890,7 +906,7 @@ const char * Logger::GetErrorLogError(LoggingError type, u32 code)
 void Logger::BlePrettyPrintAdvData(SizedData advData) const
 {
 
-    trace("Rx Packet len %d: ", advData.length);
+    trace("Rx Packet len %d: ", advData.length.GetRaw());
 
     u32 i = 0;
     SizedData fieldData;
@@ -928,12 +944,12 @@ void Logger::LogCustomError(CustomErrorTypes customErrorType, u32 extraInfo)
 }
 
 //can be called multiple times and will increment the extra each time this happens
-void Logger::LogCount(LoggingError errorType, u32 errorCode)
+void Logger::LogCount(LoggingError errorType, u32 errorCode, u32 amount)
 {
     //Check if the erroLogEntry exists already and increment the extra if yes
     for (u32 i = 0; i < errorLogPosition; i++) {
         if (errorLog[i].errorType == errorType && errorLog[i].errorCode == errorCode) {
-            errorLog[i].extraInfo++;
+            errorLog[i].extraInfo += amount;
             return;
         }
     }
@@ -941,16 +957,16 @@ void Logger::LogCount(LoggingError errorType, u32 errorCode)
     //Create the entry
     errorLog[errorLogPosition].errorType = errorType;
     errorLog[errorLogPosition].errorCode = errorCode;
-    errorLog[errorLogPosition].extraInfo = 1;
+    errorLog[errorLogPosition].extraInfo = amount;
     errorLog[errorLogPosition].timestamp = GS->timeManager.GetTime();
 
     //Will fill the error log until the last entry (last entry does get overwritten with latest value)
     if (errorLogPosition < NUM_ERROR_LOG_ENTRIES - 1) errorLogPosition++;
 }
 
-void Logger::LogCustomCount(CustomErrorTypes customErrorType)
+void Logger::LogCustomCount(CustomErrorTypes customErrorType, u32 amount)
 {
-    LogCount(LoggingError::CUSTOM, (u32)customErrorType);
+    LogCount(LoggingError::CUSTOM, (u32)customErrorType, amount);
 }
 
 const char* base64Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -990,6 +1006,11 @@ void Logger::ConvertBufferToBase64String(const u8 * srcBuffer, u32 srcLength, ch
     dstBuffer[((srcLength + 2) / 3) * 4] = 0;
 }
 
+void Logger::ConvertBufferToBase64String(const u8* srcBuffer, MessageLength srcLength, char* dstBuffer, u16 bufferLength)
+{
+    ConvertBufferToBase64String(srcBuffer, srcLength.GetRaw(), dstBuffer, bufferLength);
+}
+
 void Logger::ConvertBufferToHexString(const u8 * srcBuffer, u32 srcLength, char * dstBuffer, u16 bufferLength)
 {
     CheckedMemset(dstBuffer, 0x00, bufferLength);
@@ -1009,6 +1030,11 @@ void Logger::ConvertBufferToHexString(const u8 * srcBuffer, u32 srcLength, char 
         }
 
     };
+}
+
+void Logger::ConvertBufferToHexString(const u8* srcBuffer, MessageLength srcLength, char* dstBuffer, u16 bufferLength)
+{
+    ConvertBufferToHexString(srcBuffer, srcLength.GetRaw(), dstBuffer, bufferLength);
 }
 
 u32 Logger::ParseEncodedStringToBuffer(const char * encodedString, u8 * dstBuffer, u16 dstBufferSize, bool *didError)

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -134,6 +134,22 @@ void EnrollmentModule::TimerEventHandler(u16 passedTimeDs)
             EnrollmentConnectionConnectedHandler();
         }
     }
+}
+
+DeliveryPriority EnrollmentModule::GetPriorityOfMessage(const u8* data, MessageLength size)
+{
+    if (size >= SIZEOF_CONN_PACKET_MODULE)
+    {
+        const ConnPacketModule* mod = (const ConnPacketModule*)data;
+        if ((mod->header.messageType == MessageType::MODULE_TRIGGER_ACTION
+            || mod->header.messageType == MessageType::MODULE_ACTION_RESPONSE)
+            && mod->moduleId == moduleId)
+        {
+            // Enrollment packets are always transmitted with high prio.
+            return DeliveryPriority::HIGH;
+        }
+    }
+    return DeliveryPriority::INVALID;
 }
 
 #ifdef TERMINAL_ENABLED
@@ -285,18 +301,18 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
     //Must call superclass for handling
     Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
-    //We do not allow enrollment in safe boot mode as this would be a security issue
-    if(GS->config.safeBootEnabled){
-        logt("ERROR", "Enrollment disabled in safe boot mode");
-        return;
-    }
-
     if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
         ConnPacketModule const * packet = (ConnPacketModule const *)packetHeader;
 
         //Check if our module is meant and we should trigger an action
         if(packet->moduleId == moduleId)
         {
+            //We do not allow enrollment in safe boot mode as this would be a security issue
+            if(GS->config.safeBootEnabled){
+                logt("ERROR", "Enrollment disabled in safe boot mode");
+                return;
+            }
+
             EnrollmentModuleTriggerActionMessages actionType = (EnrollmentModuleTriggerActionMessages)packet->actionType;
             //Enrollment request
             if(actionType == EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_SERIAL
@@ -358,7 +374,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
             else if (actionType == EnrollmentModuleTriggerActionMessages::REQUEST_PROPOSALS)
             {
                 EnrollmentModuleRequestProposalMessage const * data = (EnrollmentModuleRequestProposalMessage const *)packet->data;
-                const u32 payloadLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE;
+                const u32 payloadLength = sendData->dataLength.GetRaw() - SIZEOF_CONN_PACKET_MODULE;
                 
                 if (payloadLength % sizeof(u32) != 0)
                 {
@@ -494,7 +510,7 @@ void EnrollmentModule::RefreshScanJob()
     }
 }
 
-void EnrollmentModule::Enroll(ConnPacketModule const * packet, u16 packetLength)
+void EnrollmentModule::Enroll(ConnPacketModule const * packet, MessageLength packetLength)
 {
     EnrollmentModuleSetEnrollmentBySerialMessage const * data = (EnrollmentModuleSetEnrollmentBySerialMessage const *)packet->data;
 
@@ -547,11 +563,24 @@ void EnrollmentModule::Enroll(ConnPacketModule const * packet, u16 packetLength)
     }
 #endif //IS_ACTIVE(SIG_MESH)
 
+    // Check if nodeId comes from a wrong range
+    if (
+           (GET_DEVICE_TYPE() == DeviceType::ASSET && (data->newNodeId < NODE_ID_GLOBAL_DEVICE_BASE || data->newNodeId > (NODE_ID_GLOBAL_DEVICE_BASE + NODE_ID_GLOBAL_DEVICE_BASE_SIZE)))
+        || (GET_DEVICE_TYPE() != DeviceType::ASSET && (data->newNodeId < NODE_ID_DEVICE_BASE        || data->newNodeId > (NODE_ID_DEVICE_BASE        + NODE_ID_DEVICE_BASE_SIZE)))
+        )
+    {
+        SendEnrollmentResponse(
+            EnrollmentModuleActionResponseMessages::ENROLLMENT_RESPONSE,
+            EnrollmentResponseCode::INCORRECT_NODE_ID,
+            packet->requestHandle);
+        return;
+    }
+
     StoreTemporaryEnrollmentDataAndDispatch(packet, packetLength);
 
 }
 
-void EnrollmentModule::SaveEnrollment(ConnPacketModuleStart* packet, u16 packetLength)
+void EnrollmentModule::SaveEnrollment(ConnPacketModuleStart* packet, MessageLength packetLength)
 {
     EnrollmentModuleSetEnrollmentBySerialMessage* data = (EnrollmentModuleSetEnrollmentBySerialMessage*)((ConnPacketModule*)packet)->data;
 
@@ -606,7 +635,7 @@ void EnrollmentModule::SaveEnrollment(ConnPacketModuleStart* packet, u16 packetL
         Utility::GetWrappedModuleId(moduleId));
 }
 
-void EnrollmentModule::Unenroll(ConnPacketModule const * packet, u16 packetLength)
+void EnrollmentModule::Unenroll(ConnPacketModule const * packet, MessageLength packetLength)
 {
     logt("ENROLLMOD", "Unenrolling");
 
@@ -679,7 +708,7 @@ void EnrollmentModule::SendRequestProposalResponse(u32 serialIndex)
     );
 }
 
-void EnrollmentModule::SaveUnenrollment(ConnPacketModuleStart* packet, u16 packetLength)
+void EnrollmentModule::SaveUnenrollment(ConnPacketModuleStart* packet, MessageLength packetLength)
 {
 
     GS->node.configuration.enrollmentState = EnrollmentState::NOT_ENROLLED;
@@ -717,14 +746,14 @@ void EnrollmentModule::SaveUnenrollment(ConnPacketModuleStart* packet, u16 packe
 
 #define _____________PRE_ENROLLMENT_____________
 
-void EnrollmentModule::StoreTemporaryEnrollmentDataAndDispatch(ConnPacketModule const * packet, u16 packetLength)
+void EnrollmentModule::StoreTemporaryEnrollmentDataAndDispatch(ConnPacketModule const * packet, MessageLength packetLength)
 {
     //Before we can call other modules to tell them that we want to enroll the node,
     //we have to temporarily save the enrollment data until the other module has answered
     ted.state = EnrollmentStates::PREENROLLMENT_RUNNING;
     ted.endTimeDs = GS->appTimerDs + ENROLLMENT_MODULE_PRE_ENROLLMENT_TIMEOUT_DS;
     ted.packetLength = packetLength;
-    CheckedMemcpy(&ted.requestHeader, packet, packetLength);
+    CheckedMemcpy(&ted.requestHeader, packet, packetLength.GetRaw());
 
     DispatchPreEnrollment(nullptr, PreEnrollmentReturnCode::DONE);
 }
@@ -799,7 +828,7 @@ void EnrollmentModule::PreEnrollmentFailed()
 
 #define _____________ENROLLMENT_OVER_MESH_____________
 
-void EnrollmentModule::EnrollOverMesh(ConnPacketModule const * packet, u16 packetLength, BaseConnection* connection)
+void EnrollmentModule::EnrollOverMesh(ConnPacketModule const * packet, MessageLength packetLength, BaseConnection* connection)
 {
     logt("ENROLLMOD", "Received Enrollment over the mesh request");
 
@@ -838,7 +867,7 @@ void EnrollmentModule::EnrollOverMesh(ConnPacketModule const * packet, u16 packe
 
     //If the enrollment was directed to broadcast, only perform the request at a
     //chance of 50% => Helps us to not block all nodes in a mesh at once
-    if(packet->header.receiver == NODE_ID_BROADCAST && GS->node.clusterSize > 1 && rand < UINT32_MAX/2){
+    if(packet->header.receiver == NODE_ID_BROADCAST && GS->node.GetClusterSize() > 1 && rand < UINT32_MAX/2){
         logt("ENROLLMOD", "Random skip");
         return;
     }
@@ -860,7 +889,7 @@ void EnrollmentModule::EnrollOverMesh(ConnPacketModule const * packet, u16 packe
     //If yes, we will connect to the other node and try to enroll it
     CheckedMemset(&ted, 0x00, sizeof(TemporaryEnrollmentData));
     constexpr u32 maxTedDataSize = SIZEOF_ENROLLMENT_MODULE_SET_ENROLLMENT_BY_SERIAL_MESSAGE + sizeof(ConnPacketModuleStart);
-    CheckedMemcpy(&ted.requestHeader, packet, packetLength > maxTedDataSize ? maxTedDataSize : packetLength);
+    CheckedMemcpy(&ted.requestHeader, packet, packetLength.GetRaw() > maxTedDataSize ? maxTedDataSize : packetLength.GetRaw());
 
     //Set timeout time for enrollment
     ted.endTimeDs = GS->appTimerDs + SEC_TO_DS(data->timeoutSec);
@@ -938,7 +967,7 @@ void EnrollmentModule::EnrollmentConnectionConnectedHandler()
     logt("ENROLLMOD", "Sender was %u", ted.requestHeader.header.sender);
 
     if(conn){
-        conn.SendData(buffer, len, DeliveryPriority::LOW, false);
+        conn.SendData(buffer, len, false);
     }
 
     //Final state reached, will be cleared after timeout is reached

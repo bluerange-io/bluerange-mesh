@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -53,7 +53,7 @@ void StackWatcher::Check()
     const u32 uncleanedStackSize = (const char*)StackWatcher::stackBase.back() - (const char*)&someDummyStackVariable;
     const u32 cleanedStackSize = uncleanedStackSize - sizeof(StackBaseSetter);
 
-    if (cleanedStackSize > 10000)
+    if (cleanedStackSize > 12000)
     {
 #if !defined(GITHUB_RELEASE) && !defined(__clang__)
         SIMEXCEPTION(StackOverflowException);

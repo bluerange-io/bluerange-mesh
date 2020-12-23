@@ -110,15 +110,15 @@ action 123 status get_status //Get the current status from node 123
 The following modules are currently part of the
 open source release:
 
-* xref:AdvertisingModule.adoc[_AdvertisingModule_ (_ModuleId_ 1)]
-* xref:ScanningModule.adoc[_ScanningModule_ (_ModuleId_ 2)]
-* xref:StatusReporterModule.adoc[_StatusReporterModule_ (_ModuleId_ 3)]
-* xref:EnrollmentModule.adoc[_EnrollmentModule_ (_ModuleId_ 5)]
-* xref:IoModule.adoc[_IoModule_ (_ModuleId_ 6)]
-* xref:DebugModule.adoc[_DebugModule_ (_ModuleId_ 7)]
-* xref:MeshAccessModule.adoc[_MeshAccessModule_ (_ModuleId_ 10)]
+* xref:BeaconingModule.adoc[BeaconingModule (ModuleId 1)]
+* xref:ScanningModule.adoc[ScanningModule (ModuleId 2)]
+* xref:StatusReporterModule.adoc[StatusReporterModule (ModuleId 3)]
+* xref:EnrollmentModule.adoc[EnrollmentModule (ModuleId 5)]
+* xref:IoModule.adoc[IoModule (ModuleId 6)]
+* xref:DebugModule.adoc[DebugModule (ModuleId 7)]
+* xref:MeshAccessModule.adoc[MeshAccessModule (ModuleId 10)]
 
 == Proprietary Modules
-* xref:DfuModule.adoc[_DfuModule_ (_ModuleId_ 4)]
+* xref:DfuModuleAbstract.adoc[DfuModule (ModuleId 4)]
 * EnOcean, Eink, Asset and other prorietory modules can be provided upon
 request.

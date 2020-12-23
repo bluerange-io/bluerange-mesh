@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -82,7 +82,7 @@ public:
     void AddCorrection(u32 ticks);
     void ProcessTicks();
     
-    void HandleUpdateTimestampMessages(ConnPacketHeader const * packetHeader, u16 dataLength);
+    void HandleUpdateTimestampMessages(ConnPacketHeader const * packetHeader, MessageLength dataLength);
 
     //Trivial implementation for converting the timestamp in human readable format
     //This does not pay respect to any leap seconds, gap years, whatever

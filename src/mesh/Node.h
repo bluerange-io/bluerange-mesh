@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -84,6 +84,7 @@ typedef struct meshServiceStruct_temporary
         u8 networkKey[16];
         u8 userBaseKey[16];
         u8 organizationKey[16];
+        u16 numberOfEnrolledDevices;
     };
 #pragma pack(pop)
 
@@ -106,6 +107,7 @@ private:
             START_GENERATE_LOAD       = 4,
             GENERATE_LOAD_CHUNK       = 5,
             EMERGENCY_DISCONNECT      = 6,
+            SET_ENROLLED_NODES        = 7,
         };
 
         enum class NodeModuleActionResponseMessages : u8
@@ -115,6 +117,7 @@ private:
             PING                             = 3,
             START_GENERATE_LOAD_RESULT       = 4,
             EMERGENCY_DISCONNECT_RESULT      = 5,
+            SET_ENROLLED_NODES_RESULT        = 6,
         };
 
         #pragma pack(push, 1)
@@ -130,11 +133,25 @@ private:
             EmergencyDisconnectErrorCode code;
         };
         STATIC_ASSERT_SIZE(EmergencyDisconnectResponseMessage, 1);
+
+        struct SetEnrolledNodesMessage
+        {
+            u16 enrolledNodes;
+        };
+        STATIC_ASSERT_SIZE(SetEnrolledNodesMessage, 2);
+
+        struct SetEnrolledNodesResponseMessage
+        {
+            u16 enrolledNodes;
+        };
+        STATIC_ASSERT_SIZE(SetEnrolledNodesResponseMessage, 2);
         #pragma pack(pop)
 
         bool stateMachineDisabled = false;
 
         u32 rebootTimeDs = 0;
+
+        bool clusterSizeChangeHandled = true;
 
         void SendModuleList(NodeId toNode, u8 requestHandle) const;
 
@@ -158,6 +175,7 @@ private:
         u32 capabilityRetrieverModuleIndex = 0;
         u32 capabilityRetrieverLocal = 0;
         u32 capabilityRetrieverGlobal = 0;
+        ClusterSize clusterSize = 1;
 
         bool isInit = false;
 
@@ -184,7 +202,7 @@ private:
         MeshAccessConnectionHandle emergencyDisconnectValidationConnectionUniqueId;
         void ResetEmergencyDisconnect(); //Resets all the emergency disconnect variables and closes the validation connection.
 
-    public:
+    public:    
         DECLARE_CONFIG_AND_PACKED_STRUCT(NodeConfiguration);
 
 
@@ -201,13 +219,13 @@ private:
         DiscoveryState nextDiscoveryState    = DiscoveryState::INVALID;
 
         //Timers for state changing
+        i32 clusterSizeTransitionTimeoutDs = 0;
         i32 currentStateTimeoutDs = 0;
         u32 lastDecisionTimeDs = 0;
 
         u8 noNodesFoundCounter = 0; //Incremented every time that no interesting cluster packets are found
 
         //Variables (kinda private, but I'm too lazy to write getters)
-        ClusterSize clusterSize = 1;
         ClusterId clusterId = 0;
 
         u32 radioActiveCount = 0;
@@ -293,6 +311,10 @@ private:
 
         //Helpers
         ClusterId GenerateClusterID(void) const;
+        ClusterSize GetClusterSize(void) const;
+        void SetClusterSize(ClusterSize clusterSize);
+        void SetEnrolledNodes(u16 enrolledNodes, NodeId sender);
+        void SendEnrolledNodes(u16 enrolledNodes, NodeId destinationNode);
 
         Module* GetModuleById(ModuleId id) const;
         Module* GetModuleById(VendorModuleId id) const;
@@ -315,6 +337,9 @@ private:
 
         //Receiving
         void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader) override final;
+
+        //Priority
+        virtual DeliveryPriority GetPriorityOfMessage(const u8* data, MessageLength size) override;
 
         //Methods of TerminalCommandListener
         #ifdef TERMINAL_ENABLED

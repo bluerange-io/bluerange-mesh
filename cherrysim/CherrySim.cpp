@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -161,6 +161,7 @@ void CherrySim::LoadFlashFromFile()
     //If file does not exist we just return
     if (!infile.good())
     {
+        printf("WARNING: Flash was not loaded from file as the file '%s' did not exist!", simConfig.storeFlashToFile.c_str());
         return;
     }
 
@@ -175,6 +176,7 @@ void CherrySim::LoadFlashFromFile()
     ffh = *(FlashFileHeader*)(buffer);
 
     if (
+        //=> We are not checking against the version as this is set to the FruityMesh version which is allowed to change
            ffh.sizeOfHeader  != sizeof(ffh)
         || ffh.flashSize     != SIM_MAX_FLASH_SIZE
         || ffh.amountOfNodes != GetTotalNodes()
@@ -218,6 +220,7 @@ void CherrySim::LoadFlashFromFile()
     fp.featuresetOrder = featuresetOrderCounter; \
     fp.getWatchdogTimeout = GetWatchdogTimeout_##featureset; \
     fp.getWatchdogTimeoutSafeBoot = GetWatchdogTimeoutSafeBoot_##featureset; \
+    fp.featuresetName = #featureset; \
     featuresetPointers.insert(std::pair<std::string, FeaturesetPointers>(std::string(#featureset), fp)); \
     featuresetOrderCounter++; \
 }
@@ -228,7 +231,10 @@ void CherrySim::PrepareSimulatedFeatureSets()
     //if we have defined 3 nodes with sink featureset and 2 with mesh featureset then
     //NodeId 1,2,3 will have sink featureset and 4,5 with mesh featureset
     u32 featuresetOrderCounter = 0;
-    AddSimulatedFeatureSet(github_nrf52);
+    AddSimulatedFeatureSet(github_dev_nrf52);
+    AddSimulatedFeatureSet(github_dev_nrf52840);
+    AddSimulatedFeatureSet(github_sink_nrf52);
+    AddSimulatedFeatureSet(github_mesh_nrf52);
 #ifndef GITHUB_RELEASE
     AddSimulatedFeatureSet(prod_sink_nrf52);
     AddSimulatedFeatureSet(prod_mesh_nrf52);
@@ -236,7 +242,8 @@ void CherrySim::PrepareSimulatedFeatureSets()
     AddSimulatedFeatureSet(dev_vslog);
     AddSimulatedFeatureSet(prod_vs_nrf52);
     AddSimulatedFeatureSet(prod_clc_mesh_nrf52);
-    AddSimulatedFeatureSet(dev);
+    AddSimulatedFeatureSet(dev_nrf52);
+    AddSimulatedFeatureSet(dev_nrf52840);
     AddSimulatedFeatureSet(dev_sig_mesh);
     AddSimulatedFeatureSet(dev_automated_tests_master_nrf52);
     AddSimulatedFeatureSet(dev_automated_tests_slave_nrf52);
@@ -244,7 +251,7 @@ void CherrySim::PrepareSimulatedFeatureSets()
     AddSimulatedFeatureSet(prod_pcbridge_nrf52);
     AddSimulatedFeatureSet(prod_wm_nrf52840);
     AddSimulatedFeatureSet(prod_bp_nrf52840);
-    AddSimulatedFeatureSet(prod_eink_nrf52);
+    AddSimulatedFeatureSet(prod_eink_nrf52840);
     //AssetNodes will be assigned the last nodeIds
     AddSimulatedFeatureSet(prod_asset_ins_nrf52840);
     AddSimulatedFeatureSet(prod_asset_nrf52);
@@ -270,7 +277,7 @@ std::string CherrySim::RedirectFeatureset(const std::string & oldFeatureset)
 {
     if (IsRedirectedFeatureset(oldFeatureset))
     {
-        return "github_nrf52";
+        return "github_dev_nrf52";
     }
     return oldFeatureset;
 }
@@ -1648,13 +1655,13 @@ void CherrySim::SetFeaturesets()
     for (auto& eraser : simConfigsToErase) {
         simConfig.nodeConfigName.erase(eraser);
     }
-    if (simConfig.nodeConfigName.find("github_nrf52") == simConfig.nodeConfigName.end())
+    if (simConfig.nodeConfigName.find("github_dev_nrf52") == simConfig.nodeConfigName.end())
     {
-        simConfig.nodeConfigName.insert({ "github_nrf52", amountOfRedirectedFeaturesets });
+        simConfig.nodeConfigName.insert({ "github_dev_nrf52", amountOfRedirectedFeaturesets });
     }
     else
     {
-        simConfig.nodeConfigName["github_nrf52"] += amountOfRedirectedFeaturesets;
+        simConfig.nodeConfigName["github_dev_nrf52"] += amountOfRedirectedFeaturesets;
     }
 #endif //GITHUB_RELEASE
     struct FeatureNameOrderPair{
@@ -1673,12 +1680,12 @@ void CherrySim::SetFeaturesets()
         auto entry = cherrySimInstance->featuresetPointers.find(it->first);
         if (entry == cherrySimInstance->featuresetPointers.end())
         {
-            SIMEXCEPTION(IllegalStateException); //Featureset is not defined yet
+            SIMEXCEPTIONFORCE(IllegalStateException); //Featureset is not defined yet
         }
         if (it->second <= 0)
         {
             //Found entry for featureset that does not contain any featuresets.
-            SIMEXCEPTION(IllegalStateException);
+            SIMEXCEPTIONFORCE(IllegalStateException);
         }
         FeatureNameOrderPair pair;
         pair.featuresetName = it->first;
@@ -2051,6 +2058,7 @@ void CherrySim::ConnectMasterToSlave(NodeEntry* master, NodeEntry* slave)
 
     //Generate an event for the current node
     simBleEvent s2;
+    CheckedMemset(&s2, 0, sizeof(s2));
     s2.globalId = simState.globalEventIdCounter++;
     s2.bleEvent.header.evt_id = BLE_GAP_EVT_CONNECTED;
     s2.bleEvent.header.evt_len = s2.globalId;
@@ -2107,6 +2115,7 @@ void CherrySim::ConnectMasterToSlave(NodeEntry* master, NodeEntry* slave)
 
     //Generate an event for the remote node
     simBleEvent s;
+    CheckedMemset(&s, 0, sizeof(s));
     s.globalId = simState.globalEventIdCounter++;
     s.bleEvent.header.evt_id = BLE_GAP_EVT_CONNECTED;
     s.bleEvent.header.evt_len = s.globalId;
@@ -2163,6 +2172,7 @@ u32 CherrySim::DisconnectSimulatorConnection(SoftdeviceConnection* connection, u
     connection->connectionActive = false;
 
     simBleEvent s1;
+    CheckedMemset(&s1, 0, sizeof(s1));
     s1.globalId = simState.globalEventIdCounter++;
     s1.bleEvent.header.evt_id = BLE_GAP_EVT_DISCONNECTED;
     s1.bleEvent.header.evt_len = s1.globalId;
@@ -2174,6 +2184,7 @@ u32 CherrySim::DisconnectSimulatorConnection(SoftdeviceConnection* connection, u
     partnerConnection->connectionActive = false;
 
     simBleEvent s2;
+    CheckedMemset(&s2, 0, sizeof(s2));
     s2.globalId = simState.globalEventIdCounter++;
     s2.bleEvent.header.evt_id = BLE_GAP_EVT_DISCONNECTED;
     s2.bleEvent.header.evt_len = s2.globalId;
@@ -2189,6 +2200,7 @@ void CherrySim::SimulateTimeouts() {
         currentNode->state.connectingActive = false;
 
         simBleEvent s;
+        CheckedMemset(&s, 0, sizeof(s));
         s.globalId = simState.globalEventIdCounter++;
         s.bleEvent.header.evt_id = BLE_GAP_EVT_TIMEOUT;
         s.bleEvent.header.evt_len = s.globalId;
@@ -2250,6 +2262,7 @@ void CherrySim::SendUnreliableTxCompleteEvent(NodeEntry* node, int connHandle, u
 {
     if (packetCount > 0) {
         simBleEvent s2;
+        CheckedMemset(&s2, 0, sizeof(s2));
         s2.globalId = simState.globalEventIdCounter++;
         s2.bleEvent.header.evt_id = BLE_GATTC_EVT_WRITE_CMD_TX_COMPLETE;
         s2.bleEvent.header.evt_len = s2.globalId;
@@ -2359,6 +2372,7 @@ void CherrySim::SimulateConnections() {
                         //Generate the event that the write was successful immediately
                         //TODO: Could be postponed a bit to better match the real world
                         simBleEvent s2;
+                        CheckedMemset(&s2, 0, sizeof(s2));
                         s2.globalId = simState.globalEventIdCounter++;
                         s2.bleEvent.header.evt_id = BLE_GATTC_EVT_WRITE_RSP;
                         s2.bleEvent.header.evt_len = s2.globalId;
@@ -2393,6 +2407,7 @@ void CherrySim::SimulateConnections() {
                 NodeEntry* slave = i == 0 ? currentNode : connection->partner;
 
                 simBleEvent s;
+                CheckedMemset(&s, 0, sizeof(s));
                 s.globalId = simState.globalEventIdCounter++;
                 s.bleEvent.header.evt_id = BLE_GAP_EVT_RSSI_CHANGED;
                 s.bleEvent.header.evt_len = s.globalId;
@@ -2810,9 +2825,9 @@ void CherrySim::CheckMeshingConsistency()
     //Grab information from the current clusterSize
     for (u32 i = 0; i < numNoneAssetNodes; i++)
     {
-        nodes[i].state.validityClusterSize = nodes[i].gs.node.clusterSize;
+        nodes[i].state.validityClusterSize = nodes[i].gs.node.GetClusterSize();
 
-        //printf("NODE %u has clusterSize %d" EOL, nodes[i].id, nodes[i].gs.node.clusterSize);
+        //printf("NODE %u has clusterSize %d" EOL, nodes[i].id, nodes[i].gs.node.GetClusterSize());
     }
 
     //Grab information from the currentClusterInfoUpdatePacket
@@ -2836,7 +2851,7 @@ void CherrySim::CheckMeshingConsistency()
         }
     }
 
-    //Grab information from the HighPrioQueue
+    //Grab information from the VitalQueue
     for (u32 i = 0; i < numNoneAssetNodes; i++)
     {
         NodeEntry* node = &nodes[i];
@@ -2847,17 +2862,17 @@ void CherrySim::CheckMeshingConsistency()
             MeshConnection* conn = conns.handles[k].GetConnection();
 
             if (conn->HandshakeDone()) {
-                PacketQueue* queue = &(conn->packetSendQueueHighPrio);
-                for (u32 m = 0; m < queue->_numElements; m++) {
-                    SizedData data = queue->PeekNext(m);
-                    if (data.length >= SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED + SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE) {
-                        BaseConnectionSendDataPacked* sendInfo = (BaseConnectionSendDataPacked*)data.data;
-                        ConnPacketClusterInfoUpdate* packet = (ConnPacketClusterInfoUpdate*)(data.data + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
+                ChunkedPacketQueue* queue = conn->queue.GetQueueByPriority(DeliveryPriority::VITAL);
+                for (u32 m = 0; m < queue->GetAmountOfPackets(); m++) {
+                    u8 buffer[2048];
+                    u32 length = queue->RandomAccessPeek(buffer, sizeof(buffer), m);
+                    if (length >= SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED + SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE) {
+                        ConnPacketClusterInfoUpdate* packet = (ConnPacketClusterInfoUpdate*)(buffer + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
                         if (packet->header.messageType == MessageType::CLUSTER_INFO_UPDATE)
                         {
                             //We must check if this packet was queued in the Softdevice already, if yes, we must not count it twice
                             //It will be removed after the Transmission Success was delivered from the SoftDevice
-                            if (sendInfo->sendHandle == PACKET_QUEUED_HANDLE_NOT_QUEUED_IN_SD)
+                            if (queue->IsRandomAccessIndexLookedAhead(m) == false)
                             {
                                 conn->validityClusterUpdatesToSend += packet->payload.clusterSizeChange;
                             }
@@ -2867,7 +2882,7 @@ void CherrySim::CheckMeshingConsistency()
                             //then we have to implement this check as well.
 
                             if (packet->payload.clusterSizeChange != 0) {
-                                //printf("NODE %u to %u: Change in HighPrio %d" EOL, node->id, conn->partnerId, packet->payload.clusterSizeChange);
+                                //printf("NODE %u to %u: Change in VitalPrio %d" EOL, node->id, conn->partnerId, packet->payload.clusterSizeChange);
                             }
                         }
                     }
@@ -2965,7 +2980,7 @@ void CherrySim::CheckMeshingConsistency()
         ClusterSize realClusterSize = DetermineClusterSizeAndPropagateClusterUpdates(node, nullptr);
 
         if (realClusterSize != node->state.validityClusterSize) {
-            printf("NODE %d has a real cluster size of %d and predicted size of %d, reported cluster size %d" EOL, node->id, realClusterSize, node->state.validityClusterSize, nodes[i].gs.node.clusterSize);
+            printf("NODE %d has a real cluster size of %d and predicted size of %d, reported cluster size %d" EOL, node->id, realClusterSize, node->state.validityClusterSize, nodes[i].gs.node.GetClusterSize());
             printf("-------- POTENTIAL CLUSTERING MISMATCH -----------" EOL);
             //std::cout << "Press Enter to Continue";
             //std::cin.ignore();
@@ -3132,6 +3147,11 @@ u32 GetWatchdogTimeoutSafeBoot_CherrySim()
     return getFeaturesetPointers()->getWatchdogTimeoutSafeBoot();
 }
 
+const char* GetFeaturesetName_CherrySim()
+{
+    return getFeaturesetPointers()->featuresetName;
+}
+
 //This function is responsible for setting all the BLE Stack dependent configurations according to the datasheet of the ble stack used
 void CherrySim::SetBleStack(NodeEntry* node)
 {
@@ -3157,7 +3177,7 @@ bool CherrySim::IsClusteringDone()
     std::set<ClusterId> clusterIds;
     for (u32 i = 0; i < numNoneAssetNodes; i++) {
         clusterIds.insert(nodes[i].gs.node.clusterId);
-        if ((u32)nodes[i].gs.node.clusterSize != numNoneAssetNodes) {
+        if ((u32)nodes[i].gs.node.GetClusterSize() != numNoneAssetNodes) {
             return false;
         }
     }

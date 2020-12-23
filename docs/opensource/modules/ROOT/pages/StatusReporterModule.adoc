@@ -44,6 +44,17 @@ action [nodeId] status get_connections
 action [nodeId] status get_nearby
 ----
 
+Information about all connections with a lot of detail can be requested with the _get_connections_verbose_ command. In scenarios with limited queue sizes, only single connections can be requested via an optional index parameter, as returned by the GetConnections method of the ConnectionManager.
+
+[source,C++]
+----
+//Retrieve detailed connection information from the node with nodeId.
+action [nodeId] status get_connections_verbose
+
+//Same, but only for the connection with the given index.
+action [nodeId] status get_connections_verbose {index}
+----
+
 [#LiveReports]
 === Live Reports
 Live reports are a way to send information about errors, connections, disconnections and other important events to the user through the mesh. Each live report has a unique ID according to its importance. Liver reports are activated by setting the _livereports_ level to a value greater than 0. The different levels are:

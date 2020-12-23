@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -89,25 +89,11 @@
 #include <CherrySim.h>
 #endif
 
-#ifndef SIM_ENABLED
-// The stack watcher writes a pre defined memory pattern at the bottom (end) of the stack.
-// This pre defined memory pattern is STACK_WATCHER_MAGIC_NUMBER repeated over and over again.
-// If a hardfault occurres, the stack watcher area is checked for this pre defined memory
-// pattern. If it can't find the values that were expected it probably was a stack overflow.
-constexpr u32 STACK_WATCHER_LENGTH = 32;
-constexpr u32 STACK_WATCHER_MAGIC_NUMBER = 0xED505505; //Mnemonic: Ed screams SOS SOS
-extern u32 __FruityStackLimit[]; //Variable is set in the linker script
-#define GET_STACK_WATCHER_START_ADDR() (((u32*)((u32)__FruityStackLimit - ((u32)__FruityStackLimit % alignof(u32)))) - STACK_WATCHER_LENGTH)
-#endif
-
 void BootFruityMesh()
 {
 #ifndef SIM_ENABLED
-    u32 *stackWatcherStartAddr = GET_STACK_WATCHER_START_ADDR();
-    for (u32 i = 0; i < STACK_WATCHER_LENGTH; i++)
-    {
-        stackWatcherStartAddr[i] = STACK_WATCHER_MAGIC_NUMBER;
-    }
+    Utility::FillStackSizeDetector();
+    Utility::FillStackWatcher();
 #endif //!SIM_ENABLED
 
     //Check for reboot reason
@@ -243,11 +229,6 @@ void BootFruityMesh()
     //Note: Convert to hex first!
     if(FruityHal::GetBootloaderAddress() != 0xFFFFFFFF) logt("MAIN", "UICR boot address is %x, bootloader v%u", (u32)FruityHal::GetBootloaderAddress(), FruityHal::GetBootloaderVersion());
     logt("MAIN", "Reboot reason was %u, SafeBootEnabled:%u, stacktrace %u", (u32)GS->ramRetainStructPtr->rebootReason, safeBootEnabled, GS->ramRetainStructPtr->stacktrace[0]);
-
-#ifndef SIM_ENABLED
-    int dummyStackVariable = 0;
-    logt("MAIN", "Current Stack position: %u, Stack Limit: %u, Stack max size: %u", (u32)&dummyStackVariable, (u32)__FruityStackLimit, (u32)&dummyStackVariable - (u32)__FruityStackLimit);
-#endif //!SIM_ENABLED
 
     //Start Watchdog and feed it
     FruityHal::StartWatchdog(safeBootEnabled);
@@ -602,13 +583,9 @@ void HardFaultErrorHandler(stacked_regs_t* stack)
     ramRetainStruct.code2 = stack->lr;
     ramRetainStruct.code3 = stack->psr;
 
-    u32 *stackWatcherStartAddr = GET_STACK_WATCHER_START_ADDR();
-    for (u32 i = 0; i < STACK_WATCHER_LENGTH; i++)
+    if (Utility::IsStackOverflowDetected())
     {
-        if (stackWatcherStartAddr[i] != STACK_WATCHER_MAGIC_NUMBER)
-        {
-            ramRetainStruct.rebootReason = RebootReason::STACK_OVERFLOW;
-        }
+        ramRetainStruct.rebootReason = RebootReason::STACK_OVERFLOW;
     }
 
     ramRetainStruct.crc32 = Utility::CalculateCrc32((u8*)&ramRetainStruct, sizeof(RamRetainStruct) -4);

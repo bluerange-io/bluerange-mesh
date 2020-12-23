@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -47,8 +47,6 @@ BaseConnection::BaseConnection(u8 id, ConnectionDirection direction, FruityHal::
     : connectionId(id),
     uniqueConnectionId(GS->cm.GenerateUniqueConnectionId()),
     direction(direction),
-    packetSendQueue(packetSendBuffer, PACKET_SEND_BUFFER_SIZE),
-    packetSendQueueHighPrio(packetSendBufferHighPrio, PACKET_SEND_BUFFER_HIGH_PRIO_SIZE),
     partnerAddress(*partnerAddress),
     creationTimeDs(GS->appTimerDs)
 {
@@ -110,36 +108,19 @@ bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8 const 
 
 bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8 const * data, bool fillTxBuffers)
 {
-    //Reserve space in our sendQueue for the metadata and our data
-    u8* buffer;
+    const u32 bufferSize = SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED + sendData.dataLength.GetRaw();
+    DYNAMIC_ARRAY(buffer, bufferSize);
+    CheckedMemset(buffer, 0, bufferSize);
 
-    //Select the correct packet Queue
-    //TODO: currently we only allow non-split data for high prio
-    PacketQueue* activeQueue;
+    BaseConnectionSendDataPacked* sendDataPacked = (BaseConnectionSendDataPacked*)buffer;
+    sendDataPacked->characteristicHandle = sendData.characteristicHandle;
+    sendDataPacked->deliveryOption = (u8)sendData.deliveryOption;
 
-    if(sendData.priority == DeliveryPriority::MESH_INTERNAL_HIGH && sendData.dataLength <= connectionMtu)
-    {
-        logt("CM", "Queuing in high prio queue");
-        activeQueue = &packetSendQueueHighPrio;
-    } else {
-        logt("CM", "Queuing in normal prio queue");
-        activeQueue = &packetSendQueue;
-    }
+    CheckedMemcpy(buffer + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED, data, sendData.dataLength.GetRaw());
 
-    buffer = activeQueue->Reserve(SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED + sendData.dataLength);
+    const bool successfullyQueued = queue.SplitAndAddMessage(overwritePriority == DeliveryPriority::INVALID ? GetPriorityOfMessage(data, sendData.dataLength) : overwritePriority, buffer, bufferSize, connectionPayloadSize);
 
-    if(buffer != nullptr){
-        activeQueue->numUnsentElements++;
-
-        //Copy both to the reserved space
-        BaseConnectionSendDataPacked* sendDataPacked = (BaseConnectionSendDataPacked*)buffer;
-        sendDataPacked->characteristicHandle = sendData.characteristicHandle;
-        sendDataPacked->deliveryOption = (u8)sendData.deliveryOption;
-        sendDataPacked->priority = (u8)sendData.priority;
-        sendDataPacked->dataLength = sendData.dataLength;
-        sendDataPacked->sendHandle = PACKET_QUEUED_HANDLE_NOT_QUEUED_IN_SD;
-
-        CheckedMemcpy(buffer + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED, data, sendData.dataLength);
+    if(successfullyQueued){
         if (fillTxBuffers) FillTransmitBuffers();
         return true;
     } else {
@@ -165,62 +146,41 @@ void BaseConnection::FillTransmitBuffers()
 
     if (bufferFull) return;
 
-    DYNAMIC_ARRAY(packetBuffer, connectionMtu);
-    BaseConnectionSendData sendDataStruct;
-    BaseConnectionSendData* sendData = &sendDataStruct;
-
     while(IsConnected() && connectionState != ConnectionState::REESTABLISHING && connectionState != ConnectionState::REESTABLISHING_HANDSHAKE)
     {
-        //Check if there is important data from the subclass to be sent
-        if(packetSendQueue.packetSendPosition == 0){
-            TransmitHighPrioData();
-        }
-
-        //Next, select the correct Queue from which we should be transmitting
-        //TODO: Currently we do not allow message splitting in HighPrio Queue
-        PacketQueue* activeQueue;
-        if(packetSendQueueHighPrio.numUnsentElements > 0 && packetSendQueue.packetSendPosition == 0){
-            //logt("CONN", "Queuing from high prio queue");
-            activeQueue = &packetSendQueueHighPrio;
-        } else if(packetSendQueue.numUnsentElements > 0){
-            //logt("CONN", "Queuing from normal prio queue");
-            activeQueue = &packetSendQueue;
-        } else {
-            return;
-        }
-
-        if (activeQueue->_numElements < activeQueue->numUnsentElements) {
-            logt("ERROR", "Fail: Queue numElements");
+        if (queueOrigins.IsFull())
+        {
+            // QueueOrigins are full. We have to continue with the next connection.
+            // Consider increasing the size of the queueOrigins queue to fit the number
+            // of supporter entries in the HAL TransmitBuffer.
             SIMEXCEPTION(IllegalStateException);
-            GS->logger.LogCustomError(CustomErrorTypes::FATAL_QUEUE_NUM_MISMATCH, (u16)(activeQueue == &packetSendQueue));
-
-            GS->cm.ForceDisconnectAllConnections(AppDisconnectReason::QUEUE_NUM_MISMATCH);
+            GS->logger.LogCustomError(CustomErrorTypes::FATAL_QUEUE_ORIGINS_FULL, queueOrigins.GetAmountOfElements());
+            logt("WARNING", "Queue Origins are full!");
+            bufferFull = true;
             return;
         }
+        //Check if there is important data from the subclass to be sent
+        if(queue.IsCurrentlySendingSplitMessage() == false){
+            QueueVitalPrioData();
+        }
+        //Next, select the correct Queue from which we should be transmitting
+        QueuePriorityPair queuePriorityPair = queue.GetSendQueue();
+        ChunkedPacketQueue* activeQueue = queuePriorityPair.queue;
+        if (!activeQueue) return;
 
         //Get the next packet from the packet queue that was not yet queued
-        SizedData packet = activeQueue->PeekNext(activeQueue->_numElements - activeQueue->numUnsentElements);
+        DYNAMIC_ARRAY(queueBuffer, connectionMtu + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
+        const u16 packetLength = activeQueue->PeekLookAhead(queueBuffer, connectionMtu + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED) - SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED;
 
         //Unpack data from sendQueue
-        BaseConnectionSendDataPacked* sendDataPacked = (BaseConnectionSendDataPacked*)packet.data;
-        sendData->characteristicHandle = sendDataPacked->characteristicHandle;
-        sendData->deliveryOption = (DeliveryOption)sendDataPacked->deliveryOption;
-        sendData->priority = (DeliveryPriority)sendDataPacked->priority;
-        sendData->dataLength = sendDataPacked->dataLength;
-        u8* data = (packet.data + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
+        BaseConnectionSendDataPacked* sendDataPacked = (BaseConnectionSendDataPacked*)queueBuffer;
+        u8* data = (queueBuffer + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
 
-        //Check if this packet must be split, if yes make sure that there is no other split packet currently queued, we only allow one split
-        //packet to be queued at one time (after one was queued, the packetSendPosition is reset to 0, as long as there are packetSentRemaining
-        //we have not received acknowledgements for all parts
-        if (packet.length > connectionPayloadSize && activeQueue->packetSendPosition == 0 && activeQueue->packetSentRemaining != 0) {
-            return;
-        }
+        //The subclass is allowed to modify the packet before it is sent, it will place the modified packet into the data buffer.
+        //This could be encryption of the data.
+        const MessageLength processedMessageLength = ProcessDataBeforeTransmission(data, packetLength, connectionMtu);
 
-        //The subclass is allowed to modify the packet before it is sent, it will place the modified packet into the sentData struct
-        //This could be e.g. only a part of the original packet ( a split packet )
-        SizedData sentData = ProcessDataBeforeTransmission(sendData, data, packetBuffer);
-
-        if(sentData.length == 0){
+        if(processedMessageLength.IsZero()){
             logt("ERROR", "Packet processing failed");
             GS->logger.LogCustomError(CustomErrorTypes::FATAL_PACKET_PROCESSING_FAILED, partnerId);
             DisconnectAndRemove(AppDisconnectReason::INVALID_PACKET);
@@ -228,37 +188,41 @@ void BaseConnection::FillTransmitBuffers()
         }
 
         //Send the packet to the SoftDevice
-        if(sendData->deliveryOption == DeliveryOption::WRITE_REQ)
+        if((DeliveryOption)sendDataPacked->deliveryOption == DeliveryOption::WRITE_REQ)
         {
             err = GS->gattController.BleWriteCharacteristic(
                     connectionHandle,
-                    sendData->characteristicHandle,
-                    sentData.data,
-                    sentData.length,
+                    sendDataPacked->characteristicHandle,
+                    data,
+                    processedMessageLength,
                     true);
         }
-        else if(sendData->deliveryOption == DeliveryOption::WRITE_CMD)
+        else if((DeliveryOption)sendDataPacked->deliveryOption == DeliveryOption::WRITE_CMD)
         {
             err = GS->gattController.BleWriteCharacteristic(
                     connectionHandle,
-                    sendData->characteristicHandle,
-                    sentData.data,
-                    sentData.length,
+                    sendDataPacked->characteristicHandle,
+                    data,
+                    processedMessageLength,
                     false);
         }
         else
         {
             err = GS->gattController.BleSendNotification(
                     connectionHandle,
-                    sendData->characteristicHandle,
-                    sentData.data,
-                    sentData.length);
+                    sendDataPacked->characteristicHandle,
+                    data,
+                    processedMessageLength);
         }
 
-        if(err == ErrorType::SUCCESS)
+        if(err == ErrorType::SUCCESS) 
         {
-            //FIXME: This is not using the preprocessed data (sentData)
-            PacketSuccessfullyQueuedWithSoftdevice(activeQueue, sendDataPacked, data, &sentData);
+            SizedData sizedData;
+            sizedData.data = data;
+            sizedData.length = processedMessageLength.GetRaw();
+            queueOrigins.Push(queuePriorityPair.priority);
+            activeQueue->IncrementLookAhead();
+            PacketSuccessfullyQueuedWithSoftdevice(&sizedData);
         }
         else if(err == ErrorType::BUSY)
         {
@@ -283,7 +247,7 @@ void BaseConnection::FillTransmitBuffers()
 
             GS->logger.LogCustomError(CustomErrorTypes::WARN_GATT_WRITE_ERROR, (u32)err);
 
-            HandlePacketQueuingFail(*activeQueue, sendDataPacked, (u32)err);
+            HandlePacketQueuingFail((u32)err);
 
             //Stop queuing packets for this connection to prevent infinite loops
             return;
@@ -291,16 +255,9 @@ void BaseConnection::FillTransmitBuffers()
     }
 }
 
-void BaseConnection::HandlePacketQueued(PacketQueue* activeQueue, BaseConnectionSendDataPacked* sendDataPacked)
+void BaseConnection::HandlePacketQueued()
 {
-    //Save the queue handle in the packet, decrease the number of packets to be sent from that queue and reset our fail counter for that queue
-    sendDataPacked->sendHandle = GetNextQueueHandle();
-    activeQueue->numUnsentElements--;
-    activeQueue->packetFailedToQueueCounter = 0;
-
-#ifdef SIM_ENABLED
-    //if (GS->node.configuration.nodeId == 37 && connectionHandle == 680) printf("Q@NODE %u QUEUED, giving handle %u to packet in %s gid %u (len %u)" EOL, GS->node.configuration.nodeId, sendDataPacked->sendHandle, activeQueue == &packetSendQueue ? "normalQueue" : "highPrioQueue", *((u32*)(((u8*)sendDataPacked) + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED + SIZEOF_CONN_PACKET_HEADER)), sendDataPacked->dataLength);
-#endif
+    packetFailedToQueueCounter = 0;
 }
 
 void BaseConnection::HandlePacketSent(u8 sentUnreliable, u8 sentReliable)
@@ -311,6 +268,7 @@ void BaseConnection::HandlePacketSent(u8 sentUnreliable, u8 sentReliable)
 
     //TODO: are write cmds and write reqs sent sequentially?
     //TODO: we must not send more than 100 packets from one queue, otherwise, the handles between
+    //TODO: We should think about the terminology of "Splits", "Messages", and "Packets". How do we want to use these terms in the future?
     //the queues will not match anymore to the sequence in that the packets were sent
     
     //We must iterate in a loop to delete all packets if more than one was sent
@@ -324,84 +282,44 @@ void BaseConnection::HandlePacketSent(u8 sentUnreliable, u8 sentReliable)
             continue;
         }
 
-        //Find the queue from which the packet was sent
-        PacketQueue* activeQueue;
-
-        SizedData packet = packetSendQueue.PeekNext();
-        BaseConnectionSendDataPacked* sendDataPacked = (BaseConnectionSendDataPacked*)packet.data;
-        u8 handle = sendDataPacked != nullptr ? sendDataPacked->sendHandle : PACKET_QUEUED_HANDLE_NOT_QUEUED_IN_SD;
-
-        packet = packetSendQueueHighPrio.PeekNext();
-        BaseConnectionSendDataPacked* sendDataPackedHighPrio = (BaseConnectionSendDataPacked*)packet.data;
-        u8 handleHighPrio = sendDataPackedHighPrio != nullptr ? sendDataPackedHighPrio->sendHandle : PACKET_QUEUED_HANDLE_NOT_QUEUED_IN_SD;
-
-        //If no queue has a handle, the packets must be from the normal queue because it was sending a split packet (but not all parts yet)
-        if (handle < PACKET_QUEUED_HANDLE_COUNTER_START && handleHighPrio < PACKET_QUEUED_HANDLE_COUNTER_START) {
-            activeQueue = &packetSendQueue;
-#ifdef SIM_ENABLED
-            if (packetSendQueue.packetSentRemaining == 0) {
-                SIMEXCEPTION(IllegalStateException);
-            }
-#endif
-        }
-        //Check if we do not have a queued packet in the normal queue
-        else if (handle < PACKET_QUEUED_HANDLE_COUNTER_START) {
-            activeQueue = &packetSendQueueHighPrio;
-        }
-        //Check if we do not have a queued packet in the high prio queue
-        else if (handleHighPrio < PACKET_QUEUED_HANDLE_COUNTER_START) {
-            activeQueue = &packetSendQueue;
-        }
-        //Check which handle is lower than the other handle using unsigned variables that will wrap
-        else {
-            //Must be casted to u8, otherwhise type promotion results in an integer!
-            if ((u8)(handle - handleHighPrio) < 100) {
-                activeQueue = &packetSendQueueHighPrio;
-            }
-            else {
-                activeQueue = &packetSendQueue;
-            }
-        }
-
-
-        if(activeQueue->_numElements == 0){
-            //TODO: Save Error
-            logt("ERROR", "Fail: Queue");
+        if (queueOrigins.GetAmountOfElements() == 0)
+        {
+            logt("ERROR", "!!!FATAL!!! QueueOrigins");
             SIMEXCEPTION(IllegalStateException);
 
             GS->logger.LogCustomError(CustomErrorTypes::FATAL_HANDLE_PACKET_SENT_ERROR, partnerId);
+            DisconnectAndRemove(AppDisconnectReason::HANDLE_PACKET_SENT_ERROR);
+            return;
         }
 
-        //Check if a split packet should be acknowledged
-        bool ackForSplitPacket = false;
-        if (activeQueue == &packetSendQueue && activeQueue->packetSentRemaining > 0 && sendDataPacked != nullptr && sendDataPacked->dataLength > connectionPayloadSize) {
-            activeQueue->packetSentRemaining--;
-            ackForSplitPacket = true;
+        const DeliveryPriority queueOrigin = queueOrigins.Peek();
+        queueOrigins.Pop();
+        //Find the queue from which the packet was sent
+        ChunkedPacketQueue* activeQueue = queue.GetQueueByPriority(queueOrigin);
+
+        if(activeQueue->HasPackets() == false)
+        {
+            logt("ERROR", "!!!FATAL!!! Queue");
+            SIMEXCEPTION(IllegalStateException);
+
+            GS->logger.LogCustomError(CustomErrorTypes::FATAL_HANDLE_PACKET_SENT_ERROR, partnerId);
+            DisconnectAndRemove(AppDisconnectReason::HANDLE_PACKET_SENT_ERROR);
+            return;
         }
+        DYNAMIC_ARRAY(queueBuffer, connectionMtu + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
+        const u16 length = activeQueue->PeekPacket(queueBuffer, connectionMtu + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
 
-        //Otherwise, either a normal packet or a split packet can be removed
-        if (!ackForSplitPacket || activeQueue->packetSentRemaining == 0) {
-            SizedData data = activeQueue->PeekNext();
-
-            BaseConnectionSendDataPacked* sendData = (BaseConnectionSendDataPacked*)data.data;
-
-            //We must only remove the packet if it has a handle, it might have only been sent partially so far
-            if (sendData->sendHandle != 0) {
+        BaseConnectionSendDataPacked* sendData = (BaseConnectionSendDataPacked*)queueBuffer;
 
 #ifdef SIM_ENABLED
-                if (GS->node.configuration.nodeId == 37 && connectionHandle == 680) {
-                    //printf("Q@NODE %u DISCARDS %s (packetHandle %u), gid %u (%u)" EOL, GS->node.configuration.nodeId, sendData->deliveryOption == (u8)DeliveryOption::WRITE_REQ ? "WRITE_REQ" : "WRITE_CMD", sendData->sendHandle, *((u32*)(packetHeader + 1)), sendData->dataLength);
-                }
-                //A quick check if a wrong packet was removed (not a 100% check, but helps)
-                if (sendData->deliveryOption == (u8)DeliveryOption::WRITE_REQ && !sentReliable) {
-                    SIMEXCEPTION(IllegalStateException);
-                }
+        //A quick check if a wrong packet was removed (not a 100% check, but helps)
+        if (sendData->deliveryOption == (u8)DeliveryOption::WRITE_REQ && !sentReliable) {
+            SIMEXCEPTION(IllegalStateException);
+        }
 #endif
 
-                DataSentHandler(data.data + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED, data.length - SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
-                activeQueue->DiscardNext();
-            }
-        }
+        DataSentHandler(queueBuffer + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED, length - SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
+        activeQueue->PopPacket();
     }
 
     //Log how many packets have been sent
@@ -409,9 +327,9 @@ void BaseConnection::HandlePacketSent(u8 sentUnreliable, u8 sentReliable)
     this->sentReliable += sentReliable;
 }
 
-void BaseConnection::HandlePacketQueuingFail(PacketQueue& activeQueue, BaseConnectionSendDataPacked* sendDataPacked, u32 err)
+void BaseConnection::HandlePacketQueuingFail(u32 err)
 {
-    activeQueue.packetFailedToQueueCounter++;
+    packetFailedToQueueCounter++;
 
     if (
         err != (u32)ErrorType::DATA_SIZE && 
@@ -423,96 +341,20 @@ void BaseConnection::HandlePacketQueuingFail(PacketQueue& activeQueue, BaseConne
     }
 
     //Check queuing a packet failed too often so that the connection is probably broken (could also be too many wrong packets)
-    if (activeQueue.packetFailedToQueueCounter > BASE_CONNECTION_MAX_SEND_FAIL) {
+    if (packetFailedToQueueCounter > BASE_CONNECTION_MAX_SEND_FAIL) {
         DisconnectAndRemove(AppDisconnectReason::TOO_MANY_SEND_RETRIES);
     }
 }
 
-
-void BaseConnection::ResendAllPackets(PacketQueue& queueToReset) const
-{
-    queueToReset.numUnsentElements = queueToReset._numElements;
-    queueToReset.packetSendPosition = 0;
-    queueToReset.packetSentRemaining = 0;
-
-    //Clear all send handles
-    for (int i = 0; i < queueToReset._numElements; i++)
-    {
-        SizedData packet = queueToReset.PeekNext(i);
-        BaseConnectionSendDataPacked* sendDataPacked = (BaseConnectionSendDataPacked*)packet.data;
-        sendDataPacked->sendHandle = PACKET_QUEUED_HANDLE_NOT_QUEUED_IN_SD;
-    }
-}
-
 //This basic implementation returns the data as is
-SizedData BaseConnection::ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer)
+MessageLength BaseConnection::ProcessDataBeforeTransmission(u8* message, MessageLength messageLength, MessageLength bufferLength)
 {
-    SizedData result;
-    result.data = data;
-    result.length = sendData->dataLength <= connectionMtu ? sendData->dataLength : 0;
-    return result;
+    return messageLength;
 }
 
-void BaseConnection::PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData)
+void BaseConnection::PacketSuccessfullyQueuedWithSoftdevice(SizedData* sentData)
 {
-    HandlePacketQueued(queue, sendDataPacked);
-}
-
-//This function can split a packet if necessary for sending
-//WARNING: Can only be used for one characteristic, does not support to be used in parallel
-//The implementation must manage packetSendPosition and packetQueue discarding itself
-//packetBuffer must have a size of connectionMtu
-//The function will return a pointer to the packet and the dataLength (do not use packetBuffer, use this pointer)
-SizedData BaseConnection::GetSplitData(const BaseConnectionSendData &sendData, u8* data, u8* packetBuffer) const
-{
-    SizedData result;
-    ConnPacketSplitHeader* resultHeader = (ConnPacketSplitHeader*) packetBuffer;
-    
-    //If we do not have to split the data, return data unmodified
-    if(sendData.dataLength <= connectionPayloadSize){
-        result.data = data;
-        result.length = sendData.dataLength;
-        return result;
-    }
-
-    u16 payloadSize = connectionPayloadSize - SIZEOF_CONN_PACKET_SPLIT_HEADER;
-
-    //Check if this is the last packet
-    if((packetSendQueue.packetSendPosition+1) * payloadSize >= sendData.dataLength){
-        //End packet
-        resultHeader->splitMessageType = MessageType::SPLIT_WRITE_CMD_END;
-        resultHeader->splitCounter = packetSendQueue.packetSendPosition;
-        CheckedMemcpy(
-                packetBuffer + SIZEOF_CONN_PACKET_SPLIT_HEADER,
-            data + packetSendQueue.packetSendPosition * payloadSize,
-            sendData.dataLength - packetSendQueue.packetSendPosition * payloadSize);
-        result.data = packetBuffer;
-        result.length = (sendData.dataLength - packetSendQueue.packetSendPosition * payloadSize) + SIZEOF_CONN_PACKET_SPLIT_HEADER;
-        if(result.length < 5){
-            logt("WARNING", "Split packet because of very few bytes, optimisation?");
-        }
-
-        char stringBuffer[100];
-        Logger::ConvertBufferToHexString(result.data, result.length, stringBuffer, sizeof(stringBuffer));
-        logt("CONN_DATA", "SPLIT_END_%u: %s", resultHeader->splitCounter, stringBuffer);
-
-    } else {
-        //Intermediate packet
-        resultHeader->splitMessageType = MessageType::SPLIT_WRITE_CMD;
-        resultHeader->splitCounter = packetSendQueue.packetSendPosition;
-        CheckedMemcpy(
-                packetBuffer + SIZEOF_CONN_PACKET_SPLIT_HEADER,
-            data + packetSendQueue.packetSendPosition * payloadSize,
-            payloadSize);
-        result.data = packetBuffer;
-        result.length = connectionPayloadSize;
-
-        char stringBuffer[100];
-        Logger::ConvertBufferToHexString(result.data, result.length, stringBuffer, sizeof(stringBuffer));
-        logt("CONN_DATA", "SPLIT_%u: %s", resultHeader->splitCounter, stringBuffer);
-    }
-
-    return result;
+    HandlePacketQueued();
 }
 
 #define _________________RECEIVING_________________
@@ -540,7 +382,7 @@ u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 c
     //Check if reassembly buffer limit is reached
     if(sendData->dataLength - (u32)SIZEOF_CONN_PACKET_SPLIT_HEADER + packetReassemblyPosition > packetReassemblyBuffer.size()){
         logt("ERROR", "Packet too big for reassembly");
-        GS->logger.LogCustomError(CustomErrorTypes::FATAL_PACKET_TOO_BIG, sendData->dataLength);
+        GS->logger.LogCustomError(CustomErrorTypes::FATAL_PACKET_TOO_BIG, sendData->dataLength.GetRaw());
         packetReassemblyPosition = 0;
         currentMessageIsMissingASplit = true;
         SIMEXCEPTION(PacketTooBigException);
@@ -550,7 +392,7 @@ u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 c
     u16 packetReassemblyDestination = packetHeader->splitCounter * (connectionPayloadSize - SIZEOF_CONN_PACKET_SPLIT_HEADER);
 
     //Check if a packet was missing inbetween
-    if(packetReassemblyPosition != packetReassemblyDestination){
+    if(packetReassemblyPosition < packetReassemblyDestination){
         GS->logger.LogCustomError(CustomErrorTypes::WARN_SPLIT_PACKET_MISSING, (packetReassemblyDestination - packetReassemblyPosition));
         packetReassemblyPosition = 0;
         currentMessageIsMissingASplit = true;
@@ -560,7 +402,7 @@ u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 c
 
     //Intermediate packets must always be a full MTU
     if(packetHeader->splitMessageType == MessageType::SPLIT_WRITE_CMD && sendData->dataLength != connectionPayloadSize){
-        GS->logger.LogCustomError(CustomErrorTypes::WARN_SPLIT_PACKET_NOT_IN_MTU, sendData->dataLength);
+        GS->logger.LogCustomError(CustomErrorTypes::WARN_SPLIT_PACKET_NOT_IN_MTU, sendData->dataLength.GetRaw());
         packetReassemblyPosition = 0;
         currentMessageIsMissingASplit = true;
         SIMEXCEPTION(SplitNotInMTUException);
@@ -571,9 +413,9 @@ u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 c
     CheckedMemcpy(
         packetReassemblyBuffer.data() + packetReassemblyDestination,
         data + SIZEOF_CONN_PACKET_SPLIT_HEADER,
-        sendData->dataLength - SIZEOF_CONN_PACKET_SPLIT_HEADER);
+        sendData->dataLength.GetRaw() - SIZEOF_CONN_PACKET_SPLIT_HEADER);
 
-    packetReassemblyPosition += sendData->dataLength - SIZEOF_CONN_PACKET_SPLIT_HEADER;
+    packetReassemblyPosition += (sendData->dataLength - SIZEOF_CONN_PACKET_SPLIT_HEADER).GetRaw();
 
     //Intermediate packet, no full packet yet received
     if(packetHeader->splitMessageType == MessageType::SPLIT_WRITE_CMD)
@@ -604,6 +446,24 @@ u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 c
 }
 
 #define __________________HANDLER__________________
+
+DeliveryPriority BaseConnection::GetPriorityOfMessage(const u8* data, MessageLength size)
+{
+    //The highest priority (lowest ordinal) returned from a Module will be taken
+    DeliveryPriority prio = DeliveryPriority::INVALID;
+    for (u32 i = 0; i < GS->amountOfModules; i++) {
+        if (GS->activeModules[i]->configurationPointer->moduleActive) {
+            DeliveryPriority newPrio = GS->activeModules[i]->GetPriorityOfMessage(data, size);
+            if (newPrio < prio) {
+                prio = newPrio;
+            }
+        }
+    }
+    //A mesh node in a heterogenous network might not know this message, so we should not default to a LOW priority.
+    //Additionally, the implementation should rarely care about priority and should use MEDIUM most of the time.
+    if (prio == DeliveryPriority::INVALID) prio = DeliveryPriority::MEDIUM;
+    return prio;
+}
 
 void BaseConnection::ConnectionSuccessfulHandler(u16 connectionHandle)
 {
@@ -664,7 +524,6 @@ bool BaseConnection::GapDisconnectionHandler(FruityHal::BleHciError hciDisconnec
 
 #define __________________HELPER______________________
 /*######## HELPERS ###################################*/
-
 i8 BaseConnection::GetAverageRSSI() const
 {
     if(connectionState >= ConnectionState::CONNECTED){
@@ -675,69 +534,11 @@ i8 BaseConnection::GetAverageRSSI() const
     else return 0;
 }
 
-u8 BaseConnection::GetNextQueueHandle()
-{
-    packetQueuedHandleCounter++;
-    if (packetQueuedHandleCounter == 0) packetQueuedHandleCounter = PACKET_QUEUED_HANDLE_COUNTER_START;
-
-    return packetQueuedHandleCounter;
-}
-
-
-SizedData BaseConnection::GetNextPacketToSend(const PacketQueue& queue) const
-{
-    for (u32 i = 0; i < queue._numElements; i++) {
-        SizedData data = queue.PeekNext(i); //TODO: Optimize this, as this will iterate again through all items each loop
-        BaseConnectionSendData* sendData = (BaseConnectionSendData*)data.data;
-
-        if (sendData->sendHandle == PACKET_QUEUED_HANDLE_NOT_QUEUED_IN_SD) {
-            return data;
-        }
-    }
-
-    SizedData zeroData = {nullptr, 0};
-    return zeroData;
-}
-
 u32 BaseConnection::GetAmountOfRemovedConnections()
 {
     return GS->amountOfRemovedConnections;
 }
 
-#ifdef SIM_ENABLED
-//Helper function to print the contents of the queues, not used in the code, but very useful for executing
-//in the debugger
-void BaseConnection::PrintQueueInfo()
-{
-    PacketQueue* queue = nullptr;
-    for (int i = 0; i < 2; i++)
-    {
-        if (i == 0) 
-        {
-            queue = &packetSendQueue;
-            printf("------ Normal Queue Last to First (%u), sendRemaining %u ------" EOL, queue->_numElements, queue->packetSentRemaining);
-        }
-        else if (i == 1)
-        {
-            queue = &packetSendQueueHighPrio;
-            printf("------ High Prio Queue Last to First (%u), sendRemaining %u ------" EOL, queue->_numElements, queue->packetSentRemaining);
-        }
-
-        for (int k = 0; k < queue->_numElements; k++) {
-            SizedData data = queue->PeekNext(k);
-            BaseConnectionSendDataPacked* sendData = (BaseConnectionSendDataPacked*)data.data;
-            ConnPacketHeader* header = (ConnPacketHeader*)(data.data + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
-
-            const char* type = "INVALID";
-            if (sendData->deliveryOption == (u8)DeliveryOption::WRITE_CMD) type = "WRITE_CMD";
-            if (sendData->deliveryOption == (u8)DeliveryOption::WRITE_REQ) type = "WRITE_REQ";
-            if (sendData->deliveryOption == (u8)DeliveryOption::NOTIFICATION) type = "NOTIF";
-
-            printf("%s len %u, handle %u, messageType %u, (from %u to %u)" EOL, type, sendData->dataLength, sendData->sendHandle, (u32)header->messageType, header->sender, header->receiver);
-        }
-    }
-}
-#endif
 
 /* EOF */
 

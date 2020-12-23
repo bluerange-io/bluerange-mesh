@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -75,14 +75,14 @@ public:
     u16 GetConnectionHandle();
     NodeId GetPartnerId();
     ConnectionState GetConnectionState();
-    bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable);
+    bool SendData(u8 const * data, MessageLength dataLength, bool reliable);
     bool FillTransmitBuffers();
     FruityHal::BleGapAddr GetPartnerAddress();
     u32 GetCreationTimeDs();
     i8 GetAverageRSSI();
     u16 GetSentUnreliable();
     u32 GetUniqueConnectionId();
-    PacketQueue* GetPacketSendQueue();
+    ChunkedPacketQueue* GetQueueByPriority(DeliveryPriority prio);
 };
 
 class MeshConnectionHandle : public BaseConnectionHandle
@@ -109,6 +109,8 @@ public:
     ClusterSize GetConnectedClusterSize();
     bool HandoverMasterBit();
     bool HasConnectionMasterBit();
+    bool GetEnrolledNodesSync();
+    bool SetEnrolledNodesSync(bool sync);
 };
 
 class MeshAccessConnectionHandle : public BaseConnectionHandle

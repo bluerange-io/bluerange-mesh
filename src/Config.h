@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -54,11 +54,11 @@ class RecordStorageEventListener;
 // ########### FruityMesh Version ##########################################
 
 // major (0-400), minor (0-999), patch (0-9999)
-#define FM_VERSION_MAJOR 0
-#define FM_VERSION_MINOR 8
+#define FM_VERSION_MAJOR 1
+#define FM_VERSION_MINOR 0
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 4830
+#define FM_VERSION_PATCH 90
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -115,6 +115,8 @@ extern u32 GetWatchdogTimeout_CherrySim();
 #define GET_WATCHDOG_TIMEOUT() GetWatchdogTimeout_CherrySim()
 extern u32 GetWatchdogTimeoutSafeBoot_CherrySim();
 #define GET_WATCHDOG_TIMEOUT_SAFE_BOOT() GetWatchdogTimeoutSafeBoot_CherrySim()
+extern const char* GetFeaturesetName_CherrySim();
+#define FEATURESET_NAME GetFeaturesetName_CherrySim()
 #else
 static_assert(false, "Featureset was not defined, which is mandatory!");
 #endif
@@ -146,14 +148,22 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 #define MAX_MESH_PACKET_SIZE 200
 #endif
 
-// Each of the connections has a buffer for outgoing packets, this is its size in bytes
-#ifndef PACKET_SEND_BUFFER_SIZE
-#define PACKET_SEND_BUFFER_SIZE 2000
+// The size of each send queue chunk in bytes. See: ConnectionQueueMemoryChunk
+#ifndef CONNECTION_QUEUE_MEMORY_CHUNK_SIZE
+#define CONNECTION_QUEUE_MEMORY_CHUNK_SIZE 256
 #endif
 
-// Each connection also has a high prio buffer e.g. for mesh clustering packets
-#ifndef PACKET_SEND_BUFFER_HIGH_PRIO_SIZE
-#define PACKET_SEND_BUFFER_HIGH_PRIO_SIZE 100
+// The total amount of send queue chunks. See: ConnectionQueueMemoryChunk
+#ifndef CONNECTION_QUEUE_MEMORY_CHUNK_AMOUNT
+#define CONNECTION_QUEUE_MEMORY_CHUNK_AMOUNT 40
+#endif
+
+// The maximum amount of chunks one connection can hold is limited by CONNECTION_QUEUE_MEMORY_MAX_CHUNKS_PER_CONNECTION.
+// This is because some connections may have a siginificant delay in sending out packets, e.g. due to a Connection
+// Reestablishment. In such a case the rest of the connections have to share the rest of the chunks. If this rest gets
+// to low, a high amount of dropped packets is to be expected and should therefore be avoided.
+#ifndef CONNECTION_QUEUE_MEMORY_MAX_CHUNKS_PER_CONNECTION
+#define CONNECTION_QUEUE_MEMORY_MAX_CHUNKS_PER_CONNECTION 25
 #endif
 
 // Each connection does also have a buffer to assemble packets that were split into 20 byte chunks
@@ -409,8 +419,10 @@ class Conf
         static constexpr u8 numNodesForDecision = 4;
         //If not enough nodes were found, decide after this timeout
         static constexpr u16 maxTimeUntilDecisionDs = SEC_TO_DS(2);
+        //Delay before setting new discovery after cluster size change
+        static constexpr u16 clusterSizeDiscoveryChangeDelaySec = 10;        
         //Switch to low discovery if no other nodes were found for # seconds, set to 0 to disable low discovery state
-        u16 highToLowDiscoveryTimeSec = 0; // if is not configured in featureset, low discovery will be disabled and will always be in high discovery mode
+        u16 highDiscoveryTimeoutSec = 0; // if is not configured in featureset, low discovery will be disabled and will always be in high discovery mode
 
         LedMode defaultLedMode = LedMode::OFF;
 

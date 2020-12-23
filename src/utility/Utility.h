@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -55,14 +55,14 @@ class RecordStorageEventListener;
 //Because it would not work with an array of pointers, because decltype((dst)[0]) is a reference in that case, not a ptr!
 #define CheckedMemset(dst, val, size) \
 {\
-    static_assert( std::is_pod  <std::remove_pointer<decltype(&((dst)[0]))>::type>::value \
-                || std::is_union<std::remove_pointer<decltype(&((dst)[0]))>::type>::value, "Tried to call memset on non pod type!"); /*CODE_ANALYZER_IGNORE Just a string.*/ \
+    static_assert(HAS_TRIVIAL_COPY(std::remove_pointer<decltype(&((dst)[0]))>::type) \
+                || std::is_union             <std::remove_pointer<decltype(&((dst)[0]))>::type>::value, "Tried to call memset on non trivial copyable type!"); /*CODE_ANALYZER_IGNORE Just a string.*/ \
     memset((dst), (val), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemset*/ \
 }
 #define CheckedMemcpy(dst, src, size) \
 {\
-    static_assert( std::is_pod  <std::remove_pointer<decltype(&((dst)[0]))>::type>::value \
-                || std::is_union<std::remove_pointer<decltype(&((dst)[0]))>::type>::value, "Tried to call memcpy on non pod type!"); /*CODE_ANALYZER_IGNORE Just a string.*/ \
+    static_assert(HAS_TRIVIAL_COPY(std::remove_pointer<decltype(&((dst)[0]))>::type) \
+                || std::is_union             <std::remove_pointer<decltype(&((dst)[0]))>::type>::value, "Tried to call memcpy on non trivial copyable type!"); /*CODE_ANALYZER_IGNORE Just a string.*/ \
     memcpy((dst), (src), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemcpy*/ \
 }
 
@@ -76,6 +76,16 @@ namespace Utility
     //General methods for loading settings
     u32 GetSettingsPageBaseAddress();
     RecordStorageResultCode SaveModuleSettingsToFlash(const Module* module, ModuleConfiguration* configurationPointer, const u16 configurationLength, RecordStorageEventListener* listener, u32 userType, u8* userData, u16 userDataLength);
+#ifndef SIM_ENABLED
+    SizedData GetStackWatcherAddress();
+    void FillStackWatcher(); //Fills the StackWatcher (end of the stack) with STACK_WATCHER_MAGIC_NUMBER
+    bool IsStackOverflowDetected();
+    // noinline: We use a pointer inside that function to determine how big the
+    //           stack grew. noinline makes sure that no data other than the data of
+    //           this function follows on the stack.
+    void __attribute__((noinline)) FillStackSizeDetector(); //Fills the StackDetector (Everything between stack watcher and start of the stack) with UNUSED_STACK_INDICATOR
+    u32 GetAmountOfUnusedStackBytes();
+#endif
 
     //Serial number and version utilities
     u32 GetIndexForSerial(const char* serialNumber, bool *didError = nullptr);
@@ -116,6 +126,8 @@ namespace Utility
 
     //String manipulation
     void ToUpperCase(char* str);
+
+    u32 MessageLengthToAmountOfSplitPackets(u32 messageLength, u32 mtu);
 
     //Other
     u16 ByteToAsciiHex(u8 b);

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -61,8 +61,8 @@ TEST(TestNode, TestCommands) {
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "Cleaning up conn ");
     tester.SimulateUntilClusteringDone(100 * 1000);
 
-    tester.SendTerminalCommand(1, "action 2 node discovery off");
-    tester.SimulateUntilMessageReceived(10 * 1000, 2, "-- DISCOVERY OFF --");
+    tester.SendTerminalCommand(1, "action 2 node discovery idle");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "-- DISCOVERY IDLE --");
     tester.SendTerminalCommand(1, "action 2 node discovery on");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "-- DISCOVERY HIGH --");
 
@@ -235,6 +235,10 @@ TEST(TestNode, TestCRCValidation)
     tester.SendTerminalCommand(1, "action this status get_status CRC: 3968018817");
     tester.SimulateUntilRegexMessageReceived(1 * 1000, 1, "\"initialized\":0\\} CRC: \\d+");
 
+    //This can be skipped for manual debugging via " CRC: skip"
+    tester.SendTerminalCommand(1, "action this status get_status CRC: skip");
+    tester.SimulateUntilRegexMessageReceived(1 * 1000, 1, "\"initialized\":0\\} CRC: \\d+");
+
     //Missing CRC is no longer accepted
     {
         Exceptions::DisableDebugBreakOnException disable;
@@ -326,6 +330,7 @@ TEST(TestNode, TestPreferredConnections) {
 
     tester.SimulateForGivenTime(20 * 1000);    //Make sure that the nodes rebooted.
     tester.SimulateUntilClusteringDone(100 * 1000);
+    tester.SimulateForGivenTime(10 * 1000); // Give the mesh some additional time to clean up old connections
 
     for (u32 i = 0; i < tester.sim->GetTotalNodes(); i++) {
         NodeIndexSetter setter(i);
@@ -364,8 +369,7 @@ TEST(TestNode, TestPreferredConnections) {
 
 }
 
-//FIXME: Can be enabled again once we have refactored the high-to-low discovery (IOT-2953)
-TEST(TestNode, DISABLED_TestDiscoveryStates) {
+TEST(TestNode, TestDiscoveryStates) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
@@ -374,27 +378,163 @@ TEST(TestNode, DISABLED_TestDiscoveryStates) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    //Change the state to low discovery
-    tester.SimulateUntilMessageReceived(10 * 60 * 1000, 2, "-- DISCOVERY LOW --");
+    tester.SimulateUntilClusteringDone(10 * 1000);
+
+    // Expect discovery high on startup
+    tester.SendTerminalCommand(2, "reset");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "-- DISCOVERY HIGH --");
+
+    // Give some time to recluster
+    tester.SimulateForGivenTime(30 * 1000);
+
+    // We are setting timeout to 10 sec to test if device will enter discovery low state
+    tester.sim->FindNodeById(1)->gs.config.highDiscoveryTimeoutSec = 10;
+    tester.sim->FindNodeById(2)->gs.config.highDiscoveryTimeoutSec = 10;
+    tester.SendTerminalCommand(1, "action 2 node discovery on");
+    tester.SimulateUntilMessageReceived(15 * 1000, 2, "-- DISCOVERY LOW --");
 
     //Scan duty when asset tracking job is enabled and cluster is in low discovery
     tester.SimulateForGivenTime(30 * 1000);
-    u16 interval = Conf::GetInstance().meshScanIntervalHigh;
+#ifndef GITHUB_RELEASE
+    u16 interval = tester.sim->FindNodeById(2)->gs.config.meshScanIntervalHigh;
     ASSERT_EQ(MSEC_TO_UNITS(tester.sim->FindNodeById(2)->state.scanIntervalMs, CONFIG_UNIT_0_625_MS), interval);
+#else
+    // No asset tracking for github so scan interval should be low
+    u16 interval = tester.sim->FindNodeById(2)->gs.config.meshScanIntervalLow;
+    ASSERT_EQ(MSEC_TO_UNITS(tester.sim->FindNodeById(2)->state.scanIntervalMs, CONFIG_UNIT_0_625_MS), interval);
+#endif // GITHUB_RELEASE
 
-    //Switch to High discovery when receive enrollment
-    tester.SendTerminalCommand(1, "action 2 enroll basic BBBBF 2 200");
+    // When node 2 is disconnected, cluster size will change and that should trigger high discovery
+    tester.SendTerminalCommand(1, "reset");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "-- DISCOVERY HIGH --");
 
-    tester.SimulateUntilMessageReceived(1000, 2, "-- DISCOVERY HIGH --");
+    
+    // Expect that single node will stay in discovery high forever
+    tester.SendTerminalCommand(2, "action this enroll remove BBBBC");
+    tester.SimulateForGivenTime(5 * 1000);
+    tester.SendTerminalCommand(2, "reset");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "-- DISCOVERY HIGH --");
+    tester.sim->FindNodeById(2)->gs.config.highDiscoveryTimeoutSec = 10;
+    tester.SendTerminalCommand(2, "action this node discovery on");
+    {
+        Exceptions::DisableDebugBreakOnException disable;
+        ASSERT_THROW(tester.SimulateUntilMessageReceived(100 * 1000, 2, "-- DISCOVERY LOW --"), TimeoutException);
+    }
+}
 
-    //Send change to high discovery message after given time
-    tester.SendTerminalCommand(1, "gap_disconnect 0");
-    tester.SimulateUntilMessageReceived(50*1000, 2, "High Discovery message being sent after disconnect");
+TEST(TestNode, TestDiscoverySettingEnrolled) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.nodeConfigName.clear();
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+    // testerConfig.verbose = true;
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+    tester.SimulateUntilClusteringDone(10 * 1000);
 
+    //Set number of enrolled nodes to numNodes - 1 and expect that it will set number of enrolled nodes to 0 within timeout.
+    tester.SendTerminalCommand(1, "action 0 node set_enrolled_nodes %d", cherrySimInstance->GetTotalNodes() - 1);
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"set_enrolled_nodes\",\"nodeId\":2,\"module\":0,\"enrolled_nodes\":%d}", cherrySimInstance->GetTotalNodes() - 1);
+    tester.SimulateForGivenTime(tester.sim->FindNodeById(2)->gs.config.clusterSizeDiscoveryChangeDelaySec * 1000);
+    const u16 setEnrolledNodes = tester.sim->FindNodeById(2)->gs.node.configuration.numberOfEnrolledDevices;
+    ASSERT_EQ(0, setEnrolledNodes);
+
+    //Set number of enrolled nodes to numNodes and expect that this will cause entering discovery off state
+    tester.SendTerminalCommand(1, "action 0 node set_enrolled_nodes %d", cherrySimInstance->GetTotalNodes());
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "-- DISCOVERY IDLE --");
+
+    //Set number of enrolled nodes to numNodes + 1 and expect that this will cause entering discovery high state
+    tester.SendTerminalCommand(1, "action 0 node set_enrolled_nodes %d", cherrySimInstance->GetTotalNodes() + 1);
+    std::vector<SimulationMessage> messagesHigh = {
+        SimulationMessage(1, "-- DISCOVERY HIGH --"),
+        SimulationMessage(2, "-- DISCOVERY HIGH --"), };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messagesHigh);
+
+
+    // Set enrolled nodes to number of nodes and expect that network will enter discovery off then remove info about enrolled
+    // nodes and expect network to enter high discovery
+    tester.SendTerminalCommand(1, "action 0 node set_enrolled_nodes %d", cherrySimInstance->GetTotalNodes());
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "-- DISCOVERY IDLE --");
+
+    tester.SendTerminalCommand(1, "action 0 node set_enrolled_nodes %d", 0);
+    std::vector<SimulationMessage> messagesHigh2 = {
+        SimulationMessage(1, "-- DISCOVERY HIGH --"),
+        SimulationMessage(2, "-- DISCOVERY HIGH --"), };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messagesHigh2);
+}
+
+TEST(TestNode, TestDiscoveryRestartingAndStoppingDiscovery) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.nodeConfigName.clear();
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2});
+    //testerConfig.verbose = true;
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+    tester.SendTerminalCommand(1, "action this enroll basic BBBBB 1 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
+    tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
+    tester.SendTerminalCommand(3, "action this enroll basic BBBBD 3 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
+    tester.SimulateUntilClusteringDone(10 * 1000);
+
+
+    std::vector<SimulationMessage> messagesOFF = {
+        SimulationMessage(1, "-- DISCOVERY IDLE --"),
+        SimulationMessage(2, "-- DISCOVERY IDLE --"),
+        SimulationMessage(3, "-- DISCOVERY IDLE --"), };
+
+    std::vector<SimulationMessage> messagesHIGH = {
+        SimulationMessage(1, "-- DISCOVERY HIGH --"),
+        SimulationMessage(2, "-- DISCOVERY HIGH --"),
+        SimulationMessage(3, "-- DISCOVERY HIGH --"), };
+
+    //Remove one of the nodes, set number of enrolled nodes and then expect to enter discovery off when number of nodes is reached.
+    tester.SendTerminalCommand(1, "action 2 enroll remove BBBBC");
+    tester.SimulateForGivenTime(10 * 1000);
+    tester.SendTerminalCommand(1, "action 0 node set_enrolled_nodes %d", cherrySimInstance->GetTotalNodes());
+    tester.SimulateForGivenTime(10 * 1000);
+    tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
+    tester.SimulateUntilMessagesReceived(100 * 1000, messagesOFF);
+
+    //Reset node 1 to enter and expect that other node will enter high discovery and then discovery off after reclustering
+    tester.SendTerminalCommand(1, "reset");
+    tester.SimulateUntilMessagesReceived(100 * 1000, messagesHIGH);
+    tester.SimulateUntilMessagesReceived(100 * 1000, messagesOFF);
+}
+
+TEST(TestNode, TestDiscoveryOffWillAllowConnectingNewNodes) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.nodeConfigName.clear();
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2});
+    //testerConfig.verbose = true;
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+    tester.SendTerminalCommand(1, "action this enroll basic BBBBB 1 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
+    tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
+    tester.SendTerminalCommand(3, "action this enroll basic BBBBD 3 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
+    tester.SimulateUntilClusteringDone(10 * 1000);
+    
+    // remove node from network
+    tester.SendTerminalCommand(1, "action 2 enroll remove BBBBC");
+    tester.SimulateForGivenTime(20 * 1000);
+
+    //Set number of enrolled nodes to numNodes - 1 (1 removed node) and wait for discovery off state
+    tester.SendTerminalCommand(1, "action 0 node set_enrolled_nodes %d", cherrySimInstance->GetTotalNodes() - 1);
+    std::vector<SimulationMessage> messagesOff = {
+        SimulationMessage(1, "-- DISCOVERY IDLE --"),
+        SimulationMessage(3, "-- DISCOVERY IDLE --"), };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messagesOff);
+    
+    // enroll node again and expect it will join network
+    tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
+    tester.SimulateUntilMessageReceived(20 * 1000, 2, "ClusterSize set to %d", cherrySimInstance->GetTotalNodes());
 }
 
 //Tests sending various length packets (split/not split) over normal prio queue concurrently
-//with high prio packets over a MeshConnection to see if acknowledgement works as expected
+//with vital prio packets over a MeshConnection to see if acknowledgement works as expected
 TEST(TestNode, TestMeshConnectionPacketQueuing) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
@@ -417,7 +557,7 @@ TEST(TestNode, TestMeshConnectionPacketQueuing) {
 
     u32* counter = (u32*)(buffer + SIZEOF_CONN_PACKET_HEADER + padding);
 
-    //We send split packets and high prio packets interleaved with each other and check
+    //We send split packets and vital prio packets interleaved with each other and check
     //if an exception is thrown by the implementation, we add a counter to the packets
     int k = 0, l = 0;
     for (int i = 0; i < 500; i++)
@@ -433,7 +573,7 @@ TEST(TestNode, TestMeshConnectionPacketQueuing) {
 
             tester.SendTerminalCommand(1, "rawsend %s", bufferHex);
         }
-        //High prio packets
+        //vital prio packets
         else {
             *counter = 10000 + l++;
             u16 len = 9;
@@ -455,7 +595,7 @@ TEST(TestNode, TestMeshConnectionPacketQueuing) {
 }
 
 //Tests sending various length packets (split/not split) over normal prio queue concurrently
-//with high prio packets over a MeshAccessConnection to see if acknowledgement works as expected
+//with vital prio packets over a MeshAccessConnection to see if acknowledgement works as expected
 TEST(TestNode, TestMeshAccessConnectionPacketQueuing) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
@@ -470,8 +610,12 @@ TEST(TestNode, TestMeshAccessConnectionPacketQueuing) {
 
     tester.Start();
 
-    //Connect to node 2 using a mesh access connection and the network key
+    //Connect to node 2 using a mesh access connection and the network key. Network key is different for github release (and source dist tester)!
+#ifdef GITHUB_RELEASE
+    tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 2 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22");
+#else
     tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 2 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
+#endif //GITHUB_RELEASE
     
     //Wait until connection was set up
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "Received remote mesh data");
@@ -480,19 +624,19 @@ TEST(TestNode, TestMeshAccessConnectionPacketQueuing) {
     constexpr u32 padding = 3;
 
     ConnPacketHeader* header = (ConnPacketHeader*)(buffer + padding);
-    header->messageType = MessageType::DATA_1;
     header->sender = 1;
     header->receiver = 2001; //virtual partner id
 
     u32* counter = (u32*)(buffer + SIZEOF_CONN_PACKET_HEADER + padding);
 
-    //We send split packets and high prio packets interleaved with each other and check
+    //We send split packets and vital prio packets interleaved with each other and check
     //if an exception is thrown by the implementation, we add a counter to the packets
     int k = 0, l = 0;
     for (int i = 0; i < 500; i++)
     {
         //Normal prio packets
         if (PSRNGINT(0, 100) % 2 == 0) {
+            header->messageType = MessageType::DATA_1;
 
             *counter = k++;
             u16 len = 9 + PSRNGINT(0, 35);
@@ -502,8 +646,9 @@ TEST(TestNode, TestMeshAccessConnectionPacketQueuing) {
 
             tester.SendTerminalCommand(1, "rawsend %s", bufferHex);
         }
-        //High prio packets
+        //vital prio packets
         else {
+            header->messageType = MessageType::DATA_1_VITAL;
             *counter = 10000 + l++;
             u16 len = 9;
 
@@ -542,6 +687,11 @@ TEST(TestNode, TestCapabilitySending) {
 
     std::vector<SimulationMessage> msgs = {
         SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":0,\"capabilityType\":2,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"BlueRange Node\",\"revision\":\"\\d+.\\d+.\\d+\"\\}"),
+#ifndef GITHUB_RELEASE
+        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":1,\"capabilityType\":2,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Featureset\",\"revision\":\"prod_mesh_nrf52\"\\}"),
+#else
+        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":1,\"capabilityType\":2,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Featureset\",\"revision\":\"github_dev_nrf52\"\\}"),
+#endif
         SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_end\",\"amount\":\\d+\\}"),
     };
     tester.SimulateUntilRegexMessagesReceived(100 * 1000, msgs);

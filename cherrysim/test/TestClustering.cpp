@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -33,6 +33,8 @@
 #include <ConnectionManager.h>
 #include <cmath>
 #include <algorithm>
+#include <regex>
+#include "DebugModule.h"
 
 
 //This test fixture is used to run a parametrized test based on the chosen BLE Stack
@@ -136,7 +138,7 @@ TEST_P(MultiStackFixture, TestDenseNetwork) {
     std::string site = CherrySimUtils::GetNormalizedPath() + "/test/res/densenetwork/site.json";
     std::string device = CherrySimUtils::GetNormalizedPath() + "/test/res/densenetwork/devices.json";
     constexpr u32 maxRecordedClusteringMedianMs = 43350; //The maximum median recorded over 1000 different seed offsets
-    DoClusteringTestImportedFromJson(site, device, 5, 60 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
+    DoClusteringTestImportedFromJson(site, device, 5, 600 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
 
 /*Nodes in the network are arranged according to start topology*/
@@ -181,7 +183,7 @@ TEST(TestClustering, TestClusteringWithManySdBusy) {
         CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
         SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
         simConfig.seed = i + 1;
-        simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 10 } );
+        simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 10 });
         simConfig.sdBusyProbability = UINT32_MAX / 2;
         simConfig.connectionTimeoutProbabilityPerSec = 0;
         simConfig.terminalId = -1;
@@ -194,6 +196,71 @@ TEST(TestClustering, TestClusteringWithManySdBusy) {
     }
 
     printf("Average clustering time %d seconds" EOL, clusteringTimeTotalMs / clusteringIterations / 1000);
+}
+
+TEST(TestClustering, TestMessagesInOrder) {
+    // This test makes sure that messages from the same priority (in this case the priority of raw_data_light)
+    // are always received in the order in which they were sent, without a message overtaking a previous message.
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose = true;
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    //FIXME: IOT-4648 - seed had to be changed to workaround this rare, but still valid issue
+    simConfig.seed = 2;
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 10 });
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+    tester.SimulateUntilClusteringDone(1000 * 1000);
+
+    u32 failCounter = 0;
+    u32 rawDataLightCounter = 1;
+    u32 biggestReceivedVal = 0;
+
+    for (int repeats = 0; repeats < 1000; repeats++)
+    {
+        for (u32 k = 0; k < 512; k++)
+        {
+            const u32 currentCounter = rawDataLightCounter;
+            rawDataLightCounter++;
+            char buffer[128] = {};
+            Logger::ConvertBufferToHexString((u8*)&currentCounter, sizeof(currentCounter), buffer, sizeof(buffer));
+            tester.SendTerminalCommand(1, (std::string("raw_data_light 10 0 0 ") + buffer).c_str());
+        }
+        const std::string regexString = "\\{\"nodeId\":1,\"type\":\"raw_data_light\",\"module\":0,\"protocol\":0,\"payload\":\"([A-Za-z0-9+/=]*?)\",\"requestHandle\":0\\}";
+        std::vector<SimulationMessage> msgs = { SimulationMessage(10, regexString) };
+        try
+        {
+            Exceptions::DisableDebugBreakOnException disabler;
+            tester.SimulateUntilRegexMessagesReceived(10 * 1000, msgs);
+            std::string completedMessage = msgs[0].GetCompleteMessage();
+
+            std::regex reg(regexString);
+            std::smatch matches;
+            std::regex_search(completedMessage, matches, reg);
+            u32 val = 0;
+            bool didError = false;
+            Logger::ParseEncodedStringToBuffer(matches[1].str().c_str(), (u8*)&val, sizeof(val), &didError);
+            if (didError)
+            {
+                SIMEXCEPTION(IllegalStateException);
+            }
+            if (val <= biggestReceivedVal)
+            {
+                // A message has overtaken a previous message!
+                SIMEXCEPTION(IllegalStateException);
+            }
+            biggestReceivedVal = val;
+        }
+        catch (TimeoutException& e)
+        {
+            // Messages may get dropped and thus lead to time outs. This is fine however, as long as these timeouts don't happen too often.
+            failCounter++;
+            if (failCounter > 100) SIMEXCEPTION(IllegalStateException);
+        }
+        
+    }
+
 }
 
 TEST_P(MultiStackFixture, TestBasicClusteringWithNodeReset) {
@@ -403,9 +470,9 @@ TEST(TestClustering, TestMeshingUnderLoad) {
 
     //Instruct all nodes to flood the network using FLOOD_MODE_UNRELIABLE_SPLIT
     for (u32 i = 0; i < tester.sim->GetTotalNodes(); i++) {
-        tester.SendTerminalCommand(i+1, "action this debug flood 0 4 200");
+        tester.SendTerminalCommand(i+1, "action this debug flood 0 4 10000 50000");
     }
-    tester.SimulateUntilClusteringDone(100 * 1000);
+    tester.SimulateUntilClusteringDone(1000 * 1000);
 
     printf("Clustering under load took %u seconds", tester.sim->simState.simTimeMs / 1000);
 }
@@ -559,7 +626,7 @@ TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
 }
 
 extern std::map<std::string, int> simStatCounts;
-TEST(TestClustering, TestHighPrioQueueFull) {
+TEST(TestClustering, TestVitalPrioQueueFull) {
     for (int seed = 0; seed < 3; seed++) {
         CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
         //testerConfig.verbose = true;
@@ -575,16 +642,18 @@ TEST(TestClustering, TestHighPrioQueueFull) {
         //Give the simulation some time so that we are in a half done clustering state.
         tester.SimulateGivenNumberOfSteps(30);
 
-        for (int i = 0; i < 1000; i++) {
-            tester.SendTerminalCommand(0, "update_iv 0 100");
-            tester.SimulateGivenNumberOfSteps(1);
-        }
-
-        tester.SimulateUntilClusteringDone(1000 * 1000); //Such a high value because for some RNG seeds an emergency disconnect might be required which takes quite a bit of time.
+        NodeIndexSetter setter(0);
+        DebugModule* mod = (DebugModule*)GS->node.GetModuleById(ModuleId::DEBUG_MODULE);
+        ASSERT_TRUE(mod != nullptr);
+        tester.SimulateUntilClusteringDone(1000 * 1000 /*Such a high value because for some RNG seeds an emergency disconnect might be required which takes quite a bit of time.*/,
+            [&]() {
+            NodeIndexSetter setter(0);
+            mod->SendQueueFloodMessage(DeliveryPriority::VITAL);
+        }); 
     }
-
-    ASSERT_TRUE(simStatCounts.find("highPrioQueueFull") != simStatCounts.end());
-    ASSERT_TRUE(simStatCounts["highPrioQueueFull"] > 3);
+    
+    ASSERT_TRUE(simStatCounts.find("vitalPrioQueueFull") != simStatCounts.end());
+    ASSERT_TRUE(simStatCounts["vitalPrioQueueFull"] > 3);
 }
 
 TEST(TestClustering, TestInfluceOfNodeWithWrongNetworkKey) {

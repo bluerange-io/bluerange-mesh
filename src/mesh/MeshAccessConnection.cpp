@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -81,8 +81,6 @@ MeshAccessConnection::MeshAccessConnection(u8 id, ConnectionDirection direction,
     if(direction != ConnectionDirection::DIRECTION_OUT){
         this->handshakeStartedDs = GS->appTimerDs;
     }
-
-    this->lastProcessedMessageType = MessageType::INVALID;
 
     this->tunnelType = tunnelType;
 
@@ -256,7 +254,6 @@ void MeshAccessConnection::StartHandshake(FmKeyId fmKeyId)
     SendData(
         (u8*)&packet,
         SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_START,
-        DeliveryPriority::MESH_INTERNAL_HIGH,
         false);
 }
 
@@ -315,7 +312,6 @@ void MeshAccessConnection::HandshakeANonce(ConnPacketEncryptCustomStart const * 
     SendData(
         (u8*)&packet,
         SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_ANONCE,
-        DeliveryPriority::MESH_INTERNAL_HIGH,
         false);
 }
 
@@ -368,7 +364,6 @@ void MeshAccessConnection::OnANonceReceived(ConnPacketEncryptCustomANonce const 
     SendData(
         (u8*)packet,
         SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE,
-        DeliveryPriority::MESH_INTERNAL_HIGH,
         false);
 
     connectionState = ConnectionState::HANDSHAKE_DONE;
@@ -421,7 +416,6 @@ void MeshAccessConnection::OnSNonceReceived(ConnPacketEncryptCustomSNonce const 
     SendData(
         (u8*)&packet,
         SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_DONE,
-        DeliveryPriority::MESH_INTERNAL_HIGH,
         false);
 
     connectionState = ConnectionState::HANDSHAKE_DONE;
@@ -447,7 +441,7 @@ void MeshAccessConnection::OnHandshakeComplete()
     if (GS->timeManager.IsTimeCorrected())
     {
         TimeSyncInterNetwork tsin = GS->timeManager.GetTimeSyncInterNetworkMessage(virtualPartnerId);
-        SendData((u8*)&tsin, sizeof(tsin), DeliveryPriority::LOW, false);
+        SendData((u8*)&tsin, sizeof(tsin), false);
     }
 }
 
@@ -459,11 +453,11 @@ void MeshAccessConnection::SendClusterState()
     packet.header.sender = GS->node.configuration.nodeId;
     packet.header.receiver = NODE_ID_BROADCAST;
 
-    packet.payload.clusterSizeChange = GS->node.clusterSize;
+    packet.payload.clusterSizeChange = GS->node.GetClusterSize();
     packet.payload.connectionMasterBitHandover = GS->node.HasAllMasterBits();
     packet.payload.hopsToSink = GS->cm.GetMeshHopsToShortestSink(nullptr);
 
-    SendData((u8*)&packet, sizeof(ConnPacketClusterInfoUpdate), DeliveryPriority::LOW, false);
+    SendData((u8*)&packet, sizeof(ConnPacketClusterInfoUpdate), false);
 }
 
 void MeshAccessConnection::NotifyConnectionStateSubscriber(ConnectionState state) const
@@ -589,7 +583,7 @@ void MeshAccessConnection::OnCorruptedMessage()
     msg.header.receiver    = this->virtualPartnerId;
     CheckedMemcpy(msg.magicNumber, deadDataMagicNumber, sizeof(deadDataMagicNumber));
 
-    SendData((u8*)&msg, sizeof(DeadDataMessage), DeliveryPriority::LOW, false);
+    SendData((u8*)&msg, sizeof(DeadDataMessage), false);
 
     if (amountOfCorruptedMessages >= MAX_CORRUPTED_MESSAGES)
     {
@@ -617,10 +611,10 @@ void MeshAccessConnection::LogKeys()
  * @param data[in/out] must be big enough to hold the additional bytes for the MIC which is placed at the end
  * @param dataLength[in]
  */
-void MeshAccessConnection::EncryptPacket(u8* data, u16 dataLength)
+void MeshAccessConnection::EncryptPacket(u8* data, MessageLength dataLength)
 {
-    TO_HEX(data, dataLength);
-    logt("MACONN", "Encrypting %s (%u) with nonce %u", dataHex, dataLength, encryptionNonce[1]);
+    TO_HEX(data, dataLength.GetRaw());
+    logt("MACONN", "Encrypting %s (%u) with nonce %u", dataHex, dataLength.GetRaw(), encryptionNonce[1]);
 
     u8 cleartext[16];
     u8 keystream[16];
@@ -642,9 +636,9 @@ void MeshAccessConnection::EncryptPacket(u8* data, u16 dataLength)
     //logt("MACONN", "Encryption Keystream %s", keystreamHex);
 
     //Xor cleartext with keystream to get the ciphertext
-    CheckedMemcpy(cleartext, data, dataLength);
+    CheckedMemcpy(cleartext, data, dataLength.GetRaw());
     Utility::XorBytes(keystream, cleartext, 16, ciphertext);
-    CheckedMemcpy(data, ciphertext, dataLength);
+    CheckedMemcpy(data, ciphertext, dataLength.GetRaw());
 
     //Increment nonce being used as a counter
     encryptionNonce[1]++;
@@ -668,7 +662,7 @@ void MeshAccessConnection::EncryptPacket(u8* data, u16 dataLength)
     //To generate the MIC, we xor the new keystream with our cleartext and encrypt it again
     //we therefore create a pair that cannot be reproduced by an attacker (hopefully :-))
     CheckedMemset(cleartext, 0x00, 16);
-    CheckedMemcpy(cleartext, data, dataLength);
+    CheckedMemcpy(cleartext, data, dataLength.GetRaw());
     Utility::XorBytes(keystream, cleartext, 16, cleartext);
     Utility::Aes128BlockEncrypt(
             (Aes128Block*)cleartext,
@@ -689,18 +683,18 @@ void MeshAccessConnection::EncryptPacket(u8* data, u16 dataLength)
     CheckedMemcpy(micPtr, keystream, MESH_ACCESS_MIC_LENGTH);
 
     //Log the encrypted packet
-    DYNAMIC_ARRAY(data2, dataLength + MESH_ACCESS_MIC_LENGTH);
-    CheckedMemcpy(data2, data, dataLength + MESH_ACCESS_MIC_LENGTH);
-    TO_HEX(data2, dataLength + MESH_ACCESS_MIC_LENGTH);
-    logt("MACONN", "Encrypted as %s (%u)", data2Hex, dataLength + MESH_ACCESS_MIC_LENGTH);
+    DYNAMIC_ARRAY(data2, dataLength.GetRaw() + MESH_ACCESS_MIC_LENGTH);
+    CheckedMemcpy(data2, data, dataLength.GetRaw() + MESH_ACCESS_MIC_LENGTH);
+    TO_HEX(data2, dataLength.GetRaw() + MESH_ACCESS_MIC_LENGTH);
+    logt("MACONN", "Encrypted as %s (%u)", data2Hex, dataLength.GetRaw() + MESH_ACCESS_MIC_LENGTH);
 }
 
-bool MeshAccessConnection::DecryptPacket(u8 const * data, u8 * decryptedOut, u16 dataLength)
+bool MeshAccessConnection::DecryptPacket(u8 const * data, u8 * decryptedOut, MessageLength dataLength)
 {
     if(dataLength < 4) return false;
 
-    TO_HEX(data, dataLength);
-    logt("MACONN", "Decrypting %s (%u) with nonce %u", dataHex, dataLength, decryptionNonce[1]);
+    TO_HEX(data, dataLength.GetRaw());
+    logt("MACONN", "Decrypting %s (%u) with nonce %u", dataHex, dataLength.GetRaw(), decryptionNonce[1]);
 
     u8 cleartext[16];
     u8 keystream[16];
@@ -719,7 +713,7 @@ bool MeshAccessConnection::DecryptPacket(u8 const * data, u8 * decryptedOut, u16
 
     //Xor the keystream with the ciphertext
     CheckedMemset(ciphertext, 0x00, 16);
-    CheckedMemcpy(ciphertext, data, dataLength - MESH_ACCESS_MIC_LENGTH);
+    CheckedMemcpy(ciphertext, data, dataLength.GetRaw() - MESH_ACCESS_MIC_LENGTH);
     Utility::XorBytes(ciphertext, keystream, 16, cleartext);
     //Encrypt the resulting cleartext
     Utility::Aes128BlockEncrypt(
@@ -746,7 +740,7 @@ bool MeshAccessConnection::DecryptPacket(u8 const * data, u8 * decryptedOut, u16
     //logt("MACONN", "Keystream %s", keystreamHex);
 
     //Xor keystream with ciphertext to retrieve original message
-    Utility::XorBytes(keystream, data, dataLength - MESH_ACCESS_MIC_LENGTH, decryptedOut);
+    Utility::XorBytes(keystream, data, dataLength.GetRaw() - MESH_ACCESS_MIC_LENGTH, decryptedOut);
 
     //Increment nonce being used as a counter
     decryptionNonce[1] += 2;
@@ -757,8 +751,8 @@ bool MeshAccessConnection::DecryptPacket(u8 const * data, u8 * decryptedOut, u16
     //logt("MACONN", "MIC nonce %u, Keystream %s", decryptionNonce[1], keystream2Hex);
 
 
-    TO_HEX_2(data, dataLength - MESH_ACCESS_MIC_LENGTH);
-    logt("MACONN", "Decrypted as %s (%u) micValid %u", dataHex, dataLength - MESH_ACCESS_MIC_LENGTH, micCheck == 0);
+    TO_HEX_2(data, dataLength.GetRaw() - MESH_ACCESS_MIC_LENGTH);
+    logt("MACONN", "Decrypted as %s (%u) micValid %u", dataHex, dataLength.GetRaw() - MESH_ACCESS_MIC_LENGTH, micCheck == 0);
 
     return micCheck == 0;
 }
@@ -767,26 +761,27 @@ bool MeshAccessConnection::DecryptPacket(u8 const * data, u8 * decryptedOut, u16
 #define ________________________SEND________________________
 
 //This function might modify the packet, can also split bigger packets
-SizedData MeshAccessConnection::ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer)
+MessageLength MeshAccessConnection::ProcessDataBeforeTransmission(u8* message, MessageLength messageLength, MessageLength bufferLength)
 {
-    //Use the split packet from the BaseConnection to process all packets
-    SizedData splitData = GetSplitData(*sendData, data, packetBuffer);
-
-    //We must save the message type before encrypting because we need to know if the
-    //packet was queued in the softdevice for packet splitting
-    lastProcessedMessageType = ((ConnPacketHeader*)splitData.data)->messageType;
-
     //Encrypt packets after splitting if necessary
     if(encryptionState == EncryptionState::ENCRYPTED){
+        const u16 processedLength = messageLength.GetRaw() + MESH_ACCESS_MIC_LENGTH;
+        if (processedLength > bufferLength)
+        {
+            SIMEXCEPTION(IllegalStateException);
+            GS->logger.LogCustomError(CustomErrorTypes::FATAL_ILLEGAL_PROCCESS_BUFFER_LENGTH, bufferLength.GetRaw());
+            logt("ERROR", "!!!FATAL!!! Illegal Process Buffer Length!");
+            return 0;
+        }
         //We use the given packetBuffer to store the encrypted packet + its MIC
-        CheckedMemcpy(packetBuffer, splitData.data, splitData.length);
-        EncryptPacket(packetBuffer, splitData.length);
-
-        splitData.data = packetBuffer;
-        splitData.length += MESH_ACCESS_MIC_LENGTH;
+        DYNAMIC_ARRAY(packetBuffer, bufferLength.GetRaw());
+        CheckedMemcpy(packetBuffer, message, messageLength.GetRaw());
+        EncryptPacket(packetBuffer, messageLength);
+        CheckedMemcpy(message, packetBuffer, processedLength)
+        return processedLength;
     }
 
-    return splitData;
+    return messageLength;
 }
 
 bool MeshAccessConnection::ShouldSendDataToNodeId(NodeId nodeId) const
@@ -809,7 +804,7 @@ bool MeshAccessConnection::ShouldSendDataToNodeId(NodeId nodeId) const
 }
 
 
-bool MeshAccessConnection::SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable)
+bool MeshAccessConnection::SendData(u8 const * data, MessageLength dataLength, bool reliable)
 {
     if (dataLength > MAX_MESH_PACKET_SIZE) {
         SIMEXCEPTION(PacketTooBigException);
@@ -825,17 +820,15 @@ bool MeshAccessConnection::SendData(u8 const * data, u16 dataLength, DeliveryPri
     {
         //The central can write the data to the rx characteristic of the peripheral
         sendData.characteristicHandle = partnerRxCharacteristicHandle;
-        sendData.dataLength = (u8)dataLength;
+        sendData.dataLength = dataLength;
         sendData.deliveryOption = reliable ? DeliveryOption::WRITE_REQ : DeliveryOption::WRITE_CMD;
-        sendData.priority = priority;
     }
     else
     {
         //The peripheral must send data as notifications from its tx characteristic
         sendData.characteristicHandle = meshAccessService->txCharacteristicHandle.valueHandle;
-        sendData.dataLength = (u8)dataLength;
+        sendData.dataLength = dataLength;
         sendData.deliveryOption = DeliveryOption::NOTIFICATION;
-        sendData.priority = priority;
     }
 
     return SendData(&sendData, data);
@@ -883,9 +876,9 @@ bool MeshAccessConnection::SendData(BaseConnectionSendData* sendData, u8 const *
 
         //Before sending it to our partner, we change the virtual receiver id
         //that was used in our mesh to his normal nodeId
-        DYNAMIC_ARRAY(modifiedData, sendData->dataLength);
+        DYNAMIC_ARRAY(modifiedData, sendData->dataLength.GetRaw());
         if(packetHeader->receiver == this->virtualPartnerId){
-            CheckedMemcpy(modifiedData, data, sendData->dataLength);
+            CheckedMemcpy(modifiedData, data, sendData->dataLength.GetRaw());
             ConnPacketHeader * modifiedPacketHeader = (ConnPacketHeader*)modifiedData;
             modifiedPacketHeader->receiver = this->partnerId;
             data = modifiedData;
@@ -912,7 +905,7 @@ bool MeshAccessConnection::SendData(BaseConnectionSendData* sendData, u8 const *
 }
 
 //Because we are using packet splitting, we must handle packetSendPosition and Discarding here
-void MeshAccessConnection::PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData)
+void MeshAccessConnection::PacketSuccessfullyQueuedWithSoftdevice(SizedData* sentData)
 {
     //The queued packet might be encrypted, so we must rely on the saved messageType that is saved
     //by the ProcessDataBeforeTransmission method
@@ -920,27 +913,7 @@ void MeshAccessConnection::PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* q
     if(encryptionState == EncryptionState::ENCRYPTED){
         encryptionNonce[1] += 2;
     }
-
-    //If this was an intermediate split packet
-    if (lastProcessedMessageType == MessageType::SPLIT_WRITE_CMD) {
-        queue->packetSendPosition++;
-        packetSendQueue.packetSentRemaining++;
-    }
-    //The end of a split packet
-    else if (lastProcessedMessageType == MessageType::SPLIT_WRITE_CMD_END) {
-        queue->packetSendPosition = 0;
-        packetSendQueue.packetSentRemaining++;
-
-        //Save a queue handle for that packet
-        HandlePacketQueued(queue, sendDataPacked);
-    }
-    //If this was a normal packet
-    else {
-        queue->packetSendPosition = 0;
-
-        //Discard the last packet because it was now successfully sent
-        HandlePacketQueued(queue, sendDataPacked);
-    }
+    HandlePacketQueued();
 }
 
 #define ________________________RECEIVE________________________
@@ -962,7 +935,7 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
     //logt("MACONN", "RX DATA %s", dataHex);
 
     //Check if packet must be decrypted first
-    DYNAMIC_ARRAY(decryptedData, sendData->dataLength);
+    DYNAMIC_ARRAY(decryptedData, sendData->dataLength.GetRaw());
     if(encryptionState == EncryptionState::ENCRYPTED){
         bool valid = DecryptPacket(data, decryptedData, sendData->dataLength);
         sendData->dataLength -= MESH_ACCESS_MIC_LENGTH;
@@ -979,7 +952,7 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
 
     if(connectionState == ConnectionState::CONNECTED)
     {
-        if(sendData->dataLength == SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_START && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_START){
+        if(sendData->dataLength >= SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_START && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_START){
             HandshakeANonce((ConnPacketEncryptCustomStart const *) data);
         } else if(!allowCorruptedEncryptionStart) {
             logt("ERROR", "Wrong handshake packet");
@@ -988,10 +961,10 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
     }
     else if(connectionState == ConnectionState::HANDSHAKING)
     {
-        if(sendData->dataLength == SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_ANONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_ANONCE){
+        if(sendData->dataLength >= SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_ANONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_ANONCE){
             OnANonceReceived((ConnPacketEncryptCustomANonce const *) data);
         }
-        else if(sendData->dataLength == SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_SNONCE){
+        else if(sendData->dataLength >= SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_SNONCE){
             OnSNonceReceived((ConnPacketEncryptCustomSNonce const *) data);
         } else {
             logt("ERROR", "Wrong handshake packet");
@@ -999,6 +972,8 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
         }
     }
     else if(connectionState == ConnectionState::HANDSHAKE_DONE){
+        GS->logger.LogCustomCount(CustomErrorTypes::COUNT_RECEIVED_SPLIT_OVER_MESH_ACCESS);
+
         //This will reassemble the data for us
         data = ReassembleData(sendData, data);
 
@@ -1057,9 +1032,9 @@ void MeshAccessConnection::ReceiveMeshAccessMessageHandler(BaseConnectionSendDat
     }
 
     //Replace the sender id with our virtual partner id
-    DYNAMIC_ARRAY(changedBuffer, sendData->dataLength);
+    DYNAMIC_ARRAY(changedBuffer, sendData->dataLength.GetRaw());
     if(packetHeader->sender == partnerId && replaceSenderId){
-        CheckedMemcpy(changedBuffer, data, sendData->dataLength);
+        CheckedMemcpy(changedBuffer, data, sendData->dataLength.GetRaw());
         ConnPacketHeader *changedPacketHeader = (ConnPacketHeader*)changedBuffer;
         changedPacketHeader->sender = virtualPartnerId;
         packetHeader = changedPacketHeader;
@@ -1076,20 +1051,22 @@ void MeshAccessConnection::ReceiveMeshAccessMessageHandler(BaseConnectionSendDat
         return;
     }
 
+    Logger::GetInstance().LogCustomCount(CustomErrorTypes::COUNT_TOTAL_RECEIVED_MESSAGES);
+
     if(
         tunnelType == MeshAccessTunnelType::PEER_TO_PEER
         || tunnelType == MeshAccessTunnelType::REMOTE_MESH
     ){
-        TO_HEX(data, sendData->dataLength);
-        logt("MACONN", "Received remote mesh data %s (%u) from %u", dataHex, sendData->dataLength, packetHeader->sender);
+        TO_HEX(data, sendData->dataLength.GetRaw());
+        logt("MACONN", "Received remote mesh data %s (%u) from %u", dataHex, sendData->dataLength.GetRaw(), packetHeader->sender);
 
         //Only dispatch to the local node, virtualPartnerId and remote nodeIds are kept in tact
         if(auth <= MeshAccessAuthorization::LOCAL_ONLY) GS->cm.DispatchMeshMessage(this, sendData, packetHeader, true);
     }
     else if(tunnelType == MeshAccessTunnelType::LOCAL_MESH)
     {
-        TO_HEX(data, sendData->dataLength);
-        logt("MACONN", "Received data for local mesh %s (%u) from %u aka %u", dataHex, sendData->dataLength, packetHeader->sender, virtualPartnerId);
+        TO_HEX(data, sendData->dataLength.GetRaw());
+        logt("MACONN", "Received data for local mesh %s (%u) from %u aka %u", dataHex, sendData->dataLength.GetRaw(), packetHeader->sender, virtualPartnerId);
 
         //Send to other Mesh-like Connections
         if(auth <= MeshAccessAuthorization::WHITELIST) GS->cm.RouteMeshData(this, sendData, (u8 const*)packetHeader);
@@ -1167,7 +1144,7 @@ void MeshAccessConnection::GATTServiceDiscoveredHandler(FruityHal::BleGattDBDisc
     }
 }
 
-void MeshAccessConnection::DataSentHandler(const u8* data, u16 length)
+void MeshAccessConnection::DataSentHandler(const u8* data, MessageLength length)
 {
     if (length >= sizeof(ConnPacketHeader))
     {
@@ -1186,15 +1163,13 @@ void MeshAccessConnection::PrintStatus()
 {
     const char* directionString = (direction == ConnectionDirection::DIRECTION_IN) ? "IN " : "OUT";
 
-    trace("%s MA state:%u, Queue:%u-%u(%u), hnd:%u, partnerId/virtual:%u/%u, tunnel %u" EOL,
-        directionString, 
-        (u32)this->connectionState, 
-        (packetSendQueue.readPointer - packetSendQueue.bufferStart), 
-        (packetSendQueue.writePointer - packetSendQueue.bufferStart), 
-        packetSendQueue._numElements,
-        connectionHandle, 
-        partnerId, 
-        virtualPartnerId, 
+    trace("%s MA state:%u, Queue:%u, hnd:%u, partnerId/virtual:%u/%u, tunnel %u" EOL,
+        directionString,
+        (u32)this->connectionState,
+        GetPendingPackets(),
+        connectionHandle,
+        partnerId,
+        virtualPartnerId,
         (u32)tunnelType);
 }
 

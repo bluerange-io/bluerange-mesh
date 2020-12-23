@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -114,6 +114,7 @@ enum class MessageType : u8
     //Are currently free to be used by any vendor in networks that do not mix nodes from
     //different vendors. No guarantee is made that these IDs might not be needed in the future.
     DATA_1 = 80,
+    DATA_1_VITAL = 81,
 
     CLC_DATA = 83,
 
@@ -653,6 +654,25 @@ struct TimeSyncCorrectionReply
 };
 STATIC_ASSERT_SIZE(TimeSyncCorrectionReply, 6);
 #endif
+
+//enrolled nodes
+enum class EnrolledNodesType : u8 {
+  SET = 0,
+  SET_REPLY = 1
+};
+
+struct EnrolledNodesHeader
+{
+  ConnPacketHeader header;
+  EnrolledNodesType type;
+};
+
+struct EnrolledNodesMessage
+{
+  EnrolledNodesHeader header;
+  u16 enrolledNodes;
+};
+STATIC_ASSERT_SIZE(EnrolledNodesMessage, 8);
 
 //################################################################################
 //########################### Other packet types #################################

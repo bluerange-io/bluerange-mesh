@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -54,6 +54,73 @@ RecordStorageResultCode Utility::SaveModuleSettingsToFlash(const Module* module,
     return GS->recordStorage.SaveRecord(module->recordStorageId, (u8*)configurationPointer, configurationLength, listener, userType, userData, userDataLength);
 }
 
+#ifndef SIM_ENABLED
+// The stack watcher writes a pre defined memory pattern at the bottom (end) of the stack.
+// This pre defined memory pattern is STACK_WATCHER_MAGIC_NUMBER repeated over and over again.
+// If a hardfault occurres, the stack watcher area is checked for this pre defined memory
+// pattern. If it can't find the values that were expected it probably was a stack overflow.
+extern u32 __FruityStackLimit[]; //Variable is set in the linker script
+constexpr u32 STACK_WATCHER_MAGIC_NUMBER = 0xED505505; //Mnemonic: Ed screams SOS SOS
+constexpr u32 UNUSED_STACK_INDICATOR = 0xA9B8C7D6;
+SizedData Utility::GetStackWatcherAddress()
+{
+    SizedData retVal;
+    CheckedMemset(&retVal, 0, sizeof(retVal));
+    constexpr u32 STACK_WATCHER_LENGTH = 32;
+    retVal.length = STACK_WATCHER_LENGTH * sizeof(u32);
+    retVal.data = (u8*)(((u32*)((u32)__FruityStackLimit - ((u32)__FruityStackLimit % alignof(u32)))) - STACK_WATCHER_LENGTH);
+    return retVal;
+}
+void Utility::FillStackWatcher()
+{
+    SizedData stackWatcherStartAddr = Utility::GetStackWatcherAddress();
+    volatile u32* addr = (u32*)stackWatcherStartAddr.data; // volatile because the stack guard is no valid C++ data object
+                                                           // see: https://en.cppreference.com/w/cpp/language/object
+    for (u32 i = 0; i < stackWatcherStartAddr.length.GetRaw() / sizeof(u32); i++)
+    {
+        addr[i] = STACK_WATCHER_MAGIC_NUMBER;
+    }
+}
+bool Utility::IsStackOverflowDetected()
+{
+    SizedData stackWatcherStart = GetStackWatcherAddress();
+    volatile u32 const * const addr = (u32*)stackWatcherStart.data; // volatile because the stack guard is no valid C++ data object
+                                                                    // see: https://en.cppreference.com/w/cpp/language/object
+    for (u32 i = 0; i < stackWatcherStart.length.GetRaw() / sizeof(u32); i++)
+    {
+        if (addr[i] != STACK_WATCHER_MAGIC_NUMBER)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+void Utility::FillStackSizeDetector()
+{
+    u32 dummyVar = 0;
+    u32* currentStackPointer = &dummyVar;
+    u32* currentStackPointerWithSafetyDistance = currentStackPointer - 256; //Just to make sure we don't overwrite anything unwanted we keep 1 kb distance.
+
+    volatile u32* writePointer = (u32*)(GetStackWatcherAddress().data + GetStackWatcherAddress().length); // volatile because the stack detector is no valid C++ data object
+    while(writePointer < currentStackPointerWithSafetyDistance)
+    {
+        *writePointer = UNUSED_STACK_INDICATOR;
+        writePointer++;
+    }
+}
+u32 Utility::GetAmountOfUnusedStackBytes()
+{
+    volatile u32* readPointer = (u32*)(GetStackWatcherAddress().data + GetStackWatcherAddress().length); // volatile because the stack detector is no valid C++ data object
+    u32 retVal = 0;
+    while (*readPointer == UNUSED_STACK_INDICATOR)
+    {
+        readPointer++;
+        retVal++;
+    }
+    return retVal * sizeof(u32);
+}
+#endif
+
 u32 Utility::GetRandomInteger(void)
 {
     ErrorType err = ErrorType::BUSY;
@@ -71,6 +138,8 @@ u32 Utility::GetRandomInteger(void)
 //major.minor.patch - 111.222.4444
 void Utility::GetVersionStringFromInt(const u32 version, char* outputBuffer)
 {
+    if (outputBuffer == nullptr) return;
+
     u16 major = version / 10000000UL;
     u16 minor = (version - 10000000UL * major) / 10000UL;
     u16 patch = (version - 10000000UL * major - 10000UL * minor);
@@ -189,6 +258,19 @@ void Utility::ToUpperCase(char * str)
     while ((*str = toupper(*str))) str++;
 }
 
+u32 Utility::MessageLengthToAmountOfSplitPackets(const u32 messageLength, const u32 mtu)
+{
+    if (messageLength == 0) return 0;
+    if (messageLength <= mtu) return 1;
+
+    const u32 payloadPerSplit = mtu - SIZEOF_CONN_PACKET_SPLIT_HEADER;
+    
+    u32 retVal = messageLength / payloadPerSplit;
+    if (messageLength % payloadPerSplit != 0) retVal++;
+
+    return retVal;
+}
+
 u32 Utility::GetIndexForSerial(const char* serialNumber, bool *didError){
     u32 index = 0;
     u32 serialLength = strlen(serialNumber);
@@ -196,7 +278,6 @@ u32 Utility::GetIndexForSerial(const char* serialNumber, bool *didError){
     for(u32 i=0; i< serialLength; i++){
         if(i == serialLength - 1 && serialNumber[0] == 'A') continue;
         char currentChar = serialNumber[serialLength - i - 1];
-        if (currentChar == '\0') continue;
         const char* charPos = strchr(serialAlphabet, currentChar);
         if (charPos == nullptr)
         {

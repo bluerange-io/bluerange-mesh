@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -64,7 +64,7 @@ void ResolverConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8
     GS->cm.ResolveConnection(this, sendData, data);
 }
 
-bool ResolverConnection::SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable)
+bool ResolverConnection::SendData(u8 const * data, MessageLength dataLength, bool reliable)
 {
     return false;
 };
@@ -73,5 +73,9 @@ void ResolverConnection::PrintStatus()
 {
     const char* directionString = (direction == ConnectionDirection::DIRECTION_IN) ? "IN " : "OUT";
 
-    trace("%s RSV state:%u, Queue:%u-%u(%u), hnd:%u" EOL, directionString, (u32)this->connectionState, (packetSendQueue.readPointer - packetSendQueue.bufferStart), (packetSendQueue.writePointer - packetSendQueue.bufferStart), packetSendQueue._numElements, connectionHandle);
+    trace("%s RSV state:%u, Queue:%u, hnd:%u" EOL,
+        directionString,
+        (u32)this->connectionState,
+        GetPendingPackets(),
+        connectionHandle);
 }

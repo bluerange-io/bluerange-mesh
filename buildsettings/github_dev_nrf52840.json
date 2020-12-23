@@ -1,0 +1,15 @@
+{	
+	"additionalArgs":{
+		"settings":"github_dev_nrf52840",
+		"make":"github_dev_nrf52840",
+		"flash":""
+	},
+	"buildSettings":{
+		"environmentVariables":{
+			"FEATURESET":"github_dev_nrf52840"
+		}
+	},
+	"moduleConfigs":[
+		
+	]
+}

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -43,6 +43,7 @@ private:
 
 public:
     //really public
+    PacketQueue();
     PacketQueue(u32* buffer, u16 bufferLength);
     u8* Reserve(u16 dataLength);
     bool Put(u8* data, u16 dataLength);
@@ -60,9 +61,9 @@ public:
     u8 packetFailedToQueueCounter = 0; //Used to store the number of time the packet failed to send
 
     //private
-    u8* const bufferStart;
-    u8* const bufferEnd;
-    const u16 bufferLength;
+    u8* bufferStart = nullptr;
+    u8* bufferEnd = nullptr;
+    u16 bufferLength = 0;
 
     u8* readPointer = nullptr;
     u8* writePointer = nullptr;

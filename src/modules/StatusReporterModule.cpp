@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -127,7 +127,6 @@ void StatusReporterModule::TimerEventHandler(u16 passedTimeDs)
         if(timeSinceLastPeriodicTimeSendDs > TIME_BETWEEN_PERIODIC_TIME_SENDS_DS){
             timeSinceLastPeriodicTimeSendDs = 0;
 
-            //todocurrent: Interested in connection
             constexpr size_t bufferSize = sizeof(ComponentMessageHeader) + sizeof(GS->timeManager.GetTime());
             alignas(u32) u8 buffer[bufferSize];
             CheckedMemset(buffer, 0x00, sizeof(buffer));
@@ -146,7 +145,7 @@ void StatusReporterModule::TimerEventHandler(u16 passedTimeDs)
 
             *(decltype(GS->timeManager.GetTime())*)outPacket->payload = GS->timeManager.GetTime();
 
-            GS->cm.SendMeshMessage(buffer, bufferSize, DeliveryPriority::LOW);
+            GS->cm.SendMeshMessage(buffer, bufferSize);
         }
     }
 }
@@ -166,7 +165,7 @@ void StatusReporterModule::SendStatus(NodeId toNode, u8 requestHandle, MessageTy
     StatusReporterModuleStatusMessage data;
 
     data.batteryInfo = GetBatteryVoltage();
-    data.clusterSize = GS->node.clusterSize;
+    data.clusterSize = GS->node.GetClusterSize();
     data.connectionLossCounter = (u8) GS->node.connectionLossCounter; //TODO: connectionlosscounter is random at the moment, and the u8 will wrap
     data.freeIn = GS->cm.freeMeshInConnections;
     data.freeOut = GS->cm.freeMeshOutConnections;
@@ -290,6 +289,60 @@ void StatusReporterModule::SendAllConnections(NodeId toNode, u8 requestHandle, M
     );
 }
 
+void StatusReporterModule::SendAllConnectionsVerbose(NodeId toNode, u8 requestHandle, u32 connectionIndex) const
+{
+    const BaseConnections connections = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
+
+
+    for (u32 i = 0; i < connections.count; i++)
+    {
+        if (connections.handles[i].Exists() && (i == connectionIndex || connectionIndex == CONNECTION_INDEX_INVALID))
+        {
+            const BaseConnection* c = connections.handles[i].GetConnection();
+
+            StatusReporterModuleConnectionsVerboseMessage message;
+            message.header.version = 1;
+            message.header.connectionIndex = i;
+
+            message.connection.partnerId                        = c->partnerId;
+            message.connection.partnerAddress                   = c->partnerAddress;
+            message.connection.connectionType                   = c->connectionType;
+            message.connection.averageRssi                      = c->GetAverageRSSI();
+            message.connection.connectionState                  = c->connectionState;
+            message.connection.encryptionState                  = c->encryptionState;
+            message.connection.connectionId                     = c->connectionId;
+            message.connection.uniqueConnectionId               = c->uniqueConnectionId;
+            message.connection.connectionHandle                 = c->connectionHandle;
+            message.connection.direction                        = c->direction;
+            message.connection.creationTimeDs                   = c->creationTimeDs;
+            message.connection.handshakeStartedDs               = c->handshakeStartedDs;
+            message.connection.connectionHandshakedTimestampDs  = c->connectionHandshakedTimestampDs;
+            message.connection.disconnectedTimestampDs          = c->disconnectedTimestampDs;
+            message.connection.droppedPackets                   = c->droppedPackets;
+            message.connection.sentReliable                     = c->sentReliable;
+            message.connection.sentUnreliable                   = c->sentUnreliable;
+            message.connection.pendingPackets                   = c->GetPendingPackets();
+            message.connection.connectionMtu                    = c->connectionMtu;
+            message.connection.clusterUpdateCounter             = c->clusterUpdateCounter;
+            message.connection.nextExpectedClusterUpdateCounter = c->nextExpectedClusterUpdateCounter;
+            message.connection.manualPacketsSent                = c->manualPacketsSent;
+
+            // The message is so big that we have to send the information per connection instead of all information together.
+            // This is because if we send all connections in one message, we run the risk of exceeding 200 byte which is the
+            // limit for messages. (Would be exceeded with 4 connections)
+            SendModuleActionMessage(
+                MessageType::MODULE_ACTION_RESPONSE,
+                toNode,
+                (u8)StatusModuleActionResponseMessages::ALL_CONNECTIONS_VERBOSE,
+                requestHandle,
+                (u8*)&message,
+                sizeof(message),
+                false
+            );
+        }
+    }
+}
+
 void StatusReporterModule::SendRebootReason(NodeId toNode, u8 requestHandle) const
 {
     SendModuleActionMessage(
@@ -306,6 +359,11 @@ void StatusReporterModule::SendErrors(NodeId toNode, u8 requestHandle) const{
 
     //Log another error so that we know the uptime of the node when the errors were requested
     GS->logger.LogCustomError(CustomErrorTypes::INFO_ERRORS_REQUESTED, GS->logger.errorLogPosition);
+
+#ifndef SIM_ENABLED
+    //Also report how big the stack grew.
+    GS->logger.LogCustomError(CustomErrorTypes::INFO_UNUSED_STACK_BYTES, Utility::GetAmountOfUnusedStackBytes());
+#endif
 
     StatusReporterModuleErrorLogEntryMessage data;
     for(int i=0; i< GS->logger.errorLogPosition; i++){
@@ -451,7 +509,7 @@ TerminalCommandHandlerReturnType StatusReporterModule::TerminalCommandHandler(co
 
                 return TerminalCommandHandlerReturnType::SUCCESS;
             }
-            else if(TERMARGS(3,"get_connections"))
+            else if (TERMARGS(3, "get_connections"))
             {
                 SendModuleActionMessage(
                     MessageType::MODULE_TRIGGER_ACTION,
@@ -460,6 +518,25 @@ TerminalCommandHandlerReturnType StatusReporterModule::TerminalCommandHandler(co
                     0,
                     nullptr,
                     0,
+                    false
+                );
+
+                return TerminalCommandHandlerReturnType::SUCCESS;
+            }
+            else if (TERMARGS(3, "get_connections_verbose"))
+            {
+                StatusReporterModuleConnectionsVerboseRequestMessage message;
+                CheckedMemset(&message, 0, sizeof(message));
+
+                message.connectionIndex = commandArgsSize >= 5 ? Utility::StringToU32(commandArgs[4]) : CONNECTION_INDEX_INVALID;
+
+                SendModuleActionMessage(
+                    MessageType::MODULE_TRIGGER_ACTION,
+                    destinationNode,
+                    (u8)StatusModuleTriggerActionMessages::GET_ALL_CONNECTIONS_VERBOSE,
+                    0,
+                    (u8*)&message,
+                    sizeof(message),
                     false
                 );
 
@@ -497,13 +574,18 @@ TerminalCommandHandlerReturnType StatusReporterModule::TerminalCommandHandler(co
             {
                 // Sink routing self checking mechanism requires keep_alive message to be hops based.
                 destinationNode = STATUS_REPORTER_MODULE_MAX_HOPS;
+                StatusReporterModuleKeepAliveMessage msg;
+                CheckedMemset(&msg, 0, sizeof(msg));
+
+                msg.fromSink = GET_DEVICE_TYPE() == DeviceType::SINK;
+
                 SendModuleActionMessage(
                     MessageType::MODULE_TRIGGER_ACTION,
                     destinationNode,
                     (u8)StatusModuleTriggerActionMessages::SET_KEEP_ALIVE,
                     0,
-                    nullptr,
-                    0,
+                    (u8*)&msg,
+                    sizeof(msg),
                     false
                 );
 
@@ -591,6 +673,12 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
             {
                 StatusReporterModule::SendAllConnections(packetHeader->sender, packet->requestHandle, MessageType::MODULE_ACTION_RESPONSE);
             }
+            //We were queried for our connections with verbosity
+            else if (actionType == StatusModuleTriggerActionMessages::GET_ALL_CONNECTIONS_VERBOSE && sendData->dataLength >= sizeof(StatusReporterModuleConnectionsVerboseRequestMessage))
+            {
+                const StatusReporterModuleConnectionsVerboseRequestMessage* message = (const StatusReporterModuleConnectionsVerboseRequestMessage*)packet->data;
+                StatusReporterModule::SendAllConnectionsVerbose(packetHeader->sender, packet->requestHandle, message->connectionIndex);
+            }
             //We were queried for nearby nodes (nodes in the join_me buffer)
             else if(actionType == StatusModuleTriggerActionMessages::GET_NEARBY_NODES)
             {
@@ -614,9 +702,22 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
             else if(actionType == StatusModuleTriggerActionMessages::SET_KEEP_ALIVE)
             {
                 FruityHal::FeedWatchdog();
-                if (connection != nullptr)
+                bool comesFromSink = false;
+                if (sendData->dataLength <= SIZEOF_CONN_PACKET_MODULE)
                 {
-                    u16 receivedHopsToSink = STATUS_REPORTER_MODULE_MAX_HOPS - packetHeader->receiver;
+                    // Legacy support: old keep alive messages did not have additional data in them.
+                    //                 For them we assume that this is coming from a sink.
+                    comesFromSink = true;
+                }
+                else
+                {
+                    const StatusReporterModuleKeepAliveMessage* msg = (const StatusReporterModuleKeepAliveMessage*)&packet->data;
+                    comesFromSink = msg->fromSink;
+                }
+
+                if (connection != nullptr && comesFromSink)
+                {
+                    u16 receivedHopsToSink = STATUS_REPORTER_MODULE_MAX_HOPS - packetHeader->receiver + 1;
                     MeshConnection * meshconn = GS->cm.GetMeshConnectionToPartner(connection->partnerId).GetConnection();
                     if (meshconn != nullptr)
                     {
@@ -629,6 +730,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
                             logt("DEBUGMOD", "FATAL receivedHopsToSink: %d", receivedHopsToSink);
                             logt("DEBUGMOD", "FATAL GetHopsToSink: %d", hopsToSink);
                             meshconn->SetHopsToSink(receivedHopsToSink);
+                            SIMEXCEPTION(IncorrectHopsToSinkException);
                         }
                     }
                 }
@@ -667,6 +769,65 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
                 StatusReporterModuleConnectionsMessage const * packetData = (StatusReporterModuleConnectionsMessage const *) (packet->data);
                 logjson("STATUSMOD", "{\"type\":\"connections\",\"nodeId\":%d,\"module\":%u,\"partners\":[%d,%d,%d,%d],\"rssiValues\":[%d,%d,%d,%d]}" SEP, packet->header.sender, (u8)ModuleId::STATUS_REPORTER_MODULE, packetData->partner1, packetData->partner2, packetData->partner3, packetData->partner4, packetData->rssi1, packetData->rssi2, packetData->rssi3, packetData->rssi4);
             }
+            if (actionType == StatusModuleActionResponseMessages::ALL_CONNECTIONS_VERBOSE)
+            {
+                StatusReporterModuleConnectionsVerboseMessage const* packetData = (StatusReporterModuleConnectionsVerboseMessage const*)(packet->data);
+                bool unknownButFittingVersion = false;
+                if (packetData->header.version > StatusReporterModuleConnectionsVerboseHeader::MAX_KNOWN_VERSION && sendData->dataLength >= StatusReporterModuleConnectionsVerboseMessage::SIZEOF_MAX_KNOWN_VERSION + SIZEOF_CONN_PACKET_MODULE)
+                {
+                    unknownButFittingVersion = true;
+                }
+                if (packetData->header.version == StatusReporterModuleConnectionsVerboseHeader::MAX_KNOWN_VERSION || unknownButFittingVersion)
+                {
+                    if (unknownButFittingVersion)
+                    {
+                        // The received version is unknown. It must not be used for automatic evaluation of any kind, but it may
+                        // be still usable for a human reader. Thus this data is printed out but must not be trusted blindly.
+                        logt("WARNING", "Received unknown connections_verbose version!");
+                        logjson_partial("STATUSMOD", "{\"type\":\"connections_verbose_unknown_version\",");
+                    }
+                    else
+                    {
+                        logjson_partial("STATUSMOD", "{\"type\":\"connections_verbose\",");
+                    }
+                    logjson_partial("STATUSMOD", "\"nodeId\":%d,"                                 , (i32)packet->header.sender);
+                    logjson_partial("STATUSMOD", "\"module\":%u,"                                 , (u32)ModuleId::STATUS_REPORTER_MODULE);
+                    logjson_partial("STATUSMOD", "\"version\":%u,"                                , (u32)packetData->header.version);
+                    logjson_partial("STATUSMOD", "\"connectionIndex\":%u,"                        , (u32)packetData->header.connectionIndex);
+                    logjson_partial("STATUSMOD", "\"partnerId\":%u,"                              , (u32)packetData->connection.partnerId);
+                    logjson_partial("STATUSMOD", "\"partnerAddress\":\"%u, [%x:%x:%x:%x:%x:%x]\",", (u32)packetData->connection.partnerAddress.addr_type,
+                        (u32)packetData->connection.partnerAddress.addr[0],
+                        (u32)packetData->connection.partnerAddress.addr[1],
+                        (u32)packetData->connection.partnerAddress.addr[2],
+                        (u32)packetData->connection.partnerAddress.addr[3],
+                        (u32)packetData->connection.partnerAddress.addr[4],
+                        (u32)packetData->connection.partnerAddress.addr[5]);
+                    logjson_partial("STATUSMOD", "\"connectionType\":%u,"                         , (u32)packetData->connection.connectionType);
+                    logjson_partial("STATUSMOD", "\"averageRssi\":%d,"                            , (i32)packetData->connection.averageRssi);
+                    logjson_partial("STATUSMOD", "\"connectionState\":%u,"                        , (u32)packetData->connection.connectionState);
+                    logjson_partial("STATUSMOD", "\"encryptionState\":%u,"                        , (u32)packetData->connection.encryptionState);
+                    logjson_partial("STATUSMOD", "\"connectionId\":%u,"                           , (u32)packetData->connection.connectionId);
+                    logjson_partial("STATUSMOD", "\"uniqueConnectionId\":%u,"                     , (u32)packetData->connection.uniqueConnectionId);
+                    logjson_partial("STATUSMOD", "\"connectionHandle\":%u,"                       , (u32)packetData->connection.connectionHandle);
+                    logjson_partial("STATUSMOD", "\"direction\":%u,"                              , (u32)packetData->connection.direction);
+                    logjson_partial("STATUSMOD", "\"creationTimeDs\":%u,"                         , (u32)packetData->connection.creationTimeDs);
+                    logjson_partial("STATUSMOD", "\"handshakeStartedDs\":%u,"                     , (u32)packetData->connection.handshakeStartedDs);
+                    logjson_partial("STATUSMOD", "\"connectionHandshakedTimestampDs\":%u,"        , (u32)packetData->connection.connectionHandshakedTimestampDs);
+                    logjson_partial("STATUSMOD", "\"disconnectedTimestampDs\":%u,"                , (u32)packetData->connection.disconnectedTimestampDs);
+                    logjson_partial("STATUSMOD", "\"droppedPackets\":%u,"                         , (u32)packetData->connection.droppedPackets);
+                    logjson_partial("STATUSMOD", "\"sentReliable\":%u,"                           , (u32)packetData->connection.sentReliable);
+                    logjson_partial("STATUSMOD", "\"sentUnreliable\":%u,"                         , (u32)packetData->connection.sentUnreliable);
+                    logjson_partial("STATUSMOD", "\"pendingPackets\":%u,"                         , (u32)packetData->connection.pendingPackets);
+                    logjson_partial("STATUSMOD", "\"connectionMtu\":%u,"                          , (u32)packetData->connection.connectionMtu);
+                    logjson_partial("STATUSMOD", "\"clusterUpdateCounter\":%u,"                   , (u32)packetData->connection.clusterUpdateCounter);
+                    logjson_partial("STATUSMOD", "\"nextExpectedClusterUpdateCounter\":%u,"       , (u32)packetData->connection.nextExpectedClusterUpdateCounter);
+                    logjson        ("STATUSMOD", "\"manualPacketsSent\":%u}" SEP                  , (u32)packetData->connection.manualPacketsSent);
+                }
+                else
+                {
+                    logt("ERROR", "Received unknown connections_verbose version: %u", (u32)packetData->header.version);
+                }
+            }
             else if(actionType == StatusModuleActionResponseMessages::DEVICE_INFO_V2)
             {
                 //Print packet to console
@@ -704,7 +865,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
                 //Print packet to console
                 logjson_partial("STATUSMOD", "{\"nodeId\":%u,\"type\":\"nearby_nodes\",\"module\":%u,\"nodes\":[", packet->header.sender, (u8)ModuleId::STATUS_REPORTER_MODULE);
 
-                u16 nodeCount = (sendData->dataLength - SIZEOF_CONN_PACKET_MODULE) / 3;
+                u16 nodeCount = (sendData->dataLength - SIZEOF_CONN_PACKET_MODULE).GetRaw() / 3;
                 bool first = true;
                 for(int i=0; i<nodeCount; i++){
                     u16 nodeId;

@@ -62,21 +62,16 @@ The reason behind is that someone who knows e.g. _NodeKey_ should be able to com
 === Endianess
 All of the MeshAccess data is encoded in little endian.
 
-=== MeshAccess Broadcast Messages
-The Mesh Configuration and Access
-Service is broadcast by active nodes that provide mesh access to
-smartphones or other devices through GATT.
+[#MeshAccessBroadcast]
+=== MeshAccess Broadcast Message
+The Mesh Configuration and Access Service is broadcasted by active nodes that provide mesh access to smartphones or other devices through GATT.
 
-The enrollment state is broadcast in the flags. If unenrolled, the node service is disabled.
-
-[cols="1,2,4"]
 |===
 |Bytes|Type|Description
 
-|**11**|-|**Mandatory data**
-|3|Flags|(len, type, flags byte) |4|Service UUID complete|(len, type, 2 byte UUID 0xFE12)
+|3|Flags|(len, type, flags byte)
+|4|Service UUID complete|(len, type, 2 byte UUID 0xFE12)
 |4|Service Data header|(len, type, 2 byte UUID 0xFE12)
-|**9**||**CustomDataHeader**
 |1|messageType|0x03 Mesh Configuration and Access Service (with a new
 service version, the messageType can be changed.
 |1|reserved|Must be 0
@@ -88,12 +83,11 @@ service version, the messageType can be changed.
 |1 bit|interestedInConnection |1 if asset wants to send a component_sense message, 0 otherwise
 |3 bit|reserved|Must be 0
 |4|serialNumberIndex|cf. xref:Specification.adoc[Specification]
-|**4**||**ServiceData**
 |1|moduleId0|ID of a module that is available over the mesh access connection (0 for invalid module)
 |1|moduleId1|ID of a module that is available over the mesh access connection (0 for invalid module)
 |1|moduleId2|ID of a module that is available over the mesh access connection (0 for invalid module)
 |||**Everything below is optional! Older versions of FruityMesh (< 0.8.5000) may not support it.**
-|1|deviceType|The device type of the sender. 
+|1|xref:Specification.adoc#deviceTypes[DeviceType]|The device type of the sender. 
 |**7**||**Reserved**|
 |===
 

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -59,7 +59,7 @@ typedef struct
     u8 isSink : 1;
     u8 isZeroKeyConnectable : 1;
     u8 IsConnectable : 1;
-    u8 interestedInConnetion : 1;
+    u8 interestedInConnection : 1;
     u8 reserved : 3;
     u32 serialIndex; //SerialNumber index of the beacon
     std::array<ModuleId, 3> moduleIds; //Additional subServices offered with their data
@@ -229,10 +229,10 @@ class MeshAccessModule: public Module
         u8 meshAccessSerialConnectRequestHandle = 0;
         u32 meshAccessSerialConnectConnectionId = 0;
 
-        void ReceivedMeshAccessConnectMessage(ConnPacketModule const * packet, u16 packetLength) const;
-        void ReceivedMeshAccessDisconnectMessage(ConnPacketModule const * packet, u16 packetLength) const;
-        void ReceivedMeshAccessConnectionStateMessage(ConnPacketModule const * packet, u16 packetLength) const;
-        void ReceivedMeshAccessSerialConnectMessage(ConnPacketModule const * packet, u16 packetLength);
+        void ReceivedMeshAccessConnectMessage(ConnPacketModule const * packet, MessageLength packetLength) const;
+        void ReceivedMeshAccessDisconnectMessage(ConnPacketModule const * packet, MessageLength packetLength) const;
+        void ReceivedMeshAccessConnectionStateMessage(ConnPacketModule const * packet, MessageLength packetLength) const;
+        void ReceivedMeshAccessSerialConnectMessage(ConnPacketModule const * packet, MessageLength packetLength);
 
         void ResetSerialConnectAttempt(bool cleanupConnection);
         void SendMeshAccessSerialConnectResponse(MeshAccessSerialConnectError code, NodeId partnerId = 0);
@@ -259,6 +259,9 @@ class MeshAccessModule: public Module
         //Authorization
         MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) override final;
         MeshAccessAuthorization CheckAuthorizationForAll(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) const;
+
+        //Priority
+        virtual DeliveryPriority GetPriorityOfMessage(const u8* data, MessageLength size) override;
 
         //Messages
         void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader) override final;

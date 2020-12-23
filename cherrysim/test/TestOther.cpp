@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -38,6 +38,7 @@
 #include "CherrySimUtils.h"
 #include "RingIndexGenerator.h"
 #include "json.hpp"
+#include "SimpleQueue.h"
 
 
 extern "C"{
@@ -62,6 +63,98 @@ TEST(TestOther, BatteryTest)
     for (u32 i = 0; i < tester.sim->GetTotalNodes(); i++) {
         u32 usageMicroAmpere = tester.sim->nodes[i].nanoAmperePerMsTotal / tester.sim->simState.simTimeMs;
         printf("Average Battery usage for node %d was %u uA" EOL, tester.sim->nodes[i].id, usageMicroAmpere);
+    }
+}
+
+TEST(TestOther, TestSimpleQueue)
+{
+    SimpleQueue<u32, 4> queue;
+
+    ASSERT_EQ(queue.GetAmountOfElements(), 0);
+    ASSERT_EQ(queue.IsFull(), false);
+    {
+        Exceptions::DisableDebugBreakOnException disable;
+        ASSERT_THROW(queue.Peek(), IllegalStateException);
+    }
+    ASSERT_EQ(queue.Pop(), false);
+
+    ASSERT_TRUE(queue.Push(1));
+    ASSERT_EQ(queue.GetAmountOfElements(), 1);
+    ASSERT_EQ(queue.IsFull(), false);
+    ASSERT_EQ(queue.Peek(), 1);
+    ASSERT_EQ(queue.Pop(), true);
+    ASSERT_EQ(queue.Pop(), false);
+
+    ASSERT_TRUE(queue.Push(1));
+    ASSERT_TRUE(queue.Push(2));
+    ASSERT_EQ(queue.GetAmountOfElements(), 2);
+    ASSERT_EQ(queue.IsFull(), false);
+    ASSERT_EQ(queue.Peek(), 1);
+    ASSERT_EQ(queue.Pop(), true);
+    ASSERT_EQ(queue.Peek(), 2);
+    ASSERT_EQ(queue.Pop(), true);
+    ASSERT_EQ(queue.Pop(), false);
+
+    ASSERT_TRUE(queue.Push(1));
+    ASSERT_TRUE(queue.Push(2));
+    ASSERT_TRUE(queue.Push(3));
+    ASSERT_EQ(queue.GetAmountOfElements(), 3);
+    ASSERT_EQ(queue.IsFull(), true);
+    ASSERT_EQ(queue.Peek(), 1);
+    ASSERT_EQ(queue.Pop(), true);
+    ASSERT_EQ(queue.Peek(), 2);
+    ASSERT_EQ(queue.Pop(), true);
+    ASSERT_EQ(queue.Peek(), 3);
+    ASSERT_EQ(queue.Pop(), true);
+    ASSERT_EQ(queue.Pop(), false);
+
+    ASSERT_TRUE(queue.Push(1));
+    ASSERT_TRUE(queue.Push(2));
+    ASSERT_TRUE(queue.Push(3));
+    {
+        Exceptions::DisableDebugBreakOnException disable;
+        ASSERT_THROW(queue.Push(4), IllegalStateException);
+    }
+    ASSERT_EQ(queue.GetAmountOfElements(), 3);
+    ASSERT_EQ(queue.IsFull(), true);
+    ASSERT_EQ(queue.Peek(), 1);
+    ASSERT_EQ(queue.Pop(), true);
+    ASSERT_EQ(queue.Peek(), 2);
+    ASSERT_EQ(queue.Pop(), true);
+    ASSERT_EQ(queue.Peek(), 3);
+    ASSERT_EQ(queue.Pop(), true);
+    ASSERT_EQ(queue.Pop(), false);
+}
+
+TEST(TestOther, TestSimpleQueueRandomness)
+{
+    SimpleQueue<u32, 25> queue;
+    std::queue<u32> comparisonQueue;
+    MersenneTwister mt(1);
+
+    for (u32 i = 0; i < 100000; i++)
+    {
+        ASSERT_EQ(queue.GetAmountOfElements(), comparisonQueue.size());
+        ASSERT_EQ(queue.IsFull(), queue.GetAmountOfElements() == queue.length - 1);
+        if (queue.GetAmountOfElements() > 0)
+        {
+            ASSERT_EQ(queue.Peek(), comparisonQueue.front());
+        }
+
+        // Flip coin if we push or pop
+        if ((mt.NextPsrng(0xFFFFFFFF / 2) || queue.GetAmountOfElements() == 0) && queue.IsFull() == false)
+        {
+            // push
+            const u32 element = mt.NextU32();
+            queue.Push(element);
+            comparisonQueue.push(element);
+        }
+        else
+        {
+            // pop
+            queue.Pop();
+            comparisonQueue.pop();
+        }
     }
 }
 
@@ -633,6 +726,7 @@ TEST(TestOther, TestGattcEvtTimeoutReporting) {
     //ATTENTION: Does not simulate the event properly as the connection should be invalid
     //after this event and no more data can be sent.
     simBleEvent s;
+    CheckedMemset(&s, 0, sizeof(s));
     s.globalId = tester.sim->simState.globalEventIdCounter++;
     s.bleEvent.header.evt_id = BLE_GATTC_EVT_TIMEOUT;
     s.bleEvent.header.evt_len = s.globalId;
@@ -1249,6 +1343,32 @@ TEST(TestOther, TestStringConversions) {
         ASSERT_EQ(Utility::StringToU32("70000", &didError), 70000);
         ASSERT_FALSE(didError);
     }
+}
+
+TEST(TestOther, TestNoOfReceivedMsgs) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    simConfig.terminalId = 0;
+    simConfig.SetToPerfectConditions();
+   // testerConfig.verbose = true;
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    tester.Start();
+
+    tester.SimulateUntilClusteringDone(50 * 1000);
+
+    tester.SendTerminalCommand(1, "action 2 status get_errors");
+    tester.SendTerminalCommand(1, "action 2 status get_device_info");
+    tester.SendTerminalCommand(1, "action 2 status get_device_info");
+    tester.SendTerminalCommand(1, "action 2 status get_errors");
+
+    //number of received messages (3)
+    //2 get_devic_info msgs 
+    //1 get_errors msg
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":2,\"code\":81,\"extra\":3,\"time\":\\d+");
 }
 
 #ifndef GITHUB_RELEASE

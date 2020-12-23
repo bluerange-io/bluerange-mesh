@@ -11,8 +11,8 @@ else()
 endif(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/vendor")
 add_subdirectory(aes-ccm)
 
-file(GLOB TESTERCPP    ./CherrySimTester.cpp
-                       ./test/*.cpp)
+file(GLOB TESTERCPP    CONFIGURE_DEPENDS   ./CherrySimTester.cpp
+                                           ./test/*.cpp)
 file(GLOB RUNNERCPP    ./CherrySimRunner.cpp)
 
 file(GLOB   CHERRYSIM_SRC   CONFIGURE_DEPENDS   "./*.c"
@@ -28,12 +28,9 @@ file(GLOB   CHERRYSIM_SRC   CONFIGURE_DEPENDS   "./*.c"
                                                 "./SystemTest.cpp"
                                                 "./MersenneTwister.cpp"
                                                 "./StackWatcher.cpp"
-                                                "../src/Config.cpp"
-                                                "../src/Boardconfig.cpp"
-                                                "../config/featuresets/*.cpp"
-                                                "../config/boards/*.cpp"
                                                 )												
 SET(visual_studio_source_list ${visual_studio_source_list} ${CHERRYSIM_SRC} ${TESTERCPP} ${RUNNERCPP} CACHE INTERNAL "")
+
 list(APPEND LOCAL_INC             ${gtest_include_dir}
                                   # NOTE: Nordic allowed us in their forums to use their headers in our simulator as long as it
                                   # is used to simulate a Nordic Integrated Circuit.

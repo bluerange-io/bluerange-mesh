@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -42,7 +42,7 @@ TEST(TestVendorTemplateModule, TestCommands)
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
     //testerConfig.verbose = true;
-    simConfig.nodeConfigName.insert({ "github_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "github_dev_nrf52", 1 });
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 

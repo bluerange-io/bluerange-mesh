@@ -133,7 +133,7 @@ For more information about VsCode, how to setup Debugging or for some Troublesho
 You can now continue with the xref:#GetStarted[Get Started] section.
 
 === Option 2: Manual CMake Project Configuration
-If you want to build FruityMesh on the command line, use the following instructions. Further explanation can be found under xref:BuildingWithCmake.adoc[Building With CMake]
+If you want to build FruityMesh on the command line, use the following instructions. Further explanation can be found under xref:BuildingWithCMake.adoc[Building With CMake]
 
 Open a command line in `<fruitymesh>/_build/commandline` and execute the following command within that directory. Make sure to replace the path to GCC to fit your installation (use forward slashes "*/*"):
 
@@ -143,14 +143,14 @@ WARNING: The GCC_PATH must be specified using forward slashes "*/*", not backwar
 
 Next, from the same directory, execute the following command:
 
-`cmake --build . --target github_nrf52`
+`cmake --build . --target github_dev_nrf52`
 
 Any other xref:Developers.adoc#Featuresets[Featureset] may be used as well as a target.
 
 If you installed the nRF Command Line Tools and properly configured the `PATH`, you can now type:
 
 ----
-`cmake --build . --target github_nrf52_flash`
+`cmake --build . --target github_dev_nrf52_flash`
 ----
 
 to flash the firmware on a device. This also works with any other xref:Developers.adoc#Featuresets[Featureset] by appending "_flash" to the name.
@@ -213,7 +213,20 @@ switch their led to white (all LEDs on). After you enter *action 0 io led off*, 
 * Now, connect with another terminal to the second node and enter *data* in the command prompt and observe how the data is sent to the other node and outputted on the other terminal.
 * You can add as many nodes as you like to the network and see how it reacts. If you remove a node, the network will try to repair this connection. You can observe the size change of the cluster by entering *status* from time to time.
 
-WARNING: Two nodes will only connect to each other once they have been enrolled in the same network. The Github configuration will automatically have all nodes enrolled in the same network after flashing. If you do not want this, take a look at the xref:Specification.adoc#UICR[UICR configuration] or change the default network id to 0.
+WARNING: Two nodes will only connect to each other once they have been enrolled in the same network. The Github configuration will automatically have all nodes enrolled in the same network after flashing. If you do not want this, take a look at the xref:Specification.adoc#UICR[UICR configuration].
+
+=== GitHub Featureset
+The default xref:Developers.adoc#Featuresets[Featureset] that is compiled for the github release is called github_dev_nrf52. This featureset uses some default values from `Conf::LoadDefaults()` in `Config.cpp` and sets some other default values in `SetFeaturesetConfiguration_github_dev_nrf52()` in `github_dev_nrf52.cpp`. These defaults are useful to get you started quickly. To get your nodes into production you should however make use of the xref:Specification.adoc#UICR[UICR] to store a separate node key for each of your nodes. Also, nodes are typically enrolled by the user so they should not automatically connect to the same network after flashing. Also take a look at our xref:EnrollmentModule.adoc[Enrollment Module] for more information on the enrollment of nodes.
+
+Some of the defaults that are currently used for demonstration purpose:
+
+* *Serial Number*: Auto generated in the FMxxx range (stays the same after re-flashing)
+* *Node Key*: Set to 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11
+* *Network Key*: Set to 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22
+* *Network Id*: Set to 11
+* *Enrollment State*: Set to true
+* *BLE Address*: Uses the unique address of each chip
+
 
 == What's Next
 Take a look at the xref:Features.adoc[Features] page for a detailed overview of the possibilities and check out xref:BasicUsage.adoc[Basic Usage] for usage instructions. If you're ready to contribute to the development of FruityMesh, cf. xref:Developers.adoc[Developers] for a roadmap and for instructions on how to participate.

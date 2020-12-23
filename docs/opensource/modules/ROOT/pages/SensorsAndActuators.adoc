@@ -1,4 +1,4 @@
-= Sensors and Actuators
+= Sensors and Actuators (Firmware)
 
 == Purpose
 As a generic way to send sensor measurements and to send commands to actuators, it is possible to use the component_act and component_sense messages. These messages contain a moduleId that is controlled by a vendor. Next, they contain a 2 byte component that can be used to specify a device that is somehow attached to a FruityMesh node. The registerAddress is then used to specify a handle for this value, e.g. a Modbus holding register or a characteristic. The payload is transmitted over the terminal by using base64 or hex-string encoded binary data.

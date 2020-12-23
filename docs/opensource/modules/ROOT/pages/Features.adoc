@@ -13,6 +13,7 @@ FruityMesh can be seen both as a mesh and as a complete framework to make develo
 * <<Connection Reestablishment>> in case a GAP connection drops, with automatic packet resending
 * Low xref:Battery-Consumption.adoc[Battery Consumption]
 * Integrated message queuing
+* xref:ImplementationDetails.adoc#QualityOfService[Quality of Service] gives messages different priorities while also reducing the risk of starvation of low priority services
 
 == Additional Features
 * Mesh simulation and fast development using xref:#CherrySim[CherrySim]
@@ -39,7 +40,7 @@ FruityMesh can be seen both as a mesh and as a complete framework to make develo
 == Module Features
 This is only an extract of the different features of the Modules. Make sure to take a look at the xref:Modules.adoc[Modules] documentation and at the documentation of the different modules themselves.
 
-* xref:AdvertisingModule.adoc[AdvertisingModule] for configuring custom broadcast messages such as EddyStone or iBeacon
+* xref:BeaconingModule.adoc[BeaconingModule] for configuring custom broadcast messages such as EddyStone or iBeacon
 * xref:DebugModule.adoc[DebugModule] to send test packets, flood the network, ping nodes, ...
 * xref:EnrollmentModule.adoc[EnrollmentModule] for provisioning nodes (locally or over an existing mesh) and giving them access to a mesh
 * xref:IoModule.adoc[IoModule] for signalling commands using LEDs or other pins
@@ -48,8 +49,8 @@ This is only an extract of the different features of the Modules. Make sure to t
 == Closed Source Features
 A number of modules of FruityMesh are not yet open source but can be used by customers. Contact us if you are interested.
 
-* xref:DfuModule.adoc[DfuModule] firmware updates over the mesh. Not limited to FruityMesh, but also available for connected 3rd party controllers
-* xref:bluerange-firmware:ROOT:AssetModule.adoc[AssetModule]: Broadcasting of asset telemetry messages that can be located indoors by our infrastructure
+* xref:DfuModuleAbstract.adoc[DfuModule] firmware updates over the mesh. Not limited to FruityMesh, but also available for connected 3rd party controllers
+* AssetModule: Broadcasting of asset telemetry messages that can be located indoors by our infrastructure
 * A number of xref:Tutorials.adoc[custom modules] and customization of FruityMesh have already been implemented for many customers.
 * A number of drivers, customized to work with FruityMesh
 

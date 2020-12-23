@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -45,6 +45,12 @@
 #define NO_DISCARD
 #endif
 
+//std::is_trivially_copyable seems to be unavailable in GCC 4.9, although it is specified to be available in C++11.
+#if defined(__GNUG__) && __GNUC__ < 5
+#define HAS_TRIVIAL_COPY(T) __has_trivial_copy(T)
+#else
+#define HAS_TRIVIAL_COPY(T) std::is_trivially_copyable<T>::value
+#endif
 
 //Unsigned ints
 typedef uint8_t u8;
@@ -154,6 +160,7 @@ enum class ModuleId : u8 {
     //MANAGEMENT_MODULE=11, //deprecated as of 22.05.2019
     TESTING_MODULE = 12,
     BULK_MODULE = 13,
+    ENVIRONMENT_SENSING_MODULE = 14, //Placeholder for environmental sensing module
 
     //M-Way Modules
     CLC_MODULE = 150,
@@ -235,6 +242,9 @@ enum class RebootReason : u8 {
     SEND_TO_BOOTLOADER = 21,
     UNKNOWN_BUT_BOOTED = 22,
     STACK_OVERFLOW = 23,
+    NO_CHUNK_FOR_NEW_CONNECTION = 24,
+    IMPLEMENTATION_ERROR_NO_QUEUE_SPACE_AFTER_CHECK = 25,
+    IMPLEMENTATION_ERROR_SPLIT_WITH_NO_LOOK_AHEAD = 26,
 
     USER_DEFINED_START = 200,
     USER_DEFINED_END = 255,
@@ -331,6 +341,7 @@ struct Lis2dh12Pins : CustomPins {
 struct Gdewo27w3Pins : CustomPins {
     i32 dcPin = -1;
     i32 mosiPin = -1;
+    i32 misoPin = -1;
     i32 sckPin = -1;
     i32 ssPin = -1;
     i32 resPin = -1;
@@ -339,10 +350,147 @@ struct Gdewo27w3Pins : CustomPins {
     bool epdEnablePinActiveHigh = true;
 };
 
+// Not as primitive as one might hope but other primitive types require this class.
+class MessageLength
+{
+    // The main purpose of this class is to make it harder and thus more secure to use
+    // equality == checks. The reason why this should be hard is that equality checks
+    // are not upward compatible.
+private:
+    u16 m_length = 0;
+
+public:
+    MessageLength() { /*Do nothing*/ }
+
+    // The following constructor may be none-explicit to make the usage of this type easier
+    // as it can be treated just like a numeric value (except the missing == operator)
+    // cppcheck-suppress noExplicitConstructor
+    /*none-explicit*/ MessageLength(u16 length)
+    {
+        m_length = length;
+    }
+
+    bool operator>=(u16 otherLength) const
+    {
+        return m_length >= otherLength;
+    }
+    bool operator<=(u16 otherLength) const
+    {
+        return m_length <= otherLength;
+    }
+    bool operator>(u16 otherLength) const
+    {
+        return m_length > otherLength;
+    }
+    bool operator<(u16 otherLength) const
+    {
+        return m_length < otherLength;
+    }
+    bool operator!=(u16 otherLength) const
+    {
+        return m_length != otherLength;
+    }
+    bool operator!=(MessageLength otherLength) const
+    {
+        return m_length != otherLength.m_length;
+    }
+    friend bool operator>=(u16 otherLength, const MessageLength& length)
+    {
+        return otherLength >= length.GetRaw();
+    }
+    friend bool operator<=(u16 otherLength, const MessageLength& length)
+    {
+        return otherLength <= length.GetRaw();
+    }
+    friend bool operator>(u16 otherLength, const MessageLength& length)
+    {
+        return otherLength > length.GetRaw();
+    }
+    friend bool operator<(u16 otherLength, const MessageLength& length)
+    {
+        return otherLength < length.GetRaw();
+    }
+    friend bool operator!=(u16 otherLength, const MessageLength& length)
+    {
+        return otherLength != length.GetRaw();
+    }
+    // NOTE: The operator== is undefined on purpose! In most of the cases it
+    //       is much better to check for >= to preserver upward compatibility.
+    //       as such, the name for the == check method is so long to give a
+    //       hint to others that they probably don't want to use it.
+    bool IsZero() const
+    {
+        return m_length == 0;
+    }
+
+    MessageLength operator-(u16 length) const
+    {
+        return MessageLength(m_length - length);
+    }
+    MessageLength operator+(u16 length) const
+    {
+        return MessageLength(m_length + length);
+    }
+    MessageLength& operator+=(u16 length)
+    {
+        m_length += length;
+        return *this;
+    }
+    MessageLength& operator-=(u16 length)
+    {
+        m_length -= length;
+        return *this;
+    }
+    u8* operator+(u8* ptr)
+    {
+        return ptr + m_length;
+    }
+    u8 const * operator+(u8 const * ptr)
+    {
+        return ptr + m_length;
+    }
+    friend u8* operator+(u8* ptr, const MessageLength& length)
+    {
+        return ptr + length.GetRaw();
+    }
+    friend u8 const * operator+(u8 const * ptr, const MessageLength& length)
+    {
+        return ptr + length.GetRaw();
+    }
+    friend MessageLength operator-(u16 otherLength, const MessageLength& length)
+    {
+        return MessageLength(otherLength - length.GetRaw());
+    }
+    friend MessageLength operator+(u16 otherLength, const MessageLength& length)
+    {
+        return MessageLength(otherLength + length.GetRaw());
+    }
+
+    u16 GetRaw() const
+    {
+        // NOTE: Do NOT use the return value from this function with equality checks! Use >=, <=, >, < instead!
+        return m_length;
+    }
+
+    u16& GetRawRef()
+    {
+        // NOTE: Do NOT use the return value from this function with equality checks! Use >=, <=, >, < instead!
+        return m_length;
+    }
+    const u16& GetRawRef() const
+    {
+        // NOTE: Do NOT use the return value from this function with equality checks! Use >=, <=, >, < instead!
+        return m_length;
+    }
+};
+static_assert(HAS_TRIVIAL_COPY(MessageLength), "MessageLength must be trivially copyable as it is used in a lot of POD types.");
+// The following checks make sure that MessageType<T> is binary compatible with places that previously just used T.
+static_assert(sizeof(MessageLength) == sizeof(u16), "MessageLength must be binary compatible with a u16.");
+
 //A struct that combines a data pointer and the accompanying length
 struct SizedData {
-    u8*        data; //Pointer to data
-    u16        length; //Length of Data
+    u8*           data; //Pointer to data
+    MessageLength length; //Length of Data
 };
 
 template<typename T>
@@ -359,6 +507,17 @@ struct ThreeDimStruct
     T y;
     T z;
 };
+
+enum class DeliveryPriority : u8{
+    VITAL  = 0, //Must only be used for mesh relevant data
+    HIGH   = 1,
+    MEDIUM = 2,
+    LOW    = 3,
+    // CAREFUL: If you add more priorities, do not forget to change AMOUNT_OF_SEND_QUEUE_PRIORITIES!
+
+    INVALID = 255,
+};
+constexpr u32 AMOUNT_OF_SEND_QUEUE_PRIORITIES = 4;
 
 // To determine from which location the node config was loaded
 enum class DeviceConfigOrigins : u8 {
@@ -414,7 +573,8 @@ enum class DiscoveryState : u8 {
     INVALID = 0,
     HIGH = 1, // Scanning and advertising at a high duty cycle
     LOW = 2, // Scanning and advertising at a low duty cycle
-    OFF = 3, // Scanning and advertising not enabled by the node to save power (Other modules might still advertise or scan)
+    IDLE = 3, // Scanning disabled and advertising at a low duty cycle
+    OFF = 4, // Scanning and advertising not enabled by the node to save power (Other modules might still advertise or scan)
 };
 
 //All known Subtypes of BaseConnection supported by the ConnectionManager

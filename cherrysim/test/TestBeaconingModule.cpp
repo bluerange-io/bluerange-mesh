@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -65,6 +65,7 @@ TEST(TestBeaconingModule, TestIfMessageIsBroadcastedAfterAdd) {
     tester.SimulateUntilBleEventReceived(100 * 1000, 1, BLE_GAP_EVT_ADV_REPORT, data, sizeof(data));
 
     //Test that the data is persited and node 1 receives the iBeacon message even after a reboot of node 2.
+    ASSERT_EQ(tester.sim->nodes[1].restartCounter, 1);
     tester.SendTerminalCommand(2, "reset");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "reboot");
     ASSERT_EQ(tester.sim->nodes[1].restartCounter, 2);

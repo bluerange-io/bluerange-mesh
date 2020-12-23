@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -255,6 +255,7 @@ TEST(TestRawData, TestRandomTransmissions) {
 
         tester.Start();
         tester.SimulateUntilClusteringDone(1000 * 1000);
+        tester.SimulateForGivenTime(10 * 1000); //Give the mesh some additional time to clear the vital and other queues
         u8 payloadBuffer[120];
 
         for (int transmission = 0; transmission < 50; transmission++) {

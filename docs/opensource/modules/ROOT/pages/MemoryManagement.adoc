@@ -1,0 +1,104 @@
+= Memory Management
+
+FruityMesh does not use any Heap memory and thus prohibits the use auf malloc (see xref:BuildingWithCMake.adoc#allowMalloc[How to link with malloc]) and the C++ Keyword new (except placement new). There are two reasons for this:
+
+. The firmware gets smaller because the linker can remove all the heap allocation logic.
+. We can guarantee that the firmware will always behave the same and "works" from a memory perspective (except when a StackOverflow occurs).
+
+To achieve a heap free project, several custom allocators were implemented. All of them follow one of two design principles that are explained now.
+
+== Stack Allocator
+
+Although the name seems to suggest that the stack allocator is located on the stack (however, in our case this happens to be the case), this is not always true. The "stack" in "stack allocator" instead means the stack data structure. It is the simplest possible allocator. Is has continuous buffer and a readHead that is located at the start of the buffer on creation. If someone needs memory from the stack allocator, the readHead is moved forward in the buffer by the amount of bytes that were requested and the original readHead is returned.
+
+Other implementations also allow to pop memory off the stack, effectively freeing it. We did not need this however and thus this is not implemented in FruityMesh.
+
+== Pool Allocator
+
+The pool allocator has a fixed sized array of fixed sized chunks of data. All these chunks are handled as a linked list while the data is still inside the allocator. This can be done without any waste of data, the chunks do not need to have a special place for the "next pointer" because it is known that the chunk is not used while in the allocator. As such, the "next pointer" can be placed inside the data chunk itself.
+
+When the pool allocator is then called for allocation it returns the head of the linked list and removes it from its linked list. When something is given back to the pool allocator it is inserted as the new head. As such both allocation and deallocation with a Pool allocator has O(1) time complexity.
+
+Example:
+
+At the start the linked list is completely straight forward:
+....
+Head
+|
+V
+☐ -> ☐ -> ☐ -> ☐
+....
+
+On allocation, the address of the chunk pointed by the head is returned, the head moves along.
+
+....
+      Head
+      |
+      V
+■    ☐ -> ☐ -> ☐
+....
+
+Another allocation:
+
+....
+           Head
+           |
+           V
+■    ■    ☐ -> ☐
+....
+
+When the first chunk is given back, the linked list looks like this:
+
+....
+Head
+|
+V
+☐    ■    ☐ -> ☐
+|          ^
+|          |
++----------+
+....
+
+And when the last chunk is returned:
+
+....
+      Head
+      |
+      V
+☐ <- ☐    ☐ -> ☐
+|          ^
+|          |
++----------+
+....
+
+== Usages of allocators in FruityMesh
+
+Currently three allocators exist in FruityMesh: ModuleAllocator, ConnectionAllocator, and ConnectionQueueMemoryAllocator.
+
+=== ModuleAllocator
+
+Each featureset contains a list of used modules that roughly look like this:
+
+```
+u32 InitializeModules_prod_sink_nrf52(bool createModule)
+{
+    u32 size = 0;
+    size += GS->InitializeModule<DebugModule>(createModule);
+    size += GS->InitializeModule<DFUModule>(createModule);
+    size += GS->InitializeModule<StatusReporterModule>(createModule);
+    // ...
+    return size;
+}
+```
+
+These modules are located inside a StackAllocator, the ModuleAllocator. On FruityMesh startup, this function is called twice. Once with createModule == false, once with createModule == true. The purpose of the first pass is to find out how much memory is required to store all the modules, the second pass then allocates all required modules. The allocator is located inside the main stack frame (see src/Main.cpp) on real chips, and in the NodeEntry in the simulator.
+
+=== ConnectionAllocator
+
+The memory for all logical connections (BaseConnection, MeshConnection, MeshAccessConnection, ...) comes from a PoolAllocator, the ConnectionAllocator. The chunk size is equal to the size of the biggest connection (see the union AnyConnection).
+
+=== ConnectionQueueMemoryAllocator
+
+Before the introduction of the ConnectionQueueMemoryAllocator the largest part of a connection was the memory for its send queues. This turned out to be a huge waste as normally not all possible connections are allocated. As such the memory of these unused connections could be utilized. The same applies for connections that don't send a lot. They still had a big queue buffer without using it. Part of this buffer could be utilized by other connections as well.
+
+To fix this issue, a PoolAllocator, the ConnectionQueueMemoryAllocator was introduced. The memory for the send queues is no longer part of the connections but is handled completely separately. Each send queue of each connection holds a linked list of chunks that originate from the ConnectionQueueMemoryAllocator. The implementation guarantees that each send queue has at least one chunk so that it is guaranteed that each send queue is able to send something all of the time. In addition, a distinction is made while allocating between a new connection that needs chunks during construction and allocating chunks for an already existing connection. The latter has less chunks available so that new connections are guaranteed to always have chunks available.

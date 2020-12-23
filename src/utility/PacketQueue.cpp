@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -33,6 +33,11 @@
 #include <Logger.h>
 #include <cstring>
 #include "Utility.h"
+
+PacketQueue::PacketQueue()
+{
+    //Leave uninit
+}
 
 //Data will be 4-byte aligned if all inputs are 4 byte aligned
 PacketQueue::PacketQueue(u32* buffer, u16 bufferLength)
@@ -232,8 +237,8 @@ void PacketQueue::DiscardLast()
     SizedData lastElement = PeekLast();
 
     //Discard this element (No wrapping necessary because writePointer is always at the end of an element if it exists)
-    u8 padding = (4-lastElement.length%4)%4;
-    this->writePointer -= lastElement.length + 4 + padding; //4 byte length
+    u8 padding = (4-lastElement.length.GetRaw()%4)%4;
+    this->writePointer -= lastElement.length.GetRaw() + 4 + padding; //4 byte length
     _numElements--;
 
     ((u16*)writePointer)[0] = 0;
@@ -245,7 +250,7 @@ void PacketQueue::DiscardLast()
     //If our writePointer is at buffer start, we have to find the correct position at the end of the buffer
     else if (writePointer == bufferStart) {
         lastElement = PeekLast();
-        padding = (4-lastElement.length%4)%4;
+        padding = (4-lastElement.length.GetRaw()%4)%4;
 
         writePointer = lastElement.data + lastElement.length + padding; //put writePointe to the end of the last element
         ((u16*)writePointer)[0] = 0;

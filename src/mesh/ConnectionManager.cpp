@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -278,13 +278,13 @@ void ConnectionManager::NotifyDeleteConnection()
 
 #define _________________SENDING____________
 
-void ConnectionManager::SendMeshMessage(u8* data, u16 dataLength, DeliveryPriority priority) const
+void ConnectionManager::SendMeshMessage(u8* data, u16 dataLength) const
 {
-    ErrorType err = SendMeshMessageInternal(data, dataLength, priority, false, true, true);
+    ErrorType err = SendMeshMessageInternal(data, dataLength, false, true, true);
     if (err != ErrorType::SUCCESS) logt("ERROR", "Failed to send mesh message error code: %u", (u32)err);
 }
 
-ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable, bool loopback, bool toMeshAccess) const
+ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, bool reliable, bool loopback, bool toMeshAccess) const
 {
     if (dataLength > MAX_MESH_PACKET_SIZE)
     {
@@ -300,6 +300,20 @@ ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, D
     }
 
     ConnPacketHeader* packetHeader = (ConnPacketHeader*) data;
+
+    {
+        // NOTE: The way the amountOfSplitPackets are calculated has a slight bias as it always
+        //       takes all connections into account for MTU calculation, even if the message is not
+        //       sent to some connection at all. This was done on purpose as the message sending
+        //       logic is already quite complicated. We don't want to add to this complexity just for
+        //       a slightly better logging number. In most scenarios the MTU is the same between all
+        //       connections. The only cases where this is currently not correct is when we either have
+        //       a MeshAccessConnection or if we don't send out the message at all (e.g. a loopback).
+        //       Both these cases can be ignored in the vast majority of the cases.
+        const u32 smallestMtu = GetSmallestMtuOfAllConnections();
+        const u32 amountOfSplitPackets = Utility::MessageLengthToAmountOfSplitPackets(dataLength, smallestMtu);
+        GS->logger.LogCustomCount(CustomErrorTypes::COUNT_GENERATED_SPLIT_PACKETS, amountOfSplitPackets);
+    }
 
     // ########################## Local Loopback
     if(loopback){
@@ -330,11 +344,11 @@ ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, D
             }
             if (packetHeader->receiver == NODE_ID_ANYCAST_THEN_BROADCAST) {
                 packetHeader->receiver = NODE_ID_BROADCAST;
-                mach.SendData(data, dataLength, priority, reliable);
+                mach.SendData(data, dataLength, reliable);
                 return ErrorType::SUCCESS;
             }
             else {
-                mach.SendData(data, dataLength, priority, reliable);
+                mach.SendData(data, dataLength, reliable);
             }
 
         }
@@ -348,12 +362,12 @@ ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, D
 
         if (GS->config.enableSinkRouting && dest)
         {
-            dest.SendData(data, dataLength, priority, reliable);
+            dest.SendData(data, dataLength, reliable);
         }
         // If message was adressed to sink but there is no route to sink broadcast message
         else
         {
-            BroadcastMeshPacket(data, dataLength, priority, reliable);
+            BroadcastMeshPacket(data, dataLength, reliable);
         }
     }
     else if(packetHeader->receiver == NODE_ID_LOCAL_LOOPBACK)
@@ -382,9 +396,9 @@ ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, D
 
         //Send to receiver or broadcast if not directly connected to us
         if(receiverConn){
-            receiverConn.SendData(data, dataLength, priority, reliable);
+            receiverConn.SendData(data, dataLength, reliable);
         } else {
-            BroadcastMeshPacket(data, dataLength, priority, reliable);
+            BroadcastMeshPacket(data, dataLength, reliable);
         }
     }
 
@@ -403,11 +417,13 @@ void ConnectionManager::DispatchMeshMessage(BaseConnection* connection, BaseConn
             return;
         }
 
+        Logger::GetInstance().LogCustomCount(CustomErrorTypes::COUNT_RECEIVED_MESSAGES);
+
         //Fix local loopback id and replace with our nodeId
-        DYNAMIC_ARRAY(modifiedBuffer, sendData->dataLength);
+        DYNAMIC_ARRAY(modifiedBuffer, sendData->dataLength.GetRaw());
         if (packet->receiver == NODE_ID_LOCAL_LOOPBACK)
         {
-            CheckedMemcpy(modifiedBuffer, packet, sendData->dataLength);
+            CheckedMemcpy(modifiedBuffer, packet, sendData->dataLength.GetRaw());
             ConnPacketHeader * modifiedPacket = (ConnPacketHeader*)modifiedBuffer;
             modifiedPacket->receiver = GS->node.configuration.nodeId;
             packet = modifiedPacket;
@@ -454,7 +470,7 @@ ErrorTypeUnchecked ConnectionManager::SendModuleActionMessage(MessageType messag
     }
 
     //TODO: reliable is currently not supported and by default false. The input is ignored
-    return (ErrorTypeUnchecked)GS->cm.SendMeshMessageInternal(buffer, SIZEOF_CONN_PACKET_MODULE + additionalDataSize, DeliveryPriority::LOW, false, loopback, true);
+    return (ErrorTypeUnchecked)GS->cm.SendMeshMessageInternal(buffer, SIZEOF_CONN_PACKET_MODULE + additionalDataSize, false, loopback, true);
 }
 
 ErrorTypeUnchecked ConnectionManager::SendModuleActionMessage(MessageType messageType, VendorModuleId moduleId, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool loopback) const
@@ -483,21 +499,21 @@ ErrorTypeUnchecked ConnectionManager::SendModuleActionMessage(MessageType messag
     }
 
     //TODO: reliable is currently not supported and by default false. The input is ignored
-    return (ErrorTypeUnchecked)GS->cm.SendMeshMessageInternal(buffer, SIZEOF_CONN_PACKET_MODULE_VENDOR + additionalDataSize, DeliveryPriority::LOW, false, loopback, true);
+    return (ErrorTypeUnchecked)GS->cm.SendMeshMessageInternal(buffer, SIZEOF_CONN_PACKET_MODULE_VENDOR + additionalDataSize, false, loopback, true);
 }
 
-void ConnectionManager::BroadcastMeshPacket(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable) const
+void ConnectionManager::BroadcastMeshPacket(u8* data, u16 dataLength, bool reliable) const
 {
     MeshConnections conn = GetMeshConnections(ConnectionDirection::INVALID);
     ConnPacketHeader* packetHeader = (ConnPacketHeader*)data;
     for(u32 i=0; i< conn.count; i++){
         if (packetHeader->receiver == NODE_ID_ANYCAST_THEN_BROADCAST) {
             packetHeader->receiver = NODE_ID_BROADCAST;
-            conn.handles[i].SendData(data, dataLength, priority, reliable);
+            conn.handles[i].SendData(data, dataLength, reliable);
             return;
         }
         else {
-            conn.handles[i].SendData(data, dataLength, priority, reliable);
+            conn.handles[i].SendData(data, dataLength, reliable);
         }
     }
 }
@@ -587,7 +603,7 @@ void ConnectionManager::GattcWriteResponseEventHandler(const FruityHal::GattcWri
 
 void ConnectionManager::ForwardReceivedDataToConnection(u16 connectionHandle, BaseConnectionSendData & sendData, u8 const * data)
 {
-    logt("CM", "RX Data size is: %d, handles(%d, %d), delivery %d", sendData.dataLength, connectionHandle, sendData.characteristicHandle, (u32)sendData.deliveryOption);
+    logt("CM", "RX Data size is: %d, handles(%d, %d), delivery %d", sendData.dataLength.GetRaw(), connectionHandle, sendData.characteristicHandle, (u32)sendData.deliveryOption);
 
     char stringBuffer[100];
     Logger::ConvertBufferToHexString(data, sendData.dataLength, stringBuffer, sizeof(stringBuffer));
@@ -606,7 +622,6 @@ void ConnectionManager::GattsWriteEventHandler(const FruityHal::GattsWriteEvent&
     BaseConnectionSendData sendData;
     sendData.characteristicHandle = gattsWriteEvent.GetAttributeHandle();
     sendData.deliveryOption = (gattsWriteEvent.IsWriteRequest()) ? DeliveryOption::WRITE_REQ : DeliveryOption::WRITE_CMD;
-    sendData.priority = DeliveryPriority::LOW; //TODO: Prio is unknown, should we send it in the packet?
     sendData.dataLength = gattsWriteEvent.GetLength();
 
     ForwardReceivedDataToConnection(gattsWriteEvent.GetConnectionHandle(), sendData, gattsWriteEvent.GetData() /*bleEvent.evt.gatts_evt.params.write->data*/);
@@ -618,7 +633,6 @@ void ConnectionManager::GattcHandleValueEventHandler(const FruityHal::GattcHandl
 
     sendData.characteristicHandle = handleValueEvent.GetHandle();
     sendData.deliveryOption = DeliveryOption::NOTIFICATION;
-    sendData.priority = DeliveryPriority::LOW; //TODO: Prio is unknown, should we send it in the packet?
     sendData.dataLength = handleValueEvent.GetLength();
 
 
@@ -669,10 +683,10 @@ void ConnectionManager::RouteMeshData(BaseConnection* connection, BaseConnection
     else
     {
         //If the packet should travel a number of hops, we decrement that part
-        DYNAMIC_ARRAY(modifiedMessage, sendData->dataLength);
+        DYNAMIC_ARRAY(modifiedMessage, sendData->dataLength.GetRaw());
         if(packetHeader->receiver > NODE_ID_HOPS_BASE && packetHeader->receiver < NODE_ID_HOPS_BASE + 1000)
         {
-            CheckedMemcpy(modifiedMessage, data, sendData->dataLength);
+            CheckedMemcpy(modifiedMessage, data, sendData->dataLength.GetRaw());
             ConnPacketHeader* modifiedPacketHeader = (ConnPacketHeader*)modifiedMessage;
             modifiedPacketHeader->receiver--;
             packetHeader = modifiedPacketHeader;
@@ -711,7 +725,7 @@ void ConnectionManager::BroadcastMeshData(const BaseConnection* ignoreConnection
         for (u32 i = 0; i < conn2.count; i++) {
             MeshAccessConnectionHandle maconn = conn2.handles[i];
             if (maconn && maconn.GetConnection() != ignoreConnection) {
-                maconn.SendData(data, sendData->dataLength, sendData->priority, false);
+                maconn.SendData(data, sendData->dataLength, false);
             }
         }
     }
@@ -732,7 +746,7 @@ bool ConnectionManager::IsReceiverOfNodeId(NodeId nodeId) const
     return false;
 }
 
-bool ConnectionManager::IsValidFruityMeshPacket(const u8* data, u16 dataLength) const
+bool ConnectionManager::IsValidFruityMeshPacket(const u8* data, MessageLength dataLength) const
 {
     //After a packet was decripted and reassembled, it must at least have a full header
     if(dataLength < SIZEOF_CONN_PACKET_HEADER){
@@ -812,6 +826,8 @@ u32 ConnectionManager::MessageTypeToMinimumPacketSize(MessageType messageType)
     case MessageType::DEAD_DATA:
         return sizeof(DeadDataMessage);
     case MessageType::DATA_1:
+        return SIZEOF_CONN_PACKET_HEADER;
+    case MessageType::DATA_1_VITAL:
         return SIZEOF_CONN_PACKET_HEADER;
     case MessageType::CLC_DATA:
         return SIZEOF_CONN_PACKET_HEADER;
@@ -1218,6 +1234,25 @@ BaseConnections ConnectionManager::GetConnectionsOfType(ConnectionType connectio
     return fc;
 }
 
+u16 ConnectionManager::GetSmallestMtuOfAllConnections() const
+{
+    u16 retVal = 0xFFFF;
+    BaseConnections conns = GetBaseConnections(ConnectionDirection::INVALID);
+    for (u32 i = 0; i < conns.count; i++)
+    {
+        if (conns.handles[i])
+        {
+            BaseConnection* c = conns.handles[i].GetConnection();
+            if (c->connectionMtu < retVal)
+            {
+                retVal = c->connectionMtu;
+            }
+        }
+    }
+
+    return retVal;
+}
+
 //Looks through all connections for the right handle and returns the right one
 MeshConnectionHandle ConnectionManager::GetMeshConnectionToPartner(NodeId partnerId) const
 {
@@ -1306,7 +1341,7 @@ ClusterSize ConnectionManager::GetMeshHopsToShortestSink(const BaseConnection* e
 {
     if (GET_DEVICE_TYPE() == DeviceType::SINK)
     {
-        logt("SINK", "HOPS 0, clID:%x, clSize:%d", GS->node.clusterId, GS->node.clusterSize);
+        logt("SINK", "HOPS 0, clID:%x, clSize:%d", GS->node.clusterId, GS->node.GetClusterSize());
         return 0;
     }
     else
@@ -1326,7 +1361,7 @@ ClusterSize ConnectionManager::GetMeshHopsToShortestSink(const BaseConnection* e
 
         const ClusterSize hopsToSink = c ? c.GetHopsToSink() : -1;
 
-        logt("SINK", "HOPS %d, clID:%x, clSize:%d", hopsToSink, GS->node.clusterId, GS->node.clusterSize);
+        logt("SINK", "HOPS %d, clID:%x, clSize:%d", hopsToSink, GS->node.clusterId, GS->node.GetClusterSize());
         return hopsToSink;
     }
 }
@@ -1454,8 +1489,7 @@ void ConnectionManager::TimerEventHandler(u16 passedTimeDs)
 
                 GS->cm.SendMeshMessage(
                     (u8*)&dataToSend,
-                    sizeof(TimeSyncInitial),
-                    DeliveryPriority::LOW);
+                    sizeof(TimeSyncInitial));
             }
             else if (conn->timeSyncState == MeshConnection::TimeSyncState::INITIAL_SENT)
             {
@@ -1466,14 +1500,48 @@ void ConnectionManager::TimerEventHandler(u16 passedTimeDs)
                 dataToSend.header.header.sender = GS->node.configuration.nodeId;
                 dataToSend.header.type = TimeSyncType::CORRECTION;
                 dataToSend.correctionTicks = conn->correctionTicks;
+#ifdef SIM_ENABLED
+                if (!conn->correctionTicksSuccessfullyWritten)
+                {
+                    // Implementation error! This means that we tried to send out a correction
+                    // that wasn't even written by the MessageSentHandler. Must not happen!
+                    // IOT-4554: Activate the following line once this ticket is fixed!
+                    // SIMEXCEPTION(IllegalStateException);
+                }
+#endif
 
                 logt("TSYNC", "Sending out TimeSyncCorrection, NodeId: %u, partner: %u", (u32)GS->node.configuration.nodeId, (u32)conn->partnerId);
 
                 GS->cm.SendMeshMessage(
                     (u8*)&dataToSend,
-                    sizeof(TimeSyncCorrection),
-                    DeliveryPriority::LOW
-                    );
+                    sizeof(TimeSyncCorrection));
+            }
+        }
+    }
+
+    // Enolled nodes syncing
+    timeSinceLastEnrolledNodesSyncDs += passedTimeDs;
+    if(timeSinceLastEnrolledNodesSyncDs >= ENROLLED_NODES_SYNC_INTERVALS_DS)
+    {
+        timeSinceLastEnrolledNodesSyncDs = 0;
+        MeshConnections conns = GetMeshConnections(ConnectionDirection::INVALID);
+
+        for (u32 i = 0; i < conns.count; i++)
+        {
+            MeshConnectionHandle handle = conns.handles[i];
+            if (!handle) 
+            {
+                // The Connection was already removed
+                SIMEXCEPTION(IllegalStateException);
+                GS->logger.LogCustomError(CustomErrorTypes::FATAL_CONNECTION_REMOVED_WHILE_ENROLLED_NODES_SYNC, 1000);
+                continue;
+            }
+
+            if (handle.IsHandshakeDone() == false) continue;
+
+            if (handle.GetEnrolledNodesSync() == false)
+            {
+                GS->node.SendEnrolledNodes(GS->node.configuration.numberOfEnrolledDevices, handle.GetPartnerId());
             }
         }
     }
@@ -1579,6 +1647,58 @@ void ConnectionManager::TimeSyncCorrectionReplyReceivedHandler(const TimeSyncCor
             else
             {
                 conn->timeSyncState = MeshConnection::TimeSyncState::CORRECTION_SENT;
+            }
+        }
+    }
+}
+
+void ConnectionManager::SetEnrolledNodesReceived(NodeId sender)
+{
+    MeshConnections conns = GetMeshConnections(ConnectionDirection::INVALID);
+
+    for (u32 i = 0; i < conns.count; i++)
+    {
+        MeshConnectionHandle handle = conns.handles[i];
+        if (!handle) 
+        {
+            // The Connection was already removed
+            SIMEXCEPTION(IllegalStateException);
+            GS->logger.LogCustomError(CustomErrorTypes::FATAL_CONNECTION_REMOVED_WHILE_ENROLLED_NODES_SYNC, 1000);
+            continue;
+        }
+
+
+        if (handle.GetPartnerId() == sender)
+        {
+            handle.SetEnrolledNodesSync(true);    
+        }
+        else
+        {
+            handle.SetEnrolledNodesSync(false);
+        }
+    }
+}
+
+void ConnectionManager::SetEnrolledNodesReplyReceived(NodeId sender, u16 enrolledNodes)
+{
+    MeshConnections conns = GetMeshConnections(ConnectionDirection::INVALID);
+
+    for (u32 i = 0; i < conns.count; i++)
+    {
+        MeshConnectionHandle handle = conns.handles[i];
+        if (!handle) 
+        {
+            // The Connection was already removed
+            SIMEXCEPTION(IllegalStateException);
+            GS->logger.LogCustomError(CustomErrorTypes::FATAL_CONNECTION_REMOVED_WHILE_ENROLLED_NODES_SYNC, 1000);
+            continue;
+        }
+
+        if (handle.GetPartnerId() == sender)
+        {
+            if ((handle.GetEnrolledNodesSync() == false) && (enrolledNodes == GS->node.configuration.numberOfEnrolledDevices))
+            {
+                handle.SetEnrolledNodesSync(true);
             }
         }
     }

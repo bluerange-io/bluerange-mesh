@@ -4,26 +4,23 @@
 This is a list and description of the most important folders in the repository.
 
 ----
+├── base/                     general controllers
+|   └── GlobalState.cpp       holds references to basic classes
 ├── config/                   configuration header files
-├── └── featuresets/          different build configurations
-├── inc/                      main include directory for C++ headers
-├── ├── c/                    includes for c code
-├── └── nrf52/                specific nrf52 includes
-├── inc_c/                    include directory for C headers
+|   └── featuresets/          different build configurations
 ├── linker/                   linker scripts
 ├── sdk/                      modified nRF SDKs
 ├── softdevice/               softdevice hex files
 ├── src/                      
-├── ├── base/                 wrappers for BLE stack functionality
-├── ├── c/                    drivers and other c code
-├── ├── mesh/                 mesh functionality
-├── ├── modules/              functionality wrapped in modules
-├── ├── utility/              helper classes
-├── ├── Boardconfig.cpp       runtime pin and board configuration
-├── ├── Config.cpp            configuration
-├── ├── FruityMesh.cpp        bootup and main functionality
-├── ├── GlobalState.cpp       holds references to basic classes
-├── └── Main.cpp              Startup Code
+|   ├── base/                 wrappers for BLE stack functionality
+|   ├── c/                    drivers and other c code
+|   ├── mesh/                 mesh functionality
+|   |   └── FruityMesh.cpp    bootup and main functionality
+|   ├── modules/              functionality wrapped in modules
+|   ├── utility/              helper classes
+|   ├── Boardconfig.cpp       runtime pin and board configuration
+|   ├── Config.cpp            configuration
+|   └── Main.cpp              Startup Code
 ├── util/                     tools and utilities
 └── src_examples/             code templates and examples
 ----
@@ -39,9 +36,94 @@ Most settings are found in the `fruitymesh/src/` folder in `Config.h` but should
 
 [#Featuresets]
 == Feature Sets
-FruityMesh uses so called featuresets for creating different distributions for different use-cases. A featureset defines the compile time and run time configuration for a node. The cmake build process can be configured differently for a featureset, a number of different defines or macros can be used during compile time and different code is used during runtime. This allows us to tailor the firmware functionality and size to each use-case and also allows FruityMesh to compile for different chipsets from the same source. You can specify the featureset by calling cmake with `cmake --build . --target featureset_name`.
+FruityMesh uses so called featuresets for creating different distributions for different use-cases. A featureset defines the compile time and run time configuration for a node. The cmake build process can be configured differently for a featureset, a number of different defines or macros can be used during compile time and different code is used during runtime. This allows us to tailor the firmware functionality and size to each use-case and also allows FruityMesh to compile for different chipsets from the same source. You can specify the featureset by calling cmake with `cmake --build . --target featureset_name`. A featureset consists of a file triplet, including a `.h`, `.cpp`, and `.cmake` file. It is typically located inside `fruitymesh/config/featuresets`. To create your own featureset, copy an existing featureset and modify these three files accordingly (see below for an explanation of each file).
 
-A featureset can contain a number of xref:BoardConfig.adoc[Board Configurations] which allows you to flash and run the binary of the featureset on a number of different boards. The correct board configuration such as the pin configuration is then loaded by FruityMesh at runtime depending on the boardId stored in the xref:Specification.adoc#UICR[UICR]. If no boardId is stored in the UICR, the default boards will be loaded from `Boardconfig.cpp`
+A featureset can contain a number of xref:BoardConfig.adoc[Board Configurations] which allows you to flash and run the binary of the featureset on a number of different boards. The correct board configuration such as the pin configuration is then loaded by FruityMesh at runtime depending on the boardId stored in the xref:Specification.adoc#UICR[UICR]. If no boardId is stored in the UICR, the default boards will be loaded from `Boardconfig.cpp`.
+
+=== Feature Set Header File (.h)
+The header file of a featureset is meant to change `#define` values located in `fruitymesh/src/Config.h`. In addition to this, any other value can be defined here which is then usable for any compilation unit that includes the `Config.h` file.
+
+NOTE: The usage of the header file should be avoided if possible. The reason for this is that differences between featuresets can not be properly simulated when they come from the header file of the featuresets. However, some drivers might require the usage of defines and in such cases it is necessary to use the header file.
+
+=== Feature Set Implementation File (.cpp)
+The implementation file of a featureset is the most important part of a featureset. It defines which modules should be loaded in this featureset, how these should initially be configured, which board types are supported, and other general configuration. It consists of the following functions:
+
+* `SetBoardConfiguration_...(BoardConfiguration*)`: Sets the supported board types
+* `SetFeaturesetConfiguration_...(ModuleConfiguration*, void*)`: Sets the initial configuration of built in modules
+* `SetFeaturesetConfigurationVendor_...(VendorModuleConfiguration*, void*)`: Sets the initial configuration of vendor modules
+* `InitializeModules_...(bool)`: Determines which modules should be used. Must return the size in bytes used by all modules. Is called twice, once to determine the amount of required bytes, once to actually allocate the modules.
+* `DeviceType GetDeviceType_...()`: Returns the DeviceType of this featureset.
+* `GetChipset_...()`: Returns the Chipset of this featureset.
+* `FeatureSetGroup GetFeatureSetGroup_dev_asset_ins_nrf52840()`: Returns the FeatureSetGroup of this featureset. Two distinct production featuresets must always return two distinct values.
+* `u32 GetWatchdogTimeout_...()`: The Watchdog timeout. Return 0 to disable.
+* `u32 GetWatchdogTimeoutSafeBoot_...()`: The Watchdog timeout during safe boot. Return 0 to disable.
+
+Replace `...` with the name of your featurset for all these functions.
+
+=== Feature Set CMake File (.cmake)
+Configures the featureset during build time. Can also allow the compilation (but not usage!) of `malloc`. For more details see xref:BuildingWithCMake.adoc#cmakeStructure[CMake structure overview].
+
+[#UICR]
+== UICR
+The UICR is used to store unique settings for each chip at flashing time. These are stored in an immutable persistent region of the chip. If this data is not present, default values from the code will be used. For production nodes, this data should be filled. The structure of this region is explained xref:Specification.adoc#UICR[in our Specification].
+
+It is possible to use the http://srecord.sourceforge.net/[srec_cat] utility to modify the generated .hex file with the necessary UICR data. This assumes that you have been using VsCode to compile the github_dev_nrf52 featureset. Other tools using our CMake build will work as well, only the paths will be different.
+
+* First, make sure that you have installed http://srecord.sourceforge.net/[srec_cat] and put it into your PATH so you can access it from everywhere
+* Make sure that you are not overwriting the UICR settings in the `github_dev_nrf52.cpp` featureset in the method `SetFeaturesetConfiguration_github_dev_nrf52`
+	** You should remove the part where the `NODE` settings are overwritten
+* Next, go to the folder where your compiled binary is. E.g. `C:\projects\fruitymesh\_build\vscode`
+* Open a command prompt and execute the following exemplary srec_cat command for adding UICR data to a .hex file before flashing.
+
+IMPORTANT: This is only valid for the NRF52 chipset family (Customer UICR Data is located at 0x10001080) and you must change the address offset to match your chipset when working with a different chip.
+
+[source, C++]
+.Exemplary UICR creation for node FFBBB
+----
+//Use the srec_cat utility
+srec_cat
+//Write the Magic Number so that the Mesh Node knows that there is data in the UICR
+-generate 0x10001080 0x10001084 -constant-l-e 0x00F07700 4
+//Use Boardid 4 for the NRF52-DK (PCA10040)
+-generate 0x10001084 0x10001088 -constant-l-e 4 4
+//Deprecated Field should be filled with FFFF....FFFF
+-generate 0x10001088 0x10001090 -repeat-string %FF%FF%FF%FF%FF%FF%FF%FF
+//Set a randomly generated unique NodeKey, in this example: 00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F
+-generate 0x10001090 0x100010A0 -repeat-string %00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F
+//Use Manufacturer Id 0x024D from M-Way Solutions (BLE SIG Company Identifier)
+-generate 0x100010A0 0x100010A4 -constant-l-e 0x024D 4
+//Put the node into unenrolled state by default
+-generate 0x100010A4 0x100010A8 -constant-l-e 0 4
+//Use a default nodeId of 1 in the unenrolled state
+-generate 0x100010A8 0x100010AC -constant-l-e 1 4
+//Use Device Type STATIC
+-generate 0x100010AC 0x100010B0 -constant-l-e 1 4
+//Serial Number Index for FMBBB (Make sure to read our Specification about Serial Numbers!)
+-generate 0x100010B0 0x100010B4 -constant-l-e 2673000 4
+//NetworkKey 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11
+-generate 0x100010B4 0x100010C4 -repeat-string %11%11%11%11%11%11%11%11%11%11%11%11%11%11%11%11
+//Create a new file in intel-hex format that contains all the changes
+github_dev_nrf52_merged.hex -intel -output github_dev_nrf52_merged_node_FMBBB.hex -intel -output_block_size 16
+
+//Here ist the full command without any comments so that you can paste it into a terminal:
+srec_cat -generate 0x10001080 0x10001084 -constant-l-e 0x00F07700 4 -generate 0x10001084 0x10001088 -constant-l-e 4 4 -generate 0x10001088 0x10001090 -repeat-string %FF%FF%FF%FF%FF%FF%FF%FF -generate 0x10001090 0x100010A0 -repeat-string %00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F -generate 0x100010A0 0x100010A4 -constant-l-e 0x024D 4 -generate 0x100010A4 0x100010A8 -constant-l-e 0 4 -generate 0x100010A8 0x100010AC -constant-l-e 1 4 -generate 0x100010AC 0x100010B0 -constant-l-e 1 4 -generate 0x100010B0 0x100010B4 -constant-l-e 2673000 4 -generate 0x100010B4 0x100010C4 -repeat-string %11%11%11%11%11%11%11%11%11%11%11%11%11%11%11%11 github_dev_nrf52_merged.hex -intel -output github_dev_nrf52_merged_node_FMBBB.hex -intel -output_block_size 16
+----
+
+You can check the generated file with the following command. Afterwards you can open the generated .txt file to see the binary data. Scroll down to the bottom to see the UICR data.
+
+[source, C++]
+.Converting an intel hex file (.hex) to a hex dump
+----
+srec_cat github_dev_nrf52_merged_node_FMBBB.hex -intel -output github_dev_nrf52_merged_node_FMBBB.txt -hex_dump
+----
+
+Afterwards, you can flash the created .hex file by using the `nrfjprog` utility. Remember that this .hex file is only intended for a single mesh node and that you must create other .hex files for each of your chips.
+
+[source, C++]
+.Flashing the created .hex file to a node
+----
+nrfjprog --chiperase --program github_dev_nrf52_merged_node_FMBBB.hex --reset
+----
 
 == Memory Requirements
 FruityMesh doesn't run on devices with only 16kb of RAM. It may be possible to optimize the build and resize some buffers, but this is currently not supported. The binary of FruityMesh is around 50kb depending on the configuration and will easily fit on devices with 256kb flash together with the softdevice and still be updatable using dual bank updates.
@@ -61,6 +143,116 @@ When adding documentation for a module, make sure to check the xref:ModuleDocume
 == About Contributions
 The implementation is written in C++. This makes it easy to implement new functionality and separate it from other parts in a clean way. Refactoring or refinement tips are welcome. If you contribute, please comment your code thorougly and keep the implementation as readable as possible. This will help other contributors understand the code quickly.
 If you have documentation to add, please post a pull request as well.
+
+== ErrorType/ErrorTypeUnchecked and SIMEXCEPTION
+The firmware does not use exceptions at all. They are disabled by a compiler flag and thus cannot be used. This is because exceptions tend to increase the hex file size by quite a lot as they always introduce a lot of overhead. Instead classical return values are used to indicate some kind of error or success. Most functions utilize the ErrorType or ErrorTypeUnchecked enums for this. The values of both these EnumTypes are the same. The difference is in the behavior if a returned value is dropped (not stored in a value and not used). While the ErrorTypeUnchecked allows this, the ErrorType does not. The compiler of the simulator checks for this and fails the compilation if it occurs. As all values of both enums are identical, they can be casted from one type to the other if needed.
+
+As size of the executable does not matter for the simulator, the simulator is using exceptions. However, they are rarely caught and are rarely intended to be caught. Instead they indicate some kind of behavior error that should fail the pipeline. To invoke such an exception, the SIMEXCEPTION macro can be used. In addition to just throwing the given type, the macro prints out the file and line number when an exception occurs, halts execution (debug_break), and gives us the ability to disable some exceptions for unit/integration tests (this is done so that unit/integration tests can be written that check correct behavior on error). The SIMEXCEPTION macro expands to nothing and this thus a noop in the firmware. To disable a certain type of exception, a RAII type is introduced. For example, execute the following to disable `ErrorCodeUnknownExceptions` for the lifetime of the object (e.g. the current scope): `Exceptions::ExceptionDisabler<ErrorCodeUnknownException> ecue;`.
+
+If, however, you know that there is a certain scenario where an exception has to be thrown at all cases, removing the ability to disable the exception, the SIMEXCEPTIONFORCE macro can be used. This should be used rarely however. In some scenarios it can help to satisfy a compiler warning (which is an error in our pipeline). Consider the following:
+
+```
+if(a == nullptr)
+{
+    SIMEXCEPTION(IllegalStateException);
+}
+a->someValue = 42;
+```
+Here our static code analyzer would fail the pipeline because it finds out that `IllegalStateException` could be disabled (via an ExceptionDisabler), which then would lead to a nullptr access on error case. In such a case it may be okay to use SIMEXCEPTIONFORCE. Here the static analyzer does not run into the same situation, because it knows that the function will be exited due to the throw of the exception.
+
+You could also add a return statement after the SIMEXCEPTION. Depending on the scenario this may be the best approach, however it would increase the firmware slightly because the compiler can no longer optimize the if block out. As such, if you have a scenario where you are certain that the given error case would also happen in the simulator in all cases where it may occur, the SIMEXCEPTIONFORCE approach is to be preferred as it gives us the best of both worlds: reduce the size of the firmware and make sure that an implementation error is always caught by our pipeline.
+
+== Base64 / Hex interpretation
+
+The firmware is able to interpret both Hex Strings of the form
+
+```
+00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF
+```
+
+and Base64 strings of the form
+
+```
+I0kJ8N/+AvBd+yJJCfDa/gLwWPsgSQnw1f4C8FP7H0kJ8ND+AvBO+yEcCfDL/gLwSfsbSQnwxv4M8Mz8A3wAKwPRAvA/+xdJOOAM8MP8A3wBKyvRAvA2+xNJL+CAEAAQkDQAIA1VAgAAtAEAgJaYAIBpZ/8QJwAA8Nj//8inAgA=
+``` 
+.
+
+The advantage of the hex string is that its more human friendly. When debugging, it is almost immediately clear which the fifth byte is and (roughly) which value it has. The same does not apply for the base 64 string as one char can be affected by two bytes at once. The advantage of the base64 string however is that it contains much more information and is thus able to transfer more byte per char. This can help if the uart communication is a bottleneck. One char in a hex string transfers 1/3 byte, one char in a base64 string transfers 3/4 byte.
+
+Most terminal arguments that accept one of the two also accept the other. Determining which one it is, is done automatically. This is possible because ":" is not a valid Base64 character. If the third char is a ":" the firmware can thus safely assume that the string is a hex string, if it is not, it can do the same for a base64 string as the separating ":" chars are mandatory for the hex strings. One may assume that an edge case could be if only a single byte is sent. This is not the case however, because there is no valid 2 char Base64 string. All Base64 Strings must have a length that is a multiple of 4. So, the firmware can equally safely assume a hex string if only two chars are transmitted. 
+
+== Following a RawData message from Bluerange Gateway to Smartphone
+In this chapter we follow a big message through the mesh, discussing all the splits that happen along the way. In this explanation we will start with a large file and first look where it is split, but without explanation for these splits yet. Once we have reached the most low level split, we will go back up again, explaining the reasons behind every single split. Let's assume our mesh looks like this:
+....
+A1        A2
+|         |
+N1-N2-...-Nn
+....
+Where Nx are nodes and both A1 and A2 are some highly capable devices, for example smartphones or a gateway. We want to send a rather large file from A1 to A2, let's assume the size of this file is 1 mega byte. The size of this file is way too big to fit into one message, as the size of one message is limited to 200 byte, including all the meta data. If we transfer the file via the xref:RawData.adoc#RawData[Raw Data Protocol], the file is cut into multiple 120 byte chunks on A1. Each of these chunks is then separately sent to N1, setting A2 as the receiver. N1 will put a received chunk and its metadata into its send queue. While doing so, the chunk itself is split into multiple splits. One split has the size of the MTU between the connection partners N1 and N2.
+
+We have now reached the lowest split and will discuss the reason behind all the splitting and chunking while also discussing the reassembling. The lowest split size is given by the MTU, the maximum size of a packet that is allowed to be sent between two connection partners. The minimum MTU is defined by the bluetooth spec to be 20 bytes (23 including protocol overhead). Through a mtu handshake, both connection partners can increase this number. A typical MTU at the time of writing is 60 byte. These splits are then sent to the node N2. All splits are reassembled into the full message. To do so, N2 requires a buffer in which all splits can be put to reassemble the message. The size of this buffer must be constant to guarantee that we are always able to use it. This is the reason why we have an upper limit for messages of 200 byte.
+
+Once the message is completely reassembled by N2, it interprets the message and finds out that the receiver of the message is actually A2. So N2 splits the message again and sends it to N3, which reassembles it, interprets it, sends it to N4 and so on until it reaches A2.
+
+In case you are wondering why we reassemble each message on every hop instead of sending through the splits, waiting with the reassembly until the splits reach A2: The main reason is that a mesh typically does not build up as a straight line but instead as a tree. This means that multiple data flows can come from multiple directions, possibly intertwining two different messages in the reassembly buffer of the target device. To fix this, the target device would require multiple reassembly buffers, potentially one for each member of the mesh (+ more for other devices that connect to the mesh). If it had less, then the target device would somehow have to tell the sender that it currently is unable to receive the message. This is most likely not possible in all cases so the message would have to be dropped if no reassembly buffer is available. As it is unrealistic to have such a large amount of reassembly buffers, it is much more reliable to reassemble on every hop.
+
+== Monkey Test
+To test for unknown and strange behaviour of the firmware on non typical input, a monkey test was introduced (see TestMonkey.cpp). The monkey test executes random commands. These commands are either completely valid or sometimes corrupt. If some exception occures, the monkey test fails and tries the simplify the list of executed commands that produced the exception so that a human reader can analyze it more easily. To do so, all the commands are executed again, removing one from the list. If the exception still occures, then this command was not vital for reproducing the error. This is repeated until no command can be removed anymore. The final list of commands that created the exception is then printed out before failure.
+
+Once you have the list of commands, copy it into the prepared test "TestMonkey.ReproductionTest" that is prepared for your convenience.
+
+NOTE: Make sure that the correct seed is used!
+
+The list of commands that the Monkey Test can execute can be found in the templates vector inside TestMonkey.cpp. The list follows a special syntax, customly developed:
+
+. `[[[a-b]]]` replaces this token with any number between a and b (both inclusive)
+. `{{{a|b|...|z}}}` replaces this token with a random entry in the list, e.g. a, b, or z.
+. `%%%SERIAL%%%` is replaced with a random, but valid serial number.
+
+== Connection Handles
+One, possibly devastating error source was that connection object pointers were used after they were given back to the connection allocator. This already happened in the past. The consequence of this is that some random other connection is manipulated, potentially at byte locations that have nothing to do with what the writer actually intended. To avoid this, an additional protection layer was introduced: the connection handle. A connection handle is a class that just has two numbers in it and redirects calls to it to the connection itself. Before doing so however, the two numbers are used to determine if the connection that is about to be called is still the same connection that was created at the creation of the handle. What happens if it is not, depends on if we are in the simulator or on a real node. In the simulator, an exception is thrown. On a real node, the call is logged as a counting error. The call does not do anything else after that and returns an error in most cases, informing the caller of his misbehaviour. To check if a handle is still valid, it can simply be used inside an if condition:
+
+```
+if(handle) //...
+```
+
+== Stack overflow detection
+In case of a hard fault, the firmware tries to determine if the underlying reason for that hard fault was because of a stack overflow. If this is the case, the reboot reason is changed to `STACKOVERFLOW`. To do so, a stack guard was introduced. This stack guard is at the end of the stack and a well known pattern of data is written to it on boot. If the hard fault ocurres, the firmware checks if the well known pattern of data is still present. At the time of writing the size of the stack guard is 128 byte (see: STACK_WATCHER_LENGTH * sizeof(u32)).
+
+NOTE: The check will fail to determine a stack overflow if the stack frames are too big and nothing was written to the stack guard as a consequence. In practice this can happen if a function is called that has a lot of unused stack data in it, followed by either a change to some stack data or a call to any function that puts another stackframe on the stack.
+
+NOTE: There is a very slight possibility that the stack overflow detection reports a false positive. This is, when the stack grew into the stack guard, but not beyond it. Technically this would not be a stack overflow yet. One could argue however, that the stack (although it did not overflow yet) grew way too dangerously big.
+
+NOTE: When analyzing manually, have a look for the value `0xED505505` (Mnemonic: Ed screams SOS SOS).
+
+== Determining how much stack was used during runtime
+FruityMesh keeps track of how much stack RAM was used. To do so, at boot time, the whole stack is filled with a special value (see: UNUSED_STACK_INDICATOR). When errors are queried (action this status get_errors), the stack is iterated and it is counted how many bytes still have this special value at the end of the stack. This amount is reported as INFO_UNUSED_STACK_BYTES and can be used to find potential stack overflow risks or if way too much stack is unused which could be used for other things.
+
+== RebootReason::UNKNOWN_BUT_BOOTED
+There are two reboot reasons that indicate that we don't know the exact reason of the reboot: `UNKNOWN` and `UNKNOWN_BUT_BOOTED`. The first one indicates that we were unable to read the reboot reason from the RAM retain struct. This most likely indicates that some kind of power shortage happened. The second reason indicates that although we don't know why the node is rebooting, we know that it was successfully booted previously within the current power cycle, so know that power was not lost. One possible explanation for this is when we flash a node. This resets the node, without removing power from it. If this was not the cause, then this reboot reason indicates something more sinister. Something rebooted the node without even calling any fault handler or the fault handler was for some reason unable to correctly store the RebootReason.
+
+== HAL memory
+TODO: Move to memory management
+The HAL has its own memory location to store any arbitrary data. A void pointer to this memory is stored in the GlobalState as `halMemory`. The HAL has to cast this pointer to some structure to interpret its state. The node allocates enough RAM for the HAL on boot, using the `GetHalMemorySize` function to determine how much is needed.
+
+NOTE: The hal memory is initialized to 0. Avoid using con- and destructors as these are not called by the node. If necessary, the HAL has to call them by itself.
+
+The advantage of the hal memory versus some global storage variables is that the hal memory can be fully simulated, giving each simulated node its own separate HAL state.
+
+== STL usage
+In general, STL/STD usage is prohibited in FruityMesh. There are several reasons for this:
+
+. They tend to use heap memory, which is prohibited in FruityMesh.
+. They also tend to use exceptions, which is also prohibited in FruityMesh.
+. Often the exact behavior is implementation dependent, meaning that the behavior changes across compilers. This is bad for reproducibility.
+. We don't have control over the implementation. Often they tend to be bigger than is really required for an embedded environment.
+
+There are a few exceptions to this:
+
+. std::array is okay to use everywhere as its implementation is rather trivial and was not changing at all between compilers in our tests.
+. std::type_traits are okay a well as they only give some information about types during compile time.
+
+The simulator additionally allows the usage of container classes like std::vector and std::map, as heap allocations are no problem in the simulator.
 
 == Licence
 FruityMesh is published under the GPLv3 version, which is available in the repository.

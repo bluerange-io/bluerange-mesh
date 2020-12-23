@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -60,6 +60,7 @@
 
 extern "C" {
 #include <app_timer.h>
+#include <ble_db_discovery.h>
 #ifndef SIM_ENABLED
 #include <app_util_platform.h>
 #include <nrf_uart.h>
@@ -68,7 +69,6 @@ extern "C" {
 #include <nrf_drv_gpiote.h>
 #include <nrf_delay.h>
 #include <nrf_sdm.h>
-#include <ble_db_discovery.h>
 #ifdef NRF52
 #include <nrf_power.h>
 #include <nrf_drv_twi.h>
@@ -77,6 +77,7 @@ extern "C" {
 #include <nrf_sdh.h>
 #include <nrf_sdh_ble.h>
 #include <nrf_sdh_soc.h>
+#include <SEGGER_RTT.h>
 #else
 #include <softdevice_handler.h>
 #include <ble_stack_handler_types.h>
@@ -85,6 +86,11 @@ extern "C" {
 #if IS_ACTIVE(VIRTUAL_COM_PORT)
 #include <virtual_com_port.h>
 #endif
+#endif
+
+#if FH_NRF_ENABLE_EASYDMA_TERMINAL
+#include <nrf_serial.h>
+#include <nrf_drv_uart.h>
 #endif
 }
 
@@ -102,7 +108,8 @@ extern "C" {
 
 #define APP_TIMER_MAX_TIMERS    5 //Maximum number of simultaneously created timers (2 + BSP_APP_TIMERS_NUMBER)
 
-#define SD_EVT_IRQ_PRIORITY     7
+#define HIGHER_THAN_APP_PRIO    6 //IRQ Priority of interrupts such as UART that perform little work and should be fast
+#define SD_EVT_IRQ_PRIORITY     7 //IRQ prio of our whole main application event fetching, timer handling, etc,....
 #ifdef NRF52
 
 //The priority of the SoftDevice event reporting is changed to the lowest priority (7) because we need two interrupt 
@@ -128,14 +135,14 @@ struct GpioteHandlerValues
 
 struct NrfHalMemory
 {
-#ifndef SIM_ENABLED
     std::array <app_timer_t, APP_TIMER_MAX_TIMERS> swTimers;
     ble_db_discovery_t discoveredServices;
     volatile bool twiXferDone;
     bool twiInitDone;
     volatile bool spiXferDone;
     bool spiInitDone;
-#endif
+    volatile bool nrfSerialDataAvailable = false;
+    volatile bool nrfSerialErrorDetected = false;
     bool overflowPending;
     u32 time_ms;
     GpioteHandlerValues GpioHandler[MAX_GPIOTE_HANDLERS];
@@ -1634,7 +1641,7 @@ ErrorType FruityHal::BleGattSendNotification(u16 connHandle, BleGattWriteParams 
     notificationParams.handle = params.handle;
     notificationParams.offset = params.offset;
     notificationParams.p_data = params.p_data;
-    notificationParams.p_len = &params.len;
+    notificationParams.p_len = &params.len.GetRawRef();
 
     if (params.type == BleGattWriteType::NOTIFICATION) notificationParams.type = BLE_GATT_HVX_NOTIFICATION;
     else if (params.type == BleGattWriteType::INDICATION) notificationParams.type = BLE_GATT_HVX_INDICATION;
@@ -1653,7 +1660,7 @@ ErrorType FruityHal::BleGattWrite(u16 connHandle, BleGattWriteParams const & par
     CheckedMemset(&writeParameters, 0, sizeof(ble_gattc_write_params_t));
     writeParameters.handle = params.handle;
     writeParameters.offset = params.offset;
-    writeParameters.len = params.len;
+    writeParameters.len = params.len.GetRaw();
     writeParameters.p_value = params.p_data;
 
     if (params.type == BleGattWriteType::WRITE_REQ) writeParameters.write_op = BLE_GATT_OP_WRITE_REQ;
@@ -1823,25 +1830,6 @@ ErrorType FruityHal::GetRandomBytes(u8 * p_data, u8 len)
 {
     return nrfErrToGeneric(sd_rand_application_vector_get(p_data, len));
 }
-
-//################################################
-#define _________________UART_____________________
-
-//This handler receives UART interrupts (terminal json mode)
-#if !defined(UART_ENABLED) || UART_ENABLED == 0 || defined(SIM_ENABLED) //Only enable if nordic library for UART is not used
-extern "C"{
-    void UART0_IRQHandler(void)
-    {
-        if (GS->uartEventHandler == nullptr) {
-            SIMEXCEPTION(UartNotSetException);
-        } else {
-            GS->uartEventHandler();
-        }
-    }
-}
-#endif
-
-
 
 //################################################
 #define _________________VIRTUAL_COM_PORT_____________________
@@ -2865,155 +2853,7 @@ void FruityHal::GetDeviceAddress(u8 * p_address)
     }
 }
 
-void FruityHal::DisableUart()
-{
-#ifndef SIM_ENABLED
-    //Disable UART interrupt
-    sd_nvic_DisableIRQ(UART0_IRQn);
-
-    //Disable all UART Events
-    nrf_uart_int_disable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY |
-        NRF_UART_INT_MASK_TXDRDY |
-        NRF_UART_INT_MASK_ERROR |
-        NRF_UART_INT_MASK_RXTO);
-    //Clear all pending events
-    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_CTS);
-    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_NCTS);
-    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXDRDY);
-    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_TXDRDY);
-    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_ERROR);
-    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXTO);
-
-    //Disable UART
-    NRF_UART0->ENABLE = UART_ENABLE_ENABLE_Disabled;
-
-    //Reset all Pinx to default state
-    nrf_uart_txrx_pins_disconnect(NRF_UART0);
-    nrf_uart_hwfc_pins_disconnect(NRF_UART0);
-
-    nrf_gpio_cfg_default(Boardconfig->uartTXPin);
-    nrf_gpio_cfg_default(Boardconfig->uartRXPin);
-
-    if (Boardconfig->uartRTSPin != -1) {
-        if (NRF_UART0->PSELRTS != NRF_UART_PSEL_DISCONNECTED) nrf_gpio_cfg_default(Boardconfig->uartRTSPin);
-        if (NRF_UART0->PSELCTS != NRF_UART_PSEL_DISCONNECTED) nrf_gpio_cfg_default(Boardconfig->uartCTSPin);
-    }
-#endif
-}
-
-void FruityHal::UartHandleError(u32 error)
-{
-    //Errorsource is given, but has to be cleared to be handled
-    NRF_UART0->ERRORSRC = error;
-
-    //FIXME: maybe we need some better error handling here
-}
-
-bool FruityHal::UartCheckInputAvailable()
-{
-    return NRF_UART0->EVENTS_RXDRDY == 1;
-}
-
-FruityHal::UartReadCharBlockingResult FruityHal::UartReadCharBlocking()
-{
-    UartReadCharBlockingResult retVal;
-
-#if IS_INACTIVE(GW_SAVE_SPACE)
-    while (NRF_UART0->EVENTS_RXDRDY != 1) {
-        if (NRF_UART0->EVENTS_ERROR) {
-            FruityHal::UartHandleError(NRF_UART0->ERRORSRC);
-            retVal.didError = true;
-        }
-        // Info: No timeout neede here, as we are waiting for user input
-    }
-    NRF_UART0->EVENTS_RXDRDY = 0;
-    retVal.c = NRF_UART0->RXD;
-#endif
-
-    return retVal;
-}
-
-void FruityHal::UartPutStringBlockingWithTimeout(const char* message)
-{
-    uint_fast8_t i = 0;
-    uint8_t byte = message[i++];
-
-    while (byte != '\0')
-    {
-        NRF_UART0->TXD = byte;
-        byte = message[i++];
-
-        int i = 0;
-        while (NRF_UART0->EVENTS_TXDRDY != 1) {
-            //Timeout if it was not possible to put the character
-            if (i > 10000) {
-                return;
-            }
-            i++;
-            //FIXME: Do we need error handling here? Will cause lost characters
-        }
-        NRF_UART0->EVENTS_TXDRDY = 0;
-    }
-}
-
-bool FruityHal::IsUartErroredAndClear()
-{
-    if (nrf_uart_int_enable_check(NRF_UART0, NRF_UART_INT_MASK_ERROR) &&
-        nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_ERROR))
-    {
-        nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_ERROR);
-
-        FruityHal::UartHandleError(NRF_UART0->ERRORSRC);
-
-        return true;
-    }
-    return false;
-}
-
-bool FruityHal::IsUartTimedOutAndClear()
-{
-    if (nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_RXTO))
-    {
-        nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXTO);
-
-        //Restart transmission and clear previous buffer
-        nrf_uart_task_trigger(NRF_UART0, NRF_UART_TASK_STARTRX);
-
-        return true;
-
-        //TODO: can we check if this works???
-    }
-    return false;
-}
-
-FruityHal::UartReadCharResult FruityHal::UartReadChar()
-{
-    UartReadCharResult retVal;
-
-    if (nrf_uart_int_enable_check(NRF_UART0, NRF_UART_INT_MASK_RXDRDY) &&
-        nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_RXDRDY))
-    {
-        //Reads the byte
-        nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXDRDY);
-#ifndef SIM_ENABLED
-        retVal.c = NRF_UART0->RXD;
-#else
-        retVal.c = nrf_uart_rxd_get(NRF_UART0);
-#endif
-        retVal.hasNewChar = true;
-
-        //Disable the interrupt to stop receiving until instructed further
-        nrf_uart_int_disable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
-    }
-
-    return retVal;
-}
-
-void FruityHal::UartEnableReadInterrupt()
-{
-    nrf_uart_int_enable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
-}
-
+#define __________________UART____________________
 
 static nrf_uart_baudrate_t UartBaudRateToNordic(FruityHal::UartBaudrate baudRate)
 {
@@ -3035,8 +2875,151 @@ static nrf_uart_baudrate_t UartBaudRateToNordic(FruityHal::UartBaudrate baudRate
 #endif
 }
 
+/*
+* FH_NRF_ENABLE_EASYDMA_TERMINAL: FruityHalNrf EasyDMA support for UART
+* 
+* We implemented the possibility to use UART together with EasyDMA to consume less CPU time when
+* logging data through our UART terminal. This has only been tested with our Terminal with TerminalMode::JSON
+* 
+* The implementation might be usable for other use-cases but further testing is required.
+*
+* KNOWN ISSUES:
+*    - When receiving lots of data during power-on, the controller migh reboot with an app error
+*      because functionality will be called before the softdevice was properly enabled.
+*    - When receiving many lines in a very short time, data might get lost.
+*    - Implementation was only tested with nRf52832
+*
+* In order to enable this, put the following in yourFeatureset.h:
+
+#include <easydma_terminal_nrf52_fragment.h>
+
+* Also add the following to yourFeatureset.cmake:
+
+include(config/featuresets/CMakeFragments/AddNrfEasyDmaUart.cmake)
+*/
+
+#if FH_NRF_ENABLE_EASYDMA_TERMINAL && !defined(SIM_ENABLED)
+
+//This represents a chunk of data being queued for sending using EasyDMA
+#define FH_EASYDMA_UART_SERIAL_BUFF_TX_SIZE                 64
+
+//We only ask EasyDMA for a single byte (which is like not using DMA at all for receiving)
+//As we will only get an interrupt once the buffer is full which does not work with variable length data
+//This is acceptable for us as we do not need a high throughput for receiving data. If we do need this,
+//we can rewrite it to use a timer to automatically start a new EasyDMA transfer if no data was received for some time
+#define FH_EASYDMA_UART_SERIAL_BUFF_RX_SIZE                 1
+
+//This is the FIFO for sending data, it should be big enough to be able to fit all the data that is being
+//logged for one received packet. In the best case, it can fit all data being logged for all packets of a 
+//connectionEvent. Only a short memcopy will have to be done by the CPU and the event handling will only be blocked
+//for a very short time. Once the TX FIFO is full, any call to logging will block until the data was written out.
+#define FH_EASYDMA_UART_SERIAL_FIFO_TX_SIZE                 2048
+
+//The RX buffer can be rather small as we have another RX buffer in our Terminal that is only processed after a full
+//line was received
+#define FH_EASYDMA_UART_SERIAL_FIFO_RX_SIZE                 256
+
+#define FH_EASYDMA_UART_PARITY          NRF_UART_PARITY_EXCLUDED
+
+// Define our buffers
+NRF_SERIAL_BUFFERS_DEF(serial_buffs, FH_EASYDMA_UART_SERIAL_BUFF_TX_SIZE, FH_EASYDMA_UART_SERIAL_BUFF_RX_SIZE);
+NRF_SERIAL_QUEUES_DEF(serial_queues, FH_EASYDMA_UART_SERIAL_FIFO_TX_SIZE, FH_EASYDMA_UART_SERIAL_FIFO_RX_SIZE);
+
+//A rather long block
+static app_timer_t serial_uart_rx_timer_data = { {0} };
+static const app_timer_id_t serial_uart_rx_timer = &serial_uart_rx_timer_data;
+static app_timer_t serial_uart_tx_timer_data = { {0} };
+static const app_timer_id_t serial_uart_tx_timer = &serial_uart_tx_timer_data;
+static nrf_serial_ctx_t serial_uart_ctx;
+#ifdef NRF52840
+static nrf_drv_uart_t instance = { .inst_idx = 0, .uarte = {.p_reg = NRF_UARTE0, .drv_inst_idx = 0} };
+#else
+static nrf_drv_uart_t instance = { .reg = { NRF_UARTE0}, .drv_inst_idx = 0 };
+#endif
+static const nrf_serial_t serial_uart = {
+    .instance = instance,
+    .p_ctx = &serial_uart_ctx,
+    .p_tx_timer = &serial_uart_tx_timer,
+    .p_rx_timer = &serial_uart_rx_timer,
+};
+
+// Define handlers for the nrf_serial library
+static void nrf_serial_event_handler(struct nrf_serial_s const * p_serial, nrf_serial_event_t event);
+
+// Event Handler for NRF_SERIAL events
+// WARNING: Do not log anything in here as it is called from a different interrupt and will
+//          break you program if your logging (such as Segger RTT) is not configured with threads in mind
+static void nrf_serial_event_handler(struct nrf_serial_s const * p_serial, nrf_serial_event_t event) {
+    NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
+    switch (event) {
+        //Called as soon as data was received and is now available in the FIFO RX Buffer
+        case NRF_SERIAL_EVENT_RX_DATA: {
+            halMemory->nrfSerialDataAvailable = true;
+            GS->uartEventHandler();
+        } break;
+
+        //Called as soon as the FIFO is full
+        //TODO: Currently not properly handeled but only an issue if a lot of data is received at a time
+        case NRF_SERIAL_EVENT_FIFO_ERR: {
+            //SEGGER_RTT_WriteString(0, "NRF_SERIAL_EVENT_FIFO_ERR" EOL);
+            halMemory->nrfSerialErrorDetected = true;
+            GS->uartEventHandler();
+        } break;
+
+        //Called in case there is an overrun in the UART, a framing error, etc,...
+        case NRF_SERIAL_EVENT_DRV_ERR: {
+            //SEGGER_RTT_WriteString(0, "NRF_SERIAL_EVENT_DRV_ERR" EOL);
+            halMemory->nrfSerialErrorDetected = true;
+            GS->uartEventHandler();
+        } break;
+
+        //Called once a transmission was done successfully but the nrf_serial library
+        //will automatically queue new data if there is still data in the TX FIFO
+        case NRF_SERIAL_EVENT_TX_DONE: { } break;
+    }
+}
+
+//Creates the serial_uart instance
+NRF_SERIAL_CONFIG_DEF(
+        serial_config,
+        NRF_SERIAL_MODE_DMA,
+        &serial_queues,
+        &serial_buffs,
+        nrf_serial_event_handler,
+        NULL);
+
+#endif //FH_NRF_ENABLE_EASYDMA_TERMINAL
+
 void FruityHal::EnableUart(bool promptAndEchoMode)
 {
+#if FH_NRF_ENABLE_EASYDMA_TERMINAL
+    NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
+
+    nrf_drv_uart_config_t config;
+    config.pselrxd                  = Boardconfig->uartRXPin;
+    config.pseltxd                  = Boardconfig->uartTXPin;;
+    config.pselrts                  = Boardconfig->uartRTSPin == -1 ? NRF_UART_PSEL_DISCONNECTED : Boardconfig->uartRTSPin;
+    config.pselcts                  = Boardconfig->uartCTSPin == -1 ? NRF_UART_PSEL_DISCONNECTED : Boardconfig->uartCTSPin;
+    config.hwfc                     = Boardconfig->uartRTSPin == -1 ? NRF_UART_HWFC_DISABLED : NRF_UART_HWFC_ENABLED;
+    config.parity                   = FH_EASYDMA_UART_PARITY;
+    config.baudrate                 = UartBaudRateToNordic((FruityHal::UartBaudrate)Boardconfig->uartBaudRate);
+    config.interrupt_priority       = HIGHER_THAN_APP_PRIO; //We must be fast enough to not cause a bottleneck
+
+    u32 err = nrf_serial_init(&serial_uart, &config, &serial_config);
+
+    //Configures SWI1 with IRQ prio 6
+    //This is later used to read additional data after a line was processed as
+    //Multiple read interrupts might have been missed during line processing
+    if(!err) err = sd_nvic_SetPriority(SWI1_EGU1_IRQn, 6);
+
+    if(!err) err = sd_nvic_EnableIRQ(SWI1_EGU1_IRQn);
+
+    if(!err){
+        halMemory->nrfSerialDataAvailable = false;
+        halMemory->nrfSerialErrorDetected = false;
+    }
+#else
+
     //Configure pins
     nrf_gpio_pin_set(Boardconfig->uartTXPin);
     nrf_gpio_cfg_output(Boardconfig->uartTXPin);
@@ -3082,10 +3065,275 @@ void FruityHal::EnableUart(bool promptAndEchoMode)
         //Start receiving RX events
         FruityHal::UartEnableReadInterrupt();
     }
+#endif //FH_NRF_ENABLE_EASYDMA_TERMINAL
+}
+
+void FruityHal::DisableUart()
+{
+#ifndef SIM_ENABLED
+#if FH_NRF_ENABLE_EASYDMA_TERMINAL
+    NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
+
+    u32 err = nrf_serial_uninit(&serial_uart);
+
+    if(!err){
+        halMemory->nrfSerialDataAvailable = false;
+        halMemory->nrfSerialErrorDetected = false;
+    }
+#else 
+    //Disable UART interrupt
+    sd_nvic_DisableIRQ(UART0_IRQn);
+
+    //Disable all UART Events
+    nrf_uart_int_disable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY |
+        NRF_UART_INT_MASK_TXDRDY |
+        NRF_UART_INT_MASK_ERROR |
+        NRF_UART_INT_MASK_RXTO);
+    //Clear all pending events
+    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_CTS);
+    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_NCTS);
+    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXDRDY);
+    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_TXDRDY);
+    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_ERROR);
+    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXTO);
+
+    //Disable UART
+    NRF_UART0->ENABLE = UART_ENABLE_ENABLE_Disabled;
+
+    //Reset all Pinx to default state
+    nrf_uart_txrx_pins_disconnect(NRF_UART0);
+    nrf_uart_hwfc_pins_disconnect(NRF_UART0);
+
+    nrf_gpio_cfg_default(Boardconfig->uartTXPin);
+    nrf_gpio_cfg_default(Boardconfig->uartRXPin);
+
+    if (Boardconfig->uartRTSPin != -1) {
+        if (NRF_UART0->PSELRTS != NRF_UART_PSEL_DISCONNECTED) nrf_gpio_cfg_default(Boardconfig->uartRTSPin);
+        if (NRF_UART0->PSELCTS != NRF_UART_PSEL_DISCONNECTED) nrf_gpio_cfg_default(Boardconfig->uartCTSPin);
+    }
+#endif //FH_NRF_ENABLE_EASYDMA_TERMINAL
+#endif //SIM_ENABLED
+}
+
+// TODO: The error parameter is not abstracted (IOT-4663)
+void FruityHal::UartHandleError(u32 error)
+{
+#if FH_NRF_ENABLE_EASYDMA_TERMINAL
+    //Disabling and Enabling the UART might fail as UartHandleError is called from IRQ PRIO 6
+    //We might however have a write call in progress on IRQ PRIO 7 which does not allow us to
+    //reinitialize the nrf_serial library
+    //In this case, the nrfSerialErrorDetected variable will stay true and reinitialization is
+    //retried when writing out a character
+    DisableUart();
+    EnableUart(false); //TODO: We should store the promptAndEchoMode state once we use easydma uart for PROMPT mode as well
+
+#else
+
+    //Errorsource is given, but has to be cleared to be handled
+    NRF_UART0->ERRORSRC = error;
+
+    //FIXME: maybe we need some better error handling here
+#endif
+}
+
+bool FruityHal::UartCheckInputAvailable()
+{
+#if FH_NRF_ENABLE_EASYDMA_TERMINAL
+    return ((NrfHalMemory*)GS->halMemory)->nrfSerialDataAvailable;
+#else
+    return NRF_UART0->EVENTS_RXDRDY == 1;
+#endif
+}
+
+FruityHal::UartReadCharBlockingResult FruityHal::UartReadCharBlocking()
+{
+    UartReadCharBlockingResult retVal;
+
+#if FH_NRF_ENABLE_EASYDMA_TERMINAL
+    size_t bytesRead = 0;
+    while(bytesRead == 0){
+        nrf_serial_read(&serial_uart, &retVal.c, 1, &bytesRead, 0);
+        if(((NrfHalMemory*)GS->halMemory)->nrfSerialErrorDetected) retVal.didError = true;
+    }
+#else
+    while (NRF_UART0->EVENTS_RXDRDY != 1) {
+        if (NRF_UART0->EVENTS_ERROR) {
+            FruityHal::UartHandleError(NRF_UART0->ERRORSRC);
+            retVal.didError = true;
+        }
+        // Info: No timeout neede here, as we are waiting for user input
+    }
+    NRF_UART0->EVENTS_RXDRDY = 0;
+    retVal.c = NRF_UART0->RXD;
+#endif
+
+    return retVal;
+}
+
+void FruityHal::UartPutStringBlockingWithTimeout(const char* message)
+{
+#if FH_NRF_ENABLE_EASYDMA_TERMINAL
+    u16 dataLengthRemaining = strlen(message);
+    const char* messagePtr = message;
+
+    //We might be in a state where it was impossible to restart Uart (see UartHandleError())
+    //So we try to restart it here
+    if(((NrfHalMemory*)GS->halMemory)->nrfSerialErrorDetected){
+        //We leave the error handling to our Interrupt handler to not cause threading issues
+        sd_nvic_SetPendingIRQ(SWI1_EGU1_IRQn);
+    }
+
+    char buffer[FH_EASYDMA_UART_SERIAL_BUFF_TX_SIZE];
+
+    while(dataLengthRemaining > 0){
+        //We need to make a copy of the data chunks as it might not be in RAM, which is necessary for EasyDMA
+        u16 chunkLengthRemaining = dataLengthRemaining < FH_EASYDMA_UART_SERIAL_BUFF_TX_SIZE ? dataLengthRemaining : FH_EASYDMA_UART_SERIAL_BUFF_TX_SIZE;
+        CheckedMemcpy(buffer, messagePtr, chunkLengthRemaining);
+
+        const char* chunkPtr = buffer;
+
+        int i = 0;
+        while(chunkLengthRemaining > 0) {
+            size_t bytesWritten = 0;
+            const u32 err = nrf_serial_write(&serial_uart, chunkPtr, chunkLengthRemaining, &bytesWritten, 0);
+
+            //The error might e.g. be a timeout but bytes could have been written out nevertheless
+            chunkLengthRemaining -= bytesWritten;
+            dataLengthRemaining -= bytesWritten;
+            chunkPtr += bytesWritten;
+            messagePtr += bytesWritten;
+
+            //In case we fail to write the message for a longer time, we time out
+            if(i++ > 10000) return;
+        }
+        
+    }
+#else
+    uint_fast8_t i = 0;
+    uint8_t byte = message[i++];
+
+    while (byte != '\0')
+    {
+        NRF_UART0->TXD = byte;
+        byte = message[i++];
+
+        int i = 0;
+        while (NRF_UART0->EVENTS_TXDRDY != 1) {
+            //Timeout if it was not possible to put the character
+            if (i > 10000) {
+                return;
+            }
+            i++;
+            //FIXME: Do we need error handling here? Will cause lost characters
+        }
+        NRF_UART0->EVENTS_TXDRDY = 0;
+    }
+#endif
+}
+
+//TODO: This is a duplicate of CheckAndHandleUartError (IOT-4663)
+bool FruityHal::IsUartErroredAndClear()
+{
+#if FH_NRF_ENABLE_EASYDMA_TERMINAL
+    if(((NrfHalMemory*)GS->halMemory)->nrfSerialErrorDetected){
+        UartHandleError(0);
+        return true;
+    } else {
+        return false;
+    }
+#else
+    if (nrf_uart_int_enable_check(NRF_UART0, NRF_UART_INT_MASK_ERROR) &&
+        nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_ERROR))
+    {
+        nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_ERROR);
+
+        FruityHal::UartHandleError(NRF_UART0->ERRORSRC);
+
+        return true;
+    }
+    return false;
+#endif
+}
+
+//TODO: This is a duplicate of CheckAndHandleUartTimeout (IOT-4663)
+bool FruityHal::IsUartTimedOutAndClear()
+{
+#if FH_NRF_ENABLE_EASYDMA_TERMINAL
+    //There is no known way that this can happen with EasyDMA UART
+    return false;
+#else
+    if (nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_RXTO))
+    {
+        nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXTO);
+
+        //Restart transmission and clear previous buffer
+        nrf_uart_task_trigger(NRF_UART0, NRF_UART_TASK_STARTRX);
+
+        return true;
+
+        //TODO: can we check if this works???
+    }
+    return false;
+#endif
+}
+
+FruityHal::UartReadCharResult FruityHal::UartReadChar()
+{
+    UartReadCharResult retVal;
+
+#if FH_NRF_ENABLE_EASYDMA_TERMINAL
+    size_t bytesRead = 0;
+    nrf_serial_read(&serial_uart, &retVal.c, 1, &bytesRead, 0);
+    if(bytesRead) retVal.hasNewChar = true;
+    else ((NrfHalMemory*)GS->halMemory)->nrfSerialDataAvailable = false;
+#else
+    if (nrf_uart_int_enable_check(NRF_UART0, NRF_UART_INT_MASK_RXDRDY) &&
+        nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_RXDRDY))
+    {
+        //Reads the byte
+        nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXDRDY);
+#ifndef SIM_ENABLED
+        retVal.c = NRF_UART0->RXD;
+#else
+        retVal.c = nrf_uart_rxd_get(NRF_UART0);
+#endif
+        retVal.hasNewChar = true;
+
+        //Disable the interrupt to stop receiving until instructed further
+        nrf_uart_int_disable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
+    }
+#endif
+
+    return retVal;
+}
+
+#if FH_NRF_ENABLE_EASYDMA_TERMINAL
+extern "C"{
+    void SWI1_IRQHandler(void)
+    {
+        //We can safely call this from here as it is running on the same IRQ prio as the UART
+        GS->uartEventHandler();
+    }
+}
+#endif
+
+void FruityHal::UartEnableReadInterrupt()
+{
+#if FH_NRF_ENABLE_EASYDMA_TERMINAL
+    //We trigger SWI1 to check if there is any more UART data
+    volatile u32 err = sd_nvic_SetPendingIRQ(SWI1_EGU1_IRQn);
+
+#else
+    nrf_uart_int_enable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
+#endif
 }
 
 bool FruityHal::CheckAndHandleUartTimeout()
 {
+#if FH_NRF_ENABLE_EASYDMA_TERMINAL
+    //Can not happen for EasyDMA UART with nrf_serial library
+    return false;
+#else
 #ifndef SIM_ENABLED
     if (nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_RXTO))
     {
@@ -3096,13 +3344,22 @@ bool FruityHal::CheckAndHandleUartTimeout()
 
         return true;
     }
-#endif
-
+#endif //SIM_ENABLED
     return false;
+#endif
 }
 
+// TODO: The returned error codes are not HAL abstracted (IOT-4663)
 u32 FruityHal::CheckAndHandleUartError()
 {
+#if FH_NRF_ENABLE_EASYDMA_TERMINAL
+    if(((NrfHalMemory*)GS->halMemory)->nrfSerialErrorDetected){
+        UartHandleError(1);
+        return 1;
+    } else {
+        return 0;
+    }
+#else
     //Checks if an error occured
     if (nrf_uart_int_enable_check(NRF_UART0, NRF_UART_INT_MASK_ERROR) &&
         nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_ERROR))
@@ -3111,11 +3368,30 @@ u32 FruityHal::CheckAndHandleUartError()
 
         //Errorsource is given, but has to be cleared to be handled
         NRF_UART0->ERRORSRC = NRF_UART0->ERRORSRC;
-
+        //TODO: How does this work, isn't it already cleared, isn't that the same as UartHandleError?
         return NRF_UART0->ERRORSRC;
     }
     return 0;
+#endif
 }
+
+//This handler receives UART interrupts (terminal json mode)
+#if !defined(UART_ENABLED) || UART_ENABLED == 0 || defined(SIM_ENABLED) //Only enable if nordic library for UART is not used
+extern "C"{
+    #ifndef FH_NRF_ENABLE_EASYDMA_TERMINAL
+    void UART0_IRQHandler(void)
+    {
+        if (GS->uartEventHandler == nullptr) {
+            SIMEXCEPTION(UartNotSetException);
+        } else {
+            GS->uartEventHandler();
+        }
+    }
+    #endif
+}
+#endif
+
+#define __________________TWI____________________
 
 #if defined(ACTIVATE_ASSET_MODULE)
 #ifndef SIM_ENABLED
@@ -3292,6 +3568,8 @@ bool FruityHal::TwiIsInitialized(void)
     return cherrySimInstance->currentNode->twiWasInit;
 #endif
 }
+
+#define __________________SPI____________________
 
 #ifndef SIM_ENABLED
 #define SPI_INSTANCE  0

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -190,7 +190,7 @@ void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnecti
 
         NodeId senderId = packetHeader->sender;
         ModuleIdWrapper wrappedModuleId;
-        u16 dataLength = 0;
+        MessageLength dataLength;
         const u8* dataPtr = nullptr;
         u8 requestHandle = 0;
         ModuleConfigMessages actionType;
@@ -241,10 +241,10 @@ void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnecti
                     moduleId == packet->moduleId
                     && newConfig->moduleId == oldConfig->moduleId
                     && newConfig->moduleVersion == oldConfig->moduleVersion
-                    && dataLength == configurationLength
+                    && dataLength.GetRaw() == configurationLength
                 ){
                     //Overwrite the old configuration
-                    CheckedMemcpy(oldConfig, newConfig, dataLength);
+                    CheckedMemcpy(oldConfig, newConfig, dataLength.GetRaw());
                 } else {
                     result = SetConfigResultCodes::WRONG_CONFIGURATION;
                 }
@@ -258,10 +258,10 @@ void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnecti
                     vendorModuleId == packetVendor->moduleId
                     && newConfig->moduleId == oldConfig->moduleId
                     && newConfig->moduleVersion == oldConfig->moduleVersion
-                    && dataLength == configurationLength
+                    && dataLength.GetRaw() == configurationLength
                 ){
                     //Overwrite the old configuration
-                    CheckedMemcpy(oldConfig, newConfig, dataLength);
+                    CheckedMemcpy(oldConfig, newConfig, dataLength.GetRaw());
                 } else {
                     result = SetConfigResultCodes::WRONG_CONFIGURATION;
                 }
@@ -423,7 +423,7 @@ void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnecti
     }
 }
 
-PreEnrollmentReturnCode Module::PreEnrollmentHandler(ConnPacketModule* enrollmentPacket, u16 packetLength)
+PreEnrollmentReturnCode Module::PreEnrollmentHandler(ConnPacketModule* enrollmentPacket, MessageLength packetLength)
 {
     return PreEnrollmentReturnCode::DONE;
 }

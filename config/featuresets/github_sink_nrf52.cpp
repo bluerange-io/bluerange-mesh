@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -37,43 +37,52 @@
 #include "EnrollmentModule.h"
 #include "IoModule.h"
 #include "MeshAccessModule.h"
-#include "VendorTemplateModule.h"
 #include "GlobalState.h"
 
-void SetBoardConfiguration_github_nrf52(BoardConfiguration* c)
+// This is an example featureset for a gateway (sink) node based on the nRF52832
+// Logging is disabled but UART communication is enabled
+// It also has a default enrollment hardcoded so that all mesh nodes are
+// in the same mesh network after flashing
+
+void SetBoardConfiguration_github_sink_nrf52(BoardConfiguration* c)
 {
     //Additional boards can be put in here to be selected at runtime
     //BoardConfiguration* c = (BoardConfiguration*)config;
     //e.g. setBoard_123(c);
 }
 
-void SetFeaturesetConfiguration_github_nrf52(ModuleConfiguration* config, void* module)
+void SetFeaturesetConfiguration_github_sink_nrf52(ModuleConfiguration* config, void* module)
 {
     if (config->moduleId == ModuleId::CONFIG)
     {
         Conf::GetInstance().defaultLedMode = LedMode::CONNECTIONS;
-        Conf::GetInstance().terminalMode = TerminalMode::PROMPT;
+        Conf::GetInstance().terminalMode = TerminalMode::JSON;
     }
     else if (config->moduleId == ModuleId::NODE)
     {
         //Specifies a default enrollment for the github configuration
-        //This enrollment will be overwritten as soon as the node is either enrolled or the enrollment removed
+        //This is just for illustration purpose so that all nodes are enrolled and connect to each other after flashing
+        //For production, all nodes should have a unique nodeKey in the UICR and should be unenrolled
+        //They can then be enrolled by the user e.g. by using a smartphone application
+        //More info is available as part of the documentation in the Specification and the UICR chapter
         NodeConfiguration* c = (NodeConfiguration*) config;
+        //Default state will be that the node is already enrolled
         c->enrollmentState = EnrollmentState::ENROLLED;
+        //Enroll the node by default in networkId 11
         c->networkId = 11;
-        CheckedMemset(c->networkKey, 0x00, 16);
+        //Set a default network key of 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22
+        CheckedMemcpy(c->networkKey, "\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22", 16);
+
+        //Info: The default node key and other keys are set in Conf::LoadDefaults()
     }
 }
 
-void SetFeaturesetConfigurationVendor_github_nrf52(VendorModuleConfiguration* config, void* module)
+void SetFeaturesetConfigurationVendor_github_sink_nrf52(VendorModuleConfiguration* config, void* module)
 {
-    if (config->moduleId == VENDOR_TEMPLATE_MODULE_ID)
-    {
-        logt("TMOD", "Setting template module configuration for featureset");
-    }
+
 }
 
-u32 InitializeModules_github_nrf52(bool createModule)
+u32 InitializeModules_github_sink_nrf52(bool createModule)
 {
     u32 size = 0;
     size += GS->InitializeModule<DebugModule>(createModule);
@@ -82,36 +91,31 @@ u32 InitializeModules_github_nrf52(bool createModule)
     size += GS->InitializeModule<ScanningModule>(createModule);
     size += GS->InitializeModule<EnrollmentModule>(createModule);
     size += GS->InitializeModule<IoModule>(createModule);
-
-    //Each Vendor module needs a RecordStorage id if it wants to store a persistent configuration
-    //see the section for VendorModules in RecordStorage.h for more info
-    size += GS->InitializeModule<VendorTemplateModule>(createModule, RECORD_STORAGE_RECORD_ID_VENDOR_MODULE_CONFIG_BASE + 0);
-
     size += GS->InitializeModule<MeshAccessModule>(createModule);
     return size;
 }
 
-DeviceType GetDeviceType_github_nrf52()
+DeviceType GetDeviceType_github_sink_nrf52()
 {
-    return DeviceType::STATIC;
+    return DeviceType::SINK;
 }
 
-Chipset GetChipset_github_nrf52()
+Chipset GetChipset_github_sink_nrf52()
 {
     return Chipset::CHIP_NRF52;
 }
 
-FeatureSetGroup GetFeatureSetGroup_github_nrf52()
+FeatureSetGroup GetFeatureSetGroup_github_sink_nrf52()
 {
-    return FeatureSetGroup::NRF52_MESH;
+    return FeatureSetGroup::NRF52_SINK_GITHUB;
 }
 
-u32 GetWatchdogTimeout_github_nrf52()
+u32 GetWatchdogTimeout_github_sink_nrf52()
 {
-    return 32768UL * 60 * 60 * 2;
+    return 0; //Watchdog disabled by default, activate if desired
 }
 
-u32 GetWatchdogTimeoutSafeBoot_github_nrf52()
+u32 GetWatchdogTimeoutSafeBoot_github_sink_nrf52()
 {
-    return 32768UL * 20UL;
+    return 0; //Safe Boot Mode disabled by default, activate if desired
 }

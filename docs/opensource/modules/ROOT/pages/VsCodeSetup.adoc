@@ -28,7 +28,7 @@ You should then create the file `<fruitymesh>/.vscode/launch.json` with the cont
             "demangle": true,
             
             "device": "NRF52832_XXAA",
-            "executable": "./_build/vscode/github_nrf52.out", //Path to the built FruityMesh firmware
+            "executable": "./_build/vscode/github_dev_nrf52.out", //Path to the built FruityMesh firmware
             "armToolchainPath": "C:/<your_path>/gcc-arm-embedded-4.9-2015q3/bin/", //Path to the bin folder of your GCC ARM Embedded installation
             "serverpath": "C:/<your_path>/SEGGER/JLink_V622g/JLinkGDBServerCL.exe", //Path to the SEGGER Debug Server (Installed with the nrf tools)
             //"svdFile": "C:/<your_path>/fruitymesh/sdk/sdk15/modules/nrfx/mdk/nrf52840.svd" // Path to the Device Description file for viewing Peripheral Registers (Optional)
@@ -42,6 +42,8 @@ You can start debugging by clicking the play icon in the debug view as seen here
 image:vscode_debug.png[vscode debug]
 
 WARNING: When using the debugger, make sure to use the proper "Utility" target first for flashing as this will guarantee that the SoftDevice is also flashed.
+
+WARNING: If you enter the wrong executable, you will get very strange results during debugging and the wrong binary might be flashed.
 
 For more information on debugging, see https://wiki.segger.com/J-Link:Visual_Studio_Code[here].
 

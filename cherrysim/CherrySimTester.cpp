@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -308,12 +308,17 @@ void CherrySimTester::Start()
     started = true;
 }
 
-void CherrySimTester::SimulateUntilClusteringDone(int timeoutMs)
+void CherrySimTester::SimulateUntilClusteringDone(int timeoutMs, std::function<void()> executePerStep)
 {
     if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
     int startTimeMs = sim->simState.simTimeMs;
 
     while (!sim->IsClusteringDone()) {
+        if (executePerStep)
+        {
+            executePerStep();
+        }
+
         sim->SimulateStepForAllNodes();
 
         //Watch if a timeout occurs
@@ -415,13 +420,27 @@ void CherrySimTester::SimulateUntilMessageReceived(int timeoutMs, NodeId nodeId,
     SimulateUntilMessagesReceived(timeoutMs, messages);
 }
 
-void CherrySimTester::SimulateUntilMessagesReceived(int timeoutMs, std::vector<SimulationMessage>& messages)
+void CherrySimTester::SimulateUntilMessageReceivedWithCallback(int timeoutMs, NodeId nodeId, std::function<void()> executePerStep, const char* messagePart, ...)
+{
+    if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
+    char buffer[2048];
+    va_list aptr;
+    va_start(aptr, messagePart);
+    vsnprintf(buffer, 2048, messagePart, aptr);
+    va_end(aptr);
+    std::vector<SimulationMessage> messages;
+    messages.push_back(SimulationMessage(nodeId, buffer));
+
+    SimulateUntilMessagesReceived(timeoutMs, messages, executePerStep);
+}
+
+void CherrySimTester::SimulateUntilMessagesReceived(int timeoutMs, std::vector<SimulationMessage>& messages, std::function<void()> executePerStep)
 {
     if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
     useRegex = false;
     awaitedTerminalOutputs = &messages;
 
-    _SimulateUntilMessageReceived(timeoutMs);
+    _SimulateUntilMessageReceived(timeoutMs, executePerStep);
 }
 
 void CherrySimTester::SimulateUntilRegexMessageReceived(int timeoutMs, NodeId nodeId, const char * messagePart, ...)
@@ -446,13 +465,18 @@ void CherrySimTester::SimulateUntilRegexMessagesReceived(int timeoutMs, std::vec
     _SimulateUntilMessageReceived(timeoutMs);
 }
 
-void CherrySimTester::_SimulateUntilMessageReceived(int timeoutMs)
+void CherrySimTester::_SimulateUntilMessageReceived(int timeoutMs, std::function<void()> executePerStep)
 {
     if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
     int startTimeMs = sim->simState.simTimeMs;
     awaitedMessagesFound = false;
 
     while (!awaitedMessagesFound) {
+        if (executePerStep)
+        {
+            executePerStep();
+        }
+
         sim->SimulateStepForAllNodes();
 
         //Watch if a timeout occurs

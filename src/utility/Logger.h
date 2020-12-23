@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -71,7 +71,7 @@ enum class CustomErrorTypes : u8 {
     WARN_TX_WRONG_DATA = 11,
     WARN_RX_WRONG_DATA = 12,
     WARN_CLUSTER_UPDATE_FLOW_MISMATCH = 13,
-    WARN_HIGH_PRIO_QUEUE_FULL = 14,
+    WARN_VITAL_PRIO_QUEUE_FULL = 14,
     COUNT_NO_PENDING_CONNECTION = 15,
     FATAL_HANDLE_PACKET_SENT_ERROR = 16,
     COUNT_DROPPED_PACKETS = 17,
@@ -131,6 +131,17 @@ enum class CustomErrorTypes : u8 {
     FATAL_SIG_ELEMENT_CREATION_FAILED = 71,
     FATAL_SIG_STORAGE_ERROR = 72,
     COUNT_RECEIVED_INVALID_FRUITY_MESH_PACKET = 73,
+    FATAL_NEW_CHUNK_TOO_SMALL_FOR_MESSAGE = 74,
+    FATAL_NO_CHUNK_FOR_NEW_CONNECTION = 75,
+    COUNT_GENERATED_SPLIT_PACKETS = 76,
+    COUNT_RECEIVED_SPLIT_OVER_MESH_ACCESS = 77,
+    FATAL_ILLEGAL_PROCCESS_BUFFER_LENGTH = 78,
+    FATAL_QUEUE_ORIGINS_FULL = 79,
+    COUNT_TOTAL_RECEIVED_MESSAGES = 80, // total number of received messages by node (also includes the relay packets)
+    COUNT_RECEIVED_MESSAGES = 81, //number of received messages meant to be for that particular node
+    COUNT_UART_RX_ERROR = 82,
+    INFO_UNUSED_STACK_BYTES = 83,
+    FATAL_CONNECTION_REMOVED_WHILE_ENROLLED_NODES_SYNC = 84,
 };
 
 #ifdef _MSC_VER
@@ -205,8 +216,8 @@ public:
 
     void LogError(LoggingError errorType, u32 errorCode, u32 extraInfo);
     void LogCustomError(CustomErrorTypes customErrorType, u32 extraInfo);
-    void LogCount(LoggingError errorType, u32 errorCode);
-    void LogCustomCount(CustomErrorTypes customErrorType);
+    void LogCount(LoggingError errorType, u32 errorCode, u32 amount = 1);
+    void LogCustomCount(CustomErrorTypes customErrorType, u32 amount = 1);
 
     void UartError_f(UartErrorType type) const;
 
@@ -238,8 +249,10 @@ public:
 
     //Other printing functions
     void BlePrettyPrintAdvData(SizedData advData) const;
-    static void ConvertBufferToBase64String(const u8* srcBuffer, u32 srcLength, char* dstBuffer, u16 bufferLength);
-    static void ConvertBufferToHexString   (const u8* srcBuffer, u32 srcLength, char* dstBuffer, u16 bufferLength);
+    static void ConvertBufferToBase64String(const u8* srcBuffer, u32 srcLength,           char* dstBuffer, u16 bufferLength);
+    static void ConvertBufferToBase64String(const u8* srcBuffer, MessageLength srcLength, char* dstBuffer, u16 bufferLength);
+    static void ConvertBufferToHexString(const u8* srcBuffer, u32 srcLength,           char* dstBuffer, u16 bufferLength);
+    static void ConvertBufferToHexString(const u8* srcBuffer, MessageLength srcLength, char* dstBuffer, u16 bufferLength);
 public:
     static u32 ParseEncodedStringToBuffer(const char* encodedString, u8* dstBuffer, u16 dstBufferSize, bool *didError = nullptr);
 private:

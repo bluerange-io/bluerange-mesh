@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -510,7 +510,7 @@ TEST_F(TestRecordStorage, TestRandomMultiRecordUpdates) {
                 SizedData dataB = GS->recordStorage.GetRecordData(storedRecordId);
 
                 //Record not found fail
-                if (dataB.length == 0) {
+                if (dataB.length.IsZero()) {
                     FAIL() << "Record not found in iteration " << i; //LCOV_EXCL_LINE assertion
                 }
                 //Record wrong length fail
@@ -518,7 +518,7 @@ TEST_F(TestRecordStorage, TestRandomMultiRecordUpdates) {
                     FAIL() << "Record had wrong length in iteration " << i; //LCOV_EXCL_LINE assertion
                 }
                 //Record data not matching fail
-                u32 result = memcmp(bufferedData, dataB.data, dataB.length);
+                u32 result = memcmp(bufferedData, dataB.data, dataB.length.GetRaw());
                 if (result != 0) {
                     FAIL() << "Record data corrupt in iteration " << i; //LCOV_EXCL_LINE assertion
                 }

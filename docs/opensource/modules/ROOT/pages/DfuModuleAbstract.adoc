@@ -1,4 +1,4 @@
-= DFU Module (ID 4)
+= DFU Module (Abstract)
 
 NOTE: The _DfuModule_ with _ModuleId_ 4 is not open source at the moment, but can be used by our customers. Don't hesitate to contact M-Way Solutions GmbH.
 
@@ -11,6 +11,12 @@ Not only does the _DfuModule_ allow to replace FruityMesh, the SoftDevice and th
 In order to update FruityMesh, the _DfuModule_ works in conjunction with a proprietary bootloader. The mesh stays fully functional while an update is received and all services on the mesh can still run during update distribution. Once all nodes have received the update, it is installed by all nodes in less than a few seconds and the infrastructure reboots.
 
 When updating a 3rd party component, the update is distributed by the standard implementation to all relevant nodes. Afterwards, a custom update protocol needs to be implemented between the FruityMesh controller and the 3rd party controller.
+
+== DFU_CHUNK_DROPPED message
+If a node finds out that is has to drop a DFU chunk (e.g. because the flash is currently busy) it is allowed, but not enforced to send out a DFU_CHUNK_DROPPED message. This message is sent to the DFU sender to immediately inform him about the dropped chunk so that the sender is able to immediately put that chunk back into the queue of chunks to send.
+
+== Random sending of missing dfu chunks
+When a node receives the `DFUAllChunksTransmitted` message it replies with a list of up to `MAX_REPORTED_MISSING_CHUNKS` chunks that are missing on that node. Instead of iterating the list of all chunks from the start, each node iterates it at some random index inside the array of all chunks and checks for missing chunks starting with this random chunk. This procedure speeds up DFU because every node in the mesh is able to report different missing chunks with less clashes between nodes. This way the sender of the DFU (e.g. a Bluerange Gateway) is able to fill its chunk sending queue more efficiently.
 
 == Usage
 An implementation of the mesh update using the M-Way MeshGateway is provided to customer. A version that runs on mobile operating systems is available as well.

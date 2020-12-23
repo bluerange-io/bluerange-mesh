@@ -43,7 +43,9 @@
 //Includes a header file for the used featureset
 //This allows us to enable certain modules in the featureset directly
 #ifdef FEATURESET_NAME
+#ifndef SIM_ENABLED
 #include FEATURESET_NAME
+#endif
 #endif
 
 #ifndef SDK_CONFIG_H

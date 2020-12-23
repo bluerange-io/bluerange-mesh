@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -206,7 +206,7 @@ enum class RecordStorageResultCode : u8
     RECORD_STORAGE_LOCK_DOWN = 4, //The best action for a module that receives this is to discard the write access completely.
     INTERNAL_ERROR           = 5, //Not used by the RecordStorage itself but can be used by users of the RecordStorage if they return this enum.
 
-    __END                    = 5, //When adding values to the enum, increment this
+    LAST_ENTRY               = 5, //When adding values to the enum, increment this
 };
 
 enum class RecordStoragePageState : u8

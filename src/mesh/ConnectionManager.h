@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -83,6 +83,9 @@ private:
     static constexpr u16 TIME_BETWEEN_TIME_SYNC_INTERVALS_DS = SEC_TO_DS(5);
     u16 timeSinceLastTimeSyncIntervalDs = 0;    //Let's not spam the connections with time syncs.
 
+    static constexpr u16 ENROLLED_NODES_SYNC_INTERVALS_DS = SEC_TO_DS(5);
+    u16 timeSinceLastEnrolledNodesSyncDs = 0;
+
     u32 uniqueConnectionIdCounter = 0; //Counts all created connections to assign "unique" ids
 
     BaseConnection* GetRawConnectionByUniqueId(u32 uniqueConnectionId) const;
@@ -121,6 +124,8 @@ public:
     MeshAccessConnections GetMeshAccessConnections(ConnectionDirection direction) const;
     BaseConnections GetConnectionsOfType(ConnectionType connectionType, ConnectionDirection direction) const;
 
+    u16 GetSmallestMtuOfAllConnections() const;
+
     i8 GetFreeConnectionSpot() const;
 
     bool HasFreeConnection(ConnectionDirection direction) const;
@@ -137,7 +142,7 @@ public:
     int ReestablishConnections() const;
 
     //Functions used for sending messages
-    void SendMeshMessage(u8* data, u16 dataLength, DeliveryPriority priority) const;
+    void SendMeshMessage(u8* data, u16 dataLength) const;
 
     //Send a message with a ConnPacketModule header by using a ModuleId
     ErrorTypeUnchecked SendModuleActionMessage(MessageType messageType, ModuleId moduleId, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool lookback) const;
@@ -146,7 +151,7 @@ public:
     //This method will check and moduleId parameter and will send a ConnPacketModule instead if the given id is not a VendorModuleId
     ErrorTypeUnchecked SendModuleActionMessage(MessageType messageType, VendorModuleId moduleId, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool lookback) const;
 
-    void BroadcastMeshPacket(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable) const;
+    void BroadcastMeshPacket(u8* data, u16 dataLength, bool reliable) const;
 
     void RouteMeshData(BaseConnection* connection, BaseConnectionSendData* sendData, u8 const * data) const;
     void BroadcastMeshData(const BaseConnection* ignoreConnection, BaseConnectionSendData* sendData, u8 const * data, RoutingDecision routingDecision) const;
@@ -155,7 +160,7 @@ public:
     bool IsReceiverOfNodeId(NodeId nodeId) const;
 
     //Can be used to do basic checks on packet to see if it is a valid FruityMesh packet
-    bool IsValidFruityMeshPacket(const u8* data, u16 dataLength) const;
+    bool IsValidFruityMeshPacket(const u8* data, MessageLength dataLength) const;
 
     static u32 MessageTypeToMinimumPacketSize(MessageType messageType);
 
@@ -165,7 +170,7 @@ public:
 
     //Internal use only, do not use
     //Can send packets as WRITE_REQ (required for some internal functionality) but can lead to problems with the SoftDevice
-    ErrorType SendMeshMessageInternal(u8* data, u16 dataLength, DeliveryPriority priority, bool reliable, bool loopback, bool toMeshAccess) const;
+    ErrorType SendMeshMessageInternal(u8* data, u16 dataLength, bool reliable, bool loopback, bool toMeshAccess) const;
 
 
     BaseConnectionHandle GetConnectionFromHandle(u16 connectionHandle) const;
@@ -219,6 +224,8 @@ public:
     void TimeSyncInitialReplyReceivedHandler(const TimeSyncInitialReply& reply);
     void TimeSyncCorrectionReplyReceivedHandler(const TimeSyncCorrectionReply& reply);
 
+    void SetEnrolledNodesReceived(NodeId sender);
+    void SetEnrolledNodesReplyReceived(NodeId sender, u16 enrolledNodes);
 
     u32 GenerateUniqueConnectionId();
 };

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -163,12 +163,12 @@ ConnectionState BaseConnectionHandle::GetConnectionState()
     }
 }
 
-bool BaseConnectionHandle::SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable)
+bool BaseConnectionHandle::SendData(u8 const * data, MessageLength dataLength, bool reliable)
 {
     BaseConnection* con = GetConnection();
     if (con)
     {
-        return con->SendData(data, dataLength, priority, reliable);
+        return con->SendData(data, dataLength, reliable);
     }
     else
     {
@@ -255,18 +255,19 @@ u32 BaseConnectionHandle::GetUniqueConnectionId()
     return uniqueConnectionId;
 }
 
-PacketQueue* BaseConnectionHandle::GetPacketSendQueue()
+ChunkedPacketQueue* BaseConnectionHandle::GetQueueByPriority(DeliveryPriority prio)
 {
     BaseConnection* con = GetConnection();
     if (con)
     {
-        return &con->packetSendQueue;
+        return con->queue.GetQueueByPriority(prio);
     }
     else
     {
         DEFAULT_CONNECTION_HANDLE_ERROR_HANDLING();
         return nullptr;
     }
+    return nullptr;
 }
 
 MeshConnectionHandle::MeshConnectionHandle()
@@ -387,6 +388,36 @@ bool MeshConnectionHandle::HasConnectionMasterBit()
     if (con)
     {
         return con->HasConnectionMasterBit();
+    }
+    else
+    {
+        DEFAULT_CONNECTION_HANDLE_ERROR_HANDLING();
+        return false;
+    }
+}
+
+
+bool MeshConnectionHandle::GetEnrolledNodesSync()
+{
+    MeshConnection* con = GetConnection();
+    if (con)
+    {
+        return con->GetEnrolledNodesSync();
+    }
+    else
+    {
+        DEFAULT_CONNECTION_HANDLE_ERROR_HANDLING();
+        return false;
+    }
+}
+
+bool MeshConnectionHandle::SetEnrolledNodesSync(bool sync)
+{
+    MeshConnection* con = GetConnection();
+    if (con)
+    {
+        con->SetEnrolledNodesSync(sync);
+        return true;
     }
     else
     {

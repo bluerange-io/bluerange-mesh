@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -83,7 +83,7 @@ private:
     std::array<char, MAX_TERMINAL_OUTPUT> awaitedMessageResult = { '\0' };
     CherrySimTesterConfig config = {};
     SimConfiguration simConfig = {};
-    void _SimulateUntilMessageReceived(int timeoutMs);
+    void _SimulateUntilMessageReceived(int timeoutMs, std::function<void()> executePerStep = std::function<void()>());
     bool started = false;
 
 public:
@@ -104,15 +104,16 @@ public:
     void Start();
 
     //### Simulation methods
-    void SimulateUntilClusteringDone(int timeoutMs);
+    void SimulateUntilClusteringDone(int timeoutMs, std::function<void()> executePerStep = std::function<void()>());
     void SimulateUntilClusteringDoneWithDifferentNetworkIds(int timeoutMs);
 
     void SimulateUntilClusteringDoneWithExpectedNumberOfClusters(int timeoutMs, u32 clusters);
     void SimulateGivenNumberOfSteps(int steps);
     void SimulateForGivenTime(int numMilliseconds);
     void SimulateUntilMessageReceived(int timeoutMs, NodeId nodeId, const char* messagePart, ...);
+    void SimulateUntilMessageReceivedWithCallback(int timeoutMs, NodeId nodeId, std::function<void()> executePerStep, const char* messagePart, ...);
     //Simulates until all of the messages in the messages vector are received. N copies of the same message must be received N times.
-    void SimulateUntilMessagesReceived(int timeoutMs, std::vector<SimulationMessage>& messages);
+    void SimulateUntilMessagesReceived(int timeoutMs, std::vector<SimulationMessage>& messages, std::function<void()> executePerStep = std::function<void()>());
     void SimulateUntilRegexMessageReceived(int timeoutMs, NodeId nodeId, const char* messagePart, ...);
     void SimulateUntilRegexMessagesReceived(int timeoutMs, std::vector<SimulationMessage>& messages);
     void SimulateUntilBleEventReceived(int timeoutMs, NodeId nodeId, u16 eventId, const u8* eventDataPart, u16 eventDataPartLength);

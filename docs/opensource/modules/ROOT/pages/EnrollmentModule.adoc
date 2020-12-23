@@ -30,6 +30,9 @@ Preferred network enrollment is used for assets because we would like to set the
 === Nearby Enrollment
 It is possible to activate nearby enrollment by enabling `allowUnenrolledUnsecureConnections` through the featureset. A node can then be enrolled using a MeshAccessConnection with the known xref:Specification.adoc#EncryptionKeys[ZeroKey]. This can only be done if a node is unenrolled. This is useful if no QR code or other method is available to distribute the device key. The featureset has to provide some means of resetting the node to an unenrolled state, e.g. by pressing a button, resetting the power, etc,... This is necessary because the user might lose access to the Network Key and might be unable to remove the enrollment afterwards.
 
+== Factory Reset on Enrollment
+A node performs a factory reset on enrollment. This means that first the whole settings flash is erased, then the new enrollment is written, and then the node reboots to also erase the RAM. To make sure that the factory reset is as secure as possible, a special lock down mode was introduced to the flash storage. Once any module starts the factory reset, the flash storage switches to lock down, and thus no other module is allowed to send any command to the flash storage anymore until the node has rebooted. The node that performed the lock down however is still able to write to the flash. This way the enrollment module can still write the new enrollment data to the flash before executing the reboot.
+
 === Different Enrollment Scenarios
 
 ==== Unenrolled Node

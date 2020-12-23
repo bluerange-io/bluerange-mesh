@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -227,7 +227,7 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
 
     if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
         ConnPacketModule const * packet = (ConnPacketModule const *)packetHeader;
-        u16 dataFieldLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE;
+        MessageLength dataFieldLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE;
 
         //Check if our module is meant and we should trigger an action
         if(packet->moduleId == moduleId){

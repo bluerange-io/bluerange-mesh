@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -105,6 +105,7 @@ void Node::ResetToDefaultConfiguration()
     CheckedMemcpy(configuration.userBaseKey, RamConfig->defaultUserBaseKey, 16);
 
     CheckedMemcpy(&configuration.bleAddress, &RamConfig->staticAccessAddress, sizeof(FruityHal::BleGapAddr));
+    configuration.numberOfEnrolledDevices = 0;
 
     SET_FEATURESET_CONFIGURATION(&configuration, this);
 }
@@ -278,10 +279,11 @@ void Node::HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinn
     //This node was the winner of the handshake and successfully acquired a new member
     if(completedAsWinner){
         //Update node data
-        clusterSize += 1;
+        const ClusterSize cluster = GetClusterSize() + 1;
+        SetClusterSize(cluster);
         connection->hopsToSink = connection->clusterAck1Packet.payload.hopsToSink < 0 ? -1 : connection->clusterAck1Packet.payload.hopsToSink + 1;
 
-        logt("HANDSHAKE", "ClusterSize Change from %d to %d", clusterSize-1, clusterSize);
+        logt("HANDSHAKE", "ClusterSize Change from %d to %d", GetClusterSize()-1, GetClusterSize());
 
         //Update connection data
         connection->connectedClusterId = connection->clusterIDBackup;
@@ -310,14 +312,17 @@ void Node::HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinn
         connection->ClearCurrentClusterInfoUpdatePacket();
 
         clusterId = connection->clusterAck2Packet.payload.clusterId;
-        clusterSize = connection->clusterAck2Packet.payload.clusterSize; // The other node knows best
+        SetClusterSize(connection->clusterAck2Packet.payload.clusterSize); // The other node knows best
 
         connection->hopsToSink = connection->clusterAck2Packet.payload.hopsToSink < 0 ? -1 : connection->clusterAck2Packet.payload.hopsToSink + 1;
 
-        logt("HANDSHAKE", "ClusterSize set to %d", clusterSize);
+        // We want the bigger cluster to send it's information about enrolled nodes.
+        connection->enrolledNodesSynced = true;
+
+        logt("HANDSHAKE", "ClusterSize set to %d", GetClusterSize());
     }
 
-    logjson("CLUSTER", "{\"type\":\"cluster_handshake\",\"winner\":%u,\"size\":%d}" SEP, completedAsWinner, clusterSize);
+    logjson("CLUSTER", "{\"type\":\"cluster_handshake\",\"winner\":%u,\"size\":%d}" SEP, completedAsWinner, GetClusterSize());
 
     logjson("SIM", "{\"type\":\"mesh_connect\",\"partnerId\":%u}" SEP, connection->partnerId);
 
@@ -336,9 +341,6 @@ void Node::HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinn
             GS->activeModules[i]->MeshConnectionChangedHandler(*connection);
         }
     }
-
-    //Enable discovery or prolong its state
-    KeepHighDiscoveryActive();
 
     //Update our advertisement packet
     UpdateJoinMePacket();
@@ -451,7 +453,7 @@ void Node::MeshConnectionDisconnectedHandler(AppDisconnectReason appDisconnectRe
                 GS->cm.ForceDisconnectOtherMeshConnections(nullptr, AppDisconnectReason::PARTNER_HAS_MASTERBIT);
             }
 
-            clusterSize = 1;
+            SetClusterSize(1);
             clusterId = GenerateClusterID();
 
 
@@ -461,9 +463,11 @@ void Node::MeshConnectionDisconnectedHandler(AppDisconnectReason appDisconnectRe
         //CASE 2: If we have the master bit, we keep our ClusterId (happens if we are the biggest cluster)
         else
         {
-            logt("HANDSHAKE", "ClusterSize Change from %d to %d", this->clusterSize, this->clusterSize - connectedClusterSize);
+            logt("HANDSHAKE", "ClusterSize Change from %d to %d", GetClusterSize(), GetClusterSize() - connectedClusterSize);
 
-            this->clusterSize -= connectedClusterSize;
+            ClusterSize cluster = GetClusterSize();
+            cluster -= connectedClusterSize;
+            SetClusterSize(cluster);
 
             // Inform the rest of the cluster of our new size
             ConnPacketClusterInfoUpdate packet;
@@ -475,7 +479,7 @@ void Node::MeshConnectionDisconnectedHandler(AppDisconnectReason appDisconnectRe
 
         }
 
-        logjson("CLUSTER", "{\"type\":\"cluster_disconnect\",\"size\":%d}" SEP, clusterSize);
+        logjson("CLUSTER", "{\"type\":\"cluster_disconnect\",\"size\":%d}" SEP, GetClusterSize());
 
     }
     //Handshake had not yet finished, not much to do
@@ -483,9 +487,6 @@ void Node::MeshConnectionDisconnectedHandler(AppDisconnectReason appDisconnectRe
     {
 
     }
-
-    //Enable discovery or prolong its state
-    KeepHighDiscoveryActive();
 
     //To be sure we do not have a clusterId clash if we are disconnected, we generate one if we are a single node, shouldn't hurt
     //Note that the check has to be based on the amount of MeshConnections, clusterSize is not sufficient as some MeshConnection
@@ -502,10 +503,8 @@ void Node::MeshConnectionDisconnectedHandler(AppDisconnectReason appDisconnectRe
     HandOverMasterBitIfNecessary();
 
     //Revert to discovery high
+    // FIXME: is it needed?
     noNodesFoundCounter = 0;
-
-    disconnectTimestampDs = GS->appTimerDs;
-    //TODO: Under some conditions, broadcast a message to the mesh to activate HIGH discovery again
 }
 
 //Handles incoming cluster info update
@@ -533,7 +532,9 @@ void Node::ReceiveClusterInfoUpdate(MeshConnection* connection, ConnPacketCluste
 
     if(packet->payload.clusterSizeChange != 0){
         logt("HANDSHAKE", "ClusterSize Change from %d to %d", this->clusterSize, this->clusterSize + packet->payload.clusterSizeChange);
-        this->clusterSize += packet->payload.clusterSizeChange;
+        ClusterSize cluster = GetClusterSize();
+        cluster += packet->payload.clusterSizeChange;
+        SetClusterSize(cluster);
         connection->connectedClusterSize += packet->payload.clusterSizeChange;
     }
 
@@ -583,7 +584,7 @@ void Node::HandOverMasterBitIfNecessary()  const{
         MeshConnections conns = GS->cm.GetMeshConnections(ConnectionDirection::INVALID);
         for (u32 i = 0; i < conns.count; i++) {
             MeshConnectionHandle conn = conns.handles[i];
-            if (conn.IsHandshakeDone() && conn.GetConnectedClusterSize() > clusterSize - conn.GetConnectedClusterSize()) {
+            if (conn.IsHandshakeDone() && conn.GetConnectedClusterSize() > GetClusterSize() - conn.GetConnectedClusterSize()) {
                 conn.HandoverMasterBit();
             }
         }
@@ -694,7 +695,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
         {
             logjson_partial("MODULE", "{\"nodeId\":%u,\"type\":\"module_list\",\"modules\":[", packet->header.sender);
 
-            u16 moduleCount = (sendData->dataLength - SIZEOF_CONN_PACKET_MODULE) / sizeof(ModuleInformation);
+            u16 moduleCount = (sendData->dataLength - SIZEOF_CONN_PACKET_MODULE).GetRaw() / sizeof(ModuleInformation);
             for(int i = 0; i < moduleCount; i++)
             {
                 const ModuleInformation* info = (const ModuleInformation*)(packet->data + i * sizeof(ModuleInformation));
@@ -720,7 +721,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
                 u8 ds = packet->data[0];
 
                 if(ds == 0){
-                    ChangeState(DiscoveryState::OFF);
+                    ChangeState(DiscoveryState::IDLE);
                 } else {
                     ChangeState(DiscoveryState::HIGH);
                 }
@@ -777,7 +778,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
             else if (packet->actionType == (u8)NodeModuleTriggerActionMessages::GENERATE_LOAD_CHUNK) {
                 u8 const * payload = packet->data;
                 bool payloadCorrect = true;
-                const u8 payloadLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE;
+                const u8 payloadLength = sendData->dataLength.GetRaw() - SIZEOF_CONN_PACKET_MODULE;
                 for (u32 i = 0; i < payloadLength; i++)
                 {
                     if (payload[i] != generateLoadMagicNumber)
@@ -899,6 +900,45 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
                     false
                 );
             }
+            else if (packet->actionType == (u8)NodeModuleTriggerActionMessages::SET_ENROLLED_NODES)
+            {
+                const u16 enrolledNodes = (u16)(((SetEnrolledNodesMessage const *)&packet->data)->enrolledNodes);
+
+                SetEnrolledNodes(enrolledNodes, packet->header.sender);
+                if (GS->node.configuration.numberOfEnrolledDevices == 0)
+                {
+                    ChangeState(DiscoveryState::HIGH);
+                }
+                else if (GS->node.configuration.numberOfEnrolledDevices == GS->node.GetClusterSize())
+                {
+                    ChangeState(DiscoveryState::IDLE);
+                }
+                else if (GS->node.configuration.numberOfEnrolledDevices < GS->node.GetClusterSize())
+                {
+                    //If current cluster size is bigger than requested number of enrolled devices we want to wait a bit
+                    //and then check if current configuration is valid.
+                    clusterSizeChangeHandled = false;
+                    clusterSizeTransitionTimeoutDs = SEC_TO_DS((u32)Conf::GetInstance().clusterSizeDiscoveryChangeDelaySec);
+                }
+                else if (GS->node.configuration.numberOfEnrolledDevices > GS->node.GetClusterSize())
+                {
+                    //We want high discovery state when number of enrolled devices is higher then cluster size as
+                    //nodes are probably nearby and will soon join network
+                    ChangeState(DiscoveryState::HIGH);
+                }
+                
+                SetEnrolledNodesResponseMessage responseMessage;
+                responseMessage.enrolledNodes = GS->node.configuration.numberOfEnrolledDevices;
+                SendModuleActionMessage(
+                    MessageType::MODULE_ACTION_RESPONSE,
+                    packetHeader->sender,
+                    (u8)NodeModuleActionResponseMessages::SET_ENROLLED_NODES_RESULT,
+                    0,
+                    (u8*)(&responseMessage),
+                    sizeof(responseMessage),
+                    false
+                );
+            }
         }
     }
 
@@ -936,6 +976,12 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
             {
                 logjson("NODE", "{\"type\":\"set_preferred_connections_result\",\"nodeId\":%d,\"module\":%u}" SEP, packetHeader->sender, (u32)ModuleId::NODE);
             }
+            else if (packet->actionType == (u8)NodeModuleActionResponseMessages::SET_ENROLLED_NODES_RESULT)
+            {
+                const u16 enrolledNodes = (u16)(((SetEnrolledNodesResponseMessage const *)&packet->data)->enrolledNodes);
+                logjson("NODE", "{\"type\":\"set_enrolled_nodes\",\"nodeId\":%d,\"module\":%d,\"enrolled_nodes\":%u}" SEP, packetHeader->sender, (u32)ModuleId::NODE, enrolledNodes);
+                GS->cm.SetEnrolledNodesReplyReceived(packet->header.sender, enrolledNodes);
+            }
         }
     }
 
@@ -956,9 +1002,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 
             GS->cm.SendMeshMessage(
                 (u8*)&reply,
-                sizeof(TimeSyncInitialReply),
-                DeliveryPriority::LOW
-                );
+                sizeof(TimeSyncInitialReply));
         }
         if (packet->type == TimeSyncType::INITIAL_REPLY)
         {
@@ -981,9 +1025,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 
             GS->cm.SendMeshMessage(
                 (u8*)&reply,
-                sizeof(TimeSyncCorrectionReply),
-                DeliveryPriority::LOW
-                );
+                sizeof(TimeSyncCorrectionReply));
         }
         if (packet->type == TimeSyncType::CORRECTION_REPLY)
         {
@@ -1011,7 +1053,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
         RawDataActionType actionType = RawDataActionType::START;
 
         const u8* payloadPtr = nullptr;
-        u16 payloadLength = 0;
+        MessageLength payloadLength;
 
         if (!Utility::IsVendorModuleId(packet->moduleId)) {
             senderId = packet->connHeader.sender;
@@ -1173,7 +1215,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
         ModuleIdWrapper moduleId = INVALID_WRAPPED_MODULE_ID;
         RawDataProtocol protocolId = RawDataProtocol::UNSPECIFIED;
         const u8* payloadPtr = nullptr;
-        u16 payloadLength = 0;
+        MessageLength payloadLength;
         u8 requestHandle = 0;
 
         const RawDataLight* packet = (const RawDataLight*)packetHeader;
@@ -1318,7 +1360,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
             component = data->componentHeader.component;
             registerAddress = data->componentHeader.registerAddress;
 
-            u16 payloadLength = sendData->dataLength - sizeof(data->componentHeader);
+            MessageLength payloadLength = sendData->dataLength - sizeof(data->componentHeader);
             Logger::ConvertBufferToBase64String(data->payload, payloadLength, payloadString, sizeof(payloadString));
 
         }
@@ -1334,7 +1376,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
             component = data->componentHeader.component;
             registerAddress = data->componentHeader.registerAddress;
 
-            u16 payloadLength = sendData->dataLength - sizeof(data->componentHeader);
+            MessageLength payloadLength = sendData->dataLength - sizeof(data->componentHeader);
             Logger::ConvertBufferToBase64String(data->payload, payloadLength, payloadString, sizeof(payloadString));
         }
         else {
@@ -1367,7 +1409,7 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
         ConnPacketComponentMessage const* packet = (ConnPacketComponentMessage const*)packetHeader;
 
         char payload[50];
-        u8 payloadLength = sendData->dataLength - sizeof(packet->componentHeader);
+        MessageLength payloadLength = sendData->dataLength - sizeof(packet->componentHeader);
         Logger::ConvertBufferToHexString(packet->payload, payloadLength, payload, sizeof(payload));
         logt("NODE", "component_act payload = %s", payload);
     }
@@ -1379,6 +1421,25 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
     }
 #endif
 }
+
+DeliveryPriority Node::GetPriorityOfMessage(const u8* data, MessageLength size)
+{
+    if (size >= SIZEOF_CONN_PACKET_HEADER)
+    {
+        const ConnPacketHeader* header = (const ConnPacketHeader*)data;
+        if (header->messageType == MessageType::CLUSTER_WELCOME
+            || header->messageType == MessageType::CLUSTER_ACK_1
+            || header->messageType == MessageType::CLUSTER_ACK_2
+            || header->messageType == MessageType::UPDATE_CONNECTION_INTERVAL
+            || header->messageType == MessageType::CLUSTER_INFO_UPDATE
+            || header->messageType == MessageType::DATA_1_VITAL)
+        {
+            return DeliveryPriority::VITAL;
+        }
+    }
+    return DeliveryPriority::INVALID;
+}
+
 //Processes incoming CLUSTER_INFO_UPDATE packets
 /*
  #########################################################################################################
@@ -1565,12 +1626,12 @@ Node::DecisionStruct Node::DetermineBestClusterAvailable(void)
                 if (
                     //Check if we have either different clusterSizes or if similar, only disconnect randomly
                     //to prevent recurrent situations where two nodes will always disconnect at the same time
-                    clusterSize != bestClusterAsSlave->payload.clusterSize
+                    GetClusterSize() != bestClusterAsSlave->payload.clusterSize
                     || Utility::GetRandomInteger() < UINT32_MAX / 4
                 ) {
                     GS->cm.ForceDisconnectOtherMeshConnections(nullptr, AppDisconnectReason::SHOULD_WAIT_AS_SLAVE);
 
-                    clusterSize = 1;
+                    SetClusterSize(1);
                     clusterId = GenerateClusterID();
                 }
             }
@@ -1659,7 +1720,7 @@ u32 Node::CalculateClusterScoreAsMaster(const joinMeBufferPacket& packet) const
     if (packet.payload.ackField != 0 && packet.payload.ackField != this->clusterId) return 0;
 
     //If the other cluster is bigger, we cannot connect as master
-    if (packet.payload.clusterSize > this->clusterSize) return 0;
+    if (packet.payload.clusterSize > GetClusterSize()) return 0;
 
     //Check if we recently tried to connect to him and blacklist him for a short amount of time
     if (
@@ -1702,7 +1763,7 @@ u32 Node::CalculateClusterScoreAsSlave(const joinMeBufferPacket& packet) const
     //Do not check for freeOut == 0 as the partner will probably free up a conneciton for us and we should be ready
 
     //We will only be a slave of a bigger or equal cluster
-    if (packet.payload.clusterSize < this->clusterSize) return 0;
+    if (packet.payload.clusterSize < GetClusterSize()) return 0;
 
     //Connection should have a minimum of stability
     if(packet.rssi < STABLE_CONNECTION_RSSI_THRESHOLD) return 0;
@@ -1794,7 +1855,6 @@ joinMeBufferPacket* Node::FindTargetBuffer(const AdvPacketJoinMeV0* packet)
         if(targetBuffer->payload.sender == 0)
         {
             logt("DISCOVERY", "Used empty space");
-            KeepHighDiscoveryActive();
             return targetBuffer;
         }
     }
@@ -1851,8 +1911,18 @@ joinMeBufferPacket* Node::FindTargetBuffer(const AdvPacketJoinMeV0* packet)
 
 void Node::ChangeState(DiscoveryState newState)
 {
+    // Single node should always be in high discovery
+    if ((newState != DiscoveryState::HIGH) && (GS->node.GetClusterSize() < 2))
+    {
+        return;
+    }
+
     if (currentDiscoveryState == newState || stateMachineDisabled || GET_DEVICE_TYPE() == DeviceType::ASSET){
-        currentStateTimeoutDs = (currentDiscoveryState == newState) ? SEC_TO_DS((u32)Conf::GetInstance().highToLowDiscoveryTimeSec) : currentStateTimeoutDs;
+        if ((currentDiscoveryState == DiscoveryState::HIGH) && (SEC_TO_DS((u32)Conf::GetInstance().highDiscoveryTimeoutSec) != 0))
+        {
+            currentStateTimeoutDs = SEC_TO_DS((u32)Conf::GetInstance().highDiscoveryTimeoutSec);
+            nextDiscoveryState = DiscoveryState::LOW;
+        }
         return;
     }
 
@@ -1865,8 +1935,8 @@ void Node::ChangeState(DiscoveryState newState)
         //Reset no nodes found counter
         noNodesFoundCounter = 0;
 
-        currentStateTimeoutDs = SEC_TO_DS((u32)Conf::GetInstance().highToLowDiscoveryTimeSec);
-        nextDiscoveryState = Conf::GetInstance().highToLowDiscoveryTimeSec == 0 ? DiscoveryState::INVALID : DiscoveryState::LOW;
+        currentStateTimeoutDs = SEC_TO_DS((u32)Conf::GetInstance().highDiscoveryTimeoutSec);
+        nextDiscoveryState = Conf::GetInstance().highDiscoveryTimeoutSec == 0 ? DiscoveryState::INVALID : DiscoveryState::LOW;
 
         //Reconfigure the advertising and scanning jobs
         if (meshAdvJobHandle != nullptr){
@@ -1897,15 +1967,27 @@ void Node::ChangeState(DiscoveryState newState)
 
         p_scanJob = GS->scanController.AddJob(scanJob);
     }
+    else if (newState == DiscoveryState::IDLE)
+    {
+        logt("STATES", "-- DISCOVERY IDLE --");
+
+        nextDiscoveryState = DiscoveryState::INVALID;
+
+        if (meshAdvJobHandle != nullptr) {
+            meshAdvJobHandle->advertisingInterval = Conf::meshAdvertisingIntervalLow;
+            GS->advertisingController.RefreshJob(meshAdvJobHandle);
+        }
+
+        GS->scanController.RemoveJob(p_scanJob);
+        p_scanJob = nullptr;
+    }
     else if (newState == DiscoveryState::OFF)
     {
         logt("STATES", "-- DISCOVERY OFF --");
 
         nextDiscoveryState = DiscoveryState::INVALID;
 
-        meshAdvJobHandle->slots = 0;
-        GS->advertisingController.RefreshJob(meshAdvJobHandle);
-
+        GS->advertisingController.RemoveJob(meshAdvJobHandle);
         GS->scanController.RemoveJob(p_scanJob);
         p_scanJob = nullptr;
     }
@@ -1919,12 +2001,35 @@ void Node::DisableStateMachine(bool disable)
 void Node::TimerEventHandler(u16 passedTimeDs)
 {
     currentStateTimeoutDs -= passedTimeDs;
+    clusterSizeTransitionTimeoutDs -= passedTimeDs;
 
     //Check if we should switch states because of timeouts
     if (nextDiscoveryState != DiscoveryState::INVALID && currentStateTimeoutDs <= 0)
     {
         //Go to the next state
         ChangeState(nextDiscoveryState);
+    }
+
+    //Check if new cluster size should trigger discovery change
+    if (!clusterSizeChangeHandled && clusterSizeTransitionTimeoutDs <= 0)
+    {
+        clusterSizeChangeHandled = true;
+        if (clusterSize == GS->node.configuration.numberOfEnrolledDevices)
+        {
+            ChangeState(DiscoveryState::IDLE);
+        }
+        else if ((GS->node.configuration.numberOfEnrolledDevices != 0) && (clusterSize > GS->node.configuration.numberOfEnrolledDevices))
+        {
+            //If clustersize is bigger than number of enrolled devices there is some kind of misconfiguration. We should remove info about 
+            //enrolled devices as it is invalid.
+            SetEnrolledNodes(0, GS->node.configuration.nodeId);
+            //We also need to exit discovery OFF state.
+            ChangeState(DiscoveryState::LOW);
+        }
+        else if (clusterSize < GS->node.configuration.numberOfEnrolledDevices || GS->node.configuration.numberOfEnrolledDevices <= 1)
+        {
+            ChangeState(DiscoveryState::HIGH);
+        }
     }
 
     if (DoesBiggerKnownClusterExist())
@@ -2011,7 +2116,7 @@ void Node::TimerEventHandler(u16 passedTimeDs)
         }
     }
 
-    if((disconnectTimestampDs !=0 && GS->appTimerDs >= disconnectTimestampDs + SEC_TO_DS(TIME_BEFORE_DISCOVERY_MESSAGE_SENT_SEC))&& Conf::GetInstance().highToLowDiscoveryTimeSec != 0){
+    if((disconnectTimestampDs !=0 && GS->appTimerDs >= disconnectTimestampDs + SEC_TO_DS(TIME_BEFORE_DISCOVERY_MESSAGE_SENT_SEC))&& Conf::GetInstance().highDiscoveryTimeoutSec != 0){
         logt("NODE","High Discovery message being sent after disconnect");
         //Message is broadcasted when connnection is lost to change the state to High Discovery
             u8 discoveryState = (u8)DiscoveryState::HIGH;
@@ -2076,9 +2181,7 @@ void Node::TimerEventHandler(u16 passedTimeDs)
                 message.amountOfCapabilities = capabilityRetrieverGlobal;
                 GS->cm.SendMeshMessage(
                     (u8*)&message,
-                    sizeof(CapabilityEndMessage),
-                    DeliveryPriority::LOW
-                );
+                    sizeof(CapabilityEndMessage));
             }
             else if (messageEntry.entry.type == CapabilityEntryType::NOT_READY)
             {
@@ -2090,9 +2193,7 @@ void Node::TimerEventHandler(u16 passedTimeDs)
             {
                 GS->cm.SendMeshMessage(
                     (u8*)&messageEntry,
-                    sizeof(CapabilityEntryMessage),
-                    DeliveryPriority::LOW
-                );
+                    sizeof(CapabilityEntryMessage));
             }
         }
     }
@@ -2131,11 +2232,11 @@ void Node::TimerEventHandler(u16 passedTimeDs)
 void Node::KeepHighDiscoveryActive()
 {
     //If discovery is turned off, we should not turn it on
-    if (currentDiscoveryState == DiscoveryState::OFF) return;
+    if (currentDiscoveryState == DiscoveryState::IDLE) return;
 
     //Reset the state in discovery high, if anything in the cluster configuration changed
     if(currentDiscoveryState == DiscoveryState::HIGH){
-        currentStateTimeoutDs = SEC_TO_DS(Conf::GetInstance().highToLowDiscoveryTimeSec);
+        currentStateTimeoutDs = SEC_TO_DS(Conf::GetInstance().highDiscoveryTimeoutSec);
     } else {
         ChangeState(DiscoveryState::HIGH);
     }
@@ -2156,6 +2257,47 @@ ClusterId Node::GenerateClusterID(void) const
 
     logt("NODE", "New cluster id generated %x", newId);
     return newId;
+}
+
+ClusterSize Node::GetClusterSize(void) const
+{
+    return this->clusterSize;
+}
+
+void Node::SetClusterSize(ClusterSize clusterSize)
+{
+    if (clusterSize < GS->node.configuration.numberOfEnrolledDevices || GS->node.configuration.numberOfEnrolledDevices <= 1)
+    {
+        ChangeState(DiscoveryState::HIGH);
+    }
+    else
+    {
+        clusterSizeChangeHandled = false;
+        clusterSizeTransitionTimeoutDs = SEC_TO_DS((u32)Conf::GetInstance().clusterSizeDiscoveryChangeDelaySec);
+    }
+    this->clusterSize = clusterSize;
+}
+
+void Node::SetEnrolledNodes(u16 enrolledNodes, NodeId sender)
+{
+    if (enrolledNodes == GS->node.configuration.numberOfEnrolledDevices) return;
+    GS->node.configuration.numberOfEnrolledDevices = enrolledNodes;
+    GS->cm.SetEnrolledNodesReceived(sender);
+}
+
+void Node::SendEnrolledNodes(u16 enrolledNodes, NodeId destinationNode)
+{
+    SetEnrolledNodesMessage message;
+    message.enrolledNodes = enrolledNodes;
+    SendModuleActionMessage(
+        MessageType::MODULE_TRIGGER_ACTION,
+        destinationNode,
+        (u8)NodeModuleTriggerActionMessages::SET_ENROLLED_NODES,
+        0,
+        (u8*)(&message),
+        sizeof(message),
+        false
+    );
 }
 
 bool Node::GetKey(FmKeyId fmKeyId, u8* keyOut) const
@@ -2243,7 +2385,7 @@ void Node::SetTerminalTitle() const
     if(Conf::GetInstance().terminalMode == TerminalMode::PROMPT) trace("\033]0;Node %u (%s) ClusterSize:%d (%x), [%u, %u, %u, %u]\007",
             configuration.nodeId,
             RamConfig->serialNumber,
-            clusterSize, clusterId,
+            GS->node.GetClusterSize(), clusterId,
             GS->cm->allConnections[0] != nullptr ? GS->cm.allConnections[0]->partnerId : 0,
             GS->cm->allConnections[1] != nullptr ? GS->cm.allConnections[1]->partnerId : 0,
             GS->cm->allConnections[2] != nullptr ? GS->cm.allConnections[2]->partnerId : 0,
@@ -2260,7 +2402,26 @@ CapabilityEntry Node::GetCapability(u32 index, bool firstCall)
         retVal.type = CapabilityEntryType::SOFTWARE;
         strcpy(retVal.manufacturer, "M-Way Solutions GmbH");
         strcpy(retVal.modelName   , "BlueRange Node");
-        snprintf(retVal.revision, sizeof(retVal.revision), "%d.%d.%d", FM_VERSION_MAJOR, FM_VERSION_MINOR, FM_VERSION_PATCH);
+        Utility::GetVersionStringFromInt(GS->config.GetFruityMeshVersion(), retVal.revision);
+        return retVal;
+    }
+    else if (index == 1)
+    {
+        size_t nameLength = strlen(FEATURESET_NAME);
+        if (FEATURESET_NAME[nameLength - 1] == 'h' && FEATURESET_NAME[nameLength - 2] == '.')
+        {
+            // On real hardware, the macro FEATURESET_NAME contains .h at the end.
+            // We do not want to transmit that as it does not add any information.
+            nameLength -= 2;
+        }
+        const size_t lengthToCopy = nameLength <= sizeof(CapabilityEntry::revision) ? nameLength : sizeof(CapabilityEntry::revision);
+
+        CapabilityEntry retVal;
+        CheckedMemset(&retVal, 0, sizeof(retVal));
+        retVal.type = CapabilityEntryType::SOFTWARE;
+        strcpy(retVal.manufacturer, "M-Way Solutions GmbH");
+        strcpy(retVal.modelName,    "Featureset");
+        CheckedMemcpy(retVal.revision, FEATURESET_NAME, lengthToCopy);
         return retVal;
     }
     else
@@ -2348,7 +2509,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
             if(commandArgsSize >= 5 && TERMARGS(3 ,"discovery"))
             {
-                u8 discoveryState = (TERMARGS(4 , "off")) ? 0 : 1;
+                u8 discoveryState = (TERMARGS(4 , "idle")) ? 0 : 1;
 
                 SendModuleActionMessage(
                     MessageType::MODULE_TRIGGER_ACTION,
@@ -2471,6 +2632,27 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
                 return TerminalCommandHandlerReturnType::SUCCESS;
             }
+            
+            if(commandArgsSize >= 5 && TERMARGS(3 ,"set_enrolled_nodes"))
+            {
+                bool didError = false;
+                const u16 enrolledNodes = Utility::StringToU32(commandArgs[4], &didError);
+                if ((enrolledNodes > 2000) || didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+
+                SetEnrolledNodesMessage message;
+                message.enrolledNodes = enrolledNodes;
+                SendModuleActionMessage(
+                    MessageType::MODULE_TRIGGER_ACTION,
+                    destinationNode,
+                    (u8)NodeModuleTriggerActionMessages::SET_ENROLLED_NODES,
+                    0,
+                    (u8*)(&message),
+                    sizeof(message),
+                    false
+                );
+
+                return TerminalCommandHandlerReturnType::SUCCESS;
+            }
         }
     }
 
@@ -2498,7 +2680,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
         //TODO: We could optionally allow to specify delivery priority and reliability
 
-        GS->cm.SendMeshMessage(buffer, len, DeliveryPriority::LOW);
+        GS->cm.SendMeshMessage(buffer, len);
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
@@ -2522,7 +2704,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
             }
             else if (conn->connectionType == ConnectionType::MESH_ACCESS) {
                 MeshAccessConnection* mconn = (MeshAccessConnection*)conn;
-                mconn->SendData(buffer, len, DeliveryPriority::MESH_INTERNAL_HIGH, true);
+                mconn->SendData(buffer, len, true);
             }
         }
 
@@ -2780,9 +2962,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
         GS->cm.SendMeshMessage(
             (u8*)&message,
-            sizeof(CapabilityRequestedMessage),
-            DeliveryPriority::LOW
-        );
+            sizeof(CapabilityRequestedMessage));
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
     //Set a timestamp for this node
@@ -2888,7 +3068,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
             _packet[i+5] = i+1;
         }
         
-        ErrorType err = GS->cm.SendMeshMessageInternal(_packet, dataLength, DeliveryPriority::LOW, reliable, true, true);
+        ErrorType err = GS->cm.SendMeshMessageInternal(_packet, dataLength, reliable, true, true);
         if (err == ErrorType::SUCCESS) return TerminalCommandHandlerReturnType::SUCCESS;
         else return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
     }
@@ -2955,7 +3135,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         packet.header.receiver = nodeId;
 
         packet.newInterval = newConnectionInterval;
-        ErrorType err = GS->cm.SendMeshMessageInternal((u8*)&packet, SIZEOF_CONN_PACKET_UPDATE_CONNECTION_INTERVAL, DeliveryPriority::MESH_INTERNAL_HIGH, true, true, true);
+        ErrorType err = GS->cm.SendMeshMessageInternal((u8*)&packet, SIZEOF_CONN_PACKET_UPDATE_CONNECTION_INTERVAL, true, true, true);
         if (err == ErrorType::SUCCESS) return TerminalCommandHandlerReturnType::SUCCESS;
         else return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
     }
@@ -2984,7 +3164,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         packet.requestHandle = 0;
         packet.actionType = (u8)Module::ModuleConfigMessages::GET_MODULE_LIST;
 
-        GS->cm.SendMeshMessage((u8*) &packet, SIZEOF_CONN_PACKET_MODULE, DeliveryPriority::LOW);
+        GS->cm.SendMeshMessage((u8*) &packet, SIZEOF_CONN_PACKET_MODULE);
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
@@ -3052,8 +3232,7 @@ ErrorTypeUnchecked Node::SendComponentMessageFromTerminal(MessageType componentM
 
     GS->cm.SendMeshMessage(
         buffer,
-        totalLength,
-        DeliveryPriority::LOW);
+        totalLength);
 
     return ErrorTypeUnchecked::SUCCESS;
 }

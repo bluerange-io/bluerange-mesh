@@ -1,6 +1,8 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
 = Implementing a Custom Module
 
+WARNING: Judging from past experiences, the code snippets in this tutorial tend to outdate quite quickly. We always try to keep it up to date, however if something slips through that is not working anymore as described, please have a look at the reference implementation in `fruitymesh/src/examples/PingModule.cpp/.h`. We would also be very thankful if you open an issue on Github about your findings.
+
 This tutorial guides you through the process of creating a new FruityMesh module. You'll implement a PingModule that allows you to ping a node and get its response. You'd normally implement ping functionality into the Node, StatusReporter or DebugModule, which is where it belongs, but the use-case acts as a good and easy example for building your own module. You can find the finished files in the folder `src/examples` or you can just follow the tutorial.
 
 == What Is A Module?
@@ -23,13 +25,17 @@ For a full list, check the `Module.h` file.
 
 The following guide outlines the steps to implement a simple module that can ping another node over the network and parse the response.
 
+=== Step 0
+
+Move the already existing PingModule implementation out of the FruityMesh repository. It is located in `fruitymesh/src/examples/PingModule.cpp/.h`. This guide will show you how you can reimplement this module. You might not want to remove it, so you can always compare your solution to the already existing one.
+
 === Step 1
 
 First, copy and rename the `VendorTemplateModule.cpp` and `VendorTemplateModule.h` file from  the `src/examples` directory into `src/modules/PingModule.cpp` and  `src/modules/PingModule.h`. You need to refactor the method names and some other variables. Use the search function and look for the string `template` everywhere in these two files and rename everything (e.g. "VendorTemplateModule", "VENDOR_TEMPLATE_MODULE", ....) accordingly to "PingModule" or "PING_MODULE" while keeping the lower and upper case writing.
 
 === Step 2
 
-Activate your module by instantiating it in the featureset `config/featuresets/github_nrf52.cpp` where all the other modules are instantiated. You might need to increase the MAX_MODULE_COUNT in `src/base/GlobalState.h` if the compiler complains. Your PingModule constructor needs a VendorModuleId for instantiation. All core moduleIds are specified in types.h (enum ModuleId) but you need to use a VendorModuleId. You should have created a constant with the name `PING_MODULE_ID` while renaming everything. You can use `GET_VENDOR_MODULE_ID(0xABCD, 2)` to assign a VendorModuleId. You can also replace 0xABCD with your https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers/[company identifier] if you already have one.
+Activate your module by instantiating it in the featureset `config/featuresets/github_dev_nrf52.cpp` where all the other modules are instantiated. You might need to increase the MAX_MODULE_COUNT in `src/base/GlobalState.h` if the compiler complains. Your PingModule constructor needs a VendorModuleId for instantiation. All core moduleIds are specified in FmTypes.h (enum ModuleId) but you need to use a VendorModuleId. You should have created a constant with the name `PING_MODULE_ID` while renaming everything. You can use `GET_VENDOR_MODULE_ID(0xABCD, 2)` to assign a VendorModuleId. You can also replace 0xABCD with your https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers/[company identifier] if you already have one.
 
 The initialization inside the featureset may look like this:
 
@@ -60,7 +66,7 @@ In the TerminalCommandHandler, add the following lines to the beginning of the f
 ----
 if(TERMARGS(0, "pingmod")){
     //Get the id of the target node
-    NodeId targetNodeId = Utility::StringToU16(commandArgs[0]);
+    NodeId targetNodeId = Utility::StringToU16(commandArgs[1]);
     logt("PINGMOD", "Trying to ping node %u", targetNodeId);
 
     //TODO: Send ping packet to that node
@@ -94,7 +100,7 @@ Next, add the code that is responsible for sending this packet to the other node
 ----
 if(TERMARGS(0, "pingmod")){
     //Get the id of the target node
-    NodeId targetNodeId = Utility::StringToU16(commandArgs[0]);
+    NodeId targetNodeId = Utility::StringToU16(commandArgs[1]);
     logt("PINGMOD", "Trying to ping node %u", targetNodeId);
 
     //Some data
@@ -126,14 +132,14 @@ Next, you will check if the packet arrived at its destination. Implement the Mes
 
 [source,C++]
 ----
-void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader* packetHeader)
+void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader)
 {
     //Must call superclass for handling
     Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
     //Filter trigger_action messages
     if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION && sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE_VENDOR){
-        connPacketModuleVendor* packet = (connPacketModuleVendor*)packetHeader;
+        ConnPacketModuleVendor const * packet = (ConnPacketModuleVendor const *)packetHeader;
 
         //Check if our module is meant and we should trigger an action
         if(packet->moduleId == vendorModuleId){
@@ -179,14 +185,14 @@ Then, go back to your .cpp file and insert this updated code:
 
 [source,C++]
 ----
-void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, connPacketHeader const * packetHeader)
+void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader)
 {
     //Must call superclass for handling
     Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
     //Filter trigger_action messages
     if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
-        connPacketModuleVendor const * packet = (connPacketModuleVendor const *)packetHeader;
+        ConnPacketModuleVendor const * packet = (ConnPacketModuleVendor const *)packetHeader;
 
         //Check if our module is meant and we should trigger an action
         if(packet->moduleId == vendorModuleId && sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE_VENDOR){
@@ -217,7 +223,7 @@ void PingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConn
     //Parse Module action_response messages
     if(packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE && sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE_VENDOR){
 
-        connPacketModuleVendor const * packet = (connPacketModuleVendor const *)packetHeader;
+        ConnPacketModuleVendor const * packet = (ConnPacketModuleVendor const *)packetHeader;
 
         //Check if our module is meant and we should trigger an action
         if(packet->moduleId == vendorModuleId)

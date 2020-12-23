@@ -1,5 +1,4 @@
 ifdef::env-github,env-browser[:relfileprefix: pages/]
-:relfileprefix: pages/
 
 ifdef::commercial[]
 * xref:bluerange-firmware:ROOT:index.adoc[Home]
@@ -15,7 +14,7 @@ endif::[]
 * xref:fruitymesh::Features.adoc[Features]
 * xref:fruitymesh::Specification.adoc[Specification]
 
-* Developers
+* xref:fruitymesh::Developers.adoc[Developers]
 ** xref:fruitymesh::Developers.adoc[Developer Overview]
 ** xref:fruitymesh::Class-Structure.adoc[Class Structure]
 ** xref:fruitymesh::Debugging.adoc[Debugging]
@@ -23,12 +22,13 @@ endif::[]
 ** xref:fruitymesh::BuildingWithCMake.adoc[Building with CMake]
 ** xref:fruitymesh::VsCodeSetup.adoc[VsCode Setup]
 ** xref:fruitymesh::CppCheck.adoc[CppCheck Setup]
+** xref:fruitymesh::MemoryManagement.adoc[Memory Management]
 
-* Mesh
+* xref:fruitymesh::Node.adoc[Mesh]
 ** xref:fruitymesh::Node.adoc[Node]
 ** xref:fruitymesh::Connections.adoc[Connections]
 
-* Core Functionality
+* xref:fruitymesh::AdvertisingController.adoc[Core Functionality]
 ** xref:fruitymesh::AdvertisingController.adoc[AdvertisingController]
 ** xref:fruitymesh::BoardConfig.adoc[Board Configuration]
 ** xref:fruitymesh::FruityHal.adoc[FruityHal]
@@ -39,11 +39,11 @@ endif::[]
 ** xref:fruitymesh::SensorsAndActuators.adoc[Sensors and Actuators]
 ** xref:fruitymesh::Terminal.adoc[Terminal]
 
-* Modules
+* xref:fruitymesh::Modules.adoc[Modules]
 ** xref:fruitymesh::Modules.adoc[Module Overview]
-** xref:fruitymesh::AdvertisingModule.adoc[AdvertisingModule]
+** xref:fruitymesh::BeaconingModule.adoc[BeaconingModule]
 ** xref:fruitymesh::DebugModule.adoc[DebugModule]
-** xref:fruitymesh::DfuModule.adoc[DfuModule]
+** xref:fruitymesh::DfuModule.adoc[DfuModule (Abstract)]
 ** xref:fruitymesh::EnrollmentModule.adoc[EnrollmentModule]
 ** xref:fruitymesh::IoModule.adoc[IoModule]
 ** xref:fruitymesh::MeshAccessModule.adoc[MeshAccessModule]
@@ -51,17 +51,18 @@ endif::[]
 ** xref:fruitymesh::ScanningModule.adoc[ScanningModule]
 ** xref:fruitymesh::StatusReporterModule.adoc[StatusReportModule]
 
-* Simulator
+* xref:fruitymesh::CherrySim.adoc[Simulator]
 ** xref:fruitymesh::CherrySim.adoc[CherrySim]
 
-* Measurements
+* xref:fruitymesh::Battery-Consumption.adoc[Measurements]
 ** xref:fruitymesh::Battery-Consumption.adoc[Battery Consumption]
 ** xref:fruitymesh::Throughput.adoc[Throughput]
 
-* The Fruitymesh Algorithm
+* xref:fruitymesh::The-FruityMesh-Algorithm.adoc[The Fruitymesh Algorithm]
 ** xref:fruitymesh::The-FruityMesh-Algorithm.adoc[The Fruitymesh Algorithm Basics]
 ** xref:fruitymesh::The-Algorithm-in-Detail.adoc[The Algorithm in Detail]
+** xref:fruitymesh::ImplementationDetails.adoc[Implementation Details]
 
-* Tutorials
+* xref:fruitymesh::Tutorials.adoc[Tutorials]
 ** xref:fruitymesh::Tutorials.adoc[Tutorial Overview]
 ** xref:fruitymesh::Implementing-a-Custom-Module.adoc[Implementing a Custom Module]

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -150,7 +150,7 @@ void TimeManager::ProcessTicks()
     additionalTicks -= seconds * ticksPerSecond;
 }
 
-void TimeManager::HandleUpdateTimestampMessages(ConnPacketHeader const * packetHeader, u16 dataLength)
+void TimeManager::HandleUpdateTimestampMessages(ConnPacketHeader const * packetHeader, MessageLength dataLength)
 {
     if (packetHeader->messageType == MessageType::UPDATE_TIMESTAMP)
     {

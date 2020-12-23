@@ -90,8 +90,10 @@ The cleartext of the ENCRYPT_CUSTOM_SNONCE packet might look like this:
 |0x0002|Sent to nodeId 2
 |0x64B8D3FC|First part of the randomly generated SNonce
 |0x19E80FAD|Second part of the SNonce
-|0x000000|Padded with zeros to have a block of 16 bytes
+|0x000000|Padded with zeros (only for AES-128 encryption)
 |===
+
+TIP: The zero padding is only used for encrypting the message, it should not increase the length of the message and only the message, without added padding, should be sent after the message was encrypted. This is the same for other messages, not just handshake messages.
 
 The Central has already calculated the encryption key from the ANonce as described above, it can now also generate the Session Key for decrypting packets by using the generated SNonce. Using the same procedure as above, it has to first construct the cleartext and then encrypt this cleartext by using the Long Term Key.
 
@@ -103,7 +105,7 @@ The Central has already calculated the encryption key from the ANonce as describ
 |0x0001|Node Id of the Central is 1
 |0x64B8D3FC|First part of the randomly generated SNonce
 |0x19E80FAD|Second part of the SNonce
-|0x000000000000|Padded with zeros
+|0x000000000000|Padded with zeros (only for AES-128 encryption)
 |===
 
 After encrypting this, it will have derived the Session Key for decrypting messages from the Peripheral which is `A4:13:1A:68:D2:64:B6:55:90:6E:87:AD:5F:BF:F0:A0` in this example.

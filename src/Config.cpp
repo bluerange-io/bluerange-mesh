@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -105,7 +105,7 @@ void Conf::Initialize(bool safeBootEnabled)
             && newConfig->moduleVersion == configuration.moduleVersion
             && newConfig->moduleId == configuration.moduleId
         ){
-            CheckedMemcpy((ModuleConfiguration*)&configuration, configData.data, configData.length);
+            CheckedMemcpy((ModuleConfiguration*)&configuration, configData.data, configData.length.GetRaw());
 
             logt("CONFIG", "Config loaded from flash");
         }
@@ -145,16 +145,19 @@ void Conf::LoadDefaults(){
     meshScanIntervalLow = (u16)MSEC_TO_UNITS(250, CONFIG_UNIT_0_625_MS);
     meshScanWindowLow = (u16)MSEC_TO_UNITS(3, CONFIG_UNIT_0_625_MS);
 
+    highDiscoveryTimeoutSec = 0;
+
     //Set defaults for stuff that is loaded from UICR in case that no UICR data is present
+    //This is just for testing, production nodes should always use UICR data
+    //For more info, check the UICR section in the Specification chapter of our online documentation
     manufacturerId = MANUFACTURER_ID;
-    Conf::GenerateRandomSerialAndNodeId();
-    CheckedMemset(configuration.nodeKey, 0x11, 16);
-    defaultNetworkId = 0;
-    CheckedMemset(defaultNetworkKey, 0xFF, 16);
-    CheckedMemset(defaultUserBaseKey, 0xFF, 16);
-    CheckedMemset(&staticAccessAddress.addr, 0xFF, 6);
+    Conf::GenerateRandomSerialAndNodeId(); //Generates a random serial number depending on the unique chipId for testing
+    CheckedMemset(configuration.nodeKey, 0x11, 16); //NodeKey is set to a default of 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11
+    defaultNetworkId = 0; //A node is unenrolled by default
+    CheckedMemset(defaultNetworkKey, 0xFF, 16); //NetworkKey is set to a default of FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF
+    CheckedMemset(defaultUserBaseKey, 0xFF, 16); //UserBaseKey is set to a default of FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF
+    CheckedMemset(&staticAccessAddress.addr, 0xFF, 6); //The BLE Address is empty by default, so each chip uses its preprogrammed address
     staticAccessAddress.addr_type = FruityHal::BleGapAddrType::INVALID;
-    highToLowDiscoveryTimeSec = 0;
 }
 
 void Conf::LoadDeviceConfiguration(){
@@ -187,7 +190,7 @@ void Conf::LoadDeviceConfiguration(){
             serialNumberIndex = Utility::GetIndexForSerial(serialNumber);
         }
 
-        //If no network key is present in UICR but a node key is present, use the node key for both (to migrate settings for old nodes)
+        // If no network key is present in UICR but a node key is present, use the node key for both (to migrate settings for old nodes)
         if(IsEmpty((u8*)config.networkKey, 16) && !IsEmpty(configuration.nodeKey, 16)){
             CheckedMemcpy(defaultNetworkKey, configuration.nodeKey, 16);
         } else {
@@ -244,7 +247,7 @@ void Conf::LoadSettingsFromFlash(Module* module, u16 recordId, u8* configuration
                 && vendorModuleConfig->moduleId == ((VendorModuleConfiguration*)configurationPointer)->moduleId
             )
         ){
-            CheckedMemcpy(configurationPointer, configData.data, configData.length);
+            CheckedMemcpy(configurationPointer, configData.data, configData.length.GetRaw());
 
             logt("CONFIG", "Config for module %s loaded from record %u", Utility::GetModuleIdString(module->vendorModuleId).data(), recordId);
 
@@ -257,7 +260,7 @@ void Conf::LoadSettingsFromFlash(Module* module, u16 recordId, u8* configuration
         ){
             logt("CONFIG", "Flash config for module %s has mismatching version", Utility::GetModuleIdString(module->vendorModuleId).data());
 
-            module->ConfigurationLoadedHandler(configData.data, configData.length);
+            module->ConfigurationLoadedHandler(configData.data, configData.length.GetRaw());
         }
         else {
             logt("CONFIG", "No flash config for module %s found, using defaults", Utility::GetModuleIdString(module->vendorModuleId).data());

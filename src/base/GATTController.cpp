@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -73,12 +73,12 @@ void GATTController::ServiceDiscoveryDoneDispatcher(FruityHal::BleGattDBDiscover
 }
 
 //Throws different errors that must be handeled
-ErrorType GATTController::BleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength, bool reliable) const
+ErrorType GATTController::BleWriteCharacteristic(u16 connectionHandle, u16 characteristicHandle, u8* data, MessageLength dataLength, bool reliable) const
 {
-    logt("CONN_DATA", "TX Data size is: %d, handles(%d, %d), reliable %d", dataLength, connectionHandle, characteristicHandle, reliable);
+    logt("CONN_DATA", "TX Data size is: %d, handles(%d, %d), reliable %d", dataLength.GetRaw(), connectionHandle, characteristicHandle, reliable);
 
     char stringBuffer[100];
-    Logger::ConvertBufferToHexString(data, dataLength, stringBuffer, sizeof(stringBuffer));
+    Logger::ConvertBufferToHexString(data, dataLength.GetRaw(), stringBuffer, sizeof(stringBuffer));
     logt("CONN_DATA", "%s", stringBuffer);
 
 
@@ -105,12 +105,12 @@ ErrorType GATTController::BleWriteCharacteristic(u16 connectionHandle, u16 chara
 }
 
 //TODO: Rewrite properly
-ErrorType GATTController::BleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, u16 dataLength) const
+ErrorType GATTController::BleSendNotification(u16 connectionHandle, u16 characteristicHandle, u8* data, MessageLength dataLength) const
 {
-    logt("CONN_DATA", "hvx Data size is: %d, handles(%d, %d)", dataLength, connectionHandle, characteristicHandle);
+    logt("CONN_DATA", "hvx Data size is: %d, handles(%d, %d)", dataLength.GetRaw(), connectionHandle, characteristicHandle);
 
     char stringBuffer[100];
-    Logger::ConvertBufferToHexString(data, dataLength, stringBuffer, sizeof(stringBuffer));
+    Logger::ConvertBufferToHexString(data, dataLength.GetRaw(), stringBuffer, sizeof(stringBuffer));
     logt("CONN_DATA", "%s", stringBuffer);
 
 

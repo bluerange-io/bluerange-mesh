@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -118,6 +118,7 @@ void DebugModule::SendStatistics(NodeId receiver) const
 }
 
 void DebugModule::TimerEventHandler(u16 passedTimeDs){
+//WARNING: TIME_SYNC_TEST_CODE is only for testing and will use a delay of 2 seconds!
 #if IS_ACTIVE(TIME_SYNC_TEST_CODE) && !defined(SIM_ENABLED)
 
     /*When time is synced, this will switch on green led after every 10 sec for 2 sec from the start of the minute*/
@@ -179,6 +180,14 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
         }
     }
 
+    //Auto counting for flood packets
+    if(lastFloodPacketMs && lastFloodPacketMs + 3000 < FruityHal::GetRtcMs()){
+        const u32 passedTimeMs = FruityHal::GetRtcDifferenceMs(lastFloodPacketMs, firstFloodPacketMs);
+        trace("Counted %u flood payload bytes in %u ms = %u byte/s" EOL, autoFloodSum, passedTimeMs, autoFloodSum * 1000 / passedTimeMs);
+        firstFloodPacketMs = lastFloodPacketMs = 0;
+        autoFloodSum = 0;
+    }
+
     if(floodMode != FloodMode::OFF){
         if (floodFrameSkip)
         {
@@ -227,7 +236,7 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
                         (u8)DebugModuleTriggerActionMessages::FLOOD_MESSAGE,
                         0,
                         (u8*)&data,
-                        floodMode == FloodMode::UNRELIABLE_SPLIT ? 25 : 12, //Send a big message that must be split
+                        floodMode == FloodMode::UNRELIABLE_SPLIT ? 70 : 12, //Send a big message that must be split
                         floodMode == FloodMode::RELIABLE ? true : false);
 
                 }
@@ -543,7 +552,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
         data.payload.data[1] = 3;
         data.payload.data[2] = 3;
 
-        GS->cm.SendMeshMessage((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, DeliveryPriority::LOW);
+        GS->cm.SendMeshMessage((u8*)&data, SIZEOF_CONN_PACKET_DATA_1);
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
@@ -673,7 +682,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
                 trace("%02X:", data.data[i]);
             }
 
-            trace(" (%u)" EOL, data.length);
+            trace(" (%u)" EOL, data.length.GetRaw());
         } else {
             trace("Record not found" EOL);
         }
@@ -707,13 +716,13 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
             if(reliable == 0 || reliable == 2){
                 data.payload.data[0] = i*2;
                 data.payload.data[1] = 0;
-                err = GS->cm.SendMeshMessageInternal((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, DeliveryPriority::LOW, false, true, true);
+                err = GS->cm.SendMeshMessageInternal((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, false, true, true);
             }
 
             if(reliable == 1 || reliable == 2){
                 data.payload.data[0] = i*2+1;
                 data.payload.data[1] = 1;
-                err = GS->cm.SendMeshMessageInternal((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, DeliveryPriority::LOW, true, true, true);
+                err = GS->cm.SendMeshMessageInternal((u8*)&data, SIZEOF_CONN_PACKET_DATA_1, true, true, true);
             }
         }
 
@@ -886,7 +895,18 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
         BaseConnectionHandle conn = GS->cm.GetConnectionFromHandle(hnd);
 
         if (conn) {
-            conn.GetPacketSendQueue()->Print();
+            trace("Vital Prio: ");
+            conn.GetQueueByPriority(DeliveryPriority::VITAL )->Print();
+            trace(EOL);
+            trace("High Prio: ");
+            conn.GetQueueByPriority(DeliveryPriority::HIGH  )->Print();
+            trace(EOL);
+            trace("Medium Prio: ");
+            conn.GetQueueByPriority(DeliveryPriority::MEDIUM)->Print();
+            trace(EOL);
+            trace("Low Prio: ");
+            conn.GetQueueByPriority(DeliveryPriority::LOW   )->Print();
+            trace(EOL);
         }
 
         return TerminalCommandHandlerReturnType::SUCCESS;
@@ -982,6 +1002,15 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
                 }
                 //Listens to all nodes
                 else {
+                    //Note the start of flooding
+                    if(firstFloodPacketMs == 0) firstFloodPacketMs = lastFloodPacketMs = FruityHal::GetRtcMs();
+                    //Increase flood time as long as packets are continuously received withing a threshold of 2 second at least
+                    if(firstFloodPacketMs && FruityHal::GetRtcMs() < lastFloodPacketMs + 2000){
+                        lastFloodPacketMs = FruityHal::GetRtcMs();
+                        autoFloodSum += sendData->dataLength.GetRaw();
+                    }
+                    // => Sum is checked in TimerEvent and cleared as well
+
                     //Keep track of all flood messages received
                     packetsIn++;
                 }
@@ -1031,7 +1060,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
                 p.advType = GS->advertisingController.currentAdvertisingParams.type;
                 p.payload.ackField = GS->node.currentAckId;
                 p.payload.clusterId = GS->node.clusterId;
-                p.payload.clusterSize = GS->node.clusterSize;
+                p.payload.clusterSize = GS->node.GetClusterSize();
                 p.payload.deviceType = GET_DEVICE_TYPE();
                 p.payload.freeMeshInConnections = GS->cm.freeMeshInConnections;
                 p.payload.freeMeshOutConnections = GS->cm.freeMeshOutConnections;
@@ -1165,13 +1194,14 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 #endif
         }
     }
-    else if (packetHeader->messageType == MessageType::DATA_1) {
+    else if (packetHeader->messageType == MessageType::DATA_1
+          || packetHeader->messageType == MessageType::DATA_1_VITAL) {
         if (sendData->dataLength >= SIZEOF_CONN_PACKET_HEADER + 3) //We do not need the full data packet, just the bytes that we read
         {
             ConnPacketData1 const * packet = (ConnPacketData1 const *)packetHeader;
             NodeId partnerId = connection == nullptr ? 0 : connection->partnerId;
 
-            logt("DATA", "IN <= %d ################## Got Data packet %d:%d:%d (len:%d,%s) ##################", partnerId, packet->payload.data[0], packet->payload.data[1], packet->payload.data[2], sendData->dataLength, sendData->deliveryOption == DeliveryOption::WRITE_REQ ? "r" : "u");
+            logt("DATA", "IN <= %d ################## Got Data packet %d:%d:%d (len:%d,%s) ##################", partnerId, packet->payload.data[0], packet->payload.data[1], packet->payload.data[2], sendData->dataLength.GetRaw(), sendData->deliveryOption == DeliveryOption::WRITE_REQ ? "r" : "u");
         }
     }
     else if (packetHeader->messageType == MessageType::MODULE_ACTION_RESPONSE) {
@@ -1220,7 +1250,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 
                 DebugModuleMemoryMessage const * message = (DebugModuleMemoryMessage const *)packet->data;
                 
-                u16 memoryLength = sendData->dataLength - SIZEOF_CONN_PACKET_MODULE - SIZEOF_DEBUG_MODULE_MEMORY_MESSAGE_HEADER;
+                u16 memoryLength = sendData->dataLength.GetRaw() - SIZEOF_CONN_PACKET_MODULE - SIZEOF_DEBUG_MODULE_MEMORY_MESSAGE_HEADER;
 
                 u16 bufferLength = memoryLength * 3 + 1;
                 DYNAMIC_ARRAY(buffer, bufferLength);
@@ -1246,6 +1276,17 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 
                 trace("lp %u(%u): %u ms" EOL, lpingData->leafNodeId, lpingData->hops, timePassedMs);
             }
+#ifdef SIM_ENABLED
+            else if (actionType == DebugModuleActionResponseMessages::QUEUE_FLOOD_RESPONSE_LOW) {
+                queueFloodCounterLow++;
+            }
+            else if (actionType == DebugModuleActionResponseMessages::QUEUE_FLOOD_RESPONSE_MEDIUM) {
+                queueFloodCounterMedium++;
+            }
+            else if (actionType == DebugModuleActionResponseMessages::QUEUE_FLOOD_RESPONSE_HIGH) {
+                queueFloodCounterHigh++;
+            }
+#endif
 
 #endif
 #if IS_INACTIVE(CLC_GW_SAVE_SPACE)
@@ -1275,6 +1316,95 @@ u32 DebugModule::GetPacketsOut()
 {
     return packetsOut;
 }
+
+#ifdef SIM_ENABLED
+//Used in tests to fill certain queues and then make sure that everything still works as intended.
+void DebugModule::SendQueueFloodMessage(DeliveryPriority prio)
+{
+    DebugModuleActionResponseMessages code = DebugModuleActionResponseMessages::QUEUE_FLOOD_RESPONSE_MEDIUM;
+    switch (prio)
+    {
+    case DeliveryPriority::LOW:
+        code = DebugModuleActionResponseMessages::QUEUE_FLOOD_RESPONSE_LOW;
+        break;
+    case DeliveryPriority::MEDIUM:
+        code = DebugModuleActionResponseMessages::QUEUE_FLOOD_RESPONSE_MEDIUM;
+        break;
+    case DeliveryPriority::HIGH:
+        code = DebugModuleActionResponseMessages::QUEUE_FLOOD_RESPONSE_HIGH;
+        break;
+    case DeliveryPriority::VITAL:
+        code = DebugModuleActionResponseMessages::QUEUE_FLOOD_RESPONSE_VITAL;
+        break;
+    default:
+        SIMEXCEPTION(IllegalArgumentException);
+        break;
+    }
+
+    SendModuleActionMessage(
+        MessageType::MODULE_ACTION_RESPONSE,
+        0,
+        (u8)code,
+        0,
+        nullptr,
+        0,
+        false
+    );
+}
+//Used in a test.
+void DebugModule::SendQueueFloodMessages()
+{
+    for (u32 i = 0; i < 8; i++)
+    {
+        const u32 rand = Utility::GetRandomInteger();
+        if (rand < UINT32_MAX / 3 * 1)
+        {
+            SendQueueFloodMessage(DeliveryPriority::LOW);
+        }
+        else if (rand < UINT32_MAX / 3 * 2)
+        {
+            SendQueueFloodMessage(DeliveryPriority::MEDIUM);
+        }
+        else
+        {
+            SendQueueFloodMessage(DeliveryPriority::HIGH);
+        }
+    }
+}
+u32 DebugModule::GetQueueFloodCounterLow()
+{
+    return queueFloodCounterLow;
+}
+u32 DebugModule::GetQueueFloodCounterMedium()
+{
+    return queueFloodCounterMedium;
+}
+u32 DebugModule::GetQueueFloodCounterHigh()
+{
+    return queueFloodCounterHigh;
+}
+DeliveryPriority DebugModule::GetPriorityOfMessage(const u8* data, MessageLength size)
+{
+    if (size >= SIZEOF_CONN_PACKET_MODULE)
+    {
+        const ConnPacketModule* mod = (const ConnPacketModule*)data;
+        if (mod->header.messageType == MessageType::MODULE_ACTION_RESPONSE
+            && mod->moduleId == moduleId)
+        {
+            const DebugModuleActionResponseMessages actionType = (DebugModuleActionResponseMessages)mod->actionType;
+            if (actionType == DebugModuleActionResponseMessages::QUEUE_FLOOD_RESPONSE_LOW)
+                return DeliveryPriority::LOW;
+            if (actionType == DebugModuleActionResponseMessages::QUEUE_FLOOD_RESPONSE_MEDIUM)
+                return DeliveryPriority::MEDIUM;
+            if (actionType == DebugModuleActionResponseMessages::QUEUE_FLOOD_RESPONSE_HIGH)
+                return DeliveryPriority::HIGH;
+            if (actionType == DebugModuleActionResponseMessages::QUEUE_FLOOD_RESPONSE_VITAL)
+                return DeliveryPriority::VITAL;
+        }
+    }
+    return DeliveryPriority::INVALID;
+}
+#endif
 
 void DebugModule::CauseHardfault() const
 {

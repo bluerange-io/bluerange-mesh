@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -90,9 +90,6 @@ private:
     u32 decryptionNonce[2] = {};
 
 
-    MessageType lastProcessedMessageType;
-
-
     bool GenerateSessionKey(const u8* nonce, NodeId centralNodeId, FmKeyId fmKeyId, u8* keyOut);
     void OnCorruptedMessage();
 
@@ -151,18 +148,18 @@ public:
     /*############### Encryption ##################*/
     //This will encrypt some data using the current session key with incrementing nonce/counter
     //The data buffer must have enough space to hold the 4 byte MIC at the end
-    void EncryptPacket(u8* data, u16 dataLength);
+    void EncryptPacket(u8* data, MessageLength dataLength);
 
     //Decrypts the data in place (dataLength includes MIC) with the session key
-    bool DecryptPacket(u8 const * data, u8 * decryptedOut, u16 dataLength);
+    bool DecryptPacket(u8 const * data, u8 * decryptedOut, MessageLength dataLength);
 
 
     /*############### Sending ##################*/
-    SizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer) override final;
+    MessageLength ProcessDataBeforeTransmission(u8* message, MessageLength messageLength, MessageLength bufferLength) override final;
     bool SendData(BaseConnectionSendData* sendData, u8 const * data);
-    bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable) override final;
+    bool SendData(u8 const * data, MessageLength dataLength, bool reliable) override final;
     bool ShouldSendDataToNodeId(NodeId nodeId) const;
-    void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData) override final;
+    void PacketSuccessfullyQueuedWithSoftdevice(SizedData* sentData) override final;
 
     /*############### Receiving ##################*/
     void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) override final;
@@ -171,7 +168,7 @@ public:
     /*############### Handler ##################*/
     void ConnectionSuccessfulHandler(u16 connectionHandle) override final;
     void GATTServiceDiscoveredHandler(FruityHal::BleGattDBDiscoveryEvent &evt) override final;
-    void DataSentHandler(const u8* data, u16 length) override final;
+    void DataSentHandler(const u8* data, MessageLength length) override final;
 
     void PrintStatus() override final;
 

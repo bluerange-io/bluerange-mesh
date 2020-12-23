@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -70,7 +70,7 @@ enum class SetConfigResultCodes : u8
     OTHER_ERROR          = 53, //Other error types are mapped to this generic error
 };
 
-static_assert((u8)RecordStorageResultCode::__END < 50, "RecordStorageResultCodes too big");
+static_assert((u8)RecordStorageResultCode::LAST_ENTRY < 50, "RecordStorageResultCodes too big");
 
 class Node;
 
@@ -198,12 +198,17 @@ public:
     //will definitely block the message
     virtual RoutingDecision MessageRoutingInterceptor(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader) { return 0; };
 
+    //Gives a message an arbitrary DeliveryPriority. Can return DeliveryPriority::INVALID in which case the priority is not changed.
+    //The most important priority returned by all modules wins. If all modules return DeliveryPriority::INVALID, DeliveryPriority::MEDIUM
+    //is used.
+    virtual DeliveryPriority GetPriorityOfMessage(const u8* data, MessageLength size) { return DeliveryPriority::INVALID; };
+
     //This handler receives all connection packets addressed to this node
     virtual void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader);
 
     //This handler is called before the node is enrolled, it can return PRE_ENROLLMENT_ codes
     //The enrollment packet that was received with the enrollment data is passed to the handler and can be checked
-    virtual PreEnrollmentReturnCode PreEnrollmentHandler(ConnPacketModule* enrollmentPacket, u16 packetLength);
+    virtual PreEnrollmentReturnCode PreEnrollmentHandler(ConnPacketModule* enrollmentPacket, MessageLength packetLength);
 
     virtual void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
 

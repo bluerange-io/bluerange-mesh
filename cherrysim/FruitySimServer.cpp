@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -314,7 +314,7 @@ std::string FruitySimServer::GenerateDevicesJson()
         device["details"] = {
             {"platform", "BLENODE"},
             {"clusterId", node->gs.node.clusterId},
-            {"clusterSize", node->gs.node.clusterSize},
+            {"clusterSize", node->gs.node.GetClusterSize()},
             {"nodeId", node->gs.node.configuration.nodeId},
             {"serialNumber", node->gs.config.GetSerialNumber()},
             {"connections", json::array()},

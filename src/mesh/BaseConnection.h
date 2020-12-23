@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -38,9 +38,8 @@
 #include <FruityHal.h>
 #include <array>
 
-constexpr u8 PACKET_QUEUED_HANDLE_NOT_QUEUED_IN_SD = 0;
-constexpr u8 PACKET_QUEUED_HANDLE_COUNTER_START = 10;
-
+#include "ChunkedPriorityPacketQueue.h"
+#include "SimpleQueue.h"
 
 enum class DeliveryOption : u8 {
     INVALID,
@@ -48,32 +47,20 @@ enum class DeliveryOption : u8 {
     WRITE_REQ,
     NOTIFICATION
 };
-enum class DeliveryPriority : u8{
-    MESH_INTERNAL_HIGH=0, //Must only be used for mesh relevant data
-    MEDIUM=1,
-    LOW=2,
-    LOWEST=3,
-    INVALID=4,
-};
-
 
 typedef struct BaseConnectionSendData {
     u16 characteristicHandle;
     DeliveryOption deliveryOption;
-    DeliveryPriority priority;
-    u8 sendHandle;
-    u16 dataLength;
+    MessageLength dataLength;
 } BaseConnectionSendData;
 
-constexpr size_t SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED = 6;
+constexpr size_t SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED = 3;
 #pragma pack(push)
 #pragma pack(1)
 typedef struct BaseConnectionSendDataPacked {
     u16 characteristicHandle;
     u8 deliveryOption : 4;
-    u8 priority : 4;
-    u8 sendHandle;
-    u16 dataLength;
+    // Unpacked version also has a dataLength, which is not required for the packed version.
 } BaseConnectionSendDataPacked;
 #pragma pack(pop)
 STATIC_ASSERT_SIZE(BaseConnectionSendDataPacked, SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
@@ -123,6 +110,7 @@ enum class AppDisconnectReason : u8 {
     SERIAL_CONNECT_TIMEOUT = 37,
     EN_OCEAN_ENROLLED_AND_IN_MESH = 38,
     MULTIPLE_MA_ON_ASSET = 39,
+    HANDLE_PACKET_SENT_ERROR = 40,
 };
 
 
@@ -165,6 +153,8 @@ class BaseConnection
     private: 
         bool currentMessageIsMissingASplit = false;
     protected:
+        DeliveryPriority overwritePriority = DeliveryPriority::INVALID;
+
         //Will Queue the data in the packet queue of the connection
         bool QueueData(const BaseConnectionSendData& sendData, u8 const * data);
         bool QueueData(const BaseConnectionSendData& sendData, u8 const * data, bool fillTxBuffers); // Can be used to avoid infinite recursion in queue and fillTxBuffers
@@ -195,20 +185,23 @@ class BaseConnection
 
         //################### Sending ######################
         //Must be implemented in super class
-        virtual bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable) = 0;
+        virtual bool SendData(u8 const * data, MessageLength dataLength, bool reliable) = 0;
         //Allow a subclass to transmit data before the writeQueue is processed
-        virtual bool TransmitHighPrioData() { return false; };
+        virtual bool QueueVitalPrioData() { return false; };
         //Allows a subclass to process data closely before sending it
-        virtual SizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer);
+        virtual MessageLength ProcessDataBeforeTransmission(u8* message, MessageLength messageLength, MessageLength bufferLength);
         //Called after data has been queued in the softdevice, pay attention that data points to the full packet in the queue
         //whereas sentData is the data that was really sent (e.g. the packet was split or preprocessed in some way before sending)
-        virtual void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData);
+        virtual void PacketSuccessfullyQueuedWithSoftdevice(SizedData* sentData);
         //Fills the tx buffers of the softdevice with the packets from the packet queue
         virtual void FillTransmitBuffers();
         //Gets passed the exact same data that was passed to the HAL. If that data was encrypted, the passed data
         //to this function is encrypted as well (e.g. in the MeshAccessConnection). This means that the data passed
         //to this function is the same as was returned by ProcessDataBeforeTransmission.
-        virtual void DataSentHandler(const u8* data, u16 length) {};
+        virtual void DataSentHandler(const u8* data, MessageLength length) {};
+
+        //Calls GetPriorityOfMessage of all modules to determine the priority of the message.
+        DeliveryPriority GetPriorityOfMessage(const u8* data, MessageLength size);
 
         //Handler
         virtual void ConnectionSuccessfulHandler(u16 connectionHandle);
@@ -221,25 +214,17 @@ class BaseConnection
         virtual void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) = 0;
         //Can be called by subclasses to use the ConnPacketHeader reassembly
         u8 const * ReassembleData(BaseConnectionSendData* sendData, u8 const * data);
-        SizedData GetSplitData(const BaseConnectionSendData &sendData, u8* data, u8* packetBuffer) const;
 
         //Helpers
         virtual void PrintStatus() = 0;
 
         i8 GetAverageRSSI() const;
-        //Must return the number of packets that are queued. (Not just in the Packetqueues, also HighPrioData!)
-        virtual bool GetPendingPackets() { return packetSendQueue._numElements + packetSendQueueHighPrio._numElements; };
+        //Must return the number of packets that are queued. (All queues of this connection!)
+        virtual u32 GetPendingPackets() const { return queue.GetAmountOfPackets(); };
 
-
-        SizedData GetNextPacketToSend(const PacketQueue& queue) const;
-
-        void HandlePacketQueued(PacketQueue* activeQueue, BaseConnectionSendDataPacked* sendDataPacked);
-        void HandlePacketQueuingFail(PacketQueue& activeQueue, BaseConnectionSendDataPacked* sendDataPacked, u32 err);
+        void HandlePacketQueued();
+        void HandlePacketQueuingFail(u32 err);
         void HandlePacketSent(u8 sentUnreliable, u8 sentReliable);
-
-        void ResendAllPackets(PacketQueue& queueToReset) const;
-
-        u8 GetNextQueueHandle();
 
         //Getter
         bool IsDisconnected() const{ return connectionState == ConnectionState::DISCONNECTED; };
@@ -262,15 +247,10 @@ class BaseConnection
         bool bufferFull = false; //Set to true once the softdevice reports that all buffers are full
         u8 manualPacketsSent = 0; //Used to count the packets manually sent to the softdevice using BleWriteCharacteristic, will be decremented first before packets from the queue are removed. Packets must not be sent while the queue is working
 
-        //Normal Prio Queue
-        u32 packetSendBuffer[PACKET_SEND_BUFFER_SIZE / sizeof(u32)] = {};
-        PacketQueue packetSendQueue;
+        SimpleQueue<DeliveryPriority, 32> queueOrigins;
+        ChunkedPriorityPacketQueue queue;
 
-        //High Prio Queue
-        u32 packetSendBufferHighPrio[PACKET_SEND_BUFFER_HIGH_PRIO_SIZE / sizeof(u32)] = {};
-        PacketQueue packetSendQueueHighPrio;
-
-        u8 packetQueuedHandleCounter = PACKET_QUEUED_HANDLE_COUNTER_START; //Used to assign handles to queued packets
+        u32 packetFailedToQueueCounter = 0;
 
         alignas(4) std::array<u8, PACKET_REASSEMBLY_BUFFER_SIZE> packetReassemblyBuffer{};
         u8 packetReassemblyPosition = 0; //Set to 0 if no reassembly is in progress
@@ -292,9 +272,4 @@ class BaseConnection
         u16 sentUnreliable = 0;
 
         static u32 GetAmountOfRemovedConnections();
-
-#ifdef SIM_ENABLED
-        void PrintQueueInfo();
-#endif
-
 };

@@ -1,3 +1,6 @@
+# This file is a list of CMake functions that already exist in the CMake standard
+# We are now defining a set of functions to apply these on our list of selected targets
+
 function(target_compile_options_multi TARGETS op)
   foreach(target ${TARGETS})
     target_compile_options(${target} PRIVATE ${op})

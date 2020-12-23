@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -68,11 +68,11 @@ enum class BleGattWriteType : u8
 
 struct BleGattWriteParams
 {
-    BleGattWriteType  type; 
-    u16               offset;
-    u16               handle;
-    u16               len;
-    u8               *p_data;
+    BleGattWriteType type; 
+    u16              offset;
+    u16              handle;
+    MessageLength    len;
+    u8              *p_data;
 };
 
 struct BleGattUuid

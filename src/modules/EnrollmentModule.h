@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -53,6 +53,7 @@ enum class EnrollmentResponseCode : u8 {
     ALREADY_ENROLLED_WITH_DIFFERENT_DATA = 0x10,
     PREENROLLMENT_FAILED                 = 0x11,
     SIG_CONFIGURATION_INVALID            = 0x12,
+    INCORRECT_NODE_ID                    = 0x13,
     HIGHEST_POSSIBLE_VALUE               = 0xFF,
 };
 
@@ -188,7 +189,7 @@ class EnrollmentModule: public Module
 #pragma pack(1)
         struct TemporaryEnrollmentData{
             EnrollmentStates state;
-            u16 packetLength;
+            MessageLength packetLength;
             ConnPacketModuleStart requestHeader;
             union {
                 EnrollmentModuleSetEnrollmentBySerialMessage requestData;
@@ -226,13 +227,13 @@ class EnrollmentModule: public Module
         static constexpr u32 SCAN_TIME_DS = SEC_TO_DS(60);
         void RefreshScanJob();
 
-        void Enroll(ConnPacketModule const * packet, u16 packetLength);
+        void Enroll(ConnPacketModule const * packet, MessageLength packetLength);
 
-        void EnrollOverMesh(ConnPacketModule const * packet, u16 packetLength, BaseConnection* connection);
+        void EnrollOverMesh(ConnPacketModule const * packet, MessageLength packetLength, BaseConnection* connection);
 
-        void SaveEnrollment(ConnPacketModuleStart* packet, u16 packetLength);
+        void SaveEnrollment(ConnPacketModuleStart* packet, MessageLength packetLength);
 
-        void SaveUnenrollment(ConnPacketModuleStart* packet, u16 packetLength);
+        void SaveUnenrollment(ConnPacketModuleStart* packet, MessageLength packetLength);
 
         void EnrollmentConnectionConnectedHandler();
 
@@ -240,7 +241,7 @@ class EnrollmentModule: public Module
 
         void SendEnrollmentResponse(EnrollmentModuleActionResponseMessages responseType, EnrollmentResponseCode result, u8 requestHandle) const;
 
-        void Unenroll(ConnPacketModule const * packet, u16 packetLength);
+        void Unenroll(ConnPacketModule const * packet, MessageLength packetLength);
 
         void NotifyNewStableSerialIndexScanned(u32 serialIndex);
 
@@ -265,7 +266,7 @@ class EnrollmentModule: public Module
 
         //PreEnrollment
 
-        void StoreTemporaryEnrollmentDataAndDispatch(ConnPacketModule const * packet, u16 packetLength);
+        void StoreTemporaryEnrollmentDataAndDispatch(ConnPacketModule const * packet, MessageLength packetLength);
 
         void PreEnrollmentFailed();
 
@@ -273,6 +274,9 @@ class EnrollmentModule: public Module
 #if IS_ACTIVE(BUTTONS)
         void ButtonHandler(u8 buttonId, u32 holdTimeDs) override final;
 #endif
+
+        //Priority
+        virtual DeliveryPriority GetPriorityOfMessage(const u8* data, MessageLength size) override;
 
         #ifdef TERMINAL_ENABLED
         TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;

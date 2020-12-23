@@ -210,6 +210,8 @@ All parts of CherrySim use a pseudo random number generator that is initialized 
 === Replay
 Due to the reproducible, deterministic nature of CherrySim, it is possible to replay a log file of a previous CherrySim execution if that run was configured with `simConfig.logReplayCommands = true`. If you want to do this, all you have to do is set `simConfig.replayPath` to a path of a log file. In practice you probably want to use this feature in CherrySimRunner. A designated line was created to help you with this, look for the String "@ReplayFeature@" inside `CherrySimRunner.cpp` for more information.
 
+CherrySim will load the previous simulator configuration from your log file. If it was a recording of e.g. a live session with a gateway, you might want to set `playDelay` to 0 and `realTime` to false. This will make the simulation run as fast as possible. You can find the configuration at the beginning of the log file.
+
 === Globally Available Variables
 There are a number of global variables that are helpful for inspecting the state of the simulation:
 
@@ -244,6 +246,59 @@ Then check the value of the counter in the debugger, set a conditional breakpoin
 [#CherrySimTester]
 == CherrySimTester
 CherrySimTester is used to write automated tests against the mesh. Typically a test will first set up a mesh network with a few nodes, possibly with different featuresets. Afterwards, it might wait until they are clustered and then send some terminal commands. Next, the simulation might wait for some message to be received so that the test is considered passing. Have a look at the available tests under `<fruitymesh>/cherrysim/test` to get a better understanding.
+
+== SimulateUntilRegexMessageReceived
+
+Prior to the implementation of SimulateUntilRegexMessageReceived we had to simulate for exact message hits. However, this was not always practical. For example, if the battery measurement is queried it is not helpful to only accept a specific battery measurement, instead it is important to write a google unit test that makes sure that any battery measurement is returned. This was made possible with the addition of RegexMessages.
+
+Two very nice online resources to test if a given regex matches with a message are the following: https://regex101.com/ and https://regexr.com/
+
+Noteworthy: Both "{" and "}" (occurring in JSONs) have to be escaped because they are special regex chars. The regex escape character itself has to be escaped as it is placed in a C-String-Literal, thus a "{" becomes "\\{".
+
+== StepCallbacks
+
+Some of the simulate functions also have a "stepCallback" parameter. This is a `std::function` which, if provided, is called before each simulation step. This is for example used to constantly fill the queues in tests.
+
+== Jittering
+Multiple nodes in the mesh only guarantee that the passed time is the same for all of them on average (plus a small bias). To make sure that we are able to handle such behaviour, "jittering" was implemented into the simulator. Jittering can be enabled by setting `simulateJittering` to true inside the configuration. Once it is enabled, there is on average a 50% chance that a simulated node is not simulated in one simulation step. In addition to this, nodes that have been simulated more rarely than others have a higher probability to be executed, and vice versa. This generates more randomness and closeness to the real world behaviour.
+
+== Mersenne Twister
+A custom Random Number Generator (RNG) is used in the simulator. Originally the implementation of it comes from the "BrotBoxEngine", see: https://github.com/Brotcrunsher/BrotBoxEngine/blob/master/BrotBoxEngine/BBE/MersenneTwister.h .
+
+The use of a RNG is very important in the simulator. It must have two properties:
+
+. It must generate numbers that feel random, so that a lot of different cases can be tested.
+. It must reproduce the exact same values on all platforms, if the same seed is used.
+
+The second point is unfortunately not guaranteed by the std::mt19937 and the std::distributions implementation. Although the same compiler always generates the same output, the same is not true for different compilers. In practice we noticed that MSVC generated different results compared to GCC when using the STL implementation.
+
+== Stack Overflow Simulation
+The simulator implements a simple stack overflow detection mechanism, found in the "StackWatcher". One can set the simulated "stack base" (which is the simulated start of the stack of a device) by creating the RAII type "StackBaseSetter". Most functions in the SystemTest.h then check if the current stack, minus the latest value in the StackBaseSetter is larger than some threshold. If it is, an exception is thrown.
+
+NOTE: This is just a very rough estimation that is able to detect large stack traces, as long as any SystemTest.h function is called. It does not give any guarantees about real life, it just "sometimes" finds stack overflows that also would happen on real devices.
+
+== Flash to file
+The simulator is able to store the flash of all nodes into a file, making it easier to reuse a simulated mesh as all nodes are enrolled in the proper network and all other configurations are kept. To use this feature, set `storeFlashToFile` to any path you wish. If this attribute is not the empty string, the simulator stores the flash in this file. If the given file exists, the simulator loads the configuration on startup.
+
+NOTE: This feature only stores the flash, not the RAM of the nodes. This means that if the simulator is shut down and booted up again with this file, all nodes only remember the configuration, not how they meshed up. Such a case is comparable with a complete power shortage of a mesh in the real world.
+
+== Featureset simulation
+The simulator supports simulating an arbitrary amount of different featuresets. To add a new featureset to the list of used featuresets, add it to the list inside `CherrySim::PrepareSimulatedFeatureSets()`.
+
+NOTE: Order matters in this list! The amount of nodes for each featureset during one simulation is filled up from the top to the bottom, meaning if 1 sink, 2 mesh, and one asset node is simulated, the sink gets index 0, mesh nodes 1 and 2, and the asset 3. This is because the sink featureset comes first in the `CherrySim::PrepareSimulatedFeatureSets()`, next is prod_mesh_nrf52, and at the very end the asset featuresets.
+
+One simulated featureset is a struct object that contains a set of function pointers. See `FeaturesetPointers`. All these function pointers should not be called directly, but via the macros that are used on real hardware instead.
+
+== JSON validity check in simulator
+The simulator makes sure that a printed JSON has a valid JSON format by parsing it once it is fully logged out. To see how this is done, check out `Logger::log_f`.
+
+== JSON config
+The simulator is able to store and load its configuration in JSON format. To see how this is done, have a look at `void to_json(nlohmann::json& j, const SimConfiguration& config);` and `void from_json(const nlohmann::json& j, SimConfiguration& config);`. These two functions are then used to load and store the configuration. In practice this is for example used in the CherrySimRunner to load the `MeshGwCommunicationConfig.json` which in turn is used to properly configure the simulator for our SystemTests. Have a look for `MeshGWCommunicationConfig.json` inside the `CherrySimRunner.cpp` to see how this is done.
+
+CAUTION: It is very important to keep both the `to_json` and `from_json` functions up to date when something in the configuration changes. This has to be done manually as C++ does not support reflection.
+
+== sim commands
+The simulator supports the use of special simulator commands. These commands all start with "sim ". They don't necessarily have a node as its execution target but are rather commands that have the simulator itself as target. Additionally, sim commands are treated differently as other messages as in they don't simulate the same restrictions for the length of the command. In fact a sim command can be arbitrarily long. Have a look at the `Terminal.cpp` and search for "sim " (with the space at the end and the quotation marks).
 
 == Legal Disclaimer
 Nordic allowed us in their forums to use their headers in our simulator as long as it

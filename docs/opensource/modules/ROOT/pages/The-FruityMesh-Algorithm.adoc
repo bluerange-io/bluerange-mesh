@@ -20,7 +20,7 @@ would be a bad idea because of the time it takes and the energy it
 costs. This means that every node can only see its surroundig nodes.
 
 == Simulator
-There is a xref:Simulator.adoc[Simulator] available that
+There is a xref:CherrySim.adoc[Simulator] available that
 illustrates how the algorithm works. It allows to apply
 different configurations and see how the mesh reacts.
 

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -32,6 +32,7 @@
 #include "CherrySimTester.h"
 #include "CherrySimUtils.h"
 #include "Logger.h"
+#include "DebugModule.h"
 #include <json.hpp>
 
 using json = nlohmann::json;
@@ -81,6 +82,41 @@ TEST(TestStatusReporterModule, TestCommands) {
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"reboot_reason\",\"nodeId\":2,\"module\":3,");
 }
 
+TEST(TestStatusReporterModule, TestMediumPrioCommandWorksWithQueuesFull) {
+    // Tests if medium prio commands (e.g. action 2 status get_status) works, even if other priorities
+    // are constantly heavily used. Note that priority VITAL is not tested as this priority will always
+    // be sent out first if something is available and thus would, by design, block the medium queue.
+
+    const std::vector<DeliveryPriority> prioritiesToTest = { DeliveryPriority::LOW, DeliveryPriority::HIGH };
+
+    for (const DeliveryPriority prio : prioritiesToTest)
+    {
+        CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+        SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+        simConfig.terminalId = 0;
+        //testerConfig.verbose = true;
+
+        simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+        simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+        CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+        tester.Start();
+
+        auto stepCallback = [&]() {
+            for (u32 i = 0; i < tester.sim->GetTotalNodes(); i++)
+            {
+                NodeIndexSetter setter(i);
+                DebugModule* mod = (DebugModule*)GS->node.GetModuleById(ModuleId::DEBUG_MODULE);
+                mod->SendQueueFloodMessage(prio);
+            }
+        };
+
+        tester.SimulateUntilClusteringDone(100 * 1000, stepCallback);
+
+        tester.SendTerminalCommand(1, "action 2 status get_status");
+        tester.SimulateUntilMessageReceivedWithCallback(10 * 1000, 1, stepCallback, "{\"nodeId\":2,\"type\":\"status\",\"module\":3");
+    }
+}
+
 TEST(TestStatusReporterModule, TestPeriodicTimeSend) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
@@ -99,13 +135,34 @@ TEST(TestStatusReporterModule, TestPeriodicTimeSend) {
     tester.SendTerminalCommand(1, "component_act 2 3 1 0xABCD 0x1234 01 13");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "Periodic Time Send is now: 1");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"component_sense\",\"module\":3,\"requestHandle\":13,\"actionType\":2,\"component\":\"0xABCD\",\"register\":\"0x1234\",\"payload\":");
-    
+
     //Make sure that the status module automatically disables the periodic time send after 10 minutes.
     tester.SimulateUntilMessageReceived(10 * 60 * 1000, 2, "Periodic Time Send is now: 0");
 }
 
+TEST(TestStatusReporterModule, TestGetConnectionsVerbose) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateUntilClusteringDone(10 * 1000);
+
+    //Send a write command
+    tester.SendTerminalCommand(1, "action 2 status get_connections_verbose");
+
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"type\":\"connections_verbose\",\"nodeId\":2,\"module\":3,\"version\":1,\"connectionIndex\":0,\"partnerId\":1,\"partnerAddress\":\"1, \\[0:0:1:0:0:0\\]\",\"connectionType\":1,\"averageRssi\":-?\\d+,\"connectionState\":4,\"encryptionState\":\\d+,\"connectionId\":\\d+,\"uniqueConnectionId\":\\d+,\"connectionHandle\":\\d+,\"direction\":\\d+,\"creationTimeDs\":\\d+,\"handshakeStartedDs\":\\d+,\"connectionHandshakedTimestampDs\":\\d+,\"disconnectedTimestampDs\":\\d+,\"droppedPackets\":\\d+,\"sentReliable\":\\d+,\"sentUnreliable\":\\d+,\"pendingPackets\":\\d+,\"connectionMtu\":\\d+,\"clusterUpdateCounter\":\\d+,\"nextExpectedClusterUpdateCounter\":\\d+,\"manualPacketsSent\":\\d+\\}");
+}
+
 #ifndef GITHUB_RELEASE
 TEST(TestStatusReporterModule, TestHopsToSinkFixing) {
+    Exceptions::ExceptionDisabler<IncorrectHopsToSinkException> disabler;
+    Exceptions::DisableDebugBreakOnException ddboe;
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
@@ -117,6 +174,13 @@ TEST(TestStatusReporterModule, TestHopsToSinkFixing) {
     tester.Start();
 
     tester.SimulateUntilClusteringDone(1000 * 1000);
+
+    // Simulate some additional, fixed time to make sure that all cluster update
+    // messages are sent through the mesh. These would automatically fix the hops
+    // to shortest sink counter and thus would destroy the purpose of this test.
+    // Manually tested this with 1000 different seed offsets (0, 1000, 2000, ...).
+    // Seems to be fine.
+    tester.SimulateForGivenTime(10 * 1000);
 
     for (int i = 1; i <= 6; i++) tester.sim->FindNodeById(i)->gs.logger.EnableTag("DEBUGMOD");
 
@@ -145,21 +209,43 @@ TEST(TestStatusReporterModule, TestHopsToSinkFixing) {
     tester.SimulateForGivenTime(1000 * 10);
 
     // get_erros will collect errors from the node but will also clear them
-    tester.SendTerminalCommand(1, "action 2 status get_errors");
+    tester.SendTerminalCommand(2, "action this status get_errors");
     // This must not check for the exact number in "extra" as during meshing and simulation, a different invalid amount of hops may be recorded.
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":2,\"code\":44,\"extra\":");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":2,\"code\":44,\"extra\":");
 
     tester.SendTerminalCommand(1, "action max_hops status keep_alive");
     tester.SimulateForGivenTime(1000 * 10);
     
-    tester.SendTerminalCommand(1, "action 2 status get_errors");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,");
+    tester.SendTerminalCommand(2, "action this status get_errors");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,");
 
     // We expect that incorrect hops error wont be received as hopsToSink should have been fixed together with first keep_alive message.
     {
         Exceptions::DisableDebugBreakOnException disabler;
-        ASSERT_THROW(tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":%u,\"code\":%u", LoggingError::CUSTOM, CustomErrorTypes::FATAL_INCORRECT_HOPS_TO_SINK), TimeoutException);
+        ASSERT_THROW(tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":%u,\"code\":%u", LoggingError::CUSTOM, CustomErrorTypes::FATAL_INCORRECT_HOPS_TO_SINK), TimeoutException);
     }
+}
+#endif //GITHUB_RELEASE
+
+
+#ifndef GITHUB_RELEASE
+TEST(TestStatusReporterModule, TestKeepAlive) {
+    // Executes keep_alive and makes sure that no IncorrectHopsToSinkException occures.
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    simConfig.SetToPerfectConditions();
+    //testerConfig.verbose = true;
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 5});
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateUntilClusteringDone(1000 * 1000);
+
+    tester.SendTerminalCommand(1, "action this status keep_alive");
+
+    tester.SimulateForGivenTime(10 * 1000); // Just simulate a little and make sure that no IncorrectHopsToSinkException occures
 }
 #endif //GITHUB_RELEASE
 

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -163,7 +163,7 @@ TEST(TestMeshAccessModule, TestAdvertisementLegacy)
     maPacket->isSink = 0;
     maPacket->isZeroKeyConnectable = 1;
     maPacket->IsConnectable = 0;
-    maPacket->interestedInConnetion = 1;
+    maPacket->interestedInConnection = 1;
     maPacket->reserved = 0;
     maPacket->serialIndex = 829; //SerialNumber index of the beacon
 
@@ -400,7 +400,7 @@ TEST(TestMeshAccessModule, TestInfoRetrievalOverOrgaKey) {
 
     tester.SendTerminalCommand(1, "action 0 enroll basic BBBBB 1 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00 10 0 0");
     tester.SendTerminalCommand(2, "action 0 enroll basic BBBBC 2 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 10 0 0");
-    tester.SendTerminalCommand(3, "action 0 enroll basic BBBBD 3 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0 0");
+    tester.SendTerminalCommand(3, "action 0 enroll basic BBBBD 33000 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0 0");
     
     tester.SimulateUntilMessageReceived(100 * 1000, 1, "clusterSize\":2"); //Wait until the nodes have clustered.
 
@@ -433,7 +433,7 @@ TEST(TestMeshAccessModule, TestConnectWithNetworkKey)
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
     simConfig.preDefinedPositions = { {0.5, 0.5},{0.6, 0.6} };
-    simConfig.nodeConfigName.insert({ "github_nrf52", 2 });
+    simConfig.nodeConfigName.insert({ "github_dev_nrf52", 2 });
     simConfig.SetToPerfectConditions();
 
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);

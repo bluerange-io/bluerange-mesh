@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -61,6 +61,7 @@ CREATEEXCEPTIONINHERITING(UnknownJsonEntryException                             
 CREATEEXCEPTIONINHERITING(IllegalParameterException                                 , IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(NotAValidMessageTypeException                             , IllegalArgumentException);
 CREATEEXCEPTIONINHERITING(IllegalFruityMeshPacketException                          , IllegalArgumentException);
+CREATEEXCEPTIONINHERITING(IntegerUnderflowException                                 , IllegalArgumentException);
 
 CREATEEXCEPTION(IllegalStateException);
 CREATEEXCEPTIONINHERITING(ZeroOnNonPodTypeException                , IllegalStateException);
@@ -75,6 +76,7 @@ CREATEEXCEPTIONINHERITING(InternalTerminalCommandErrorException    , IllegalStat
 CREATEEXCEPTIONINHERITING(FileException                            , IllegalStateException);
 CREATEEXCEPTIONINHERITING(SigProvisioningFailedException           , IllegalStateException);
 CREATEEXCEPTIONINHERITING(SigCreateElementFailedException          , IllegalStateException);
+CREATEEXCEPTIONINHERITING(IncorrectHopsToSinkException             , IllegalStateException);
 
 CREATEEXCEPTION(BufferException);
 CREATEEXCEPTIONINHERITING(TriedToReadEmptyBufferException         , BufferException);
@@ -99,6 +101,7 @@ CREATEEXCEPTION(BLEStackError);
 CREATEEXCEPTION(HardfaultException);
 CREATEEXCEPTION(NonCompatibleDataTypeException);
 CREATEEXCEPTION(OutOfMemoryException);
+CREATEEXCEPTION(AllocatorOutOfMemoryException);
 CREATEEXCEPTION(MemoryCorruptionException);
 CREATEEXCEPTION(NotFromThisAllocatorException);
 CREATEEXCEPTION(TimeoutException);

@@ -5,8 +5,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(SANITIZER  "")
   endif(ENABLE_SANITIZERS)
   
-  set(CMAKE_C_FLAGS           "-include ${PROJECT_SOURCE_DIR}/cherrysim/SystemTest.h -DSDK=11 -m32 -Wno-unknown-pragmas -fno-builtin -fno-strict-aliasing -fomit-frame-pointer -std=gnu99" CACHE INTERNAL "c compiler flags")
-  set(CMAKE_CXX_FLAGS         "-include ${PROJECT_SOURCE_DIR}/cherrysim/SystemTest.h -DSDK=11 -m32 -Wno-unknown-pragmas -fprofile-arcs -ftest-coverage -fno-builtin -fno-strict-aliasing -fomit-frame-pointer -fdata-sections -ffunction-sections -fsingle-precision-constant -std=c++17 -pthread ${SANITIZER} -fno-omit-frame-pointer " CACHE INTERNAL "cxx compiler flags")
+  set(CMAKE_C_FLAGS           "-include ${PROJECT_SOURCE_DIR}/cherrysim/SystemTest.h -m32 -Wno-unknown-pragmas -fno-builtin -fno-strict-aliasing -fomit-frame-pointer -std=gnu99" CACHE INTERNAL "c compiler flags")
+  set(CMAKE_CXX_FLAGS         "-include ${PROJECT_SOURCE_DIR}/cherrysim/SystemTest.h -m32 -Wno-unknown-pragmas -fprofile-arcs -ftest-coverage -fno-builtin -fno-strict-aliasing -fomit-frame-pointer -fdata-sections -ffunction-sections -fsingle-precision-constant -std=c++17 -pthread ${SANITIZER} -fno-omit-frame-pointer " CACHE INTERNAL "cxx compiler flags")
   set(CMAKE_EXE_LINKER_FLAGS  "-rdynamic -fprofile-arcs -ftest-coverage ${SANITIZER} -fno-omit-frame-pointer"  CACHE INTERNAL "exe link flags")
 
   set(CMAKE_C_FLAGS_DEBUG     "-Og -g3 -ggdb3"  CACHE INTERNAL "c debug compiler flags")

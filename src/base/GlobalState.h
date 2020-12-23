@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -42,6 +42,7 @@
 #include "Config.h"
 #include "Boardconfig.h"
 #include "ConnectionManager.h"
+#include "ConnectionQueueMemoryAllocator.h"
 #include "Logger.h"
 #include "Terminal.h"
 #include "FlashStorage.h"
@@ -118,6 +119,7 @@ class GlobalState
         Conf config;
         Boardconf boardconf;
         ConnectionManager cm;
+        ConnectionQueueMemoryAllocator connectionQueueMemoryAllocator;
         Logger logger;
         Terminal terminal;
         FlashStorage flashStorage;

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -53,7 +53,6 @@ MeshConnection::MeshConnection(u8 id, ConnectionDirection direction, FruityHal::
     CheckedMemset(&clusterAck2Packet, 0x00, sizeof(ConnPacketClusterAck2));
     clusterIDBackup = 0;
     clusterSizeBackup = 0;
-    hopsToSinkBackup = -1;
     hopsToSink = -1;
     ClearCurrentClusterInfoUpdatePacket();
 
@@ -276,11 +275,8 @@ void MeshConnection::GapReconnectionSuccessfulHandler(const FruityHal::GapConnec
     handshakeStartedDs = GS->appTimerDs;
 
     //Reset all send queues so that the packets are being sent again
-    ResendAllPackets(packetSendQueue);
-    ResendAllPackets(packetSendQueueHighPrio);
-
-    //Also reset our reassembly buffer
-    packetReassemblyPosition = 0;
+    queue.RollbackLookAhead();
+    queueOrigins.Reset();
 }
 
 #define __________________SENDING_________________
@@ -292,7 +288,6 @@ bool MeshConnection::SendHandshakeMessage(u8* data, u16 dataLength, bool reliabl
     sendData.characteristicHandle = partnerWriteCharacteristicHandle;
     sendData.dataLength = dataLength;
     sendData.deliveryOption = reliable ? DeliveryOption::WRITE_REQ : DeliveryOption::WRITE_CMD;
-    sendData.priority = DeliveryPriority::MESH_INTERNAL_HIGH;
 
     if(IsConnected()){
         QueueData(sendData, data);
@@ -304,7 +299,7 @@ bool MeshConnection::SendHandshakeMessage(u8* data, u16 dataLength, bool reliabl
 }
 
 //This is a small wrapper for the SendData method
-bool MeshConnection::SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable)
+bool MeshConnection::SendData(u8 const * data, MessageLength dataLength, bool reliable)
 {
     if (dataLength > MAX_MESH_PACKET_SIZE) {
         SIMEXCEPTION(PacketTooBigException);
@@ -314,9 +309,8 @@ bool MeshConnection::SendData(u8 const * data, u16 dataLength, DeliveryPriority 
 
     BaseConnectionSendData sendData;
     sendData.characteristicHandle = partnerWriteCharacteristicHandle;
-    sendData.dataLength = (u8)dataLength;
+    sendData.dataLength = dataLength;
     sendData.deliveryOption = reliable ? DeliveryOption::WRITE_REQ : DeliveryOption::WRITE_CMD;
-    sendData.priority = priority;
 
     return SendData(&sendData, data);
 }
@@ -343,8 +337,8 @@ bool MeshConnection::SendData(BaseConnectionSendData* sendData, u8 const * data)
     //sending of packets by a factor of 14, so we only use them for mesh critical functionality such as clustering
     sendData->deliveryOption = DeliveryOption::WRITE_CMD;
 
-    logt("CONN_DATA", "PUT_PACKET(%d):len:%d,type:%d,prio:%u,hex:%s",
-            connectionId, sendData->dataLength, (u32)packetHeader->messageType, (u32)sendData->priority, stringBuffer);
+    logt("CONN_DATA", "PUT_PACKET(%d):len:%d,type:%d,hex:%s",
+            connectionId, sendData->dataLength.GetRaw(), (u32)packetHeader->messageType, stringBuffer);
 
     //Put packet in the queue for sending
     return QueueData(*sendData, data);
@@ -352,16 +346,11 @@ bool MeshConnection::SendData(BaseConnectionSendData* sendData, u8 const * data)
 
 //Allows a Subclass to send Custom Data before the writeQueue is processed
 //should return true if something was sent
-bool MeshConnection::TransmitHighPrioData()
+bool MeshConnection::QueueVitalPrioData()
 {
     if(
         HandshakeDone() //Handshake must be finished
-        && currentClusterInfoUpdatePacket.header.messageType != MessageType::INVALID //A cluster update packet must be waiting
-        && ( // and it must provide some kind of update
-                currentClusterInfoUpdatePacket.payload.clusterSizeChange != 0
-                || currentClusterInfoUpdatePacket.payload.connectionMasterBitHandover != 0
-                || (currentClusterInfoUpdatePacket.payload.hopsToSink != -1 && GET_DEVICE_TYPE() != DeviceType::SINK)
-            )
+        && ClusterInfoUpdateHasData()
     ){
         //If a clusterUpdate is available we send it immediately
         u8* data = (u8*)&(currentClusterInfoUpdatePacket);
@@ -372,14 +361,13 @@ bool MeshConnection::TransmitHighPrioData()
             GS->logger.LogCustomError(CustomErrorTypes::WARN_TX_WRONG_DATA, (u32)((ConnPacketHeader*)data)->messageType);
         }
 
-        //Use this to queue the clusterUpdate in the high prio queue
+        //Use this to queue the clusterUpdate in the vital prio queue
         BaseConnectionSendData sendData;
         CheckedMemset(&sendData, 0x00, sizeof(BaseConnectionSendData));
 
         sendData.characteristicHandle = partnerWriteCharacteristicHandle;
         sendData.dataLength = SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE;
         sendData.deliveryOption = DeliveryOption::WRITE_CMD;
-        sendData.priority = DeliveryPriority::MESH_INTERNAL_HIGH;
 
         //Set the counter for the packet
         currentClusterInfoUpdatePacket.payload.counter = ++clusterUpdateCounter;
@@ -394,10 +382,10 @@ bool MeshConnection::TransmitHighPrioData()
             ClearCurrentClusterInfoUpdatePacket();
         }
         else {
-            SIMSTATCOUNT("highPrioQueueFull");
+            SIMSTATCOUNT("vitalPrioQueueFull");
             logt("WARNING", "Could not queue CLUSTER_UPDATE");
 
-            GS->logger.LogCustomError(CustomErrorTypes::WARN_HIGH_PRIO_QUEUE_FULL, partnerId);
+            GS->logger.LogCustomError(CustomErrorTypes::WARN_VITAL_PRIO_QUEUE_FULL, partnerId);
 
             //We must reset our current counter as it was not used
             clusterUpdateCounter--;
@@ -415,46 +403,20 @@ void MeshConnection::ClearCurrentClusterInfoUpdatePacket()
     currentClusterInfoUpdatePacket.payload.hopsToSink = GET_DEVICE_TYPE() == DeviceType::SINK ? 0 : -1;
 }
 
-//This function might modify the packet, can also split bigger packets
-SizedData MeshConnection::ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer)
+void MeshConnection::PacketSuccessfullyQueuedWithSoftdevice(SizedData* sentData)
 {
-    //Use the split packet from the BaseConnection to process all packets
-    return GetSplitData(*sendData, data, packetBuffer);
-}
-
-void MeshConnection::PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData)
-{
-    ConnPacketHeader* splitPacketHeader = (ConnPacketHeader*) sentData->data;
-    //If this was an intermediate split packet
-    if (splitPacketHeader->messageType == MessageType::SPLIT_WRITE_CMD) {
-        packetSendQueue.packetSendPosition++;
-        packetSendQueue.packetSentRemaining++;
-    }
-    //The end of a split packet
-    else if (splitPacketHeader->messageType == MessageType::SPLIT_WRITE_CMD_END) {
-        queue->packetSendPosition = 0;
-        packetSendQueue.packetSentRemaining++;
-
-        //Save a queue handle for that packet
-        HandlePacketQueued(queue, sendDataPacked);
-    }
-    //If this was a normal packet
-    else {
-        packetSendQueue.packetSendPosition = 0;
-
-        //Save a queue handle for that packet
-        HandlePacketQueued(queue, sendDataPacked);
-
-        //Check if this was the end of a handshake, if yes, mark handshake as completed
-        if (((ConnPacketHeader*)sentData->data)->messageType == MessageType::CLUSTER_ACK_2)
-        {
-            //Notify Node of HandshakeDone
-            GS->node.HandshakeDoneHandler((MeshConnection*)this, true);
-        }        
+    //Save a queue handle for that packet
+    HandlePacketQueued();
+    
+    //Check if this was the end of a handshake, if yes, mark handshake as completed
+    if (((ConnPacketHeader*)sentData->data)->messageType == MessageType::CLUSTER_ACK_2)
+    {
+        //Notify Node of HandshakeDone
+        GS->node.HandshakeDoneHandler((MeshConnection*)this, true);
     }
 }
 
-void MeshConnection::DataSentHandler(const u8 * data, u16 length)
+void MeshConnection::DataSentHandler(const u8 * data, MessageLength length)
 {
     const ConnPacketHeader* header = (const ConnPacketHeader*)data;
     if (header->messageType == MessageType::TIME_SYNC)
@@ -462,6 +424,9 @@ void MeshConnection::DataSentHandler(const u8 * data, u16 length)
         const TimeSyncHeader* header = (const TimeSyncHeader*)data;
         if (header->type == TimeSyncType::INITIAL)
         {
+#ifdef SIM_ENABLED
+            correctionTicksSuccessfullyWritten = true;
+#endif
             correctionTicks = GS->timeManager.GetTimePoint() - syncSendingOrdered;
         }
     }
@@ -483,7 +448,7 @@ void MeshConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8 con
 
     char stringBuffer[200];
     Logger::ConvertBufferToHexString(data, sendData->dataLength, stringBuffer, sizeof(stringBuffer));
-    logt("CONN_DATA", "Mesh RX %d,length:%d,deliv:%d,data:%s", (u32)packetHeader->messageType, sendData->dataLength, (u32)sendData->deliveryOption, stringBuffer);
+    logt("CONN_DATA", "Mesh RX %d,length:%d,deliv:%d,data:%s", (u32)packetHeader->messageType, sendData->dataLength.GetRaw(), (u32)sendData->deliveryOption, stringBuffer);
 
     //This will reassemble the data for us
     data = ReassembleData(sendData, data);
@@ -509,14 +474,15 @@ void MeshConnection::ReceiveMeshMessageHandler(BaseConnectionSendData* sendData,
         logt("ERROR", "POSSIBLE WRONG DATA RECEIVED!");
 
         //TODO set the extra value of the LogCustomError back to the message type after the currently occurring issue is fixed.
-        GS->logger.LogCustomError(CustomErrorTypes::WARN_RX_WRONG_DATA, (u32)sendData->dataLength);
+        GS->logger.LogCustomError(CustomErrorTypes::WARN_RX_WRONG_DATA, (u32)sendData->dataLength.GetRaw());
     }
     //Print packet as hex
     {
         char stringBuffer[100];
         Logger::ConvertBufferToHexString(data, sendData->dataLength, stringBuffer, sizeof(stringBuffer));
-        logt("CONN_DATA", "Received type %d,length:%d,deliv:%d,data:%s", (u32)packetHeader->messageType, sendData->dataLength, (u32)sendData->deliveryOption, stringBuffer);
+        logt("CONN_DATA", "Received type %d,length:%d,deliv:%d,data:%s", (u32)packetHeader->messageType, sendData->dataLength.GetRaw(), (u32)sendData->deliveryOption, stringBuffer);
     }
+    Logger::GetInstance().LogCustomCount(CustomErrorTypes::COUNT_TOTAL_RECEIVED_MESSAGES);
 
     if(!HandshakeDone() || connectionState == ConnectionState::REESTABLISHING_HANDSHAKE){
         ReceiveHandshakePacketHandler(sendData, data);
@@ -571,8 +537,7 @@ void MeshConnection::StartHandshakeAfterMtuExchange()
     //Changes to these values are only sent after the handshake has finished and the handshake
     //must not use values that are saved in the node because these might have changed in the meantime
     clusterIDBackup = GS->node.clusterId;
-    clusterSizeBackup = GS->node.clusterSize;
-    hopsToSinkBackup = GS->cm.GetMeshHopsToShortestSink(this);
+    clusterSizeBackup = GS->node.GetClusterSize();
     
     ClearCurrentClusterInfoUpdatePacket();
 
@@ -640,8 +605,7 @@ void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendD
             //Changes to these values are only sent after the handshake has finished and the handshake
             //must not use values that are saved in the node because these might have changed in the meantime
             clusterIDBackup = GS->node.clusterId;
-            clusterSizeBackup = GS->node.clusterSize;
-            hopsToSinkBackup = GS->cm.GetMeshHopsToShortestSink(this);
+            clusterSizeBackup = GS->node.GetClusterSize();
             
             ClearCurrentClusterInfoUpdatePacket();
 
@@ -721,7 +685,7 @@ void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendD
                 //These values will be overwritten by the ACK2 packet that we receive from out partner
                 //But if we do never receive an ACK2, this is our new starting point
                 //Setting the size to 1 is a safety precaution
-                GS->node.clusterSize = 1;
+                GS->node.SetClusterSize(1);
                 GS->node.clusterId = GS->node.GenerateClusterID();
             }
         }
@@ -895,9 +859,9 @@ void MeshConnection::ReceiveReconnectionHandshakePacket(ConnPacketReconnect cons
 
 #define _________________OTHER_______________________
 
-bool MeshConnection::GetPendingPackets() {
+u32 MeshConnection::GetPendingPackets() const {
     //Adds 1 if a clusterUpdatePacket must be send
-    return packetSendQueue._numElements + packetSendQueueHighPrio._numElements + (currentClusterInfoUpdatePacket.header.messageType == MessageType::INVALID ? 0 : 1);
+    return BaseConnection::GetPendingPackets() + (ClusterInfoUpdateHasData() ? 1 : 0);
 }
 bool MeshConnection::IsValidMessageType(MessageType t)
 {
@@ -932,13 +896,33 @@ bool MeshConnection::IsValidMessageType(MessageType t)
     }
 
 }
+bool MeshConnection::ClusterInfoUpdateHasData() const
+{
+    return currentClusterInfoUpdatePacket.payload.clusterSizeChange != 0
+        || currentClusterInfoUpdatePacket.payload.connectionMasterBitHandover != 0
+        || (currentClusterInfoUpdatePacket.payload.hopsToSink != -1 && GET_DEVICE_TYPE() != DeviceType::SINK);
+}
 ;
 
 void MeshConnection::PrintStatus()
 {
     const char* directionString = (direction == ConnectionDirection::DIRECTION_IN) ? "IN " : "OUT";
 
-    trace("%s(%d) FM %u, state:%u, cluster:%x(%d), sink:%d, Queue:%u-%u(%u), mb:%u, hnd:%u, tSync:%u, sent:%u, rssi:%d" EOL, directionString, connectionId, this->partnerId, (u32)this->connectionState, this->connectedClusterId, this->connectedClusterSize, this->hopsToSink, (packetSendQueue.readPointer - packetSendQueue.bufferStart), (packetSendQueue.writePointer - packetSendQueue.bufferStart), packetSendQueue._numElements, connectionMasterBit, connectionHandle, (u32)timeSyncState, sentUnreliable, GetAverageRSSI());
+    trace("%s(%d) FM %u, state:%u, cluster:%x(%d), sink:%d, Queue:%u, mb:%u, hnd:%u, tSync:%u, sent:%u, rssi:%d, mtu:%u" EOL,
+        directionString,
+        connectionId,
+        this->partnerId,
+        (u32)this->connectionState,
+        this->connectedClusterId,
+        this->connectedClusterSize,
+        this->hopsToSink,
+        GetPendingPackets(),
+        connectionMasterBit,
+        connectionHandle,
+        (u32)timeSyncState,
+        sentUnreliable,
+        GetAverageRSSI(),
+        connectionPayloadSize);
 }
 
 void MeshConnection::SetHopsToSink(ClusterSize hops)
@@ -949,4 +933,14 @@ void MeshConnection::SetHopsToSink(ClusterSize hops)
 ClusterSize MeshConnection::GetHopsToSink()
 {
     return hopsToSink;
+}
+
+void MeshConnection::SetEnrolledNodesSync(bool sync)
+{
+    enrolledNodesSynced = sync;
+}
+
+bool MeshConnection::GetEnrolledNodesSync()
+{
+    return enrolledNodesSynced;
 }

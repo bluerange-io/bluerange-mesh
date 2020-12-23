@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -68,7 +68,6 @@ class MeshConnection
 
         ClusterId clusterIDBackup;
         ClusterSize clusterSizeBackup;
-        ClusterSize hopsToSinkBackup;
         ClusterSize hopsToSink;
 
         //Timestamp and Clustering messages must be sent immediately and are not queued
@@ -82,8 +81,14 @@ class MeshConnection
 
         //Timing
         TimeSyncState timeSyncState = TimeSyncState::UNSYNCED;
+#ifdef SIM_ENABLED
+        bool correctionTicksSuccessfullyWritten = false;
+#endif
         u32 correctionTicks = 0;
         TimePoint syncSendingOrdered;
+
+        //Enrolled nodes syncronization
+        bool enrolledNodesSynced = false;
 
         //Reestablishing
         bool mustRetryReestablishing = false;
@@ -122,14 +127,13 @@ class MeshConnection
         bool HasConnectionMasterBit();
 
         //Sending Data
-        bool TransmitHighPrioData() override final;
+        bool QueueVitalPrioData() override final;
         void ClearCurrentClusterInfoUpdatePacket();
-        SizedData ProcessDataBeforeTransmission(BaseConnectionSendData* sendData, u8* data, u8* packetBuffer) override final;
-        void PacketSuccessfullyQueuedWithSoftdevice(PacketQueue* queue, BaseConnectionSendDataPacked* sendDataPacked, u8* data, SizedData* sentData) override final;
-        void DataSentHandler(const u8* data, u16 length) override final;
+        void PacketSuccessfullyQueuedWithSoftdevice(SizedData* sentData) override final;
+        void DataSentHandler(const u8* data, MessageLength length) override final;
 
         bool SendData(BaseConnectionSendData* sendData, u8 const * data);
-        bool SendData(u8 const * data, u16 dataLength, DeliveryPriority priority, bool reliable) override final;
+        bool SendData(u8 const * data, MessageLength dataLength, bool reliable) override final;
 
         //Receiving Data
         void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) override final;
@@ -142,10 +146,13 @@ class MeshConnection
 
         //Helpers
         void PrintStatus() override final;
-        bool GetPendingPackets() override final;
+        u32 GetPendingPackets() const override final;
         bool IsValidMessageType(MessageType type);
+        bool ClusterInfoUpdateHasData() const;
 
         //Setter
         void SetHopsToSink(ClusterSize hops);
         ClusterSize GetHopsToSink();
+        void SetEnrolledNodesSync(bool sync);
+        bool GetEnrolledNodesSync();
 };

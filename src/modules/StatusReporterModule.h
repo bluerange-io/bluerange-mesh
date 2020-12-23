@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -85,6 +85,62 @@ typedef struct
 STATIC_ASSERT_SIZE(StatusReporterModuleConnectionsMessage, 12);
 #pragma pack(pop)
 
+#pragma pack(push)
+#pragma pack(1)
+struct StatusReporterModuleConnectionsVerboseRequestMessage
+{
+    u32 connectionIndex;
+};
+STATIC_ASSERT_SIZE(StatusReporterModuleConnectionsVerboseRequestMessage, 4);
+struct StatusReporterModuleConnectionsVerboseHeader
+{
+    constexpr static u32 MAX_KNOWN_VERSION = 1;
+    u32 version;
+    u32 connectionIndex;
+};
+STATIC_ASSERT_SIZE(StatusReporterModuleConnectionsVerboseHeader, 8);
+struct StatusReporterModuleConnectionsVerboseConnection
+{
+    NodeId                partnerId;
+    FruityHal::BleGapAddr partnerAddress;
+    ConnectionType        connectionType;
+    i8                    averageRssi;
+    ConnectionState       connectionState;
+    EncryptionState       encryptionState;
+    u8                    connectionId;
+    u32                   uniqueConnectionId;
+    u16                   connectionHandle;
+    ConnectionDirection   direction;
+    u32                   creationTimeDs;
+    u32                   handshakeStartedDs;
+    u32                   connectionHandshakedTimestampDs;
+    u32                   disconnectedTimestampDs;
+    u16                   droppedPackets;
+    u16                   sentReliable;
+    u16                   sentUnreliable;
+    u32                   pendingPackets;
+    u32                   connectionMtu;
+    u8                    clusterUpdateCounter;
+    u8                    nextExpectedClusterUpdateCounter;
+    u8                    manualPacketsSent;
+};
+STATIC_ASSERT_SIZE(StatusReporterModuleConnectionsVerboseConnection, 54);
+struct StatusReporterModuleConnectionsVerboseMessage
+{
+    constexpr static u32 SIZEOF_MAX_KNOWN_VERSION = 62;
+    StatusReporterModuleConnectionsVerboseHeader header;
+    StatusReporterModuleConnectionsVerboseConnection connection;
+};
+STATIC_ASSERT_SIZE(StatusReporterModuleConnectionsVerboseMessage, 62);
+
+struct StatusReporterModuleKeepAliveMessage
+{
+    u8 fromSink : 1;
+    u8 reserved : 7;
+};
+STATIC_ASSERT_SIZE(StatusReporterModuleKeepAliveMessage, 1);
+#pragma pack(pop)
+
 /*
  * The StatusReporterModule can respond to a number of requests for device info
  * or device status, current mesh connections, etc... it also does battery
@@ -110,6 +166,7 @@ public:
             SET_KEEP_ALIVE = 9,
             GET_DEVICE_INFO_V2 = 10,
             SET_LIVEREPORTING = 11,
+            GET_ALL_CONNECTIONS_VERBOSE = 12,
         };
 
         enum class StatusModuleActionResponseMessages : u8
@@ -124,6 +181,7 @@ public:
             //DISCONNECT_REASON = 7, removed as of 21.05.2019
             REBOOT_REASON = 8,
             DEVICE_INFO_V2 = 10,
+            ALL_CONNECTIONS_VERBOSE = 12,
         };
 
         enum class StatusModuleGeneralMessages : u8
@@ -218,6 +276,8 @@ private:
         void SendDeviceInfoV2(NodeId toNode, u8 requestHandle, MessageType messageType) const;
         void SendNearbyNodes(NodeId toNode, u8 requestHandle, MessageType messageType);
         void SendAllConnections(NodeId toNode, u8 requestHandle, MessageType messageType) const;
+        constexpr static u32 CONNECTION_INDEX_INVALID = 0xFFFFFFFF;
+        void SendAllConnectionsVerbose(NodeId toNode, u8 requestHandle, u32 connectionIndex) const;
         void SendErrors(NodeId toNode, u8 requestHandle) const;
         void SendRebootReason(NodeId toNode, u8 requestHandle) const;
 

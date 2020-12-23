@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -149,10 +149,24 @@ void ScanningModule::MeshMessageReceivedHandler(BaseConnection* connection, Base
         if (connPacket->actionType == (u8)ScanModuleMessages::ASSET_TRACKING_PACKET)
         {
             TrackedAssetMessage const * msg = (TrackedAssetMessage const *)connPacket->data;
-            u32 amount = (sendData->dataLength - SIZEOF_CONN_PACKET_MODULE) / sizeof(TrackedAssetMessage);
+            u32 amount = (sendData->dataLength - SIZEOF_CONN_PACKET_MODULE).GetRaw() / sizeof(TrackedAssetMessage);
             ReceiveTrackedAssets(msg, amount, packetHeader->sender);
         }
     }
+}
+
+DeliveryPriority ScanningModule::GetPriorityOfMessage(const u8* data, MessageLength size)
+{
+    if (size >= SIZEOF_CONN_PACKET_HEADER)
+    {
+        const ConnPacketHeader* header = (const ConnPacketHeader*)data;
+        if (header->messageType == MessageType::ASSET_GENERIC
+            || header->messageType == MessageType::ASSET_LEGACY)
+        {
+            return DeliveryPriority::LOW;
+        }
+    }
+    return DeliveryPriority::INVALID;
 }
 
 
@@ -368,7 +382,7 @@ void ScanningModule::SendTrackedAssets()
 
 void ScanningModule::ReceiveTrackedAssetsLegacy(BaseConnectionSendData* sendData, ScanModuleTrackedAssetsLegacyMessage const * packet) const
 {
-    u8 count = (sendData->dataLength - SIZEOF_CONN_PACKET_HEADER)  / SIZEOF_SCAN_MODULE_TRACKED_ASSET_LEGACY;
+    u8 count = (sendData->dataLength - SIZEOF_CONN_PACKET_HEADER).GetRaw() / SIZEOF_SCAN_MODULE_TRACKED_ASSET_LEGACY;
 
     logjson_partial("SCANMOD", "{\"nodeId\":%d,\"type\":\"tracked_assets\",\"assets\":[", packet->header.sender);
 

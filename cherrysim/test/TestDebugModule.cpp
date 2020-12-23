@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -49,6 +49,7 @@ TEST(TestDebugModule, TestCommands) {
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("DEBUGMOD");
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("WATCHDOG");
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("PQ");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("CPQ");
     tester.sim->FindNodeById(2)->gs.logger.EnableTag("DEBUGMOD");
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("DEBUG");
 
@@ -146,7 +147,7 @@ TEST(TestDebugModule, TestCommands) {
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "Flooding has");
 
     tester.SendTerminalCommand(1, "printqueue 1");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Printing Queue: ");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Amount of Packets");
 
 }
 
@@ -176,4 +177,54 @@ TEST(TestDebugModule, TestReadMemory) {
     //We just make sure that it does not crash once we request too much
     tester.SendTerminalCommand(1, "action 2 debug readmem 10 400");
     tester.SimulateGivenNumberOfSteps(50);
+}
+
+TEST(TestDebugModule, TestQueueFlood) {
+    // This test makes sure that data sent in high prio is being sent more than data in the medium queue. The same is checked for medium <=> low.
+    // To check this, a lot of small messages are queued into random queues via the DebugModule. Random queues are chosen because if we would
+    // iterate over all queues in the same order all the time, the first queue might get all the messages all the time, leaving none to the other
+    // queues.
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2 });
+    simConfig.SetToPerfectConditions();
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateUntilClusteringDone(100 * 1000);
+
+    DebugModule* mod = nullptr;
+    {
+        NodeIndexSetter set(1);
+        // Determining the address of the DebugModule of NodeIndex 1. We do this
+        // before the loop so that we don't have to determine it over and over again.
+        mod = (DebugModule*)GS->node.GetModuleById(ModuleId::DEBUG_MODULE);
+        ASSERT_TRUE(mod != nullptr);
+    }
+
+    for (u32 i = 0; i < 10000; i++)
+    {
+        NodeIndexSetter set(1);
+        mod->SendQueueFloodMessages();
+        tester.SimulateGivenNumberOfSteps(1);
+    }
+
+
+    NodeIndexSetter set(0);
+    // Now mod is no longer the address of the DebugModule of NodeIndex 1, but of NodeIndex 0.
+    mod = (DebugModule*)GS->node.GetModuleById(ModuleId::DEBUG_MODULE);
+    if (mod == nullptr) SIMEXCEPTIONFORCE(IllegalStateException);
+    const u32 high   = mod->GetQueueFloodCounterHigh();
+    const u32 medium = mod->GetQueueFloodCounterMedium();
+    const u32 low    = mod->GetQueueFloodCounterLow();
+
+    // Make sure that the high queue sent at least 50% more than the medium queue.
+    // Do the same with medium <=> low.
+    ASSERT_TRUE(high > medium * 3 / 2);
+    ASSERT_TRUE(medium > low * 3 / 2);
+
+    // Also make sure that the low prio queue was able to send at least some minimum.
+    ASSERT_TRUE(low > 100);
 }

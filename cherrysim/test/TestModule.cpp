@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -91,7 +91,7 @@ TEST(TestModule, TestSetActive) {
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
     //testerConfig.verbose = true;
-    simConfig.nodeConfigName.insert({ "github_nrf52", 2 });
+    simConfig.nodeConfigName.insert({ "github_dev_nrf52", 2 });
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
@@ -170,7 +170,7 @@ TEST(TestModule, TestSetAndGetConfiguration) {
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
     //testerConfig.verbose = true;
-    simConfig.nodeConfigName.insert({ "github_nrf52", 2 });
+    simConfig.nodeConfigName.insert({ "github_dev_nrf52", 2 });
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
@@ -251,7 +251,7 @@ TEST(TestModule, TestGetModuleList) {
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
     //testerConfig.verbose = true;
-    simConfig.nodeConfigName.insert({ "github_nrf52", 2 });
+    simConfig.nodeConfigName.insert({ "github_dev_nrf52", 2 });
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
@@ -276,7 +276,7 @@ TEST(TestModule, TestConfigRemovalDuringEnrollment) {
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
     //testerConfig.verbose = true;
-    simConfig.nodeConfigName.insert({ "github_nrf52", 2 });
+    simConfig.nodeConfigName.insert({ "github_dev_nrf52", 2 });
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 

@@ -9,12 +9,7 @@ The _Debug_ module does not perform a lot of functionality itself. It triggers a
 == Terminal Commands
 
 === Resetting Nodes
-Sometimes it is necessary to reset all nodes connected to a mesh at once. The reset command can be used for this purpose. After receiving the command, each node waits a predefined time before performing a reset. This time can be defined and is set to 10 seconds by default. This ensures that the packet is sent to all nodes before the reset process starts.
-[source, C++]
-----
-//Receiving nodes will reset within a few seconds
-action [nodeId] debug reset {waitSeconds}
-----
+We have moved the reset functionality to our xref:Node.adoc#RemoteReset[Node].
 
 === Request Discover Buffer
 To debug problems with discovery, it is useful to fetch the contents of the xref:Specification.adoc[JOIN_ME] buffer from all nodes in a mesh.

@@ -1,0 +1,15 @@
+{	
+	"additionalArgs":{
+		"settings":"github_sink_nrf52",
+		"make":"github_sink_nrf52",
+		"flash":""
+	},
+	"buildSettings":{
+		"environmentVariables":{
+			"FEATURESET":"github_sink_nrf52"
+		}
+	},
+	"moduleConfigs":[
+		
+	]
+}

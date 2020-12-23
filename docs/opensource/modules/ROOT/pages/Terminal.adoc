@@ -25,6 +25,17 @@ The _stopterm_ command switches the node into an interrupt based input
 mode where terminal input does not affect the functionality until a line
 feed '\r' is received. All output messages are in JSON format.
 
+
+== CRC checking on terminal commands and output
+FruityMesh supports CRC checks for terminal commands and JSON messages. There are two possibilities to enable CRC checks:
+
+* Call `GS->terminal.EnableCrcChecks()` (done by prod_sink_nrf52 on boot)
+* Send some terminal command that contains a CRC at the end
+
+For both, terminal commands and JSONs, the CRC is appended to the string. The CRC has the exact regex form `" CRC: \d+$"` (without ""). When the CRC checks are enabled, debugging can be quite difficult. To solve this issue, you can replace the calculated CRC number to the exact string "skip", so when appending `" CRC: skip"` to a message, CRC calculation is disabled for this single terminal command. Note however that CRC checks are still enabled after this terminal command.
+
+When printing out a json with `logjson` the CRC is automatically appended. In cases where the printing of a json is split between multiple lines, the macro `logjson_partial` can be used for every json part, except the last one which has to be a `logjson`.
+
 == Rebooting (Local Command)
 
 `reset`

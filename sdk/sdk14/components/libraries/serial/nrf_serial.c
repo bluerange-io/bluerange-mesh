@@ -368,7 +368,11 @@ ret_code_t nrf_serial_write(nrf_serial_t const * p_serial,
             .expired = false,
     };
 
-    if (timeout_ms != NRF_SERIAL_MAX_TIMEOUT)
+	//Modified by M-Way to not use a timer when timeout_ms is 0
+    if(timeout_ms == 0){
+        tout_ctx.expired = true;
+    }
+    else if (timeout_ms != NRF_SERIAL_MAX_TIMEOUT)
     {
         ret = timeout_setup(p_serial,
                             p_serial->p_tx_timer,
@@ -395,14 +399,14 @@ ret_code_t nrf_serial_write(nrf_serial_t const * p_serial,
         }
 
         sleep_handler(p_serial);
-    } while (!tout_ctx.expired);
+    } while (!tout_ctx.expired && timeout_ms != 0); //Modified by M-Way to not use a timer when timeout_ms is 0
 
     if (p_written)
     {
         *p_written = size - left;
     }
 
-    if (!tout_ctx.expired && (timeout_ms != NRF_SERIAL_MAX_TIMEOUT))
+    if (!tout_ctx.expired && (timeout_ms != NRF_SERIAL_MAX_TIMEOUT) && timeout_ms != 0) //Modified by M-Way to not use a timer when timeout_ms is 0
     {
         (void)app_timer_stop(*p_serial->p_tx_timer);
     }
@@ -449,7 +453,11 @@ ret_code_t nrf_serial_read(nrf_serial_t const * p_serial,
             .expired = false,
     };
 
-    if (timeout_ms != NRF_SERIAL_MAX_TIMEOUT)
+    //Modified by M-Way to not use a timer when timeout_ms is 0
+    if(timeout_ms == 0){
+        tout_ctx.expired = true;
+    }
+    else if (timeout_ms != NRF_SERIAL_MAX_TIMEOUT)
     {
         ret = timeout_setup(p_serial,
                             p_serial->p_rx_timer,
@@ -492,7 +500,7 @@ ret_code_t nrf_serial_read(nrf_serial_t const * p_serial,
         *p_read = size - left;
     }
 
-    if (!tout_ctx.expired && (timeout_ms != NRF_SERIAL_MAX_TIMEOUT))
+    if (!tout_ctx.expired && (timeout_ms != NRF_SERIAL_MAX_TIMEOUT)  && timeout_ms != 0) //Modified by M-Way to not use a timer when timeout_ms is 0
     {
         (void)app_timer_stop(*p_serial->p_rx_timer);
     }
@@ -536,7 +544,11 @@ ret_code_t nrf_serial_flush(nrf_serial_t const * p_serial, uint32_t timeout_ms)
             .expired = false,
     };
 
-    if (timeout_ms != NRF_SERIAL_MAX_TIMEOUT)
+    //Modified by M-Way to not use a timer when timeout_ms is 0
+    if(timeout_ms == 0){
+        tout_ctx.expired = true;
+    }
+    else if (timeout_ms != NRF_SERIAL_MAX_TIMEOUT)
     {
         ret = timeout_setup(p_serial,
                             p_serial->p_tx_timer,
@@ -562,7 +574,7 @@ ret_code_t nrf_serial_flush(nrf_serial_t const * p_serial, uint32_t timeout_ms)
         sleep_handler(p_serial);
     } while (!tout_ctx.expired);
 
-    if (!tout_ctx.expired && (timeout_ms != NRF_SERIAL_MAX_TIMEOUT))
+    if (!tout_ctx.expired && (timeout_ms != NRF_SERIAL_MAX_TIMEOUT)  && timeout_ms != 0) //Modified by M-Way to not use a timer when timeout_ms is 0
     {
         (void)app_timer_stop(*p_serial->p_tx_timer);
     }

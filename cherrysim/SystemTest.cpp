@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -936,6 +936,7 @@ extern "C"
             //Set our own conneciton to encrypted
             connection->connectionEncrypted = true;
             simBleEvent s1;
+            CheckedMemset(&s1, 0, sizeof(s1));
             s1.globalId = cherrySimInstance->simState.globalEventIdCounter++;
             s1.bleEvent.header.evt_id = BLE_GAP_EVT_CONN_SEC_UPDATE;
             s1.bleEvent.header.evt_len = s1.globalId;
@@ -948,6 +949,7 @@ extern "C"
             //Set our own partners connection to encrypted
             connection->partnerConnection->connectionEncrypted = true;
             simBleEvent s2;
+            CheckedMemset(&s2, 0, sizeof(s2));
             s2.globalId = cherrySimInstance->simState.globalEventIdCounter++;
             s2.bleEvent.header.evt_id = BLE_GAP_EVT_CONN_SEC_UPDATE;
             s2.bleEvent.header.evt_len = s2.globalId;

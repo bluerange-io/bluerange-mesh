@@ -11,7 +11,7 @@ The _BeaconingModule_ is currently configured by setting its persistent configur
 
 == Add an advertising job
 
-`action [nodeId] adv add [Hex/Base64-String up to 31 byte] {requestHandle}`
+`action [nodeId] adv add [Hex/Base64-String up to 31 byte] \{requestHandle}`
 
 The node with the given nodeId will advertise the given advertising message on success together with all other advertising messages that were either configured through a different module or through the BeaconingModule. Note that only valid broadcast messages are actually advertised. Others are rejected by our HAL.
 
@@ -48,7 +48,7 @@ where "code" can have the following values:
 
 == Set an advertising job
 
-`action [nodeId] adv set [slot] [Hex/Base64-String up to 31 byte] {requestHandle}`
+`action [nodeId] adv set [slot] [Hex/Base64-String up to 31 byte] \{requestHandle}`
 
 The node with the given nodeId will advertise the given advertising message on success together with all other advertising messages that were either configured through a different module or through the BeaconingModule. Note that only valid broadcast messages are actually advertised. Others are rejected by our HAL.
 
@@ -85,7 +85,7 @@ where "code" can have the following values:
 
 == Remove an advertising job
 
-`action [nodeId] adv remove [slot] {requestHandle}`
+`action [nodeId] adv remove [slot] \{requestHandle}`
 
 Clears an advertisement slot. The node with the given nodeId will no longer advertise data in this slot. If this slot is already cleared, the command silently succeeds.
 

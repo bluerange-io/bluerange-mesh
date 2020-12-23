@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -125,7 +125,9 @@ public:
     //After the terminal has been initialized (all transports), this is true
     bool terminalIsInitialized = false;
 
-    bool lineToReadAvailable = false;
+    //Will be set to true once a full line was received during an interrupt
+    //Will then be reset by the event looper once the line was fully processed
+    volatile bool lineToReadAvailable = false;
 
     //###### General ######
     //Checks if a line is available or reads a line if input is detected

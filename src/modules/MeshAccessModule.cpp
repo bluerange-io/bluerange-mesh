@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2020 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -323,7 +323,7 @@ void MeshAccessModule::UpdateMeshAccessBroadcastPacket(u16 advIntervalMs)
             }
         }
     }
-    serviceData->interestedInConnetion = interestedInConnection;
+    serviceData->interestedInConnection = interestedInConnection;
     serviceData->serialIndex = RamConfig->GetSerialNumberIndex();
     //Insert the moduleIds that should be advertised
     serviceData->moduleIds = moduleIdsToAdvertise;
@@ -467,7 +467,7 @@ void MeshAccessModule::MeshAccessMessageReceivedHandler(MeshAccessConnection* co
 
 }
 
-void MeshAccessModule::ReceivedMeshAccessConnectMessage(ConnPacketModule const * packet, u16 packetLength) const
+void MeshAccessModule::ReceivedMeshAccessConnectMessage(ConnPacketModule const * packet, MessageLength packetLength) const
 {
     logt("MAMOD", "Received connect task");
     MeshAccessModuleConnectMessage const * message = (MeshAccessModuleConnectMessage const *) packet->data;
@@ -481,12 +481,12 @@ void MeshAccessModule::ReceivedMeshAccessConnectMessage(ConnPacketModule const *
     }
 }
 
-void MeshAccessModule::ReceivedMeshAccessDisconnectMessage(ConnPacketModule const * packet, u16 packetLength) const
+void MeshAccessModule::ReceivedMeshAccessDisconnectMessage(ConnPacketModule const * packet, MessageLength packetLength) const
 {
     logt("MAMOD", "Received disconnect task");
     MeshAccessModuleDisconnectMessage const * message = (MeshAccessModuleDisconnectMessage const *) packet->data;
 
-    BaseConnections conns = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
+    MeshAccessConnections conns = GS->cm.GetMeshAccessConnections(ConnectionDirection::INVALID);
 
     //Look for a connection with a matchin mac address
     for(u32 i=0; i<conns.count; i++){
@@ -499,7 +499,7 @@ void MeshAccessModule::ReceivedMeshAccessDisconnectMessage(ConnPacketModule cons
     }
 }
 
-void MeshAccessModule::ReceivedMeshAccessConnectionStateMessage(ConnPacketModule const * packet, u16 packetLength) const
+void MeshAccessModule::ReceivedMeshAccessConnectionStateMessage(ConnPacketModule const * packet, MessageLength packetLength) const
 {
     MeshAccessModuleConnectionStateMessage const * message = (MeshAccessModuleConnectionStateMessage const *) packet->data;
 
@@ -507,7 +507,7 @@ void MeshAccessModule::ReceivedMeshAccessConnectionStateMessage(ConnPacketModule
     logjson("MAMOD",  "\"requestHandle\":%u,\"partnerId\":%u,\"state\":%u}" SEP, packet->requestHandle, message->vPartnerId, message->state);
 }
 
-void MeshAccessModule::ReceivedMeshAccessSerialConnectMessage(ConnPacketModule const * packet, u16 packetLength)
+void MeshAccessModule::ReceivedMeshAccessSerialConnectMessage(ConnPacketModule const * packet, MessageLength packetLength)
 {
     MeshAccessModuleSerialConnectMessage const * message = (MeshAccessModuleSerialConnectMessage const *)packet->data;
     if (meshAccessSerialConnectMessageReceiveTimeDs != 0 && 
@@ -656,6 +656,23 @@ MeshAccessAuthorization MeshAccessModule::CheckAuthorizationForAll(BaseConnectio
     logt("MACONN", "Message auth is %u", (u32)auth);
 
     return auth;
+}
+
+DeliveryPriority MeshAccessModule::GetPriorityOfMessage(const u8* data, MessageLength size)
+{
+    if (size >= SIZEOF_CONN_PACKET_HEADER)
+    {
+        const ConnPacketHeader* header = (const ConnPacketHeader*)data;
+        if (header->messageType == MessageType::ENCRYPT_CUSTOM_START
+            || header->messageType == MessageType::ENCRYPT_CUSTOM_ANONCE
+            || header->messageType == MessageType::ENCRYPT_CUSTOM_SNONCE
+            || header->messageType == MessageType::ENCRYPT_CUSTOM_DONE
+            || header->messageType == MessageType::DEAD_DATA)
+        {
+            return DeliveryPriority::VITAL;
+        }
+    }
+    return DeliveryPriority::INVALID;
 }
 
 
@@ -880,20 +897,6 @@ void MeshAccessModule::GapAdvertisementReportEventHandler(const FruityHal::GapAd
             && packet->data.messageType == ServiceDataMessageType::MESH_ACCESS)
         {
             const advStructureMeshAccessServiceData* maPacket = (const advStructureMeshAccessServiceData*)&packet->data;
-            if (maPacket->interestedInConnetion == 1
-                && maPacket->networkId == GS->node.configuration.networkId
-                && maPacket->networkId != 0)
-            {
-                u16 connectionId = MeshAccessConnection::ConnectAsMaster(&addr, 10, 4, FmKeyId::ORGANIZATION, GS->node.configuration.organizationKey, MeshAccessTunnelType::LOCAL_MESH);
-                if (connectionId != 0)
-                {
-                    MeshAccessConnectionHandle maconn = GS->cm.GetMeshAccessConnectionByUniqueId(connectionId);
-                    if (maconn)
-                    {
-                        maconn.GetConnection()->KeepAliveFor(meshAccessInterestedInConnectionInitialKeepAliveDs);
-                    }
-                }
-            }
 
             OnFoundSerialIndexWithAddr(addr, maPacket->serialIndex);
         }

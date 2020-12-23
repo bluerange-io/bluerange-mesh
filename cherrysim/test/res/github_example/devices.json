@@ -7,7 +7,7 @@
       "y": 0.2,
       "z": 0,
       "onMap": true,
-      "cherrySimFeatureSet":"github_nrf52"
+      "cherrySimFeatureSet":"github_dev_nrf52"
     }
   },
   {
@@ -17,7 +17,7 @@
       "y": 0.7,
       "z": 0,
       "onMap": true,
-      "cherrySimFeatureSet":"github_nrf52"
+      "cherrySimFeatureSet":"github_dev_nrf52"
     }
   }
 ]
