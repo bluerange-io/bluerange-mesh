@@ -5,7 +5,7 @@ include(FetchContent)
 FetchContent_Declare(
   bbe
   GIT_REPOSITORY https://github.com/Brotcrunsher/BrotboxEngine
-  GIT_TAG        master
+  GIT_TAG        v0.1.7
 )
 FetchContent_GetProperties(bbe)
 if(NOT bbe_POPULATED)
