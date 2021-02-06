@@ -94,6 +94,13 @@ extern "C"{
 #include <unistd.h>
 #endif
 
+#ifdef FM_NATIVE_RENDERER_ENABLED
+#include "BBERenderer.h"
+
+BBERenderer* bbeRenderer = nullptr;
+bool bbeRendererWasDestroyed = false;
+#endif
+
 using json = nlohmann::json;
 
 
@@ -305,6 +312,20 @@ void SegFaultHandler(int sig)
 CherrySim::CherrySim(const SimConfiguration &simConfig)
     : simConfig(simConfig)
 {
+#ifdef FM_NATIVE_RENDERER_ENABLED
+    if (!bbeRenderer && !bbeRendererWasDestroyed)
+    {
+        bbeRenderer = new BBERenderer(this); // The BBERenderer is a rather massive object so we rather put it on the heap.
+        bbeRenderer->setExternallyManaged(true);
+        bbeRenderer->start(1280, 720, "FruityMesh - BBERenderer");
+    }
+    if (!bbeRendererWasDestroyed)
+    {
+        bbeRenderer->setSim(this);
+        bbeRenderer->reset();
+    }
+#endif
+
 #ifdef CI_PIPELINE
     //Static is okay, as the seg fault handler works accross all simulations.
     static bool segfaultHandlerSet = false;
@@ -826,6 +847,9 @@ void CherrySim::SimulateStepForAllNodes()
 
     //printf("-- %u --" EOL, simState.simTimeMs);
     for (u32 i = 0; i < GetTotalNodes(); i++) {
+#ifdef FM_NATIVE_RENDERER_ENABLED
+        if (bbeRenderer && bbeRenderer->isPaused()) break;
+#endif
         NodeIndexSetter setter(i);
         bool simulateNode = true;
         if (simConfig.simulateJittering)
@@ -877,6 +901,20 @@ void CherrySim::SimulateStepForAllNodes()
     //Back up the flash every flashToFileWriteInterval's step.
     flashToFileWriteCycle++;
     if (flashToFileWriteCycle % flashToFileWriteInterval == 0) StoreFlashToFile();
+
+#ifdef FM_NATIVE_RENDERER_ENABLED
+    if (bbeRenderer && bbeRenderer->keepAlive())
+    {
+        bbeRenderer->frame();
+    }
+    else if(bbeRenderer)
+    {
+        bbeRenderer->shutdown();
+        delete bbeRenderer;
+        bbeRenderer = nullptr;
+        bbeRendererWasDestroyed = true;
+    }
+#endif
 }
 
 void CherrySim::QuitSimulation()
@@ -2343,6 +2381,13 @@ void CherrySim::SimulateConnections() {
                 for (int k = 0; k < numPacketsToSend; k++) {
                     SoftDeviceBufferedPacket* packet = getNextPacketToWrite(connection);
                     if (packet == nullptr) break;
+
+#ifdef FM_NATIVE_RENDERER_ENABLED
+                    if (bbeRenderer)
+                    {
+                        bbeRenderer->addPacket(packet->sender, packet->receiver);
+                    }
+#endif
 
                     //Notifications
                     if (packet->isHvx) {

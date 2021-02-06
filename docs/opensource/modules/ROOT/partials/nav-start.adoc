@@ -53,6 +53,7 @@ endif::[]
 
 * xref:fruitymesh::CherrySim.adoc[Simulator]
 ** xref:fruitymesh::CherrySim.adoc[CherrySim]
+** xref:fruitymesh::NativeCherrySimRenderer.adoc[Native CherrySim Renderer]
 
 * xref:fruitymesh::Battery-Consumption.adoc[Measurements]
 ** xref:fruitymesh::Battery-Consumption.adoc[Battery Consumption]
