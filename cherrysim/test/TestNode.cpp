@@ -61,6 +61,8 @@ TEST(TestNode, TestCommands) {
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "Cleaning up conn ");
     tester.SimulateUntilClusteringDone(100 * 1000);
 
+    tester.SimulateGivenNumberOfSteps(10);
+
     tester.SendTerminalCommand(1, "action 2 node discovery idle");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "-- DISCOVERY IDLE --");
     tester.SendTerminalCommand(1, "action 2 node discovery on");
@@ -79,7 +81,7 @@ TEST(TestNode, TestCommands) {
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "JOIN_ME Buffer:");
 
     tester.SendTerminalCommand(1, "datal r");
-    tester.SimulateUntilMessageReceived(10 * 1000, 2, "11:08:8C");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "RX Data size is:");
 
     tester.SendTerminalCommand(1, "settime 1337 0");
     tester.SimulateGivenNumberOfSteps(1);
@@ -422,7 +424,8 @@ TEST(TestNode, TestDiscoveryStates) {
     }
 }
 
-TEST(TestNode, TestDiscoverySettingEnrolled) {
+//Could be enabled again after this ticket BR-572
+TEST(TestNode, DISABLED_TestDiscoverySettingEnrolled) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.nodeConfigName.clear();

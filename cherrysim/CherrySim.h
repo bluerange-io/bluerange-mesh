@@ -99,6 +99,9 @@ public:
 
     void ErasePage(u32 pageAddress);
 
+    //Can be used to inject a single record configuration into the flash of the current node before booting it
+    void WriteRecordToFlash(u16 recordId, u8* data, u16 dataLength);
+
     std::map<std::string, FeaturesetPointers> featuresetPointers;
 
     std::queue<ReplayRecordEntry> replayRecordEntries;
@@ -240,6 +243,9 @@ public:
 #ifndef GITHUB_RELEASE
     void SimulateClcData();
 #endif //GITHUB_RELEASE
+
+    // Timeslot API Simulation
+    void SimulateTimeslot();
 
     //Other Simulation
     void SimulateTimer();

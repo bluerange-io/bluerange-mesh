@@ -114,6 +114,7 @@ CREATEEXCEPTION(NotImplementedException);
 CREATEEXCEPTION(CorruptOrOutdatedSavefile);
 CREATEEXCEPTION(ZeroTimeoutNotSupportedException);
 CREATEEXCEPTION(ErrorLoggedException);
+CREATEEXCEPTION(InterruptDeadlockException);
 //LCOV_EXCL_STOP debug code
 
 #undef CREATEEXCEPTION //Exceptions must be created above!

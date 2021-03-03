@@ -249,7 +249,7 @@ void Conf::LoadSettingsFromFlash(Module* module, u16 recordId, u8* configuration
         ){
             CheckedMemcpy(configurationPointer, configData.data, configData.length.GetRaw());
 
-            logt("CONFIG", "Config for module %s loaded from record %u", Utility::GetModuleIdString(module->vendorModuleId).data(), recordId);
+            logt("CONFIG", "Config for module %s loaded from record %u", Utility::GetModuleIdString(module->vendorModuleId, false).data(), recordId);
 
             module->ConfigurationLoadedHandler(nullptr, 0);
         }
@@ -258,12 +258,12 @@ void Conf::LoadSettingsFromFlash(Module* module, u16 recordId, u8* configuration
             (!Utility::IsVendorModuleId(module->moduleId) && configData.length >= SIZEOF_MODULE_CONFIGURATION_HEADER)
             || (Utility::IsVendorModuleId(module->vendorModuleId) && configData.length >= SIZEOF_VENDOR_MODULE_CONFIGURATION_HEADER)
         ){
-            logt("CONFIG", "Flash config for module %s has mismatching version", Utility::GetModuleIdString(module->vendorModuleId).data());
+            logt("CONFIG", "Flash config for module %s has mismatching version", Utility::GetModuleIdString(module->vendorModuleId, false).data());
 
             module->ConfigurationLoadedHandler(configData.data, configData.length.GetRaw());
         }
         else {
-            logt("CONFIG", "No flash config for module %s found, using defaults", Utility::GetModuleIdString(module->vendorModuleId).data());
+            logt("CONFIG", "No flash config for module %s found, using defaults", Utility::GetModuleIdString(module->vendorModuleId, false).data());
 
             module->ConfigurationLoadedHandler(nullptr, 0);
         }

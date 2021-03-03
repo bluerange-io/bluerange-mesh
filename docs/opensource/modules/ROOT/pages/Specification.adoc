@@ -291,6 +291,9 @@ regenerated and distributed to users.
 TIP: A key that is filled with 0xFF is considered invalid and cannot be
 used.
 
+== QR Codes
+One convenient method to transmit a node key out of band is by using QR codes. Please see our dedicated xref:QRCodeGeneration.adoc[specification on QR codes] for more information on how to generate QR codes that are compatible with the FruityMesh / BlueRange ecosystem.
+
 [#deviceTypes]
 == Device Types
 There are different device types that are given to nodes with specific functionality:

@@ -53,6 +53,8 @@ BaseConnection::BaseConnection(u8 id, ConnectionDirection direction, FruityHal::
     //Initialize to defaults
     clusterUpdateCounter = 0;
     nextExpectedClusterUpdateCounter = 1;
+    CheckedMemset(dataSentBuffer, 0x00, sizeof(dataSentBuffer));
+    dataSentLength = 0;
 
     GS->cm.NotifyNewConnection();
 }
@@ -102,11 +104,11 @@ void BaseConnection::DisconnectAndRemove(AppDisconnectReason reason)
 #define __________________SENDING__________________
 
 
-bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8 const * data){
-    return QueueData(sendData, data, true);
+bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8 const * data, u32* messageHandle){
+    return QueueData(sendData, data, true, messageHandle);
 }
 
-bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8 const * data, bool fillTxBuffers)
+bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8 const * data, bool fillTxBuffers, u32* messageHandle)
 {
     const u32 bufferSize = SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED + sendData.dataLength.GetRaw();
     DYNAMIC_ARRAY(buffer, bufferSize);
@@ -118,7 +120,7 @@ bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8 const 
 
     CheckedMemcpy(buffer + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED, data, sendData.dataLength.GetRaw());
 
-    const bool successfullyQueued = queue.SplitAndAddMessage(overwritePriority == DeliveryPriority::INVALID ? GetPriorityOfMessage(data, sendData.dataLength) : overwritePriority, buffer, bufferSize, connectionPayloadSize);
+    const bool successfullyQueued = queue.SplitAndAddMessage(overwritePriority == DeliveryPriority::INVALID ? GetPriorityOfMessage(data, sendData.dataLength) : overwritePriority, buffer, bufferSize, connectionPayloadSize, messageHandle);
 
     if(successfullyQueued){
         if (fillTxBuffers) FillTransmitBuffers();
@@ -307,7 +309,8 @@ void BaseConnection::HandlePacketSent(u8 sentUnreliable, u8 sentReliable)
             return;
         }
         DYNAMIC_ARRAY(queueBuffer, connectionMtu + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
-        const u16 length = activeQueue->PeekPacket(queueBuffer, connectionMtu + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
+        u32 messageHandle;
+        const u16 length = activeQueue->PeekPacket(queueBuffer, connectionMtu + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED, &messageHandle);
 
         BaseConnectionSendDataPacked* sendData = (BaseConnectionSendDataPacked*)queueBuffer;
 
@@ -317,9 +320,38 @@ void BaseConnection::HandlePacketSent(u8 sentUnreliable, u8 sentReliable)
             SIMEXCEPTION(IllegalStateException);
         }
 #endif
+        if (messageHandle == 0)
+        {
+            CheckedMemcpy(&dataSentBuffer[dataSentLength], queueBuffer + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED + SIZEOF_CONN_PACKET_SPLIT_HEADER, length - SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED - SIZEOF_CONN_PACKET_SPLIT_HEADER);
+            dataSentLength += (length - SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED - SIZEOF_CONN_PACKET_SPLIT_HEADER);
+            activeQueue->PopPacket();
+            continue;
+        }
 
-        DataSentHandler(queueBuffer + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED, length - SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED);
+        if (dataSentLength != 0)
+        {
+            CheckedMemcpy(&dataSentBuffer[dataSentLength], queueBuffer + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED + SIZEOF_CONN_PACKET_SPLIT_HEADER, length - SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED - SIZEOF_CONN_PACKET_SPLIT_HEADER);
+            dataSentLength += (length - SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED - SIZEOF_CONN_PACKET_SPLIT_HEADER);
+            DataSentHandler(dataSentBuffer, dataSentLength, messageHandle);
+#ifdef SIM_ENABLED
+            char stringBuffer[1000];
+            Logger::ConvertBufferToBase64String(dataSentBuffer, dataSentLength, stringBuffer, sizeof(stringBuffer));
+            logt("CONN", "DataSentHandler: %s", stringBuffer);
+#endif
+        }
+        else
+        {
+            DataSentHandler(queueBuffer + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED, length - SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED, messageHandle);
+#ifdef SIM_ENABLED
+            char stringBuffer[1000];
+            Logger::ConvertBufferToBase64String(queueBuffer + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED, length - SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED, stringBuffer, sizeof(stringBuffer));
+            logt("CONN", "DataSentHandler: %s", stringBuffer);
+#endif
+        }
+
+
         activeQueue->PopPacket();
+        dataSentLength = 0;
     }
 
     //Log how many packets have been sent

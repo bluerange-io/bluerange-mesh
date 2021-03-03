@@ -75,7 +75,7 @@ public:
     u16 GetConnectionHandle();
     NodeId GetPartnerId();
     ConnectionState GetConnectionState();
-    bool SendData(u8 const * data, MessageLength dataLength, bool reliable);
+    bool SendData(u8 const * data, MessageLength dataLength, bool reliable, u32 * messageHandle=nullptr);
     bool FillTransmitBuffers();
     FruityHal::BleGapAddr GetPartnerAddress();
     u32 GetCreationTimeDs();
@@ -105,7 +105,7 @@ public:
     ClusterSize GetHopsToSink();
     bool SetHopsToSink(ClusterSize hops);
     using BaseConnectionHandle::SendData;
-    bool SendData(BaseConnectionSendData* sendData, u8 const * data);
+    bool SendData(BaseConnectionSendData* sendData, u8 const * data, u32 * messageHandle=nullptr);
     ClusterSize GetConnectedClusterSize();
     bool HandoverMasterBit();
     bool HasConnectionMasterBit();

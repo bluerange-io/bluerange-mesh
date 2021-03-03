@@ -140,6 +140,7 @@ extern "C" {
 #define ACTIVATE_MODBUS_MODULE 1
 #define ACTIVATE_MODBUS_COMM 1
 #define ACTIVATE_INS 1
+#define ACTIVATE_RUUVI_WEATHER_MODULE 1
 
 #define ACTIVATE_UNSECURE_MEMORY_READBACK 1
 
@@ -235,6 +236,39 @@ typedef enum {
     LIS2DH12_RATE_400 = 7 << 4    /** 1k+ rates not implemented */
 }lis2dh12_sample_rate_t;
 
+enum
+{
+    RADIO_TXPOWER_TXPOWER_Neg40dBm = 1,
+    RADIO_TXPOWER_TXPOWER_Neg20dBm,
+    RADIO_TXPOWER_TXPOWER_Neg16dBm,
+    RADIO_TXPOWER_TXPOWER_Neg12dBm,
+    RADIO_TXPOWER_TXPOWER_Neg8dBm,
+    RADIO_TXPOWER_TXPOWER_Neg4dBm,
+    RADIO_TXPOWER_TXPOWER_0dBm,
+    RADIO_TXPOWER_TXPOWER_Pos3dBm,
+    RADIO_TXPOWER_TXPOWER_Pos4dBm,
+};
+
+enum
+{
+    RADIO_TXPOWER_TXPOWER_Pos = 0,
+};
+
+typedef struct
+{
+    // Attributes that are interesting for the simulator.
+    uint32_t PACKETPTR;
+    uint32_t TXPOWER;
+
+    // The actial radio has more event registers.
+    bool EVENTS_DISABLED;
+    bool EVENTS_DISABLED_MASKED;
+
+    // The actual radio has more task registers.
+    bool TASKS_DISABLE;
+    bool TASKS_TXEN;
+} NRF_RADIO_Type;
+
 typedef enum
 {
     NRF_UART_HWFC_DISABLED = 0,
@@ -290,7 +324,13 @@ typedef enum
 #define NRF_WDT_RR0 0
 #define NRF_WDT_TASK_START 0
 #define NRF_WDT_BEHAVIOUR_RUN_SLEEP 0
-#define NRF_SDH_BLE_GATT_MAX_MTU_SIZE 251
+//****************************************
+//NOTE: if we want to change NRF_SDH_BLE_GATT_MAX_MTU_SIZE value in future, We
+//Should also change in sdk_config.h . in order to keep this value consistent
+//in both simulatore and frimware
+#define NRF_SDH_BLE_GATT_MAX_MTU_SIZE 63
+
+//*****************************
 #define NRF_SDH_BLE_GATTS_ATTR_TAB_SIZE 580
 #define GATT_MTU_SIZE_DEFAULT 23
 
@@ -669,6 +709,7 @@ void nrf_drv_gpiote_in_event_enable(nrf_drv_gpiote_pin_t pin, bool);
 #define BME280_STANDBY_1000_MS 4
 #define BME280_MODE_NORMAL 5
 #define BME280REG_CTRL_MEAS 6
+#define BME280_MODE_FORCED 7
 typedef uint32_t BME280_Ret;
 
 uint32_t bme280_init(int32_t slaveSelectPin);
@@ -701,11 +742,13 @@ extern NRF_FICR_Type* simFicrPtr;
 extern NRF_UICR_Type* simUicrPtr;
 extern NRF_GPIO_Type* simGpioPtr;
 extern NRF_UART_Type* simUartPtr;
+extern NRF_RADIO_Type* simRadioPtr;
 extern uint8_t* simFlashPtr;
 #define NRF_FICR (simFicrPtr)
 #define NRF_UICR (simUicrPtr)
 #define NRF_GPIO (simGpioPtr)
 #define NRF_UART0 (simUartPtr)
+#define NRF_RADIO (simRadioPtr)
 
 //The flash region start address points to the beginning of the flash memory. All address calculations must
 //use the correct addresses including the start address of the flash space.
@@ -734,6 +777,13 @@ uint32_t sd_ble_gatts_service_add(uint8_t type, ble_uuid_t const *p_uuid, uint16
 uint32_t sd_ble_gatts_characteristic_add(uint16_t service_handle, ble_gatts_char_md_t const *p_char_md, ble_gatts_attr_t const *p_attr_char_value, ble_gatts_char_handles_t *p_handles);
 uint32_t sd_ble_gatts_sys_attr_set(uint16_t conn_handle, uint8_t const *p_sys_attr_data, uint16_t len, uint32_t flags);
 uint32_t sd_ble_gattc_primary_services_discover(uint16_t conn_handle, uint16_t start_handle, ble_uuid_t const *p_srvc_uuid);
+//********************************************************
+// NOTE: This implementation simulates the mtu request by pushing the event directly into the queue of the partner node
+//On real nodes, softdevice will send a message of mtu request which could be affected by some other factors as well like order of queue etc 
+uint32_t sd_ble_gattc_exchange_mtu_request(uint16_t connHandle, uint16_t clientRxMtu);
+uint32_t sd_ble_gap_data_length_update(uint16_t connHandle, ble_gap_data_length_params_t const* p_dl_params, ble_gap_data_length_limitation_t* p_dl_limitation);
+uint32_t sd_ble_gatts_exchange_mtu_reply(uint16_t connHandle, uint16_t serverRxMtu);
+//********************************************************
 uint32_t sd_ble_gattc_characteristics_discover(uint16_t conn_handle, ble_gattc_handle_range_t const *p_handle_range);
 uint32_t sd_ble_gattc_write(uint16_t conn_handle, ble_gattc_write_params_t const *p_write_params);
 uint32_t sd_ble_gap_scan_stop();
@@ -773,6 +823,10 @@ uint32_t app_timer_cnt_get();
 uint32_t app_timer_cnt_diff_compute(uint32_t nowTime, uint32_t previousTime);
 typedef void (*ble_radio_notification_evt_handler_t) (bool radio_active);
 
+uint32_t sd_radio_session_open(nrf_radio_signal_callback_t callback);
+uint32_t sd_radio_session_close();
+uint32_t sd_radio_request(nrf_radio_request_t const * request);
+
 
 void sim_collect_statistic_count(const char* key);
 void sim_collect_statistic_avg(const char* key, int value);
@@ -802,6 +856,8 @@ bool IsEmpty(const uint8_t* data, uint32_t length);
 #define ACTIVATE_LOGGING 1
 
 #define ACTIVATE_CLC_MODULE 1
+
+#define ACTIVATE_TIMESLOT 1
 
 #ifndef GITHUB_RELEASE
 #define ACTIVATE_SIG_MESH 1

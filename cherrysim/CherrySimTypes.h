@@ -68,7 +68,7 @@ constexpr int PACKET_STAT_SIZE = 10*1024;
 //A BLE Event that is sent by the Simulator is wrapped
 struct simBleEvent {
     ble_evt_t bleEvent;
-    u8 data[GATT_MTU_SIZE_DEFAULT]; //overflow area for ble_evt_t as sizeof(ble_evt_t) does not include write data, this must be added using the MTU
+    u8 data[NRF_SDH_BLE_GATT_MAX_MTU_SIZE]; //overflow area for ble_evt_t as sizeof(ble_evt_t) does not include write data, this must be added using the MTU
     u32 size;
     u32 globalId;
     u32 additionalInfo; //Can be used to store a pointer or other information
@@ -89,7 +89,7 @@ struct SoftDeviceBufferedPacket {
         ble_gatts_hvx_params_t   hvxParams;
     }params;
     bool isHvx;
-    uint8_t data[30];
+    uint8_t data[NRF_SDH_BLE_GATT_MAX_MTU_SIZE];
 
 };
 
@@ -99,10 +99,11 @@ struct PacketStat {
     ModuleIdWrapper moduleId = INVALID_WRAPPED_MODULE_ID;
     u8 actionType = 0;
     u8 isSplit = 0;
+    u8 requestHandle = 0;
     u32 count = 0;
 };
 constexpr int packetStatCompareBytes = sizeof(PacketStat) - sizeof(u32);
-static_assert(sizeof(PacketStat) == 11);
+static_assert(sizeof(PacketStat) == 12);
 #pragma pack(pop)
 
 
@@ -235,6 +236,7 @@ struct NodeEntry {
     NRF_FICR_Type ficr;
     NRF_UICR_Type uicr;
     NRF_GPIO_Type gpio;
+    NRF_RADIO_Type radio;
     u8 flash[SIM_MAX_FLASH_SIZE];
     SoftdeviceState state;
     std::deque<simBleEvent> eventQueue;
@@ -278,6 +280,12 @@ struct NodeEntry {
     PacketStat routedPackets[PACKET_STAT_SIZE];
 
     MoveAnimation animation;
+
+    // Timeslot simulation
+    nrf_radio_signal_callback_t timeslotRadioSignalCallback = nullptr;
+    bool timeslotCloseSessionRequested = false;
+    bool timeslotRequested = false;
+    bool timeslotActive = false;
 };
 
 

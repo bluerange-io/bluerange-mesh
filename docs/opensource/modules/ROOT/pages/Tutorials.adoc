@@ -11,3 +11,10 @@ tutorial that will guide you through the necessary steps on how to
 create a Module that can send and receive ping requests.
 
 Tutorial: xref:Implementing-a-Custom-Module.adoc[Implementing a Custom Module]
+
+== Hardware
+FruityMesh can not just be used with Nordics nRF52-DK and nRF52840-DK.
+If you want to know how to use other hardware together with FruityMesh,
+have a look at the following examples.
+
+Tutorial: xref:fruitymesh::UsingRuuviTagsWithFruityMesh.adoc[Using RuuviTags with FruityMesh]

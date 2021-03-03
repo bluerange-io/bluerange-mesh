@@ -6,6 +6,8 @@ The _EnrollmentModule_ has _ModuleId_ 5. New nodes are normally flashed without 
 
 In order to assign a node to a mesh, the user has to give a `networkId`, the `networkKey` and a unique `nodeId` for this mesh. This can be done by a MeshGateway or a dedicated enrollment app. The enrollment packet should be sent to the broadcast address 0 and must contain to xref:Specification.adoc#SerialNumbers[serial number] of the node to be enrolled.
 
+For enrolling devices using a smartphone app it is very common to use QR codes. Please see our xref:QRCodeGeneration.adoc[specification on QR codes] on how to generate QR codes that are compatible with the rest of the FruityMesh / BlueRange ecosystem.
+
 == Functionality
 
 === Enrolling Over The Mesh

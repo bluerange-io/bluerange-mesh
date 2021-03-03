@@ -436,7 +436,7 @@ void StatusReporterModule::GapAdvertisementReportEventHandler(const FruityHal::G
 
     const AdvPacketHeader* packetHeader = (const AdvPacketHeader*)data;
 
-    if (packetHeader->messageType == ServiceDataMessageType::JOIN_ME_V0)
+    if (packetHeader->messageType == ManufacturerSpecificMessageType::JOIN_ME_V0)
     {
         if (dataLength == SIZEOF_ADV_PACKET_JOIN_ME)
         {

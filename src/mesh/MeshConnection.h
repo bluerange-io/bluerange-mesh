@@ -130,10 +130,10 @@ class MeshConnection
         bool QueueVitalPrioData() override final;
         void ClearCurrentClusterInfoUpdatePacket();
         void PacketSuccessfullyQueuedWithSoftdevice(SizedData* sentData) override final;
-        void DataSentHandler(const u8* data, MessageLength length) override final;
+        void DataSentHandler(const u8* data, MessageLength length, u32 messageHandle) override final;
 
-        bool SendData(BaseConnectionSendData* sendData, u8 const * data);
-        bool SendData(u8 const * data, MessageLength dataLength, bool reliable) override final;
+        bool SendData(BaseConnectionSendData* sendData, u8 const * data, u32 * messageHandle=nullptr);
+        bool SendData(u8 const * data, MessageLength dataLength, bool reliable, u32 * messageHandle=nullptr) override final;
 
         //Receiving Data
         void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) override final;

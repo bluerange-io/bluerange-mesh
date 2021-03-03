@@ -31,8 +31,8 @@
 #include <CherrySimUtils.h>
 
 //Helper function that checks a given message type for a maximum count and clears it if it was ok
-void CheckAndClearStat(PacketStat* stat, MessageType mt, ModuleId moduleId, u32 minCount = 0, u32 maxCount = UINT32_MAX, u8 actionType = 0);
-void CheckAndClearStat(PacketStat* stat, MessageType mt, ModuleIdWrapper moduleId, u32 minCount = 0, u32 maxCount = UINT32_MAX, u8 actionType = 0);
+void CheckAndClearStat(PacketStat* stat, MessageType mt, ModuleId moduleId, u32 minCount = 0, u32 maxCount = UINT32_MAX, u8 actionType = 0, u8 requestHandle = 0);
+void CheckAndClearStat(PacketStat* stat, MessageType mt, ModuleIdWrapper moduleId, u32 minCount = 0, u32 maxCount = UINT32_MAX, u8 actionType = 0, u8 requestHandle = 0);
 
 //After checking and clearing all stat entries we can check if it is empty with this function
 void checkStatEmpty(PacketStat* stat);

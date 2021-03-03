@@ -219,12 +219,17 @@ ModuleIdWrapper Utility::GetWrappedModuleIdFromTerminal(const char* commandArg, 
 }
 
 //ATTENTION, you need to access .data() when using this with printf!
-ModuleIdString Utility::GetModuleIdString(ModuleIdWrapper wrappedModuleId)
+ModuleIdString Utility::GetModuleIdString(ModuleIdWrapper wrappedModuleId, bool mayUseDoubleQuotes)
 {
     ModuleIdString out;
 
     if (IsVendorModuleId(wrappedModuleId)) {
-        sprintf(out.data(), "\"0x%08X\"", wrappedModuleId);
+        // TODO: Clean-up all usages of this function and remove the
+        //       mayUseDoubleQuotes parameter. Tracked via BR-668.
+        if (mayUseDoubleQuotes)
+            sprintf(out.data(), "\"0x%08X\"", wrappedModuleId);
+        else
+            sprintf(out.data(), "0x%08X", wrappedModuleId);
     }
     else {
         sprintf(out.data(), "%u", (u8)Utility::GetModuleId(wrappedModuleId));

@@ -223,7 +223,7 @@ SECTIONS
 		__noinit_start__ = .;
 		*(.noinit .noinit.*)
 		__noinit_end__ = .;
-	} > RAM
+	} > RAM_NO_INIT
 
 	.heap : ALIGN(4)
 	{

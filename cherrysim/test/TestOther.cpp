@@ -1483,3 +1483,74 @@ TEST(TestOther, TestConnectionSupervisionTimeoutWontDisconnect) {
     }
 }
 #endif //GITHUB_RELEASE
+
+TEST(TestOther, TestDataSentSplit) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    // testerConfig.verbose = true;
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+    tester.SimulateUntilClusteringDone(10 * 1000);
+    
+    alignas(4) u8 buffer[MAX_MESH_PACKET_SIZE];
+
+    // Put a message header in the beginning of buffer
+    ConnPacketHeader* header = (ConnPacketHeader*)(buffer);
+    header->messageType = MessageType::DATA_1;
+    header->sender = 1;
+    header->receiver = 0;
+
+    // Put some data after header
+    u8* counter = (u8*)(buffer + SIZEOF_CONN_PACKET_HEADER);
+    for (uint8_t i = 0; i < MAX_MESH_PACKET_SIZE - SIZEOF_CONN_PACKET_HEADER; i++)
+    {
+        *counter = i;
+        counter++;
+    }
+
+    char bufferHex[500];
+    uint8_t len;
+
+    // Test non split packet
+    len = 10;
+    {
+        NodeIndexSetter setter(1);
+        tester.sim->currentNode->gs.cm.SendMeshMessage(buffer, len);
+    }
+
+    Logger::ConvertBufferToBase64String(buffer, len, bufferHex, sizeof(bufferHex));
+    tester.SimulateUntilMessageReceived(100 * 1000, 2, "DataSentHandler: %s", bufferHex);
+    
+    // Test mid-size message
+    len = MAX_MESH_PACKET_SIZE / 3;
+    {
+        NodeIndexSetter setter(1);
+        tester.sim->currentNode->gs.cm.SendMeshMessage(buffer, len);
+    }
+
+    Logger::ConvertBufferToBase64String(buffer, len, bufferHex, sizeof(bufferHex));
+    tester.SimulateUntilMessageReceived(100 * 1000, 2, "DataSentHandler: %s", bufferHex);
+
+    // Test max-size message
+    len = MAX_MESH_PACKET_SIZE;
+    {
+        NodeIndexSetter setter(1);
+        tester.sim->currentNode->gs.cm.SendMeshMessage(buffer, len);
+    }
+
+    Logger::ConvertBufferToBase64String(buffer, len, bufferHex, sizeof(bufferHex));
+    tester.SimulateUntilMessageReceived(100 * 1000, 2, "DataSentHandler: %s", bufferHex);
+
+    // Test non split packet again to make sure it will return proper data after split packet was handled
+    len = 10;
+    {
+        NodeIndexSetter setter(1);
+        tester.sim->currentNode->gs.cm.SendMeshMessage(buffer, len);
+    }
+
+    Logger::ConvertBufferToBase64String(buffer, len, bufferHex, sizeof(bufferHex));
+    tester.SimulateUntilMessageReceived(100 * 1000, 2, "DataSentHandler: %s", bufferHex);
+}

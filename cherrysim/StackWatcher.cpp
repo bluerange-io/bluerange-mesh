@@ -55,12 +55,13 @@ void StackWatcher::Check()
 
     if (cleanedStackSize > 12000)
     {
-#if !defined(GITHUB_RELEASE) && !defined(__clang__)
+#if !defined(GITHUB_RELEASE) && !defined(__clang__) && !defined(SANITIZERS_ENABLED)
         SIMEXCEPTION(StackOverflowException);
 #else
         //The "GITHUB_RELEASE" configuration executes only github featuresets which, by definition, consume much more RAM.
         //__clang__ has vastly different stack frames and is thus not supported as well. As this is just a sanity check,
         //supporting one compiler for the pipeline and one for local runs is sufficient.
+        //If sanitizers are enabled, the RAM stack usage is a lot higher than without so we cannot do any useful testing here
 #endif //GITHUB_RELEASE
     }
 }

@@ -47,6 +47,7 @@
 #include "Terminal.h"
 #include "FlashStorage.h"
 #include "RecordStorage.h"
+#include "Timeslot.h"
 #include "LedWrapper.h"
 #include "Node.h"
 #include "ConnectionAllocator.h"
@@ -89,8 +90,7 @@ class GlobalState
 
         //#################### Event Buffer ###########################
 #if defined(SIM_ENABLED)
-        static constexpr u16 BLE_STACK_EVT_MSG_BUF_SIZE = 18;
-        u32 currentEventBuffer[BLE_STACK_EVT_MSG_BUF_SIZE];
+        u32 currentEventBuffer[15 + NRF_SDH_BLE_GATT_MAX_MTU_SIZE / 4]; //This value was picked arbitrarily so that the buffer will be big enough to fit all kinds of events. This is more than enough for all event types and is simpler than using the complex macros from the SDK to pick the correct size.
         static constexpr u16 SIZE_OF_EVENT_BUFFER = sizeof(currentEventBuffer);
 #endif
 
@@ -124,6 +124,10 @@ class GlobalState
         Terminal terminal;
         FlashStorage flashStorage;
         RecordStorage recordStorage;
+
+#if IS_ACTIVE(TIMESLOT)
+        Timeslot timeslot;
+#endif
 
 #if IS_ACTIVE(SIG_MESH)
         SigAccessLayer sig;

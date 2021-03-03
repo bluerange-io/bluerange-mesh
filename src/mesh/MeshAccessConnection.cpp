@@ -312,7 +312,8 @@ void MeshAccessConnection::HandshakeANonce(ConnPacketEncryptCustomStart const * 
     SendData(
         (u8*)&packet,
         SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_ANONCE,
-        false);
+        false,
+        &anonceMessageHandle);
 }
 
 //This method is called by the Central after the ANonce was received
@@ -804,7 +805,7 @@ bool MeshAccessConnection::ShouldSendDataToNodeId(NodeId nodeId) const
 }
 
 
-bool MeshAccessConnection::SendData(u8 const * data, MessageLength dataLength, bool reliable)
+bool MeshAccessConnection::SendData(u8 const * data, MessageLength dataLength, bool reliable, u32 * messageHandle)
 {
     if (dataLength > MAX_MESH_PACKET_SIZE) {
         SIMEXCEPTION(PacketTooBigException);
@@ -831,11 +832,11 @@ bool MeshAccessConnection::SendData(u8 const * data, MessageLength dataLength, b
         sendData.deliveryOption = DeliveryOption::NOTIFICATION;
     }
 
-    return SendData(&sendData, data);
+    return SendData(&sendData, data, messageHandle);
 }
 
 //This is the generic method for sending data
-bool MeshAccessConnection::SendData(BaseConnectionSendData* sendData, u8 const * data)
+bool MeshAccessConnection::SendData(BaseConnectionSendData* sendData, u8 const * data, u32 * messageHandle)
 {
     ConnPacketHeader const * packetHeader = (ConnPacketHeader const *)data;
 
@@ -886,7 +887,7 @@ bool MeshAccessConnection::SendData(BaseConnectionSendData* sendData, u8 const *
 
         //Put packet in the queue for sending
         if(auth != MeshAccessAuthorization::UNDETERMINED && auth != MeshAccessAuthorization::BLACKLIST){
-            return QueueData(*sendData, data);
+            return QueueData(*sendData, data, messageHandle);
         } else {
             return false;
         }
@@ -895,7 +896,7 @@ bool MeshAccessConnection::SendData(BaseConnectionSendData* sendData, u8 const *
     {
         //Put packet in the queue for sending
         if(auth != MeshAccessAuthorization::UNDETERMINED && auth != MeshAccessAuthorization::BLACKLIST){
-            return QueueData(*sendData, data);
+            return QueueData(*sendData, data, messageHandle);
         } else {
             return false;
         }
@@ -1144,16 +1145,13 @@ void MeshAccessConnection::GATTServiceDiscoveredHandler(FruityHal::BleGattDBDisc
     }
 }
 
-void MeshAccessConnection::DataSentHandler(const u8* data, MessageLength length)
+void MeshAccessConnection::DataSentHandler(const u8* data, MessageLength length, u32 messageHandle)
 {
-    if (length >= sizeof(ConnPacketHeader))
+    if (messageHandle == anonceMessageHandle)
     {
-        const ConnPacketHeader* header = (const ConnPacketHeader*)data;
-        if (header->messageType == MessageType::ENCRYPT_CUSTOM_ANONCE)
-        {
-            //Set encryption state to encrypted because we await the next packet to be encrypted
-            encryptionState = EncryptionState::ENCRYPTED;
-        }
+        anonceMessageHandle = 0;
+        //Set encryption state to encrypted because we await the next packet to be encrypted
+        encryptionState = EncryptionState::ENCRYPTED;
     }
 }
 

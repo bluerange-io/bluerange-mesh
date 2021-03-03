@@ -319,38 +319,45 @@ else(BUILD_FEATURESETS)
     target_compile_definitions(cherrySim_tester PRIVATE "CI_PIPELINE")
   endif()
   
+if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor")
+  include(config/featuresets/CMakeFragments/AddIns.cmake)
+endif()
+
   find_program(cppcheck_exists NAMES cppcheck)
   if(cppcheck_exists)
+    set(cppcheck_command "" CACHE STRING "cppcheck command")
     list(APPEND cppcheck_command
-	  "cppcheck"
-	  "--inline-suppr"
-	  "--enable=all"
-	  "-q"
-	  "--template=gcc"
-	  "--suppress=*:${CMAKE_SOURCE_DIR}/cherrysim/json.hpp"
-	  "--suppress=*:${CMAKE_SOURCE_DIR}/src/vendor/ins/*"
-	  "--suppress=missingInclude"
-	  "--suppress=cstyleCast"
-	  "--suppress=variableScope"
-	  "--suppress=shadowVar"
-	  "--suppress=noConstructor"
-	  "--suppress=unmatchedSuppression"
-	  "--suppress=redundantAssignment"
-	  "--suppress=unusedVariable"
-	  "--suppress=unusedFunction"
-	  "--suppress=exceptThrowInDestructor"
-	  "--suppress=unreadVariable"
-	  "--suppress=shadowArgument"
-	  "--suppress=postfixOperator"
-	  "--suppress=shadowVariable"
-	  "--suppress=knownConditionTrueFalse"
-	  "--suppress=virtualCallInConstructor"
-	  "--suppress=objectIndex"
-	  "--suppress=zerodiv"
-	  "--suppress=redundantInitialization"
-	  "--suppress=useInitializationList"
-	  "--suppress=useStlAlgorithm"
+         "cppcheck"
+         "--inline-suppr"
+         "--enable=all"
+         "-q"
+         "--template=gcc"
+         "--suppress=*:${CMAKE_SOURCE_DIR}/cherrysim/json.hpp"
+         "--suppress=missingInclude"
+         "--suppress=cstyleCast"
+         "--suppress=variableScope"
+         "--suppress=shadowVar"
+         "--suppress=noConstructor"
+         "--suppress=unmatchedSuppression"
+         "--suppress=redundantAssignment"
+         "--suppress=unusedVariable"
+         "--suppress=unusedFunction"
+         "--suppress=exceptThrowInDestructor"
+         "--suppress=unreadVariable"
+         "--suppress=shadowArgument"
+         "--suppress=postfixOperator"
+         "--suppress=shadowVariable"
+         "--suppress=knownConditionTrueFalse"
+         "--suppress=virtualCallInConstructor"
+         "--suppress=objectIndex"
+         "--suppress=zerodiv"
+         "--suppress=redundantInitialization"
+         "--suppress=useInitializationList"
+         "--suppress=useStlAlgorithm"
 	)
+  if(DEFINED fruityins_SOURCE_DIR)
+	  list(APPEND cppcheck_command "--suppress=*:${fruityins_SOURCE_DIR}/*")
+  endif()
 	if(CI_PIPELINE)
 	  list(APPEND cppcheck_command "--error-exitcode=1")
 	endif()
@@ -368,6 +375,6 @@ else(BUILD_FEATURESETS)
   
   set_target_properties(event event_core event_extra gtest gtest_main PROPERTIES FOLDER Dependencies)
   set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT cherrySim_runner)
+  source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX fruitymesh FILES ${visual_studio_source_list})
   
-  source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${visual_studio_source_list})
 endif(BUILD_FEATURESETS)

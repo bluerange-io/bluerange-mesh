@@ -53,11 +53,11 @@ The reason can have the following values:
 The reboot reason is also stored in the error log
 
 == Capability Retrieval
-The capability retrieval command helps a user (e.g. the Bluerange Gateway) to find out what some node in the mesh is capable of. Such a capability can be for example if it is a regent lamp and if so, how many heads and sensors are connected to it. A node can return an arbitrary amount of capabilities, each in its own message. A single capability consists of the following data:
+The capability retrieval command helps a user (e.g. the Bluerange Gateway) to find out what some node in the mesh is capable of. Such a capability can be for example if it is a Regent lamp and if so, how many heads and sensors are connected to it. A node can return an arbitrary amount of capabilities, each in its own message. A single capability consists of the following data:
 
-* *CapabilityEntryType* - Whether if the capability describes some kind of hardware (e.g. a lamp) or some software (e.g. the firmware version of the lamp).
+* *CapabilityEntryType* - Whether if the capability describes some kind of hardware (e.g. a lamp), some software (e.g. the firmware version of the lamp), supports a certain device catalog metadata or provides custom properties.
 * *Manufacturer* - Human readable ASCII String of up to 32 chars, describing who built this piece of hardware/software.
-* *ModelName* - Human readable ASCII String of up to 53 chars, containing the name of the capability.
+* *ModelName* - Human readable ASCII String of up to 53 chars, containing the name of the capability such as the hardware model or software component name.
 * *Revision* - Human readable ASCII String of up to 32 chars, the "value" of the capability. Often it is used as the version, but it can also be the amount of something (e.g. the amount of lamps connected to this node). As such, the interpretation of this field is highly dependent on the capability.
 
 NOTE: None of the *Manufacturer*, *ModelName*, or *Revision* fields are zero terminated strings. They must always be copied in their entirety.
@@ -66,7 +66,24 @@ Each module in the firmware has a function with the following header: `Capabilit
 
 NOTE: Every module has its own distinct local capability index range which always starts with 0.
 
-NOTE: The Capability Retrieval has room for some future improvement and a version 2. We could loosen up the strict restrictions of 32/53/32 chars per field and instead add the restriction of 115 (32 + 53 + 32 - 2) chars in total, shared among the three fields, adding either a header that describes the length of the first two entries or zero terminate them. This could also speed up capability retrieval as smaller messages need to be transferred. If this implementation is worth it however is now clear. Capability retrieval is already quite complex for the firmware (e.g. we have to wait for the response of some controllers). In addition, capability retrieval is not intended to be used very often, only during the first setup of the system.
+NOTE: The Capability Retrieval has room for some future improvements. We could loosen up the strict restrictions of 32/53/32 chars per field and instead add the restriction of 115 (32 + 53 + 32 - 2) chars in total, shared among the three fields, adding either a header that describes the length of the first two entries or zero terminate them. This could also speed up capability retrieval as smaller messages need to be transferred. Capability retrieval can become quite complex in firmware, such as when having to wait for the response of some controllers. In addition, capabilities are not intended to be queried frequently, but e.g. for auto-detection during initial setup of the system or after update installation.
+
+Hard- and software capabilities should list the individual components the device is made of. This can be reported as e.g.:
+
+[source]
+----
+CapabilityEntry entries[] = {
+	{ CapabilityEntryType::HARDWARE, "M-Way Solutions GmbH", "BlueRange Node", "52-rev B" },
+	{ CapabilityEntryType::SOFTWARE, "M-Way Solutions GmbH", "BlueRange BootLoader", "1.0.100" },
+	{ CapabilityEntryType::SOFTWARE, "M-Way Solutions GmbH", "BlueRange Firmware", "1.0.100" },
+};
+----
+
+The metadata capabilities refer to additional documents build into the BlueRange system device catalog. The catalog data itself is maintained in and consumed by higher-level software components outside of firmware code. The document referenced states details regarding the actuators and sensors of the device incl. their types, units and possible ranges. Also characteristics curves of the power consumed for evaluation in smart metering may be part of the data provided.
+
+As an example, the entry `{ CapabilityEntryType::METADATA, "Smart Lights Ltd.", "NightLight Moon", "1.0" }` references version 1.0 of the catalog metadata for the product `NightLight Moon` of `Smart Lights Ltd.`.
+
+In addition properties may be made available. This may be used to report device-specific values that make no sense looking up in the device catalog. An example use is the number of heads in a multi-part device, e.g. `{ CapabilityEntryType::PROPERTY, "Smart Lights Ltd.", "Lamp head count", "2" }`. The model name field serves as a key, while the revision serves as a value. Property data is vendor-specific and may be used in catalog data to check its applicability beyond just the hard- and software capabilities.
 
 == Terminal Commands
 
@@ -204,7 +221,7 @@ The receiver sends all its capabilities:
 	"nodeId":4,
 	"type":"capability_entry",
 	"index":0, // Ascending unique number for each capability
-	"capabilityType":2, // 1: Hardware, 2: Software
+	"capabilityType":2, // 1: Hardware, 2: Software, 3: Metadata, 4: Property
 	"manufacturer":"M-Way Solutions GmbH", // Up to 31 chars
 	"model":"BlueRange Node", // Up to 52 chars
 	"revision":"0.8.451" // Up to 31 chars

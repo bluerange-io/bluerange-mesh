@@ -67,6 +67,8 @@ The output on a sink will be:
 }
 ----
 
+IMPORTANT: component and register can also be represented as a string that contains the number in hex representation. The implementation must be able to support both an integer or a string representation of an unsigned hex number. For example: `"component":"0x1234"` and `"register":"0x5678"`.
+
 [#ComponentAct]
 === Actuator message
 

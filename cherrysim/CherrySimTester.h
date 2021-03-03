@@ -100,7 +100,8 @@ public:
 
     static CherrySimTesterConfig CreateDefaultTesterConfiguration();
     static SimConfiguration CreateDefaultSimConfiguration();
-    //### Starting
+
+    //### This boots up all nodes after they were initialized and flashed
     void Start();
 
     //### Simulation methods

@@ -76,7 +76,7 @@ ChunkedPriorityPacketQueue::ChunkedPriorityPacketQueue()
     }
 }
 
-bool ChunkedPriorityPacketQueue::SplitAndAddMessage(DeliveryPriority prio, u8* data, u16 size, u16 payloadSizePerSplit)
+bool ChunkedPriorityPacketQueue::SplitAndAddMessage(DeliveryPriority prio, u8* data, u16 size, u16 payloadSizePerSplit, u32* messageHandle)
 {
     if ((u32)prio >= AMOUNT_OF_SEND_QUEUE_PRIORITIES)
     {
@@ -87,7 +87,7 @@ bool ChunkedPriorityPacketQueue::SplitAndAddMessage(DeliveryPriority prio, u8* d
 
     if (prio == DeliveryPriority::VITAL && size <= MAX_VITAL_SIZE)
     {
-        return queues[(u32)DeliveryPriority::VITAL].AddMessage(data, size, false);
+        return queues[(u32)DeliveryPriority::VITAL].AddMessage(data, size, messageHandle, false);
     }
     else
     {
@@ -103,7 +103,7 @@ bool ChunkedPriorityPacketQueue::SplitAndAddMessage(DeliveryPriority prio, u8* d
             prio = DeliveryPriority::HIGH;
             logt("FATAL", "Vital queue message had to be queued with high prio queue because it was too large!");
         }
-        return queues[(u32)prio].SplitAndAddMessage(data, size, payloadSizePerSplit);
+        return queues[(u32)prio].SplitAndAddMessage(data, size, payloadSizePerSplit, messageHandle);
     }
 }
 

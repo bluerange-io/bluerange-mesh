@@ -290,7 +290,7 @@ bool MeshConnection::SendHandshakeMessage(u8* data, u16 dataLength, bool reliabl
     sendData.deliveryOption = reliable ? DeliveryOption::WRITE_REQ : DeliveryOption::WRITE_CMD;
 
     if(IsConnected()){
-        QueueData(sendData, data);
+        QueueData(sendData, data, nullptr);
 
         return true;
     } else {
@@ -299,7 +299,7 @@ bool MeshConnection::SendHandshakeMessage(u8* data, u16 dataLength, bool reliabl
 }
 
 //This is a small wrapper for the SendData method
-bool MeshConnection::SendData(u8 const * data, MessageLength dataLength, bool reliable)
+bool MeshConnection::SendData(u8 const * data, MessageLength dataLength, bool reliable, u32 * messageHandle)
 {
     if (dataLength > MAX_MESH_PACKET_SIZE) {
         SIMEXCEPTION(PacketTooBigException);
@@ -312,11 +312,11 @@ bool MeshConnection::SendData(u8 const * data, MessageLength dataLength, bool re
     sendData.dataLength = dataLength;
     sendData.deliveryOption = reliable ? DeliveryOption::WRITE_REQ : DeliveryOption::WRITE_CMD;
 
-    return SendData(&sendData, data);
+    return SendData(&sendData, data, messageHandle);
 }
 
 //This is the generic method for sending data
-bool MeshConnection::SendData(BaseConnectionSendData* sendData, u8 const * data)
+bool MeshConnection::SendData(BaseConnectionSendData* sendData, u8 const * data, u32 * messageHandle)
 {
     if(!HandshakeDone()) return false; //Do not allow data being sent when Handshake has not finished yet
 
@@ -341,7 +341,7 @@ bool MeshConnection::SendData(BaseConnectionSendData* sendData, u8 const * data)
             connectionId, sendData->dataLength.GetRaw(), (u32)packetHeader->messageType, stringBuffer);
 
     //Put packet in the queue for sending
-    return QueueData(*sendData, data);
+    return QueueData(*sendData, data, messageHandle);
 }
 
 //Allows a Subclass to send Custom Data before the writeQueue is processed
@@ -372,7 +372,7 @@ bool MeshConnection::QueueVitalPrioData()
         //Set the counter for the packet
         currentClusterInfoUpdatePacket.payload.counter = ++clusterUpdateCounter;
 
-        bool queued = QueueData(sendData, data, false);
+        bool queued = QueueData(sendData, data, false, nullptr);
 
         if (queued) {
             logt("CONN", "Queued CLUSTER UPDATE for CONN hnd %u", connectionHandle);
@@ -416,7 +416,7 @@ void MeshConnection::PacketSuccessfullyQueuedWithSoftdevice(SizedData* sentData)
     }
 }
 
-void MeshConnection::DataSentHandler(const u8 * data, MessageLength length)
+void MeshConnection::DataSentHandler(const u8 * data, MessageLength length, u32 messageHandle)
 {
     const ConnPacketHeader* header = (const ConnPacketHeader*)data;
     if (header->messageType == MessageType::TIME_SYNC)
@@ -877,6 +877,7 @@ bool MeshConnection::IsValidMessageType(MessageType t)
         case(MessageType::UPDATE_CONNECTION_INTERVAL):
         case(MessageType::ASSET_LEGACY):
         case(MessageType::ASSET_GENERIC):
+        case(MessageType::SIG_MESH_SIMPLE):
         case(MessageType::MODULE_CONFIG):
         case(MessageType::MODULE_TRIGGER_ACTION):
         case(MessageType::MODULE_ACTION_RESPONSE):

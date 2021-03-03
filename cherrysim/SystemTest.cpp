@@ -69,6 +69,7 @@ GlobalState* simGlobalStatePtr;
 NRF_FICR_Type* simFicrPtr;
 NRF_UICR_Type* simUicrPtr;
 NRF_GPIO_Type* simGpioPtr;
+NRF_RADIO_Type* simRadioPtr;
 uint8_t* simFlashPtr;
 
 
@@ -1162,6 +1163,86 @@ extern "C"
         return 0;
     }
 
+    uint32_t sd_ble_gattc_exchange_mtu_request(uint16_t connHandle, uint16_t clientRxMtu)
+    {
+        START_OF_FUNCTION();
+
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
+            return NRF_ERROR_BUSY;
+        }
+
+
+        SoftdeviceConnection* connection = cherrySimInstance->FindConnectionByHandle(cherrySimInstance->currentNode, connHandle);
+
+        if (connection == nullptr) {
+            return BLE_ERROR_INVALID_CONN_HANDLE;
+        }
+
+        connection->connectionMtu = clientRxMtu - FruityHal::ATT_HEADER_SIZE;
+        simBleEvent s1;
+        CheckedMemset(&s1, 0, sizeof(s1));
+        s1.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+        s1.bleEvent.header.evt_id = BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST;
+        s1.bleEvent.header.evt_len = s1.globalId;
+        s1.bleEvent.evt.gattc_evt.conn_handle = connHandle;
+        s1.bleEvent.evt.gatts_evt.params.exchange_mtu_request.client_rx_mtu = clientRxMtu;
+        ble_gap_addr_t address = CherrySim::Convert(&cherrySimInstance->currentNode->address);
+        CheckedMemcpy(&s1.bleEvent.evt.gap_evt.params.sec_info_request.peer_addr, &address, sizeof(ble_gap_addr_t));
+
+        connection->partner->eventQueue.push_back(s1);
+
+
+        return NRF_SUCCESS;
+    }
+
+    uint32_t sd_ble_gap_data_length_update(uint16_t connHandle, ble_gap_data_length_params_t const* p_dl_params, ble_gap_data_length_limitation_t* p_dl_limitation) 
+    {
+        START_OF_FUNCTION();
+
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
+            return NRF_ERROR_BUSY;
+        }
+
+        return NRF_SUCCESS;
+
+    }
+
+    uint32_t sd_ble_gatts_exchange_mtu_reply(uint16_t connHandle, uint16_t serverRxMtu) 
+    {
+        START_OF_FUNCTION();
+
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
+            return NRF_ERROR_BUSY;
+        }
+
+        if (serverRxMtu < GATT_MTU_SIZE_DEFAULT) {
+            return NRF_ERROR_INVALID_LENGTH;
+        }
+
+        SoftdeviceConnection* connection = cherrySimInstance->FindConnectionByHandle(cherrySimInstance->currentNode, connHandle);
+
+        if (connection == nullptr) {
+            return BLE_ERROR_INVALID_CONN_HANDLE;
+        }
+
+        connection->connectionMtu = serverRxMtu - FruityHal::ATT_HEADER_SIZE;
+
+        simBleEvent s1;
+        CheckedMemset(&s1, 0, sizeof(s1));
+        s1.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+        s1.bleEvent.header.evt_id = BLE_GATTC_EVT_EXCHANGE_MTU_RSP;
+        s1.bleEvent.header.evt_len = s1.globalId;
+        s1.bleEvent.evt.gattc_evt.conn_handle = connHandle;
+        s1.bleEvent.evt.gattc_evt.params.exchange_mtu_rsp.server_rx_mtu = serverRxMtu;
+        ble_gap_addr_t address = CherrySim::Convert(&cherrySimInstance->currentNode->address);
+        CheckedMemcpy(&s1.bleEvent.evt.gap_evt.params.sec_info_request.peer_addr, &address, sizeof(ble_gap_addr_t));
+  
+        connection->partner->eventQueue.push_back(s1);
+
+
+        return NRF_SUCCESS;
+    }
+
     SoftDeviceBufferedPacket* findFreePacketBuffer(SoftdeviceConnection* connection) {
         START_OF_FUNCTION();
         for (int i = 0; i < SIM_NUM_UNRELIABLE_BUFFERS; i++) {
@@ -1202,7 +1283,7 @@ extern "C"
             return BLE_ERROR_INVALID_CONN_HANDLE;
         }
 
-        if (p_write_params->len > connection->connectionMtu - FruityHal::ATT_HEADER_SIZE)
+        if (p_write_params->len > connection->connectionMtu)
         {
             return NRF_ERROR_DATA_SIZE;
         }
@@ -1612,6 +1693,67 @@ extern "C"
     uint32_t sd_power_reset_reason_clr(uint32_t p) {
         START_OF_FUNCTION();
         return 0;
+    }
+
+    // Timeslot API
+
+    uint32_t sd_radio_session_open(nrf_radio_signal_callback_t callback)
+    {
+        START_OF_FUNCTION();
+
+        // check that the callback is set
+        if (!callback)
+            return NRF_ERROR_INVALID_ADDR;
+
+        auto* node = cherrySimInstance->currentNode;
+
+        // check that no callback is registered
+        if (node->timeslotRadioSignalCallback)
+            return NRF_ERROR_BUSY;
+
+        // check that the timeslot session is not currently closing
+        if (node->timeslotCloseSessionRequested)
+            return NRF_ERROR_BUSY;
+
+        node->timeslotRadioSignalCallback = callback;
+        return NRF_SUCCESS;
+    }
+
+    uint32_t sd_radio_session_close()
+    {
+        START_OF_FUNCTION();
+
+        auto* node = cherrySimInstance->currentNode;
+
+        // check that the callback was set
+        if (!node->timeslotRadioSignalCallback)
+            return NRF_ERROR_FORBIDDEN;
+
+        // check that the timeslot session is not already closing
+        if (node->timeslotCloseSessionRequested)
+            return NRF_ERROR_BUSY;
+
+        node->timeslotRadioSignalCallback = nullptr;
+        return NRF_SUCCESS;
+    }
+
+    uint32_t sd_radio_request(nrf_radio_request_t const * request)
+    {
+        START_OF_FUNCTION();
+
+        // check that the request pointer was set
+        if (!request)
+            return NRF_ERROR_INVALID_ADDR;
+
+        auto* node = cherrySimInstance->currentNode;
+
+        // check that the timeslot session is not closing
+        if (node->timeslotCloseSessionRequested)
+            return NRF_ERROR_FORBIDDEN;
+
+        // TODO: Check the parameters and schedule the timeslots as requested.
+        node->timeslotRequested = true;
+        return NRF_SUCCESS;
     }
 
 }

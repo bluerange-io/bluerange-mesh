@@ -1470,7 +1470,7 @@ void Node::UpdateJoinMePacket() const
 
     advPacket->meshIdentifier = MESH_IDENTIFIER;
     advPacket->networkId = configuration.networkId;
-    advPacket->messageType = ServiceDataMessageType::JOIN_ME_V0;
+    advPacket->messageType = ManufacturerSpecificMessageType::JOIN_ME_V0;
 
     //Build a JOIN_ME packet and set it in the advertisement data
     AdvPacketPayloadJoinMeV0* packet = (AdvPacketPayloadJoinMeV0*)(buffer+SIZEOF_ADV_PACKET_HEADER);
@@ -1801,7 +1801,7 @@ void Node::GapAdvertisementMessageHandler(const FruityHal::GapAdvertisementRepor
 
     const AdvPacketHeader* packetHeader = (const AdvPacketHeader*) data;
 
-    if (packetHeader->messageType == ServiceDataMessageType::JOIN_ME_V0)
+    if (packetHeader->messageType == ManufacturerSpecificMessageType::JOIN_ME_V0)
     {
         if (dataLength == SIZEOF_ADV_PACKET_JOIN_ME)
         {
@@ -3187,6 +3187,11 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         GS->terminal.EnableCrcChecks();
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
+#if IS_ACTIVE(SIG_MESH)
+    //Forwards TerminalCommandHandler to SigAccessLayer
+    TerminalCommandHandlerReturnType ret = GS->sig.TerminalCommandHandler(commandArgs, commandArgsSize);
+    if(ret != TerminalCommandHandlerReturnType::UNKNOWN) return ret;
+#endif
 
     //Must be called to allow the module to get and set the config
     return Module::TerminalCommandHandler(commandArgs, commandArgsSize);

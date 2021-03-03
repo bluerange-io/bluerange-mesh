@@ -52,6 +52,7 @@
 #include <Utility.h>
 #include <FmTypes.h>
 #include <FlashStorage.h>
+#include <Timeslot.h>
 
 #ifndef GITHUB_RELEASE
 #if IS_ACTIVE(ASSET_MODULE)
@@ -343,6 +344,10 @@ void DispatchSystemEvents(FruityHal::SystemEvents sys_evt)
 {
     //Hand system events to new storage class
     FlashStorage::GetInstance().SystemEventHandler(sys_evt);
+
+#if IS_ACTIVE(TIMESLOT)
+    Timeslot::GetInstance().DispatchRadioSystemEvent(sys_evt);
+#endif // IS_ACTIVE(TIMESLOT)
 }
 
 //This function dispatches once a Button was pressed for some time

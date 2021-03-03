@@ -55,7 +55,7 @@ public:
 
     void PrintStatus() override;
 
-    bool SendData(u8 const * data, MessageLength dataLength, bool reliable) override;
+    bool SendData(u8 const * data, MessageLength dataLength, bool reliable, u32 * messageHandle=nullptr) override;
 
 };
 

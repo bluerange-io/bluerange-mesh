@@ -801,12 +801,17 @@ void EnrollmentModule::DispatchPreEnrollment(Module* lastModuleCalled, PreEnroll
 
     logt("ENROLLMOD", "PreEnrollment succeeded");
 
-    //First, clear all settings that are stored on the chip
-    RecordStorageResultCode errorCode = GS->recordStorage.LockDownAndClearAllSettings(Utility::GetWrappedModuleId(moduleId), this, (u32)EnrollmentModuleSaveActions::ERASE_RECORD_STORAGE);
-    if (errorCode != RecordStorageResultCode::SUCCESS)
-    {
-        logt("WARN", "Could not save because %u", (u32)errorCode);
-        GS->logger.LogCustomError(CustomErrorTypes::WARN_ENROLLMENT_LOCK_DOWN_FAILED, (u16)errorCode);
+    if (ted.requestHeader.actionType == (u8)EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_SERIAL) {
+        SaveEnrollment(&ted.requestHeader, ted.packetLength);
+    }
+    else {
+        //First, clear all settings that are stored on the chip
+        RecordStorageResultCode errorCode = GS->recordStorage.LockDownAndClearAllSettings(Utility::GetWrappedModuleId(moduleId), this, (u32)EnrollmentModuleSaveActions::ERASE_RECORD_STORAGE);
+        if (errorCode != RecordStorageResultCode::SUCCESS)
+        {
+            logt("WARN", "Could not save because %u", (u32)errorCode);
+            GS->logger.LogCustomError(CustomErrorTypes::WARN_ENROLLMENT_LOCK_DOWN_FAILED, (u16)errorCode);
+        }
     }
 }
 
@@ -1126,11 +1131,7 @@ void EnrollmentModule::RecordStorageEventHandler(u16 recordId, RecordStorageResu
     {
         if (resultCode == RecordStorageResultCode::SUCCESS)
         {
-            if (ted.requestHeader.actionType == (u8)EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_SERIAL)
-            {
-                SaveEnrollment(&ted.requestHeader, ted.packetLength);
-            }
-            else if (ted.requestHeader.actionType == (u8)EnrollmentModuleTriggerActionMessages::REMOVE_ENROLLMENT)
+            if (ted.requestHeader.actionType == (u8)EnrollmentModuleTriggerActionMessages::REMOVE_ENROLLMENT)
             {
                 SaveUnenrollment(&ted.requestHeader, ted.packetLength);
             }

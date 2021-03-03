@@ -49,13 +49,22 @@ private:
     ConnectionQueueMemoryChunk* lookAheadChunk = nullptr;
     ConnectionQueueMemoryChunk* writeChunk     = nullptr;
     u32 amountOfPackets = 0;
+    u32 messageHandle = 0;
     bool isCurrentlySendingSplitMessage = false;
 
     struct QueueEntryHeader
     {
         u16 size;
         u16 isSplit : 1;
-        u16 reserved : 15;
+        u16 isExtended : 1;
+        u16 isLastSplit : 1;
+        u16 reserved : 13;
+    };
+
+    struct ExtendedQueueEntryHeader
+    {
+        QueueEntryHeader header;
+        u32 handle;
     };
 
     struct ChunkHeadPair
@@ -65,7 +74,7 @@ private:
     };
 
     void AddMessageRaw(u8* data, u16 size);
-    u16 PeekPacketRaw(u8* outData, u16 outDataSize, const ConnectionQueueMemoryChunk* chunk, u32 head) const;
+    u16 PeekPacketRaw(u8* outData, u16 outDataSize, const ConnectionQueueMemoryChunk* chunk, u32 head, u32* messageHandle=nullptr) const;
     ChunkHeadPair GetChunkHeadPairOfIndex(u16 index) const;
 
     DeliveryPriority prio = DeliveryPriority::VITAL;
@@ -79,14 +88,14 @@ public:
     ChunkedPacketQueue& operator=(const ChunkedPacketQueue&  other) = delete;
     ChunkedPacketQueue& operator=(      ChunkedPacketQueue&& other) = delete;
     
-    bool AddMessage(u8* data, u16 size, bool isSplit = false);
-    u16 PeekPacket      (u8* outData, u16 outDataSize) const;
-    u16 RandomAccessPeek(u8* outData, u16 outDataSize, u16 index) const; //Careful, very expensive!
+    bool AddMessage(u8* data, u16 size, u32 * messageHandle, bool isSplit = false);
+    u16 PeekPacket      (u8* outData, u16 outDataSize, u32* messageHandle=nullptr) const;
+    u16 RandomAccessPeek(u8* outData, u16 outDataSize, u16 index, u32* messageHandle=nullptr) const; //Careful, very expensive!
     void PopPacket();
     bool HasPackets() const;
     bool IsCurrentlySendingSplitMessage() const;
 
-    bool SplitAndAddMessage(u8* data, u16 size, u16 payloadSizePerSplit);
+    bool SplitAndAddMessage(u8* data, u16 size, u16 payloadSizePerSplit, u32 * messageHandle);
 
     bool IsLookAheadAndReadSame() const;
     bool HasMoreToLookAhead() const;

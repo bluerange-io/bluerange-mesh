@@ -80,21 +80,21 @@ TEST(TestStatistics, TestNumberClusteringMessagesSent) {
 
 //#################################### Helpers for Statistic Tests #######################################
 
-void CheckAndClearStat(PacketStat* stat, MessageType mt, ModuleId moduleId, u32 minCount, u32 maxCount, u8 actionType)
+void CheckAndClearStat(PacketStat* stat, MessageType mt, ModuleId moduleId, u32 minCount, u32 maxCount, u8 actionType, u8 requestHandle)
 {
-    CheckAndClearStat(stat, mt, Utility::GetWrappedModuleId(moduleId), minCount, maxCount, actionType);
+    CheckAndClearStat(stat, mt, Utility::GetWrappedModuleId(moduleId), minCount, maxCount, actionType, requestHandle);
 }
 
-//Helper function that checks a given message type for a maximum count and clears it if it was ok
+//Helper function that checks a given message type with its request handle for a maximum count and clears the message type for statistics it if it was ok
 //Used for VendorModuleId & WrappedModuleIdU32
-void CheckAndClearStat(PacketStat* stat, MessageType mt, ModuleIdWrapper moduleId, u32 minCount, u32 maxCount, u8 actionType)
+void CheckAndClearStat(PacketStat* stat, MessageType mt, ModuleIdWrapper moduleId, u32 minCount, u32 maxCount, u8 actionType, u8 requestHandle)
 {
     for (u32 i = 0; i < PACKET_STAT_SIZE; i++) {
         PacketStat* entry = stat + i;
         if (entry->messageType == mt) {
             if (moduleId == INVALID_WRAPPED_MODULE_ID || (moduleId == entry->moduleId && actionType == entry->actionType)) {
-                if (entry->count < minCount) SIMEXCEPTION(IllegalStateException);
-                if (entry->count > maxCount) SIMEXCEPTION(IllegalStateException);
+                if (entry->count < minCount && entry->requestHandle == requestHandle) SIMEXCEPTION(IllegalStateException);
+                if (entry->count > maxCount && entry->requestHandle == requestHandle) SIMEXCEPTION(IllegalStateException);
                 entry->messageType = MessageType::INVALID;
             }
         }

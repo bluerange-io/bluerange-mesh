@@ -55,9 +55,9 @@ fruity-api/log
 dependency-reduced-pom.xml
 
 ## Gradle
-fruity-api/.gradle
+.gradle
+!gradle/wrapper/gradle-wrapper.jar
 fruity-api/build/
-!gradle-wrapper.jar
 
 ## Java
 *.class
