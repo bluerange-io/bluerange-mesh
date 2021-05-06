@@ -202,10 +202,86 @@ void ConnectionManager::SetMeshConnectionInterval(u16 connectionInterval) const
     MeshConnections conn = GetMeshConnections(ConnectionDirection::DIRECTION_OUT);
     for(u32 i=0; i< conn.count; i++){
         if (conn.handles[i].IsHandshakeDone()){
-            GS->gapController.RequestConnectionParameterUpdate(conn.handles[i].GetConnectionHandle(), connectionInterval, connectionInterval, 0, Conf::meshConnectionSupervisionTimeout);
+            DISCARD(GAPController::GetInstance().RequestConnectionParameterUpdate(
+                conn.handles[i].GetConnectionHandle(),
+                connectionInterval,
+                connectionInterval,
+                0,
+                Conf::meshConnectionSupervisionTimeout
+            ));
         }
     }
 }
+
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+void ConnectionManager::UpdateConnectionIntervalForLongTermMeshConnections() const
+{
+    // If the connection intervals for young and long-term connections are the
+    // same, skip the update procedure.
+    if (        Conf::GetInstance().meshMinLongTermConnectionInterval
+                    == Conf::GetInstance().meshMinConnectionInterval
+            &&  Conf::GetInstance().meshMaxLongTermConnectionInterval
+                    == Conf::GetInstance().meshMaxConnectionInterval)
+    {
+        return;
+    }
+
+    // The logic which kicks off the update.
+    const auto updateConnections = [](MeshConnections connectionsToUpdate)
+    {
+        // Iterate over all the connections.
+        for (u32 i=0; i < connectionsToUpdate.count; ++i)
+        {
+            auto &handle = connectionsToUpdate.handles[i];
+            // Skip connections that are not fully connected already.
+            if (handle.GetConnectionState() != ConnectionState::HANDSHAKE_DONE)
+            {
+                continue;
+            }
+            // Get a pointer to the connection object.
+            auto *connection = handle.GetConnection();
+            // Skip connections for which the long term connection interval
+            // has already been requested.
+            if (connection->longTermConnectionIntervalRequested)
+            {
+                continue;
+            }
+            // The handshakeStartedDs timestamp is set on successful connection
+            // in BaseConnection::ConnectionSuccessfulHandler.
+            const auto connectionAgeDs = GS->appTimerDs - connection->handshakeStartedDs;
+            // Check that the connection is older than the long term age.
+            const bool isCentral = 
+                connection->direction == ConnectionDirection::DIRECTION_OUT;
+            const auto ageThresholdDs =
+                Conf::meshConnectionLongTermAgeDs
+                + (isCentral ? 0u : Conf::meshConnectionLongTermAgePeripheralPenaltyDs);
+            if (connectionAgeDs >= ageThresholdDs)
+            {
+                // Actually request the connection parameter update.
+                const auto err = GAPController::GetInstance().RequestConnectionParameterUpdate(
+                    handle.GetConnectionHandle(),
+                    Conf::GetInstance().meshMinLongTermConnectionInterval,
+                    Conf::GetInstance().meshMaxLongTermConnectionInterval,
+                    Conf::meshPeripheralSlaveLatency,
+                    Conf::meshConnectionSupervisionTimeout
+                );
+                // If the connection parameter update was handled by the
+                // SoftDevice we consider the job done.
+                if (err == ErrorType::SUCCESS)
+                {
+                    // Ensure that the long term interval is not requested again for
+                    // this connection.
+                    connection->longTermConnectionIntervalRequested = true;
+                }
+            }
+        }
+    };
+
+    // Fetch all connections with this node in the central and peripheral role.
+    updateConnections(GetMeshConnections(ConnectionDirection::DIRECTION_OUT));
+    updateConnections(GetMeshConnections(ConnectionDirection::DIRECTION_IN));
+}
+#endif
 
 void ConnectionManager::GATTServiceDiscoveredHandler(u16 connHandle, FruityHal::BleGattDBDiscoveryEvent& evt)
 {
@@ -1545,6 +1621,11 @@ void ConnectionManager::TimerEventHandler(u16 passedTimeDs)
             }
         }
     }
+
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+    // Connection interval update for long term connections.
+    UpdateConnectionIntervalForLongTermMeshConnections();
+#endif
 }
 
 void ConnectionManager::ResetTimeSync()

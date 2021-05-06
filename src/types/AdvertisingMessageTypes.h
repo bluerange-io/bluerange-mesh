@@ -51,13 +51,19 @@ constexpr u32 ADV_PACKET_MAX_SIZE = 31;
 
 //Message types: Protocol defined, up to 19 because we want to have a unified
 //type across advertising and connection packets if we need to unify these.
-enum class ServiceDataMessageType : u8
+enum class ServiceDataMessageType : u16
 {
     INVALID      = 0,
-    JOIN_ME_V0   = 0x01,
+    // depricated : JOIN_ME_V0   = 0x01,
     LEGACY_ASSET = 0x02,
     MESH_ACCESS  = 0x03,
     ASSET        = 0x04,
+};
+
+enum class ManufacturerSpecificMessageType : u8
+{
+    INVALID      = 0,
+    JOIN_ME_V0   = 0x01,
 };
 
 //Start packing all these structures
@@ -97,7 +103,6 @@ typedef struct
 {
     AdvStructureUUID16 uuid;
     ServiceDataMessageType messageType; //Message type depending on our custom service
-    u8 reserved;
 }AdvStructureServiceDataAndType;
 STATIC_ASSERT_SIZE(AdvStructureServiceDataAndType, SIZEOF_ADV_STRUCTURE_SERVICE_DATA_AND_TYPE);
 
@@ -133,7 +138,7 @@ typedef struct
     AdvStructureManufacturer manufacturer;
     u8 meshIdentifier;
     NetworkId networkId;
-    ServiceDataMessageType messageType;
+    ManufacturerSpecificMessageType messageType; 
 }AdvPacketHeader;
 STATIC_ASSERT_SIZE(AdvPacketHeader, 11);
 

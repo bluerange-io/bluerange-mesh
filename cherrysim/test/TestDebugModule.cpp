@@ -146,7 +146,7 @@ TEST(TestDebugModule, TestCommands) {
     tester.SendTerminalCommand(1, "floodstat");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "Flooding has");
 
-    tester.SendTerminalCommand(1, "printqueue 1");
+    tester.SendTerminalCommand(1, "printqueue");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "Amount of Packets");
 
 }

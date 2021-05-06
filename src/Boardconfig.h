@@ -89,6 +89,9 @@ typedef struct BoardConfiguration
     uint32_t voltageDividerR1;
     uint32_t voltageDividerR2;
     uint8_t dcDcEnabled;
+
+    // If set to value different than 0, turns on some battery opimizations
+    uint8_t powerOptimizationEnabled;
 } BoardConfiguration;
 #pragma pack(pop)
 

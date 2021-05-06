@@ -64,7 +64,7 @@ void ResolverConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8
     GS->cm.ResolveConnection(this, sendData, data);
 }
 
-bool ResolverConnection::SendData(u8 const * data, MessageLength dataLength, bool reliable)
+bool ResolverConnection::SendData(u8 const * data, MessageLength dataLength, bool reliable, u32 * messageHandle)
 {
     return false;
 };

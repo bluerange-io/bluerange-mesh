@@ -127,7 +127,6 @@ void Conf::LoadDefaults(){
     configuration.amountOfPreferredPartnerIds = 0;
 
     terminalMode = TerminalMode::JSON;
-    defaultLedMode = LedMode::CONNECTIONS;
 
     enableSinkRouting = true;
     //Check if the BLE stack supports the number of connections and correct if not
@@ -136,8 +135,15 @@ void Conf::LoadDefaults(){
     meshMaxInConnections = 2;
 #endif
 
-    meshMinConnectionInterval = 12; //FIXME_HAL: 12 units = 15ms (1.25ms steps)
-    meshMaxConnectionInterval = 12; //FIXME_HAL: 12 units = 15ms (1.25ms steps)
+    meshMinConnectionInterval = (u16)MSEC_TO_UNITS(15, CONFIG_UNIT_1_25_MS);
+    meshMaxConnectionInterval = (u16)MSEC_TO_UNITS(15, CONFIG_UNIT_1_25_MS);
+
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+    // Initialize the long term connection intervals to the same values as the
+    // 'normal' intervals.
+    meshMinLongTermConnectionInterval = meshMinConnectionInterval;
+    meshMaxLongTermConnectionInterval = meshMaxConnectionInterval;
+#endif
 
     meshScanIntervalHigh = 120; //FIXME_HAL: 120 units = 75ms (0.625ms steps)
     meshScanWindowHigh = 12; //FIXME_HAL: 12 units = 7.5ms (0.625ms steps)
@@ -249,7 +255,7 @@ void Conf::LoadSettingsFromFlash(Module* module, u16 recordId, u8* configuration
         ){
             CheckedMemcpy(configurationPointer, configData.data, configData.length.GetRaw());
 
-            logt("CONFIG", "Config for module %s loaded from record %u", Utility::GetModuleIdString(module->vendorModuleId).data(), recordId);
+            logt("CONFIG", "Config for module %s loaded from record %u", Utility::GetModuleIdString(module->vendorModuleId, false).data(), recordId);
 
             module->ConfigurationLoadedHandler(nullptr, 0);
         }
@@ -258,12 +264,12 @@ void Conf::LoadSettingsFromFlash(Module* module, u16 recordId, u8* configuration
             (!Utility::IsVendorModuleId(module->moduleId) && configData.length >= SIZEOF_MODULE_CONFIGURATION_HEADER)
             || (Utility::IsVendorModuleId(module->vendorModuleId) && configData.length >= SIZEOF_VENDOR_MODULE_CONFIGURATION_HEADER)
         ){
-            logt("CONFIG", "Flash config for module %s has mismatching version", Utility::GetModuleIdString(module->vendorModuleId).data());
+            logt("CONFIG", "Flash config for module %s has mismatching version", Utility::GetModuleIdString(module->vendorModuleId, false).data());
 
             module->ConfigurationLoadedHandler(configData.data, configData.length.GetRaw());
         }
         else {
-            logt("CONFIG", "No flash config for module %s found, using defaults", Utility::GetModuleIdString(module->vendorModuleId).data());
+            logt("CONFIG", "No flash config for module %s found, using defaults", Utility::GetModuleIdString(module->vendorModuleId, false).data());
 
             module->ConfigurationLoadedHandler(nullptr, 0);
         }

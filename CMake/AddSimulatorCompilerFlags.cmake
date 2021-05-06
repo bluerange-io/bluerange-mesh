@@ -1,6 +1,7 @@
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if(ENABLE_SANITIZERS)
     set(SANITIZER  "-fsanitize=address -fsanitize=undefined -fsanitize=integer-divide-by-zero -fsanitize=unreachable -fsanitize=vla-bound -fsanitize=null -fsanitize=return -fsanitize=enum -fsanitize=bool -fsanitize=vptr -fsanitize=pointer-overflow")
+    target_compile_definitions(cherrySim_tester PRIVATE "SANITIZERS_ENABLED")
   else(ENABLE_SANITIZERS)
     set(SANITIZER  "")
   endif(ENABLE_SANITIZERS)

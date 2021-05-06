@@ -36,62 +36,6 @@
 //TODO: Once this feature is ready, we should enable it in the Github release
 #ifndef GITHUB_RELEASE
 
-TEST(TestSigAccessLayer, TestGenericModels)
-{
-    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-    simConfig.terminalId = 0;
-    simConfig.nodeConfigName.insert({ "dev_sig_mesh", 1 });
-    //testerConfig.verbose = true;
-    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
-    tester.Start();
-
-    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIG");
-    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIGMODEL");
-
-    //Send a sig message (0x23) from nodeid 0x0001 to broadcast 0x0000: senderSigAddress 0x1234, receiverSigAddress 0x000A,
-    //opcode "Generic OnOff Set" 0x8202, state 0x01, transaction identifier 0x00
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:02:82:01:00");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Got state change for element 0 from model 1000 and state 1 with new value 1");
-
-    //Same as above but sends a generic level set message with a level of 0x7788 and transaction id of 0
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:06:82:88:77:00");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Got state change for element 0 from model 1300 and state 2 with new value 30600");
-
-    //Same as above but sends a light lightness set message with a level of 0x7711 and transaction id of 0
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:4C:82:11:77:00");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Got state change for element 0 from model 1300 and state 5 with new value 33356");
-
-    //Sends a generic level set message to the second element with level 0x7788 and transaction id of 0
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0B:00:06:82:88:77:00");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "received generic level set: level 30600, TID 0");
-
-    //Asks the primary element for the composition data
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:08:80:00");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Sending SIG message: 23:01:00:00:00  0A:00:34:12  02:00:11:11:22:22:33:33:00:00:00:00:00:00:04:00:00:00:00:10:02:10:00:13:00:00:02:01:00:10:02:10:78:56:34:12");
-
-    //Set publication address (opcode 0x03) of first element to publish address 0x7777 for model 0x1002
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:03:0A:00:77:77:00:00:00:00:00:02:10");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Setting publication address of elementIndex 0, modelid 0x1002 to 0x7777");
-
-    //Set publication address (opcode 0x03) of second element to publish address 0x1111 for model 0x12345678
-    //Must still be sent to element address 1 as this is the configuration server
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:03:0B:00:11:11:00:00:00:00:00:78:56:34:12");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Setting publication address of elementIndex 1, modelid 0x12345678 to 0x1111");
-
-    //Request the publish status (opcode 0x8018) for element 1, model 0x1002
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:18:80:0A:00:02:10");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Sending SIG message: 23:01:00:00:00  0A:00:34:12  00:0A:00:77:77:00:00:00:00:00:02:10");
-
-    //Add a subscription to address 0xC001 for element 1, model 0x1000
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:1B:80:0A:00:01:C0:00:10");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Adding subscription for elementIndex 0, modelid 0x1000 with address 0xC001");
-
-    //Add a subscription to address 0xC002 for element 1, model 0x1002 => will be added to same model as above as the lists are shared
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:1B:80:0A:00:02:C0:02:10");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Adding subscription for elementIndex 0, modelid 0x1300 with address 0xC002");
-}
-
 TEST(TestSigAccessLayer, TestConfigCompositionData)
 {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
@@ -105,9 +49,12 @@ TEST(TestSigAccessLayer, TestConfigCompositionData)
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIG");
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIGMODEL");
 
+    tester.SendTerminalCommand(1, "sigprint");
+    tester.SimulateGivenNumberOfSteps(1);
+
     //Asks the primary element for the composition data
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:08:80:00");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Sending SIG message: 23:01:00:00:00  0A:00:34:12  02:00:11:11:22:22:33:33:00:00:00:00:00:00:04:00:00:00:00:10:02:10:00:13:00:00:02:01:00:10:02:10:78:56:34:12");
+    tester.SendTerminalCommand(1, "sigmesh 0x1234 0x0010 0x8008 00");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Sending SIG message: 23:01:00:00:00  10:00:34:12  02:00:11:11:22:22:33:33:00:00:00:00:00:00:03:00:00:00:00:10:02:10:00:00:02:01:00:10:02:10:78:56:34:12:00:00:04:00:02:10:00:10:06:10:00:13");
 }
 
 TEST(TestSigAccessLayer, TestConfigModelPublication)
@@ -124,17 +71,17 @@ TEST(TestSigAccessLayer, TestConfigModelPublication)
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIGMODEL");
 
     //Set publication address (opcode 0x03) of first element to publish address 0x7777 for model 0x1002
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:03:0A:00:77:77:00:00:00:00:00:02:10");
+    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:10:00:03:10:00:77:77:00:00:00:00:00:02:10");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "Setting publication address of elementIndex 0, modelid 0x1002 to 0x7777");
 
     //Set publication address (opcode 0x03) of second element to publish address 0x1111 for model 0x12345678
     //Must still be sent to element address 1 as this is the configuration server
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:03:0B:00:11:11:00:00:00:00:00:78:56:34:12");
+    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:10:00:03:11:00:11:11:00:00:00:00:00:78:56:34:12");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "Setting publication address of elementIndex 1, modelid 0x12345678 to 0x1111");
 
     //Request the publish status (opcode 0x8018) for element 1, model 0x1002
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:18:80:0A:00:02:10");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Sending SIG message: 23:01:00:00:00  0A:00:34:12  00:0A:00:77:77:00:00:00:00:00:02:10");
+    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:10:00:18:80:10:00:02:10");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Sending SIG message: 23:01:00:00:00  10:00:34:12  00:10:00:77:77:00:00:00:00:00:02:10");
 }
 
 TEST(TestSigAccessLayer, TestConfigModelSubscription)
@@ -150,25 +97,44 @@ TEST(TestSigAccessLayer, TestConfigModelSubscription)
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIG");
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIGMODEL");
 
-    //Add a subscription to address 0xC001 for element 1, model 0x1000
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:1B:80:0A:00:01:C0:00:10");
+    //######## First element contains both a Generic OnOff and a Generic Level Server (independent from each other)
+
+    //Add a subscription to address 0xC001 for the first element, model 0x1000
+    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:10:00:1B:80:10:00:01:C0:00:10");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "Adding subscription for elementIndex 0, modelid 0x1000 with address 0xC001");
     //The publish address should now be registered
     tester.SendTerminalCommand(1, "sigprint");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Model id 0x1000, (publishAddr 0x0000) (subscriptions 0xC001");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Model id 0x1000 (GENERIC_ONOFF_SERVER), (publishAddr 0x0000) (subscriptions 0xC001");
 
-    //Add a subscription to address 0xC002 for element 1, model 0x1002 => will be added to same model as above as the lists are shared
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:1B:80:0A:00:02:C0:02:10");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Adding subscription for elementIndex 0, modelid 0x1300 with address 0xC002");
+    //Add a subscription to address 0xC002 for the first element, model 0x1002
+    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:10:00:1B:80:10:00:02:C0:02:10");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Adding subscription for elementIndex 0, modelid 0x1002 with address 0xC002");
+    //The publish address should now be registered
+    tester.SendTerminalCommand(1, "sigprint");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Model id 0x1002 (GENERIC_LEVEL_SERVER), (publishAddr 0x0000) (subscriptions 0xC002");
+
+
+    //######## Third element contains a LightLightness Server with Multi Inheritance
+
+    //Add a subscription to address 0xC003  for the third element, model 0x1002 => will be added to same model as above as the lists are shared
+    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:10:00:1B:80:12:00:03:C0:02:10");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Adding subscription for elementIndex 2, modelid 0x1300 with address 0xC003");
     //The subscription should be registered for the root model
     tester.SendTerminalCommand(1, "sigprint");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Model id 0x1300, (publishAddr 0x0000) (subscriptions 0xC002");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Model id 0x1300 (LIGHT_LIGHTNESS_SERVER), (publishAddr 0x0000) (subscriptions 0xC003");
 
     //Add same subscription again, should not be added twice
-    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:0A:00:1B:80:0A:00:02:C0:02:10");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Adding subscription for elementIndex 0, modelid 0x1300 with address 0xC002");
+    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:10:00:1B:80:12:00:03:C0:02:10");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Adding subscription for elementIndex 2, modelid 0x1300 with address 0xC003");
     tester.SendTerminalCommand(1, "sigprint");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Model id 0x1300, (publishAddr 0x0000) (subscriptions 0xC002, )");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Model id 0x1300 (LIGHT_LIGHTNESS_SERVER), (publishAddr 0x0000) (subscriptions 0xC003, )");
+
+    //Adding a Subscription to 0xC004 of the Multi-Inheritance Model based on a class-member (Model 0x1000) should also register on the root model
+    tester.SendTerminalCommand(1, "rawsend 23:01:00:00:00:34:12:10:00:1B:80:12:00:04:C0:00:10");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Adding subscription for elementIndex 2, modelid 0x1300 with address 0xC004");
+    //The subscription should be registered for the root model
+    tester.SendTerminalCommand(1, "sigprint");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Model id 0x1300 (LIGHT_LIGHTNESS_SERVER), (publishAddr 0x0000) (subscriptions 0xC003, 0xC004");
 }
 
 TEST(TestSigAccessLayer, TestDirectMethodAccess)
@@ -193,7 +159,7 @@ TEST(TestSigAccessLayer, TestDirectMethodAccess)
     for (u32 i = 0; i < tester.sim->GetTotalNodes(); i++)
     {
         NodeIndexSetter setter(i);
-        ASSERT_EQ(SigAccessLayer::GetInstance().nodeAddress, (i + 1) * 10);
+        ASSERT_EQ(SigAccessLayer::GetInstance().nodeAddress, (i + 1) * 16);
     }
 
     {
@@ -227,7 +193,7 @@ TEST(TestSigAccessLayer, TestProvisionChangeOnEnrollment)
 
     {
         NodeIndexSetter setter(0);
-        ASSERT_EQ(SigAccessLayer::GetInstance().nodeAddress, 930); // 930 = nodeId * 10
+        ASSERT_EQ(SigAccessLayer::GetInstance().nodeAddress, 93 * 16); // 930 = nodeId * 16
     }
 }
 
@@ -303,7 +269,9 @@ TEST(TestSigAccessLayer, TestPersistenceState)
     {
         NodeIndexSetter setter(0);
         ASSERT_NE(GS->sig.numElements, 0);
-        GS->sig.elements[0].states[2]->SetValue(17);
+        //TODO: This is currently accessing the LIGHT_LIGHTNESS_ACTUAL_STATE to check persistency, probably the OnPowerUp State should be used
+        //instead, also we should not use a fixed array access to the state
+        GS->sig.elements[2].states[2]->SetValue(17);
         tester.SimulateUntilMessageReceived(120 * 1000, 1, "Successfully stored SigElement state!");
         tester.SimulateForGivenTime(10 * 1000); //Give the record storage some additional time to make sure it stored it.
     }
@@ -313,8 +281,28 @@ TEST(TestSigAccessLayer, TestPersistenceState)
     ASSERT_EQ(tester.sim->nodes[0].restartCounter, 2);
     {
         NodeIndexSetter setter(0);
-        ASSERT_EQ(GS->sig.elements[0].states[2]->GetValue(), 17);
+        ASSERT_EQ(GS->sig.elements[2].states[2]->GetValue(), 17);
     }
+}
+
+TEST(TestSigAccessLayer, TestSigCommands)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    simConfig.nodeConfigName.insert({ "dev_sig_mesh", 1 });
+    //testerConfig.verbose = true;
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIG");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("SIGMODEL");
+
+    //Send a sig message (0x23) from nodeid 0x0001 to broadcast 0x0000: senderSigAddress 0x1234, receiverSigAddress 0x0010,
+    //opcode "Generic OnOff Set" 0x8202, state 0x01, transaction identifier 0x00
+    tester.SendTerminalCommand(1, "sigmesh 0x1234 0x0010 0x8202 01:00");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"sigmesh\",\"nodeId\":1,\"senderAddress\":\"0x1234\",\"receiverAddress\":\"0x0010\",\"opcode\":\"0x8202\",\"payload\":\"AQA=\"}");
+
 }
 
 #endif //GITHUB_RELEASE

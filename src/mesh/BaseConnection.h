@@ -154,10 +154,11 @@ class BaseConnection
         bool currentMessageIsMissingASplit = false;
     protected:
         DeliveryPriority overwritePriority = DeliveryPriority::INVALID;
-
+        u8 dataSentBuffer[MAX_MESH_PACKET_SIZE];
+        u8 dataSentLength;
         //Will Queue the data in the packet queue of the connection
-        bool QueueData(const BaseConnectionSendData& sendData, u8 const * data);
-        bool QueueData(const BaseConnectionSendData& sendData, u8 const * data, bool fillTxBuffers); // Can be used to avoid infinite recursion in queue and fillTxBuffers
+        bool QueueData(const BaseConnectionSendData& sendData, u8 const * data, u32* messageHandle=nullptr);
+        bool QueueData(const BaseConnectionSendData& sendData, u8 const * data, bool fillTxBuffers, u32* messageHandle=nullptr); // Can be used to avoid infinite recursion in queue and fillTxBuffers
 
         bool PrepareBaseConnection(FruityHal::BleGapAddr* address, ConnectionType connectionType) const;
 
@@ -185,7 +186,7 @@ class BaseConnection
 
         //################### Sending ######################
         //Must be implemented in super class
-        virtual bool SendData(u8 const * data, MessageLength dataLength, bool reliable) = 0;
+        virtual bool SendData(u8 const * data, MessageLength dataLength, bool reliable, u32 * messageHandle) = 0;
         //Allow a subclass to transmit data before the writeQueue is processed
         virtual bool QueueVitalPrioData() { return false; };
         //Allows a subclass to process data closely before sending it
@@ -198,7 +199,7 @@ class BaseConnection
         //Gets passed the exact same data that was passed to the HAL. If that data was encrypted, the passed data
         //to this function is encrypted as well (e.g. in the MeshAccessConnection). This means that the data passed
         //to this function is the same as was returned by ProcessDataBeforeTransmission.
-        virtual void DataSentHandler(const u8* data, MessageLength length) {};
+        virtual void DataSentHandler(const u8* data, MessageLength length, u32 messageHandle) {};
 
         //Calls GetPriorityOfMessage of all modules to determine the priority of the message.
         DeliveryPriority GetPriorityOfMessage(const u8* data, MessageLength size);
@@ -214,6 +215,17 @@ class BaseConnection
         virtual void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) = 0;
         //Can be called by subclasses to use the ConnPacketHeader reassembly
         u8 const * ReassembleData(BaseConnectionSendData* sendData, u8 const * data);
+
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+        /// Called in response to a connection parameter update.
+        virtual void GapConnParamUpdateHandler(
+                const FruityHal::BleGapConnParams & params);
+        /// Called on the device in the central role, when the remote device
+        /// in the peripheral role requests an update of the connection
+        /// parameters.
+        virtual void GapConnParamUpdateRequestHandler(
+                const FruityHal::BleGapConnParams & params);
+#endif
 
         //Helpers
         virtual void PrintStatus() = 0;

@@ -52,6 +52,7 @@
 #include <Utility.h>
 #include <FmTypes.h>
 #include <FlashStorage.h>
+#include <Timeslot.h>
 
 #ifndef GITHUB_RELEASE
 #if IS_ACTIVE(ASSET_MODULE)
@@ -343,6 +344,10 @@ void DispatchSystemEvents(FruityHal::SystemEvents sys_evt)
 {
     //Hand system events to new storage class
     FlashStorage::GetInstance().SystemEventHandler(sys_evt);
+
+#if IS_ACTIVE(TIMESLOT)
+    Timeslot::GetInstance().DispatchRadioSystemEvent(sys_evt);
+#endif // IS_ACTIVE(TIMESLOT)
 }
 
 //This function dispatches once a Button was pressed for some time
@@ -438,6 +443,18 @@ void DispatchEvent(const FruityHal::GapConnectionSecurityUpdateEvent & e)
 {
     GAPController::GetInstance().GapConnectionSecurityUpdateEventHandler(e);
 }
+
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+void DispatchEvent(const FruityHal::GapConnParamUpdateEvent & e)
+{
+    GAPController::GetInstance().GapConnParamUpdateEventHandler(e);
+}
+
+void DispatchEvent(const FruityHal::GapConnParamUpdateRequestEvent & e)
+{
+    GAPController::GetInstance().GapConnParamUpdateRequestEventHandler(e);
+}
+#endif
 
 void DispatchEvent(const FruityHal::GattcWriteResponseEvent & e)
 {

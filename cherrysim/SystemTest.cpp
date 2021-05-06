@@ -39,6 +39,7 @@
 #include <Logger.h>
 #include <fstream>
 #include <limits>
+#include <optional>
 
 extern "C" {
 #include <app_timer.h>
@@ -69,6 +70,7 @@ GlobalState* simGlobalStatePtr;
 NRF_FICR_Type* simFicrPtr;
 NRF_UICR_Type* simUicrPtr;
 NRF_GPIO_Type* simGpioPtr;
+NRF_RADIO_Type* simRadioPtr;
 uint8_t* simFlashPtr;
 
 
@@ -636,9 +638,18 @@ extern "C"
             return (int32_t)ErrorType::NULL_ERROR;
         }
         axis3bit16_t* buffer = (axis3bit16_t*)buff;
-        buffer->i16bit[0] = (i16)cherrySimInstance->simState.rnd.NextU32();
-        buffer->i16bit[1] = (i16)cherrySimInstance->simState.rnd.NextU32();
-        buffer->i16bit[2] = (i16)cherrySimInstance->simState.rnd.NextU32();
+        if (ctx->moving)
+        {
+            buffer->i16bit[0] = (i16)cherrySimInstance->simState.rnd.NextU32();
+            buffer->i16bit[1] = (i16)cherrySimInstance->simState.rnd.NextU32();
+            buffer->i16bit[2] = (i16)cherrySimInstance->simState.rnd.NextU32();
+        }
+        else
+        {
+            buffer->i16bit[0] = 0;
+            buffer->i16bit[1] = 0;
+            buffer->i16bit[2] = 0;
+        }
 
         return (int32_t)ErrorType::SUCCESS;
 
@@ -974,8 +985,165 @@ extern "C"
         if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
             return NRF_ERROR_BUSY;
         }
+        // Find the connection corresponding to the handle on the current node.
+        SoftdeviceConnection* connection = cherrySimInstance->FindConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
+        // If the connection handle could not be resolved, the handle was bogus.
+        if (!connection || !connection->connectionActive)
+        {
+            return BLE_ERROR_INVALID_CONN_HANDLE;
+        }
+        // TODO: Verify that the parameters are supported in the simulator.
+        // Called on the central.
+        if (connection->isCentral)
+        {
+            // The optional will be empty if a pending request was rejected.
+            // In any other case (parameter change from the central or accepted
+            // request of the peripheral) the optional will hold the new
+            // parameters.
+            std::optional<ble_gap_conn_params_t> params;
+            // If a connection parameter update request was pending on the
+            // connection, the request can be either accepted or rejected.
+            if (connection->connParamUpdateRequestPending)
+            {
+                // Potentially accept the request if the parameters match the
+                // requested parameters.
+                if (p_conn_params)
+                {
+                    const auto &cpurp = connection->connParamUpdateRequestParameters;
+                    if (    cpurp.minConnInterval != p_conn_params->min_conn_interval
+                        ||  cpurp.maxConnInterval != p_conn_params->max_conn_interval
+                        ||  cpurp.slaveLatency != p_conn_params->slave_latency
+                        ||  cpurp.connSupTimeout != p_conn_params->conn_sup_timeout)
+                    {
+                        // TODO: Check if the actual softdevice reacts like
+                        //       this, the documentation does not make that
+                        //       clear.
+                        return NRF_ERROR_INVALID_PARAM;
+                    }
+                    // Accept the request.
+                    params = *p_conn_params;
+                    connection->connParamUpdateRequestPending = false;
+                }
+                // Reject the pending request.
+                else
+                {
+                    connection->connParamUpdateRequestPending = false;
+                }
+            }
+            // No request was pending on the central, this means we just change
+            // the current connection parameters.
+            else
+            {
+                // Check that we actually got parameters.
+                if (!p_conn_params)
+                {
+                    return NRF_ERROR_INVALID_ADDR;
+                }
+                params = *p_conn_params;
+            }
 
-        return 0;
+            // Fetch the partner connection.
+            SoftdeviceConnection * peripheralConnection = connection->partnerConnection;
+
+            // If new parameters are available, generate events on both, central
+            // and peripheral with the new parameters and change the parameters
+            // stored in the connection object.
+            if (params.has_value())
+            {
+                // Change the parameters in the connection objects.
+                connection->connectionInterval =
+                    UNITS_TO_MSEC(params->min_conn_interval, CONFIG_UNIT_1_25_MS);
+                peripheralConnection->connectionInterval =
+                    UNITS_TO_MSEC(params->min_conn_interval, CONFIG_UNIT_1_25_MS);
+
+                { // central event
+                    simBleEvent simEvent = {};
+                    simEvent.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+
+                    auto & bleEvent = simEvent.bleEvent;
+                    bleEvent.header.evt_id = BLE_GAP_EVT_CONN_PARAM_UPDATE;
+                    bleEvent.header.evt_len = simEvent.globalId;
+                    bleEvent.evt.gap_evt.conn_handle = connection->connectionHandle;
+                    bleEvent.evt.gap_evt.params.conn_param_update.conn_params = *params;
+
+                    connection->owningNode->eventQueue.push_back(simEvent);
+                }
+
+                { // peripheral event
+                    simBleEvent simEvent = {};
+                    simEvent.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+
+                    auto & bleEvent = simEvent.bleEvent;
+                    bleEvent.header.evt_id = BLE_GAP_EVT_CONN_PARAM_UPDATE;
+                    bleEvent.header.evt_len = simEvent.globalId;
+                    bleEvent.evt.gap_evt.conn_handle = connection->connectionHandle;
+                    bleEvent.evt.gap_evt.params.conn_param_update.conn_params = *params;
+
+                    peripheralConnection->owningNode->eventQueue.push_back(simEvent);
+                }
+            }
+            // If a request was rejected, generate an event on the peripheral.
+            else
+            {
+                simBleEvent simEvent = {};
+                simEvent.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+
+                auto & bleEvent = simEvent.bleEvent;
+                bleEvent.header.evt_id = BLE_GAP_EVT_CONN_PARAM_UPDATE;
+                bleEvent.header.evt_len = simEvent.globalId;
+                bleEvent.evt.gap_evt.conn_handle = connection->connectionHandle;
+
+                auto & connParams = bleEvent.evt.gap_evt.params.conn_param_update.conn_params;
+                connParams.min_conn_interval = peripheralConnection->connectionInterval;
+                connParams.max_conn_interval = peripheralConnection->connectionInterval;
+                connParams.slave_latency = Conf::meshPeripheralSlaveLatency;
+                connParams.conn_sup_timeout = Conf::meshConnectionSupervisionTimeout;
+
+                peripheralConnection->owningNode->eventQueue.push_back(simEvent);
+            }
+        }
+        // Called on the peripheral.
+        else
+        {
+            // Fetch the partner connection.
+            SoftdeviceConnection * centralConnection = connection->partnerConnection;
+            // Check that no connection parameter update request is already
+            // pending.
+            if (centralConnection->connParamUpdateRequestPending)
+            {
+                return NRF_ERROR_BUSY;
+            }
+            // Check that the connection parameters were actually passed.
+            if (!p_conn_params)
+            {
+                return NRF_ERROR_INVALID_ADDR;
+            }
+            // TODO: Check the constraints of the parameter values and
+            //       return NRF_ERROR_INVALID_PARAM if violated.
+            // Update the requested connection parameters.
+            auto &cpurp = centralConnection->connParamUpdateRequestParameters;
+            cpurp.minConnInterval = p_conn_params->min_conn_interval;
+            cpurp.maxConnInterval = p_conn_params->max_conn_interval;
+            cpurp.slaveLatency = p_conn_params->slave_latency;
+            cpurp.connSupTimeout = p_conn_params->conn_sup_timeout; 
+            // Compute the timeout and set the pending flag.
+            centralConnection->connParamUpdateRequestTimeoutDs =
+                centralConnection->owningNode->gs.appTimerDs + 20;
+            centralConnection->connParamUpdateRequestPending = true;
+            // Create the event on the central.
+            simBleEvent simEvent = {};
+            simEvent.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+            auto & bleEvent = simEvent.bleEvent;
+            bleEvent.header.evt_id = BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST;
+            bleEvent.header.evt_len = simEvent.globalId;
+            bleEvent.evt.gap_evt.conn_handle = centralConnection->connectionHandle;
+            bleEvent.evt.gap_evt.params.conn_param_update_request.conn_params =
+                *p_conn_params;
+            // Push the request event into the event queue of the central node.
+            centralConnection->owningNode->eventQueue.push_back(simEvent);
+        }
+
+        return NRF_SUCCESS;
     }
 
     uint32_t sd_ble_gap_scan_stop()
@@ -1162,6 +1330,86 @@ extern "C"
         return 0;
     }
 
+    uint32_t sd_ble_gattc_exchange_mtu_request(uint16_t connHandle, uint16_t clientRxMtu)
+    {
+        START_OF_FUNCTION();
+
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
+            return NRF_ERROR_BUSY;
+        }
+
+
+        SoftdeviceConnection* connection = cherrySimInstance->FindConnectionByHandle(cherrySimInstance->currentNode, connHandle);
+
+        if (connection == nullptr) {
+            return BLE_ERROR_INVALID_CONN_HANDLE;
+        }
+
+        connection->connectionMtu = clientRxMtu - FruityHal::ATT_HEADER_SIZE;
+        simBleEvent s1;
+        CheckedMemset(&s1, 0, sizeof(s1));
+        s1.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+        s1.bleEvent.header.evt_id = BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST;
+        s1.bleEvent.header.evt_len = s1.globalId;
+        s1.bleEvent.evt.gattc_evt.conn_handle = connHandle;
+        s1.bleEvent.evt.gatts_evt.params.exchange_mtu_request.client_rx_mtu = clientRxMtu;
+        ble_gap_addr_t address = CherrySim::Convert(&cherrySimInstance->currentNode->address);
+        CheckedMemcpy(&s1.bleEvent.evt.gap_evt.params.sec_info_request.peer_addr, &address, sizeof(ble_gap_addr_t));
+
+        connection->partner->eventQueue.push_back(s1);
+
+
+        return NRF_SUCCESS;
+    }
+
+    uint32_t sd_ble_gap_data_length_update(uint16_t connHandle, ble_gap_data_length_params_t const* p_dl_params, ble_gap_data_length_limitation_t* p_dl_limitation) 
+    {
+        START_OF_FUNCTION();
+
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
+            return NRF_ERROR_BUSY;
+        }
+
+        return NRF_SUCCESS;
+
+    }
+
+    uint32_t sd_ble_gatts_exchange_mtu_reply(uint16_t connHandle, uint16_t serverRxMtu) 
+    {
+        START_OF_FUNCTION();
+
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
+            return NRF_ERROR_BUSY;
+        }
+
+        if (serverRxMtu < GATT_MTU_SIZE_DEFAULT) {
+            return NRF_ERROR_INVALID_LENGTH;
+        }
+
+        SoftdeviceConnection* connection = cherrySimInstance->FindConnectionByHandle(cherrySimInstance->currentNode, connHandle);
+
+        if (connection == nullptr) {
+            return BLE_ERROR_INVALID_CONN_HANDLE;
+        }
+
+        connection->connectionMtu = serverRxMtu - FruityHal::ATT_HEADER_SIZE;
+
+        simBleEvent s1;
+        CheckedMemset(&s1, 0, sizeof(s1));
+        s1.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+        s1.bleEvent.header.evt_id = BLE_GATTC_EVT_EXCHANGE_MTU_RSP;
+        s1.bleEvent.header.evt_len = s1.globalId;
+        s1.bleEvent.evt.gattc_evt.conn_handle = connHandle;
+        s1.bleEvent.evt.gattc_evt.params.exchange_mtu_rsp.server_rx_mtu = serverRxMtu;
+        ble_gap_addr_t address = CherrySim::Convert(&cherrySimInstance->currentNode->address);
+        CheckedMemcpy(&s1.bleEvent.evt.gap_evt.params.sec_info_request.peer_addr, &address, sizeof(ble_gap_addr_t));
+  
+        connection->partner->eventQueue.push_back(s1);
+
+
+        return NRF_SUCCESS;
+    }
+
     SoftDeviceBufferedPacket* findFreePacketBuffer(SoftdeviceConnection* connection) {
         START_OF_FUNCTION();
         for (int i = 0; i < SIM_NUM_UNRELIABLE_BUFFERS; i++) {
@@ -1202,7 +1450,7 @@ extern "C"
             return BLE_ERROR_INVALID_CONN_HANDLE;
         }
 
-        if (p_write_params->len > connection->connectionMtu - FruityHal::ATT_HEADER_SIZE)
+        if (p_write_params->len > connection->connectionMtu)
         {
             return NRF_ERROR_DATA_SIZE;
         }
@@ -1612,6 +1860,67 @@ extern "C"
     uint32_t sd_power_reset_reason_clr(uint32_t p) {
         START_OF_FUNCTION();
         return 0;
+    }
+
+    // Timeslot API
+
+    uint32_t sd_radio_session_open(nrf_radio_signal_callback_t callback)
+    {
+        START_OF_FUNCTION();
+
+        // check that the callback is set
+        if (!callback)
+            return NRF_ERROR_INVALID_ADDR;
+
+        auto* node = cherrySimInstance->currentNode;
+
+        // check that no callback is registered
+        if (node->timeslotRadioSignalCallback)
+            return NRF_ERROR_BUSY;
+
+        // check that the timeslot session is not currently closing
+        if (node->timeslotCloseSessionRequested)
+            return NRF_ERROR_BUSY;
+
+        node->timeslotRadioSignalCallback = callback;
+        return NRF_SUCCESS;
+    }
+
+    uint32_t sd_radio_session_close()
+    {
+        START_OF_FUNCTION();
+
+        auto* node = cherrySimInstance->currentNode;
+
+        // check that the callback was set
+        if (!node->timeslotRadioSignalCallback)
+            return NRF_ERROR_FORBIDDEN;
+
+        // check that the timeslot session is not already closing
+        if (node->timeslotCloseSessionRequested)
+            return NRF_ERROR_BUSY;
+
+        node->timeslotRadioSignalCallback = nullptr;
+        return NRF_SUCCESS;
+    }
+
+    uint32_t sd_radio_request(nrf_radio_request_t const * request)
+    {
+        START_OF_FUNCTION();
+
+        // check that the request pointer was set
+        if (!request)
+            return NRF_ERROR_INVALID_ADDR;
+
+        auto* node = cherrySimInstance->currentNode;
+
+        // check that the timeslot session is not closing
+        if (node->timeslotCloseSessionRequested)
+            return NRF_ERROR_FORBIDDEN;
+
+        // TODO: Check the parameters and schedule the timeslots as requested.
+        node->timeslotRequested = true;
+        return NRF_SUCCESS;
     }
 
 }

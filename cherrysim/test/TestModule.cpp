@@ -271,7 +271,7 @@ TEST(TestModule, TestGetModuleList) {
         "]}");
 }
 
-TEST(TestModule, TestConfigRemovalDuringEnrollment) {
+TEST(TestModule, TestConfigRemovalDuringUnenrollment) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
@@ -304,14 +304,13 @@ TEST(TestModule, TestConfigRemovalDuringEnrollment) {
     tester.SendTerminalCommand(1, "get_modules 2");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"id\":3,\"version\":2,\"active\":0}");
 
-    //We cannot enroll it again using the same enrollment as it will otherwhise not clear its data
-    tester.SendTerminalCommand(1, "action 2 enroll basic BBBBC 3 7 AA:BB:CC:DD:AA:BB:CC:DD:AA:BB:CC:DD:AA:BB:CC:DD");
-    tester.SimulateForGivenTime(10 * 1000);
-    tester.SimulateUntilClusteringDone(100 * 1000);
+    //We send an unenrollment to the node
+    tester.SendTerminalCommand(1, "action 2 enroll remove BBBBC");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "reboot");
 
-    //As node 3 (previous node 2) should have cleared all its settings now, both modules should be on again
-    tester.SendTerminalCommand(1, "get_modules 3");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"id\":\"0xABCD01F0\",\"version\":1,\"active\":1}");
-    tester.SendTerminalCommand(1, "get_modules 3");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"id\":3,\"version\":2,\"active\":1}");
+    //As node 2 should have cleared all its settings now, both modules should be on again
+    tester.SendTerminalCommand(2, "get_modules 2");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"id\":\"0xABCD01F0\",\"version\":1,\"active\":1}");
+    tester.SendTerminalCommand(2, "get_modules 2");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"id\":3,\"version\":2,\"active\":1}");
 }

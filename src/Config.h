@@ -58,7 +58,7 @@ class RecordStorageEventListener;
 #define FM_VERSION_MINOR 0
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 90
+#define FM_VERSION_PATCH 830
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -443,6 +443,19 @@ class Conf
         u16 meshMaxConnectionInterval = 0;
         //(100-32000) Connection supervisory timeout
         static constexpr u16 meshConnectionSupervisionTimeout = (u16)MSEC_TO_UNITS(1000, CONFIG_UNIT_10_MS);
+
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+        //(7.5-4000) Minimum acceptable connection interval for long term connections
+        u16 meshMinLongTermConnectionInterval = 0;
+        //(7.5-4000) Maximum acceptable connection interval for long term connections
+        u16 meshMaxLongTermConnectionInterval = 0;
+        //Age of a mesh connection after which it is considered long term for
+        //the purpose of adjusting it's connection interval.
+        static constexpr u16 meshConnectionLongTermAgeDs = 50;
+        //Age penalty added for peripherals to stop central and peripheral
+        //from requesting an update simultaneously.
+        static constexpr u16 meshConnectionLongTermAgePeripheralPenaltyDs = 20;
+#endif
 
         //Mesh discovery parameters
         //DISCOVERY_HIGH

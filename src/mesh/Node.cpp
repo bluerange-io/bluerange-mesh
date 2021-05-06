@@ -1470,7 +1470,7 @@ void Node::UpdateJoinMePacket() const
 
     advPacket->meshIdentifier = MESH_IDENTIFIER;
     advPacket->networkId = configuration.networkId;
-    advPacket->messageType = ServiceDataMessageType::JOIN_ME_V0;
+    advPacket->messageType = ManufacturerSpecificMessageType::JOIN_ME_V0;
 
     //Build a JOIN_ME packet and set it in the advertisement data
     AdvPacketPayloadJoinMeV0* packet = (AdvPacketPayloadJoinMeV0*)(buffer+SIZEOF_ADV_PACKET_HEADER);
@@ -1801,7 +1801,7 @@ void Node::GapAdvertisementMessageHandler(const FruityHal::GapAdvertisementRepor
 
     const AdvPacketHeader* packetHeader = (const AdvPacketHeader*) data;
 
-    if (packetHeader->messageType == ServiceDataMessageType::JOIN_ME_V0)
+    if (packetHeader->messageType == ManufacturerSpecificMessageType::JOIN_ME_V0)
     {
         if (dataLength == SIZEOF_ADV_PACKET_JOIN_ME)
         {
@@ -3129,6 +3129,29 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         NodeId nodeId = Utility::StringToU16(commandArgs[1]);
         u16 newConnectionInterval = Utility::StringToU16(commandArgs[2]);
 
+        #ifdef SIM_ENABLED
+        // Neccessary for monkey-testing this command in combination with
+        // the IllegalStateException that is thrown when the connection
+        // interval does not match one of the values in the if-statements
+        // at the end of CherrySim::SimulateBatteryUsage() (CherrySim.cpp).
+        // This is not the best solution, but fixes the test and is not as
+        // invasive as to silently change the connection interval while
+        // setting it.
+        switch (newConnectionInterval)
+        {
+            case MSEC_TO_UNITS(7, CONFIG_UNIT_1_25_MS):
+            case MSEC_TO_UNITS(10, CONFIG_UNIT_1_25_MS):
+            case MSEC_TO_UNITS(15, CONFIG_UNIT_1_25_MS):
+            case MSEC_TO_UNITS(30, CONFIG_UNIT_1_25_MS):
+            case MSEC_TO_UNITS(90, CONFIG_UNIT_1_25_MS):
+            case MSEC_TO_UNITS(100, CONFIG_UNIT_1_25_MS):
+                break;
+            default:
+                logt("WARNING", "Ignoring command because the connection interval is not valid for simulated battery measurements.");
+                return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
+        }
+        #endif
+
         ConnPacketUpdateConnectionInterval packet;
         packet.header.messageType = MessageType::UPDATE_CONNECTION_INTERVAL;
         packet.header.sender = GS->node.configuration.nodeId;
@@ -3187,6 +3210,11 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         GS->terminal.EnableCrcChecks();
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
+#if IS_ACTIVE(SIG_MESH)
+    //Forwards TerminalCommandHandler to SigAccessLayer
+    TerminalCommandHandlerReturnType ret = GS->sig.TerminalCommandHandler(commandArgs, commandArgsSize);
+    if(ret != TerminalCommandHandlerReturnType::UNKNOWN) return ret;
+#endif
 
     //Must be called to allow the module to get and set the config
     return Module::TerminalCommandHandler(commandArgs, commandArgsSize);

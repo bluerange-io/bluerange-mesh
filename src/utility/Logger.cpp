@@ -595,6 +595,12 @@ const char* Logger::GetErrorLogCustomError(CustomErrorTypes type)
         return "COUNT_UART_RX_ERROR";
     case CustomErrorTypes::INFO_UNUSED_STACK_BYTES:
         return "INFO_UNUSED_STACK_BYTES";
+    case CustomErrorTypes::FATAL_CONNECTION_REMOVED_WHILE_ENROLLED_NODES_SYNC:
+        return "FATAL_CONNECTION_REMOVED_WHILE_ENROLLED_NODES_SYNC";
+    case CustomErrorTypes::INFO_UPTIME_RELATIVE:
+        return "INFO_UPTIME_RELATIVE";
+    case CustomErrorTypes::INFO_UPTIME_ABSOLUTE:
+        return "INFO_UPTIME_ABSOLUTE";
     default:
         SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
         return "UNKNOWN_ERROR";

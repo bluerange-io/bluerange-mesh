@@ -33,7 +33,7 @@ FruityMesh can be seen both as a mesh and as a complete framework to make develo
 * <<Watchdog With Safe Boot Mode>> to really make sure that the nodes will always be running
 * xref:Logger.adoc[Debug Logger] with support for filtering log tags during runtime
 * Support for xref:Logger.adoc[UART logging and Segger RTT logging], also at the same time
-* xref:Logger.adoc#ErrorLog[Error Log] and xref:StatusReporterModule.adoc#LiveReports[Live Error Reporting] for logging and retrieving errors in production setups
+* xref:ErrorLog.adoc[Error Log] and xref:StatusReporterModule.adoc#LiveReports[Live Error Reporting] for logging and retrieving errors in production setups
 * No heap usage for more reliability
 * Automatic logging of the xref:Node.adoc#RebootMessage[reboot reason] and reporting over the mesh
 

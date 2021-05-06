@@ -38,7 +38,7 @@
 // Adds a message. Private as the method does not check for size or nullptrs, the caller has to do this.
 void ChunkedPacketQueue::AddMessageRaw(u8* data, u16 size)
 {
-    writeChunk->amountOfByteInThisChunk = Utility::NextMultipleOf(writeChunk->amountOfByteInThisChunk, sizeof(QueueEntryHeader));
+    writeChunk->amountOfByteInThisChunk = Utility::NextMultipleOf(writeChunk->amountOfByteInThisChunk, sizeof(u32));
     const u32 sizeLeftInCurrentWriteChunk = CONNECTION_QUEUE_MEMORY_CHUNK_SIZE > writeChunk->amountOfByteInThisChunk ? CONNECTION_QUEUE_MEMORY_CHUNK_SIZE - writeChunk->amountOfByteInThisChunk : 0;
 
     if (sizeLeftInCurrentWriteChunk >= size)
@@ -46,7 +46,7 @@ void ChunkedPacketQueue::AddMessageRaw(u8* data, u16 size)
         // The data fits completely in the current writeChunk
         CheckedMemcpy(writeChunk->data.data() + writeChunk->amountOfByteInThisChunk, data, size);
         writeChunk->amountOfByteInThisChunk += size;
-        writeChunk->amountOfByteInThisChunk = Utility::NextMultipleOf(writeChunk->amountOfByteInThisChunk, sizeof(QueueEntryHeader));
+        writeChunk->amountOfByteInThisChunk = Utility::NextMultipleOf(writeChunk->amountOfByteInThisChunk, sizeof(u32));
     }
     else
     {
@@ -55,7 +55,7 @@ void ChunkedPacketQueue::AddMessageRaw(u8* data, u16 size)
         {
             CheckedMemcpy(writeChunk->data.data() + writeChunk->amountOfByteInThisChunk, data, sizeLeftInCurrentWriteChunk);
             writeChunk->amountOfByteInThisChunk += sizeLeftInCurrentWriteChunk;
-            writeChunk->amountOfByteInThisChunk = Utility::NextMultipleOf(writeChunk->amountOfByteInThisChunk, sizeof(QueueEntryHeader));
+            writeChunk->amountOfByteInThisChunk = Utility::NextMultipleOf(writeChunk->amountOfByteInThisChunk, sizeof(u32));
         }
         ConnectionQueueMemoryChunk* newChunk = GS->connectionQueueMemoryAllocator.Allocate();
         if (!newChunk)
@@ -68,13 +68,14 @@ void ChunkedPacketQueue::AddMessageRaw(u8* data, u16 size)
         writeChunk = newChunk;
         CheckedMemcpy(writeChunk->data.data(), data + sizeLeftInCurrentWriteChunk, size - sizeLeftInCurrentWriteChunk);
         writeChunk->amountOfByteInThisChunk += size - sizeLeftInCurrentWriteChunk;
-        writeChunk->amountOfByteInThisChunk = Utility::NextMultipleOf(writeChunk->amountOfByteInThisChunk, sizeof(QueueEntryHeader));
+        writeChunk->amountOfByteInThisChunk = Utility::NextMultipleOf(writeChunk->amountOfByteInThisChunk, sizeof(u32));
     }
 }
 
-u16 ChunkedPacketQueue::PeekPacketRaw(u8* outData, u16 outDataSize, const ConnectionQueueMemoryChunk* chunk, u32 head) const
+u16 ChunkedPacketQueue::PeekPacketRaw(u8* outData, u16 outDataSize, const ConnectionQueueMemoryChunk* chunk, u32 head, u32* messageHandle) const
 {
     const QueueEntryHeader* header = (const QueueEntryHeader*)(chunk->data.data() + head);
+    const u16 headerSize = header->isExtended ? sizeof(ExtendedQueueEntryHeader) : sizeof(QueueEntryHeader);
     if (header->reserved != 0)
     {
         SIMEXCEPTION(MemoryCorruptionException);
@@ -97,9 +98,22 @@ u16 ChunkedPacketQueue::PeekPacketRaw(u8* outData, u16 outDataSize, const Connec
     }
 
     // If the following static_assert failes, the messageStart calculation would be wrong.
+    static_assert(sizeof(ExtendedQueueEntryHeader) % sizeof(u32) == 0, "Sizeof ExtendedQueueEntryHeader must be a multiple of 4!");
     static_assert(sizeof(QueueEntryHeader) % sizeof(u32) == 0, "Sizeof QueueEntryHeader must be a multiple of 4!");
-    const u32 messageStartOffset = head + sizeof(QueueEntryHeader);
-
+    const u32 messageStartOffset = head + headerSize;
+    if (messageHandle != nullptr)
+    {
+        if (header->isExtended)
+        {
+            const ExtendedQueueEntryHeader* header = (const ExtendedQueueEntryHeader*)(chunk->data.data() + head);
+            *messageHandle = header->handle;
+        }
+        else
+        {
+            *messageHandle = 0;
+        }
+    }
+    
     if (messageStartOffset + header->size < CONNECTION_QUEUE_MEMORY_CHUNK_SIZE)
     {
         // The message can be read from a single chunk.
@@ -114,9 +128,11 @@ u16 ChunkedPacketQueue::PeekPacketRaw(u8* outData, u16 outDataSize, const Connec
             CheckedMemcpy(outData, chunk->data.data() + messageStartOffset, amountOfDataInFirstChunk);
         }
         const u32 amountOfDataInSecondChunk = header->size - amountOfDataInFirstChunk;
+        // In rare case it might happen that header is split among 2 packets. We need to read data from second chunk with proper offset.
+        const u32 secondChunkOffset = messageStartOffset > CONNECTION_QUEUE_MEMORY_CHUNK_SIZE ? (messageStartOffset % CONNECTION_QUEUE_MEMORY_CHUNK_SIZE) : 0;
         if (amountOfDataInSecondChunk > 0)
         {
-            CheckedMemcpy(outData + amountOfDataInFirstChunk, chunk->nextChunk->data.data(), amountOfDataInSecondChunk);
+            CheckedMemcpy(outData + amountOfDataInFirstChunk, chunk->nextChunk->data.data() + secondChunkOffset, amountOfDataInSecondChunk);
         }
     }
 
@@ -138,9 +154,10 @@ ChunkedPacketQueue::ChunkHeadPair ChunkedPacketQueue::GetChunkHeadPairOfIndex(u1
     for (u16 i = 0; i < index; i++)
     {
         const QueueEntryHeader* header = (const QueueEntryHeader*)(currentChunk->data.data() + currentHead);
-        currentHead += sizeof(QueueEntryHeader);
+        const u16 headerSize = header->isExtended ? sizeof(ExtendedQueueEntryHeader) : sizeof(QueueEntryHeader);
+        currentHead += headerSize;
         currentHead += header->size;
-        currentHead = Utility::NextMultipleOf(currentHead, sizeof(QueueEntryHeader));
+        currentHead = Utility::NextMultipleOf(currentHead, sizeof(u32));
         if (currentHead >= CONNECTION_QUEUE_MEMORY_CHUNK_SIZE)
         {
             if (currentChunk->nextChunk == nullptr)
@@ -193,7 +210,7 @@ ChunkedPacketQueue::~ChunkedPacketQueue()
     }
 }
 
-bool ChunkedPacketQueue::SplitAndAddMessage(u8* data, const u16 size, const u16 payloadSizePerSplit)
+bool ChunkedPacketQueue::SplitAndAddMessage(u8* data, const u16 size, const u16 payloadSizePerSplit, u32 * messageHandle)
 {
     if (size > MAX_MESH_PACKET_SIZE + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED)
     {
@@ -212,12 +229,12 @@ bool ChunkedPacketQueue::SplitAndAddMessage(u8* data, const u16 size, const u16 
     }
     if (size <= payloadSizePerSplit + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED)
     {
-        return AddMessage(data, size, false);
+        return AddMessage(data, size, messageHandle, false);
     }
 
     const u32 amountOfSplits = Utility::MessageLengthToAmountOfSplitPackets(size, payloadSizePerSplit);
     const u32 sizeInQueueOfStartingSplits = Utility::NextMultipleOf(Utility::NextMultipleOf(payloadSizePerSplit - SIZEOF_CONN_PACKET_SPLIT_HEADER, sizeof(QueueEntryHeader)) + SIZEOF_CONN_PACKET_SPLIT_HEADER, sizeof(QueueEntryHeader)) + sizeof(QueueEntryHeader);
-    const u32 sizeInQueueOfLastSplit = Utility::NextMultipleOf(Utility::NextMultipleOf(size - (payloadSizePerSplit - SIZEOF_CONN_PACKET_SPLIT_HEADER) * (amountOfSplits - 1), sizeof(QueueEntryHeader)) + SIZEOF_CONN_PACKET_SPLIT_HEADER, sizeof(QueueEntryHeader)) + sizeof(QueueEntryHeader);
+    const u32 sizeInQueueOfLastSplit = Utility::NextMultipleOf(Utility::NextMultipleOf(size - (payloadSizePerSplit - SIZEOF_CONN_PACKET_SPLIT_HEADER) * (amountOfSplits - 1), sizeof(ExtendedQueueEntryHeader)) + SIZEOF_CONN_PACKET_SPLIT_HEADER, sizeof(ExtendedQueueEntryHeader)) + sizeof(ExtendedQueueEntryHeader);
     const u32 sizeInQueue = sizeInQueueOfStartingSplits * (amountOfSplits - 1) + sizeInQueueOfLastSplit;
     const u32 amountOfExtraChunks = (sizeInQueue - (CONNECTION_QUEUE_MEMORY_CHUNK_SIZE - readChunk->amountOfByteInThisChunk)) / CONNECTION_QUEUE_MEMORY_CHUNK_SIZE + 1;
     if (CONNECTION_QUEUE_MEMORY_CHUNK_SIZE - readChunk->amountOfByteInThisChunk < sizeInQueue && GS->connectionQueueMemoryAllocator.IsChunkAvailable(false, amountOfExtraChunks + (u32)prio) == false)
@@ -255,7 +272,7 @@ bool ChunkedPacketQueue::SplitAndAddMessage(u8* data, const u16 size, const u16 
         data += sizeOfThisSplit;
         sizeLeft -= sizeOfThisSplit;
 
-        const bool successfullyAdded = AddMessage(payloadBuffer, sizeOfThisSplit + SIZEOF_CONN_PACKET_SPLIT_HEADER + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED, isSplit);
+        const bool successfullyAdded = AddMessage(payloadBuffer, sizeOfThisSplit + SIZEOF_CONN_PACKET_SPLIT_HEADER + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED, messageHandle, isSplit);
         if (!successfullyAdded)
         {
             // Must never happen! A check happened earlier if we are able to allocate enough chunks for the message.
@@ -269,7 +286,7 @@ bool ChunkedPacketQueue::SplitAndAddMessage(u8* data, const u16 size, const u16 
     return true;
 }
 
-bool ChunkedPacketQueue::AddMessage(u8* data, u16 size, bool isSplit)
+bool ChunkedPacketQueue::AddMessage(u8* data, u16 size, u32 * messageHandle, bool isSplit)
 {
     if (size > MAX_MESH_PACKET_SIZE)
     {
@@ -285,50 +302,80 @@ bool ChunkedPacketQueue::AddMessage(u8* data, u16 size, bool isSplit)
     // The following assumption is because the implementation never splits data over mutliple chunks. Thus, if one
     // chunk is completely full, the message must always be placable in a new chunk (as long as one is available).
     // A "split" in this context means a split across multiple chunks, NOT across multiple packets.
-    static_assert(MAX_MESH_PACKET_SIZE + sizeof(QueueEntryHeader) <= CONNECTION_QUEUE_MEMORY_CHUNK_SIZE,
+    static_assert(MAX_MESH_PACKET_SIZE + sizeof(ExtendedQueueEntryHeader) <= CONNECTION_QUEUE_MEMORY_CHUNK_SIZE,
         "The implementation of this class assumes that a maximum packet size plus the size of a header always fits in a freshly allocated chunk.");
-    const u16 sizeInQueue = Utility::NextMultipleOf(size + sizeof(QueueEntryHeader), sizeof(QueueEntryHeader));
-    if (
-        CONNECTION_QUEUE_MEMORY_CHUNK_SIZE - writeChunk->amountOfByteInThisChunk < sizeInQueue 
-        && GS->connectionQueueMemoryAllocator.IsChunkAvailable(false, 1 + (u32)prio) == false // Make sure that higher prio queues are still able to allocate at least one chunk.
-        )
+
+    if (isSplit)
     {
-        // If there is no memory left for this message.
-        return false;
+        const u16 sizeInQueue = Utility::NextMultipleOf(size + sizeof(ExtendedQueueEntryHeader), sizeof(ExtendedQueueEntryHeader));
+        if (CONNECTION_QUEUE_MEMORY_CHUNK_SIZE - writeChunk->amountOfByteInThisChunk < sizeInQueue && GS->connectionQueueMemoryAllocator.IsChunkAvailable(false, 1 + (u32)prio) == false)
+        {
+            // If there is no memory left for this message.
+            return false;
+        }
+        if (messageHandle != nullptr) *messageHandle = 0;
+        QueueEntryHeader header;
+        CheckedMemset(&header, 0, sizeof(header));
+        header.size = size;
+        header.isSplit = isSplit;
+        AddMessageRaw((u8*)&header, sizeof(header));
+        AddMessageRaw(data, size);
+        amountOfPackets++;
+
+        if (lookAheadChunk->currentLookAheadHead == CONNECTION_QUEUE_MEMORY_CHUNK_SIZE)
+        {
+            // Edge case! If we have looked ahead through all the available messages, hit exactly the end of
+            // the last chunk and then add a new message, the lookAhead is not moved to the new chunk.
+            lookAheadChunk = lookAheadChunk->nextChunk;
+        }
     }
-
-    QueueEntryHeader header;
-    CheckedMemset(&header, 0, sizeof(header));
-    header.size = size;
-    header.isSplit = isSplit;
-    AddMessageRaw((u8*)&header, sizeof(header));
-    AddMessageRaw(data, size);
-    amountOfPackets++;
-
-    if (lookAheadChunk->currentLookAheadHead == CONNECTION_QUEUE_MEMORY_CHUNK_SIZE)
+    else
     {
-        // Edge case! If we have looked ahead through all the available messages, hit exactly the end of
-        // the last chunk and then add a new message, the lookAhead is not moved to the new chunk.
-        lookAheadChunk = lookAheadChunk->nextChunk;
+        this->messageHandle++;
+        const u16 sizeInQueue = Utility::NextMultipleOf(size + sizeof(ExtendedQueueEntryHeader), sizeof(ExtendedQueueEntryHeader));
+        if (CONNECTION_QUEUE_MEMORY_CHUNK_SIZE - writeChunk->amountOfByteInThisChunk < sizeInQueue && GS->connectionQueueMemoryAllocator.IsChunkAvailable(false, 1 + (u32)prio) == false)
+        {
+            // If there is no memory left for this message.
+            return false;
+        }
+
+        ExtendedQueueEntryHeader header;
+        CheckedMemset(&header, 0, sizeof(header));
+        header.header.size = size;
+        header.header.isSplit = isSplit;
+        header.header.isExtended = true;
+        header.handle = this->messageHandle;
+        if (messageHandle != nullptr) *messageHandle = this->messageHandle;
+        AddMessageRaw((u8*)&header, sizeof(header));
+        AddMessageRaw(data, size);
+        amountOfPackets++;
+
+        if (lookAheadChunk->currentLookAheadHead == CONNECTION_QUEUE_MEMORY_CHUNK_SIZE)
+        {
+            // Edge case! If we have looked ahead through all the available messages, hit exactly the end of
+            // the last chunk and then add a new message, the lookAhead is not moved to the new chunk.
+            lookAheadChunk = lookAheadChunk->nextChunk;
+        }
+        
     }
 
     return true;
 }
 
-u16 ChunkedPacketQueue::PeekPacket(u8* outData, u16 outDataSize) const
+u16 ChunkedPacketQueue::PeekPacket(u8* outData, u16 outDataSize, u32* messageHandle) const
 {
     if (!HasPackets())
     {
         SIMEXCEPTION(IllegalStateException);
         return 0;
     }
-    return PeekPacketRaw(outData, outDataSize, readChunk, readChunk->currentReadHead);
+    return PeekPacketRaw(outData, outDataSize, readChunk, readChunk->currentReadHead, messageHandle);
 }
 
-u16 ChunkedPacketQueue::RandomAccessPeek(u8* outData, u16 outDataSize, u16 index) const
+u16 ChunkedPacketQueue::RandomAccessPeek(u8* outData, u16 outDataSize, u16 index, u32* messageHandle) const
 {
     const ChunkHeadPair pair = GetChunkHeadPairOfIndex(index);
-    return PeekPacketRaw(outData, outDataSize, pair.chunk, pair.head);
+    return PeekPacketRaw(outData, outDataSize, pair.chunk, pair.head, messageHandle);
 }
 
 void ChunkedPacketQueue::PopPacket()
@@ -339,11 +386,13 @@ void ChunkedPacketQueue::PopPacket()
         return;
     }
     const bool needToMoveLookAhead = IsLookAheadAndReadSame(); // If the look ahead is the same as the read, we have to move the look ahead with the read as else the look ahead would point to invalid data.
-    const u16 size = ((QueueEntryHeader*)(readChunk->data.data() + readChunk->currentReadHead))->size;
-    const u16 sizeToPop = size + sizeof(QueueEntryHeader);
+    const QueueEntryHeader* header = ((QueueEntryHeader*)(readChunk->data.data() + readChunk->currentReadHead));
+    const u16 size = header->size;
+    const u16 headerSize = header->isExtended ? sizeof(ExtendedQueueEntryHeader) : sizeof(QueueEntryHeader);
+    const u16 sizeToPop = size + headerSize;
     const u16 oldReadHead = readChunk->currentReadHead;
     readChunk->currentReadHead += sizeToPop;
-    readChunk->currentReadHead = Utility::NextMultipleOf(readChunk->currentReadHead, sizeof(QueueEntryHeader));
+    readChunk->currentReadHead = Utility::NextMultipleOf(readChunk->currentReadHead, sizeof(u32));
     if (needToMoveLookAhead) readChunk->currentLookAheadHead = readChunk->currentReadHead;
     if (readChunk->currentReadHead >= CONNECTION_QUEUE_MEMORY_CHUNK_SIZE && readChunk != writeChunk)
     {
@@ -357,7 +406,7 @@ void ChunkedPacketQueue::PopPacket()
             // If the end of the popped message reaches into the next chunk
             const u16 sizeToPopFromSecondChunk = sizeToPop - sizeRemovedFromFirstChunk;
             readChunk->currentReadHead += sizeToPopFromSecondChunk;
-            readChunk->currentReadHead = Utility::NextMultipleOf(readChunk->currentReadHead, sizeof(QueueEntryHeader));
+            readChunk->currentReadHead = Utility::NextMultipleOf(readChunk->currentReadHead, sizeof(u32));
             if (needToMoveLookAhead) readChunk->currentLookAheadHead = readChunk->currentReadHead;
         }
     }
@@ -411,6 +460,7 @@ u16 ChunkedPacketQueue::PeekLookAhead(u8* outData, u16 outDataSize) const
         SIMEXCEPTION(IllegalStateException);
         return 0;
     }
+
     return PeekPacketRaw(outData, outDataSize, lookAheadChunk, lookAheadChunk->currentLookAheadHead);
 }
 
@@ -422,12 +472,13 @@ void ChunkedPacketQueue::IncrementLookAhead()
         return;
     }
     const QueueEntryHeader* header = ((const QueueEntryHeader*)(lookAheadChunk->data.data() + lookAheadChunk->currentLookAheadHead));
+    const u16 headerSize = header->isExtended ? sizeof(ExtendedQueueEntryHeader) : sizeof(QueueEntryHeader);
     isCurrentlySendingSplitMessage = header->isSplit == 1 ? true : false;
     const u16 size = header->size;
-    const u16 sizeToJump = size + sizeof(QueueEntryHeader);
+    const u16 sizeToJump = size + headerSize;
     const u16 oldReadHead = lookAheadChunk->currentLookAheadHead;
     lookAheadChunk->currentLookAheadHead += sizeToJump;
-    lookAheadChunk->currentLookAheadHead = Utility::NextMultipleOf(lookAheadChunk->currentLookAheadHead, sizeof(QueueEntryHeader));
+    lookAheadChunk->currentLookAheadHead = Utility::NextMultipleOf(lookAheadChunk->currentLookAheadHead, sizeof(u32));
     if (lookAheadChunk->currentLookAheadHead >= CONNECTION_QUEUE_MEMORY_CHUNK_SIZE && lookAheadChunk != writeChunk)
     {
         lookAheadChunk = lookAheadChunk->nextChunk;
@@ -437,7 +488,7 @@ void ChunkedPacketQueue::IncrementLookAhead()
             // If the end of the popped message reaches into the next chunk
             const u16 sizeToPopFromSecondChunk = sizeToJump - sizeRemovedFromFirstChunk;
             lookAheadChunk->currentLookAheadHead += sizeToPopFromSecondChunk;
-            lookAheadChunk->currentLookAheadHead = Utility::NextMultipleOf(lookAheadChunk->currentLookAheadHead, sizeof(QueueEntryHeader));
+            lookAheadChunk->currentLookAheadHead = Utility::NextMultipleOf(lookAheadChunk->currentLookAheadHead, sizeof(u32));
         }
     }
 }

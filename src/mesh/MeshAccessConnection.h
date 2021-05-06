@@ -100,6 +100,7 @@ private:
     // devices with high battery importance like assets.
     u32 scheduledConnectionRemovalTimeDs = 0;
 
+    u32 anonceMessageHandle = 0;
 public:
 
     //The tunnel type describes the direction in which the MeshAccess connection works
@@ -156,8 +157,8 @@ public:
 
     /*############### Sending ##################*/
     MessageLength ProcessDataBeforeTransmission(u8* message, MessageLength messageLength, MessageLength bufferLength) override final;
-    bool SendData(BaseConnectionSendData* sendData, u8 const * data);
-    bool SendData(u8 const * data, MessageLength dataLength, bool reliable) override final;
+    bool SendData(BaseConnectionSendData* sendData, u8 const * data, u32 * messageHandle=nullptr);
+    bool SendData(u8 const * data, MessageLength dataLength, bool reliable, u32 * messageHandle=nullptr) override final;
     bool ShouldSendDataToNodeId(NodeId nodeId) const;
     void PacketSuccessfullyQueuedWithSoftdevice(SizedData* sentData) override final;
 
@@ -168,7 +169,7 @@ public:
     /*############### Handler ##################*/
     void ConnectionSuccessfulHandler(u16 connectionHandle) override final;
     void GATTServiceDiscoveredHandler(FruityHal::BleGattDBDiscoveryEvent &evt) override final;
-    void DataSentHandler(const u8* data, MessageLength length) override final;
+    void DataSentHandler(const u8* data, MessageLength length, u32 messageHandle) override final;
 
     void PrintStatus() override final;
 

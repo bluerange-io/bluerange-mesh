@@ -34,12 +34,22 @@ WARNING: The GCC_PATH must be specified using forward slashes ("/"), not backwar
 Once the native build files are created, it is possible to create all the executables without interacting with the native compiler directly. To do this, while being in the directory where you created the native build files, execute `cmake --build .`. If you are using visual studio, the .exe files are then located inside the `Debug` directory.
 
 [#Troubleshooting]
-=== Troubleshooting
+== Troubleshooting
 
-1. (For Simulator) 32 bit compilation must be available. On some systems this is not the case by default. If you are using Visual Studio, the flag `-A Win32` forces cmake to generate a 32 bit compatible solution.
-2. (For Simulator) If several visual studio versions are installed (e.g. 2017 + 2019), make sure that you are starting the solution file with the correct visual studio version.
-3. (For Simulator & Firmware) "Invalid character escape": If you pass any paths with white spaces you have to put them into quotation marks. If cmake still complains about wrong escape chars you have to remove all the cache files.
-4. In case this error happens: "CMake Error at CMakeLists.txt:4 (message): In-Source Build is prohibited. Please execute cmake from a different directory". Please make sure that the entire repository is clean in the same state that you cloned it (e.g. use git reset --hard) before trying to build again.
+=== Simulator must be compiled as a 32 bit binary
+32 bit compilation must be available. On some systems this is not the case by default. If you are using Visual Studio, the flag `-A Win32` forces cmake to generate a 32 bit compatible solution.
+
+=== Generated Visual Studio project must be started with the correct version
+If several visual studio versions are installed (e.g. 2017 + 2019), make sure that you are starting the solution file with the correct visual studio version. The one that is displayed by CMake while it generates the project.
+
+=== Invalid character escape can be displayed and the build will fail
+"Invalid character escape" can be displayed: If you pass any paths with white spaces you have to put them into quotation marks. If cmake still complains about wrong escape chars you have to remove all the cache files.
+
+=== In-Source Build is prohibited
+In case this error happens: "CMake Error at CMakeLists.txt:4 (message): In-Source Build is prohibited. Please execute cmake from a different directory". Please make sure that the entire repository is clean in the same state that you cloned it (e.g. use git reset --hard) before trying to build again.
+
+=== The CMake build can fail because it cannot clone an external git dependency
+The CMake build will fail if it cannot download an external dependency. In some cases it fails because it is not able to provide the credentials for this repository because your private key might not be loaded properly. Open a command prompt and try to clone the repository yourself, if this fails or if you have to provide a passphrase, you need to do some changes. CMake does not allow for any user input, so you either have to use an unprotected key or your passphrase needs to be cached. On Windows, you can follow these steps to get it working: https://stackoverflow.com/a/4356869. If you run into an additional Problem with "fatal: ssh variant 'simple' does not support setting port", you can follow these steps "https://stackoverflow.com/a/48417901". Make sure to restart your IDE so that it can pick up the environment variables that you configured.
 
 [#cmakeStructure]
 == CMake structure overview

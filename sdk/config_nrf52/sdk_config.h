@@ -8212,9 +8212,16 @@
 #endif
 
 // <o> NRF_SDH_BLE_GATT_MAX_MTU_SIZE - Static maximum MTU size. 
+
+//****************************************
+//NOTE: if we want to change NRF_SDH_BLE_GATT_MAX_MTU_SIZE value in future, We
+//Should also change in CherrySimTypes.h  in order to keep this value consistent
+//in both simulatore and frimware
 #ifndef NRF_SDH_BLE_GATT_MAX_MTU_SIZE
 #define NRF_SDH_BLE_GATT_MAX_MTU_SIZE 63
 #endif
+
+//***************************************
 
 // <o> NRF_SDH_BLE_GATTS_ATTR_TAB_SIZE - Attribute Table size in bytes. The size must be a multiple of 4. 
 #ifndef NRF_SDH_BLE_GATTS_ATTR_TAB_SIZE

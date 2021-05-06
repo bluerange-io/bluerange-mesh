@@ -102,7 +102,7 @@ namespace Utility
     ModuleId GetModuleId(ModuleIdWrapper wrappedModuleId);
 
     ModuleIdWrapper GetWrappedModuleIdFromTerminal(const char* commandArg, bool* didError = nullptr);
-    ModuleIdString GetModuleIdString(ModuleIdWrapper wrappedModuleId);
+    ModuleIdString GetModuleIdString(ModuleIdWrapper wrappedModuleId, bool mayUseDoubleQuotes = true);
 
     //Random functionality
     u32 GetRandomInteger(void);
@@ -172,6 +172,52 @@ namespace Utility
         if (val < minValue) return minValue;
         if (val > maxValue) return maxValue;
         return val;
+    }
+
+    /// Write an integer byte-by-byte in little endian (least significant byte
+    /// first) order to a byte-buffer.
+    template<typename T>
+    void WriteLE(u8 *dst, T value)
+    {
+        static_assert(
+            std::is_integral<T>::value,
+            "value must be of integral type"
+        );
+
+        // cast to an unsigned value (two's complement signed ints don't
+        // change bit patterns - see C++17 standard draft 7.8 §2 integral
+        // conversions[conv.integral])
+        const typename std::make_unsigned<T>::type unsignedValue = value;
+
+        // write least significand byte first (always write forward in memory)
+        for (unsigned byteIndex = 0; byteIndex < sizeof(value); ++byteIndex)
+        {
+            const u8 byteValue = (unsignedValue >> (byteIndex * 8)) & 0xFF;
+            dst[byteIndex] = byteValue;
+        }
+    }
+
+    /// Write an integer byte-by-byte in big endian (most significant byte
+    /// first) order to a byte-buffer.
+    template<typename T>
+    void WriteBE(u8 *dst, T value)
+    {
+        static_assert(
+            std::is_integral<T>::value,
+            "value must be of integral type"
+        );
+
+        // cast to an unsigned value (two's complement signed ints don't
+        // change bit patterns - see C++17 standard draft 7.8 §2 integral
+        // conversions[conv.integral])
+        const typename std::make_unsigned<T>::type unsignedValue = value;
+
+        // write most significand byte first (always write forward in memory)
+        for (int byteIndex = sizeof(value) - 1; byteIndex >= 0; --byteIndex)
+        {
+            const u8 byteValue = (unsignedValue >> (byteIndex * 8)) & 0xFF;
+            dst[sizeof(value) - byteIndex - 1] = byteValue;
+        }
     }
 }
 

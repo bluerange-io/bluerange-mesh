@@ -1,0 +1,14 @@
+{
+	"additionalArgs":{
+		"settings":"prod_ruuvi_weather_nrf52",
+		"make":"prod_ruuvi_weather_nrf52",
+		"platform":"nrf52",
+		"flash":"",
+		"devicetype":1
+	},
+	"buildSettings":{
+		"environmentVariables":{
+			"FEATURESET":"prod_ruuvi_weather_nrf52"
+		}
+	}
+}

@@ -49,3 +49,36 @@ TEST(TestIoModule, TestCommands) {
     tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"nodeId\":2,\"type\":\"set_pin_config_result\",\"module\":6");
 
 }
+
+TEST(TestIoModule, TestIdentifyCommands)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    testerConfig.verbose = false;
+
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2 });
+    simConfig.SetToPerfectConditions();
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    tester.Start();
+    tester.SimulateUntilClusteringDone(60 * 1000);
+
+    {
+        NodeIndexSetter nodeIndexSetter{0};
+        GS->logger.EnableTag("IOMOD");
+    }
+
+    // Turn identification ON on node 1 from node 2.
+    tester.SendTerminalCommand(2, "action 1 io identify on");
+
+    // Check that identification was turned on on node 1.
+    tester.SimulateUntilRegexMessageReceived(60 * 1000, 1, "identification started by SET_IDENTIFICATION message");
+
+    // Turn identification OFF on node 1 from node 2.
+    tester.SendTerminalCommand(2, "action 1 io identify off");
+
+    // Check that identification was turned off on node 1.
+    tester.SimulateUntilRegexMessageReceived(60 * 1000, 1, "identification stopped by SET_IDENTIFICATION message");
+}

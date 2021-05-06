@@ -51,7 +51,10 @@ public:
     void StartEncryptingConnection(u16 connectionHandle) const;
 
     //Update the connection interval
-    void RequestConnectionParameterUpdate(u16 connectionHandle, u16 minConnectionInterval, u16 maxConnectionInterval, u16 slaveLatency, u16 supervisionTimeout) const;
+    ErrorType RequestConnectionParameterUpdate(
+            u16 connectionHandle, u16 minConnectionInterval,
+            u16 maxConnectionInterval, u16 slaveLatency,
+            u16 supervisionTimeout) const;
 
 
 
@@ -61,5 +64,10 @@ public:
     void GapTimeoutEventHandler(const FruityHal::GapTimeoutEvent& gapTimeoutEvent);
     void GapSecurityInfoRequestEvenetHandler(const FruityHal::GapSecurityInfoRequestEvent& securityInfoRequestEvent);
     void GapConnectionSecurityUpdateEventHandler(const FruityHal::GapConnectionSecurityUpdateEvent& connectionSecurityUpdateEvent);
+
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+    void GapConnParamUpdateEventHandler(const FruityHal::GapConnParamUpdateEvent& connParamUpdateEvent);
+    void GapConnParamUpdateRequestEventHandler(const FruityHal::GapConnParamUpdateRequestEvent& connParamUpdateRequestEvent);
+#endif
 };
 

@@ -62,7 +62,7 @@ private:
 public:
     ChunkedPriorityPacketQueue();
 
-    bool SplitAndAddMessage(DeliveryPriority prio, u8* data, u16 size, u16 payloadSizePerSplit);
+    bool SplitAndAddMessage(DeliveryPriority prio, u8* data, u16 size, u16 payloadSizePerSplit, u32* messageHandle);
     u32 GetAmountOfPackets() const;
     bool IsCurrentlySendingSplitMessage() const;
     QueuePriorityPair GetSendQueue();

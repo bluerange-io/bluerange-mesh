@@ -47,9 +47,10 @@ TEST(TestBaseConnection, TestSimpleTransmissions) {
     tester.SimulateUntilClusteringDone(10 * 1000);
 
     //We modify the MTU of the connection and set it so that it is too small for a normal packet
+    //smallest value is 10 and componsated with three 3 byte ATT_HEADER_SIZE, so payload mtu would be 7 
     for (int i = 0; i < SIM_MAX_CONNECTION_NUM; i++) {
         if (tester.sim->nodes[0].state.connections[i].connectionActive) {
-            tester.sim->nodes[0].state.connections[i].connectionMtu = 10;
+            tester.sim->nodes[0].state.connections[i].connectionMtu = 7;
         }
     }
 

@@ -889,11 +889,21 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
     if(TERMARGS(0, "printqueue") )
     {
-        if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+        BaseConnectionHandle conn;
 
-        u16 hnd = Utility::StringToU16(commandArgs[1]);
-        BaseConnectionHandle conn = GS->cm.GetConnectionFromHandle(hnd);
-
+        if (commandArgsSize >= 2) {
+            u16 hnd = Utility::StringToU16(commandArgs[1]);
+            conn = GS->cm.GetConnectionFromHandle(hnd);
+        }
+        else {
+            BaseConnections conns = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
+            for (u32 i = 0; i < conns.count; i++) {
+                conn = conns.handles[i];
+                if (conn) {
+                    break;
+                }
+            }
+        }
         if (conn) {
             trace("Vital Prio: ");
             conn.GetQueueByPriority(DeliveryPriority::VITAL )->Print();

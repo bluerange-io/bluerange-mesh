@@ -358,6 +358,7 @@ enum class SensorMessageActionType : u8
     ERROR_RSP = 1, // Error during READ/WRITE/...
     READ_RSP = 2, // Response following a READ
     WRITE_RSP = 3, // Response following a WRITE_ACK
+    CMD_RSP = 4,
 };
 
 enum class ActorMessageActionType : u8
@@ -365,7 +366,8 @@ enum class ActorMessageActionType : u8
     RESERVED = 0, // Unused
     WRITE = 1, // Write without acknowledgement
     READ = 2, // Read a value
-    WRITE_ACK = 3 // Write with acknowledgement
+    WRITE_ACK = 3, // Write with acknowledgement
+    CMD = 4,
 };
 
 //COMPONENT_MESSAGE_HEADER is used for component_act and component_sense messages
@@ -541,8 +543,24 @@ enum class CapabilityActionType : u8
 enum class CapabilityEntryType : u8
 {
     INVALID = 0,
-    HARDWARE = 1,
-    SOFTWARE = 2,
+
+    HARDWARE = 1, //capability describing some hardware aspect incl. e.g. board revision, etc.
+    SOFTWARE = 2, //some software component such as a firmware or bootloader incl. version information.
+
+    /*
+     * The revision information here identifies a concrete version of the metadata document that shall be processed when
+     * assembling the set of controls (aka. actuators and sensors) and other features supported by the device.
+     * A metadata document itself may contain further restrictions on applicability such as specific hardware and
+     * software capabilities that need to be present as well.
+     */
+    METADATA = 3, //designates same metadata document as stored in the device catalog.
+    /*
+     * This may be used when the firmware reports device specific values that make no sense looking up in the device
+     * catalog. An example use is the number of heads in a multi-part device. The use of this type of metadata should be
+     * avoided as this is not intended as a replacement of properly modeling metadata!
+     * The model field serves as a key, while the revision serves as a value.
+     */
+    PROPERTY = 4, //designates a metadata property reported by device firmware.
 
     NOT_READY = 100,    //The module is currently not ready to report the capability with the provided index but will be in the near future.
 };

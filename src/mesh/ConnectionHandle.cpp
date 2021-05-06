@@ -163,12 +163,12 @@ ConnectionState BaseConnectionHandle::GetConnectionState()
     }
 }
 
-bool BaseConnectionHandle::SendData(u8 const * data, MessageLength dataLength, bool reliable)
+bool BaseConnectionHandle::SendData(u8 const * data, MessageLength dataLength, bool reliable, u32 * messageHandle)
 {
     BaseConnection* con = GetConnection();
     if (con)
     {
-        return con->SendData(data, dataLength, reliable);
+        return con->SendData(data, dataLength, reliable, messageHandle);
     }
     else
     {
@@ -339,12 +339,12 @@ bool MeshConnectionHandle::SetHopsToSink(ClusterSize hops)
     }
 }
 
-bool MeshConnectionHandle::SendData(BaseConnectionSendData * sendData, u8 const * data)
+bool MeshConnectionHandle::SendData(BaseConnectionSendData * sendData, u8 const * data, u32 * messageHandle)
 {
     MeshConnection* con = GetConnection();
     if (con)
     {
-        return con->SendData(sendData, data);
+        return con->SendData(sendData, data, messageHandle);
     }
     else
     {

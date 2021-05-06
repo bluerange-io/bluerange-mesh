@@ -70,10 +70,11 @@ TEST(TestChunkedPacketQueue, TestSimpleAllocations)
     for (u32 repeats = 0; repeats < MAX_MESH_PACKET_SIZE - 1; repeats++)
     {
         ASSERT_FALSE(queue.HasPackets());
-        ASSERT_TRUE(queue.AddMessage(arr.data(), repeats + 1));
+        u32 messageHandle;
+        ASSERT_TRUE(queue.AddMessage(arr.data(), repeats + 1, &messageHandle));
         ASSERT_TRUE(queue.HasPackets());
         u8 readBuffer[1024 * 8];
-        ASSERT_EQ(repeats + 1, queue.PeekPacket(readBuffer, sizeof(readBuffer)));
+        ASSERT_EQ(repeats + 1, queue.PeekPacket(readBuffer, sizeof(readBuffer), &messageHandle));
         for (size_t i = 0; i < repeats + 1u; i++)
         {
             ASSERT_EQ(readBuffer[i], arr[i]);
@@ -84,7 +85,9 @@ TEST(TestChunkedPacketQueue, TestSimpleAllocations)
 
     // Check if splitting works as expected. Each split contains a split header and a send_data_packed.
     ASSERT_FALSE(queue.HasPackets());
-    queue.SplitAndAddMessage(arr.data(), 65, 20);
+    u32 messageHandle;
+    queue.SplitAndAddMessage(arr.data(), 65, 20, &messageHandle);
+    ASSERT_NE(0, messageHandle);
     ASSERT_TRUE(queue.HasPackets());
     u8 readBuffer[1024 * 8];
     CheckedMemset(readBuffer, 0, sizeof(readBuffer));
@@ -95,7 +98,8 @@ TEST(TestChunkedPacketQueue, TestSimpleAllocations)
     for (u32 i = 0; i < 4; i++)
     {
         const u32 expectedSize = (i != 3 ? 20 : 10) + SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED;
-        ASSERT_EQ(expectedSize, queue.PeekPacket(readBuffer, sizeof(readBuffer)));
+        u32 messageHandle;
+        ASSERT_EQ(expectedSize, queue.PeekPacket(readBuffer, sizeof(readBuffer), &messageHandle));
         ASSERT_EQ(0, memcmp(readBuffer, arr.data(), SIZEOF_BASE_CONNECTION_SEND_DATA_PACKED));
         ASSERT_EQ(splitHeader->splitCounter, i);
         ASSERT_EQ(splitHeader->splitMessageType, i != 3 ? MessageType::SPLIT_WRITE_CMD : MessageType::SPLIT_WRITE_CMD_END);
@@ -120,7 +124,8 @@ TEST(TestChunkedPacketQueue, TestSimpleAllocations)
                     PACKET_LOOP(p5)
                     {
 #undef PACKET_LOOP
-#define ADD_MSG(i) ASSERT_TRUE(queue.AddMessage(arr.data(), i)); ASSERT_TRUE(queue.HasPackets());
+                        u32 messageHandle;
+#define ADD_MSG(i) ASSERT_TRUE(queue.AddMessage(arr.data(), i, &messageHandle)); ASSERT_TRUE(queue.HasPackets());
                         ASSERT_FALSE(queue.HasPackets());
                         ADD_MSG(p1);
                         ADD_MSG(p2);
@@ -128,10 +133,8 @@ TEST(TestChunkedPacketQueue, TestSimpleAllocations)
                         ADD_MSG(p4);
                         ADD_MSG(p5);
 #undef ADD_MSG
-
                         u8 readBuffer[1024 * 8];
-
-#define CHECK_AND_POP(i) ASSERT_EQ(i, queue.PeekPacket(readBuffer, sizeof(readBuffer))); \
+#define CHECK_AND_POP(i) ASSERT_EQ(i, queue.PeekPacket(readBuffer, sizeof(readBuffer), &messageHandle)); \
                         for (size_t loop = 0; loop < i; loop++) \
                         { \
                             ASSERT_EQ(readBuffer[loop], arr[loop]); \
@@ -179,7 +182,8 @@ TEST(TestChunkedPacketQueue, TestSimpleAllocations)
                 message.data[i] = (u8)mt.NextU32();
             }
 
-            if (queue.AddMessage(message.data, message.size))
+            u32 messageHandle;
+            if (queue.AddMessage(message.data, message.size, &messageHandle))
             {
                 messages.push(message);
                 lookAheadMessages.push(message);
@@ -189,7 +193,8 @@ TEST(TestChunkedPacketQueue, TestSimpleAllocations)
         {
             // Pop
             u8 peekBuffer[1024];
-            u16 size = queue.PeekPacket(peekBuffer, sizeof(peekBuffer));
+            u32 messageHandle;
+            u16 size = queue.PeekPacket(peekBuffer, sizeof(peekBuffer), &messageHandle);
             ASSERT_EQ(size, messages.front().size);
             for (size_t i = 0; i < messages.front().size; i++)
             {

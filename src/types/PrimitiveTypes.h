@@ -45,6 +45,17 @@
 #define NO_DISCARD
 #endif
 
+//If a NO_DISCARD value is intentionally unhandeled, use this
+#define DISCARD(value) static_cast<void>(value)
+
+// The [[fallthrough]] attribute is a C++17 feature
+// and thus is only supported in the Simulator.
+#ifdef SIM_ENABLED
+#define FALLTHROUGH [[fallthrough]]
+#else
+#define FALLTHROUGH
+#endif
+
 //std::is_trivially_copyable seems to be unavailable in GCC 4.9, although it is specified to be available in C++11.
 #if defined(__GNUG__) && __GNUC__ < 5
 #define HAS_TRIVIAL_COPY(T) __has_trivial_copy(T)
@@ -245,6 +256,7 @@ enum class RebootReason : u8 {
     NO_CHUNK_FOR_NEW_CONNECTION = 24,
     IMPLEMENTATION_ERROR_NO_QUEUE_SPACE_AFTER_CHECK = 25,
     IMPLEMENTATION_ERROR_SPLIT_WITH_NO_LOOK_AHEAD = 26,
+    CONFIG_MIGRATION = 27,
 
     USER_DEFINED_START = 200,
     USER_DEFINED_END = 255,
@@ -601,10 +613,16 @@ enum class LedMode : u8 {
     OFF = 0, // Led is off
     ON = 1, // Led is constantly on
     CONNECTIONS = 2, // Led blinks red if not connected and green for the number of connections
-    RADIO = 3, // Led shows radio activity
-    CLUSTERING = 4, // Led colour chosen according to clusterId (deprecated)
-    ASSET = 5,
+    RADIO_DEPRECATED = 3, // deprecated since 26/03/2021 (not implemented)
+    CLUSTERING_DEPRECATED = 4, // deprecated 26/03/2021 (not implemented)
+    ASSET_DEPRECATED = 5, // deprecated 26/03/2021 (not implemented)
     CUSTOM = 6, // Led controlled by a specific module
+};
+
+// Identification mode defines LED behaviour or vendor specific behaviour
+enum class IdentificationMode : u8 {
+    IDENTIFICATION_START = 1,
+    IDENTIFICATION_STOP = 2,
 };
 
 //DFU ERROR CODES

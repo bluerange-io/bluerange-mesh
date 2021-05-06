@@ -80,6 +80,7 @@ void Boardconf::ResetToDefaultConfiguration()
     configuration.voltageDividerR1 = 0;
     configuration.voltageDividerR2 = 0;
     configuration.dcDcEnabled = false;
+    configuration.powerOptimizationEnabled = false;
 
     //Now, we load all Default boards (nRf Development kits)
     SetBoard_4(&configuration);

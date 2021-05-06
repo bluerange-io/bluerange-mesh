@@ -66,9 +66,14 @@ extern "C"{
 #include <Config.h>
 #include <Boardconfig.h>
 #include <FlashStorage.h>
+#include <RecordStorage.h>
 #ifndef GITHUB_RELEASE
+#if IS_ACTIVE(CLC_COMM)
 #include <ClcComm.h>
+#endif
+#if IS_ACTIVE(VS_MODULE)
 #include "VsComm.h"
+#endif
 #endif //GITHUB_RELEASE
 #include <ConnectionMessageTypes.h>
 
@@ -78,9 +83,13 @@ extern "C"{
 #include <EnrollmentModule.h>
 #include <IoModule.h>
 #ifndef GITHUB_RELEASE
+#if IS_ACTIVE(CLC_MODULE)
 #include <ClcModule.h>
-#include <ClcComm.h>
 #include "ClcMock.h"
+#endif
+#if IS_ACTIVE(CLC_COMM)
+#include <ClcComm.h>
+#endif
 #include "AssetModule.h"
 #endif //GITHUB_RELEASE
 #include "ConnectionAllocator.h"
@@ -237,33 +246,86 @@ void CherrySim::PrepareSimulatedFeatureSets()
     //NOTE: Add the featureset in order in which NodeIds will be assigned e.g 
     //if we have defined 3 nodes with sink featureset and 2 with mesh featureset then
     //NodeId 1,2,3 will have sink featureset and 4,5 with mesh featureset
-    u32 featuresetOrderCounter = 0;
-    AddSimulatedFeatureSet(github_dev_nrf52);
-    AddSimulatedFeatureSet(github_dev_nrf52840);
-    AddSimulatedFeatureSet(github_sink_nrf52);
-    AddSimulatedFeatureSet(github_mesh_nrf52);
-#ifndef GITHUB_RELEASE
-    AddSimulatedFeatureSet(prod_sink_nrf52);
-    AddSimulatedFeatureSet(prod_mesh_nrf52);
-    AddSimulatedFeatureSet(prod_mesh_usb_nrf52840);
-    AddSimulatedFeatureSet(dev_vslog);
-    AddSimulatedFeatureSet(prod_vs_nrf52);
-    AddSimulatedFeatureSet(prod_clc_mesh_nrf52);
-    AddSimulatedFeatureSet(dev_nrf52);
-    AddSimulatedFeatureSet(dev_nrf52840);
-    AddSimulatedFeatureSet(dev_sig_mesh);
-    AddSimulatedFeatureSet(dev_automated_tests_master_nrf52);
-    AddSimulatedFeatureSet(dev_automated_tests_slave_nrf52);
-    AddSimulatedFeatureSet(prod_vs_converter_nrf52);
-    AddSimulatedFeatureSet(prod_pcbridge_nrf52);
-    AddSimulatedFeatureSet(prod_wm_nrf52840);
-    AddSimulatedFeatureSet(prod_bp_nrf52840);
-    AddSimulatedFeatureSet(prod_eink_nrf52840);
-    //AssetNodes will be assigned the last nodeIds
-    AddSimulatedFeatureSet(prod_asset_ins_nrf52840);
-    AddSimulatedFeatureSet(prod_asset_nrf52);
 
-#endif //GITHUB_RELEASE
+    //NOTE 2: The macro for the featureset is defined by the cmakelist in the featureset folder.
+    //It defines all the featureset in the folder with the same name but in upper case.
+    u32 featuresetOrderCounter = 0;
+#ifdef GITHUB_DEV_NRF52 //GITHUB_DEV_NRF52
+    AddSimulatedFeatureSet(github_dev_nrf52);
+#endif //GITHUB_DEV_NRF52
+#ifdef GITHUB_DEV_NRF52840 //GITHUB_DEV_NRF52840
+    AddSimulatedFeatureSet(github_dev_nrf52840);
+#endif //GITHUB_DEV_NRF52840
+#ifdef GITHUB_SINK_NRF52 // GITHUB_SINK_NRF52
+    AddSimulatedFeatureSet(github_sink_nrf52);
+#endif // GITHUB_SINK_NRF52
+#ifdef GITHUB_MESH_NRF52 //GITHUB_MESH_NRF52
+    AddSimulatedFeatureSet(github_mesh_nrf52);
+#endif //GITHUB_MESH_NRF52
+#ifdef GITHUB_SINK_USB_NRF52840 //GITHUB_SINK_USB_NRF52840    
+    AddSimulatedFeatureSet(github_sink_usb_nrf52840);
+#endif //GITHUB_SINK_USB_NRF52840
+#ifdef PROD_RUUVI_WEATHER_NRF52 //PROD_RUUVI_WEATHER_NRF52
+    AddSimulatedFeatureSet(prod_ruuvi_weather_nrf52);
+#endif //PROD_RUUVI_WEATHER_NRF52
+#ifdef PROD_SINK_NRF52 //PROD_SINK_NRF52
+    AddSimulatedFeatureSet(prod_sink_nrf52);
+#endif //PROD_SINK_NRF52
+#ifdef DEV_NRF52 //DEV_NRF52
+    AddSimulatedFeatureSet(dev_nrf52);
+#endif //DEV_NRF52
+#ifdef DEV_NRF52840 //DEV_NRF52840
+    AddSimulatedFeatureSet(dev_nrf52840);
+#endif //DEV_NRF52840
+#ifdef PROD_MESH_NRF52 //PROD_MESH_NRF52
+    AddSimulatedFeatureSet(prod_mesh_nrf52);
+#endif //PROD_MESH_NRF52
+#ifdef PROD_MESH_USB_NRF52840
+    AddSimulatedFeatureSet(prod_mesh_usb_nrf52840);
+#endif //PROD_MESH_USB_NRF52840
+#ifdef DEV_VSLOG //DEV_VSLOG
+    AddSimulatedFeatureSet(dev_vslog);
+#endif //DEV_VSLOG
+#ifdef PROD_VS_NRF52 //PROD_VS_NRF52
+    AddSimulatedFeatureSet(prod_vs_nrf52);
+#endif
+#ifdef PROD_CLC_MESH_NRF52 //PROD_CLC_MESH_NRF52
+    AddSimulatedFeatureSet(prod_clc_mesh_nrf52);
+#endif //PROD_CLC_MESH_NRF52
+#ifdef DEV_SIG_MESH //DEV_SIG_MESH
+    AddSimulatedFeatureSet(dev_sig_mesh);
+#endif //DEV_SIG_MESH
+#ifdef DEV_AUTOMATED_TESTS_MASTER_NRF52 //DEV_AUTOMATED_TESTS_MASTER_NRF52
+    AddSimulatedFeatureSet(dev_automated_tests_master_nrf52);
+#endif //DEV_AUTOMATED_TESTS_MASTER_NRF52
+#ifdef DEV_AUTOMATED_TESTS_MASTER_NRF52 //DEV_AUTOMATED_TESTS_SLAVE_NRF52
+    AddSimulatedFeatureSet(dev_automated_tests_slave_nrf52);
+#endif //DEV_AUTOMATED_TESTS_SLAVE_NRF52
+#ifdef PROD_VS_CONVERTER_NRF52 //PROD_VS_CONVERTER_NRF52
+    AddSimulatedFeatureSet(prod_vs_converter_nrf52);
+#endif //PROD_VS_CONVERTER_NRF52
+#ifdef PROD_PCBRIDGE_NRF52 //PROD_PCBRIDGE_NRF52
+    AddSimulatedFeatureSet(prod_pcbridge_nrf52);
+#endif //PROD_PCBRIDGE_NRF52
+#ifdef PROD_WM_NRF52840 //PROD_WM_NRF52840
+    AddSimulatedFeatureSet(prod_wm_nrf52840);
+#endif //PROD_WM_NRF52840
+#ifdef PROD_BP_NRF52840 //PROD_BP_NRF52840
+    AddSimulatedFeatureSet(prod_bp_nrf52840);
+#endif //PROD_BP_NRF52840
+#ifdef PROD_EINK_NRF52840 //PROD_EINK_NRF52840
+    AddSimulatedFeatureSet(prod_eink_nrf52840);
+#endif //PROD_EINK_NRF52840
+
+//AssetNodes will be assigned the last nodeIds
+
+#ifdef PROD_ASSET_INS_NRF52840 //PROD_ASSET_INS_NRF52840
+    AddSimulatedFeatureSet(prod_asset_ins_nrf52840);
+#endif //PROD_ASSET_INS_NRF52840
+#ifdef PROD_ASSET_NRF52 //PROD_ASSET_NRF52
+    AddSimulatedFeatureSet(prod_asset_nrf52);
+#endif //PROD_ASSET_NRF52
+
 }
 #undef AddSimulatedFeatureSet
 
@@ -875,9 +937,11 @@ void CherrySim::SimulateStepForAllNodes()
             SimulateConnections();
             SimulateServiceDiscovery();
             SimulateUartInterrupts();
-#ifndef GITHUB_RELEASE
+#if IS_ACTIVE(CLC_MODULE)
             SimulateClcData();
-#endif //GITHUB_RELEASE
+#endif
+            SimulateTimeslot();
+            SimulateConnectionParameterUpdateRequestTimeout();
             try {
                 FruityHal::EventLooper();
                 SimulateFlashCommit();
@@ -1535,6 +1599,7 @@ void CherrySim::SetNode(u32 i)
     simGpioPtr = &(nodes[i].gpio);
     simFlashPtr = nodes[i].flash;
     simUartPtr = &(nodes[i].state.uartType);
+    simRadioPtr = &(nodes[i].radio);
 
     __application_start_address = (uint32_t)simFlashPtr + FruityHal::GetSoftDeviceSize();
     __application_end_address = (uint32_t)__application_start_address + ChipsetToApplicationSize(GET_CHIPSET());
@@ -1666,6 +1731,12 @@ void CherrySim::InitNode(u32 i)
     nodes[i].index = i;
     nodes[i].id = i + 1;
 
+    //Initialize FICR memory
+    CheckedMemset(&nodes[i].ficr, 0xFF, sizeof(nodes[i].ficr));
+
+    //Initialize UICR memory
+    CheckedMemset(&nodes[i].uicr, 0xFF, sizeof(nodes[i].uicr));
+
     //Initialize flash memory
     CheckedMemset(nodes[i].flash, 0xFF, sizeof(nodes[i].flash));
     //TODO: We could load a softdevice and app image into flash, would that help for something?
@@ -1693,13 +1764,16 @@ void CherrySim::SetFeaturesets()
     for (auto& eraser : simConfigsToErase) {
         simConfig.nodeConfigName.erase(eraser);
     }
-    if (simConfig.nodeConfigName.find("github_dev_nrf52") == simConfig.nodeConfigName.end())
+    if (amountOfRedirectedFeaturesets > 0)
     {
-        simConfig.nodeConfigName.insert({ "github_dev_nrf52", amountOfRedirectedFeaturesets });
-    }
-    else
-    {
-        simConfig.nodeConfigName["github_dev_nrf52"] += amountOfRedirectedFeaturesets;
+        if (simConfig.nodeConfigName.find("github_dev_nrf52") == simConfig.nodeConfigName.end())
+        {
+            simConfig.nodeConfigName.insert({ "github_dev_nrf52", amountOfRedirectedFeaturesets });
+        }
+        else
+        {
+            simConfig.nodeConfigName["github_dev_nrf52"] += amountOfRedirectedFeaturesets;
+        }
     }
 #endif //GITHUB_RELEASE
     struct FeatureNameOrderPair{
@@ -1712,21 +1786,36 @@ void CherrySim::SetFeaturesets()
         }
     };
 
+    std::string featureset = "";
     std::vector<FeatureNameOrderPair> definedFeaturesets;
     for (auto it = simConfig.nodeConfigName.begin(); it != simConfig.nodeConfigName.end(); it++)
     {
-        auto entry = cherrySimInstance->featuresetPointers.find(it->first);
+        featureset = it->first;
+        auto entry = cherrySimInstance->featuresetPointers.find(featureset);
         if (entry == cherrySimInstance->featuresetPointers.end())
         {
-            SIMEXCEPTIONFORCE(IllegalStateException); //Featureset is not defined yet
+            if (it->first == "prod_sink_nrf52")
+            {
+                featureset = "dev_nrf52";
+                entry = cherrySimInstance->featuresetPointers.find(featureset);
+            }
+            else 
+            {
+                SIMEXCEPTIONFORCE(IllegalStateException); //Featureset is not defined yet
+            }
         }
         if (it->second <= 0)
         {
+            printf(
+                "Invalid node config with featureset %s and count %d!\n",
+                it->first.c_str(),
+                it->second
+            );
             //Found entry for featureset that does not contain any featuresets.
             SIMEXCEPTIONFORCE(IllegalStateException);
         }
         FeatureNameOrderPair pair;
-        pair.featuresetName = it->first;
+        pair.featuresetName = featureset;
         pair.noOfNodesWithFeatureset = it->second;
         pair.orderNumber = entry->second.featuresetOrder;
         definedFeaturesets.emplace_back(pair);
@@ -1744,7 +1833,14 @@ void CherrySim::SetFeaturesets()
 
 //This will configure UICR / FICR and flash (settings,...) of a node
 void CherrySim::FlashNode(u32 i) {
-    //Configure UICR
+
+    NodeIndexSetter setter(i);
+
+    //##### Configure FICR
+    nodes[i].ficr.CODESIZE = ChipsetToCodeSize(GetChipset_CherrySim());
+    nodes[i].ficr.CODEPAGESIZE = ChipsetToPageSize(GetChipset_CherrySim());
+
+    //##### Configure UICR
     nodes[i].uicr.CUSTOMER[0] = UICR_SETTINGS_MAGIC_WORD; //magicNumber
     nodes[i].uicr.CUSTOMER[1] = 19; //boardType (Simulator board)
     Utility::GenerateBeaconSerialForIndex(i, (char*)(nodes[i].uicr.CUSTOMER + 2)); //serialNumber
@@ -1762,10 +1858,17 @@ void CherrySim::FlashNode(u32 i) {
     nodes[i].uicr.CUSTOMER[15] = 0; //networkkey
     nodes[i].uicr.CUSTOMER[16] = 0; //networkkey
 
+    nodes[i].uicr.BOOTLOADERADDR = ChipsetToBootloaderAddr(GetChipset_CherrySim());
+
+    //##### Configure Flash
+    //Put some data where the bootloader is supposed to be (add a version number)
+    //TODO: Having a hardcoded 1024 is not a nice thing to do to give the offset of the bootloader version
+    *((u32*)&nodes[i].flash[currentNode->uicr.BOOTLOADERADDR + 1024]) = 123;
+
     //TODO: Add app, softdevice, etc,... from .hex files into flash
     //Afterwards, we can use the normal size calculation for addresses without redefining it
 
-    NodeIndexSetter setter(i);
+    //TODO: Rewrite this part
     if (GET_DEVICE_TYPE() == DeviceType::ASSET)
     {
         nodes[i].uicr.CUSTOMER[11] = (u32)DeviceType::ASSET; //deviceType
@@ -1785,27 +1888,8 @@ void CherrySim::FlashNode(u32 i) {
     }
 }
 
-void CherrySim::ErasePage(u32 pageAddress)
-{
-    u32* p = (u32*)pageAddress;
-
-    for (u32 i = 0; i < FruityHal::GetCodePageSize() / sizeof(u32); i++) {
-        p[i] = 0xFFFFFFFF;
-    }
-}
-
 void CherrySim::BootCurrentNode()
 {
-    //Configure FICR
-    //We can't do this any earlier because test code might want to change the featureset.
-    currentNode->ficr.CODESIZE = ChipsetToCodeSize(GetChipset_CherrySim());
-    currentNode->ficr.CODEPAGESIZE = ChipsetToPageSize(GetChipset_CherrySim());
-
-    //Initialize UICR
-    currentNode->uicr.BOOTLOADERADDR = ChipsetToBootloaderAddr(GetChipset_CherrySim());
-    //Put some data where the bootloader is supposed to be (add a version number)
-    *((u32*)&currentNode->flash[currentNode->uicr.BOOTLOADERADDR + 1024]) = 123;
-
     if (currentNode->ficr.CODESIZE * currentNode->ficr.CODEPAGESIZE > SIM_MAX_FLASH_SIZE)
     {
         SIMEXCEPTION(RequiredFlashTooBigException);
@@ -1868,7 +1952,47 @@ void CherrySim::BootCurrentNode()
     //FIXME: Move to runner / tester
     //Lets us do some configuration after the boot
     Conf::GetInstance().terminalMode = TerminalMode::PROMPT;
-    Conf::GetInstance().defaultLedMode = LedMode::OFF;
+}
+
+void CherrySim::ErasePage(u32 pageAddress)
+{
+    u32* p = (u32*)pageAddress;
+
+    for (u32 i = 0; i < FruityHal::GetCodePageSize() / sizeof(u32); i++) {
+        p[i] = 0xFFFFFFFF;
+    }
+}
+
+void CherrySim::WriteRecordToFlash(u16 recordId, u8* data, u16 dataLength) {
+    RecordStoragePage pageHeader;
+    pageHeader.magicNumber = RECORD_STORAGE_ACTIVE_PAGE_MAGIC_NUMBER;
+    pageHeader.versionCounter = 0x01;
+
+    u8 padding = (4 - dataLength % 4) % 4;
+    u16 recordLength = dataLength + SIZEOF_RECORD_STORAGE_RECORD_HEADER + padding;
+
+    DYNAMIC_ARRAY(buffer, recordLength);
+    CheckedMemset(buffer, 0x00, recordLength);
+
+    RecordStorageRecord* record = (RecordStorageRecord*)buffer;
+    record->padding = padding;
+    record->recordActive = 1;
+    record->recordLength = recordLength;
+    record->recordId = recordId;
+    record->versionCounter = 1;
+    CheckedMemcpy(record->data, data, dataLength);
+
+    //The crc is calculated over the record header and data, excluding the first two byte (crc and flags)
+    record->crc = Utility::CalculateCrc8(((u8*)record) + sizeof(u16), record->recordLength - sizeof(u16));
+
+    u8* dest = (u8*)Utility::GetSettingsPageBaseAddress();
+
+    //Put the page header at the beginning of the settings page in flash
+    CheckedMemcpy(dest, &pageHeader, SIZEOF_RECORD_STORAGE_PAGE_HEADER);
+    dest += SIZEOF_RECORD_STORAGE_PAGE_HEADER;
+
+    //Put the record and data on the settings page in flash
+    CheckedMemcpy(dest, record, recordLength);
 }
 
 void CherrySim::ResetCurrentNode(RebootReason rebootReason, bool throwException) {
@@ -2251,9 +2375,17 @@ void CherrySim::SimulateTimeouts() {
 
 void CherrySim::SimulateUartInterrupts()
 {
+    u32 i = 0;
     const SoftdeviceState &state = currentNode->state;
     while (state.uartReadIndex != state.uartBufferLength && cherrySimInstance->currentNode->state.currentlyEnabledUartInterrupts != 0) {
         UART0_IRQHandler();
+
+        //Check if we are stuck in an "endless" loop of generating interrupts
+        //This might only happen in the simulator if the interrupt handling is implemented in a different way than on physical hardware
+        if (++i > 10000) {
+            SIMEXCEPTION(InterruptDeadlockException)
+            break;
+        }
     }
 }
 
@@ -2646,7 +2778,7 @@ void CherrySim::SimulateServiceDiscovery()
     GS->dbDiscoveryHandler(&dbEvt);
 }
 
-#ifndef GITHUB_RELEASE
+#if IS_ACTIVE(CLC_MODULE)
 void CherrySim::SimulateClcData() {
 
     ClcModule* clcMod = (ClcModule*)currentNode->gs.node.GetModuleById(ModuleId::CLC_MODULE);
@@ -2654,7 +2786,7 @@ void CherrySim::SimulateClcData() {
         currentNode->clcMock.SendPeriodicData();
     }
 }
-#endif //GITHUB_RELEASE
+#endif //IS_ACTIVE(CLC_MODULE)
 
 void CherrySim::SimulateMovement()
 {
@@ -2767,6 +2899,118 @@ void CherrySim::SimulateBatteryUsage()
     }
 
     //TODO: Add up current for connections according to connectionIntervals of each connection
+}
+
+//################################ Timeslot Simulation ####################################
+// Simulation of the Timeslot API and associated radio events.
+//#########################################################################################
+
+void CherrySim::SimulateTimeslot() {
+    if (currentNode->timeslotRequested)
+    {
+        // If a timeslot was requested, make the timeslot active and trigger
+        // the START radio signal.
+        currentNode->timeslotRequested = false;
+        currentNode->timeslotActive = true;
+        currentNode->timeslotRadioSignalCallback(
+            NRF_RADIO_CALLBACK_SIGNAL_TYPE_START 
+        );
+    }
+    else if (currentNode->timeslotActive)
+    {
+        // If the timeslot is active, check if tasks of the radio peripheral
+        // were triggered and generate the corresponding events.
+
+        auto &radio = currentNode->radio;
+
+        if (radio.TASKS_DISABLE)
+        {
+            radio.TASKS_DISABLE = false;
+            radio.EVENTS_DISABLED = !radio.EVENTS_DISABLED_MASKED;
+            logt("SIM", "radio task DISABLE triggered" SEP);
+        }
+
+        if (radio.TASKS_TXEN)
+        {
+            // TODO: Implement proper handling of the radio peripherals state
+            //       transitions. This code assumes that the peripheral was
+            //       setup by the RadioHandleBleAdvTxStart function.
+            radio.TASKS_TXEN = false;
+            radio.EVENTS_DISABLED = !radio.EVENTS_DISABLED_MASKED;
+            logt("SIM", "radio task TXEN triggered" SEP);
+        }
+
+        if (radio.EVENTS_DISABLED)
+        {
+            // Trigger the RADIO radio signal if any event was activated.
+            currentNode->timeslotRadioSignalCallback(
+                NRF_RADIO_CALLBACK_SIGNAL_TYPE_RADIO
+            );
+        }
+    }
+
+    if (currentNode->timeslotCloseSessionRequested)
+    {
+        // Close the timeslot session and trigger the corresponding system
+        // event.
+        currentNode->timeslotCloseSessionRequested = false;
+        currentNode->gs.timeslot.DispatchRadioSystemEvent(
+            FruityHal::SystemEvents::RADIO_SESSION_CLOSED
+        );
+    }
+}
+
+void CherrySim::SimulateConnectionParameterUpdateRequestTimeout()
+{
+    for (int connIndex = 0; connIndex < currentNode->state.configuredTotalConnectionCount; ++connIndex)
+    {
+        auto & connection = currentNode->state.connections[connIndex];
+        // Skip connections that are not active.
+        if (!connection.connectionActive)
+        {
+            continue;
+        }
+        // Skip connections where we are not the central.
+        if (!connection.isCentral)
+        {
+            continue;
+        }
+        // Skip connections where no connection parameter update request is pending.
+        if (!connection.connParamUpdateRequestPending)
+        {
+            continue;
+        }
+        // Skip connections that have not timed out yet.
+        if (currentNode->gs.appTimerDs < connection.connParamUpdateRequestTimeoutDs)
+        {
+            continue;
+        }
+
+        // After timing out the request is not pending anymore.
+        connection.connParamUpdateRequestPending = false;
+
+        // The request has timed out, generate an event on the _peripheral_ with
+        // the current connection parameters (i.e. similar to when a request
+        // is rejected).
+        auto & peripheral = *connection.partner;
+        const auto & peripheralConnection = *connection.partnerConnection;
+
+        simBleEvent simEvent = {};
+        simEvent.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+
+        auto & bleEvent = simEvent.bleEvent;
+        bleEvent.header.evt_id = BLE_GAP_EVT_CONN_PARAM_UPDATE;
+        bleEvent.header.evt_len = simEvent.globalId;
+        bleEvent.evt.gap_evt.conn_handle = peripheralConnection.connectionHandle;
+
+        auto & connParams = bleEvent.evt.gap_evt.params.conn_param_update.conn_params;
+        connParams.min_conn_interval = peripheralConnection.connectionInterval;
+        connParams.max_conn_interval = peripheralConnection.connectionInterval;
+        connParams.slave_latency = Conf::meshPeripheralSlaveLatency;
+        connParams.conn_sup_timeout = Conf::meshConnectionSupervisionTimeout;
+
+        peripheral.eventQueue.push_back(simEvent);
+    }
 }
 
 //################################## Other Simulation #####################################
@@ -3492,6 +3736,7 @@ void CherrySim::AddMessageToStats(PacketStat* statArray, u8* message, u16 messag
         moduleHeader = (ConnPacketModule*)header;
         packet.moduleId = Utility::GetWrappedModuleId(moduleHeader->moduleId);
         packet.actionType = moduleHeader->actionType;
+        packet.requestHandle = moduleHeader->requestHandle;
     }
 
     //Add the packet to our stat array

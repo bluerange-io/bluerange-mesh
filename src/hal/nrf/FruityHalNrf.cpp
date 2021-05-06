@@ -41,6 +41,7 @@
 #include <GlobalState.h>
 #include <Logger.h>
 #include <ScanController.h>
+#include <Timeslot.h>
 #include <Node.h>
 #include "Utility.h"
 #ifdef SIM_ENABLED
@@ -100,7 +101,7 @@ extern "C" {
 #if defined(NRF52) || defined(NRF52840)
 #define BOOTLOADER_UICR_ADDRESS           (NRF_UICR->NRFFW[0])
 #elif defined(SIM_ENABLED)
-#define BOOTLOADER_UICR_ADDRESS           (FLASH_REGION_START_ADDRESS + NRF_UICR->BOOTLOADERADDR)
+#define BOOTLOADER_UICR_ADDRESS           (NRF_UICR->BOOTLOADERADDR)
 #endif
 
 #define APP_TIMER_PRESCALER     0 // Value of the RTC1 PRESCALER register
@@ -152,6 +153,10 @@ struct NrfHalMemory
 #if SDK == 15
     ble_gap_adv_data_t advData;
 #endif
+#if IS_ACTIVE(TIMESLOT)
+    nrf_radio_signal_callback_return_param_t timeslotRadioCallbackReturnParam;
+    nrf_radio_request_t timeslotRadioRequest;
+#endif // IS_ACTIVE(TIMESLOT)
 };
 
 
@@ -190,6 +195,7 @@ static FruityHal::BleGattEror nrfErrToGenericGatt(u32 code);
 static const char* getBleEventNameString(u16 bleEventId);
 u32 ClearGeneralPurposeRegister(u32 gpregId, u32 mask);
 u32 WriteGeneralPurposeRegister(u32 gpregId, u32 mask);
+static uint32_t sdAppEvtWaitAnomaly87();
 
 #define __________________BLE_STACK_INIT____________________
 // ############### BLE Stack Initialization ########################
@@ -579,7 +585,7 @@ void FruityHal::EventLooper()
         }
     }
 
-    u32 err = sd_app_evt_wait();
+    u32 err = sdAppEvtWaitAnomaly87();
     FRUITYMESH_ERROR_CHECK(err); // OK
     err = sd_nvic_ClearPendingIRQ(SD_EVT_IRQn);
     FRUITYMESH_ERROR_CHECK(err);  // OK
@@ -630,7 +636,7 @@ void FruityHal::EventLooper()
         GS->mainContextHandlers[i]();
     }
 
-    u32 err = sd_app_evt_wait();
+    u32 err = sdAppEvtWaitAnomaly87();
     FRUITYMESH_ERROR_CHECK(err); // OK
 }
 
@@ -720,6 +726,20 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
             DispatchEvent(csue);
         }
         break;
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+    case BLE_GAP_EVT_CONN_PARAM_UPDATE:
+        {
+            FruityHal::GapConnParamUpdateEvent cpue(&bleEvent);
+            DispatchEvent(cpue);
+        }
+        break;
+    case BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST:
+        {
+            FruityHal::GapConnParamUpdateRequestEvent cpure(&bleEvent);
+            DispatchEvent(cpure);
+        }
+        break;
+#endif
     case BLE_GATTC_EVT_WRITE_RSP:
         {
 #ifdef SIM_ENABLED
@@ -758,38 +778,6 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
         }
         break;
 
-
-
-
-        /* Extremly platform dependent events below! 
-           Because they are so platform dependent, 
-           there is no handler for them and we have
-           to deal with them here. */
-
-#if defined(NRF52)
-    case BLE_GAP_EVT_DATA_LENGTH_UPDATE_REQUEST:
-    {
-        //We automatically answer all data length update requests
-        //The softdevice will chose the parameters so that our configured NRF_SDH_BLE_GATT_MAX_MTU_SIZE fits into a link layer packet
-        sd_ble_gap_data_length_update(bleEvent.evt.gap_evt.conn_handle, nullptr, nullptr);
-    }
-    break;
-
-    case BLE_GAP_EVT_DATA_LENGTH_UPDATE:
-    {
-        ble_gap_evt_data_length_update_t const * params = (ble_gap_evt_data_length_update_t const *) &bleEvent.evt.gap_evt.params.data_length_update;
-
-        logt("FH", "DLE Result: rx %u/%u, tx %u/%u",
-                params->effective_params.max_rx_octets,
-                params->effective_params.max_rx_time_us,
-                params->effective_params.max_tx_octets,
-                params->effective_params.max_tx_time_us);
-
-        // => We do not notify the application and can assume that it worked if the other device has enough resources
-        //    If it does not work, this link will have a slightly reduced throughput, so this is monitored in another place
-    }
-    break;
-
     case BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST:
     {
         //We answer all MTU update requests with our max mtu that was configured
@@ -813,6 +801,37 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
         logt("FH", "MTU for hnd %u updated to %u", bleEvent.evt.gattc_evt.conn_handle, effectiveMtu);
 
         ConnectionManager::GetInstance().MtuUpdatedHandler(bleEvent.evt.gattc_evt.conn_handle, effectiveMtu);
+    }
+    break;
+
+    case BLE_GAP_EVT_DATA_LENGTH_UPDATE:
+    {
+        ble_gap_evt_data_length_update_t const* params = (ble_gap_evt_data_length_update_t const*)&bleEvent.evt.gap_evt.params.data_length_update;
+
+        logt("FH", "DLE Result: rx %u/%u, tx %u/%u",
+            params->effective_params.max_rx_octets,
+            params->effective_params.max_rx_time_us,
+            params->effective_params.max_tx_octets,
+            params->effective_params.max_tx_time_us);
+
+        // => We do not notify the application and can assume that it worked if the other device has enough resources
+        //    If it does not work, this link will have a slightly reduced throughput, so this is monitored in another place
+    }
+    break;
+
+
+
+        /* Extremly platform dependent events below! 
+           Because they are so platform dependent, 
+           there is no handler for them and we have
+           to deal with them here. */
+
+#if defined(NRF52)
+    case BLE_GAP_EVT_DATA_LENGTH_UPDATE_REQUEST:
+    {
+        //We automatically answer all data length update requests
+        //The softdevice will chose the parameters so that our configured NRF_SDH_BLE_GATT_MAX_MTU_SIZE fits into a link layer packet
+        sd_ble_gap_data_length_update(bleEvent.evt.gap_evt.conn_handle, nullptr, nullptr);
     }
     break;
 
@@ -857,6 +876,15 @@ FruityHal::GapConnParamUpdateEvent::GapConnParamUpdateEvent(void const * _evt)
     }
 }
 
+FruityHal::GapConnParamUpdateRequestEvent::GapConnParamUpdateRequestEvent(void const * _evt)
+    :GapEvent(_evt)
+{
+    if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id != BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST)
+    {
+        SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
+    }
+}
+
 FruityHal::GapEvent::GapEvent(void const * _evt)
     : BleEvent(_evt)
 {
@@ -867,9 +895,44 @@ u16 FruityHal::GapEvent::GetConnectionHandle() const
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.conn_handle;
 }
 
+u16 FruityHal::GapConnParamUpdateEvent::GetMinConnectionInterval() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.min_conn_interval;
+}
+
 u16 FruityHal::GapConnParamUpdateEvent::GetMaxConnectionInterval() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.max_conn_interval;
+}
+
+u16 FruityHal::GapConnParamUpdateEvent::GetSlaveLatency() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.slave_latency;
+}
+
+u16 FruityHal::GapConnParamUpdateEvent::GetConnectionSupervisionTimeout() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.conn_sup_timeout;
+}
+
+u16 FruityHal::GapConnParamUpdateRequestEvent::GetMinConnectionInterval() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.min_conn_interval;
+}
+
+u16 FruityHal::GapConnParamUpdateRequestEvent::GetMaxConnectionInterval() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.max_conn_interval;
+}
+
+u16 FruityHal::GapConnParamUpdateRequestEvent::GetSlaveLatency() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.slave_latency;
+}
+
+u16 FruityHal::GapConnParamUpdateRequestEvent::GetConnectionSupervisionTimeout() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.conn_sup_timeout;
 }
 
 FruityHal::GapRssiChangedEvent::GapRssiChangedEvent(void const * _evt)
@@ -1494,6 +1557,13 @@ ErrorType FruityHal::BleGapConnectionParamsUpdate(u16 conn_handle, BleGapConnPar
     return nrfErrToGeneric(sd_ble_gap_conn_param_update(conn_handle, &gapConnectionParams));
 }
 
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+ErrorType FruityHal::BleGapRejectConnectionParamsUpdate(u16 conn_handle)
+{
+    return nrfErrToGeneric(sd_ble_gap_conn_param_update(conn_handle, nullptr));
+}
+#endif
+
 ErrorType FruityHal::BleGapConnectionPreferredParamsSet(BleGapConnParams const & params)
 {
     ble_gap_conn_params_t gapConnectionParams = translate(params);
@@ -1701,8 +1771,8 @@ ErrorType FruityHal::BleGattCharAdd(u16 service_handle, BleGattCharMd const & ch
 
 ErrorType FruityHal::BleGapDataLengthExtensionRequest(u16 connHandle)
 {
-#ifdef NRF52
-    //We let the SoftDevice decide the maximum according to the NRF_SDH_BLE_GATT_MAX_MTU_SIZE and connection configuration
+#if defined (NRF52) || defined (SIM_ENABLED)
+    //We let the SoftDevice decide the maximum according to the -NRF_SDH_BLE_GATT_MAX_MTU_SIZE and connection configuration
     ErrorType err = nrfErrToGeneric(sd_ble_gap_data_length_update(connHandle, nullptr, nullptr));
     logt("FH", "Start DLE Update (%u) on conn %u", (u32)err, connHandle);
 
@@ -1725,15 +1795,13 @@ u32 FruityHal::BleGattGetMaxMtu()
 
 ErrorType FruityHal::BleGattMtuExchangeRequest(u16 connHandle, u16 clientRxMtu)
 {
-#ifdef NRF52
+#if defined (NRF52) || defined (SIM_ENABLED)
     u32 err = sd_ble_gattc_exchange_mtu_request(connHandle, clientRxMtu);
 
     logt("FH", "Start MTU Exchange (%u) on conn %u with %u", err, connHandle, clientRxMtu);
 
     return nrfErrToGeneric(err);
 #else
-    //TODO: We should implement MTU Exchange in the Simulator as soon as it is based on the NRF52
-
     return ErrorType::NOT_SUPPORTED;
 #endif
 }
@@ -1794,7 +1862,7 @@ void button_interrupt_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t ac
 
 ErrorType FruityHal::WaitForEvent()
 {
-    return nrfErrToGeneric(sd_app_evt_wait());
+    return nrfErrToGeneric(sdAppEvtWaitAnomaly87());
 }
 
 ErrorType FruityHal::InitializeButtons()
@@ -2051,7 +2119,7 @@ extern "C"
 u32 FruityHal::GetBootloaderVersion()
 {
     if(BOOTLOADER_UICR_ADDRESS != 0xFFFFFFFF){
-        return *(u32*)(BOOTLOADER_UICR_ADDRESS + 1024);
+        return *(u32*)(FLASH_REGION_START_ADDRESS + BOOTLOADER_UICR_ADDRESS + 1024);
     } else {
         return 0;
     }
@@ -2059,7 +2127,16 @@ u32 FruityHal::GetBootloaderVersion()
 
 u32 FruityHal::GetBootloaderAddress()
 {
+#ifndef SIM_ENABLED
     return BOOTLOADER_UICR_ADDRESS;
+#else
+    if (BOOTLOADER_UICR_ADDRESS == 0xFFFFFFFF) {
+        return 0xFFFFFFFF;
+    }
+    else {
+        return FLASH_REGION_START_ADDRESS + BOOTLOADER_UICR_ADDRESS;
+    }
+#endif
 }
 
 void FruityHal::ActivateBootloaderOnReset()
@@ -3393,7 +3470,8 @@ extern "C"{
 
 #define __________________TWI____________________
 
-#if defined(ACTIVATE_ASSET_MODULE)
+#if IS_ACTIVE(ASSET_MODULE)
+
 #ifndef SIM_ENABLED
 #define TWI_INSTANCE_ID     1
 static constexpr nrf_drv_twi_t twi = NRF_DRV_TWI_INSTANCE(TWI_INSTANCE_ID);
@@ -3569,11 +3647,15 @@ bool FruityHal::TwiIsInitialized(void)
 #endif
 }
 
+#endif
+
 #define __________________SPI____________________
+
+#if defined(SPI_ENABLED) || IS_ACTIVE(ASSET_MODULE)
 
 #ifndef SIM_ENABLED
 #define SPI_INSTANCE  0
-static constexpr nrf_drv_spi_t spi = NRF_DRV_SPI_INSTANCE(SPI_INSTANCE);
+static const nrf_drv_spi_t spi = NRF_DRV_SPI_INSTANCE(SPI_INSTANCE);
 #endif
 
 #ifndef SIM_ENABLED
@@ -3644,7 +3726,7 @@ ErrorType FruityHal::SpiTransfer(u8* const p_toWrite, u8 count, u8* const p_toRe
         //Locks if run in interrupt context
         while (!halMemory->spiXferDone)
         {
-            sd_app_evt_wait();
+            sdAppEvtWaitAnomaly87();
         }
         nrf_gpio_pin_set((u32)slaveSelectPin);
         retVal = NRF_SUCCESS;
@@ -3665,9 +3747,481 @@ void FruityHal::SpiConfigureSlaveSelectPin(i32 pin)
     nrf_gpio_pin_set((u32)pin);
 #endif
 }
-#endif // defined(ACTIVATE_ASSET_MODULE)
+
+#endif // defined(SPI_ENABLED)
 
 u32 FruityHal::GetHalMemorySize()
 {
     return sizeof(NrfHalMemory);
+}
+
+#if IS_ACTIVE(TIMESLOT)
+
+// ######################### Timeslot API ############################
+
+static FruityHal::RadioCallbackSignalType nrfRadioCallbackSignalTypeToGeneric(uint8_t signal_type)
+{
+    switch (signal_type)
+    {
+        case NRF_RADIO_CALLBACK_SIGNAL_TYPE_START:
+            return FruityHal::RadioCallbackSignalType::START;
+        case NRF_RADIO_CALLBACK_SIGNAL_TYPE_RADIO:
+            return FruityHal::RadioCallbackSignalType::RADIO;
+        case NRF_RADIO_CALLBACK_SIGNAL_TYPE_TIMER0:
+            return FruityHal::RadioCallbackSignalType::TIMER0;
+        case NRF_RADIO_CALLBACK_SIGNAL_TYPE_EXTEND_SUCCEEDED:
+            return FruityHal::RadioCallbackSignalType::EXTEND_SUCCEEDED;
+        case NRF_RADIO_CALLBACK_SIGNAL_TYPE_EXTEND_FAILED:
+            return FruityHal::RadioCallbackSignalType::EXTEND_FAILED;
+        default:
+            SIMEXCEPTION(IllegalArgumentException);
+            return FruityHal::RadioCallbackSignalType::UNKNOWN_SIGNAL_TYPE;
+    }
+}
+
+extern "C" {
+
+static nrf_radio_signal_callback_return_param_t * nrfRadioCallback(uint8_t signal_type)
+{
+    // code adapted from https://devzone.nordicsemi.com/nordic/short-range-guides/b/software-development-kit/posts/setting-up-the-timeslot-api
+
+    // ATTENTION: This signal handler runs at interrupt priority level 0,
+    //            the highest priority. Since softdevice API functions
+    //            are executed as SVC interrupts with priority 4, no such
+    //            functions can be used.
+
+    auto *halMemory = static_cast<NrfHalMemory *>(GS->halMemory);
+    auto &returnParam = halMemory->timeslotRadioCallbackReturnParam;
+    auto &radioRequest = halMemory->timeslotRadioRequest;
+
+    returnParam.params.request.p_next = NULL;
+    returnParam.callback_action = NRF_RADIO_SIGNAL_CALLBACK_ACTION_NONE;
+
+    const auto callbackAction = Timeslot::GetInstance().DispatchRadioSignalCallback(nrfRadioCallbackSignalTypeToGeneric(signal_type));
+    switch (callbackAction)
+    {
+        case FruityHal::RadioCallbackAction::NONE:
+            returnParam.params.request.p_next = NULL;
+            returnParam.callback_action = NRF_RADIO_SIGNAL_CALLBACK_ACTION_NONE;
+            break;
+
+        // case FruityHal::RadioCallbackAction::EXTEND:
+        //     ... not supported by the POC ...
+
+        case FruityHal::RadioCallbackAction::END:
+            returnParam.params.request.p_next = NULL;
+            returnParam.callback_action = NRF_RADIO_SIGNAL_CALLBACK_ACTION_END;
+#if defined(SIM_ENABLED)
+            cherrySimInstance->currentNode->timeslotActive = false;
+            logt("FH", "timeslot is over");
+#endif
+            break;
+
+        case FruityHal::RadioCallbackAction::REQUEST_AND_END:
+            returnParam.params.request.p_next = &radioRequest;
+            returnParam.callback_action = NRF_RADIO_SIGNAL_CALLBACK_ACTION_REQUEST_AND_END;
+#if defined(SIM_ENABLED)
+            cherrySimInstance->currentNode->timeslotActive = false;
+            logt("FH", "timeslot is over");
+#endif
+            break;
+    }
+
+#if defined(SIM_ENABLED)
+    cherrySimInstance->currentNode->timeslotRequested =
+            returnParam.params.request.p_next != nullptr;
+    if (cherrySimInstance->currentNode->timeslotRequested)
+    {
+        logt("FH", "another timeslot was requested");
+    }
+#endif
+
+    return &returnParam;
+}
+
+}
+
+ErrorType FruityHal::TimeslotOpenSession()
+{
+    ErrorType err = ErrorType::SUCCESS;
+
+    err = nrfErrToGeneric(sd_radio_session_open(&nrfRadioCallback));
+    if (err != ErrorType::SUCCESS)
+    {
+        logt("FH", "sd_radio_session_open failed (%u)", (u32)err);
+    }
+
+#if defined(SIM_ENABLED)
+    logt("FH", "timeslot session successfully opened");
+#endif
+
+    return err;
+}
+
+void FruityHal::TimeslotCloseSession()
+{
+    const auto err = nrfErrToGeneric(sd_radio_session_close());
+    if (err != ErrorType::SUCCESS)
+    {
+        logt("FH", "sd_radio_session_close failed (%u)", (u32)err);
+    }
+
+#if defined(SIM_ENABLED)
+    logt("FH", "timeslot session closing successfully requested");
+    cherrySimInstance->currentNode->timeslotCloseSessionRequested = true;
+#endif
+}
+
+void FruityHal::TimeslotConfigureNextEventEarliest(u32 lengthMicroseconds)
+{
+    auto *halMemory = static_cast<NrfHalMemory *>(GS->halMemory);
+    auto &radioRequest = halMemory->timeslotRadioRequest;
+
+    // TODO: sanity-check arguments (eg. length > min length)
+
+    radioRequest.request_type = NRF_RADIO_REQ_TYPE_EARLIEST;
+    radioRequest.params.earliest.hfclk = NRF_RADIO_HFCLK_CFG_XTAL_GUARANTEED;
+    radioRequest.params.earliest.priority = NRF_RADIO_PRIORITY_NORMAL;
+    radioRequest.params.earliest.length_us = lengthMicroseconds;
+    radioRequest.params.earliest.timeout_us = 1000000;
+
+#if defined(SIM_ENABLED)
+    logt("FH", "timeslot configured for earliest next event with length %u", radioRequest.params.earliest.timeout_us);
+#endif
+}
+
+void FruityHal::TimeslotConfigureNextEventNormal(u32 lengthMicroseconds, u32 distanceMicroseconds)
+{
+    auto *halMemory = static_cast<NrfHalMemory *>(GS->halMemory);
+    auto &radioRequest = halMemory->timeslotRadioRequest;
+
+    // TODO: sanity-check arguments (eg. length > min length, length < distance)
+
+    radioRequest.request_type = NRF_RADIO_REQ_TYPE_NORMAL;
+    radioRequest.params.normal.hfclk = NRF_RADIO_HFCLK_CFG_XTAL_GUARANTEED;
+    radioRequest.params.normal.priority = NRF_RADIO_PRIORITY_NORMAL;
+    radioRequest.params.normal.length_us = lengthMicroseconds;
+    radioRequest.params.normal.distance_us = distanceMicroseconds;
+
+#if defined(SIM_ENABLED)
+    logt("FH", "timeslot configured for next event with length %u and distance %u", radioRequest.params.earliest.timeout_us, radioRequest.params.normal.distance_us);
+#endif
+}
+
+ErrorType FruityHal::TimeslotRequestNextEvent()
+{
+    auto *halMemory = static_cast<NrfHalMemory *>(GS->halMemory);
+    auto &radioRequest = halMemory->timeslotRadioRequest;
+
+#if defined(SIM_ENABLED)
+    logt("FH", "timeslot next event requested");
+    cherrySimInstance->currentNode->timeslotRequested = true;
+#endif
+
+    return nrfErrToGeneric(sd_radio_request(&radioRequest));
+}
+    
+// ######################### RADIO ############################
+
+void FruityHal::RadioUnmaskEvent(RadioEvent radioEvent)
+{
+#if defined(SIM_ENABLED)
+    switch (radioEvent)
+    {
+        case RadioEvent::DISABLED:
+            NRF_RADIO->EVENTS_DISABLED_MASKED = false;
+            break;
+        
+        default:
+            SIMEXCEPTION(IllegalArgumentException);
+    }
+#else
+#define FRUITY_HAL_RADIO_INTENSET(EVENT_NAME) \
+    ((RADIO_INTENSET_ ## EVENT_NAME ## _Enabled << RADIO_INTENSET_ ## EVENT_NAME ## _Pos) & RADIO_INTENSET_ ## EVENT_NAME ## _Msk)
+
+    u32 intenset = 0;
+
+    switch (radioEvent)
+    {
+        case RadioEvent::DISABLED:
+            intenset |= FRUITY_HAL_RADIO_INTENSET(DISABLED);
+            break;
+    }
+
+    NRF_RADIO->INTENSET = intenset;
+
+#undef FRUITY_HAL_RADIO_INTENSET
+#endif
+}
+
+void FruityHal::RadioMaskEvent(RadioEvent radioEvent)
+{
+#if defined(SIM_ENABLED)
+    switch (radioEvent)
+    {
+        case RadioEvent::DISABLED:
+            NRF_RADIO->EVENTS_DISABLED_MASKED = true;
+            break;
+        
+        default:
+            SIMEXCEPTION(IllegalArgumentException);
+    }
+#else
+#define FRUITY_HAL_RADIO_INTENCLR(EVENT_NAME) \
+    ((RADIO_INTENCLR_ ## EVENT_NAME ## _Enabled << RADIO_INTENCLR_ ## EVENT_NAME ## _Pos) & RADIO_INTENCLR_ ## EVENT_NAME ## _Msk)
+
+    u32 intenclr = 0;
+
+    switch (radioEvent)
+    {
+        case RadioEvent::DISABLED:
+            intenclr |= FRUITY_HAL_RADIO_INTENCLR(DISABLED);
+            break;
+    }
+
+    NRF_RADIO->INTENCLR = intenclr;
+
+#undef FRUITY_HAL_RADIO_INTENCLR
+#endif
+}
+
+#define FRUITY_HAL_RADIO_CHECK_EVENT(EVENT_NAME)                           \
+    static_cast<bool>(NRF_RADIO->EVENTS_ ## EVENT_NAME != 0)
+#define FRUITY_HAL_RADIO_CLEAR_EVENT(EVENT_NAME) \
+    NRF_RADIO->EVENTS_ ## EVENT_NAME = 0
+
+bool FruityHal::RadioCheckEvent(RadioEvent radioEvent)
+{
+    switch (radioEvent)
+    {
+        case RadioEvent::DISABLED:
+            return FRUITY_HAL_RADIO_CHECK_EVENT(DISABLED);
+
+#if defined(SIM_ENABLED)
+        default:
+            SIMEXCEPTION(IllegalArgumentException);
+#endif
+    }
+
+    return false;
+}
+
+void FruityHal::RadioClearEvent(RadioEvent radioEvent)
+{
+    switch (radioEvent)
+    {
+        case RadioEvent::DISABLED:
+            FRUITY_HAL_RADIO_CLEAR_EVENT(DISABLED);
+            break;
+
+#if defined(SIM_ENABLED)
+        default:
+            SIMEXCEPTION(IllegalArgumentException);
+#endif
+    }
+}
+
+bool FruityHal::RadioCheckAndClearEvent(RadioEvent radioEvent)
+{
+    const bool result = RadioCheckEvent(radioEvent);
+    RadioClearEvent(radioEvent);
+    return result;
+}
+
+#undef FRUITY_HAL_RADIO_CHECK_EVENT
+#undef FRUITY_HAL_RADIO_CLEAR_EVENT
+
+void FruityHal::RadioTriggerTask(RadioTask radioTask)
+{
+#define FRUITY_HAL_RADIO_TRIGGER_TASK(TASK_NAME) \
+    NRF_RADIO->TASKS_ ## TASK_NAME = 1
+
+    switch (radioTask)
+    {
+        case RadioTask::DISABLE:
+            FRUITY_HAL_RADIO_TRIGGER_TASK(DISABLE);
+            break;
+
+        case RadioTask::TXEN:
+            FRUITY_HAL_RADIO_TRIGGER_TASK(TXEN);
+            break;
+
+#if defined(SIM_ENABLED)    
+        default:
+            SIMEXCEPTION(IllegalArgumentException);
+            break;
+#endif
+    }
+
+#undef FRUITY_HAL_RADIO_TRIGGER_TASK
+}
+
+void FruityHal::RadioChooseBleAdvertisingChannel(unsigned channelIndex)
+{
+    if (channelIndex < 37 || channelIndex > 39)
+    {
+        SIMEXCEPTION(IllegalArgumentException);
+        return; // assert?
+    }
+
+#if !defined(SIM_ENABLED)
+    constexpr struct {
+        u32 whitening;
+        u32 frequency;
+    } advChannelConfigurations[] = {
+        {37, 2}, {38, 26}, {39, 80}
+    };
+    const auto &channel = advChannelConfigurations[channelIndex - 37];
+
+    // Radio channel frequency (bits 0..6, range 0-100) and channel map (bit 8).
+    NRF_RADIO->FREQUENCY = channel.frequency;
+
+    // Initial value for data whitening (bit-mixing to reduce DC-bias in the RF-signal).
+    NRF_RADIO->DATAWHITEIV = channel.whitening;
+#endif
+}
+
+signed FruityHal::RadioChooseTxPowerHint(signed txPowerHint, bool dryRun)
+{
+#if defined(SIM_ENABLED) || defined(NRF52) || defined(NRF52840)
+    // Lookup table of supported transmission powers (in dBm) and the
+    // corresponding value of the TXPOWER register of the radio peripheral.
+    // IMPORTANT: Keep the lookup-table in ascending order.
+    static constexpr struct {
+        i8 txPower;
+        u8 registerValue;
+    } supportedValues[] = {
+        {-40, RADIO_TXPOWER_TXPOWER_Neg40dBm},
+        {-20, RADIO_TXPOWER_TXPOWER_Neg20dBm},
+        {-16, RADIO_TXPOWER_TXPOWER_Neg16dBm},
+        {-12, RADIO_TXPOWER_TXPOWER_Neg12dBm},
+        {-8, RADIO_TXPOWER_TXPOWER_Neg8dBm},
+        {-4, RADIO_TXPOWER_TXPOWER_Neg4dBm},
+        {0, RADIO_TXPOWER_TXPOWER_0dBm},
+#if defined(NRF52840)
+        {2, RADIO_TXPOWER_TXPOWER_Pos2dBm},
+#endif
+        {3, RADIO_TXPOWER_TXPOWER_Pos3dBm},
+        {4, RADIO_TXPOWER_TXPOWER_Pos4dBm},
+#if defined(NRF52840)
+        {5, RADIO_TXPOWER_TXPOWER_Pos5dBm},
+        {6, RADIO_TXPOWER_TXPOWER_Pos6dBm},
+        {7, RADIO_TXPOWER_TXPOWER_Pos7dBm},
+        {8, RADIO_TXPOWER_TXPOWER_Pos8dBm},
+#endif
+    };
+
+    static constexpr size_t supportedValueCount = sizeof(supportedValues) / sizeof(supportedValues[0]);
+
+    auto result = [txPowerHint] {
+        for (size_t index = 0; index < supportedValueCount; ++index)
+        {
+            // Round the hint up to the next supported value.
+            if (txPowerHint <= supportedValues[index].txPower)
+                return supportedValues[index];
+        }
+
+        // The hint was smaller than the minimum, here we round up.
+        return supportedValues[supportedValueCount - 1];
+    }();
+
+    if (!dryRun)
+    {
+        // Transmission power ranges from -40dBm to +8dBm.
+        NRF_RADIO->TXPOWER = (result.registerValue << RADIO_TXPOWER_TXPOWER_Pos);
+    }
+
+    return result.txPower;
+#else
+    return 0;
+#endif
+}
+
+void FruityHal::RadioHandleBleAdvTxStart(u8 *packet)
+{
+    // For reference see the following example for nRF51 Series SoCs from Nordic
+    // https://github.com/NordicPlayground/nRF51-multi-role-conn-observer-advertiser
+    //
+#if !defined(SIM_ENABLED)
+    // Power-cycle the radio, this resets the peripheral and registersto its initial state.
+    NRF_RADIO->POWER = 1;
+#endif
+
+    RadioClearEvent(RadioEvent::DISABLED);
+    RadioChooseBleAdvertisingChannel(37);
+    RadioChooseTxPowerHint(0);
+
+    // Set the packet pointer for radio tx/rx.
+    NRF_RADIO->PACKETPTR = (u32)reinterpret_cast<uintptr_t>(packet);
+
+#if !defined(SIM_ENABLED)
+    // For the POC we use 1Mbit/s BLE (just like the example ...).
+    NRF_RADIO->MODE = (RADIO_MODE_MODE_Ble_1Mbit << RADIO_MODE_MODE_Pos);
+
+    // Setup the access address used on-air.
+    // TODO: refactor into separate functions that handle the mapping
+    //       between logical addresses and the base / prefix pairs.
+    NRF_RADIO->PREFIX0 = 0x0000008e;
+    NRF_RADIO->BASE0 = 0x89bed600;
+    NRF_RADIO->TXADDRESS = 0; // logical address from 0-7
+    NRF_RADIO->RXADDRESSES = 0; // POC does not receive (bits 0-7 clear)
+
+    // Setup packet configuration (on-air LENGTH #bits, S0 #bytes, S1 #bytes, ...)
+    // TODO: refactor into separate functions
+    NRF_RADIO->PCNF0 = (
+            ((1u << RADIO_PCNF0_S0LEN_Pos) & RADIO_PCNF0_S0LEN_Msk)
+        |   ((2u << RADIO_PCNF0_S1LEN_Pos) & RADIO_PCNF0_S1LEN_Msk)
+        |   ((6u << RADIO_PCNF0_LFLEN_Pos) & RADIO_PCNF0_LFLEN_Msk)
+    );
+    constexpr auto endian = RADIO_PCNF1_ENDIAN_Little;
+    constexpr auto whiteen = RADIO_PCNF1_WHITEEN_Enabled;
+    NRF_RADIO->PCNF1 = (
+            ((37u     << RADIO_PCNF1_MAXLEN_Pos) & RADIO_PCNF1_MAXLEN_Msk)
+        |   ((0u      << RADIO_PCNF1_STATLEN_Pos) & RADIO_PCNF1_STATLEN_Msk)
+        |   ((3u      << RADIO_PCNF1_BALEN_Pos) & RADIO_PCNF1_BALEN_Msk)
+        |   ((endian  << RADIO_PCNF1_ENDIAN_Pos) & RADIO_PCNF1_ENDIAN_Msk)
+        |   ((whiteen << RADIO_PCNF1_WHITEEN_Pos) & RADIO_PCNF1_WHITEEN_Msk)
+    );
+
+    // Configure shortcuts through the radios state-transitions.
+    NRF_RADIO->SHORTS = (
+            ((1 << RADIO_SHORTS_READY_START_Pos) & RADIO_SHORTS_READY_START_Msk)
+        |   ((1 << RADIO_SHORTS_END_DISABLE_Pos) & RADIO_SHORTS_END_DISABLE_Msk)
+    );
+
+    // Configure the checksum computation.
+    NRF_RADIO->CRCCNF = (
+            (RADIO_CRCCNF_LEN_Three << RADIO_CRCCNF_LEN_Pos)
+        |   (RADIO_CRCCNF_SKIPADDR_Skip << RADIO_CRCCNF_SKIPADDR_Pos)
+    );
+    NRF_RADIO->CRCINIT = 0x00555555; // CRC initial value
+    NRF_RADIO->CRCPOLY = 0x0000065b; // CRC polynomial function
+
+    // Configure interframe spacing in us. This is the time between the
+    // last and first bit of two consecutive packets.
+    NRF_RADIO->TIFS = 150;
+
+    NVIC_EnableIRQ(RADIO_IRQn);
+#endif
+}
+
+#endif // IS_ACTIVE(TIMESLOT)
+
+/// Implements fix for anomaly 87 (CPU: Unexpected wake from System ON Idle
+/// when using FPU). See [1] for details.
+///
+/// This function should be called instead of sd_app_evt_wait.
+///
+/// [1] https://infocenter.nordicsemi.com/topic/errata_nRF52832_EngC/ERR/nRF52832/EngineeringC/latest/anomaly_832_87.html?cp=4_2_1_2_1_24
+static uint32_t sdAppEvtWaitAnomaly87()
+{
+#if !defined(SIM_ENABLED)
+    CRITICAL_REGION_ENTER();
+    __set_FPSCR(__get_FPSCR() & ~(0x0000009F));
+    (void) __get_FPSCR();
+    NVIC_ClearPendingIRQ(FPU_IRQn);
+    CRITICAL_REGION_EXIT();
+#endif
+
+    return sd_app_evt_wait();
 }

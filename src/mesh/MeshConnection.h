@@ -94,6 +94,12 @@ class MeshConnection
         bool mustRetryReestablishing = false;
         u32 reestablishmentStartedDs = 0;
 
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+        /// If the long term connection interval was already requested, so that
+        /// the request is not repeated.
+        bool longTermConnectionIntervalRequested = false;
+#endif
+
 #ifdef SIM_ENABLED
         //Cluster validity checking in the Simulator
         i16 validityClusterUpdatesToSend;
@@ -130,10 +136,10 @@ class MeshConnection
         bool QueueVitalPrioData() override final;
         void ClearCurrentClusterInfoUpdatePacket();
         void PacketSuccessfullyQueuedWithSoftdevice(SizedData* sentData) override final;
-        void DataSentHandler(const u8* data, MessageLength length) override final;
+        void DataSentHandler(const u8* data, MessageLength length, u32 messageHandle) override final;
 
-        bool SendData(BaseConnectionSendData* sendData, u8 const * data);
-        bool SendData(u8 const * data, MessageLength dataLength, bool reliable) override final;
+        bool SendData(BaseConnectionSendData* sendData, u8 const * data, u32 * messageHandle=nullptr);
+        bool SendData(u8 const * data, MessageLength dataLength, bool reliable, u32 * messageHandle=nullptr) override final;
 
         //Receiving Data
         void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) override final;
@@ -143,6 +149,10 @@ class MeshConnection
         //Handler
         bool GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason) override final;
         void GapReconnectionSuccessfulHandler(const FruityHal::GapConnectedEvent& connectedEvent) override final;
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+        void GapConnParamUpdateHandler(const FruityHal::BleGapConnParams & params) override final;
+        void GapConnParamUpdateRequestHandler(const FruityHal::BleGapConnParams & params) override final;
+#endif
 
         //Helpers
         void PrintStatus() override final;

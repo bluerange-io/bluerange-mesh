@@ -1,0 +1,57 @@
+= Featuresets
+
+== Featureset concept
+
+A featureset is a file that describes a set of features that a given target supports. This relates mainly to software features, unlike xref:BoardConfig.adoc[BoardConfig] which describes hardware capabilites. This useful idea is taking advantage of the modularity of FruityMesh. Different modules can be included at any time to optimize for power or for size.
+
+At the same time featureset files describe default behaviours, e.g. terminal operation mode, default LED behaviour or even default network assignment.
+
+== Default enrollment
+
+All featuresets available on GitHub have the same enrollment data in their default configuration, meaning they don't need to be enrolled and create a mesh right after flashing. This approach is *only* valid for demonstration purposes and should *not* be included in _production_ featuresets.
+
+[code, c++]
+    //Specifies a default enrollment for the github configuration
+    //This is just for illustration purpose so that all nodes are enrolled and connect to each other after flashing
+    //For production, all nodes should have a unique nodeKey in the UICR and should be unenrolled
+    //They can then be enrolled by the user e.g. by using a smartphone application
+    //More info is available as part of the documentation in the Specification and the UICR chapter
+    NodeConfiguration* c = (NodeConfiguration*) config;
+    //Default state will be that the node is already enrolled
+    c->enrollmentState = EnrollmentState::ENROLLED;
+    //Enroll the node by default in networkId 11
+    c->networkId = 11;
+    //Set a default network key of 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22
+    CheckedMemcpy(c->networkKey, "\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22", 16);
+
+== Available featuresets
+
+Our GitHub distribution includes multiple featuresets, which are described below. There are more featuresets, with more functionalities available to our customers. Please check out our offerings if you are interested in features like asset tracking or over-the-mesh DFU.
+
+NOTE: As stated above, all of the following featuresets contain default enrollment data.
+
+=== github_dev_nrf52
+
+This featureset is targeted for the NRF52-DK from Nordic Semiconductors. It enables most of the publicly available features. It can be used to quickly set up and test FruityMesh networks. It has all logging methods enabled (UART, Segger RTT).
+
+=== github_dev_nrf52840
+
+This featureset is similiar to `github_dev_nrf52`, but is targeted for the NRF52840-DK from Nordic Semiconductors. It also enables most of the features and logging methods.
+
+=== github_sink_nrf52
+
+This featureset is again targeted for NRF52-DK. It implements a node that serves as bridge between the mesh and a mesh gateway. It does _not_ enable logging, but instead transports JSON messages over UART to the connected computer.
+
+=== github_mesh_nrf52
+
+This featureset is targeted for the NRF52-DK. It implements a standard mesh node. Only features crucial to meshing are enabled.
+
+=== github_sink_usb_nrf52840
+
+This featureset is mainly targeted for the NRF52840-DK. It implements a node that serves as a bridge between the mesh and a mesh gateway. This featurest does not use UART communication for sending JSON messages, but the USB peripheral of the NRF52840 chip which is attached to a separate USB connector on the DK.
+
+NOTE: This target can also work on the NRF52840-DONGLE, but we do _not_ support that platform. For instructions on how to flash the NRF52840-DONGLE refer to this https://devzone.nordicsemi.com/nordic/short-range-guides/b/getting-started/posts/nrf52840-dongle-programming-tutorial[tutorial].
+
+=== prod_ruuvi_weather_nrf52
+
+This featureset is targeted for the https://ruuvi.com/ruuvitag-specs/[RuuviTag]. It uses the `RuuviWeatherModule` which reads sensor data and sends it through the mesh to be advertised in a format compatible with the Ruuvi Station app. For more information please have a look at xref:UsingRuuviTagsWithFruityMesh.adoc[this tutorial].

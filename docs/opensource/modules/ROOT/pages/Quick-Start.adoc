@@ -13,7 +13,7 @@ You have three possibilities:
 
 [#Precompiled]
 == Flashing Precompiled Firmware
-The precompiled firmware can be flashed in three easy steps.
+The precompiled firmware can be flashed in three easy steps. You can download it from our link:https://github.com/mwaylabs/fruitymesh/releases[GitHub Release Page].
 
 === Download nRF5 Command Line Tools
 The nRF Command Line Tools are handy for flashing the compiled firmware on a device. You can download them here for the operating system of your choice and install them:
@@ -25,11 +25,13 @@ The tools come with a bundled installation of the Segger Utilities, which are ne
 You should add the *bin/* folder of the installation to your operating system PATH variable to make development easier.
 
 === Flash SoftDevice & Application
-Plug in your nrf52 development board via USB, then open a command prompt in the FruityMesh folder and type in the following command for flashing:
+Plug in your nrf52 development board via USB, then open a command prompt in the downloaded folder and type in the following command for flashing:
 
 ----
-C:/<path_to_nrfjprog>/nrfjprog.exe --chiperase --program binary/fruitymesh_nrf52_s132.hex --reset
+C:/<path_to_nrfjprog>/nrfjprog.exe --chiperase --program github_dev_nrf52_merged.hex --reset
 ----
+
+There are a number of different precompiled binaries available, you can find some more information on the release page.
 
 Your output should look like this:
 

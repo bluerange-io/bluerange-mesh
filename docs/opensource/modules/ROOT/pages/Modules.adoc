@@ -27,7 +27,11 @@ Each custom module should extend the _Module_ class to have a set of methods tha
 
 TIP: Commands are given with arguments in brackets *[arg]*. These must be entered by the user. Arguments in curly brackets *\{arg}* are optional.
 
-=== Module Configuration
+== Module Configuration
+Every module in fruitymesh has its own configuration and version number. This configuration is automatically loaded from flash during booting, provided that it has same configuration version number as the currently running firmware and has the same or less configuration size than the already existing one. If one wishes to increase the version number then the configuration must be manually migrated. Default configuration is loaded first and is later on overwritten by the loaded configuration in full or parts. Afterwards, once module configuration is successfully loaded, it is then put into ram. The method in UtilityModule (Utility::SaveModuleSettingsToFlash(....)) could be used to store module configuration. This method uses xref:RecordStorage.adoc[RecordStorage] with moduleId as a recordId to store module configurations. Refer to xref:RecordStorage.adoc[RecordStorage] to get more information on how to store and extract data using Record Storage. Node Module configuration is erased after unenrolling the BlueRange device and is updated to new configuration provided during enrollment message after the BlueRange device is enrolled.
+
+=== Set Module Configuration
+
 Sends a new module configuration to any node.
 The resulting binary configuration will be copied to the
 modulen configuration of the specified module.
@@ -120,5 +124,5 @@ open source release:
 
 == Proprietary Modules
 * xref:DfuModuleAbstract.adoc[DfuModule (ModuleId 4)]
-* EnOcean, Eink, Asset and other prorietory modules can be provided upon
+* EnOcean, Eink, Asset and other proprietary modules can be provided upon
 request.
