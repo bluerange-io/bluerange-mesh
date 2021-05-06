@@ -47,21 +47,24 @@ STATIC_ASSERT_SIZE(IoModuleConfiguration, 5);
  */
 class IoModule: public Module
 {
-    private:
+    public:
         enum class IoModuleTriggerActionMessages : u8{
             SET_PIN_CONFIG = 0,
             GET_PIN_CONFIG = 1,
             GET_PIN_LEVEL = 2,
-            SET_LED = 3 //used to trigger a signaling led
+            SET_LED = 3, //used to trigger a signaling led
+            SET_IDENTIFICATION = 4, // set identification state
         };
 
         enum class IoModuleActionResponseMessages : u8{
             SET_PIN_CONFIG_RESULT = 0,
             PIN_CONFIG = 1,
             PIN_LEVEL = 2,
-            SET_LED_RESPONSE = 3
+            SET_LED_RESPONSE = 3,
+            SET_IDENTIFICATION_RESPONSE = 4,
         };
 
+    private:
         //Combines a pin and its config
         static constexpr int SIZEOF_GPIO_PIN_CONFIG = 2;
         struct gpioPinConfig{
@@ -76,6 +79,7 @@ class IoModule: public Module
         STATIC_ASSERT_SIZE(gpioPinConfig, 2);
 
 
+    public:
         //####### Module messages (these need to be packed)
         #pragma pack(push)
         #pragma pack(1)
@@ -87,11 +91,23 @@ class IoModule: public Module
 
             }IoModuleSetLedMessage;
             STATIC_ASSERT_SIZE(IoModuleSetLedMessage, 1);
+            
+            static constexpr int SIZEOF_IO_MODULE_SET_IDENTIFICATION_MESSAGE = 1;
+            typedef struct
+            {
+                IdentificationMode identificationMode;
+
+            }IoModuleSetIdentificationMessage;
+            STATIC_ASSERT_SIZE(IoModuleSetIdentificationMessage, 1);
 
         #pragma pack(pop)
         //####### Module messages end
 
+    private:
         u8 ledBlinkPosition = 0;
+        /// The remaining identification time in deci-seconds. Identification
+        /// is active if this variable holds a non-zero value.
+        u32 remainingIdentificationTimeDs = 0;
 
     public:
 
@@ -112,4 +128,8 @@ class IoModule: public Module
         #ifdef TERMINAL_ENABLED
         TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
         #endif
+
+    private:
+        /// Returns true if identification is currently active.
+        bool IsIdentificationActive() const;
 };

@@ -65,7 +65,7 @@ Live reports are a way to send information about errors, connections, disconnect
 * Info (150)
 * Debug (200)
 
-Live reports can be generated in the firmware using the `SendLiveReport` method. Two extra parameters can be given that can contain additional information for the specific report/error. These will of course only be received if the node is currently part of the mesh. If this is not the case, than it might be better to use the xref:Logger.adoc#_error_log[error log].
+Live reports can be generated in the firmware using the `SendLiveReport` method. Two extra parameters can be given that can contain additional information for the specific report/error. These will of course only be received if the node is currently part of the mesh. If this is not the case, than it might be better to use the xref:#ErrorLog[error log].
 
 [source,C++]
 ----
@@ -81,6 +81,22 @@ Live reports are printed on the terminal of a sink node and can be used to debug
 [source,Javascript]
 ----
 {"type":"live_report","nodeId":123,"module":3,"code":1,"extra":2,"extra2":3}
+----
+
+[#ErrorLog]
+=== Error Log
+The error log stores metrics and errors that help monitoring the mesh. This information can be periodically queried e.g. by a gateway. More information is available on the dedicated xref:ErrorLog.adoc[error log page].
+
+`action [nodeId] status get_errors`
+
+The queried nodes will respond with their complete error log that they have stored in RAM. The error log is cleared on reboot as it is only stored in RAM and is also cleared after it was queried. The error log is printed on a sink node (or any other if json logging is active) as multiple json objects.
+
+.Exemplary response on a sink node
+[source,Javascript]
+----
+{"type":"error_log_entry","nodeId":2,"module":3,"errType":2,"code":22,"extra":59,"time":10000,"typeStr":"CUSTOM","codeStr":"COUNT_JOIN_ME_RECEIVED"}
+{"type":"error_log_entry","nodeId":2,"module":3,"errType":2,"code":86,"extra":10030,"time":10030,"typeStr":"CUSTOM","codeStr":"INFO_UPTIME_ABSOLUTE"}
+{"type":"error_log_entry","nodeId":2,"module":3,"errType":2,"code":20,"extra":6,"time":10030,"typeStr":"CUSTOM","codeStr":"INFO_ERRORS_REQUESTED"}
 ----
 
 === Component periodic timestamp sending

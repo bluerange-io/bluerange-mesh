@@ -36,6 +36,7 @@
 #include <GAPController.h>
 #include "FruityHal.h"
 #include <GlobalState.h>
+#include <ConnectionManager.h>
 
 #include <Utility.h>
 
@@ -192,6 +193,58 @@ void GAPController::GapConnectionSecurityUpdateEventHandler(const FruityHal::Gap
     ConnectionManager::GetInstance().GapConnectionEncryptedHandler(connectionSecurityUpdateEvent);
 }
 
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+void GAPController::GapConnParamUpdateEventHandler(
+        const FruityHal::GapConnParamUpdateEvent& connParamUpdateEvent)
+{
+    const auto rawConnectionHandle = connParamUpdateEvent.GetConnectionHandle();
+    auto connection = ConnectionManager::GetInstance()
+        .GetConnectionFromHandle(rawConnectionHandle);
+
+    if (connection.Exists())
+    {
+        FruityHal::BleGapConnParams params = {
+            connParamUpdateEvent.GetMinConnectionInterval(),
+            connParamUpdateEvent.GetMaxConnectionInterval(),
+            connParamUpdateEvent.GetSlaveLatency(),
+            connParamUpdateEvent.GetConnectionSupervisionTimeout(),
+        };
+        connection.GetConnection()->GapConnParamUpdateHandler(params);
+    }
+#if IS_ACTIVE(CONN_PARAM_UPDATE_LOGGING)
+    else
+    {
+        logt("CONN", "Received GapConnParamUpdateEvent but connection %x does not exist.", rawConnectionHandle);
+    }
+#endif
+}
+
+void GAPController::GapConnParamUpdateRequestEventHandler(const FruityHal::GapConnParamUpdateRequestEvent& connParamUpdateRequestEvent)
+{
+    const auto rawConnectionHandle =
+        connParamUpdateRequestEvent.GetConnectionHandle();
+    auto connection = ConnectionManager::GetInstance()
+        .GetConnectionFromHandle(rawConnectionHandle);
+
+    if (connection.Exists())
+    {
+        FruityHal::BleGapConnParams params = {
+            connParamUpdateRequestEvent.GetMinConnectionInterval(),
+            connParamUpdateRequestEvent.GetMaxConnectionInterval(),
+            connParamUpdateRequestEvent.GetSlaveLatency(),
+            connParamUpdateRequestEvent.GetConnectionSupervisionTimeout(),
+        };
+        connection.GetConnection()->GapConnParamUpdateRequestHandler(params);
+    }
+#if IS_ACTIVE(CONN_PARAM_UPDATE_LOGGING)
+    else
+    {
+        logt("CONN", "Received GapConnParamUpdateRequestEvent but connection %x does not exist.", rawConnectionHandle);
+    }
+#endif
+}
+#endif
+
 void GAPController::StartEncryptingConnection(u16 connectionHandle) const
 {
     //Key identification data
@@ -216,26 +269,49 @@ void GAPController::StartEncryptingConnection(u16 connectionHandle) const
     logt("SEC", "encrypting connection handle %u with key. result %u", connectionHandle, (u32)err);
 }
 
-void GAPController::RequestConnectionParameterUpdate(u16 connectionHandle, u16 minConnectionInterval, u16 maxConnectionInterval, u16 slaveLatency, u16 supervisionTimeout) const
+ErrorType GAPController::RequestConnectionParameterUpdate(
+        u16 connectionHandle, u16 minConnectionInterval,
+        u16 maxConnectionInterval, u16 slaveLatency,
+        u16 supervisionTimeout) const
 {
-    ErrorType err = ErrorType::SUCCESS;
+#if IS_ACTIVE(CONN_PARAM_UPDATE_LOGGING)
+    logt(
+        "CONN",
+        "Started connection parameter update on connection handle=%u "
+            "(min=%u, max=%u, sl=%u, st=%u)",
+        connectionHandle, minConnectionInterval, maxConnectionInterval,
+        slaveLatency, supervisionTimeout
+    );
+#endif
 
-    FruityHal::BleGapConnParams connParams;
-    CheckedMemset(&connParams, 0x00, sizeof(connParams));
+    FruityHal::BleGapConnParams connParams = {};
     connParams.minConnInterval = minConnectionInterval;
     connParams.maxConnInterval = maxConnectionInterval;
     connParams.slaveLatency = slaveLatency;
     connParams.connSupTimeout = supervisionTimeout;
 
-    //TODO: Check against compatibility with gap connection parameters limits
-    err = FruityHal::BleGapConnectionParamsUpdate(connectionHandle, connParams);
-    if (err != ErrorType::BUSY) {
-        FRUITYMESH_ERROR_CHECK((u32)err);
+    // Try to update the connection parameters. If successful an event
+    // (BLE_GAP_EVT_CONN_PARAM_UPDATE) will be generated which indicates
+    // the result of the update procedure.
+    const auto err = FruityHal::BleGapConnectionParamsUpdate(connectionHandle, connParams);
+    if (err != ErrorType::SUCCESS)
+    {
+        logt(
+            "CONN",
+            "BleGapConnectionParamsUpdate failed (%u): %s",
+            static_cast<u32>(err),
+            Logger::GetGeneralErrorString(err)
+        );
     }
 
-    //TODO: error handling: What if it doesn't work, what if the other side does not agree, etc....
+    // The GAPController will handle the events and dispatch them to the
+    // respective connection.
 
-    //TODO: Use connection parameters negitation library: http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v11.0.0%2Fgroup__ble__sdk__lib__conn__params.html
+    // TODO: Think about using the connection parameters negitation library [1].
+    //       The library only works for peripherals, since the central does not
+    //       provide a way to negotiate with the peripheral, it just changes
+    //       the parameters.
+    // [1] http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v11.0.0%2Fgroup__ble__sdk__lib__conn__params.html
 
-
+    return err;
 }

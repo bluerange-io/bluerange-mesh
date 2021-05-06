@@ -12,9 +12,8 @@ The logger also has functionality for logging events to the RAM, e.g. `logError`
 
 The logger and terminal can be used over UART or over Segger RTT. It is also possible to have both log transports enabled at the same time. Use the defines `ACTIVATE_UART` and `ACTIVATE_SEGGER_RTT` to enable this functionality in your featureset.
 
-[#ErrorLog]
 == Error Log
-Because there are errors that only happen during production or in a test mesh that is not easily debuggable, the Logger supports logging errors to RAM. Each node can store a number of errors in RAM. We allow to store a timestamp, an error code and some extra information. This log can be queried every few minutes or hours by anyone attached to the mesh, e.g. a Gateway. The errors have different significance and some information is logged using a counter that always increments. This statistical information can be used to determine the health of a live mesh and to monitor it. Other errors are more severe but happen less often. For these, a seperate entry that includes the timestamp is stored. Storing the errors is necessary as they might be generated while a node is disconnected from the mesh. The error log will be cleared once the errors have been queried. Reboots are also stored in this log. Once a node fails for any reason, it will store that reason in the error log after it has rebootet. Reasons can include watchdog reboots, reboots due to a firmware update, hardfault, etc,.... To log an error in your custom application, use the `logError` method from the `Logger` class.
+The error log is used to log metrics and errors during runtime. It is documented on the dedicated xref:ErrorLog.adoc[error log] page. The error log can for example be periodically queried by a gateway.
 
 == Terminal Commands
 

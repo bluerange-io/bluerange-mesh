@@ -3129,6 +3129,29 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         NodeId nodeId = Utility::StringToU16(commandArgs[1]);
         u16 newConnectionInterval = Utility::StringToU16(commandArgs[2]);
 
+        #ifdef SIM_ENABLED
+        // Neccessary for monkey-testing this command in combination with
+        // the IllegalStateException that is thrown when the connection
+        // interval does not match one of the values in the if-statements
+        // at the end of CherrySim::SimulateBatteryUsage() (CherrySim.cpp).
+        // This is not the best solution, but fixes the test and is not as
+        // invasive as to silently change the connection interval while
+        // setting it.
+        switch (newConnectionInterval)
+        {
+            case MSEC_TO_UNITS(7, CONFIG_UNIT_1_25_MS):
+            case MSEC_TO_UNITS(10, CONFIG_UNIT_1_25_MS):
+            case MSEC_TO_UNITS(15, CONFIG_UNIT_1_25_MS):
+            case MSEC_TO_UNITS(30, CONFIG_UNIT_1_25_MS):
+            case MSEC_TO_UNITS(90, CONFIG_UNIT_1_25_MS):
+            case MSEC_TO_UNITS(100, CONFIG_UNIT_1_25_MS):
+                break;
+            default:
+                logt("WARNING", "Ignoring command because the connection interval is not valid for simulated battery measurements.");
+                return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
+        }
+        #endif
+
         ConnPacketUpdateConnectionInterval packet;
         packet.header.messageType = MessageType::UPDATE_CONNECTION_INTERVAL;
         packet.header.sender = GS->node.configuration.nodeId;

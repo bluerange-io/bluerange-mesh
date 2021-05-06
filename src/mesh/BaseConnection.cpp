@@ -554,6 +554,49 @@ bool BaseConnection::GapDisconnectionHandler(FruityHal::BleHciError hciDisconnec
     return true;
 }
 
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+void BaseConnection::GapConnParamUpdateHandler(
+        const FruityHal::BleGapConnParams & params)
+{
+#if IS_ACTIVE(CONN_PARAM_UPDATE_LOGGING)
+    logt(
+        "CONN",
+        "Connection parameter update on connection with id=%u "
+        "(max=%u, min=%u, sl=%u, st=%u) as %s",
+        connectionId, params.maxConnInterval, params.minConnInterval,
+        params.slaveLatency, params.connSupTimeout,
+        (direction == ConnectionDirection::DIRECTION_OUT) ? "central" : "peripheral"
+    );
+#endif
+}
+
+void BaseConnection::GapConnParamUpdateRequestHandler(
+        const FruityHal::BleGapConnParams & params)
+{
+#if IS_ACTIVE(CONN_PARAM_UPDATE_LOGGING)
+    logt(
+        "CONN",
+        "Connection parameter update request on connection with id=%u "
+        "(max=%u, min=%u, sl=%u, st=%u) as %s",
+        connectionId, params.maxConnInterval, params.minConnInterval,
+        params.slaveLatency, params.connSupTimeout,
+        (direction == ConnectionDirection::DIRECTION_OUT) ? "central" : "peripheral"
+    );
+#endif
+
+    // Connection parameter update _requests_ are only happening on devices in
+    // the central role, as a result of the remote peripheral device requesting
+    // the parameter change.
+    if (direction != ConnectionDirection::DIRECTION_OUT)
+    {
+#if IS_ACTIVE(CONN_PARAM_UPDATE_LOGGING)
+        logt("ERROR", "Received connection parameter update request as peripheral.");
+#endif
+        SIMEXCEPTION(IllegalStateException);
+    }
+}
+#endif
+
 #define __________________HELPER______________________
 /*######## HELPERS ###################################*/
 i8 BaseConnection::GetAverageRSSI() const

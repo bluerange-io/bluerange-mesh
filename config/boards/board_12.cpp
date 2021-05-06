@@ -57,6 +57,7 @@ void SetBoard_12(BoardConfiguration* c)
         c->batteryAdcInputPin = -2;
         c->dcDcEnabled = true;
         GS->boardconf.getCustomPinset = &SetCustomPins_12;
+        c->powerOptimizationEnabled = false;
     }
 }
 

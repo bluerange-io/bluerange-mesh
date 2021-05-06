@@ -9,13 +9,23 @@ The IO module only supports toggling of LEDs and
 different pins at the moment. It will be extended to include support for basic sensors that can be read by e.g. analog/digital conversion.
 
 === Change LED Mode
-Changes the LED mode to either on or off (depending on
-configuration either off permanently or connection signaling)
+Changes the LED mode to one of the states. It is possible to turn leds on or off, but also eg. signal number of connections.
+
+[cols="1,2"]
+|===
+|Mode|Blink pattern
+
+|on|all LEDs are on
+|off|all LEDs are off
+|connections|if networkId = 1, red LED on + 
+if no connections red LED blinking + 
+if connected green LED blinking for connection count
+|===
 
 [source,C++]
 ----
 //Set led mode
-action [nodeId] io led [mode = on / off / cluster]
+action [nodeId] io led [mode = on / off / connections]
 
 //Switch leds on on all nodes
 action 0 io led on
@@ -31,4 +41,16 @@ action [nodeId] io pinset [pinNumber] [mode] ...
 
 //Configure Pins 21 and 22
 action 0 io pinset 21 high 22 low
+----
+
+=== Start identification
+Starts identification procedure which will blink all board LEDs with a 200ms period for a total of 30 seconds. Can also be handled by other modules to start custom identification. This mode overrules curent led mode.
+
+[source,C++]
+----
+//Trigger identification
+action [nodeId] io identify [mode = on / off]
+
+//Trigger identification
+action 0 io identify on
 ----

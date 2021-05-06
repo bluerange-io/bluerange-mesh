@@ -37,9 +37,9 @@
 #include "MersenneTwister.h"
 #include "json.hpp"
 #include "MoveAnimation.h"
-#ifndef GITHUB_RELEASE
+#if IS_ACTIVE(CLC_MODULE)
 #include "ClcMock.h"
-#endif //GITHUB_RELEASE
+#endif //ACTIVATE_CLC_MODULE
 
 extern "C" {
 #include <ble_hci.h>
@@ -129,6 +129,10 @@ struct SoftdeviceConnection {
     //Clustering validity
     i16 validityClusterSizeToSend;
 
+    // Connection Parameter Update (only used when isCentral == true)
+    bool connParamUpdateRequestPending = false;
+    u32 connParamUpdateRequestTimeoutDs = 0;
+    FruityHal::BleGapConnParams connParamUpdateRequestParameters = {};
 };
 
 struct CharacteristicDB_t
@@ -230,9 +234,9 @@ struct NodeEntry {
     FeaturesetPointers* featuresetPointers = nullptr;
     FruityHal::BleGapAddr address;
     GlobalState gs;
-#ifndef GITHUB_RELEASE
+#if IS_ACTIVE(CLC_MODULE)
     ClcMock clcMock;
-#endif //GITHUB_RELEASE
+#endif //ACTIVATE_CLC_MODULE
     NRF_FICR_Type ficr;
     NRF_UICR_Type uicr;
     NRF_GPIO_Type gpio;

@@ -132,6 +132,8 @@ Storing merged file.
 The previous step generated the merged firmware file `prod_ruuvi_weather_nrf52_merged.hex` ready for flashing onto your RuuviTag.
 Our CMake build system generates `...\_flash` targets for every featureset, which call upon `nrfjprog` from the _nRF Command-Line Tools_ to flash the firmware on a connected device.
 
+WARNING: Please _remove_ the battery from the RuuviTag before pressing it on the Ruuvi Devkit.
+
 .Figure: Ruuvi Devkit on a nRF52-DK. Alignment pins are marked with arrows.
 image:using-ruuvitags-with-fruitymesh_ruuvi-devkit.jpg[nodest]
 

@@ -354,3 +354,36 @@ TEST(TestStatusReporterModule, TestConnectionRssiReportingWithNoise) {
     }
 }
 #endif //GITHUB_RELEASE
+
+//This test makes sure that a node will correctly report its relative or absolute uptime through the error log
+TEST(TestStatusReporterModule, TestUptimeReporting) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateUntilClusteringDone(50 * 1000);
+
+    //Add some more uptime so that we are sure to have a two digit uptime
+    tester.SimulateForGivenTime(10 * 1000);
+
+    //Request the error log from node 2
+    tester.SendTerminalCommand(1, "action 2 status get_errors");
+
+    //The time should be more than two digits but less than three
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"("type":"error_log_entry","nodeId":2,"module":3,"errType":2,"code":85,"extra":\d\d,"time":\d+,"typeStr":"CUSTOM","codeStr":"INFO_UPTIME_RELATIVE")");
+
+    //Now, we set the time of the sink node and wait until it got synchronized in the mesh
+    tester.SendTerminalCommand(1, "settime 10000 0");
+    tester.SimulateForGivenTime(30 * 1000);
+
+    //Now, the absolute time should be reported and should be 5 digits long
+    tester.SendTerminalCommand(1, "action 2 status get_errors");
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"("type":"error_log_entry","nodeId":2,"module":3,"errType":2,"code":86,"extra":\d\d\d\d\d,"time":\d+,"typeStr":"CUSTOM","codeStr":"INFO_UPTIME_ABSOLUTE")");
+
+}

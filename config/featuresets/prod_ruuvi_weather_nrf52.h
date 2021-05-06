@@ -36,4 +36,7 @@
 #define ACTIVATE_DRIVER_BME280        1
 #define ACTIVATE_TIMESLOT             1
 
+#define ACTIVATE_CONN_PARAM_UPDATE            1
+#define ACTIVATE_CONN_PARAM_UPDATE_LOGGING    1
+
 #define SPI_ENABLED 1

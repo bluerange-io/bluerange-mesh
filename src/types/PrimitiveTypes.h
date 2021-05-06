@@ -613,10 +613,16 @@ enum class LedMode : u8 {
     OFF = 0, // Led is off
     ON = 1, // Led is constantly on
     CONNECTIONS = 2, // Led blinks red if not connected and green for the number of connections
-    RADIO = 3, // Led shows radio activity
-    CLUSTERING = 4, // Led colour chosen according to clusterId (deprecated)
-    ASSET = 5,
+    RADIO_DEPRECATED = 3, // deprecated since 26/03/2021 (not implemented)
+    CLUSTERING_DEPRECATED = 4, // deprecated 26/03/2021 (not implemented)
+    ASSET_DEPRECATED = 5, // deprecated 26/03/2021 (not implemented)
     CUSTOM = 6, // Led controlled by a specific module
+};
+
+// Identification mode defines LED behaviour or vendor specific behaviour
+enum class IdentificationMode : u8 {
+    IDENTIFICATION_START = 1,
+    IDENTIFICATION_STOP = 2,
 };
 
 //DFU ERROR CODES

@@ -68,8 +68,12 @@ extern "C"{
 #include <FlashStorage.h>
 #include <RecordStorage.h>
 #ifndef GITHUB_RELEASE
+#if IS_ACTIVE(CLC_COMM)
 #include <ClcComm.h>
+#endif
+#if IS_ACTIVE(VS_MODULE)
 #include "VsComm.h"
+#endif
 #endif //GITHUB_RELEASE
 #include <ConnectionMessageTypes.h>
 
@@ -79,9 +83,13 @@ extern "C"{
 #include <EnrollmentModule.h>
 #include <IoModule.h>
 #ifndef GITHUB_RELEASE
+#if IS_ACTIVE(CLC_MODULE)
 #include <ClcModule.h>
-#include <ClcComm.h>
 #include "ClcMock.h"
+#endif
+#if IS_ACTIVE(CLC_COMM)
+#include <ClcComm.h>
+#endif
 #include "AssetModule.h"
 #endif //GITHUB_RELEASE
 #include "ConnectionAllocator.h"
@@ -93,6 +101,13 @@ extern "C"{
 #include <execinfo.h>
 #include <signal.h>
 #include <unistd.h>
+#endif
+
+#ifdef FM_NATIVE_RENDERER_ENABLED
+#include "BBERenderer.h"
+
+BBERenderer* bbeRenderer = nullptr;
+bool bbeRendererWasDestroyed = false;
 #endif
 
 using json = nlohmann::json;
@@ -231,35 +246,86 @@ void CherrySim::PrepareSimulatedFeatureSets()
     //NOTE: Add the featureset in order in which NodeIds will be assigned e.g 
     //if we have defined 3 nodes with sink featureset and 2 with mesh featureset then
     //NodeId 1,2,3 will have sink featureset and 4,5 with mesh featureset
-    u32 featuresetOrderCounter = 0;
-    AddSimulatedFeatureSet(github_dev_nrf52);
-    AddSimulatedFeatureSet(github_dev_nrf52840);
-    AddSimulatedFeatureSet(github_sink_nrf52);
-    AddSimulatedFeatureSet(github_mesh_nrf52);
-    AddSimulatedFeatureSet(github_sink_usb_nrf52840);
-    AddSimulatedFeatureSet(prod_ruuvi_weather_nrf52);
-#ifndef GITHUB_RELEASE
-    AddSimulatedFeatureSet(prod_sink_nrf52);
-    AddSimulatedFeatureSet(prod_mesh_nrf52);
-    AddSimulatedFeatureSet(prod_mesh_usb_nrf52840);
-    AddSimulatedFeatureSet(dev_vslog);
-    AddSimulatedFeatureSet(prod_vs_nrf52);
-    AddSimulatedFeatureSet(prod_clc_mesh_nrf52);
-    AddSimulatedFeatureSet(dev_nrf52);
-    AddSimulatedFeatureSet(dev_nrf52840);
-    AddSimulatedFeatureSet(dev_sig_mesh);
-    AddSimulatedFeatureSet(dev_automated_tests_master_nrf52);
-    AddSimulatedFeatureSet(dev_automated_tests_slave_nrf52);
-    AddSimulatedFeatureSet(prod_vs_converter_nrf52);
-    AddSimulatedFeatureSet(prod_pcbridge_nrf52);
-    AddSimulatedFeatureSet(prod_wm_nrf52840);
-    AddSimulatedFeatureSet(prod_bp_nrf52840);
-    AddSimulatedFeatureSet(prod_eink_nrf52840);
-    //AssetNodes will be assigned the last nodeIds
-    AddSimulatedFeatureSet(prod_asset_ins_nrf52840);
-    AddSimulatedFeatureSet(prod_asset_nrf52);
 
-#endif //GITHUB_RELEASE
+    //NOTE 2: The macro for the featureset is defined by the cmakelist in the featureset folder.
+    //It defines all the featureset in the folder with the same name but in upper case.
+    u32 featuresetOrderCounter = 0;
+#ifdef GITHUB_DEV_NRF52 //GITHUB_DEV_NRF52
+    AddSimulatedFeatureSet(github_dev_nrf52);
+#endif //GITHUB_DEV_NRF52
+#ifdef GITHUB_DEV_NRF52840 //GITHUB_DEV_NRF52840
+    AddSimulatedFeatureSet(github_dev_nrf52840);
+#endif //GITHUB_DEV_NRF52840
+#ifdef GITHUB_SINK_NRF52 // GITHUB_SINK_NRF52
+    AddSimulatedFeatureSet(github_sink_nrf52);
+#endif // GITHUB_SINK_NRF52
+#ifdef GITHUB_MESH_NRF52 //GITHUB_MESH_NRF52
+    AddSimulatedFeatureSet(github_mesh_nrf52);
+#endif //GITHUB_MESH_NRF52
+#ifdef GITHUB_SINK_USB_NRF52840 //GITHUB_SINK_USB_NRF52840    
+    AddSimulatedFeatureSet(github_sink_usb_nrf52840);
+#endif //GITHUB_SINK_USB_NRF52840
+#ifdef PROD_RUUVI_WEATHER_NRF52 //PROD_RUUVI_WEATHER_NRF52
+    AddSimulatedFeatureSet(prod_ruuvi_weather_nrf52);
+#endif //PROD_RUUVI_WEATHER_NRF52
+#ifdef PROD_SINK_NRF52 //PROD_SINK_NRF52
+    AddSimulatedFeatureSet(prod_sink_nrf52);
+#endif //PROD_SINK_NRF52
+#ifdef DEV_NRF52 //DEV_NRF52
+    AddSimulatedFeatureSet(dev_nrf52);
+#endif //DEV_NRF52
+#ifdef DEV_NRF52840 //DEV_NRF52840
+    AddSimulatedFeatureSet(dev_nrf52840);
+#endif //DEV_NRF52840
+#ifdef PROD_MESH_NRF52 //PROD_MESH_NRF52
+    AddSimulatedFeatureSet(prod_mesh_nrf52);
+#endif //PROD_MESH_NRF52
+#ifdef PROD_MESH_USB_NRF52840
+    AddSimulatedFeatureSet(prod_mesh_usb_nrf52840);
+#endif //PROD_MESH_USB_NRF52840
+#ifdef DEV_VSLOG //DEV_VSLOG
+    AddSimulatedFeatureSet(dev_vslog);
+#endif //DEV_VSLOG
+#ifdef PROD_VS_NRF52 //PROD_VS_NRF52
+    AddSimulatedFeatureSet(prod_vs_nrf52);
+#endif
+#ifdef PROD_CLC_MESH_NRF52 //PROD_CLC_MESH_NRF52
+    AddSimulatedFeatureSet(prod_clc_mesh_nrf52);
+#endif //PROD_CLC_MESH_NRF52
+#ifdef DEV_SIG_MESH //DEV_SIG_MESH
+    AddSimulatedFeatureSet(dev_sig_mesh);
+#endif //DEV_SIG_MESH
+#ifdef DEV_AUTOMATED_TESTS_MASTER_NRF52 //DEV_AUTOMATED_TESTS_MASTER_NRF52
+    AddSimulatedFeatureSet(dev_automated_tests_master_nrf52);
+#endif //DEV_AUTOMATED_TESTS_MASTER_NRF52
+#ifdef DEV_AUTOMATED_TESTS_MASTER_NRF52 //DEV_AUTOMATED_TESTS_SLAVE_NRF52
+    AddSimulatedFeatureSet(dev_automated_tests_slave_nrf52);
+#endif //DEV_AUTOMATED_TESTS_SLAVE_NRF52
+#ifdef PROD_VS_CONVERTER_NRF52 //PROD_VS_CONVERTER_NRF52
+    AddSimulatedFeatureSet(prod_vs_converter_nrf52);
+#endif //PROD_VS_CONVERTER_NRF52
+#ifdef PROD_PCBRIDGE_NRF52 //PROD_PCBRIDGE_NRF52
+    AddSimulatedFeatureSet(prod_pcbridge_nrf52);
+#endif //PROD_PCBRIDGE_NRF52
+#ifdef PROD_WM_NRF52840 //PROD_WM_NRF52840
+    AddSimulatedFeatureSet(prod_wm_nrf52840);
+#endif //PROD_WM_NRF52840
+#ifdef PROD_BP_NRF52840 //PROD_BP_NRF52840
+    AddSimulatedFeatureSet(prod_bp_nrf52840);
+#endif //PROD_BP_NRF52840
+#ifdef PROD_EINK_NRF52840 //PROD_EINK_NRF52840
+    AddSimulatedFeatureSet(prod_eink_nrf52840);
+#endif //PROD_EINK_NRF52840
+
+//AssetNodes will be assigned the last nodeIds
+
+#ifdef PROD_ASSET_INS_NRF52840 //PROD_ASSET_INS_NRF52840
+    AddSimulatedFeatureSet(prod_asset_ins_nrf52840);
+#endif //PROD_ASSET_INS_NRF52840
+#ifdef PROD_ASSET_NRF52 //PROD_ASSET_NRF52
+    AddSimulatedFeatureSet(prod_asset_nrf52);
+#endif //PROD_ASSET_NRF52
+
 }
 #undef AddSimulatedFeatureSet
 
@@ -308,6 +374,20 @@ void SegFaultHandler(int sig)
 CherrySim::CherrySim(const SimConfiguration &simConfig)
     : simConfig(simConfig)
 {
+#ifdef FM_NATIVE_RENDERER_ENABLED
+    if (!bbeRenderer && !bbeRendererWasDestroyed)
+    {
+        bbeRenderer = new BBERenderer(this); // The BBERenderer is a rather massive object so we rather put it on the heap.
+        bbeRenderer->setExternallyManaged(true);
+        bbeRenderer->start(1280, 720, "FruityMesh - BBERenderer");
+    }
+    if (!bbeRendererWasDestroyed)
+    {
+        bbeRenderer->setSim(this);
+        bbeRenderer->reset();
+    }
+#endif
+
 #ifdef CI_PIPELINE
     //Static is okay, as the seg fault handler works accross all simulations.
     static bool segfaultHandlerSet = false;
@@ -829,6 +909,9 @@ void CherrySim::SimulateStepForAllNodes()
 
     //printf("-- %u --" EOL, simState.simTimeMs);
     for (u32 i = 0; i < GetTotalNodes(); i++) {
+#ifdef FM_NATIVE_RENDERER_ENABLED
+        if (bbeRenderer && bbeRenderer->isPaused()) break;
+#endif
         NodeIndexSetter setter(i);
         bool simulateNode = true;
         if (simConfig.simulateJittering)
@@ -854,10 +937,11 @@ void CherrySim::SimulateStepForAllNodes()
             SimulateConnections();
             SimulateServiceDiscovery();
             SimulateUartInterrupts();
-#ifndef GITHUB_RELEASE
+#if IS_ACTIVE(CLC_MODULE)
             SimulateClcData();
-#endif //GITHUB_RELEASE
+#endif
             SimulateTimeslot();
+            SimulateConnectionParameterUpdateRequestTimeout();
             try {
                 FruityHal::EventLooper();
                 SimulateFlashCommit();
@@ -881,6 +965,20 @@ void CherrySim::SimulateStepForAllNodes()
     //Back up the flash every flashToFileWriteInterval's step.
     flashToFileWriteCycle++;
     if (flashToFileWriteCycle % flashToFileWriteInterval == 0) StoreFlashToFile();
+
+#ifdef FM_NATIVE_RENDERER_ENABLED
+    if (bbeRenderer && bbeRenderer->keepAlive())
+    {
+        bbeRenderer->frame();
+    }
+    else if(bbeRenderer)
+    {
+        bbeRenderer->shutdown();
+        delete bbeRenderer;
+        bbeRenderer = nullptr;
+        bbeRendererWasDestroyed = true;
+    }
+#endif
 }
 
 void CherrySim::QuitSimulation()
@@ -1688,13 +1786,23 @@ void CherrySim::SetFeaturesets()
         }
     };
 
+    std::string featureset = "";
     std::vector<FeatureNameOrderPair> definedFeaturesets;
     for (auto it = simConfig.nodeConfigName.begin(); it != simConfig.nodeConfigName.end(); it++)
     {
-        auto entry = cherrySimInstance->featuresetPointers.find(it->first);
+        featureset = it->first;
+        auto entry = cherrySimInstance->featuresetPointers.find(featureset);
         if (entry == cherrySimInstance->featuresetPointers.end())
         {
-            SIMEXCEPTIONFORCE(IllegalStateException); //Featureset is not defined yet
+            if (it->first == "prod_sink_nrf52")
+            {
+                featureset = "dev_nrf52";
+                entry = cherrySimInstance->featuresetPointers.find(featureset);
+            }
+            else 
+            {
+                SIMEXCEPTIONFORCE(IllegalStateException); //Featureset is not defined yet
+            }
         }
         if (it->second <= 0)
         {
@@ -1707,7 +1815,7 @@ void CherrySim::SetFeaturesets()
             SIMEXCEPTIONFORCE(IllegalStateException);
         }
         FeatureNameOrderPair pair;
-        pair.featuresetName = it->first;
+        pair.featuresetName = featureset;
         pair.noOfNodesWithFeatureset = it->second;
         pair.orderNumber = entry->second.featuresetOrder;
         definedFeaturesets.emplace_back(pair);
@@ -1844,7 +1952,6 @@ void CherrySim::BootCurrentNode()
     //FIXME: Move to runner / tester
     //Lets us do some configuration after the boot
     Conf::GetInstance().terminalMode = TerminalMode::PROMPT;
-    Conf::GetInstance().defaultLedMode = LedMode::OFF;
 }
 
 void CherrySim::ErasePage(u32 pageAddress)
@@ -2407,6 +2514,13 @@ void CherrySim::SimulateConnections() {
                     SoftDeviceBufferedPacket* packet = getNextPacketToWrite(connection);
                     if (packet == nullptr) break;
 
+#ifdef FM_NATIVE_RENDERER_ENABLED
+                    if (bbeRenderer)
+                    {
+                        bbeRenderer->addPacket(packet->sender, packet->receiver);
+                    }
+#endif
+
                     //Notifications
                     if (packet->isHvx) {
                         GenerateNotification(packet);
@@ -2664,7 +2778,7 @@ void CherrySim::SimulateServiceDiscovery()
     GS->dbDiscoveryHandler(&dbEvt);
 }
 
-#ifndef GITHUB_RELEASE
+#if IS_ACTIVE(CLC_MODULE)
 void CherrySim::SimulateClcData() {
 
     ClcModule* clcMod = (ClcModule*)currentNode->gs.node.GetModuleById(ModuleId::CLC_MODULE);
@@ -2672,7 +2786,7 @@ void CherrySim::SimulateClcData() {
         currentNode->clcMock.SendPeriodicData();
     }
 }
-#endif //GITHUB_RELEASE
+#endif //IS_ACTIVE(CLC_MODULE)
 
 void CherrySim::SimulateMovement()
 {
@@ -2843,6 +2957,59 @@ void CherrySim::SimulateTimeslot() {
         currentNode->gs.timeslot.DispatchRadioSystemEvent(
             FruityHal::SystemEvents::RADIO_SESSION_CLOSED
         );
+    }
+}
+
+void CherrySim::SimulateConnectionParameterUpdateRequestTimeout()
+{
+    for (int connIndex = 0; connIndex < currentNode->state.configuredTotalConnectionCount; ++connIndex)
+    {
+        auto & connection = currentNode->state.connections[connIndex];
+        // Skip connections that are not active.
+        if (!connection.connectionActive)
+        {
+            continue;
+        }
+        // Skip connections where we are not the central.
+        if (!connection.isCentral)
+        {
+            continue;
+        }
+        // Skip connections where no connection parameter update request is pending.
+        if (!connection.connParamUpdateRequestPending)
+        {
+            continue;
+        }
+        // Skip connections that have not timed out yet.
+        if (currentNode->gs.appTimerDs < connection.connParamUpdateRequestTimeoutDs)
+        {
+            continue;
+        }
+
+        // After timing out the request is not pending anymore.
+        connection.connParamUpdateRequestPending = false;
+
+        // The request has timed out, generate an event on the _peripheral_ with
+        // the current connection parameters (i.e. similar to when a request
+        // is rejected).
+        auto & peripheral = *connection.partner;
+        const auto & peripheralConnection = *connection.partnerConnection;
+
+        simBleEvent simEvent = {};
+        simEvent.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+
+        auto & bleEvent = simEvent.bleEvent;
+        bleEvent.header.evt_id = BLE_GAP_EVT_CONN_PARAM_UPDATE;
+        bleEvent.header.evt_len = simEvent.globalId;
+        bleEvent.evt.gap_evt.conn_handle = peripheralConnection.connectionHandle;
+
+        auto & connParams = bleEvent.evt.gap_evt.params.conn_param_update.conn_params;
+        connParams.min_conn_interval = peripheralConnection.connectionInterval;
+        connParams.max_conn_interval = peripheralConnection.connectionInterval;
+        connParams.slave_latency = Conf::meshPeripheralSlaveLatency;
+        connParams.conn_sup_timeout = Conf::meshConnectionSupervisionTimeout;
+
+        peripheral.eventQueue.push_back(simEvent);
     }
 }
 

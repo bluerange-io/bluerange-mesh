@@ -1,0 +1,26 @@
+ifndef::imagesdir[:imagesdir: ../assets/images]
+= Native Renderer
+
+== General
+Besides the web renderer, CherrySim also supports a native renderer. The native renderer has several advantages and disadvantages compared to the web renderer, enumerated below.
+
+.Comparison
+|===
+|Advantages |Disadvantages 
+
+|Much more responsive rendering. The current state of the simulator is represented accurate.|More complex to set up.
+|The renderer can give data back to the simulator.|Can slow down execution as it is run in the same thread as the simulator.
+|Connections are visible in red before they get turned into logical BaseConnections.|The direction of the connections is not visible (yet).
+|It is possible to pause simulations steps so that a closer look at the mesh build up can be done.|If a breakpoint is triggered, the renderer is no longer responding.
+|It shows the sent packets, giving an intuitive way to see how much traffic is happening between the nodes.|The Rendering is no longer available once the simulation stops.
+|More stats about nodes are visible.|
+|Simulator stats like width, height, and the number of nodes are visible.|
+|Simpler Camera Control. Drag & Drop the mouse to move, scroll wheel to zoom.
+|===
+
+image:NativeRenderer.png[NativeRenderer]
+
+== Setup
+
+1. Download & install the [Vulkan SDK](https://vulkan.lunarg.com/).
+2. When generating the CMake files, pass -DFM_NATIVE_RENDERER_ENABLED=ON to it. For example: cmake .. -A Win32 -DFM_NATIVE_RENDERER_ENABLED=ON

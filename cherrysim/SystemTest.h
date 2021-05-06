@@ -129,20 +129,23 @@ extern "C" {
 
 
 //################ Enable compilation of all modules for Simulator ###########################
-#define ACTIVATE_CLC_MODULE 1
-#define ACTIVATE_CLC_COMM 1
-#define ACTIVATE_CLC_CONN 1
+
+#if defined PROD_EINK_NRF52840 || defined(PROD_EINK_NRF52) //PROD_EINK_NRF52840 || PROD_EINK_NRF52
 #define ACTIVATE_EINK_MODULE 1
+#endif //PROD_EINK_NRF52840 || PROD_EINK_NRF52
+
 #define ACTIVATE_ASSET_MODULE 1
-#define ACTIVATE_VS_MODULE 1
-#define ACTIVATE_WM_MODULE 1
-#define ACTIVATE_BP_MODULE 1
-#define ACTIVATE_MODBUS_MODULE 1
-#define ACTIVATE_MODBUS_COMM 1
+
+#if defined PROD_ASSET_INS_NRF52840 //PROD_ASSET_INS_NRF52840
 #define ACTIVATE_INS 1
+#endif //PROD_ASSET_INS_NRF52840
+
 #define ACTIVATE_RUUVI_WEATHER_MODULE 1
 
 #define ACTIVATE_UNSECURE_MEMORY_READBACK 1
+
+#define ACTIVATE_CONN_PARAM_UPDATE         1
+#define ACTIVATE_CONN_PARAM_UPDATE_LOGGING 1
 
 #define NRF_GPIOTE_POLARITY_TOGGLE 1
 #define NRF_GPIOTE_POLARITY_HITOLO 2
@@ -543,6 +546,7 @@ typedef struct {
     lis2dh12_read_ptr   read_reg;
     /** Customizable optional pointer **/
     void *handle;
+    bool moving;
 } lis2dh12_ctx_t;
 
 typedef struct {
@@ -855,17 +859,8 @@ bool IsEmpty(const uint8_t* data, uint32_t length);
 //Enable all necessary modules and parts
 #define ACTIVATE_LOGGING 1
 
-#define ACTIVATE_CLC_MODULE 1
-
 #define ACTIVATE_TIMESLOT 1
 
-#ifndef GITHUB_RELEASE
-#define ACTIVATE_SIG_MESH 1
-#define ACTIVATE_SIG_EXAMPLE_MODULE 1
-#else
-#define ACTIVATE_SIG_MESH 0
-#define ACTIVATE_SIG_EXAMPLE_MODULE 0
-#endif
 
 #endif
 #endif /* SYSTEMTEST_H_ */

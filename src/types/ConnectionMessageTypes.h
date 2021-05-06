@@ -358,6 +358,7 @@ enum class SensorMessageActionType : u8
     ERROR_RSP = 1, // Error during READ/WRITE/...
     READ_RSP = 2, // Response following a READ
     WRITE_RSP = 3, // Response following a WRITE_ACK
+    CMD_RSP = 4,
 };
 
 enum class ActorMessageActionType : u8
@@ -365,7 +366,8 @@ enum class ActorMessageActionType : u8
     RESERVED = 0, // Unused
     WRITE = 1, // Write without acknowledgement
     READ = 2, // Read a value
-    WRITE_ACK = 3 // Write with acknowledgement
+    WRITE_ACK = 3, // Write with acknowledgement
+    CMD = 4,
 };
 
 //COMPONENT_MESSAGE_HEADER is used for component_act and component_sense messages

@@ -89,7 +89,20 @@ namespace FruityHal
     {
     public:
         explicit GapConnParamUpdateEvent(void const * evt);
+        u16 GetMinConnectionInterval() const;
         u16 GetMaxConnectionInterval() const;
+        u16 GetSlaveLatency() const;
+        u16 GetConnectionSupervisionTimeout() const;
+    };
+
+    class GapConnParamUpdateRequestEvent : public GapEvent 
+    {
+    public:
+        explicit GapConnParamUpdateRequestEvent(void const * evt);
+        u16 GetMinConnectionInterval() const;
+        u16 GetMaxConnectionInterval() const;
+        u16 GetSlaveLatency() const;
+        u16 GetConnectionSupervisionTimeout() const;
     };
 
     class GapRssiChangedEvent : public GapEvent
@@ -348,6 +361,7 @@ namespace FruityHal
     ErrorType BleGapAppearance(BleAppearance appearance);
 
     ErrorType BleGapConnectionParamsUpdate(u16 conn_handle, BleGapConnParams const & params);
+    ErrorType BleGapRejectConnectionParamsUpdate(u16 conn_handle);
     ErrorType BleGapConnectionPreferredParamsSet(BleGapConnParams const & params);
 
     ErrorType BleGapDataLengthExtensionRequest(u16 connHandle);

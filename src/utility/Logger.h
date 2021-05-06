@@ -50,6 +50,7 @@ enum class LoggingError : u8 {
     CUSTOM = 2, //Defined below (CustomErrorTypes)
     GATT_STATUS = 3, //Defined in "FruityHalError.h" (BleGattEror)
     REBOOT = 4, //Defined below (RebootReason)
+    VENDOR = 5, //A placeholder for vendor/3rd party error codes, feel free to use this category for your own implementation of custom error types
 };
 
 //There are a number of different error types (by convention)
@@ -142,6 +143,8 @@ enum class CustomErrorTypes : u8 {
     COUNT_UART_RX_ERROR = 82,
     INFO_UNUSED_STACK_BYTES = 83,
     FATAL_CONNECTION_REMOVED_WHILE_ENROLLED_NODES_SYNC = 84,
+    INFO_UPTIME_RELATIVE = 85,
+    INFO_UPTIME_ABSOLUTE = 86,
 };
 
 #ifdef _MSC_VER

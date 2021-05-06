@@ -177,6 +177,19 @@ bool MeshConnection::GapDisconnectionHandler(const FruityHal::BleHciError hciDis
 
     BaseConnection::GapDisconnectionHandler(hciDisconnectReason);
 
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+    // Reset the flag indicating that the long term connection inteval was
+    // requested, such that after re-establishment the parameters will be
+    // updated again.
+    if (longTermConnectionIntervalRequested)
+    {
+        longTermConnectionIntervalRequested = false;
+#if IS_ACTIVE(CONN_PARAM_UPDATE_LOGGING)
+        logt("CONN", "Long-term connection state was reset due to disconnect");
+#endif
+    }
+#endif
+
     //Check if we are a leaf node, do not try to reconnect, probably out of range
     if(direction == ConnectionDirection::DIRECTION_IN && GET_DEVICE_TYPE() == DeviceType::LEAF){
         GS->logger.LogCustomError(CustomErrorTypes::INFO_IGNORING_CONNECTION_SUSTAIN_LEAF, partnerId);
@@ -237,6 +250,49 @@ bool MeshConnection::GapDisconnectionHandler(const FruityHal::BleHciError hciDis
         return true;
     }
 }
+
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+void MeshConnection::GapConnParamUpdateHandler(
+        const FruityHal::BleGapConnParams & params)
+{
+    // Call the base class.
+    BaseConnection::GapConnParamUpdateHandler(params);
+
+    // For now skip requesting our long-term connection interval after the
+    // parameters were updated once. See TODO below.
+    longTermConnectionIntervalRequested = true;
+
+    // TODO: Mark the connection parameters as updated, block or start further
+    //       update attempts.
+}
+
+void MeshConnection::GapConnParamUpdateRequestHandler(
+        const FruityHal::BleGapConnParams & params)
+{
+    // Call the base class.
+    BaseConnection::GapConnParamUpdateRequestHandler(params);
+
+    // For now skip requesting our long-term connection interval after
+    // our partner has requested a change from us, since we are currently
+    // always accepting the updated parameters. See TODO below.
+    longTermConnectionIntervalRequested = true;
+
+    // For now simply accept any request. See TODO below.
+    DISCARD(GAPController::GetInstance().RequestConnectionParameterUpdate(
+        connectionHandle,
+        params.minConnInterval, params.maxConnInterval,
+        params.slaveLatency, params.connSupTimeout
+    ));
+    
+    // TODO: Add code that validates the requested parameters (e.g. compare
+    //       with our settings for long term connections). If we accept,
+    //       call GAPController::RequestConnectionParameterUpdate with the
+    //       acceptable parameters, the 'old' / current parameters or
+    //       other parameters. If no 'answer' is sent, the request will
+    //       automatically time out on the peripheral and the connection
+    //       keeps it's current parameters.
+}
+#endif
 
 void MeshConnection::TryReestablishing()
 {

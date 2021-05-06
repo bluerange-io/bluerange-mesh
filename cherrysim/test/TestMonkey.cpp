@@ -81,8 +81,9 @@ const std::vector<std::string> templates{
 /* IO MODULE */
 /*************/
 //Documented
-    "action [[[0-4]]] io led {{{on|off|cluster}}}",
+    "action [[[0-4]]] io led {{{on|off|connections}}}",
     "action [[[0-4]]] io pinset [[[1-128]]] {{{low|high}}}",
+    "action [[[0-4]]] io identify {{{on|off}}}",
 //Undocumented
 
 /**********************/

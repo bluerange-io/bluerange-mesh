@@ -1,0 +1,57 @@
+{
+	"first-test-animation": {
+		"type": "lerp",
+		"looped": true,
+		"key_points": [
+			{
+				"x": 1.0,
+				"y": 0.1,
+				"z": -3,
+				"durationSec": 1.5
+			},
+			{
+				"x": -3.0,
+				"y": 0.7,
+				"z": -2,
+				"durationSec": 1.3,
+				"type": "cosine"
+			},
+			{
+				"x": 0.123,
+				"y": 0.456,
+				"z": 0.789,
+				"durationSec": 0.1
+			}
+		]
+	},
+	"second-test-animation": {
+		"type": "cosine",
+		"key_points": [
+			{
+				"x": 1.3,
+				"y": 0.2,
+				"z": -2,
+				"durationSec": 2.5,
+				"type": "boolean"
+			},
+			{
+				"x": -2.0,
+				"y": 0.1,
+				"z": -1,
+				"durationSec": 1.2
+			},
+			{
+				"x": -0.123,
+				"y": -0.456,
+				"z": -0.789,
+				"durationSec": 0.5
+			},
+			{
+				"x": 0,
+				"y": 0,
+				"z": 0,
+				"durationSec": 0.5
+			}
+		]
+	}
+}

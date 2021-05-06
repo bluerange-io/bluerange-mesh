@@ -77,67 +77,95 @@ void IoModule::TimerEventHandler(u16 passedTimeDs)
 {
     //Do stuff on timer...
 
-
-    //If the Beacon is in the enrollment network
-    if(currentLedMode == LedMode::CONNECTIONS && GS->node.configuration.networkId == 1){
-
-        GS->ledRed.On();
-        GS->ledGreen.Off();
-        GS->ledBlue.Off();
-
-    }
-    else if (currentLedMode == LedMode::CONNECTIONS)
+    if (IsIdentificationActive())
     {
-        //Calculate the current blink step
-        ledBlinkPosition = (ledBlinkPosition + 1) % (((GS->config.meshMaxInConnections + Conf::GetInstance().meshMaxOutConnections) + 2) * 2);
-
-        //No Connections: Red blinking, Connected: Green blinking for connection count
-
-        BaseConnections conns = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
-        u8 countHandshakeDone = 0;
-        for(u32 i=0; i< conns.count; i++){
-            BaseConnection *conn = conns.handles[i].GetConnection();
-            if(conn != nullptr && conn->HandshakeDone()) countHandshakeDone++;
+        // Check if identification time has run out.
+        if (remainingIdentificationTimeDs <= passedTimeDs)
+        {
+            // Make really sure that identification is inactive.
+            remainingIdentificationTimeDs = 0;
         }
-        
-        u8 i = ledBlinkPosition / 2;
-        if(i < (Conf::GetInstance().meshMaxInConnections + Conf::GetInstance().meshMaxOutConnections)){
-            if(ledBlinkPosition % 2 == 0){
-                //No connections
-                if (conns.count == 0){ GS->ledRed.On(); }
-                //Connected and handshake done
-                else if(i < countHandshakeDone) { GS->ledGreen.On(); }
-                //Connected and handshake not done
-                else if(i < conns.count) { GS->ledBlue.On(); }
-                //A free connection
-                else if(i < (GS->config.meshMaxInConnections + Conf::GetInstance().meshMaxOutConnections)) {  }
-            } else {
-                GS->ledRed.Off();
-                GS->ledGreen.Off();
-                GS->ledBlue.Off();
+        else
+        {
+            // Toggle all LEDs under our control on every timer tick as long
+            // as identification is active.
+            GS->ledRed.Toggle();
+            GS->ledGreen.Toggle();
+            GS->ledBlue.Toggle();
+            // Adjust the remaining identification time.
+            remainingIdentificationTimeDs -= passedTimeDs;
+        }
+    }
+    else
+    {
+        // If power optimizations are enabled for board we keep LEDs off - only blink for identification
+        if (Boardconfig->powerOptimizationEnabled)
+        {
+            GS->ledRed.Off();
+            GS->ledGreen.Off();
+            GS->ledBlue.Off();
+            return;
+        }
+
+        // Identification overrides any other LED activity / mode.
+
+        //If the Beacon is in the enrollment network
+        if(currentLedMode == LedMode::CONNECTIONS && GS->node.configuration.networkId == 1){
+
+            GS->ledRed.On();
+            GS->ledGreen.Off();
+            GS->ledBlue.Off();
+
+        }
+        else if (currentLedMode == LedMode::CONNECTIONS)
+        {
+            //Calculate the current blink step
+            ledBlinkPosition = (ledBlinkPosition + 1) % (((GS->config.meshMaxInConnections + Conf::GetInstance().meshMaxOutConnections) + 2) * 2);
+
+            //No Connections: Red blinking, Connected: Green blinking for connection count
+
+            BaseConnections conns = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
+            u8 countHandshakeDone = 0;
+            for(u32 i=0; i< conns.count; i++){
+                BaseConnection *conn = conns.handles[i].GetConnection();
+                if(conn != nullptr && conn->HandshakeDone()) countHandshakeDone++;
+            }
+            
+            u8 i = ledBlinkPosition / 2;
+            if(i < (Conf::GetInstance().meshMaxInConnections + Conf::GetInstance().meshMaxOutConnections)){
+                if(ledBlinkPosition % 2 == 0){
+                    //No connections
+                    if (conns.count == 0){ GS->ledRed.On(); }
+                    //Connected and handshake done
+                    else if(i < countHandshakeDone) { GS->ledGreen.On(); }
+                    //Connected and handshake not done
+                    else if(i < conns.count) { GS->ledBlue.On(); }
+                    //A free connection
+                    else if(i < (GS->config.meshMaxInConnections + Conf::GetInstance().meshMaxOutConnections)) {  }
+                } else {
+                    GS->ledRed.Off();
+                    GS->ledGreen.Off();
+                    GS->ledBlue.Off();
+                }
             }
         }
-    }
-    else if(currentLedMode == LedMode::ON)
-    {
-        //All LEDs on (orange when only green and red available)
-        GS->ledRed.On();
-        GS->ledGreen.On();
-        GS->ledBlue.On();
-    }
-    else if(currentLedMode == LedMode::OFF)
-    {
-        GS->ledRed.Off();
-        GS->ledGreen.Off();
-        GS->ledBlue.Off();
-    }
-    else if(currentLedMode == LedMode::ASSET)
-    {
-        //Constant red
-
-        GS->ledRed.On();
-        GS->ledGreen.Off();
-        GS->ledBlue.Off();
+        else if(currentLedMode == LedMode::ON)
+        {
+            //All LEDs on (orange when only green and red available)
+            GS->ledRed.On();
+            GS->ledGreen.On();
+            GS->ledBlue.On();
+        }
+        else if(currentLedMode == LedMode::OFF)
+        {
+            GS->ledRed.Off();
+            GS->ledGreen.Off();
+            GS->ledBlue.Off();
+        }
+        else if(currentLedMode == LedMode::CUSTOM)
+        {
+            // Controlled by other module
+        }
     }
 }
 
@@ -192,8 +220,9 @@ TerminalCommandHandlerReturnType IoModule::TerminalCommandHandler(const char* co
                 IoModuleSetLedMessage data;
 
                 if(TERMARGS(4, "on")) data.ledMode= LedMode::ON;
-                else if(TERMARGS(4, "cluster")) data.ledMode = LedMode::CLUSTERING;
-                else data.ledMode = Conf::GetInstance().defaultLedMode == LedMode::OFF ? LedMode::OFF : LedMode::CONNECTIONS;
+                else if(TERMARGS(4, "off")) data.ledMode = LedMode::OFF;
+                else if(TERMARGS(4, "connections")) data.ledMode = LedMode::CONNECTIONS;
+                else return TerminalCommandHandlerReturnType::UNKNOWN;
 
                 u8 requestHandle = commandArgsSize >= 6 ? Utility::StringToU8(commandArgs[5]) : 0;
 
@@ -204,6 +233,46 @@ TerminalCommandHandlerReturnType IoModule::TerminalCommandHandler(const char* co
                     requestHandle,
                     (u8*)&data,
                     1,
+                    false
+                );
+
+                return TerminalCommandHandlerReturnType::SUCCESS;
+            }
+
+            if (TERMARGS(3, "identify"))
+            {
+                if (commandArgsSize < 5) 
+                {
+                    return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+                }
+                // Define the message object.
+                IoModuleSetIdentificationMessage data = {};
+                // Fill in the identification mode based on the terminal
+                // command arguments.
+                if (TERMARGS(4, "on"))
+                {
+                    data.identificationMode = IdentificationMode::IDENTIFICATION_START;
+                }
+                else if (TERMARGS(4, "off"))
+                {
+                    data.identificationMode = IdentificationMode::IDENTIFICATION_STOP;
+                }
+                else
+                {
+                    return TerminalCommandHandlerReturnType::UNKNOWN;
+                }
+                // Parse the request handle if available.
+                u8 requestHandle = commandArgsSize >= 6 ? Utility::StringToU8(commandArgs[5]) : 0;
+                // Turn identification on by sending a start or stop message. This
+                // message is also handled by vendor modules to start any vendor
+                // identification mechanism.
+                SendModuleActionMessage(
+                    MessageType::MODULE_TRIGGER_ACTION,
+                    destinationNode,
+                    (u8)IoModuleTriggerActionMessages::SET_IDENTIFICATION,
+                    requestHandle,
+                    (u8*)&data,
+                    sizeof(IoModuleSetIdentificationMessage),
                     false
                 );
 
@@ -265,24 +334,53 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
 
                 IoModuleSetLedMessage const * data = (IoModuleSetLedMessage const *)packet->data;
 
-                configuration.ledMode = data->ledMode;
                 currentLedMode = data->ledMode;
-
-                if(currentLedMode == LedMode::ON){
-                    GS->ledRed.On();
-                    GS->ledGreen.On();
-                    GS->ledBlue.On();
-                } else {
-                    GS->ledRed.Off();
-                    GS->ledGreen.Off();
-                    GS->ledBlue.Off();
-                }
+                configuration.ledMode = data->ledMode;
 
                 //send confirmation
                 SendModuleActionMessage(
                     MessageType::MODULE_ACTION_RESPONSE,
                     packet->header.sender,
                     (u8)IoModuleActionResponseMessages::SET_LED_RESPONSE,
+                    packet->requestHandle,
+                    nullptr,
+                    0,
+                    false
+                );
+            }
+            else if(actionType == IoModuleTriggerActionMessages::SET_IDENTIFICATION){
+
+                const auto * data = (IoModuleSetIdentificationMessage const *)packet->data;
+
+                switch (data->identificationMode)
+                {
+                    case IdentificationMode::IDENTIFICATION_START:
+                        logt("IOMOD", "identification started by SET_IDENTIFICATION message");
+                        // Set the remaining identification time, which
+                        // activates identification.
+                        remainingIdentificationTimeDs = 300;
+                        // Make sure all leds are in the same state.
+                        GS->ledRed.Off();
+                        GS->ledGreen.Off();
+                        GS->ledBlue.Off();
+                        break;
+
+                    case IdentificationMode::IDENTIFICATION_STOP:
+                        logt("IOMOD", "identification stopped by SET_IDENTIFICATION message");
+                        // Set the remaining identification time to zero,
+                        // which deactivates the identification.
+                        remainingIdentificationTimeDs = 0;
+                        break;
+
+                    default:
+                        break;
+                }
+
+                // Send the action response message.
+                SendModuleActionMessage(
+                    MessageType::MODULE_ACTION_RESPONSE,
+                    packet->header.sender,
+                    (u8)IoModuleActionResponseMessages::SET_IDENTIFICATION_RESPONSE,
                     packet->requestHandle,
                     nullptr,
                     0,
@@ -310,6 +408,18 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
                 logjson_partial("MODULE", "{\"nodeId\":%u,\"type\":\"set_led_result\",\"module\":%u,", packet->header.sender, (u8)ModuleId::IO_MODULE);
                 logjson("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, 0);
             }
+            else if(actionType == IoModuleActionResponseMessages::SET_IDENTIFICATION_RESPONSE)
+            {
+                logjson_partial("MODULE", "{\"nodeId\":%u,\"type\":\"identify_response\",\"module\":%u,", packet->header.sender, (u8)ModuleId::IO_MODULE);
+                logjson("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, 0);
+            }
         }
     }
+}
+
+bool IoModule::IsIdentificationActive() const
+{
+    // The remaining time is non-zero if and only if identification is
+    // currently active.
+    return remainingIdentificationTimeDs > 0;
 }

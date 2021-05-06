@@ -1,0 +1,61 @@
+= Error Log
+
+== Purpose
+The error log is an important component for *detecting issues* in a productive mesh and for *monitoring* it. Often, an error might cause a node to temporarily disconnect from the network. Therefore, the Logger supports *logging errors to RAM*.
+
+Each node can store a number of errors in RAM. We allow to store a *timestamp*, an *error code* and some *extra information*. This log can be queried every few minutes or hours by anyone attached to the mesh, e.g. a Gateway. The errors have different significance and some information is logged using a counter that always increments. This statistical information can be used to determine the health of a live mesh and to monitor it. Other errors are more severe but happen less often. For these, a separate entry that includes the timestamp is stored in RAM. Storing the errors is necessary as they might be generated while a node is disconnected from the mesh.
+
+The error log will be cleared once the errors have been queried. *Reboot reasons* are also stored in this log. Once a node fails for any reason, it will store that reason in the error log after it has rebooted. Reasons can include watchdog reboots, reboots due to a firmware update, hardfault, or others. The previous error log will be lost after a reboot as it is not stored persistently.
+
+Finally, the error log is also used to report the *uptime of a node*. Once the log is queried, the uptime will be stored in the log as well and a final entry will be generated with the type `INFO_ERRORS_REQUESTED`. This is always the last entry of the error log.
+
+For a complete list of error types, refer to the definitions in `Logger.h` as we are continuously adding more types.
+
+== Logging Errors
+Errors are logged into different categories. See the `LoggingError` type in `Logger.h` for more information. One category is the REBOOT type that reports a number of different reasons for why a node has rebooted.
+
+To log an error in your custom application, use the `LogError` or `LogCount` methods from the `Logger` class. For an error, you have to give the LoggingError category which you should specify as `VENDOR`. Other categories are maintained by us and will be extended in future FruityMesh versions. You will be able to specify a 32bit error code and an extra with 32bits in which you can fill any information that you think might be helpful in finding the error.
+
+.Example
+[source,C++]
+----
+enum class VendorErrorTypes : u32 {
+    FATAL_CUSTOM_MODULE_CRASH = 1,
+};
+GS->logger.LogError(LoggingError::VENDOR, (u32)VendorErrorTypes::FATAL_CUSTOM_MODULE_CRASH, additionalInfo);
+----
+
+== Logging Counts
+It is also possible to use the LogCount method which will either create a new log entry or will increase the count if the entry already exists. This is useful for collecting metrics, e.g. the number of connection losses, number of sent packets, etc,....
+
+.Example
+[source,C++]
+----
+enum class VendorErrorTypes : u32 {
+    COUNT_CUSTOM_PACKETS_SENT = 2,
+};
+//Logs another two packets that have been sent
+GS->logger.LogCount(LoggingError::VENDOR, (u32)VendorErrorTypes::COUNT_CUSTOM_PACKETS_SENT, 2);
+----
+
+== Querying the Error Log
+
+`action [nodeId] status get_errors`
+
+The queried nodes will respond with their complete error log that they have stored in RAM. The error log is automatically cleared after it was queried. The error log is printed on a sink node (or any other if json logging is active) as multiple json objects.
+
+.Exemplary response on a sink node
+[source,Javascript]
+----
+{"type":"error_log_entry","nodeId":2,"module":3,"errType":2,"code":22,"extra":59,"time":10000,"typeStr":"CUSTOM","codeStr":"COUNT_JOIN_ME_RECEIVED"}
+{"type":"error_log_entry","nodeId":2,"module":3,"errType":2,"code":86,"extra":10030,"time":10030,"typeStr":"CUSTOM","codeStr":"INFO_UPTIME_ABSOLUTE"}
+{"type":"error_log_entry","nodeId":2,"module":3,"errType":2,"code":20,"extra":6,"time":10030,"typeStr":"CUSTOM","codeStr":"INFO_ERRORS_REQUESTED"}
+----
+
+The error type (category) and the error code are both printed as a number and (if known by the sink node) also as a string for easier readability.
+
+As part of the error log, the uptime of a node is reported either as a relative timestamp in seconds since reboot or as an absolute unix timestamp. The two types `INFO_UPTIME_ABSOLUTE` or `INFO_UPTIME_RELATIVE` are used for this purpose.
+
+The error log should be collected periodically as it will fill up over time and will not be able to keep any additional entries.
+
+WARNING: The time is reported as either a relative time in seconds or as an absolute Unix Timestamp. The absolute timestamp is reported if the time of the node was the xref:Node.adoc#TimeSynchronization[synced at one point]. It is easy to distinguish the two possibilities by e.g. checking if the time is lower than e.g. 1000000000 which will mean it is a relative timestamp.

@@ -444,6 +444,18 @@ void DispatchEvent(const FruityHal::GapConnectionSecurityUpdateEvent & e)
     GAPController::GetInstance().GapConnectionSecurityUpdateEventHandler(e);
 }
 
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+void DispatchEvent(const FruityHal::GapConnParamUpdateEvent & e)
+{
+    GAPController::GetInstance().GapConnParamUpdateEventHandler(e);
+}
+
+void DispatchEvent(const FruityHal::GapConnParamUpdateRequestEvent & e)
+{
+    GAPController::GetInstance().GapConnParamUpdateRequestEventHandler(e);
+}
+#endif
+
 void DispatchEvent(const FruityHal::GattcWriteResponseEvent & e)
 {
     ConnectionManager::GetInstance().GattcWriteResponseEventHandler(e);

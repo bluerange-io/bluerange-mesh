@@ -39,6 +39,7 @@
 #include <Logger.h>
 #include <fstream>
 #include <limits>
+#include <optional>
 
 extern "C" {
 #include <app_timer.h>
@@ -637,9 +638,18 @@ extern "C"
             return (int32_t)ErrorType::NULL_ERROR;
         }
         axis3bit16_t* buffer = (axis3bit16_t*)buff;
-        buffer->i16bit[0] = (i16)cherrySimInstance->simState.rnd.NextU32();
-        buffer->i16bit[1] = (i16)cherrySimInstance->simState.rnd.NextU32();
-        buffer->i16bit[2] = (i16)cherrySimInstance->simState.rnd.NextU32();
+        if (ctx->moving)
+        {
+            buffer->i16bit[0] = (i16)cherrySimInstance->simState.rnd.NextU32();
+            buffer->i16bit[1] = (i16)cherrySimInstance->simState.rnd.NextU32();
+            buffer->i16bit[2] = (i16)cherrySimInstance->simState.rnd.NextU32();
+        }
+        else
+        {
+            buffer->i16bit[0] = 0;
+            buffer->i16bit[1] = 0;
+            buffer->i16bit[2] = 0;
+        }
 
         return (int32_t)ErrorType::SUCCESS;
 
@@ -975,8 +985,165 @@ extern "C"
         if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
             return NRF_ERROR_BUSY;
         }
+        // Find the connection corresponding to the handle on the current node.
+        SoftdeviceConnection* connection = cherrySimInstance->FindConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
+        // If the connection handle could not be resolved, the handle was bogus.
+        if (!connection || !connection->connectionActive)
+        {
+            return BLE_ERROR_INVALID_CONN_HANDLE;
+        }
+        // TODO: Verify that the parameters are supported in the simulator.
+        // Called on the central.
+        if (connection->isCentral)
+        {
+            // The optional will be empty if a pending request was rejected.
+            // In any other case (parameter change from the central or accepted
+            // request of the peripheral) the optional will hold the new
+            // parameters.
+            std::optional<ble_gap_conn_params_t> params;
+            // If a connection parameter update request was pending on the
+            // connection, the request can be either accepted or rejected.
+            if (connection->connParamUpdateRequestPending)
+            {
+                // Potentially accept the request if the parameters match the
+                // requested parameters.
+                if (p_conn_params)
+                {
+                    const auto &cpurp = connection->connParamUpdateRequestParameters;
+                    if (    cpurp.minConnInterval != p_conn_params->min_conn_interval
+                        ||  cpurp.maxConnInterval != p_conn_params->max_conn_interval
+                        ||  cpurp.slaveLatency != p_conn_params->slave_latency
+                        ||  cpurp.connSupTimeout != p_conn_params->conn_sup_timeout)
+                    {
+                        // TODO: Check if the actual softdevice reacts like
+                        //       this, the documentation does not make that
+                        //       clear.
+                        return NRF_ERROR_INVALID_PARAM;
+                    }
+                    // Accept the request.
+                    params = *p_conn_params;
+                    connection->connParamUpdateRequestPending = false;
+                }
+                // Reject the pending request.
+                else
+                {
+                    connection->connParamUpdateRequestPending = false;
+                }
+            }
+            // No request was pending on the central, this means we just change
+            // the current connection parameters.
+            else
+            {
+                // Check that we actually got parameters.
+                if (!p_conn_params)
+                {
+                    return NRF_ERROR_INVALID_ADDR;
+                }
+                params = *p_conn_params;
+            }
 
-        return 0;
+            // Fetch the partner connection.
+            SoftdeviceConnection * peripheralConnection = connection->partnerConnection;
+
+            // If new parameters are available, generate events on both, central
+            // and peripheral with the new parameters and change the parameters
+            // stored in the connection object.
+            if (params.has_value())
+            {
+                // Change the parameters in the connection objects.
+                connection->connectionInterval =
+                    UNITS_TO_MSEC(params->min_conn_interval, CONFIG_UNIT_1_25_MS);
+                peripheralConnection->connectionInterval =
+                    UNITS_TO_MSEC(params->min_conn_interval, CONFIG_UNIT_1_25_MS);
+
+                { // central event
+                    simBleEvent simEvent = {};
+                    simEvent.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+
+                    auto & bleEvent = simEvent.bleEvent;
+                    bleEvent.header.evt_id = BLE_GAP_EVT_CONN_PARAM_UPDATE;
+                    bleEvent.header.evt_len = simEvent.globalId;
+                    bleEvent.evt.gap_evt.conn_handle = connection->connectionHandle;
+                    bleEvent.evt.gap_evt.params.conn_param_update.conn_params = *params;
+
+                    connection->owningNode->eventQueue.push_back(simEvent);
+                }
+
+                { // peripheral event
+                    simBleEvent simEvent = {};
+                    simEvent.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+
+                    auto & bleEvent = simEvent.bleEvent;
+                    bleEvent.header.evt_id = BLE_GAP_EVT_CONN_PARAM_UPDATE;
+                    bleEvent.header.evt_len = simEvent.globalId;
+                    bleEvent.evt.gap_evt.conn_handle = connection->connectionHandle;
+                    bleEvent.evt.gap_evt.params.conn_param_update.conn_params = *params;
+
+                    peripheralConnection->owningNode->eventQueue.push_back(simEvent);
+                }
+            }
+            // If a request was rejected, generate an event on the peripheral.
+            else
+            {
+                simBleEvent simEvent = {};
+                simEvent.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+
+                auto & bleEvent = simEvent.bleEvent;
+                bleEvent.header.evt_id = BLE_GAP_EVT_CONN_PARAM_UPDATE;
+                bleEvent.header.evt_len = simEvent.globalId;
+                bleEvent.evt.gap_evt.conn_handle = connection->connectionHandle;
+
+                auto & connParams = bleEvent.evt.gap_evt.params.conn_param_update.conn_params;
+                connParams.min_conn_interval = peripheralConnection->connectionInterval;
+                connParams.max_conn_interval = peripheralConnection->connectionInterval;
+                connParams.slave_latency = Conf::meshPeripheralSlaveLatency;
+                connParams.conn_sup_timeout = Conf::meshConnectionSupervisionTimeout;
+
+                peripheralConnection->owningNode->eventQueue.push_back(simEvent);
+            }
+        }
+        // Called on the peripheral.
+        else
+        {
+            // Fetch the partner connection.
+            SoftdeviceConnection * centralConnection = connection->partnerConnection;
+            // Check that no connection parameter update request is already
+            // pending.
+            if (centralConnection->connParamUpdateRequestPending)
+            {
+                return NRF_ERROR_BUSY;
+            }
+            // Check that the connection parameters were actually passed.
+            if (!p_conn_params)
+            {
+                return NRF_ERROR_INVALID_ADDR;
+            }
+            // TODO: Check the constraints of the parameter values and
+            //       return NRF_ERROR_INVALID_PARAM if violated.
+            // Update the requested connection parameters.
+            auto &cpurp = centralConnection->connParamUpdateRequestParameters;
+            cpurp.minConnInterval = p_conn_params->min_conn_interval;
+            cpurp.maxConnInterval = p_conn_params->max_conn_interval;
+            cpurp.slaveLatency = p_conn_params->slave_latency;
+            cpurp.connSupTimeout = p_conn_params->conn_sup_timeout; 
+            // Compute the timeout and set the pending flag.
+            centralConnection->connParamUpdateRequestTimeoutDs =
+                centralConnection->owningNode->gs.appTimerDs + 20;
+            centralConnection->connParamUpdateRequestPending = true;
+            // Create the event on the central.
+            simBleEvent simEvent = {};
+            simEvent.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+            auto & bleEvent = simEvent.bleEvent;
+            bleEvent.header.evt_id = BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST;
+            bleEvent.header.evt_len = simEvent.globalId;
+            bleEvent.evt.gap_evt.conn_handle = centralConnection->connectionHandle;
+            bleEvent.evt.gap_evt.params.conn_param_update_request.conn_params =
+                *p_conn_params;
+            // Push the request event into the event queue of the central node.
+            centralConnection->owningNode->eventQueue.push_back(simEvent);
+        }
+
+        return NRF_SUCCESS;
     }
 
     uint32_t sd_ble_gap_scan_stop()

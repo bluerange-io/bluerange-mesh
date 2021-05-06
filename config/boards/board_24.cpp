@@ -50,5 +50,6 @@ void SetBoard_24(BoardConfiguration* c)
         c->lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_SYNTH;
         c->lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_50_PPM;
         c->dcDcEnabled = false;
+        c->powerOptimizationEnabled = false;
     }
 }

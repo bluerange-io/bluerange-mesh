@@ -247,6 +247,9 @@ public:
     // Timeslot API Simulation
     void SimulateTimeslot();
 
+    // Connection Parameter Update Request Simulation
+    void SimulateConnectionParameterUpdateRequestTimeout();
+
     //Other Simulation
     void SimulateTimer();
     void SimulateWatchDog();

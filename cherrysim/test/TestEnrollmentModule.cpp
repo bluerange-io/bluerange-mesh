@@ -35,7 +35,7 @@
 #include <cmath>
 #include "MeshAccessModule.h"
 
-#ifndef GITHUB_RELEASE
+#if IS_ACTIVE(CLC_MODULE)
 TEST(TestEnrollmentModule, TestCommands) {
     //Configure a clc sink and a mesh clc beacon
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
@@ -68,7 +68,7 @@ TEST(TestEnrollmentModule, TestCommands) {
     ASSERT_TRUE(tester.sim->nodes[1].gs.node.configuration.enrollmentState == EnrollmentState::NOT_ENROLLED);
     ASSERT_TRUE(tester.sim->nodes[1].gs.node.configuration.networkId == 0);
 }
-#endif //GITHUB_RELEASE
+#endif //ACTIVATE_CLC_MODULE
 
 TEST(TestEnrollmentModule, TestFactoryReset) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();

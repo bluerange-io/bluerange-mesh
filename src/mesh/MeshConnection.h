@@ -94,6 +94,12 @@ class MeshConnection
         bool mustRetryReestablishing = false;
         u32 reestablishmentStartedDs = 0;
 
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+        /// If the long term connection interval was already requested, so that
+        /// the request is not repeated.
+        bool longTermConnectionIntervalRequested = false;
+#endif
+
 #ifdef SIM_ENABLED
         //Cluster validity checking in the Simulator
         i16 validityClusterUpdatesToSend;
@@ -143,6 +149,10 @@ class MeshConnection
         //Handler
         bool GapDisconnectionHandler(FruityHal::BleHciError hciDisconnectReason) override final;
         void GapReconnectionSuccessfulHandler(const FruityHal::GapConnectedEvent& connectedEvent) override final;
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+        void GapConnParamUpdateHandler(const FruityHal::BleGapConnParams & params) override final;
+        void GapConnParamUpdateRequestHandler(const FruityHal::BleGapConnParams & params) override final;
+#endif
 
         //Helpers
         void PrintStatus() override final;

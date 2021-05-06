@@ -423,7 +423,8 @@ TEST(TestOther, TestJsonConfigSerialization)
     simConfig->siteJsonPath.~basic_string();
 }
 
-#ifndef GITHUB_RELEASE
+
+#if defined(PROD_SINK_NRF52)
 TEST(TestOther, TestReplay)
 {
     std::string logAccumulatorDemonstrator = "";
@@ -502,7 +503,8 @@ TEST(TestOther, TestReplay)
     ASSERT_TRUE(logAccumulatorReplay.find("[!]COMMAND EXECUTION START:[!]index:0,time:32350,cmd:action 0 enroll basic BBBBG 5 118 ED:24:56:91:4E:48:C1:E1:7B:7B:D9:22:17:AE:59:EF FE:47:59:4D:FA:06:61:49:52:28:FD:5B:84:CA:DB:F5 43:BF:7F:7C:7B:AB:B2:C8:C5:3B:22:EB:F3:49:3B:01 05:00:00:00:05:00:00:00:05:00:00:00:05:00:00:00 5 0 CRC: 2568303097[!]COMMAND EXECUTION END[!]") != std::string::npos);
     ASSERT_TRUE(logAccumulatorReplay.find("[!]COMMAND EXECUTION START:[!]index:0,time:42350,cmd:action 0 enroll basic BBBBG 5 118 ED:24:56:91:4E:48:C1:E1:7B:7B:D9:22:17:AE:59:EF FE:47:59:4D:FA:06:61:49:52:28:FD:5B:84:CA:DB:F5 43:BF:7F:7C:7B:AB:B2:C8:C5:3B:22:EB:F3:49:3B:01 05:00:00:00:05:00:00:00:05:00:00:00:05:00:00:00 5 0 CRC: 2568303097[!]COMMAND EXECUTION END[!]") != std::string::npos);
 }
-#endif //GITHUB_RELEASE
+#endif //PROD_SINK_NRF52
+
 
 TEST(TestOther, TestSimCommandCrc)
 {
@@ -614,7 +616,8 @@ TEST(TestOther, TestEncryption) {
     ccm_soft_encrypt(&ccme);
 }
 
-#ifndef GITHUB_RELEASE
+
+#if IS_ACTIVE(CLC_MODULE)
 TEST(TestOther, TestConnectionAllocator) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     testerConfig.verbose = false;
@@ -662,7 +665,7 @@ TEST(TestOther, TestConnectionAllocator) {
         }
     }
 }
-#endif //GITHUB_RELEASE
+#endif //IS_ACTIVE(CLC_MODULE)
 
 //Tests the implementation of CherrySimTester::SimulateUntilMessagesReceived.
 TEST(TestOther, TestMultiMessageSimulation) {
@@ -1043,7 +1046,7 @@ TEST(TestOther, TestBulkMode) {
 }
 #endif //GITHUB_RELEASE
 
-#ifndef GITHUB_RELEASE
+#if defined(DEV_AUTOMATED_TESTS_MASTER_NRF52)
 TEST(TestOther, TestWatchdog) {
     Exceptions::ExceptionDisabler<WatchdogTriggeredException> wtDisabler;
     Exceptions::ExceptionDisabler<SafeBootTriggeredException> stDisabler;
@@ -1103,10 +1106,11 @@ TEST(TestOther, TestWatchdog) {
         ASSERT_EQ(tester.sim->nodes[0].restartCounter, 1); //watchdogs are disabled, nodes should not starve at all.
     }
 }
-#endif //GITHUB_RELEASE
+#endif //DEV_AUTOMATED_TESTS_MASTER_NRF52
 
 
 #ifndef GITHUB_RELEASE
+#if IS_ACTIVE(CLC_MODULE)
 extern void SetBoard_3(BoardConfiguration *c);
 extern void SetBoard_4(BoardConfiguration *c);
 extern void SetBoard_9(BoardConfiguration *c);
@@ -1195,6 +1199,7 @@ TEST(TestOther, TestBoards) {
     c.boardType = 24;
     SetBoard_24(&c);
 }
+#endif // IS_ACTIVE(CLC_MODULE)
 #endif //GITHUB_RELEASE
 
 TEST(TestOther, TestRingIndexGenerator) {

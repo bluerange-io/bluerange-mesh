@@ -28,6 +28,8 @@ option(CI_PIPELINE "Meant to be set by the CI Pipeline to do some code manipulat
 
 option(FORCE_CPPCHECK "If set and the simulator is built, the generation fails if cppcheck could not be found." OFF)
 
+option(FM_NATIVE_RENDERER_ENABLED "If set and the simulator is built, a native renderer is compiled into the executable." OFF)
+
 # Sanitizers are used to do a number of runtime checks that help us to spot issues.
 # However the compile time increases by a lot and the executable will also execute slower.
 option(ENABLE_SANITIZERS "If ON and GCC is used and the simulator is built, sanitizer flags are used during compilation." ON) # ON by default is intentional
@@ -319,7 +321,7 @@ else(BUILD_FEATURESETS)
     target_compile_definitions(cherrySim_tester PRIVATE "CI_PIPELINE")
   endif()
   
-if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config/featuresets/CMakeFragments/AddIns.cmake")
   include(config/featuresets/CMakeFragments/AddIns.cmake)
 endif()
 
@@ -375,6 +377,11 @@ endif()
   
   set_target_properties(event event_core event_extra gtest gtest_main PROPERTIES FOLDER Dependencies)
   set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT cherrySim_runner)
-  source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX fruitymesh FILES ${visual_studio_source_list})
   
+  if(FM_NATIVE_RENDERER_ENABLED)
+    add_compile_definitions(FM_NATIVE_RENDERER_ENABLED)
+    add_subdirectory(BBERenderer)
+  endif()
+  
+  source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX fruitymesh FILES ${visual_studio_source_list})
 endif(BUILD_FEATURESETS)

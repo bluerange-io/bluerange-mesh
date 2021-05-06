@@ -195,6 +195,7 @@ static FruityHal::BleGattEror nrfErrToGenericGatt(u32 code);
 static const char* getBleEventNameString(u16 bleEventId);
 u32 ClearGeneralPurposeRegister(u32 gpregId, u32 mask);
 u32 WriteGeneralPurposeRegister(u32 gpregId, u32 mask);
+static uint32_t sdAppEvtWaitAnomaly87();
 
 #define __________________BLE_STACK_INIT____________________
 // ############### BLE Stack Initialization ########################
@@ -584,7 +585,7 @@ void FruityHal::EventLooper()
         }
     }
 
-    u32 err = sd_app_evt_wait();
+    u32 err = sdAppEvtWaitAnomaly87();
     FRUITYMESH_ERROR_CHECK(err); // OK
     err = sd_nvic_ClearPendingIRQ(SD_EVT_IRQn);
     FRUITYMESH_ERROR_CHECK(err);  // OK
@@ -635,7 +636,7 @@ void FruityHal::EventLooper()
         GS->mainContextHandlers[i]();
     }
 
-    u32 err = sd_app_evt_wait();
+    u32 err = sdAppEvtWaitAnomaly87();
     FRUITYMESH_ERROR_CHECK(err); // OK
 }
 
@@ -725,6 +726,20 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
             DispatchEvent(csue);
         }
         break;
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+    case BLE_GAP_EVT_CONN_PARAM_UPDATE:
+        {
+            FruityHal::GapConnParamUpdateEvent cpue(&bleEvent);
+            DispatchEvent(cpue);
+        }
+        break;
+    case BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST:
+        {
+            FruityHal::GapConnParamUpdateRequestEvent cpure(&bleEvent);
+            DispatchEvent(cpure);
+        }
+        break;
+#endif
     case BLE_GATTC_EVT_WRITE_RSP:
         {
 #ifdef SIM_ENABLED
@@ -861,6 +876,15 @@ FruityHal::GapConnParamUpdateEvent::GapConnParamUpdateEvent(void const * _evt)
     }
 }
 
+FruityHal::GapConnParamUpdateRequestEvent::GapConnParamUpdateRequestEvent(void const * _evt)
+    :GapEvent(_evt)
+{
+    if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id != BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST)
+    {
+        SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
+    }
+}
+
 FruityHal::GapEvent::GapEvent(void const * _evt)
     : BleEvent(_evt)
 {
@@ -871,9 +895,44 @@ u16 FruityHal::GapEvent::GetConnectionHandle() const
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.conn_handle;
 }
 
+u16 FruityHal::GapConnParamUpdateEvent::GetMinConnectionInterval() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.min_conn_interval;
+}
+
 u16 FruityHal::GapConnParamUpdateEvent::GetMaxConnectionInterval() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.max_conn_interval;
+}
+
+u16 FruityHal::GapConnParamUpdateEvent::GetSlaveLatency() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.slave_latency;
+}
+
+u16 FruityHal::GapConnParamUpdateEvent::GetConnectionSupervisionTimeout() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.conn_sup_timeout;
+}
+
+u16 FruityHal::GapConnParamUpdateRequestEvent::GetMinConnectionInterval() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.min_conn_interval;
+}
+
+u16 FruityHal::GapConnParamUpdateRequestEvent::GetMaxConnectionInterval() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.max_conn_interval;
+}
+
+u16 FruityHal::GapConnParamUpdateRequestEvent::GetSlaveLatency() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.slave_latency;
+}
+
+u16 FruityHal::GapConnParamUpdateRequestEvent::GetConnectionSupervisionTimeout() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.conn_sup_timeout;
 }
 
 FruityHal::GapRssiChangedEvent::GapRssiChangedEvent(void const * _evt)
@@ -1498,6 +1557,13 @@ ErrorType FruityHal::BleGapConnectionParamsUpdate(u16 conn_handle, BleGapConnPar
     return nrfErrToGeneric(sd_ble_gap_conn_param_update(conn_handle, &gapConnectionParams));
 }
 
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+ErrorType FruityHal::BleGapRejectConnectionParamsUpdate(u16 conn_handle)
+{
+    return nrfErrToGeneric(sd_ble_gap_conn_param_update(conn_handle, nullptr));
+}
+#endif
+
 ErrorType FruityHal::BleGapConnectionPreferredParamsSet(BleGapConnParams const & params)
 {
     ble_gap_conn_params_t gapConnectionParams = translate(params);
@@ -1796,7 +1862,7 @@ void button_interrupt_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t ac
 
 ErrorType FruityHal::WaitForEvent()
 {
-    return nrfErrToGeneric(sd_app_evt_wait());
+    return nrfErrToGeneric(sdAppEvtWaitAnomaly87());
 }
 
 ErrorType FruityHal::InitializeButtons()
@@ -3660,7 +3726,7 @@ ErrorType FruityHal::SpiTransfer(u8* const p_toWrite, u8 count, u8* const p_toRe
         //Locks if run in interrupt context
         while (!halMemory->spiXferDone)
         {
-            sd_app_evt_wait();
+            sdAppEvtWaitAnomaly87();
         }
         nrf_gpio_pin_set((u32)slaveSelectPin);
         retVal = NRF_SUCCESS;
@@ -4140,3 +4206,22 @@ void FruityHal::RadioHandleBleAdvTxStart(u8 *packet)
 }
 
 #endif // IS_ACTIVE(TIMESLOT)
+
+/// Implements fix for anomaly 87 (CPU: Unexpected wake from System ON Idle
+/// when using FPU). See [1] for details.
+///
+/// This function should be called instead of sd_app_evt_wait.
+///
+/// [1] https://infocenter.nordicsemi.com/topic/errata_nRF52832_EngC/ERR/nRF52832/EngineeringC/latest/anomaly_832_87.html?cp=4_2_1_2_1_24
+static uint32_t sdAppEvtWaitAnomaly87()
+{
+#if !defined(SIM_ENABLED)
+    CRITICAL_REGION_ENTER();
+    __set_FPSCR(__get_FPSCR() & ~(0x0000009F));
+    (void) __get_FPSCR();
+    NVIC_ClearPendingIRQ(FPU_IRQn);
+    CRITICAL_REGION_EXIT();
+#endif
+
+    return sd_app_evt_wait();
+}

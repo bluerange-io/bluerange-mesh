@@ -355,15 +355,24 @@ void StatusReporterModule::SendRebootReason(NodeId toNode, u8 requestHandle) con
         false
     );
 }
-void StatusReporterModule::SendErrors(NodeId toNode, u8 requestHandle) const{
+void StatusReporterModule::SendErrors(NodeId toNode, u8 requestHandle) const
+{
 
-    //Log another error so that we know the uptime of the node when the errors were requested
-    GS->logger.LogCustomError(CustomErrorTypes::INFO_ERRORS_REQUESTED, GS->logger.errorLogPosition);
+    //If our time is synced we report the absolute uptime, otherwhise the relative uptime is all we know
+    if (GS->timeManager.IsTimeSynced()) {
+        GS->logger.LogCustomError(CustomErrorTypes::INFO_UPTIME_ABSOLUTE, GS->timeManager.GetTime());
+    }
+    else {
+        GS->logger.LogCustomError(CustomErrorTypes::INFO_UPTIME_RELATIVE, DS_TO_SEC(GS->appTimerDs));
+    }
 
 #ifndef SIM_ENABLED
     //Also report how big the stack grew.
     GS->logger.LogCustomError(CustomErrorTypes::INFO_UNUSED_STACK_BYTES, Utility::GetAmountOfUnusedStackBytes());
 #endif
+
+    //Log another error so that we know this is the last entry of the error log
+    GS->logger.LogCustomError(CustomErrorTypes::INFO_ERRORS_REQUESTED, GS->logger.errorLogPosition);
 
     StatusReporterModuleErrorLogEntryMessage data;
     for(int i=0; i< GS->logger.errorLogPosition; i++){
