@@ -36,6 +36,7 @@ void SetBoard_12(BoardConfiguration* c)
 {
     if(c->boardType == 12)
     {
+        c->boardName = "RuuviTag";
         c->led1Pin =  17;
         c->led2Pin =  19;
         c->led3Pin =  -1;
@@ -56,6 +57,9 @@ void SetBoard_12(BoardConfiguration* c)
         // batteryAdcInput -2 is used if we want to measure battery on MCU and that is only possible if Vbatt_max < 3.6V
         c->batteryAdcInputPin = -2;
         c->dcDcEnabled = true;
+        c->powerOptimizationEnabled = true;
+        c->powerButtonActiveHigh = false;
+        c->powerButton =  13;
         GS->boardconf.getCustomPinset = &SetCustomPins_12;
     }
 }

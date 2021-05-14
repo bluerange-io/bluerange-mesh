@@ -1,0 +1,37 @@
+ifndef::imagesdir[:imagesdir: ../assets/images]
+= Native Renderer
+
+== General
+Besides the web renderer, CherrySim also supports a native renderer. The native renderer has several advantages and disadvantages compared to the web renderer, enumerated below.
+
+.Comparison
+|===
+|Advantages |Disadvantages 
+
+|Much more responsive rendering. The current state of the simulator is represented accurate.|More complex to set up.
+|The renderer can give data back to the simulator.|Can slow down execution as it is run in the same thread as the simulator.
+|Connections are visible in red before they get turned into logical BaseConnections.|The direction of the connections is not visible (yet).
+|It is possible to pause simulations steps so that a closer look at the mesh build up can be done.|If a breakpoint is triggered, the renderer is no longer responding.
+|It shows the sent packets, giving an intuitive way to see how much traffic is happening between the nodes.|The Rendering is no longer available once the simulation stops.
+|More stats about nodes are visible.|
+|Simulator stats like width, height, and the number of nodes are visible.|
+|Simpler Camera Control. Drag & Drop the mouse to move, scroll wheel to zoom.
+|===
+
+image:NativeRenderer.png[NativeRenderer]
+
+== Usage
+Once compiled in, the Native Renderer will automatically open a new window on startup of the CherrySimRunner or CherrySimTester. GAP connections between nodes will be drawn in a red color, they will turn blue once FruityMesh tries to establish a connection and will turn green as soon as the connection is in a handshaked state. Around some nodes, you might see a colored (maybe blinking) circle that represents the LED of that node. The current simulation time will be shown on the right side.
+
+Hover over any node and the details will be displayed in the panel on the right.
+
+You can close the renderer at any time to significantly speed up the simulation as the rendering is done for each frame and slows down the simulation. Make sure to take a look at the fastLane option in our xref:CherrySim.adoc[CherrySim documentation] which is very useful for debugging.
+
+== Setup
+
+1. Download & install the [Vulkan SDK](https://vulkan.lunarg.com/).
+2. When generating the CMake files, pass -DFM_NATIVE_RENDERER_ENABLED=ON to it. For example: cmake .. -A Win32 -DFM_NATIVE_RENDERER_ENABLED=ON
+
+== Mock
+
+For testing API calls correctness in testing environment new cmake variable `FM_NATIVE_RENDERER_MOCK_ENABLED` was added. To build the simulator with the native renderer enabled, but without the BBEngine backend (and dependencies) pass `-DFM_NATIVE_RENDERER_MOCK_ENABLED=ON` when generating cmake files. Using `-DFM_NATIVE_RENDERER_ENABLED=ON` is still required e.g. `cmake .. -A Win32 -DFM_NATIVE_RENDERER_ENABLED=ON -DFM_NATIVE_RENDERER_MOCK_ENABLED=ON`.

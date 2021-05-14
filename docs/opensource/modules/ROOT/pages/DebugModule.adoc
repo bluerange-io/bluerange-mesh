@@ -119,6 +119,43 @@ Prints the registered advertising jobs of the advertising controller.
 advjobs
 ----
 
+=== Printing a Log of all received Advertisement Messages
+This command is helpful to log all received advertisement messages and print their payload in a readable way. Most important information is printed for all known messages. Also, the raw data is printed as well. A number of filters can be used to scan for a number of identifiers in the message and also filter for a certain message type.
+
+[source, C++]
+----
+scanlog {deviceIdentifier=*} {messageType=0}
+----
+
+.Examples
+[source, C++]
+----
+//Prints all received advertisement messages
+scanlog
+scanlog *
+
+//Prints JOIN_ME messages received from any node
+scanlog * 1
+
+//Prints MeshAccess Broadcast messages from the node with the serialNumber BBBBB
+scanlog BBBBB 3
+
+//Prints all messages where the BLE Address of the sender is AA:BB:CC:DD:EE:FF
+scanlog AA:BB:CC:DD:EE:FF
+
+//Stops printing received messages
+scanlog off
+----
+
+
+=== Boost scanning for some time
+Useful in combination with scanlog, this will register a scanjob with a given timeout (by default 60 seconds) in which the node will scan as much as possible. A maximum of 10 minutes is supported. Executing it multiple times will register multiple scan jobs.
+
+[source, C++]
+----
+scanboost {boostTimeSec=60}
+----
+
 === Heap
 Prints statistics about the current heap usage.
 [source, C++]

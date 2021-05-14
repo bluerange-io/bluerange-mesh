@@ -89,6 +89,22 @@ typedef u16 NodeId;
 typedef u32 ClusterId;
 typedef i16 ClusterSize;
 
+//All possible identifiers to (more or less) uniquely identify the device
+//Data is Little Endian for each of the parts of an identifier
+//Most identifiers have a textual representation so they can be entered on the terminal
+enum class DeviceIdentifier : u8
+{
+    INVALID                 = 0, //Invalid Identifier. Written as -
+    SERIAL_NUMBER_INDEX     = 1, //u32 index of the serial number. Written as e.g. 0x00123456
+    SERIAL_NUMBER_STRING    = 2, //serial number as an ASCII string, either 5 or 7 characters long, usually \0 terminated. Written as e.g. BBCDF or BBCDFGG
+    BLE_GAP_ADDRESS         = 3, //Also known as MAC_ADDRESS to the platform, 7 bytes (see FruityHal::BleGapAddr). Written as e.g. AA:BB:CC:DD:EE:FF
+    CUSTOM_IDENTIFIER       = 4, //u8 length + variable length custom identifier. Written as Base64, e.g. EjRWAA== (must end with =)
+    NODE_ID                 = 5, //u16 nodeId. Written as e.g. 123
+    MESH_ADDRESS            = 6, //u16 nodeId + u16 networkId, networkId may be 0 if nodeId is in the orga-wide range. Written as e.g. 1234,111
+    DEVICE_UUID             = 7, //DeviceUuid given by the BlueRange platform. Written as e.g. 123e4567-e89b-12d3-a456-426614174000
+    WILDCARD                = 8, //A special value that accepts each and every device and identifier type. Written as *
+};
+
 /*## Available Node ids #############################################################*/
 // Refer to protocol specification @https://github.com/mwaylabs/fruitymesh/wiki/Protocol-Specification
 
@@ -183,6 +199,8 @@ enum class ModuleId : u8 {
     ET_MODULE = 156, //Placeholder for Partner
     MODBUS_MODULE = 157,
     BP_MODULE = 158,
+    ASSET_SCANNING_MODULE = 159,
+    MULTI_ASSET_MODULE = 160,
 
     //Other Modules, this range can be used for experimenting but must not be used if FruityMesh
     //nodes are to be used in a network with nodes of different vendors as their moduleIds will clash
@@ -227,6 +245,10 @@ static_assert(sizeof(ModuleIdWrapperUnion) == 4, "You have a weird compiler");
 
 constexpr VendorModuleId GET_VENDOR_MODULE_ID(u16 vendorId, u8 subId) { return ( ((u8)ModuleId::VENDOR_MODULE_ID_PREFIX) | ((u8)subId << 8) | ((u16)vendorId << 16) ); }
 
+enum class SensorType : u8 {
+    CO2_SENSOR = 0x30, // Measured CO2 concentration in ppm
+};
+
 // The reason why the device was rebooted
 enum class RebootReason : u8 {
     UNKNOWN = 0,
@@ -251,12 +273,17 @@ enum class RebootReason : u8 {
     SET_SERIAL_SUCCESS = 19,
     SET_SERIAL_FAILED = 20,
     SEND_TO_BOOTLOADER = 21,
-    UNKNOWN_BUT_BOOTED = 22,
+    UNKNOWN_BUT_BOOTED = 22,    // This is set after successful boot when we can't figure out reset reason eg. after flashing.
     STACK_OVERFLOW = 23,
     NO_CHUNK_FOR_NEW_CONNECTION = 24,
     IMPLEMENTATION_ERROR_NO_QUEUE_SPACE_AFTER_CHECK = 25,
     IMPLEMENTATION_ERROR_SPLIT_WITH_NO_LOOK_AHEAD = 26,
     CONFIG_MIGRATION = 27,
+    DEVICE_OFF = 28,
+    DEVICE_WAKE_UP = 29,
+    FACTORY_RESET = 30,
+
+    //INFO: Make sure to add new enum values to the Logger.cpp class
 
     USER_DEFINED_START = 200,
     USER_DEFINED_END = 255,
@@ -266,26 +293,33 @@ enum class RebootReason : u8 {
 //Live reports are sent through the mesh as soon as something notable happens
 //Could be some info, a warning or an error
 
-enum class LiveReportTypes : u8 {
-    LEVEL_ERROR = 0,
-    LEVEL_WARN = 50,
+enum class LiveReportTypes : u8
+{
+    //##### Error Reporting disabled #####
+    LEVEL_OFF = 0,
+
+    //##### Fatal Error Level (Below 50) #####
+
+    LEVEL_FATAL = 50,
+
+    //##### Warning Level (Below 100) #####
     HANDSHAKED_MESH_DISCONNECTED = 51, //extra is partnerid, extra2 is appDisconnectReason
     WARN_GAP_DISCONNECTED = 52, //extra is partnerid, extra2 is hci code
+    LEVEL_WARN = 100,
 
-    //########
-    LEVEL_INFO = 100,
+    //##### Info Level (below 150) #####
     GAP_CONNECTED_INCOMING = 101, //extra is connHandle, extra2 is 4 bytes of gap addr
     GAP_TRYING_AS_MASTER = 102, //extra is partnerId, extra2 is 4 bytes of gap addr
     GAP_CONNECTED_OUTGOING = 103, //extra is connHandle, extra2 is 4 byte of gap addr
     //Deprecated: GAP_DISCONNECTED = 104,
-
     HANDSHAKE_FAIL = 105, //extra is tempPartnerId, extra2 is handshakeFailCode
     MESH_CONNECTED = 106, //extra is partnerid, extra2 is asWinner
     //Deprecated: MESH_DISCONNECTED = 107,
+    LEVEL_INFO = 150,
 
-    //########
-    LEVEL_DEBUG = 150,
+    //##### Debug Level (Everything else) #####
     DECISION_RESULT = 151, //extra is decision type, extra2 is preferredPartner
+    LEVEL_DEBUG
 };
 
 enum class LiveReportHandshakeFailCode : u8
@@ -613,10 +647,16 @@ enum class LedMode : u8 {
     OFF = 0, // Led is off
     ON = 1, // Led is constantly on
     CONNECTIONS = 2, // Led blinks red if not connected and green for the number of connections
-    RADIO = 3, // Led shows radio activity
-    CLUSTERING = 4, // Led colour chosen according to clusterId (deprecated)
-    ASSET = 5,
+    RADIO_DEPRECATED = 3, // deprecated since 26/03/2021 (not implemented)
+    CLUSTERING_DEPRECATED = 4, // deprecated 26/03/2021 (not implemented)
+    ASSET_DEPRECATED = 5, // deprecated 26/03/2021 (not implemented)
     CUSTOM = 6, // Led controlled by a specific module
+};
+
+// Identification mode defines LED behaviour or vendor specific behaviour
+enum class IdentificationMode : u8 {
+    IDENTIFICATION_START = 1,
+    IDENTIFICATION_STOP = 2,
 };
 
 //DFU ERROR CODES

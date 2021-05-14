@@ -176,3 +176,94 @@ TEST(TestBeaconingModule, TestIfMessageIsBroadcastedAfterSet) {
     //Wait until node 2 receives an advertising message that contains this iBeacon message
     tester.SimulateUntilBleEventReceived(100 * 1000, 1, BLE_GAP_EVT_ADV_REPORT, dataShort, sizeof(dataShort));
 }
+
+#if defined(PROD_SINK_NRF52) && defined(PROD_ASSET_NRF52)
+TEST(TestBeaconingModule, TestAddAndSetOnAssetOverMeshAccessSerialConnectWithOrgaKey)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose               = true;
+    SimConfiguration simConfig    = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId          = 0;
+    simConfig.defaultNetworkId    = 0;
+    simConfig.preDefinedPositions = {{0.1, 0.1}, {0.2, 0.1}, {0.3, 0.1}};
+    simConfig.nodeConfigName.insert({"prod_sink_nrf52", 1});
+    simConfig.nodeConfigName.insert({"prod_mesh_nrf52", 1});
+    simConfig.nodeConfigName.insert({"prod_asset_nrf52", 1});
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateGivenNumberOfSteps(10);
+
+    tester.SendTerminalCommand(
+        1, "action this enroll basic BBBBB 1 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 "
+           "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 "
+           "01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00 10 0 0");
+    tester.SendTerminalCommand(
+        2, "action this enroll basic BBBBC 2 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 "
+           "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 "
+           "02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 10 0 0");
+    tester.SendTerminalCommand(
+        3, "action this enroll basic BBBBD 33000 20000 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 "
+           "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 "
+           "03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0 0");
+
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, "clusterSize\":2"); // Wait until the nodes have clustered.
+
+    // Initiate a connection from the sink on the mesh node to the asset tag using the organization key.
+    tester.SendTerminalCommand(
+        1, "action 2 ma serial_connect BBBBD 4 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 33000 20 13");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1,
+                                        R"({"type":"serial_connect_response","module":10,"nodeId":2,)"
+                                        R"("requestHandle":13,"code":0,"partnerId":33000})");
+
+    // Add an advertisement with all-zero payload.
+    tester.SendTerminalCommand(
+        1, "action 33000 adv add "
+           "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00 60");
+    // Wait for the response on the sink.
+    tester.SimulateUntilMessageReceived(
+        10 * 1000, 1, R"({"type":"adv_add_response","nodeId":33000,"module":1,"requestHandle":60,"code":0})");
+
+    // Remove the advertisement in slot 0.
+    tester.SendTerminalCommand(1, "action 33000 adv remove 0 61");
+    // Wait for the response on the sink.
+    tester.SimulateUntilMessageReceived(
+        10 * 1000, 1, R"({"type":"adv_remove_response","nodeId":33000,"module":1,"requestHandle":61,"code":0})");
+
+    // Add an advertisement with non-zero payload (iBeacon).
+    tester.SendTerminalCommand(
+        1, "action 33000 adv add "
+           "02:01:06:1A:FF:4C:00:02:15:F0:01:8B:9B:75:09:4C:31:A9:05:1A:27:D3:9C:00:3C:EA:60:00:32:81:00 62");
+    // Wait for the response on the sink.
+    tester.SimulateUntilMessageReceived(
+        10 * 1000, 1, R"({"type":"adv_add_response","nodeId":33000,"module":1,"requestHandle":62,"code":0})");
+
+    // Remove the advertisement in slot 0.
+    tester.SendTerminalCommand(1, "action 33000 adv remove 0 63");
+    // Wait for the response on the sink.
+    tester.SimulateUntilMessageReceived(
+        10 * 1000, 1, R"({"type":"adv_remove_response","nodeId":33000,"module":1,"requestHandle":63,"code":0})");
+
+    // Set the advertisement slot 0 to all-zero payload.
+    tester.SendTerminalCommand(
+        1, "action 33000 adv set 0 "
+           "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00 64");
+    // Wait for the response on the sink.
+    tester.SimulateUntilMessageReceived(
+        10 * 1000, 1, R"({"type":"adv_set_response","nodeId":33000,"module":1,"requestHandle":64,"code":0})");
+
+    // Remove the advertisement in slot 0.
+    tester.SendTerminalCommand(1, "action 33000 adv remove 0 65");
+    // Wait for the response on the sink.
+    tester.SimulateUntilMessageReceived(
+        10 * 1000, 1, R"({"type":"adv_remove_response","nodeId":33000,"module":1,"requestHandle":65,"code":0})");
+
+    // Set the advertisement slot 0 to a non-zero payload (iBeacon).
+    tester.SendTerminalCommand(
+        1, "action 33000 adv set 0 "
+           "02:01:06:1A:FF:4C:00:02:15:F0:01:8B:9B:75:09:4C:31:A9:05:1A:27:D3:9C:00:3C:EA:60:00:32:81:00 66");
+    // Wait for the response on the sink.
+    tester.SimulateUntilMessageReceived(
+        10 * 1000, 1, R"({"type":"adv_set_response","nodeId":33000,"module":1,"requestHandle":66,"code":0})");
+}
+#endif

@@ -366,20 +366,8 @@ void MeshAccessConnection::OnANonceReceived(ConnPacketEncryptCustomANonce const 
         (u8*)packet,
         SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE,
         false);
-
-    connectionState = ConnectionState::HANDSHAKE_DONE;
-
-    //Needed by our packet splitting methods, payload is now less than before because of MIC
-    connectionPayloadSize = connectionMtu - MESH_ACCESS_MIC_LENGTH;
-
-    //Send the current mesh state to our partner
-    SendClusterState();
-
-    NotifyConnectionStateSubscriber(ConnectionState::HANDSHAKE_DONE);
-
-    logt("MACONN", "Handshake done as Central");
-
-    OnHandshakeComplete();
+    
+    // => Continues after MessageType::ENCRYPT_CUSTOM_DONE is received
 }
 
 //This method is called by the Peripheral after the SNonce was received
@@ -436,6 +424,25 @@ void MeshAccessConnection::OnSNonceReceived(ConnPacketEncryptCustomSNonce const 
     OnHandshakeComplete();
 }
 
+void MeshAccessConnection::OnEncryptCustomDoneReceived(ConnPacketEncryptCustomDone const* inPacket)
+{
+    if (inPacket != nullptr && inPacket->status == (u8)ErrorType::SUCCESS)
+    {
+        connectionState = ConnectionState::HANDSHAKE_DONE;
+
+        //Needed by our packet splitting methods, payload is now less than before because of MIC
+        connectionPayloadSize = connectionMtu - MESH_ACCESS_MIC_LENGTH;
+
+        //Send the current mesh state to our partner
+        SendClusterState();
+
+        NotifyConnectionStateSubscriber(ConnectionState::HANDSHAKE_DONE);
+
+        logt("MACONN", "Handshake done as Central");
+
+        OnHandshakeComplete();
+    }
+}
 //This method is called by both the Peripheral and the Central after the connectionState was set to HANDSHAKE_DONE for the first time.
 void MeshAccessConnection::OnHandshakeComplete()
 {
@@ -752,8 +759,8 @@ bool MeshAccessConnection::DecryptPacket(u8 const * data, u8 * decryptedOut, Mes
     //logt("MACONN", "MIC nonce %u, Keystream %s", decryptionNonce[1], keystream2Hex);
 
 
-    TO_HEX_2(data, dataLength.GetRaw() - MESH_ACCESS_MIC_LENGTH);
-    logt("MACONN", "Decrypted as %s (%u) micValid %u", dataHex, dataLength.GetRaw() - MESH_ACCESS_MIC_LENGTH, micCheck == 0);
+    TO_HEX(decryptedOut, dataLength.GetRaw() - MESH_ACCESS_MIC_LENGTH);
+    logt("MACONN", "Decrypted as %s (%u) micValid %u", decryptedOutHex, dataLength.GetRaw() - MESH_ACCESS_MIC_LENGTH, micCheck == 0);
 
     return micCheck == 0;
 }
@@ -801,7 +808,9 @@ bool MeshAccessConnection::ShouldSendDataToNodeId(NodeId nodeId) const
         //Organization wide NodeIds. These are commonly used for assets that connect via MeshAccessConnections
         || (nodeId >= NODE_ID_GLOBAL_DEVICE_BASE && nodeId < (NODE_ID_GLOBAL_DEVICE_BASE + NODE_ID_GLOBAL_DEVICE_BASE_SIZE))
         //DFU messages are typically sent to group ids. They must be allowed.
-        || (nodeId >= NODE_ID_GROUP_BASE && nodeId < (NODE_ID_GROUP_BASE + NODE_ID_GROUP_BASE_SIZE));
+        || (nodeId >= NODE_ID_GROUP_BASE && nodeId < (NODE_ID_GROUP_BASE + NODE_ID_GROUP_BASE_SIZE))
+        //Connections using the network key with tunnel type REMOTE_MESH are allowed to send messages to the remote node.
+        || (fmKeyId == FmKeyId::NETWORK && tunnelType == MeshAccessTunnelType::REMOTE_MESH && direction == ConnectionDirection::DIRECTION_OUT);
 }
 
 
@@ -935,7 +944,9 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
     //TO_HEX(data, sendData->dataLength);
     //logt("MACONN", "RX DATA %s", dataHex);
 
-    //Check if packet must be decrypted first
+    // If the connection is encrypted (on peripheral after successfully sending
+    // the ANONCE packet, on the central before sending the SNONCE packet),
+    // try to decrypt the data.
     DYNAMIC_ARRAY(decryptedData, sendData->dataLength.GetRaw());
     if(encryptionState == EncryptionState::ENCRYPTED){
         bool valid = DecryptPacket(data, decryptedData, sendData->dataLength);
@@ -943,8 +954,18 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
         data = decryptedData;
 
         if(!valid){
-            logt("WARNING", "Invalid packet");
-            OnCorruptedMessage();
+            if(connectionState < ConnectionState::HANDSHAKE_DONE){
+                // Failed decryption during the handshake leads to disconnection.
+                logt("WARNING", "Invalid packet during handshake");
+                DisconnectAndRemove(AppDisconnectReason::INVALID_HANDSHAKE_PACKET);
+            }
+            else{
+                // The first failed decryption on an established connection
+                // (e.g. due to a dropped packet) leads to reset of the
+                // encryption and connection state (see OnCorruptedMessage).
+                logt("WARNING", "Invalid packet");
+                OnCorruptedMessage();
+            }
             return;
         }
     }
@@ -962,12 +983,20 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
     }
     else if(connectionState == ConnectionState::HANDSHAKING)
     {
-        if(sendData->dataLength >= SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_ANONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_ANONCE){
-            OnANonceReceived((ConnPacketEncryptCustomANonce const *) data);
+        if(sendData->dataLength >= SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_ANONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_ANONCE)
+        {
+            OnANonceReceived((ConnPacketEncryptCustomANonce const*)data);
         }
-        else if(sendData->dataLength >= SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_SNONCE){
-            OnSNonceReceived((ConnPacketEncryptCustomSNonce const *) data);
-        } else {
+        else if(sendData->dataLength >= SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_SNONCE)
+        {
+            OnSNonceReceived((ConnPacketEncryptCustomSNonce const*)data);
+        }
+        else if(sendData->dataLength >= SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_DONE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_DONE)
+        {
+            OnEncryptCustomDoneReceived((ConnPacketEncryptCustomDone const*) data);
+        }
+        else 
+        {
             logt("ERROR", "Wrong handshake packet");
             DisconnectAndRemove(AppDisconnectReason::INVALID_HANDSHAKE_PACKET);
         }

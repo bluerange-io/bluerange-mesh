@@ -106,16 +106,21 @@ TEST(TestMeshAccessModule, TestReceivingClusterUpdate)
 }
 #endif //GITHUB_RELEASE
 
-#ifndef GITHUB_RELEASE
+#if defined(PROD_SINK_NRF52)
 TEST(TestMeshAccessModule, TestAdvertisement) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.SetToPerfectConditions();
     simConfig.terminalId = 0;
     //testerConfig.verbose = true;
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
+
+    //We must set the serial or the sink will not broadcast any MeshAccess packets
+    tester.SendTerminalCommand(1, "set_serial BBBBB");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Reboot reason");
 
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("MAMOD");
     tester.sim->FindNodeById(2)->gs.logger.EnableTag("MAMOD");
@@ -124,10 +129,10 @@ TEST(TestMeshAccessModule, TestAdvertisement) {
     tester.SendTerminalCommand(2, "malog");
 
     //Test if we receive the advertisement packets, once with sink 0, once with sink 1.
-    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "Serial BBBBC, Addr 00:00:00:02:00:00, networkId \\d+, enrolled \\d+, sink 0, deviceType 1, connectable \\d+, rssi ");
-    tester.SimulateUntilRegexMessageReceived(10 * 1000, 2, "Serial BBBBB, Addr 00:00:00:01:00:00, networkId \\d+, enrolled \\d+, sink 1, deviceType 3, connectable \\d+, rssi ");
+    tester.SimulateUntilRegexMessageReceived(20 * 1000, 1, "Serial BBBBC, Addr 00:00:00:02:00:00, networkId \\d+, enrolled \\d+, sink 0, deviceType 1, connectable \\d+, rssi ");
+    tester.SimulateUntilRegexMessageReceived(20 * 1000, 2, "Serial BBBBB, Addr 00:00:00:01:00:00, networkId \\d+, enrolled \\d+, sink 1, deviceType 3, connectable \\d+, rssi ");
 }
-#endif //GITHUB_RELEASE
+#endif
 
 #ifndef GITHUB_RELEASE
 TEST(TestMeshAccessModule, TestAdvertisementLegacy)
@@ -208,11 +213,8 @@ TEST(TestMeshAccessModule, TestUnsecureNoneKeyConnection) {
     //Wait for establishing mesh access connection
     tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 0"); //0 = FmKeyId::ZERO
 
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Received remote mesh data");
-
-
-
-
+    tester.SimulateUntilRegexMessageReceived(20 * 1000, 1, "\\{\"nodeId\":1,\"type\":\"ma_conn_state\",\"module\":10,\"requestHandle\":0,\"partnerId\":\\d+,\"state\":4\\}");
+    
     //Disable unsecure connections.
     {
         NodeIndexSetter setter(0);
@@ -233,6 +235,7 @@ TEST(TestMeshAccessModule, TestUnsecureNoneKeyConnection) {
     
 }
 
+#if defined(PROD_SINK_NRF52)
 TEST(TestMeshAccessModule, TestRestrainedAccess) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
@@ -246,14 +249,20 @@ TEST(TestMeshAccessModule, TestRestrainedAccess) {
     tester.sim->nodes[1].uicr.CUSTOMER[9] = 123; // Change default network id of node 2
 
     tester.Start();
-    tester.SendTerminalCommand(2, "set_node_key 00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF");
+
+    //Serial must be set so that the sink advertises MeshAccess broadcasts
+    tester.SendTerminalCommand(1, "set_serial BBBBB");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Reboot reason was");
+
+    tester.SendTerminalCommand(1, "set_node_key 00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF");
     tester.SimulateGivenNumberOfSteps(1);
 
     //Wait for establishing mesh access connection                          5 = FmKeyId::RESTRAINED
-    tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 5 2A:FC:35:99:4C:86:11:48:58:4C:C6:D9:EE:D4:A2:B6");
+    tester.SendTerminalCommand(2, "action this ma connect 00:00:00:01:00:00 5 2A:FC:35:99:4C:86:11:48:58:4C:C6:D9:EE:D4:A2:B6");
 
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Received remote mesh data");
+    tester.SimulateUntilRegexMessageReceived(20 * 1000, 2, "\\{\"nodeId\":2,\"type\":\"ma_conn_state\",\"module\":10,\"requestHandle\":0,\"partnerId\":\\d+,\"state\":4\\}");
 }
+#endif
 
 #ifndef GITHUB_RELEASE
 TEST(TestMeshAccessModule, TestSerialConnect) {
@@ -458,3 +467,445 @@ TEST(TestMeshAccessModule, TestConnectWithNetworkKey)
     // We should initially get a message that gives us info about the cluster, size 2 and 1 hop to sink
     tester.SimulateUntilMessageReceived(5000, 2, "-- TX Handshake Done");
 }
+
+TEST(TestMeshAccessModule, TestActionViaNetworkKeyRemoteMeshOnNonPartnerNode)
+{
+    //Set up a test with two nodes that are close together
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    // testerConfig.verbose = true;
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    simConfig.preDefinedPositions = { {0.5, 0.5},{0.6, 0.6},{0.7, 0.7} };
+    simConfig.nodeConfigName.insert({ "github_dev_nrf52", 3 });
+    simConfig.SetToPerfectConditions();
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    //Enable some logging to be able to better understand the MeshAccessConnection
+    for (int nodeId : std::array<int, 3>{1, 2, 3})
+    {
+        tester.sim->FindNodeById(nodeId)->gs.logger.EnableTag("MACONN");
+        tester.sim->FindNodeById(nodeId)->gs.logger.EnableTag("MAMOD");
+        tester.sim->FindNodeById(nodeId)->gs.logger.EnableTag("CONN_DATA");
+    }
+
+    // The nodes are connected as such:
+    // (1) --access--> (2) <==mesh==> (3)
+
+    tester.Start();
+
+    tester.SendTerminalCommand(1, "action 0 enroll basic BBBBB 1 123 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00 10 0 0");
+    tester.SendTerminalCommand(2, "action 0 enroll basic BBBBC 2 456 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 44:44:44:44:44:44:44:44:44:44:44:44:44:44:44:44 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 10 0 0");
+    tester.SendTerminalCommand(3, "action 0 enroll basic BBBBD 3 456 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 44:44:44:44:44:44:44:44:44:44:44:44:44:44:44:44 03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0 0");
+
+    tester.SimulateUntilClusteringDoneWithExpectedNumberOfClusters(60000, 2);
+
+    // Tell node 1 to connect to node 2 using a mesh access connection and the
+    // network key (2). Use MESH_ACCESS_TUNNEL_TYPE_REMOTE_MESH (1) to access
+    // nodes in the remote mesh network.
+    tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 2 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 1");
+
+    // Simulate until the mesh access connection has been successfully
+    // established.
+    tester.SimulateUntilRegexMessageReceived(5000, 1, R"("nodeId":1,"type":"ma_conn_state","module":10,"requestHandle":0,"partnerId":[^,]*,"state":4)");
+
+    // Find the virtual partner id of the partner of node 1.
+    NodeId virtualPartnerId = 0;
+    {
+        NodeIndexSetter nodeIndexSetter{0};
+        ASSERT_EQ(
+            tester.sim->currentNode->gs.node.configuration.nodeId,
+            static_cast<NodeId>(1)
+        );
+        auto meshAccessConnections =
+            tester.sim->FindNodeById(1)->gs.cm.GetMeshAccessConnections(ConnectionDirection::DIRECTION_OUT);
+        ASSERT_EQ(meshAccessConnections.count, 1);
+        virtualPartnerId = meshAccessConnections.handles[0].GetVirtualPartnerId();
+    }
+
+    // Find the virtual partner id of node 1 as seen by node 2.
+    NodeId remoteVirtualPartnerId = 0;
+    {
+        NodeIndexSetter nodeIndexSetter{1};
+        ASSERT_EQ(
+            tester.sim->currentNode->gs.node.configuration.nodeId,
+            static_cast<NodeId>(2)
+        );
+        auto meshAccessConnections =
+            tester.sim->FindNodeById(2)->gs.cm.GetMeshAccessConnections(ConnectionDirection::DIRECTION_IN);
+        ASSERT_EQ(meshAccessConnections.count, 1);
+        remoteVirtualPartnerId = meshAccessConnections.handles[0].GetVirtualPartnerId();
+    }
+
+    // Request the device info of the partner node and verify it is received
+    // with the virtual node id of the partner.
+    tester.SendTerminalCommand(1, "action %u status get_device_info", virtualPartnerId);
+    tester.SimulateUntilRegexMessageReceived(5000, 1, R"("nodeId":%u,.*"type":"device_info")", virtualPartnerId);
+
+    // Request the device info of the partner node using it's node id in the
+    // remote mesh and verify it is received with it's virtual node id of the partner.
+    tester.SendTerminalCommand(1, "action 2 status get_device_info");
+    tester.SimulateUntilRegexMessageReceived(5000, 1, R"("nodeId":%u,.*"type":"device_info")", virtualPartnerId);
+
+    // Request the device info of the node connected to the partner node and
+    // verify it is received with it's remote node id.
+    tester.SendTerminalCommand(1, "action 3 status get_device_info");
+    tester.SimulateUntilRegexMessageReceived(5000, 1, R"("nodeId":3,.*"type":"device_info")");
+
+    // Request the connections of the node connected to the partner node and
+    // verify it is received.
+    tester.SendTerminalCommand(1, "action 3 status get_connections");
+    tester.SimulateUntilRegexMessageReceived(5000, 1, R"("type":"connections",.*"nodeId":3[^0-9])");
+
+    {   // Request the connections via broadcast and verify they are all received.
+        tester.SendTerminalCommand(1, "action 0 status get_connections");
+        auto messages = std::vector<SimulationMessage>{
+            {1, R"("type":"connections",.*"nodeId":1[^0-9])"},
+            {1, R"("type":"connections",.*"nodeId":)" + std::to_string(virtualPartnerId) + "[^0-9]"},
+            {1, R"("type":"connections",.*"nodeId":3[^0-9])"},
+        };
+        tester.SimulateUntilRegexMessagesReceived(10000, messages);
+    }
+
+    {   // Request the connection via the virtual node id on the remote
+        // partner node and make sure the answer is received.
+        tester.SendTerminalCommand(2, "action %u status get_connections", remoteVirtualPartnerId);
+        tester.SimulateUntilRegexMessageReceived(10000, 2, R"("type":"connections",.*"nodeId":%u[^0-9])", remoteVirtualPartnerId);
+    }
+
+    {   // Request the connection via the virtual node id on the remote
+        // (non-partner) node and make sure the answer is received.
+        tester.SendTerminalCommand(3, "action %u status get_connections", remoteVirtualPartnerId);
+        tester.SimulateUntilRegexMessageReceived(10000, 3, R"("type":"connections",.*"nodeId":%u[^0-9])", remoteVirtualPartnerId);
+    }
+
+    {   // Request the connection via broadcast on the remote (non-partner) node
+        // and make sure all answers are received.
+        tester.SendTerminalCommand(3, "action 0 status get_connections");
+        auto messages = std::vector<SimulationMessage>{
+            {3, R"("type":"connections",.*"nodeId":3[^0-9])"},
+            {3, R"("type":"connections",.*"nodeId":2[^0-9])"},
+            {3, R"("type":"connections",.*"nodeId":)" + std::to_string(remoteVirtualPartnerId) + "[^0-9]"},
+        };
+        tester.SimulateUntilRegexMessagesReceived(10000, messages);
+    }
+}
+
+TEST(TestMeshAccessModule, TestActionViaNodeKeyRemoteMeshOnNonPartnerNode)
+{
+    //Set up a test with two nodes that are close together
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose = true;
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    simConfig.preDefinedPositions = { {0.5, 0.5},{0.6, 0.6},{0.7, 0.7} };
+    simConfig.nodeConfigName.insert({ "github_dev_nrf52", 3 });
+    simConfig.SetToPerfectConditions();
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    //Enable some logging to be able to better understand the MeshAccessConnection
+    for (int nodeId : std::array<int, 3>{1, 2, 3})
+    {
+        tester.sim->FindNodeById(nodeId)->gs.logger.EnableTag("MACONN");
+        tester.sim->FindNodeById(nodeId)->gs.logger.EnableTag("MAMOD");
+        tester.sim->FindNodeById(nodeId)->gs.logger.EnableTag("CONN_DATA");
+    }
+    // Change default network id of node 1 such that node 2 and 3 form their
+    // own small mesh.
+    tester.sim->nodes[0].uicr.CUSTOMER[9] = 123;
+    tester.sim->nodes[1].uicr.CUSTOMER[9] = 456;
+    tester.sim->nodes[2].uicr.CUSTOMER[9] = 456;
+
+    // The nodes are connected as such:
+    // (1) --access--> (2) <==mesh==> (3)
+
+    tester.Start();
+
+    tester.SendTerminalCommand(1, "action 0 enroll basic BBBBB 1 123 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00 10 0 0");
+    tester.SendTerminalCommand(2, "action 0 enroll basic BBBBC 2 456 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 44:44:44:44:44:44:44:44:44:44:44:44:44:44:44:44 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 10 0 0");
+    tester.SendTerminalCommand(3, "action 0 enroll basic BBBBD 3 456 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 44:44:44:44:44:44:44:44:44:44:44:44:44:44:44:44 03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0 0");
+
+    tester.SimulateUntilClusteringDoneWithExpectedNumberOfClusters(60000, 2);
+
+    // Tell node 1 to connect to node 2 using a mesh access connection and the
+    // node key (1). Use MESH_ACCESS_TUNNEL_TYPE_REMOTE_MESH (1) to access
+    // nodes in the remote mesh network.
+    tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 1 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 1");
+
+    // Simulate until the mesh access connection has been successfully
+    // established.
+    tester.SimulateUntilRegexMessageReceived(5000, 1, R"("nodeId":1,"type":"ma_conn_state","module":10,"requestHandle":0,"partnerId":[^,]*,"state":4)");
+
+    // Find the virtual partner id of the partner of node 1.
+    NodeId virtualPartnerId = 0;
+    {
+        NodeIndexSetter nodeIndexSetter{0};
+        ASSERT_EQ(
+            tester.sim->currentNode->gs.node.configuration.nodeId,
+            static_cast<NodeId>(1)
+        );
+        auto meshAccessConnections =
+            tester.sim->FindNodeById(1)->gs.cm.GetMeshAccessConnections(ConnectionDirection::DIRECTION_OUT);
+        ASSERT_EQ(meshAccessConnections.count, 1);
+        virtualPartnerId = meshAccessConnections.handles[0].GetVirtualPartnerId();
+    }
+
+    // Find the virtual partner id of node 1 as seen by node 2.
+    NodeId remoteVirtualPartnerId = 0;
+    {
+        NodeIndexSetter nodeIndexSetter{1};
+        ASSERT_EQ(
+            tester.sim->currentNode->gs.node.configuration.nodeId,
+            static_cast<NodeId>(2)
+        );
+        auto meshAccessConnections =
+            tester.sim->FindNodeById(2)->gs.cm.GetMeshAccessConnections(ConnectionDirection::DIRECTION_IN);
+        ASSERT_EQ(meshAccessConnections.count, 1);
+        remoteVirtualPartnerId = meshAccessConnections.handles[0].GetVirtualPartnerId();
+    }
+
+    // Request the device info of the partner node and verify it is received
+    // with the virtual node id of the partner.
+    tester.SendTerminalCommand(1, "action %u status get_device_info", virtualPartnerId);
+    tester.SimulateUntilRegexMessageReceived(5000, 1, R"("nodeId":%u,.*"type":"device_info")", virtualPartnerId);
+
+    {   Exceptions::DisableDebugBreakOnException disableDebugBreakOnException;
+        // Request the device info of the partner node using it's non-virtual
+        // node id and verify it is not received.
+        tester.SendTerminalCommand(1, "action 2 status get_device_info");
+        ASSERT_THROW(
+            tester.SimulateUntilRegexMessageReceived(5000, 1, R"("nodeId":[^,]*,.*"type":"device_info")"),
+            TimeoutException
+        );
+    }
+
+    {   Exceptions::DisableDebugBreakOnException disableDebugBreakOnException;
+        // Request the device info of the non-partner remote node and verify it
+        // is not received.
+        tester.SendTerminalCommand(1, "action 3 status get_device_info");
+        ASSERT_THROW(
+            tester.SimulateUntilRegexMessageReceived(5000, 1, R"("nodeId":[^,]*,.*"type":"device_info")"),
+            TimeoutException
+        );
+    }
+
+    {   // Request the device info via broadcast and verify it is received with
+        // the virtual node id of the partner and the node itself.
+        tester.SendTerminalCommand(1, "action 0 status get_device_info");
+        auto messages = std::vector<SimulationMessage>{
+            {1, R"("nodeId":1,.*"type":"device_info")"},
+            {1, R"("nodeId":)" + std::to_string(virtualPartnerId) + R"(,.*"type":"device_info")"},
+        };
+        tester.SimulateUntilRegexMessagesReceived(5000, messages);
+    }
+
+    tester.SimulateForGivenTime(10000);
+
+    {   Exceptions::DisableDebugBreakOnException disableDebugBreakOnException;
+        // Request the device info via broadcast and verify no response is
+        // received from the non-partner remote node.
+        tester.SendTerminalCommand(1, "action 0 status get_device_info");
+        ASSERT_THROW(
+            tester.SimulateUntilRegexMessageReceived(5000, 1, R"("nodeId":3,.*"type":"device_info")"),
+            TimeoutException
+        );
+    }
+}
+
+TEST(TestMeshAccessModule, TestMeshAccessConnectionUsingInvalidKeyData)
+{
+    //Set up a test with two nodes that are close together
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose = true;
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    simConfig.preDefinedPositions = { {0.5, 0.5},{0.6, 0.6} };
+    simConfig.nodeConfigName.insert({ "github_dev_nrf52", 2 });
+    simConfig.SetToPerfectConditions();
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    //Enable some logging to be able to better understand the MeshAccessConnection
+    for (int nodeId : std::array{1, 2})
+    {
+        tester.sim->FindNodeById(nodeId)->gs.logger.EnableTag("MACONN");
+        tester.sim->FindNodeById(nodeId)->gs.logger.EnableTag("MAMOD");
+        tester.sim->FindNodeById(nodeId)->gs.logger.EnableTag("CONN_DATA");
+    }
+
+    // The nodes are connected as such:
+    // (1) --access--> (2)
+
+    tester.Start();
+
+    tester.SendTerminalCommand(1, "action 0 enroll basic BBBBB 1 123 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00 10 0 0");
+    tester.SendTerminalCommand(2, "action 0 enroll basic BBBBC 2 456 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 44:44:44:44:44:44:44:44:44:44:44:44:44:44:44:44 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 10 0 0");
+
+    tester.SimulateForGivenTime(60000);
+
+    tester.SimulateUntilClusteringDoneWithExpectedNumberOfClusters(10000, 2);
+
+    // Tell node 1 to connect to node 2 using a mesh access connection and the
+    // node key (1). Use MESH_ACCESS_TUNNEL_TYPE_REMOTE_MESH (1) to access
+    // nodes in the remote mesh network. Deliberately use the wrong node key.
+    tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 1 0F:00:00:00:0F:00:00:00:0F:00:00:00:0F:00:00:00 1");
+
+    // Make sure the mesh access connection is not established (i.e. state is
+    // DISCONNECTED).
+    tester.SimulateUntilRegexMessageReceived(5000, 1, R"("nodeId":1,"type":"ma_conn_state","module":10,"requestHandle":0,"partnerId":[^,]*,"state":0)");
+}
+
+
+#if defined(PROD_SINK_NRF52) && defined(PROD_SINK_USB_NRF52840)
+TEST(TestMeshAccessModule, TestMeshBridgeMode) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+    simConfig.SetToPerfectConditions();
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_sink_usb_nrf52840", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    //By default all nodes are unenrolled
+    tester.sim->nodes[0].uicr.CUSTOMER[9] = 0;
+    tester.sim->nodes[1].uicr.CUSTOMER[9] = 0;
+    tester.sim->nodes[2].uicr.CUSTOMER[9] = 0;
+
+    tester.Start();
+
+    //Third node is used to monitor the MeshAccessBroadcast messages of the other two nodes
+    tester.SendTerminalCommand(3, "malog");
+
+    //Enroll both sink nodes in a different network
+    tester.SendTerminalCommand(1, "action this enroll basic BBBBB 1 123 AA:BB:CC:DD:AA:BB:CC:DD:AA:BB:CC:DD:AA:BB:CC:DD");
+    tester.SendTerminalCommand(2, "action this enroll basic BBBBC 1 234 AA:BB:CC:DD:AA:BB:CC:DD:AA:BB:CC:DD:AA:BB:CC:DD");
+
+    //Make sure both are not broadcasting any meshaccess messages
+    {
+        Exceptions::DisableDebugBreakOnException ddboe;
+
+        std::vector<SimulationMessage> messages = {
+            SimulationMessage(3, "Serial BBBBB, Addr 00:00:00:01:00:00, networkId 123"),
+            SimulationMessage(3, "Serial BBBBC, Addr 00:00:00:02:00:00, networkId 234"),
+        };
+        ASSERT_THROW(tester.SimulateUntilMessagesReceived(10 * 1000, messages), TimeoutException);
+        ASSERT_FALSE(messages[0].IsFound());
+        ASSERT_FALSE(messages[1].IsFound());
+    }
+
+    //Set the serial for both nodes
+    tester.SendTerminalCommand(1, "set_serial CCCCC");
+    tester.SendTerminalCommand(2, "set_serial DDDDD");
+
+    //Make sure they are now advertising MeshAccesBroadcast messages
+    std::vector<SimulationMessage> messages = {
+        SimulationMessage(3, "Serial CCCCC, Addr 00:00:00:01:00:00, networkId 123"),
+        SimulationMessage(3, "Serial DDDDD, Addr 00:00:00:02:00:00, networkId 234"),
+    };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messages);
+
+    //Do a soft reset
+    tester.SendTerminalCommand(1, "reset");
+    tester.SendTerminalCommand(2, "reset");
+
+    //Make sure they are still broadcasting mesh access messages
+    messages = {
+        SimulationMessage(3, "Serial CCCCC, Addr 00:00:00:01:00:00, networkId 123"),
+        SimulationMessage(3, "Serial DDDDD, Addr 00:00:00:02:00:00, networkId 234"),
+    };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messages);
+
+    //Simulate a power loss for both sink nodes
+    {
+        NodeIndexSetter setter(0);
+        tester.sim->ResetCurrentNode(RebootReason::UNKNOWN, false, true);
+    }
+    {
+        NodeIndexSetter setter(1);
+        tester.sim->ResetCurrentNode(RebootReason::UNKNOWN, false, true);
+    }
+    tester.SimulateForGivenTime(1 * 1000);
+
+    //Only prod_sink_nrf52 should broadcast packets now as it remembers its enrollment, prod_sink_usb_nrf52840 uses a temporary enrollment
+    tester.SimulateUntilMessageReceived(10 * 1000, 3, "Serial CCCCC, Addr 00:00:00:01:00:00, networkId 123");
+    {
+        Exceptions::DisableDebugBreakOnException ddboe;
+        ASSERT_THROW(tester.SimulateUntilMessageReceived(10 * 1000, 3, "Serial DDDDD, Addr 00:00:00:02:00:00, networkId 234"), TimeoutException);
+        ASSERT_THROW(tester.SimulateUntilMessageReceived(10 * 1000, 3, "Serial BBBBC, Addr 00:00:00:02:00:00, networkId 234"), TimeoutException);
+    }
+}
+
+//This tests that ma serial_connect works when the BLE address is specified as well
+TEST(TestMeshAccessModule, TestSerialConnectWithBleAddress) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+    simConfig.preDefinedPositions = { {0.45, 0.45}, {0.5, 0.5}, {0.55, 0.55} };
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_asset_nrf52", 1 });
+    simConfig.SetToPerfectConditions();
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    //Enroll all in the same network with same orga key
+    tester.SendTerminalCommand(1, "action this enroll basic BBBBB 1 10 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33");
+    tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33");
+    tester.SendTerminalCommand(3, "action this enroll basic BBBBD 33123 10 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33");
+
+    //Wait until rebooted and clustered
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Reboot");
+    tester.SimulateUntilClusteringDone(100 * 1000);
+
+    //Tell node 2 to use serial_connect to connect to the asset tag
+    tester.SendTerminalCommand(1, "action 2 ma serial_connect BBBBD 4 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 33123 10 7 00:00:00:03:00:00");
+
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "Doing instant serial_connect to BLE address");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"type":"serial_connect_response","module":10,"nodeId":2,"requestHandle":7,"code":0,"partnerId":33123})");
+
+    //Make sure we can properly send and receive data from the asset tag
+    tester.SendTerminalCommand(1, "action 33123 status get_device_info");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"("serialNumber":"BBBBD")");
+}
+
+//This tests that the ma serial_connect will fall back to scanning even if the wrong BLE address is given
+TEST(TestMeshAccessModule, TestSerialConnectWithWrongBleAddress) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+    simConfig.preDefinedPositions = { {0.45, 0.45}, {0.5, 0.5}, {0.55, 0.55} };
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_asset_nrf52", 1 });
+    simConfig.SetToPerfectConditions();
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    //Enroll all in the same network with same orga key
+    tester.SendTerminalCommand(1, "action this enroll basic BBBBB 1 10 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33");
+    tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33");
+    tester.SendTerminalCommand(3, "action this enroll basic BBBBD 33123 10 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33");
+
+    //Wait until rebooted and clustered
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Reboot");
+    tester.SimulateUntilClusteringDone(100 * 1000);
+
+    //Tell node 2 to use serial_connect to connect to the asset tag
+    tester.SendTerminalCommand(1, "action 2 ma serial_connect BBBBD 4 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 33123 10 7 AB:CD:EF:12:34:56");
+
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "Doing instant serial_connect to BLE address");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"type":"serial_connect_response","module":10,"nodeId":2,"requestHandle":7,"code":0,"partnerId":33123})");
+
+    //Make sure we can properly send and receive data from the asset tag
+    tester.SendTerminalCommand(1, "action 33123 status get_device_info");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"("serialNumber":"BBBBD")");
+}
+#endif

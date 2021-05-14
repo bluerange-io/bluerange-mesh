@@ -196,7 +196,7 @@ private:
 //Asset packet handling
     void HandleAssetLegacyPackets(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent);
     void HandleAssetPackets(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent);
-    bool AddTrackedAsset(const AdvPacketAssetServiceData* packet, i8 rssi);
+    bool AddTrackedAsset(const AdvPacketLegacyV2AssetServiceData* packet, i8 rssi);
     void ReceiveTrackedAssetsLegacy(BaseConnectionSendData* sendData, ScanModuleTrackedAssetsLegacyMessage const * packet) const;
     void ReceiveTrackedAssets(TrackedAssetMessage const * msg, u32 amount, NodeId sender) const;
     void RssiRunningAverageCalculationInPlace(RssiContainer &container, u8 advertisingChannel, i8 rssi);

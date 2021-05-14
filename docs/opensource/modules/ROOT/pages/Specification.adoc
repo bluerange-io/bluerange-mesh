@@ -81,7 +81,10 @@ Below is a list of all messages that we have currently openly specified. These a
 |0x01|Placeholder for xref:#JoinMe[JOIN_ME Packet] (Currently based on Manufacturer Data)
 |0x02|Legacy Asset Tracking Broadcast (Deprecated for new type 0x04)
 |0x03|xref:MeshAccessModule.adoc#MeshAccessBroadcast[MeshAccess Broadcast]
-|0x04|xref:AssetModule.adoc#AssetBroadcast[Asset Tracking Broadcast]
+|0x04|Legacy Asset Tracking Broadcast (Deprecated for new types 0x06 and 0x07)
+|0x05|Sensor Broadcast
+|0x06|Asset BLE Broadcast
+|0x07|Asset INS Broadcast
 |===
 
 === Other Advertising Packets
@@ -110,7 +113,7 @@ There are two types of module ids: the standard *ModuleId* has a size of one byt
 
 VendorModuleIds were not part of FruityMesh prior to version 1.x.x. FruityMesh tries to keep the usage of VendorModuleIds as easy as possible and does most of the work when using VendorModuleIds. Some parts will e.g. use different message types for messages with ModuleId and VendorModuleId and other parts use the ModuleIdWrapper to be able to work with both module id types in the same data structure. As a convention, whenever a ModuleId is printed out as a string, it is printed as a decimal number, e.g. `123`. VendorModuleIds on the other hand are printed as a string like this `"0xABCD01F0"` to make the individual parts easier to read.
 
-To get started, see xref:Implementing-a-Custom-Module.adoc[Implementing a Custom Module].
+To get started, see xref:ImplementingCustomModule.adoc[Implementing a Custom Module].
 
 .ModuleId
 In the implementation, the ModuleId is either used as a single byte or stored using the 4 byte ModuleIdWrapper with the subId and vendorId set to 0. This depends on the implementation of a feature.

@@ -37,6 +37,7 @@ void SetBoard_4(BoardConfiguration* c)
 {
     if(c->boardType == 4)
     {
+        c->boardName = "nRF52-DK";
         c->led1Pin =  17;
         c->led2Pin =  18;
         c->led3Pin =  19;
@@ -53,6 +54,8 @@ void SetBoard_4(BoardConfiguration* c)
         c->lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_XTAL;
         c->lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_20_PPM;
         c->dcDcEnabled = true;
+        c->powerOptimizationEnabled = false;
+        c->powerButton =  -1;
         GS->boardconf.getCustomPinset = &SetCustomPins_4;
     }
 }

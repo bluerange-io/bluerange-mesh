@@ -34,6 +34,7 @@ void SetBoard_18(BoardConfiguration* c)
 {
     if(c->boardType == 18)
     {
+        c->boardName = "nRF52840-DK";
         c->led1Pin =  13;
         c->led2Pin =  14;
         c->led3Pin =  15;
@@ -50,5 +51,7 @@ void SetBoard_18(BoardConfiguration* c)
         c->lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_XTAL;
         c->lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_20_PPM;
         c->dcDcEnabled = true;
+        c->powerOptimizationEnabled = false;
+        c->powerButton =  -1;
     }
 }

@@ -73,8 +73,29 @@
 
 #include "virtual_com_port.h"
 
-//Forward declarations
+
+// Some helper macros for debugging
+
+#if ACTIVATE_SEGGER_RTT == 1
 extern void SeggerRttPrintf_c(const char* message, ...);
+#define FRUITYMESH_DETAIL_VCOM_LOG_IMPL(...) SeggerRttPrintf_c(__VA_ARGS__)
+#else
+#define FRUITYMESH_DETAIL_VCOM_LOG_IMPL(...) do {} while(0)
+#endif
+
+#if 1
+#define FRUITYMESH_VCOM_LOG_ERROR(...) FRUITYMESH_DETAIL_VCOM_LOG_IMPL(__VA_ARGS__)
+#else
+#define FRUITYMESH_VCOM_LOG_ERROR(...) do {} while(0)
+#endif
+
+#if 0
+#define FRUITYMESH_VCOM_LOG_DEBUG(...) FRUITYMESH_DETAIL_VCOM_LOG_IMPL(__VA_ARGS__)
+#else
+#define FRUITYMESH_VCOM_LOG_DEBUG(...) do {} while(0)
+#endif
+
+
 static void cdc_acm_user_ev_handler(app_usbd_class_inst_t const * p_inst, app_usbd_cdc_acm_user_event_t event);
 
 // CDC_ACM class instance
@@ -82,9 +103,9 @@ APP_USBD_CDC_ACM_GLOBAL_DEF(m_app_cdc_acm,
                             cdc_acm_user_ev_handler,
                             0, //CDC_ACM_COMM_INTERFACE
                             1, //CDC_ACM_DATA_INTERFACE
-							NRF_DRV_USBD_EPIN2, //CDC_ACM_COMM_EPIN
-							NRF_DRV_USBD_EPIN1, //CDC_ACM_DATA_EPIN
-							NRF_DRV_USBD_EPOUT1, //CDC_ACM_DATA_EPOUT
+                            NRF_DRV_USBD_EPIN2, //CDC_ACM_COMM_EPIN
+                            NRF_DRV_USBD_EPIN1, //CDC_ACM_DATA_EPIN
+                            NRF_DRV_USBD_EPOUT1, //CDC_ACM_DATA_EPOUT
                             APP_USBD_CDC_COMM_PROTOCOL_AT_V250
 );
 
@@ -107,23 +128,55 @@ static bool virtualComOpened = false;
 //Set to true once data is being sent out, we must wait for the completion event
 static volatile bool currentlySendingData = false;
 
-uint32_t storeReadByte(uint8_t byte)
+/// Set to true if the event irq should be set to pending after the event processing function has returned. Will be
+/// reset to false once the irq was set to pending.
+static volatile bool setEventIrqPendingAfterProcessUsbEvents = false;
+
+/// Process events from the app_usbd event queue and potentially set the event irq to pending, if required for
+/// handling a completed input line.
+static bool ProcessAppUsbdEventQueue()
 {
-	lineBuffer[lineBufferOffset] =  byte;
-	lineBufferOffset++;
+    const bool result = app_usbd_event_queue_process();
 
-	//If the line is finished, it should be processed before additional data is read
-	if(byte == '\r' || lineBufferOffset > VIRTUAL_COM_LINE_BUFFER_SIZE - 1)
-	{
-		lineBuffer[lineBufferOffset-1] = '\0';
-		lineToReadAvailable = true;
+    // If requested, set the event irq to pending. Depending on the current interrupt priority (if any) this may or
+    // may not call the event callback immediately. The interrupt must _not_ be set pending inside of the
+    // cdc_acm_user_ev_handler in case the handler runs at a lower interrupt level than the event interrupt (this
+    // will make any received data be processed twice).
+    if (setEventIrqPendingAfterProcessUsbEvents)
+    {
+        setEventIrqPendingAfterProcessUsbEvents = false;
+        sd_nvic_SetPendingIRQ(SD_EVT_IRQn);
+    }
 
-		SeggerRttPrintf_c("USB Line available: %s\n", lineBuffer);
+    return result;
+}
 
-		return NRF_ERROR_BUSY;
-	}
+typedef enum
+{
+    FRUITYMESH_VCOM_MORE_BYTES_REQUIRED = NRF_SUCCESS,
+    FRUITYMESH_VCOM_WHOLE_LINE_BUFFERED = NRF_ERROR_BUSY,
+}
+ProcessSingleReceivedByteResult;
 
-	return NRF_SUCCESS;
+/// Process a single byte received from the virtual com port. The return value indicates whether a complete line was
+/// read (in which case it should be processed as soon as possible) or if more bytes are required.
+static ProcessSingleReceivedByteResult ProcessSingleReceivedByte(uint8_t byte)
+{
+    lineBuffer[lineBufferOffset] = byte;
+    lineBufferOffset++;
+
+    //If the line is finished, it should be processed before additional data is read
+    if (byte == '\r' || lineBufferOffset > VIRTUAL_COM_LINE_BUFFER_SIZE - 1)
+    {
+        lineBuffer[lineBufferOffset-1] = '\0';
+        lineToReadAvailable = true;
+
+        FRUITYMESH_VCOM_LOG_DEBUG("USB Line available: %s\n", lineBuffer);
+
+        return FRUITYMESH_VCOM_WHOLE_LINE_BUFFERED;
+    }
+
+    return FRUITYMESH_VCOM_MORE_BYTES_REQUIRED;
 }
 
 /**
@@ -138,17 +191,17 @@ static void cdc_acm_user_ev_handler(app_usbd_class_inst_t const * p_inst,
     {
         case APP_USBD_CDC_ACM_USER_EVT_PORT_OPEN:
         {
-        	//Workaround for a weird bug that occurs when testing with minicom on linux
-        	//An echo back of our sent data would be generated and garbage data as well
-        	for(int i=0; i<10; i++){
-            	app_usbd_event_queue_process();
-            	nrf_delay_us(10000);
-        	}
+            //Workaround for a weird bug that occurs when testing with minicom on linux
+            //An echo back of our sent data would be generated and garbage data as well
+            for(int i=0; i<10; i++){
+                app_usbd_event_queue_process();
+                nrf_delay_us(10000);
+            }
 
-        	virtualComOpened = true;
-        	if(portEventHandlerPtr) portEventHandlerPtr(true);
+            virtualComOpened = true;
+            if(portEventHandlerPtr) portEventHandlerPtr(true);
 
-            SeggerRttPrintf_c("USB port open\n");
+            FRUITYMESH_VCOM_LOG_DEBUG("USB port open\n");
 
             // Setup first transfer
             ret_code_t ret = app_usbd_cdc_acm_read(&m_app_cdc_acm,
@@ -159,37 +212,43 @@ static void cdc_acm_user_ev_handler(app_usbd_class_inst_t const * p_inst,
             break;
         }
         case APP_USBD_CDC_ACM_USER_EVT_PORT_CLOSE:
-        	virtualComOpened = false;
-        	if(portEventHandlerPtr) portEventHandlerPtr(false);
+            virtualComOpened = false;
+            if(portEventHandlerPtr) portEventHandlerPtr(false);
 
-            SeggerRttPrintf_c("USB port close\n");
+            FRUITYMESH_VCOM_LOG_DEBUG("USB port close\n");
             break;
         case APP_USBD_CDC_ACM_USER_EVT_TX_DONE:
-        	currentlySendingData = false;
+            currentlySendingData = false;
             break;
         case APP_USBD_CDC_ACM_USER_EVT_RX_DONE:
         {
-            ret_code_t ret = NRF_SUCCESS;
+            ret_code_t ret;
+
             do
             {
                 // Print received char
-                //SeggerRttPrintf_c("char: %u\n", m_rx_buffer[0]);
+                //FRUITYMESH_VCOM_LOG_DEBUG("char: %u\n", m_rx_buffer[0]);
 
-                ret = storeReadByte(m_rx_buffer[0]);
+                const uint32_t processingResult = ProcessSingleReceivedByte(m_rx_buffer[0]);
 
-                if(ret == NRF_SUCCESS)
+                if (processingResult == FRUITYMESH_VCOM_MORE_BYTES_REQUIRED)
                 {
-                	// Fetch data until internal buffer is empty
-					ret = app_usbd_cdc_acm_read(&m_app_cdc_acm, m_rx_buffer, READ_SIZE);
-                } else {
-                	//Make sure that we fetch this full line as soon as possible by setting the IRQ
-                	sd_nvic_SetPendingIRQ(SD_EVT_IRQn);
-
-                	//Full line available, reading from USB is not restarted
-                	break;
+                    // Restart the _potentially_ asynchronous read. This will cause execution to break out of the loop
+                    // if the read could not be fulfilled immediately and allows the event handler to end.
+                    ret = app_usbd_cdc_acm_read(&m_app_cdc_acm, m_rx_buffer, READ_SIZE);
                 }
+                else
+                {
+                    // Instruct the event processing function to set the event irq to pending. The event handler _must
+                    // exit_ before the irq is set to pending.
+                    setEventIrqPendingAfterProcessUsbEvents = true;
 
-            } while (ret == NRFX_SUCCESS);
+                    // Since we have read a full line, we defer rescheduling another read until the line has actually
+                    // been processed, after the event handler has exited.
+                    break;
+                }
+            }
+            while (ret == NRF_SUCCESS);
 
             break;
         }
@@ -203,26 +262,26 @@ static void usbd_user_ev_handler(app_usbd_event_type_t event)
     switch (event)
     {
         case APP_USBD_EVT_DRV_SUSPEND:
-            SeggerRttPrintf_c("USB suspend\n");
-        	virtualComInitialized = false;
-        	virtualComOpened = false;
+            FRUITYMESH_VCOM_LOG_DEBUG("USB suspend\n");
+            virtualComInitialized = false;
+            virtualComOpened = false;
             break;
         case APP_USBD_EVT_DRV_RESUME:
-            SeggerRttPrintf_c("USB resume\n");
-        	virtualComInitialized = true;
+            FRUITYMESH_VCOM_LOG_DEBUG("USB resume\n");
+            virtualComInitialized = true;
             break;
         case APP_USBD_EVT_STOPPED:
-            SeggerRttPrintf_c("USB stopped\n");
+            FRUITYMESH_VCOM_LOG_DEBUG("USB stopped\n");
             app_usbd_disable();
-        	virtualComInitialized = false;
-        	virtualComOpened = true;
+            virtualComInitialized = false;
+            virtualComOpened = true;
             break;
         case APP_USBD_EVT_STARTED:
-            SeggerRttPrintf_c("USB started\n");
-        	virtualComInitialized = true;
+            FRUITYMESH_VCOM_LOG_DEBUG("USB started\n");
+            virtualComInitialized = true;
             break;
         case APP_USBD_EVT_POWER_DETECTED:
-            SeggerRttPrintf_c("USB power detected\n");
+            FRUITYMESH_VCOM_LOG_DEBUG("USB power detected\n");
 
             if (!nrf_drv_usbd_is_enabled())
             {
@@ -230,11 +289,11 @@ static void usbd_user_ev_handler(app_usbd_event_type_t event)
             }
             break;
         case APP_USBD_EVT_POWER_REMOVED:
-            SeggerRttPrintf_c("USB power removed\n");
+            FRUITYMESH_VCOM_LOG_DEBUG("USB power removed\n");
             app_usbd_stop();
             break;
         case APP_USBD_EVT_POWER_READY:
-		SeggerRttPrintf_c("USB ready\n");
+            FRUITYMESH_VCOM_LOG_DEBUG("USB ready\n");
             app_usbd_start();
             break;
         default:
@@ -261,108 +320,141 @@ uint32_t virtualComInit()
     ret = app_usbd_class_append(class_cdc_acm);
     APP_ERROR_CHECK(ret);
 
-	return NRF_SUCCESS;
+    return NRF_SUCCESS;
 }
 
 uint32_t virtualComStart(void (*portEventHandler)(bool))
 {
-	virtualComOpened = false;
+    virtualComOpened = false;
 
-	//Make sure that the clock driver knows that the LWCLK is needed, otherwise it might get stuck
-	//while releasing the lw_clock once the softdevice is deinitialized
-	//See: https://devzone.nordicsemi.com/f/nordic-q-a/40319/sd_softdevice_disable-not-returning-during-transport-shutdown-in-dfu-bootloader
-	nrf_drv_clock_lfclk_request(NULL);
+    //Make sure that the clock driver knows that the LWCLK is needed, otherwise it might get stuck
+    //while releasing the lw_clock once the softdevice is deinitialized
+    //See: https://devzone.nordicsemi.com/f/nordic-q-a/40319/sd_softdevice_disable-not-returning-during-transport-shutdown-in-dfu-bootloader
+    nrf_drv_clock_lfclk_request(NULL);
 
-	ret_code_t ret = app_usbd_power_events_enable();
-	APP_ERROR_CHECK(ret);
+    ret_code_t ret = app_usbd_power_events_enable();
+    APP_ERROR_CHECK(ret);
 
-	portEventHandlerPtr = portEventHandler;
+    portEventHandlerPtr = portEventHandler;
 
-	return NRF_SUCCESS;
+    return NRF_SUCCESS;
 }
 
-uint32_t virtualComCheck()
+uint32_t virtualComEventLoop()
 {
-	//Fetch all queued events
-	while (app_usbd_event_queue_process())
-	{
-		/* Nothing to do */
-	}
+    // Process all queued USB events.
+    while (ProcessAppUsbdEventQueue())
+    {
+        /* Nothing to do */
+    }
 
-	return NRF_SUCCESS;
+    return NRF_SUCCESS;
 }
 
 //If a line is available, it is copied to the buffer and reading is restarted
 uint32_t virtualComCheckAndProcessLine(uint8_t* buffer, uint16_t bufferLength)
 {
-	if(lineToReadAvailable){
+    if (lineToReadAvailable)
+    {
+        //The buffer provided must be bigger or equal to the line buffer size
+        if (bufferLength < VIRTUAL_COM_LINE_BUFFER_SIZE)
+        {
+            // TODO / BUG: If this ever happens, the virtual com port will never read again, as the read is never
+            //             rescheduled. This should cause a reboot with an _appropriate_ `RebootReason` being set.
+            //             Tracked in BR-2093.
+            FRUITYMESH_VCOM_LOG_ERROR("Wrong buffer size\n");
+            return NRF_ERROR_NO_MEM;
+        }
 
-		//The buffer provided must be bigger or equal to the line buffer size
-		if(bufferLength < VIRTUAL_COM_LINE_BUFFER_SIZE){
-			SeggerRttPrintf_c("Wrong buffer size\n");
-			return NRF_ERROR_NO_MEM;
-		}
+        memcpy(buffer, lineBuffer, lineBufferOffset);
 
-		memcpy(buffer, lineBuffer, lineBufferOffset);
-
-		lineBufferOffset = 0;
-		lineToReadAvailable = false;
-		SeggerRttPrintf_c("LN false\n");
-
-		//Continue reading data from USB
-		uint32_t ret = NRF_SUCCESS;
-
-		do
-		{
-			//Setup reading again
-			ret = app_usbd_cdc_acm_read(&m_app_cdc_acm,
-										m_rx_buffer,
-										READ_SIZE);
-
-			//If success is returned, we must continue reading because no event will be generated
-			if(ret == NRF_SUCCESS){
-				//We store the read byte, but we need to break if a full line was read
-				uint32_t ret2 = storeReadByte(m_rx_buffer[0]);
-				if(ret2 != NRF_SUCCESS) break;
-			} else {
-				//Full line available
-				break;
-			}
+        lineBufferOffset = 0;
+        lineToReadAvailable = false;
+        FRUITYMESH_VCOM_LOG_DEBUG("LN false\n");
 
 
-		} while (ret == NRF_SUCCESS);
+        uint32_t ret;
 
+        do
+        {
+            // Restart the _potentially_ asynchronous read. This will cause execution to break out of the loop
+            // if the read could not be fulfilled immediately.
+            ret = app_usbd_cdc_acm_read(&m_app_cdc_acm, m_rx_buffer, READ_SIZE);
 
-		return NRF_SUCCESS;
-	} else {
-		return NRF_ERROR_BUSY;
-	}
+            if (ret == NRF_SUCCESS)
+            {
+                const uint32_t processingResult = ProcessSingleReceivedByte(m_rx_buffer[0]);
+
+                if (processingResult == FRUITYMESH_VCOM_WHOLE_LINE_BUFFERED)
+                {
+                    // If another whole line was read, indicate that another line is available and break out of the
+                    // loop. Otherwise we might lose the terminal as no read is ever scheduled again.
+                    lineToReadAvailable = true;
+                    break;
+                }
+            }
+            else
+            {
+                // Since we rely on a single read-buffer, we should never get into the situation that two buffers were
+                // scheduled already.
+                ASSERT(ret == NRF_ERROR_IO_PENDING);
+
+                // The read was scheduled asynchronously and we will be informed via the TX_DONE event of completion.
+                break;
+            }
+        }
+        while (ret == NRF_SUCCESS);
+
+        return NRF_SUCCESS;
+    }
+    else
+    {
+        return NRF_ERROR_BUSY;
+    }
 }
 
 uint32_t virtualComWriteData(const uint8_t* buffer, uint16_t bufferLength)
 {
-	if(!virtualComInitialized || !virtualComOpened) return 0;
+    if (!virtualComInitialized || !virtualComOpened) return 0;
 
-	uint32_t err;
+    uint32_t err;
 
-	//We try to send the data a few times and drop it if we failed multiple times
-	for(int i=0; i<100; i++){
-		err = app_usbd_cdc_acm_write(&m_app_cdc_acm, buffer, bufferLength);
-		if(err == NRF_SUCCESS){
-			currentlySendingData = true;
-		}
+    // Try to write the data to the virtual com port a number of times, drop the write if it does not succeed.
+    for (int i = 0; i < 100; ++i)
+    {
+        // Start the asynchronous write.
+        err = app_usbd_cdc_acm_write(&m_app_cdc_acm, buffer, bufferLength);
 
-		//We must wait until the data was sent
-		for(int j = 0; j<1000; j++){
-			if(!currentlySendingData) break;
-			nrf_delay_us(1);
-		}
+        // If the write was scheduled wait for it to complete.
+        if (err == NRF_SUCCESS)
+        {
+            currentlySendingData = true;
 
-		if(err == 0) break;
-		SeggerRttPrintf_c(".");
-	}
+            // Process all USB events until the pending write was completed. We must process the events here, as the
+            // event queue internal to the app_usbd library can 'overflow' and drop events otherwise. If a RX_DONE event
+            // is dropped our input processing stops working. See BR-1987 and BR-1580 for more information.
+            uint_fast32_t processEventQueueCounter = 0;
+            while (currentlySendingData)
+            {
+                // Drop the write if we are stuck in an 'infinite' loop. On a nRF52840-DK the counter reached at most
+                // 550 when sending large messages (578 bytes written at a time).
+                if (++processEventQueueCounter == 10000u || !virtualComOpened || !virtualComInitialized)
+                {
+                    FRUITYMESH_VCOM_LOG_ERROR("Write dropped due to timeout");
+                    currentlySendingData = false;
+                    break;
+                }
 
-	return err;
+                // Ignore if no event has been generated, we need to wait until it has been processed.
+                ProcessAppUsbdEventQueue();
+            }
+
+            // The write has been completed successfully, break out of the loop.
+            break;
+        }
+    }
+
+    return err;
 }
 
 #endif //IS_ACTIVE(VIRTUAL_COM_PORT)

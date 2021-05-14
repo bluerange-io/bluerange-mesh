@@ -56,6 +56,10 @@ void DispatchEvent(const FruityHal::GapDisconnectedEvent& e);
 void DispatchEvent(const FruityHal::GapTimeoutEvent& e);
 void DispatchEvent(const FruityHal::GapSecurityInfoRequestEvent& e);
 void DispatchEvent(const FruityHal::GapConnectionSecurityUpdateEvent& e);
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+void DispatchEvent(const FruityHal::GapConnParamUpdateEvent & e);
+void DispatchEvent(const FruityHal::GapConnParamUpdateRequestEvent & e);
+#endif
 void DispatchEvent(const FruityHal::GattcWriteResponseEvent& e);
 void DispatchEvent(const FruityHal::GattcTimeoutEvent& e);
 void DispatchEvent(const FruityHal::GattsWriteEvent& e);

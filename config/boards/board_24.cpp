@@ -34,6 +34,7 @@ void SetBoard_24(BoardConfiguration* c)
 {
     if(c->boardType == 24)
     {
+        c->boardName = "Laird BL654-USB";
         c->led1Pin =  13;
         c->led2Pin =  -1;
         c->led3Pin =  -1;
@@ -50,5 +51,7 @@ void SetBoard_24(BoardConfiguration* c)
         c->lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_SYNTH;
         c->lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_50_PPM;
         c->dcDcEnabled = false;
+        c->powerOptimizationEnabled = false;
+        c->powerButton =  -1;
     }
 }

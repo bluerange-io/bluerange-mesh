@@ -107,7 +107,7 @@ void RuuviWeatherModule::ResetToDefaultConfiguration()
     #if defined(NRF52840)
     configuration.advertiserTxPower = FruityHal::RadioChooseTxPowerHint(+8, true);
     #else
-    configuration.advertiserTxPower = FruityHal::RadioChooseTxPowerHint(-40, true);
+    configuration.advertiserTxPower = FruityHal::RadioChooseTxPowerHint(+4, true);
     #endif
     configuration.advertiserEnabled = true;
 
@@ -525,7 +525,9 @@ FruityHal::RadioCallbackAction RuuviWeatherModule::HandleRadioSignal(FruityHal::
             break;
 
         case FruityHal::RadioCallbackSignalType::RADIO:
+#if defined(SIM_ENABLED)
             logt("RUUVI", "handling radio signal RADIO");
+#endif
 
             if (FruityHal::RadioCheckAndClearEvent(FruityHal::RadioEvent::DISABLED))
             {

@@ -89,7 +89,20 @@ namespace FruityHal
     {
     public:
         explicit GapConnParamUpdateEvent(void const * evt);
+        u16 GetMinConnectionInterval() const;
         u16 GetMaxConnectionInterval() const;
+        u16 GetSlaveLatency() const;
+        u16 GetConnectionSupervisionTimeout() const;
+    };
+
+    class GapConnParamUpdateRequestEvent : public GapEvent 
+    {
+    public:
+        explicit GapConnParamUpdateRequestEvent(void const * evt);
+        u16 GetMinConnectionInterval() const;
+        u16 GetMaxConnectionInterval() const;
+        u16 GetSlaveLatency() const;
+        u16 GetConnectionSupervisionTimeout() const;
     };
 
     class GapRssiChangedEvent : public GapEvent
@@ -281,6 +294,12 @@ namespace FruityHal
         GPIO_PIN_PULLUP            = 2
     };
 
+    enum class GpioSenseMode {
+        GPIO_PIN_NOSENSE              = 0,
+        GPIO_PIN_LOWSENSE             = 1,
+        GPIO_PIN_HIGHSENSE            = 2
+    };
+
     enum class GpioTransistion {
         GPIO_TRANSITION_TOGGLE      = 0,
         GPIO_TRANSITION_LOW_TO_HIGH = 1,
@@ -348,6 +367,7 @@ namespace FruityHal
     ErrorType BleGapAppearance(BleAppearance appearance);
 
     ErrorType BleGapConnectionParamsUpdate(u16 conn_handle, BleGapConnParams const & params);
+    ErrorType BleGapRejectConnectionParamsUpdate(u16 conn_handle);
     ErrorType BleGapConnectionPreferredParamsSet(BleGapConnParams const & params);
 
     ErrorType BleGapDataLengthExtensionRequest(u16 connHandle);
@@ -406,6 +426,7 @@ namespace FruityHal
 
     void SystemReset();
     void SystemReset(bool softdeviceEnabled);
+    void SystemEnterOff(bool softdeviceEnabled);
     RebootReason GetRebootReason();
     ErrorType ClearRebootReason();
     void StartWatchdog(bool safeBoot);
@@ -414,6 +435,7 @@ namespace FruityHal
     void DelayMs(u32 delayMs);
     void EcbEncryptBlock(const u8 * p_key, const u8 * p_clearText, u8 * p_cipherText);
     u8 ConvertPortToGpio(u8 port, u8 pin);
+    
 
     // ######################### FLASH ############################
 
@@ -436,6 +458,9 @@ namespace FruityHal
     ErrorType TwiRead(u8 slaveAddress, u8 * pReceiveData, u8 length);
     bool TwiIsInitialized(void);
     void TwiGpioAddressPinSetAndWait(bool high, i32 sdaPin);
+    void TwiUninit();
+    void TwiStart(i32 sclPin, i32 sdaPin);
+    void TwiStop();
 
     //spi
     void SpiInit(i32 sckPin, i32 misoPin, i32 mosiPin);
@@ -446,6 +471,7 @@ namespace FruityHal
     // ######################### GPIO ############################
     void GpioConfigureOutput(u32 pin);
     void GpioConfigureInput(u32 pin, GpioPullMode mode);
+    void GpioConfigureInputSense(u32 pin, GpioPullMode mode, GpioSenseMode sense);
     void GpioConfigureDefault(u32 pin);
     void GpioPinSet(u32 pin);
     void GpioPinClear(u32 pin);
@@ -467,7 +493,7 @@ namespace FruityHal
     // ################# USB CDC (Virtual Com Port) #############
     void VirtualComInitBeforeStack();
     void VirtualComInitAfterStack(void (*portEventHandler)(bool));
-    void VirtualComProcessEvents();
+    void VirtualComEventLoop();
     ErrorType VirtualComCheckAndProcessLine(u8* buffer, u16 bufferLength);
     void VirtualComWriteData(const u8* data, u16 dataLength);
 

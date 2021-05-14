@@ -52,6 +52,7 @@ The reason can have the following values:
 
 The reboot reason is also stored in the error log
 
+[#CapabilityRetrieval]
 == Capability Retrieval
 The capability retrieval command helps a user (e.g. the Bluerange Gateway) to find out what some node in the mesh is capable of. Such a capability can be for example if it is a Regent lamp and if so, how many heads and sensors are connected to it. A node can return an arbitrary amount of capabilities, each in its own message. A single capability consists of the following data:
 
@@ -85,18 +86,17 @@ As an example, the entry `{ CapabilityEntryType::METADATA, "Smart Lights Ltd.", 
 
 In addition properties may be made available. This may be used to report device-specific values that make no sense looking up in the device catalog. An example use is the number of heads in a multi-part device, e.g. `{ CapabilityEntryType::PROPERTY, "Smart Lights Ltd.", "Lamp head count", "2" }`. The model name field serves as a key, while the revision serves as a value. Property data is vendor-specific and may be used in catalog data to check its applicability beyond just the hard- and software capabilities.
 
+See xref:#QueryCapabilitiesThroughTerminal[this section] on how to retrieve the capabilities through the terminal.
+
 == Terminal Commands
 
 === Getting Basic Information (Local Command)
 
 `status`
 
-It is very convenient to get easily readable information about a node.
-The status command displays the currently active connections and their
-state. It also display device information and the clustering state.
+It is very convenient to get easily readable information about a node. The status command displays the currently active connections and their state. It also display device information and the clustering state.
 
-The following will be printed on the local terminal after the command
-was entered:
+The following will be printed on the local terminal after the command was entered:
 
 ....
 Node BBBBB (nodeId: 1) vers: 80000, NodeKey: 01:00:....:00:00
@@ -114,14 +114,9 @@ OUT(1) FM 10, state:4, cluster:fa690006(1), sink:-1, Queue:0-0(0), Buf:1/7, mb:1
 
 `action [nodeId] node discovery [on / off]`
 
-It might be necessary to switch the node's state machine into a
-different discovery state. This can be done through the mesh and can be
-used by a MeshGateway to turn off discovery once all enrolled nodes are
-connected. This allows the node to use a very low power consumption if
-scanning doesn't need to be active for other tasks.
+It might be necessary to switch the node's state machine into a different discovery state. This can be done through the mesh and can be used by a MeshGateway to turn off discovery once all enrolled nodes are connected. This allows the node to use a very low power consumption if scanning doesn't need to be active for other tasks.
 
-Once the node loses a connection to one of its partners, it will
-automatically switch discovery on again.
+Once the node loses a connection to one of its partners, it will automatically switch discovery on again.
 
 Examples
 
@@ -196,8 +191,8 @@ and starts sending generate_load_chunk messages to node 3. Node 3 then logs:
 {"type":"generate_load_chunk","nodeId":2,"size":10,"payloadCorrect":1,"requestHandle":18}
 ----
 
-
-=== Querying Device Capabilities
+[#QueryCapabilitiesThroughTerminal]
+=== Querying Device Capabilities through the Terminal
 
 `request_capability [nodeId]`
 
@@ -303,21 +298,17 @@ The node includes functionality to send sensor messages and actuator messages in
 
 [#TimeSynchronization]
 == Time Synchronization
-To synchronize a time over the mesh, the
-time needs first to be set on the local node using the _settime_ command.
-The time is stored internally as an unsigned 32-bit integer.
+To synchronize a time over the mesh, the time needs first to be set on the local node using the _settime_ command. The time is stored internally as an unsigned 32-bit integer together with an additional variable that stores the extra number of crystal ticks for better accuracy. The number of offset minutes is used to pass additional time zone information, e.g. pass 120 to get a time zone offset of 2 hours.
 
 `settime [u32 unixTimestampSec] [i16 offsetMinutes]`
 
-Afterwards, the time of the local node can be queried using:
+Afterwards, the local time of the local node can be queried on the terminal using:
 
 `gettime`
 
-The output gives the current time and date of the node in a
-human-readable format. This is only an approximate
-calculation. It is just to verify if the time was set correctly.
-Internally, the nodes work with Unix time stamps.
+The output gives the local time and date of the node in a human-readable format. This is only an approximate calculation. It is just to verify if the time was set correctly. Internally, the nodes work with Unix time stamps.
 
+[#queryingActiveModules]
 == Querying Active Modules
 
 `get_modules [nodeId]`
@@ -410,6 +401,7 @@ Acknowledge packet sent by the bigger cluster after receiving ack1 from the smal
 |4|ClusterSize|hopsToSink|The number of hops to sink if there is one, otherwise -1.
 |===
 
+[#ClusterInfoUpdate]
 ==== ClusterInfoUpdate
 This packet informs a node about a change in the cluster size or structure. It can be sent throughout the mesh but is modified on each node before resending. It will only give the change in clusterSize and not the absolute value, the node must keep count itself. It will however give the absolute size if it is sent over a MeshAccessConnection.
 

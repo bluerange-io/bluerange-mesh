@@ -58,7 +58,7 @@ class RecordStorageEventListener;
 #define FM_VERSION_MINOR 0
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 520
+#define FM_VERSION_PATCH 1940
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -268,6 +268,10 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 #define ACTIVATE_SEGGER_RTT 0
 #endif
 
+#ifndef ACTIVATE_APP_UART
+#define ACTIVATE_APP_UART 0
+#endif
+
 // In case stdout should be used, enable this (wont't work on nrf hardware)
 #ifndef ACTIVATE_STDIO
 #define ACTIVATE_STDIO 0
@@ -357,6 +361,17 @@ class Conf
         NodeId defaultNodeId = 0;
         //Used to set a static random BLE address (loaded from DeviceConfiguration if type set to 0xFF)
         FruityHal::BleGapAddr staticAccessAddress;
+        
+        //By default, the RecordStorage library is used to persist settings in flash, this can be disabled.
+        //If disabled, enrollments will be stored in RAM across soft reboots
+        //The enrollment will be lost after power was lost for a short time
+        bool enableRecordStorage = true;
+
+        //Set this to true in your featureset to use the node as a mesh bridge (e.g. attached to a gateway)
+        //It is then possible to overwrite its serial number and node key and it will not allow connections before
+        //this data is available
+        bool enableMeshBridgeMode = false;
+
         //##################
 
         void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
@@ -443,6 +458,19 @@ class Conf
         u16 meshMaxConnectionInterval = 0;
         //(100-32000) Connection supervisory timeout
         static constexpr u16 meshConnectionSupervisionTimeout = (u16)MSEC_TO_UNITS(1000, CONFIG_UNIT_10_MS);
+
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+        //(7.5-4000) Minimum acceptable connection interval for long term connections
+        u16 meshMinLongTermConnectionInterval = 0;
+        //(7.5-4000) Maximum acceptable connection interval for long term connections
+        u16 meshMaxLongTermConnectionInterval = 0;
+        //Age of a mesh connection after which it is considered long term for
+        //the purpose of adjusting it's connection interval.
+        static constexpr u16 meshConnectionLongTermAgeDs = 50;
+        //Age penalty added for peripherals to stop central and peripheral
+        //from requesting an update simultaneously.
+        static constexpr u16 meshConnectionLongTermAgePeripheralPenaltyDs = 20;
+#endif
 
         //Mesh discovery parameters
         //DISCOVERY_HIGH
@@ -552,6 +580,17 @@ class Conf
 #endif
 
 // Set the Terminal to enabled if one of the log transports is defined
-#if (ACTIVATE_SEGGER_RTT == 1) || (ACTIVATE_UART == 1) || (ACTIVATE_STDIO == 1)
+#if (ACTIVATE_SEGGER_RTT == 1) || (ACTIVATE_UART == 1) || (ACTIVATE_STDIO == 1) || (ACTIVATE_VIRTUAL_COM_PORT == 1)
 #define TERMINAL_ENABLED
+#endif
+
+// Activate enum-to-string functions by default if the terminal is enabled.
+// They can be explicitly disabled (per-featureset) by defining
+// ACTIVATE_ENUM_TO_STRING to 0 in the featureset header.
+#ifndef ACTIVATE_ENUM_TO_STRING
+    #ifdef TERMINAL_ENABLED
+        #define ACTIVATE_ENUM_TO_STRING 1
+    #else
+        #define ACTIVATE_ENUM_TO_STRING 0
+    #endif
 #endif

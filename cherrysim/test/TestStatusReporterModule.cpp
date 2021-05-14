@@ -211,7 +211,7 @@ TEST(TestStatusReporterModule, TestHopsToSinkFixing) {
     // get_erros will collect errors from the node but will also clear them
     tester.SendTerminalCommand(2, "action this status get_errors");
     // This must not check for the exact number in "extra" as during meshing and simulation, a different invalid amount of hops may be recorded.
-    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":2,\"code\":44,\"extra\":");
+    tester.SimulateUntilMessageReceived(30 * 1000, 2, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":2,\"code\":44,\"extra\":");
 
     tester.SendTerminalCommand(1, "action max_hops status keep_alive");
     tester.SimulateForGivenTime(1000 * 10);
@@ -314,7 +314,8 @@ TEST(TestStatusReporterModule, TestConnectionRssiReportingWithNoise) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    // Very long time for clustering as distance between nodes is at limit of reception
+    tester.SimulateUntilClusteringDone(1000 * 1000);
 
     tester.SimulateGivenNumberOfSteps(100);
 
@@ -354,3 +355,154 @@ TEST(TestStatusReporterModule, TestConnectionRssiReportingWithNoise) {
     }
 }
 #endif //GITHUB_RELEASE
+
+//This test makes sure that a node will correctly report its relative or absolute uptime through the error log
+TEST(TestStatusReporterModule, TestUptimeReporting) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateUntilClusteringDone(50 * 1000);
+
+    //Add some more uptime so that we are sure to have a two digit uptime
+    tester.SimulateForGivenTime(10 * 1000);
+
+    //Request the error log from node 2
+    tester.SendTerminalCommand(1, "action 2 status get_errors");
+
+    //The time should be more than two digits but less than three
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"("type":"error_log_entry","nodeId":2,"module":3,"errType":2,"code":85,"extra":\d\d,"time":\d+,"typeStr":"CUSTOM","codeStr":"INFO_UPTIME_RELATIVE")");
+
+    //Now, we set the time of the sink node and wait until it got synchronized in the mesh
+    tester.SendTerminalCommand(1, "settime 10000 0");
+    tester.SimulateForGivenTime(30 * 1000);
+
+    //Now, the absolute time should be reported and should be 5 digits long
+    tester.SendTerminalCommand(1, "action 2 status get_errors");
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"("type":"error_log_entry","nodeId":2,"module":3,"errType":2,"code":86,"extra":\d\d\d\d\d,"time":\d+,"typeStr":"CUSTOM","codeStr":"INFO_UPTIME_ABSOLUTE")");
+}
+
+TEST(TestStatusReporterModule, TestCapabilitySending) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.SetToPerfectConditions();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateUntilClusteringDone(50 * 1000);
+
+    {
+        // configure the node
+        NodeIndexSetter setter(1);
+        GS->logger.EnableTag("NODE");
+        GS->logger.EnableTag("ERROR");
+        GS->logger.EnableTag("STATUSMOD");
+    }
+
+    tester.SendTerminalCommand(1, "request_capability 2");
+
+    // start of capabilities
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "Capabilities are requested");
+
+    // software capability of Node module
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":\\d+,\"capabilityType\":2,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"BlueRange Node\",\"revision\":\"\\d+.\\d+.\\d+\"\\}");
+    // metadata capability of Status module
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":\\d+,\"capabilityType\":3,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"BlueRange Node Status\",\"revision\":\"0\"\\}");
+
+    // end of capabilities
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"nodeId\":2,\"type\":\"capability_end\",\"amount\":\\d+\\}");
+}
+
+
+TEST(TestStatusReporterModule, TestErrorLogTimes) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.SetToPerfectConditions();
+    simConfig.terminalId = 1;
+    //testerConfig.verbose = true;
+
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    //Simulate for a given long enough time for the two nodes to cluster
+    tester.SimulateForGivenTime(30 * 1000);
+
+    //Make sure that relative time is sent in seconds
+    tester.SendTerminalCommand(1, "action 2 status get_errors");
+    //Wait until we receive an error log entry with a relative time of around 30 seconds
+    tester.SimulateUntilRegexMessageReceived(30 * 1000, 1, R"(error_log_entry.*time":3[0-9],.*INFO_UPTIME_RELATIVE)");
+
+    //Make sure that absolute time is sent as UTC time in seconds, wait a bit until time is synced
+    tester.SendTerminalCommand(1, "settime 10000 120");
+    tester.SimulateForGivenTime(30 * 1000);
+    tester.SendTerminalCommand(1, "action 2 status get_errors");
+    tester.SimulateUntilRegexMessageReceived(30 * 1000, 1, R"(error_log_entry.*time":100[0-9]{2},.*INFO_UPTIME_ABSOLUTE)");
+}
+
+
+#if defined(PROD_SINK_NRF52) && defined(PROD_ASSET_NRF52)
+TEST(TestStatusReporterModule, TestActionsOnAssetOverMeshAccessSerialConnectWithOrgaKey)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    testerConfig.verbose               = true;
+    SimConfiguration simConfig         = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId               = 0;
+    simConfig.defaultNetworkId         = 0;
+    simConfig.preDefinedPositions      = {{0.1, 0.1}, {0.2, 0.1}, {0.3, 0.1}};
+    simConfig.nodeConfigName.insert({"prod_sink_nrf52", 1});
+    simConfig.nodeConfigName.insert({"prod_mesh_nrf52", 1});
+    simConfig.nodeConfigName.insert({"prod_asset_nrf52", 1});
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateGivenNumberOfSteps(10);
+
+    tester.SendTerminalCommand(
+        1, "action this enroll basic BBBBB 1 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 "
+           "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 "
+           "01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00 10 0 0");
+    tester.SendTerminalCommand(
+        2, "action this enroll basic BBBBC 2 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 "
+           "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 "
+           "02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 10 0 0");
+    tester.SendTerminalCommand(
+        3, "action this enroll basic BBBBD 33000 20000 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 "
+           "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 "
+           "03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0 0");
+
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, "clusterSize\":2"); // Wait until the nodes have clustered.
+
+    // Initiate a connection from the sink on the mesh node to the asset tag using the organization key.
+    tester.SendTerminalCommand(
+        1, "action 2 ma serial_connect BBBBD 4 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 33000 20 13");
+    tester.SimulateUntilMessageReceived(
+        10 * 1000, 1,
+        R"({"type":"serial_connect_response","module":10,"nodeId":2,)"
+        R"("requestHandle":13,"code":0,"partnerId":33000})");
+
+    tester.SendTerminalCommand(1, "action 33000 status get_status");
+    // Wait for the response on the sink.
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":33000,"type":"status","module":3,)");
+
+    tester.SendTerminalCommand(1, "action 33000 status get_device_info");
+    // Wait for the response on the sink.
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":33000,"type":"device_info","module":3,)");
+
+    tester.SendTerminalCommand(1, "action 33000 status set_init");
+    // Wait for the response on the sink.
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"type":"set_init_result","nodeId":33000,"module":3})");
+}
+#endif

@@ -75,6 +75,8 @@ struct FeaturesetPointers
     const char* featuresetName = nullptr;
 };
 
+class SocketTerm;
+
 class CherrySim
 {
     friend class NodeIndexSetter;
@@ -91,6 +93,8 @@ public:
     NodeEntry* currentNode = nullptr; //A pointer to the current node under simulation
     NodeEntry* nodes = nullptr; //A pointer that points to the memory that holds the complete state of all nodes
     std::string logAccumulator;
+
+    bool renderLess = false;
 
     CherrySimEventListener* simEventListener = nullptr;
 
@@ -122,9 +126,20 @@ TESTER_PUBLIC:
     u32 totalNodes = 0;
     u32 assetNodes = 0;
     TerminalPrintListener* terminalPrintListener = nullptr;
-    FruitySimServer* server = nullptr;
+    FruitySimServer* webserver = nullptr;
+    SocketTerm* socketTerm = nullptr;
 
     std::chrono::time_point<std::chrono::steady_clock> lastTick;
+
+    //This keeps a list of functions that will be called on every simulation step
+    //It is useful for mocks that do not have a sense of time themselves but need one
+    struct LambdaWithHandle {
+        NodeEntry* owningNode;
+        std::function<void(void)> lambda;
+
+        void operator()() const { lambda(); }
+    };
+    std::vector<LambdaWithHandle> simStepCallbacks;
 
     std::map<std::string, MoveAnimation> loadedMoveAnimations;
     bool IsValidMoveAnimationJson(const nlohmann::json &json) const;
@@ -140,9 +155,8 @@ TESTER_PUBLIC:
     std::string AnimationGetName(u32 serialNumber);
     void AnimationStart(u32 serialNumber, const std::string& name);
     void AnimationStop(u32 serialNumber);
+    void AnimationShake(u32 serialNumber);
     bool AnimationLoadJsonFromPath(const char* path);
-
-    bool ShouldSimIvTrigger(u32 ivMs);
 
     void StoreFlashToFile();
     void LoadFlashFromFile();
@@ -181,7 +195,7 @@ public:
     void InitNode(u32 i); // Creates a node with default settings (like manufacturing the hardware)
     void FlashNode(u32 i); // Flashes a node with uicr and settings
     void BootCurrentNode(); // Starts the node. ShutdownCurrentNode() must be called to clean up
-    void ResetCurrentNode(RebootReason rebootReason, bool throwException = true); //Resets a node and boots it again (Only call this after node was bootet)
+    void ResetCurrentNode(RebootReason rebootReason, bool throwException = true, bool powerLoss = false); //Resets a node and boots it again (Only call this after node was booted already)
     void ShutdownCurrentNode(); //Deletes the memory allocated by the node during runtime
     static void SendUartCommand(NodeId nodeId, const u8* message, u32 messageLength);
 
@@ -193,14 +207,21 @@ public:
     void CheckForMultiTensorflowUsage();
 
     void QueueInterruptCurrentNode(u32 pin);
-    void QueueAccelerationInterrutCurrentNode();
+    void QueueAccelerationInterruptCurrentNode();
+
+    //Adds a handler that will be executed each simulation step
+    void AddSimulationStepHandler(std::function<void(void)> lambda);
+    //Removes all handlers for a node that is being destroyed
+    void CleanSimulationStepHandlers(NodeEntry* nodeEntry);
 
 public:
     //This section is public so that softdevice calls from c code can access the functions
 
     //Import devices from json or generate a random scenario
+    bool IsUsableDeviceEntry(nlohmann::json deviceJson);
+    nlohmann::json& NormalizeDeviceEntry(nlohmann::json& device);
     void ImportDataFromJson();
-    void ImportPositionsFromJson();
+    void ImportPositionsAndDataFromJson();
     void PositionNodesRandomly();
     void LoadPresetNodePositions();
 
@@ -239,13 +260,11 @@ public:
     void StartServiceDiscovery(u16 connHandle, const ble_uuid_t &p_uuid, int discoveryTimeMs);
     void SimulateServiceDiscovery();
 
-    //Clc Nodes Simulation
-#ifndef GITHUB_RELEASE
-    void SimulateClcData();
-#endif //GITHUB_RELEASE
-
     // Timeslot API Simulation
     void SimulateTimeslot();
+
+    // Connection Parameter Update Request Simulation
+    void SimulateConnectionParameterUpdateRequestTimeout();
 
     //Other Simulation
     void SimulateTimer();
@@ -280,9 +299,30 @@ public:
     float GetReceptionRssiNoNoise(const NodeEntry* sender, const NodeEntry* receiver, int8_t senderDbmTx, int8_t senderCalibratedTx);
     uint32_t CalculateReceptionProbability(const NodeEntry* sendingNode, const NodeEntry* receivingNode);
 
+    bool ShouldSimIvTrigger(u32 ivMs);
+    bool ShouldSimConnectionIvTrigger(u32 ivMs, SoftdeviceConnection* connection);
+
     SoftdeviceConnection* FindConnectionByHandle(NodeEntry* node, int connectionHandle);
-    NodeEntry* FindNodeById(int id);
     u8 GetNumSimConnections(const NodeEntry* node);
+
+    /// Returns true if the terminal of the current node is allowed by the simulator configuration.
+    bool IsSimTermOfCurrentNodeActive() const;
+
+    /// Returns the pointer to the first node entry with the given node id. Returns nullptr if there is no node with
+    /// the specified id.
+    NodeEntry* FindNodeById(int id);
+
+    /// Returns the pointer to the node entry with the given node id. Throws if multiple nodes have the same node id.
+    /// Returns nullptr if there is no node with the specified id.
+    NodeEntry* FindUniqueNodeById(NodeId nodeId);
+
+    /// Returns the pointer to the node entry with the given node id and network id. Throws if multiple nodes have the
+    /// same node id and network id. Returns nullptr if there is no node with the specified ids.
+    NodeEntry* FindUniqueNodeById(NodeId nodeId, NetworkId networkId);
+
+    /// Returns the pointer to the node entry with the given terminal id. Throws if multiple nodes have the same
+    /// terminal id. Returns nullptr if no node with the specified terminal id was found.
+    NodeEntry* FindUniqueNodeByTerminalId(unsigned terminalId);
 
     void FakeVersionOfCurrentNode(u32 version);
 

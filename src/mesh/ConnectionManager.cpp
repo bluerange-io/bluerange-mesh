@@ -202,10 +202,86 @@ void ConnectionManager::SetMeshConnectionInterval(u16 connectionInterval) const
     MeshConnections conn = GetMeshConnections(ConnectionDirection::DIRECTION_OUT);
     for(u32 i=0; i< conn.count; i++){
         if (conn.handles[i].IsHandshakeDone()){
-            GS->gapController.RequestConnectionParameterUpdate(conn.handles[i].GetConnectionHandle(), connectionInterval, connectionInterval, 0, Conf::meshConnectionSupervisionTimeout);
+            DISCARD(GAPController::GetInstance().RequestConnectionParameterUpdate(
+                conn.handles[i].GetConnectionHandle(),
+                connectionInterval,
+                connectionInterval,
+                0,
+                Conf::meshConnectionSupervisionTimeout
+            ));
         }
     }
 }
+
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+void ConnectionManager::UpdateConnectionIntervalForLongTermMeshConnections() const
+{
+    // If the connection intervals for young and long-term connections are the
+    // same, skip the update procedure.
+    if (        Conf::GetInstance().meshMinLongTermConnectionInterval
+                    == Conf::GetInstance().meshMinConnectionInterval
+            &&  Conf::GetInstance().meshMaxLongTermConnectionInterval
+                    == Conf::GetInstance().meshMaxConnectionInterval)
+    {
+        return;
+    }
+
+    // The logic which kicks off the update.
+    const auto updateConnections = [](MeshConnections connectionsToUpdate)
+    {
+        // Iterate over all the connections.
+        for (u32 i=0; i < connectionsToUpdate.count; ++i)
+        {
+            auto &handle = connectionsToUpdate.handles[i];
+            // Skip connections that are not fully connected already.
+            if (handle.GetConnectionState() != ConnectionState::HANDSHAKE_DONE)
+            {
+                continue;
+            }
+            // Get a pointer to the connection object.
+            auto *connection = handle.GetConnection();
+            // Skip connections for which the long term connection interval
+            // has already been requested.
+            if (connection->longTermConnectionIntervalRequested)
+            {
+                continue;
+            }
+            // The handshakeStartedDs timestamp is set on successful connection
+            // in BaseConnection::ConnectionSuccessfulHandler.
+            const auto connectionAgeDs = GS->appTimerDs - connection->handshakeStartedDs;
+            // Check that the connection is older than the long term age.
+            const bool isCentral = 
+                connection->direction == ConnectionDirection::DIRECTION_OUT;
+            const auto ageThresholdDs =
+                Conf::meshConnectionLongTermAgeDs
+                + (isCentral ? 0u : Conf::meshConnectionLongTermAgePeripheralPenaltyDs);
+            if (connectionAgeDs >= ageThresholdDs)
+            {
+                // Actually request the connection parameter update.
+                const auto err = GAPController::GetInstance().RequestConnectionParameterUpdate(
+                    handle.GetConnectionHandle(),
+                    Conf::GetInstance().meshMinLongTermConnectionInterval,
+                    Conf::GetInstance().meshMaxLongTermConnectionInterval,
+                    Conf::meshPeripheralSlaveLatency,
+                    Conf::meshConnectionSupervisionTimeout
+                );
+                // If the connection parameter update was handled by the
+                // SoftDevice we consider the job done.
+                if (err == ErrorType::SUCCESS)
+                {
+                    // Ensure that the long term interval is not requested again for
+                    // this connection.
+                    connection->longTermConnectionIntervalRequested = true;
+                }
+            }
+        }
+    };
+
+    // Fetch all connections with this node in the central and peripheral role.
+    updateConnections(GetMeshConnections(ConnectionDirection::DIRECTION_OUT));
+    updateConnections(GetMeshConnections(ConnectionDirection::DIRECTION_IN));
+}
+#endif
 
 void ConnectionManager::GATTServiceDiscoveredHandler(u16 connHandle, FruityHal::BleGattDBDiscoveryEvent& evt)
 {
@@ -286,6 +362,8 @@ void ConnectionManager::SendMeshMessage(u8* data, u16 dataLength) const
 
 ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, bool reliable, bool loopback, bool toMeshAccess) const
 {
+    ErrorType err = ErrorType::SUCCESS;
+
     if (dataLength > MAX_MESH_PACKET_SIZE)
     {
         SIMEXCEPTION(PacketTooBigException);
@@ -344,11 +422,22 @@ ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, b
             }
             if (packetHeader->receiver == NODE_ID_ANYCAST_THEN_BROADCAST) {
                 packetHeader->receiver = NODE_ID_BROADCAST;
-                mach.SendData(data, dataLength, reliable);
-                return ErrorType::SUCCESS;
+                bool result = mach.SendData(data, dataLength, reliable);
+                if (result)
+                {
+                    return ErrorType::SUCCESS;
+                }
+                else
+                {
+                    return ErrorType::INTERNAL;
+                }
             }
             else {
-                mach.SendData(data, dataLength, reliable);
+                bool result = mach.SendData(data, dataLength, reliable);
+                if (result == false)
+                {
+                    err = ErrorType::INTERNAL;
+                }
             }
 
         }
@@ -362,12 +451,20 @@ ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, b
 
         if (GS->config.enableSinkRouting && dest)
         {
-            dest.SendData(data, dataLength, reliable);
+            bool result = dest.SendData(data, dataLength, reliable);
+            if (result == false)
+            {
+                err = ErrorType::INTERNAL;
+            }
         }
         // If message was adressed to sink but there is no route to sink broadcast message
         else
         {
-            BroadcastMeshPacket(data, dataLength, reliable);
+            bool result = BroadcastMeshPacket(data, dataLength, reliable);
+            if (result == false)
+            {
+                err = ErrorType::INTERNAL;
+            }
         }
     }
     else if(packetHeader->receiver == NODE_ID_LOCAL_LOOPBACK)
@@ -396,13 +493,21 @@ ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, b
 
         //Send to receiver or broadcast if not directly connected to us
         if(receiverConn){
-            receiverConn.SendData(data, dataLength, reliable);
+            bool result = receiverConn.SendData(data, dataLength, reliable);
+            if (result == false)
+            {
+                err = ErrorType::INTERNAL;
+            }
         } else {
-            BroadcastMeshPacket(data, dataLength, reliable);
+            bool result = BroadcastMeshPacket(data, dataLength, reliable);
+            if (result == false)
+            {
+                err = ErrorType::INTERNAL;
+            }
         }
     }
 
-    return ErrorType::SUCCESS;
+    return err;
 }
 
 void ConnectionManager::DispatchMeshMessage(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packet, bool checkReceiver) const
@@ -502,20 +607,29 @@ ErrorTypeUnchecked ConnectionManager::SendModuleActionMessage(MessageType messag
     return (ErrorTypeUnchecked)GS->cm.SendMeshMessageInternal(buffer, SIZEOF_CONN_PACKET_MODULE_VENDOR + additionalDataSize, false, loopback, true);
 }
 
-void ConnectionManager::BroadcastMeshPacket(u8* data, u16 dataLength, bool reliable) const
+bool ConnectionManager::BroadcastMeshPacket(u8* data, u16 dataLength, bool reliable) const
 {
+    bool ret = true;
     MeshConnections conn = GetMeshConnections(ConnectionDirection::INVALID);
     ConnPacketHeader* packetHeader = (ConnPacketHeader*)data;
     for(u32 i=0; i< conn.count; i++){
+        // We might have connections that will be dropped, because eg. nodes are in the same cluster. This is very rare,
+        // but can happen right after or during clustering. We don't want to send data over those connections.
+        if (conn.handles[i].IsHandshakeDone() == false) continue;
+
         if (packetHeader->receiver == NODE_ID_ANYCAST_THEN_BROADCAST) {
             packetHeader->receiver = NODE_ID_BROADCAST;
-            conn.handles[i].SendData(data, dataLength, reliable);
-            return;
+            bool result = conn.handles[i].SendData(data, dataLength, reliable);
+            ret = result && ret;
+            return ret;
         }
         else {
-            conn.handles[i].SendData(data, dataLength, reliable);
+            bool result = conn.handles[i].SendData(data, dataLength, reliable);
+            ret = result && ret; 
         }
     }
+
+    return ret;
 }
 
 ConnectionManager & ConnectionManager::GetInstance()
@@ -1483,7 +1597,7 @@ void ConnectionManager::TimerEventHandler(u16 passedTimeDs)
             {
                 alignas(u32) TimeSyncInitial dataToSend = GS->timeManager.GetTimeSyncIntialMessage(conn->partnerId);
 
-                conn->syncSendingOrdered = GS->timeManager.GetTimePoint();
+                conn->syncSendingOrdered = GS->timeManager.GetLocalTimePoint();
 
                 logt("TSYNC", "Sending out TimeSyncInitial, NodeId: %u, partner: %u", (u32)GS->node.configuration.nodeId, (u32)conn->partnerId);
 
@@ -1506,7 +1620,7 @@ void ConnectionManager::TimerEventHandler(u16 passedTimeDs)
                     // Implementation error! This means that we tried to send out a correction
                     // that wasn't even written by the MessageSentHandler. Must not happen!
                     // IOT-4554: Activate the following line once this ticket is fixed!
-                    // SIMEXCEPTION(IllegalStateException);
+                    SIMEXCEPTION(IllegalStateException);
                 }
 #endif
 
@@ -1545,6 +1659,11 @@ void ConnectionManager::TimerEventHandler(u16 passedTimeDs)
             }
         }
     }
+
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+    // Connection interval update for long term connections.
+    UpdateConnectionIntervalForLongTermMeshConnections();
+#endif
 }
 
 void ConnectionManager::ResetTimeSync()

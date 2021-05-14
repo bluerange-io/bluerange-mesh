@@ -326,6 +326,54 @@ void BeaconingModule::MeshMessageReceivedHandler(BaseConnection* connection, Bas
     }
 }
 
+MeshAccessAuthorization BeaconingModule::CheckMeshAccessPacketAuthorization(
+    BaseConnectionSendData *sendData, u8 const *data, FmKeyId fmKeyId, DataDirection direction)
+{
+    const auto *packet = (ConnPacketHeader const *)data;
+
+    if (packet->messageType == MessageType::MODULE_TRIGGER_ACTION ||
+        packet->messageType == MessageType::MODULE_ACTION_RESPONSE)
+    {
+        const auto *mod = (ConnPacketModule const *)data;
+        if (mod->moduleId == moduleId)
+        {
+            // MeshAccess connections using the organization key are allowed to add, set and remove advertisements.
+            if (fmKeyId == FmKeyId::ORGANIZATION)
+            {
+                if (packet->messageType == MessageType::MODULE_TRIGGER_ACTION)
+                {
+                    switch (mod->actionType)
+                    {
+                    case (u8)BeaconingModuleTriggerActionMessages::ADD_MESSAGE:
+                    case (u8)BeaconingModuleTriggerActionMessages::SET_MESSAGE:
+                    case (u8)BeaconingModuleTriggerActionMessages::REMOVE_MESSAGE:
+                        return MeshAccessAuthorization::WHITELIST;
+
+                    default:
+                        return MeshAccessAuthorization::UNDETERMINED;
+                    }
+                }
+
+                if (packet->messageType == MessageType::MODULE_ACTION_RESPONSE)
+                {
+                    switch (mod->actionType)
+                    {
+                    case (u8)BeaconingModuleActionResponseMessages::ADD_MESSAGE_RESPONSE:
+                    case (u8)BeaconingModuleActionResponseMessages::SET_MESSAGE_RESPONSE:
+                    case (u8)BeaconingModuleActionResponseMessages::REMOVE_MESSAGE_RESPONSE:
+                        return MeshAccessAuthorization::WHITELIST;
+
+                    default:
+                        return MeshAccessAuthorization::UNDETERMINED;
+                    }
+                }
+            }
+        }
+    }
+
+    return MeshAccessAuthorization::UNDETERMINED;
+}
+
 #ifdef TERMINAL_ENABLED
 TerminalCommandHandlerReturnType BeaconingModule::TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize)
 {

@@ -40,28 +40,34 @@ TimeManager::TimeManager()
     timeSinceSyncTime = 0;
 }
 
-u32 TimeManager::GetTime()
+u32 TimeManager::GetUtcTime()
+{
+    ProcessTicks();
+    u32 unixTime = syncTime + timeSinceSyncTime;
+
+    return unixTime;
+}
+
+u32 TimeManager::GetLocalTime()
 {
     ProcessTicks();
     u32 unixTime = syncTime + timeSinceSyncTime;
     i32 offsetSeconds = offset * 60;
-#if IS_INACTIVE(CLC_GW_SAVE_SPACE)
     if (offsetSeconds < 0 && unixTime < static_cast<u32>(-offsetSeconds))
     {
         //Edge case.
         return unixTime;
     }
     else
-#endif
     {
         return static_cast<u32>(unixTime + offsetSeconds);
     }
 }
 
-TimePoint TimeManager::GetTimePoint()
+TimePoint TimeManager::GetLocalTimePoint()
 {
     ProcessTicks();
-    return TimePoint(GetTime(), additionalTicks);
+    return TimePoint(GetLocalTime(), additionalTicks);
 }
 
 void TimeManager::SetTime(u32 syncTimeDs, u32 timeSinceSyncTimeDs, i16 offset, u32 additionalTicks)
@@ -167,11 +173,11 @@ void TimeManager::HandleUpdateTimestampMessages(ConnPacketHeader const * packetH
     }
 }
 
-void TimeManager::convertTimestampToString(char * buffer)
+void TimeManager::convertLocalTimeToString(char * buffer)
 {
     ProcessTicks();
     u32 gapDays;
-    u32 remainingSeconds = GetTime();
+    u32 remainingSeconds = GetLocalTime();
 
     u32 yearDivider = 60 * 60 * 24 * 365;
     u16 years = remainingSeconds / yearDivider + 1970;

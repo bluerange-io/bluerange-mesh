@@ -35,24 +35,48 @@
 
 #include "Logger.h"
 
+#ifndef SIM_ENABLED
+GlobalState GlobalState::instance;
+__attribute__((section (".noinit"))) RamRetainStruct ramRetainStruct;
+__attribute__((section (".noinit"))) RamRetainStruct ramRetainStructPreviousBoot;
+__attribute__((section (".noinit"))) u32 rebootMagicNumber;
+__attribute__((section(".noinit"))) u32 watchdogExtraInfoFlags;
+__attribute__((section(".noinit"))) TemporaryEnrollment temporaryEnrollment;
+#endif
+
 /**
  * The GlobalState was introduced to create multiple instances of FruityMesh
  * in a single process. This lets us do some simulation.
  */
-
-#ifndef SIM_ENABLED
-GlobalState GlobalState::instance;
-__attribute__ ((section (".noinit"))) RamRetainStruct ramRetainStruct;
-__attribute__ ((section (".noinit"))) RamRetainStruct ramRetainStructPreviousBoot;
-__attribute__ ((section (".noinit"))) u32 rebootMagicNumber;
-#endif
-
 GlobalState::GlobalState()
 {
     //Some initialization
+#ifndef SIM_ENABLED
     ramRetainStructPtr = &ramRetainStruct;
     ramRetainStructPreviousBootPtr = &ramRetainStructPreviousBoot;
     rebootMagicNumberPtr = &rebootMagicNumber;
+    watchdogExtraInfoFlagsPtr = &watchdogExtraInfoFlags;
+    temporaryEnrollmentPtr = &temporaryEnrollment;
+#else
+    ramRetainStructPtr = &cherrySimInstance->currentNode->retainedRamMemory.ramRetainStruct;
+    ramRetainStructPreviousBootPtr = &cherrySimInstance->currentNode->retainedRamMemory.ramRetainStructPreviousBoot;
+    rebootMagicNumberPtr = &cherrySimInstance->currentNode->retainedRamMemory.rebootMagicNumber;
+    watchdogExtraInfoFlagsPtr = &cherrySimInstance->currentNode->retainedRamMemory.watchdogExtraInfoFlags;
+    temporaryEnrollmentPtr = &cherrySimInstance->currentNode->retainedRamMemory.temporaryEnrollment;
+#endif //SIM_ENABLED
+    lastSendTimestamp = 0;
+    lastReceivedTimestamp = 0;
+    timestampInAppTimerHandler = 0;
+    eventLooperTriggerTimestamp = 0;
+    fruitymeshEventLooperTriggerTimestamp = 0;
+    bleEventLooperTriggerTimestamp = 0;
+    socEventLooperTriggerTimestamp = 0;
+    sinkNodeId = 0;
+    inGetRandomLoop = false;
+    inPullEventsLoop = false;
+    safeBootEnabled = false;
+    advertismentReceivedTimestamp = 0;
+    lastReceivedFromSinkTimestamp = 0;
 #if defined(SIM_ENABLED)
     CheckedMemset(currentEventBuffer, 0, sizeof(currentEventBuffer));
 #endif

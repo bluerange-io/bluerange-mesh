@@ -131,8 +131,8 @@ namespace Utility
 
     //Other
     u16 ByteToAsciiHex(u8 b);
-    u32 ByteFromAsciiHex(char* asciiHex, u8 numChars);
-    void LogRebootJson();
+    u32 ByteFromAsciiHex(const char* asciiHex, u8 numChars);
+    void LogRebootJson(bool rebootReasonCleared);
 
     bool Contains(const u8* data, const u32 length, const u8 searchValue);
 

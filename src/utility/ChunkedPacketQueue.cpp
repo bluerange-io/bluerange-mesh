@@ -503,6 +503,16 @@ void ChunkedPacketQueue::RollbackLookAhead()
         currentChunk = currentChunk->nextChunk;
     }
     lookAheadChunk = readChunk;
+
+    //We must reevaluate if the queue is currently sending a split packet as this might have changed after the rollback
+    //E.g. The node was previously sending a long split message from queue-A where all packets were already queued, so it was done sending a split message
+    //Then, queue-B was sending a split message and is now in the middle, so we have queue-A with currentlySendingSplitPacket=false and queue-B with true
+    //Now, only two packets of the split message were ACKed by the SoftDevice and a RECONNECT is done
+    //After the Rollback, it is essential that queue-A is starting sending instead of queue-B as it is in the middle of sending a split packet
+    if (GetAmountOfPackets() > 0) {
+        const QueueEntryHeader* header = ((const QueueEntryHeader*)(lookAheadChunk->data.data() + lookAheadChunk->currentLookAheadHead));
+        isCurrentlySendingSplitMessage = header->isSplit == 1 ? true : false;
+    }
 }
 
 bool ChunkedPacketQueue::IsRandomAccessIndexLookedAhead(u16 index) const

@@ -363,6 +363,65 @@ TEST_F(TestRecordStorage, TestDeactivateRecord) {
 
 }
 
+
+TEST_F(TestRecordStorage, TestImmortalizeRecord) {
+    NodeIndexSetter setter(0);
+    logt("WARNING", "---- CLEANUP ----");
+
+    //Setup
+    CheckedMemset(startPage, 0xff, numPages * FruityHal::GetCodePageSize());
+    RepairPages();
+
+    cherrySimInstance->SimCommitFlashOperations();
+
+    logt("WARNING", "---- TEST DEACTIVATE RECORD ----");
+
+    RecordStoragePage* usedPage = (RecordStoragePage*)(startPage + FruityHal::GetCodePageSize());
+
+    //Save record
+    u8 data[] = { 1,2,3,4 };
+    GS->recordStorage.SaveRecord(5, data, sizeof(data), nullptr, 0);
+
+    //Deactivate record
+    GS->recordStorage.ImmortalizeRecord(5, nullptr, 0);
+
+    //Committing done after all three steps are queued to test async
+    cherrySimInstance->SimCommitFlashOperations();
+
+    //Record must still be valid
+    RecordStorageRecord* record = GS->recordStorage.GetRecord(5);
+    if (!IsRecordValid(usedPage, record))
+    {
+        FAIL() << "Record corrupted"; //LCOV_EXCL_LINE assertion
+    }
+
+    //Record must have the mortal flag set to 0
+    record = GS->recordStorage.GetRecord(5);
+    if (record->mortal != 0)
+    {
+        FAIL() << "Record does not have eternal live"; //LCOV_EXCL_LINE assertion
+    }
+
+    //This should report that there are no mortal records
+    ASSERT_TRUE(!GS->recordStorage.HasMortalRecords());
+
+    //Create another record that is mortal
+    GS->recordStorage.SaveRecord(6, data, sizeof(data), nullptr, 0);
+    cherrySimInstance->SimCommitFlashOperations();
+
+    //Now, we should have mortal records
+    ASSERT_TRUE(GS->recordStorage.HasMortalRecords());
+
+    //We deactivate the mortal record
+    GS->recordStorage.DeactivateRecord(6, nullptr, 0);
+    cherrySimInstance->SimCommitFlashOperations();
+
+    //We should still have mortal records (deactivated, but this method does not care)
+    ASSERT_TRUE(GS->recordStorage.HasMortalRecords());
+
+
+}
+
 TEST_F(TestRecordStorage, TestFlashBusy) {
     NodeIndexSetter setter(0);
     logt("WARNING", "---- CLEANUP ----");

@@ -37,6 +37,7 @@
 #include "Config.h"
 #include "Node.h"
 
+#if defined(PROD_SINK_NRF52)
 TEST(TestNode, TestCommands) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
@@ -85,7 +86,7 @@ TEST(TestNode, TestCommands) {
 
     tester.SendTerminalCommand(1, "settime 1337 0");
     tester.SimulateGivenNumberOfSteps(1);
-    ASSERT_EQ(tester.sim->FindNodeById(1)->gs.timeManager.GetTime(), 1337);
+    ASSERT_EQ(tester.sim->FindNodeById(1)->gs.timeManager.GetLocalTime(), 1337);
 
     tester.SendTerminalCommand(1, "gettime");
     tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "Time is currently approx. 1970 years, 1 days, 00h:22m:17s,\\d+ ticks");
@@ -204,6 +205,7 @@ TEST(TestNode, TestCommands) {
     ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[6]), 107);
     ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[7]), 108);
 }
+#endif
 
 TEST(TestNode, TestCRCValidation)
 {
@@ -263,6 +265,7 @@ TEST(TestNode, TestCRCValidation)
     }
 }
 
+// Reenable after BR-476 is fixed
 TEST(TestNode, TestGenerateLoad) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
@@ -467,19 +470,23 @@ TEST(TestNode, DISABLED_TestDiscoverySettingEnrolled) {
     tester.SimulateUntilMessagesReceived(10 * 1000, messagesHigh2);
 }
 
+//This test checks that all nodes receive the number of enrolled nodes, even if they are currently not connected to the mesh
 TEST(TestNode, TestDiscoveryRestartingAndStoppingDiscovery) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.nodeConfigName.clear();
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2});
+    simConfig.SetToPerfectConditions();
+    simConfig.preDefinedPositions = { {0.2, 0.2}, {0.2, 0.25}, {0.25, 0.2} };
     //testerConfig.verbose = true;
+
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
     tester.SendTerminalCommand(1, "action this enroll basic BBBBB 1 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
     tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
     tester.SendTerminalCommand(3, "action this enroll basic BBBBD 3 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(100 * 1000);
 
 
     std::vector<SimulationMessage> messagesOFF = {
@@ -493,47 +500,80 @@ TEST(TestNode, TestDiscoveryRestartingAndStoppingDiscovery) {
         SimulationMessage(3, "-- DISCOVERY HIGH --"), };
 
     //Remove one of the nodes, set number of enrolled nodes and then expect to enter discovery off when number of nodes is reached.
-    tester.SendTerminalCommand(1, "action 2 enroll remove BBBBC");
+    tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 11 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
+    //Wait until we are sure the node is not part of the mesh anymore
     tester.SimulateForGivenTime(10 * 1000);
-    tester.SendTerminalCommand(1, "action 0 node set_enrolled_nodes %d", cherrySimInstance->GetTotalNodes());
+    //Tell the other two nodes that we have a total of 3 nodes in our mesh
+    tester.SendTerminalCommand(1, "action this node set_enrolled_nodes %d", 3);
+    tester.SendTerminalCommand(3, "action this node set_enrolled_nodes %d", 3);
     tester.SimulateForGivenTime(10 * 1000);
+    //Enroll the missing node again in the same network
     tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
-    tester.SimulateUntilMessagesReceived(100 * 1000, messagesOFF);
+    //All nodes should go to discovery idle state after some time
+    {
+        std::vector<SimulationMessage> msgs = {
+        SimulationMessage(1, "-- DISCOVERY IDLE --"),
+        SimulationMessage(2, "-- DISCOVERY IDLE --"),
+        SimulationMessage(3, "-- DISCOVERY IDLE --"), };
+        tester.SimulateUntilMessagesReceived(100 * 1000, msgs);
+    }
 
-    //Reset node 1 to enter and expect that other node will enter high discovery and then discovery off after reclustering
+    //Reset node 1 to enter and expect that other node will enter high discovery
     tester.SendTerminalCommand(1, "reset");
-    tester.SimulateUntilMessagesReceived(100 * 1000, messagesHIGH);
-    tester.SimulateUntilMessagesReceived(100 * 1000, messagesOFF);
+    {
+        std::vector<SimulationMessage> msgs = {
+        SimulationMessage(1, "-- DISCOVERY HIGH --"),
+        SimulationMessage(2, "-- DISCOVERY HIGH --"),
+        SimulationMessage(3, "-- DISCOVERY HIGH --"), };
+        tester.SimulateUntilMessagesReceived(100 * 1000, msgs);
+    }
+    //After reclustering, they should go back to idle state
+    {
+        std::vector<SimulationMessage> msgs = {
+        SimulationMessage(1, "-- DISCOVERY IDLE --"),
+        SimulationMessage(2, "-- DISCOVERY IDLE --"),
+        SimulationMessage(3, "-- DISCOVERY IDLE --"), };
+        tester.SimulateUntilMessagesReceived(100 * 1000, msgs);
+    }
 }
 
-TEST(TestNode, TestDiscoveryOffWillAllowConnectingNewNodes) {
+// Can be enabled again after BR-1438 is fixed
+TEST(TestNode, DISABLED_TestDiscoveryOffWillAllowConnectingNewNodes) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.nodeConfigName.clear();
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2});
+    simConfig.SetToPerfectConditions();
+    simConfig.preDefinedPositions = { {0.2, 0.2}, {0.2, 0.25}, {0.25, 0.2} };
     //testerConfig.verbose = true;
+    
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
     tester.SendTerminalCommand(1, "action this enroll basic BBBBB 1 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
     tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
     tester.SendTerminalCommand(3, "action this enroll basic BBBBD 3 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(100 * 1000);
     
     // remove node from network
-    tester.SendTerminalCommand(1, "action 2 enroll remove BBBBC");
-    tester.SimulateForGivenTime(20 * 1000);
+    tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 11 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
+    tester.SimulateForGivenTime(10 * 1000);
+
+    tester.SendTerminalCommand(2, "status");
 
     //Set number of enrolled nodes to numNodes - 1 (1 removed node) and wait for discovery off state
-    tester.SendTerminalCommand(1, "action 0 node set_enrolled_nodes %d", cherrySimInstance->GetTotalNodes() - 1);
+
+    tester.SendTerminalCommand(1, "action this node set_enrolled_nodes %d", 2);
+    tester.SendTerminalCommand(3, "action this node set_enrolled_nodes %d", 2);
+
     std::vector<SimulationMessage> messagesOff = {
         SimulationMessage(1, "-- DISCOVERY IDLE --"),
         SimulationMessage(3, "-- DISCOVERY IDLE --"), };
     tester.SimulateUntilMessagesReceived(10 * 1000, messagesOff);
     
-    // enroll node again and expect it will join network
+    // enroll node again in the same network and expect it will join network
     tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
-    tester.SimulateUntilMessageReceived(20 * 1000, 2, "ClusterSize set to %d", cherrySimInstance->GetTotalNodes());
+    tester.SimulateUntilMessageReceived(20 * 1000, 2, "ClusterSize set to %d", 3);
 }
 
 //Tests sending various length packets (split/not split) over normal prio queue concurrently
@@ -691,9 +731,11 @@ TEST(TestNode, TestCapabilitySending) {
     std::vector<SimulationMessage> msgs = {
         SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":0,\"capabilityType\":2,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"BlueRange Node\",\"revision\":\"\\d+.\\d+.\\d+\"\\}"),
 #ifndef GITHUB_RELEASE
-        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":1,\"capabilityType\":2,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Featureset\",\"revision\":\"prod_mesh_nrf52\"\\}"),
+        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":1,\"capabilityType\":4,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Featureset\",\"revision\":\"prod_mesh_nrf52\"\\}"),
+        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":2,\"capabilityType\":4,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Board Id\",\"revision\":\"Simulator Board \\(19\\)\"\\}"),
 #else
-        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":1,\"capabilityType\":2,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Featureset\",\"revision\":\"github_dev_nrf52\"\\}"),
+        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":1,\"capabilityType\":4,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Featureset\",\"revision\":\"github_dev_nrf52\"\\}"),
+        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":2,\"capabilityType\":4,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Board Id\",\"revision\":\"UNKNOWN \\(19\\)\"\\}"),
 #endif
         SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_end\",\"amount\":\\d+\\}"),
     };
@@ -716,7 +758,7 @@ TEST(TestNode, TestRapidDisconnections) {
     tester.SimulateForGivenTime(11 * 1000);
 
     //Simulate very frequent connection losses
-    tester.sim->simConfig.connectionTimeoutProbabilityPerSec = 0.1;
+    tester.sim->simConfig.connectionTimeoutProbabilityPerSec = 0.1 * UINT32_MAX;
 
     //We just simulate for some time to see if sth. in the node crashes
     tester.SimulateForGivenTime(20 * 1000);
@@ -817,4 +859,263 @@ TEST(TestNode, TestComponentSenseAndActWithModuleIdWrapper)
     tester.SendTerminalCommand(1, "component_sense this 0xABCD77F0 3 0x1111 0x2222 MzM=");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":1,\"type\":\"component_sense\",\"module\":\"0xABCD77F0\",\"requestHandle\":0,\"actionType\":3,\"component\":\"0x1111\",\"register\":\"0x2222\",\"payload\":\"MzM=\"}");
 
+}
+
+TEST(TestNode, TestNoConnectionParameterUpdateRequestedForStandardFeaturesets)
+{
+    // NOTE: This test exists to ensure that the connection parameter update
+    //       is not enabled for all featuresets, like the standard
+    //       "prod_mesh_nrf52" featureset.
+
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 3 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    tester.Start();
+
+    tester.SimulateUntilClusteringDone(100 * 1000);
+
+    Exceptions::DisableDebugBreakOnException disableDebugBreakOnException;
+
+    ASSERT_THROW(tester.SimulateUntilMessageReceived(1000 * 1000, 1, "Started connection parameter update"), TimeoutException);
+}
+
+TEST(TestNode, TestConnectionParameterUpdateRequested)
+{
+    // NOTE: This test checks that the connection parameter update is requested
+    //       in certain featuresets.
+
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+
+    // Create two nodes which have the connection parameter update enabled.
+    simConfig.nodeConfigName.insert({ "prod_ruuvi_weather_nrf52", 2 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    // Supported connection interval in the simulator (related to battery
+    // usage estimation).
+    constexpr auto targetConnectionIntervalMs = 90;
+    constexpr auto targetConnectionIntervalUnits = MSEC_TO_UNITS(
+        targetConnectionIntervalMs,
+        CONFIG_UNIT_1_25_MS
+    );
+
+    tester.Start();
+
+    for (int nodeIndex = 0; nodeIndex < 2; ++nodeIndex)
+    {
+        auto &node = tester.sim->nodes[nodeIndex];
+
+        node.gs.logger.DisableTag("RUUVI");
+        node.gs.logger.EnableTag("DEBUG");
+
+        ASSERT_EQ(
+            node.gs.config.meshMinConnectionInterval,
+            node.gs.config.meshMaxConnectionInterval
+        );
+
+        ASSERT_GT(node.gs.config.meshMinConnectionInterval, 0);
+
+
+        // Increase the long-term connection interval to trigger the update, use
+        // a value supported in the simulator.
+        node.gs.config.meshMinLongTermConnectionInterval = targetConnectionIntervalUnits;
+        node.gs.config.meshMaxLongTermConnectionInterval = targetConnectionIntervalUnits;
+
+        ASSERT_LT(
+            node.gs.config.meshMinConnectionInterval,
+            node.gs.config.meshMinLongTermConnectionInterval
+        );
+    }
+
+    tester.SimulateUntilClusteringDone(100 * 1000);
+
+    // Store the node entry of the central / peripheral node.
+    NodeEntry * centralNodeEntry = nullptr, * peripheralNodeEntry = nullptr;
+    const SoftdeviceConnection * centralConnection = nullptr, * peripheralConnection = nullptr;
+    // Find out which node is the central and which is the peripheral.
+    for (int nodeIndex = 0; nodeIndex < 2; ++nodeIndex)
+    {
+        auto &node = tester.sim->nodes[nodeIndex];
+        for (u32 connIndex = 0; connIndex < node.state.configuredTotalConnectionCount; ++connIndex)
+        {
+            const auto & connection = node.state.connections[connIndex];
+            // Skip inactive connections
+            if (!connection.connectionActive)
+            {
+                continue;
+            }
+
+            if (connection.isCentral)
+            {
+                // Blow up if the central has already been found.
+                ASSERT_FALSE(centralNodeEntry);
+                // Store the cenral node's entry.
+                centralNodeEntry = &node;
+                centralConnection = &connection;
+            }
+            else
+            {
+                // Blow up if the peripheral has already been found.
+                ASSERT_FALSE(peripheralNodeEntry);
+                // Store the peripheral node's entry.
+                peripheralNodeEntry = &node;
+                peripheralConnection = &connection;
+            }
+        }
+    }
+    // Make sure we have a central and peripheral node.
+    ASSERT_TRUE(centralNodeEntry);
+    ASSERT_TRUE(peripheralNodeEntry);
+
+    const auto centralNodeId = centralNodeEntry->gs.node.configuration.nodeId;
+    const auto peripheralNodeId = peripheralNodeEntry->gs.node.configuration.nodeId;
+
+    std::vector<SimulationMessage> messages = {
+        {centralNodeId, "Started connection parameter update"},
+        {centralNodeId, "Connection parameter update"},
+        {peripheralNodeId, "Connection parameter update"},
+    };
+    tester.SimulateUntilMessagesReceived(1000 * 1000, messages);
+
+    // Make sure the connection interval was actually changed on both sides.
+    ASSERT_EQ(
+        centralConnection->connectionInterval,
+        targetConnectionIntervalMs
+    );
+    ASSERT_EQ(
+        centralConnection->connectionInterval,
+        peripheralConnection->connectionInterval
+    );
+}
+
+TEST(TestNode, TestConnectionParameterUpdateRequestedByPeripheral)
+{
+    // NOTE: This test checks that the connection parameter update is requested
+    //       in certain featuresets.
+
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+
+    // Create two nodes which have the connection parameter update enabled.
+    simConfig.nodeConfigName.insert({ "prod_ruuvi_weather_nrf52", 2 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    // Supported connection interval in the simulator (related to battery
+    // usage estimation).
+    constexpr auto targetConnectionIntervalMs = 90;
+    constexpr auto targetConnectionIntervalUnits = MSEC_TO_UNITS(
+        targetConnectionIntervalMs,
+        CONFIG_UNIT_1_25_MS
+    );
+
+    tester.Start();
+
+    for (int nodeIndex = 0; nodeIndex < 2; ++nodeIndex)
+    {
+        auto &node = tester.sim->nodes[nodeIndex];
+
+        node.gs.logger.DisableTag("RUUVI");
+        node.gs.logger.EnableTag("DEBUG");
+
+        // 'Deactivate' the long-term connection interval, by assigning it's
+        // default value.
+        node.gs.config.meshMinLongTermConnectionInterval =
+            node.gs.config.meshMinConnectionInterval;
+        node.gs.config.meshMaxLongTermConnectionInterval =
+            node.gs.config.meshMaxConnectionInterval;
+
+        ASSERT_EQ(
+            node.gs.config.meshMinConnectionInterval,
+            node.gs.config.meshMaxConnectionInterval
+        );
+
+        ASSERT_GT(node.gs.config.meshMinConnectionInterval, 0);
+
+        ASSERT_EQ(
+            node.gs.config.meshMinLongTermConnectionInterval,
+            node.gs.config.meshMaxLongTermConnectionInterval
+        );
+
+        ASSERT_EQ(
+            node.gs.config.meshMinConnectionInterval,
+            node.gs.config.meshMinLongTermConnectionInterval
+        );
+    }
+
+    tester.SimulateUntilClusteringDone(100 * 1000);
+
+    // Store the node entry of the central / peripheral node.
+    NodeEntry * centralNodeEntry = nullptr, * peripheralNodeEntry = nullptr;
+    const SoftdeviceConnection * centralConnection = nullptr, * peripheralConnection = nullptr;
+    // Find out which node is the central and which is the peripheral.
+    for (int nodeIndex = 0; nodeIndex < 2; ++nodeIndex)
+    {
+        auto &node = tester.sim->nodes[nodeIndex];
+        for (u32 connIndex = 0; connIndex < node.state.configuredTotalConnectionCount; ++connIndex)
+        {
+            const auto & connection = node.state.connections[connIndex];
+            // Skip inactive connections
+            if (!connection.connectionActive)
+            {
+                continue;
+            }
+
+            if (connection.isCentral)
+            {
+                // Blow up if the central has already been found.
+                ASSERT_FALSE(centralNodeEntry);
+                // Store the cenral node's entry.
+                centralNodeEntry = &node;
+                centralConnection = &connection;
+            }
+            else
+            {
+                // Blow up if the peripheral has already been found.
+                ASSERT_FALSE(peripheralNodeEntry);
+                // Store the peripheral node's index.
+                peripheralNodeEntry = &node;
+                peripheralConnection = &connection;
+            }
+        }
+    }
+    // Make sure we have a central and peripheral node.
+    ASSERT_TRUE(centralNodeEntry);
+    ASSERT_TRUE(peripheralNodeEntry);
+
+    const auto centralNodeId = centralNodeEntry->gs.node.configuration.nodeId;
+    const auto peripheralNodeId = peripheralNodeEntry->gs.node.configuration.nodeId;
+
+    // Increase the long-term connection interval to trigger the update, use a
+    // value supported in the simulator.
+    peripheralNodeEntry->gs.config.meshMinLongTermConnectionInterval =
+        targetConnectionIntervalUnits;
+    peripheralNodeEntry->gs.config.meshMaxLongTermConnectionInterval =
+        targetConnectionIntervalUnits;
+
+    std::vector<SimulationMessage> messages = {
+        {peripheralNodeId, "Started connection parameter update"},
+        {centralNodeId, "Connection parameter update request"},
+        {centralNodeId, "Started connection parameter update"},
+        {centralNodeId, "Connection parameter update"},
+        {peripheralNodeId, "Connection parameter update"},
+    };
+    tester.SimulateUntilMessagesReceived(1000 * 1000, messages);
+
+    // Make sure the connection interval was actually changed on both sides.
+    ASSERT_EQ(
+        centralConnection->connectionInterval,
+        targetConnectionIntervalMs
+    );
+    ASSERT_EQ(
+        centralConnection->connectionInterval,
+        peripheralConnection->connectionInterval
+    );
 }

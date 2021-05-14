@@ -196,7 +196,7 @@ void ScanningModule::HandleAssetLegacyPackets(const FruityHal::GapAdvertisementR
             && packet->uuid.len == SIZEOF_ADV_STRUCTURE_UUID16-1
             && packet->data.uuid.type == (u8)BleGapAdType::TYPE_SERVICE_DATA
             && packet->data.uuid.uuid == MESH_SERVICE_DATA_SERVICE_UUID16
-            && packet->data.messageType == ServiceDataMessageType::LEGACY_ASSET
+            && packet->data.messageType == ServiceDataMessageType::LEGACY_ASSET_V1
     ){
         char serial[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
         Utility::GenerateBeaconSerialForIndex(assetPacket->serialNumberIndex, serial);
@@ -218,7 +218,7 @@ void ScanningModule::HandleAssetLegacyPackets(const FruityHal::GapAdvertisementR
             if (rssi >= 10 && rssi <= 90) //filter out wrong rssis
             {
                 //Adds the asset packet to our buffer
-                AdvPacketAssetServiceData assetData;
+                AdvPacketLegacyV2AssetServiceData assetData;
                 CheckedMemset(&assetData, 0, sizeof(assetData));
 
                 assetData.data = assetPacket->data;
@@ -248,16 +248,16 @@ void ScanningModule::HandleAssetLegacyPackets(const FruityHal::GapAdvertisementR
 void ScanningModule::HandleAssetPackets(const FruityHal::GapAdvertisementReportEvent & advertisementReportEvent)
 {
     const AdvPacketServiceAndDataHeader* packet = (const AdvPacketServiceAndDataHeader*)advertisementReportEvent.GetData();
-    const AdvPacketAssetServiceData* assetPacket = (const AdvPacketAssetServiceData*)&packet->data;
+    const AdvPacketLegacyV2AssetServiceData* assetPacket = (const AdvPacketLegacyV2AssetServiceData*)&packet->data;
 
     //Check if the advertising packet is an asset packet
     if (
-        advertisementReportEvent.GetDataLength() >= SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA
+        advertisementReportEvent.GetDataLength() >= SIZEOF_ADV_STRUCTURE_LEGACY_V2_ASSET_SERVICE_DATA
         && packet->flags.len == SIZEOF_ADV_STRUCTURE_FLAGS - 1
         && packet->uuid.len == SIZEOF_ADV_STRUCTURE_UUID16 - 1
         && packet->data.uuid.type == (u8)BleGapAdType::TYPE_SERVICE_DATA
         && packet->data.uuid.uuid == MESH_SERVICE_DATA_SERVICE_UUID16
-        && packet->data.messageType == ServiceDataMessageType::ASSET
+        && packet->data.messageType == ServiceDataMessageType::LEGACY_ASSET_V2
         ) {
         logt("SCANMOD", "RX ASSETLEGACY ADV: nodeId %u, batteryPower %u, absolutePositionX %u, absolutePositionY %u, pressure %u, rssi %d", 
             assetPacket->assetNodeId,
@@ -277,7 +277,7 @@ void ScanningModule::HandleAssetPackets(const FruityHal::GapAdvertisementReportE
     }
 }
 
-bool ScanningModule::AddTrackedAsset(const AdvPacketAssetServiceData * packet, i8 rssi)
+bool ScanningModule::AddTrackedAsset(const AdvPacketLegacyV2AssetServiceData * packet, i8 rssi)
 {
     ScannedAssetTrackingStorage* slot = nullptr;
 

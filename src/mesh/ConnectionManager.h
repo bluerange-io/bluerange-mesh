@@ -151,7 +151,8 @@ public:
     //This method will check and moduleId parameter and will send a ConnPacketModule instead if the given id is not a VendorModuleId
     ErrorTypeUnchecked SendModuleActionMessage(MessageType messageType, VendorModuleId moduleId, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool lookback) const;
 
-    void BroadcastMeshPacket(u8* data, u16 dataLength, bool reliable) const;
+    // Returns false if data was not send for at least one connection
+    bool BroadcastMeshPacket(u8* data, u16 dataLength, bool reliable) const;
 
     void RouteMeshData(BaseConnection* connection, BaseConnectionSendData* sendData, u8 const * data) const;
     void BroadcastMeshData(const BaseConnection* ignoreConnection, BaseConnectionSendData* sendData, u8 const * data, RoutingDecision routingDecision) const;
@@ -184,6 +185,13 @@ public:
     u16 GetPendingPackets() const;
 
     void SetMeshConnectionInterval(u16 connectionInterval) const;
+
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+    /// Iterate through the mesh connections and update the connection
+    /// intervals for long term connections as defined by values in the
+    /// Config class.
+    void UpdateConnectionIntervalForLongTermMeshConnections() const;
+#endif
 
     void DeleteConnection(BaseConnection* connection, AppDisconnectReason reason);
 

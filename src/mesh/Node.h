@@ -50,6 +50,7 @@ constexpr int MAX_RAW_DATA_CHUNK_SIZE = 60;
 
 constexpr int TIME_BEFORE_DISCOVERY_MESSAGE_SENT_SEC = 30;
 
+constexpr u8 NODE_MODULE_CONFIG_VERSION = 2;
 
 typedef struct
 {
@@ -87,6 +88,10 @@ typedef struct meshServiceStruct_temporary
         u16 numberOfEnrolledDevices;
     };
 #pragma pack(pop)
+
+enum class NodeSaveActions : u8 {
+    FACTORY_RESET,
+};
 
 /*
  * The node represents a mesh-enabled device and is a mandatory module (id 0).
@@ -340,6 +345,9 @@ private:
 
         //Priority
         virtual DeliveryPriority GetPriorityOfMessage(const u8* data, MessageLength size) override;
+
+        //Listener for record storage events
+        void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override final;
 
         //Methods of TerminalCommandListener
         #ifdef TERMINAL_ENABLED

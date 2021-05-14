@@ -58,8 +58,6 @@
 #include <CherrySim.h>    //required for faking DFU
 #endif
 
-constexpr u8 NODE_MODULE_CONFIG_VERSION = 2;
-
 //The number of connection attempts to one node before blacklisting this node for some time
 constexpr u8 connectAttemptsBeforeBlacklisting = 5;
 
@@ -120,6 +118,42 @@ void Node::ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfig
     }
     if(Utility::CompareMem(0x00, configuration.userBaseKey, 16)){
         CheckedMemcpy(configuration.userBaseKey, RamConfig->defaultUserBaseKey, 16);
+    }
+
+    //In case persistence is disabled, we check if there is a temporary enrollment that should be loaded
+    if (!GS->config.enableRecordStorage)
+    {
+        //First, check the CRC of the enrollment and clear it if it is in an in-correct state
+        u32 crc32 = Utility::CalculateCrc32((u8*)GS->temporaryEnrollmentPtr, sizeof(TemporaryEnrollment) - sizeof(u32));
+        
+        //Erase persistent data if there is any available on the device
+        if (GS->recordStorage.HasMortalRecords()) {
+            GS->recordStorage.LockDownAndClearAllSettings(Utility::GetWrappedModuleId(ModuleId::NODE), this, (u32)NodeSaveActions::FACTORY_RESET);
+        }
+
+        if (crc32 == GS->temporaryEnrollmentPtr->crc32) {
+
+            if (GS->temporaryEnrollmentPtr->enrollmentState == EnrollmentState::ENROLLED) {
+                GS->node.configuration.enrollmentState = GS->temporaryEnrollmentPtr->enrollmentState;
+                GS->node.configuration.nodeId = GS->temporaryEnrollmentPtr->nodeId;
+                GS->node.configuration.networkId = GS->temporaryEnrollmentPtr->networkId;
+                CheckedMemcpy(GS->node.configuration.networkKey, GS->temporaryEnrollmentPtr->networkKey, sizeof(GS->temporaryEnrollmentPtr->networkKey));
+                CheckedMemcpy(GS->node.configuration.userBaseKey, GS->temporaryEnrollmentPtr->userBaseKey, sizeof(GS->temporaryEnrollmentPtr->userBaseKey));
+                CheckedMemcpy(GS->node.configuration.organizationKey, GS->temporaryEnrollmentPtr->organizationKey, sizeof(GS->temporaryEnrollmentPtr->organizationKey));
+            }
+
+            if (GS->temporaryEnrollmentPtr->serialNumberIndex != 0) {
+                GS->config.configuration.isSerialNumberIndexOverwritten = true;
+                GS->config.configuration.overwrittenSerialNumberIndex = GS->temporaryEnrollmentPtr->serialNumberIndex;
+            }
+
+            if (!Utility::CompareMem(0x00, GS->temporaryEnrollmentPtr->nodeKey, sizeof(GS->temporaryEnrollmentPtr->nodeKey))) {
+                CheckedMemcpy(GS->config.configuration.nodeKey, GS->temporaryEnrollmentPtr->nodeKey, sizeof(GS->temporaryEnrollmentPtr->nodeKey));
+            }
+        }
+        else {
+            CheckedMemset(GS->temporaryEnrollmentPtr, 0x00, sizeof(TemporaryEnrollment));
+        }
     }
 
     //Random offset that can be used to disperse packets from different nodes over time
@@ -2227,6 +2261,8 @@ void Node::TimerEventHandler(u16 passedTimeDs)
         }
     }
 
+    // Handle Device off
+    GS->deviceOff.TimerHandler(passedTimeDs);
 }
 
 void Node::KeepHighDiscoveryActive()
@@ -2359,7 +2395,7 @@ void Node::PrintStatus(void) const
     trace("Node %s (nodeId: %u) vers: %u, NodeKey: %02X:%02X:....:%02X:%02X" EOL EOL, RamConfig->GetSerialNumber(), configuration.nodeId, GS->config.GetFruityMeshVersion(),
             RamConfig->GetNodeKey()[0], RamConfig->GetNodeKey()[1], RamConfig->GetNodeKey()[14], RamConfig->GetNodeKey()[15]);
     SetTerminalTitle();
-    trace("Mesh clusterSize:%u, clusterId:%u" EOL, clusterSize, clusterId);
+    trace("Mesh clusterSize:%u, clusterId:%u, featureset: %s" EOL, clusterSize, clusterId, FEATURESET_NAME);
     trace("Enrolled %u: networkId:%u, deviceType:%u, NetKey %02X:%02X:....:%02X:%02X, UserBaseKey %02X:%02X:....:%02X:%02X" EOL,
             (u32)configuration.enrollmentState, configuration.networkId, (u32)GET_DEVICE_TYPE(),
             configuration.networkKey[0], configuration.networkKey[1], configuration.networkKey[14], configuration.networkKey[15],
@@ -2418,10 +2454,28 @@ CapabilityEntry Node::GetCapability(u32 index, bool firstCall)
 
         CapabilityEntry retVal;
         CheckedMemset(&retVal, 0, sizeof(retVal));
-        retVal.type = CapabilityEntryType::SOFTWARE;
+        retVal.type = CapabilityEntryType::PROPERTY;
         strcpy(retVal.manufacturer, "M-Way Solutions GmbH");
         strcpy(retVal.modelName,    "Featureset");
         CheckedMemcpy(retVal.revision, FEATURESET_NAME, lengthToCopy);
+        return retVal;
+    }
+
+    else if (index == 2)
+    {
+        CapabilityEntry retVal;
+        CheckedMemset(&retVal, 0, sizeof(retVal));
+        retVal.type = CapabilityEntryType::PROPERTY;
+        strcpy(retVal.manufacturer, "M-Way Solutions GmbH");
+        strcpy(retVal.modelName, "Board Id");
+        if (GS->boardconf.configuration.boardName == nullptr)
+        {
+            snprintf(retVal.revision, sizeof(retVal.revision), "%s (%u)", "UNKNOWN", GS->boardconf.configuration.boardType);
+        }
+        else
+        {
+            snprintf(retVal.revision, sizeof(retVal.revision), "%s (%u)", GS->boardconf.configuration.boardName, GS->boardconf.configuration.boardType);
+        }
         return retVal;
     }
     else
@@ -2488,6 +2542,15 @@ void Node::PrintBufferStatus(void) const
     trace("**************" EOL);
 }
 
+
+void Node::RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength)
+{
+    //After a factory reset of the RecordStorage, we need to reset
+    if (userType == (u32)NodeSaveActions::FACTORY_RESET)
+    {
+        Reboot(SEC_TO_DS(1), RebootReason::FACTORY_RESET);
+    }
+}
 
 /*
  #########################################################################################################
@@ -2950,7 +3013,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         CheckedMemset(&message, 0, sizeof(message));
         message.header.header.messageType = MessageType::CAPABILITY;
         message.header.header.sender      = configuration.nodeId;
-        message.header.header.receiver    = Utility::StringToU16(commandArgs[1]);
+        message.header.header.receiver    = Utility::TerminalArgumentToNodeId(commandArgs[1]);
         message.header.actionType         = CapabilityActionType::REQUESTED;
 
         //We don't allow broadcasts of the capability request
@@ -2978,7 +3041,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
     else if(TERMARGS(0, "gettime"))
     {
         char timestring[80];
-        GS->timeManager.convertTimestampToString(timestring);
+        GS->timeManager.convertLocalTimeToString(timestring);
 
         if (GS->timeManager.IsTimeSynced())
         {
@@ -3004,10 +3067,23 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
     else if (TERMARGS(0, "set_serial") && commandArgsSize == 2)
     {
-        if (strlen(commandArgs[1]) != 5) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+        if (!GS->config.enableMeshBridgeMode)
+        {
+            return TerminalCommandHandlerReturnType::UNKNOWN;
+        }
 
-        u32 serial = Utility::GetIndexForSerial(commandArgs[1]);
-        if (serial == INVALID_SERIAL_NUMBER_INDEX) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+        const auto serialNumberLength = strlen(commandArgs[1]);
+        if (serialNumberLength != 5 && serialNumberLength != 7)
+        {
+            return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+        }
+
+        bool      getIndexForSerialError = false;
+        const u32 serial                 = Utility::GetIndexForSerial(commandArgs[1], &getIndexForSerialError);
+        if (getIndexForSerialError)
+        {
+            return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+        }
 
         GS->config.SetSerialNumberIndex(serial);
 
@@ -3018,6 +3094,10 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
     else if (TERMARGS(0, "set_node_key") && commandArgsSize == 2)
     {
+        if (!GS->config.enableMeshBridgeMode) {
+            return TerminalCommandHandlerReturnType::UNKNOWN;
+        }
+
         u8 key[16];
         const u32 length = Logger::ParseEncodedStringToBuffer(commandArgs[1], key, sizeof(key));
         
@@ -3129,6 +3209,29 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         NodeId nodeId = Utility::StringToU16(commandArgs[1]);
         u16 newConnectionInterval = Utility::StringToU16(commandArgs[2]);
 
+        #ifdef SIM_ENABLED
+        // Neccessary for monkey-testing this command in combination with
+        // the IllegalStateException that is thrown when the connection
+        // interval does not match one of the values in the if-statements
+        // at the end of CherrySim::SimulateBatteryUsage() (CherrySim.cpp).
+        // This is not the best solution, but fixes the test and is not as
+        // invasive as to silently change the connection interval while
+        // setting it.
+        switch (newConnectionInterval)
+        {
+            case MSEC_TO_UNITS(7, CONFIG_UNIT_1_25_MS):
+            case MSEC_TO_UNITS(10, CONFIG_UNIT_1_25_MS):
+            case MSEC_TO_UNITS(15, CONFIG_UNIT_1_25_MS):
+            case MSEC_TO_UNITS(30, CONFIG_UNIT_1_25_MS):
+            case MSEC_TO_UNITS(90, CONFIG_UNIT_1_25_MS):
+            case MSEC_TO_UNITS(100, CONFIG_UNIT_1_25_MS):
+                break;
+            default:
+                logt("WARNING", "Ignoring command because the connection interval is not valid for simulated battery measurements.");
+                return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
+        }
+        #endif
+
         ConnPacketUpdateConnectionInterval packet;
         packet.header.messageType = MessageType::UPDATE_CONNECTION_INTERVAL;
         packet.header.sender = GS->node.configuration.nodeId;
@@ -3144,7 +3247,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
     //Get the status information of this node
     else if(TERMARGS(0, "get_plugged_in"))
     {
-        logjson("NODE", "{\"type\":\"plugged_in\",\"nodeId\":%u,\"serialNumber\":\"%s\",\"fmVersion\":%u}" SEP, configuration.nodeId, RamConfig->GetSerialNumber(), FM_VERSION);
+        logjson("NODE", "{\"type\":\"plugged_in\",\"nodeId\":%u,\"serialNumber\":\"%s\",\"fmVersion\":%u}" SEP, configuration.nodeId, RamConfig->GetSerialNumber(), GS->config.GetFruityMeshVersion());
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
 #if IS_INACTIVE(SAVE_SPACE)

@@ -106,6 +106,7 @@ constexpr size_t NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH = 8;
 constexpr u32 SERIAL_NUMBER_FM_TESTING_RANGE_START = 2673000;
 constexpr u32 SERIAL_NUMBER_FM_TESTING_RANGE_END = 2699999;
 constexpr u32 INVALID_SERIAL_NUMBER_INDEX = 0xFFFFFFFFUL;
+constexpr u32 SHORT_SERIAL_NUMBER_INDEX_MAX = 24300000UL;
 
 // End of line seperators to use
 #define EOL "\r\n"
@@ -173,6 +174,8 @@ enum class FeatureSetGroup : NodeId
     /*FruityDeploy-FeatureSetGroup*/NRF52_DEV_GITHUB      = 20031,
     /*FruityDeploy-FeatureSetGroup*/NRF52840_DEV_GITHUB   = 20032,
     /*FruityDeploy-FeatureSetGroup*/NRF52_RV_WEATHER_MESH = 20033,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_LVE_NBT      = 20034,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_MULTI_ASSET     = 20035,
 };
 
 //Sets the maximum number of firmware group ids that can be compiled into the firmware
@@ -208,6 +211,21 @@ struct RamRetainStruct {
     u32 crc32;
 };
 STATIC_ASSERT_SIZE(RamRetainStruct, RAM_PERSIST_STACKSTRACE_SIZE * 4 + 18);
+
+
+struct TemporaryEnrollment
+{
+    EnrollmentState enrollmentState;
+    u32 serialNumberIndex;
+    NodeId nodeId;
+    NetworkId networkId;
+    u8 nodeKey[16];
+    u8 networkKey[16];
+    u8 userBaseKey[16];
+    u8 organizationKey[16];
+    u32 crc32;
+};
+STATIC_ASSERT_SIZE(TemporaryEnrollment, 13 + 64);
 #pragma pack(pop)
 
 // Header for all module configurations

@@ -39,6 +39,7 @@
 #include <Logger.h>
 #include <fstream>
 #include <limits>
+#include <optional>
 
 extern "C" {
 #include <app_timer.h>
@@ -84,6 +85,7 @@ extern "C"
     void nrf_gpio_cfg_default(uint32_t pin_number) {}
     void nrf_gpio_cfg_output(uint32_t pin_number) {}
     void nrf_gpio_cfg_input(uint32_t pin_number, nrf_gpio_pin_pull_t pull_config) {}
+    void nrf_gpio_cfg_sense_input(uint32_t pin_number, nrf_gpio_pin_pull_t pull_config, nrf_gpio_pin_sense_t sense_config) {}
     void nrf_uart_baudrate_set(NRF_UART_Type *p_reg, nrf_uart_baudrate_t baudrate) {}
     uint32_t nrf_gpio_pin_read(uint32_t pin) { return 1; }
     void nrf_uart_configure(NRF_UART_Type *p_reg, nrf_uart_parity_t parity, nrf_uart_hwfc_t hwfc) {}
@@ -203,6 +205,11 @@ extern "C"
             ResetUart(state);
         }
         return retVal;
+    }
+
+    void nrf_power_system_off()
+    {
+        START_OF_FUNCTION();
     }
 
     uint8_t ST_getRebootReason()
@@ -487,6 +494,13 @@ extern "C"
         return NRF_SUCCESS;
     }
 
+    bool is_lis2dh12_moving_in_simulation()
+    {
+        //Check if the node was moved within the last 100ms
+        return cherrySimInstance->currentNode->lastMovementSimTimeMs != 0
+            && cherrySimInstance->currentNode->lastMovementSimTimeMs + 100 >= cherrySimInstance->simState.simTimeMs;
+    }
+
 
     int32_t lis2dh12_device_id_get(lis2dh12_ctx_t *ctx, uint8_t *buff)
     {
@@ -637,9 +651,22 @@ extern "C"
             return (int32_t)ErrorType::NULL_ERROR;
         }
         axis3bit16_t* buffer = (axis3bit16_t*)buff;
-        buffer->i16bit[0] = (i16)cherrySimInstance->simState.rnd.NextU32();
-        buffer->i16bit[1] = (i16)cherrySimInstance->simState.rnd.NextU32();
-        buffer->i16bit[2] = (i16)cherrySimInstance->simState.rnd.NextU32();
+
+        //Check if there was movement in the last 100ms
+        if (is_lis2dh12_moving_in_simulation())
+        {
+            //TODO: Use realistic values
+            buffer->i16bit[0] = (i16)cherrySimInstance->simState.rnd.NextU32();
+            buffer->i16bit[1] = (i16)cherrySimInstance->simState.rnd.NextU32();
+            buffer->i16bit[2] = (i16)cherrySimInstance->simState.rnd.NextU32();
+        }
+        else
+        {
+            //TODO: Use realistic values
+            buffer->i16bit[0] = 0;
+            buffer->i16bit[1] = 0;
+            buffer->i16bit[2] = 0;
+        }
 
         return (int32_t)ErrorType::SUCCESS;
 
@@ -975,8 +1002,165 @@ extern "C"
         if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
             return NRF_ERROR_BUSY;
         }
+        // Find the connection corresponding to the handle on the current node.
+        SoftdeviceConnection* connection = cherrySimInstance->FindConnectionByHandle(cherrySimInstance->currentNode, conn_handle);
+        // If the connection handle could not be resolved, the handle was bogus.
+        if (!connection || !connection->connectionActive)
+        {
+            return BLE_ERROR_INVALID_CONN_HANDLE;
+        }
+        // TODO: Verify that the parameters are supported in the simulator.
+        // Called on the central.
+        if (connection->isCentral)
+        {
+            // The optional will be empty if a pending request was rejected.
+            // In any other case (parameter change from the central or accepted
+            // request of the peripheral) the optional will hold the new
+            // parameters.
+            std::optional<ble_gap_conn_params_t> params;
+            // If a connection parameter update request was pending on the
+            // connection, the request can be either accepted or rejected.
+            if (connection->connParamUpdateRequestPending)
+            {
+                // Potentially accept the request if the parameters match the
+                // requested parameters.
+                if (p_conn_params)
+                {
+                    const auto &cpurp = connection->connParamUpdateRequestParameters;
+                    if (    cpurp.minConnInterval != p_conn_params->min_conn_interval
+                        ||  cpurp.maxConnInterval != p_conn_params->max_conn_interval
+                        ||  cpurp.slaveLatency != p_conn_params->slave_latency
+                        ||  cpurp.connSupTimeout != p_conn_params->conn_sup_timeout)
+                    {
+                        // TODO: Check if the actual softdevice reacts like
+                        //       this, the documentation does not make that
+                        //       clear.
+                        return NRF_ERROR_INVALID_PARAM;
+                    }
+                    // Accept the request.
+                    params = *p_conn_params;
+                    connection->connParamUpdateRequestPending = false;
+                }
+                // Reject the pending request.
+                else
+                {
+                    connection->connParamUpdateRequestPending = false;
+                }
+            }
+            // No request was pending on the central, this means we just change
+            // the current connection parameters.
+            else
+            {
+                // Check that we actually got parameters.
+                if (!p_conn_params)
+                {
+                    return NRF_ERROR_INVALID_ADDR;
+                }
+                params = *p_conn_params;
+            }
 
-        return 0;
+            // Fetch the partner connection.
+            SoftdeviceConnection * peripheralConnection = connection->partnerConnection;
+
+            // If new parameters are available, generate events on both, central
+            // and peripheral with the new parameters and change the parameters
+            // stored in the connection object.
+            if (params.has_value())
+            {
+                // Change the parameters in the connection objects.
+                connection->connectionInterval =
+                    UNITS_TO_MSEC(params->min_conn_interval, CONFIG_UNIT_1_25_MS);
+                peripheralConnection->connectionInterval =
+                    UNITS_TO_MSEC(params->min_conn_interval, CONFIG_UNIT_1_25_MS);
+
+                { // central event
+                    simBleEvent simEvent = {};
+                    simEvent.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+
+                    auto & bleEvent = simEvent.bleEvent;
+                    bleEvent.header.evt_id = BLE_GAP_EVT_CONN_PARAM_UPDATE;
+                    bleEvent.header.evt_len = simEvent.globalId;
+                    bleEvent.evt.gap_evt.conn_handle = connection->connectionHandle;
+                    bleEvent.evt.gap_evt.params.conn_param_update.conn_params = *params;
+
+                    connection->owningNode->eventQueue.push_back(simEvent);
+                }
+
+                { // peripheral event
+                    simBleEvent simEvent = {};
+                    simEvent.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+
+                    auto & bleEvent = simEvent.bleEvent;
+                    bleEvent.header.evt_id = BLE_GAP_EVT_CONN_PARAM_UPDATE;
+                    bleEvent.header.evt_len = simEvent.globalId;
+                    bleEvent.evt.gap_evt.conn_handle = connection->connectionHandle;
+                    bleEvent.evt.gap_evt.params.conn_param_update.conn_params = *params;
+
+                    peripheralConnection->owningNode->eventQueue.push_back(simEvent);
+                }
+            }
+            // If a request was rejected, generate an event on the peripheral.
+            else
+            {
+                simBleEvent simEvent = {};
+                simEvent.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+
+                auto & bleEvent = simEvent.bleEvent;
+                bleEvent.header.evt_id = BLE_GAP_EVT_CONN_PARAM_UPDATE;
+                bleEvent.header.evt_len = simEvent.globalId;
+                bleEvent.evt.gap_evt.conn_handle = connection->connectionHandle;
+
+                auto & connParams = bleEvent.evt.gap_evt.params.conn_param_update.conn_params;
+                connParams.min_conn_interval = peripheralConnection->connectionInterval;
+                connParams.max_conn_interval = peripheralConnection->connectionInterval;
+                connParams.slave_latency = Conf::meshPeripheralSlaveLatency;
+                connParams.conn_sup_timeout = Conf::meshConnectionSupervisionTimeout;
+
+                peripheralConnection->owningNode->eventQueue.push_back(simEvent);
+            }
+        }
+        // Called on the peripheral.
+        else
+        {
+            // Fetch the partner connection.
+            SoftdeviceConnection * centralConnection = connection->partnerConnection;
+            // Check that no connection parameter update request is already
+            // pending.
+            if (centralConnection->connParamUpdateRequestPending)
+            {
+                return NRF_ERROR_BUSY;
+            }
+            // Check that the connection parameters were actually passed.
+            if (!p_conn_params)
+            {
+                return NRF_ERROR_INVALID_ADDR;
+            }
+            // TODO: Check the constraints of the parameter values and
+            //       return NRF_ERROR_INVALID_PARAM if violated.
+            // Update the requested connection parameters.
+            auto &cpurp = centralConnection->connParamUpdateRequestParameters;
+            cpurp.minConnInterval = p_conn_params->min_conn_interval;
+            cpurp.maxConnInterval = p_conn_params->max_conn_interval;
+            cpurp.slaveLatency = p_conn_params->slave_latency;
+            cpurp.connSupTimeout = p_conn_params->conn_sup_timeout; 
+            // Compute the timeout and set the pending flag.
+            centralConnection->connParamUpdateRequestTimeoutDs =
+                centralConnection->owningNode->gs.appTimerDs + 20;
+            centralConnection->connParamUpdateRequestPending = true;
+            // Create the event on the central.
+            simBleEvent simEvent = {};
+            simEvent.globalId = cherrySimInstance->simState.globalEventIdCounter++;
+            auto & bleEvent = simEvent.bleEvent;
+            bleEvent.header.evt_id = BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST;
+            bleEvent.header.evt_len = simEvent.globalId;
+            bleEvent.evt.gap_evt.conn_handle = centralConnection->connectionHandle;
+            bleEvent.evt.gap_evt.params.conn_param_update_request.conn_params =
+                *p_conn_params;
+            // Push the request event into the event queue of the central node.
+            centralConnection->owningNode->eventQueue.push_back(simEvent);
+        }
+
+        return NRF_SUCCESS;
     }
 
     uint32_t sd_ble_gap_scan_stop()
@@ -1167,10 +1351,11 @@ extern "C"
     {
         START_OF_FUNCTION();
 
-        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
+        //HINT: No sdBusyProbability is used here, as tests with a network of 50 nodes have shown that NRF_BUSY did not occur
+        //a single time in 4 months
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbabilityUnlikely)) {
             return NRF_ERROR_BUSY;
         }
-
 
         SoftdeviceConnection* connection = cherrySimInstance->FindConnectionByHandle(cherrySimInstance->currentNode, connHandle);
 
@@ -1184,10 +1369,8 @@ extern "C"
         s1.globalId = cherrySimInstance->simState.globalEventIdCounter++;
         s1.bleEvent.header.evt_id = BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST;
         s1.bleEvent.header.evt_len = s1.globalId;
-        s1.bleEvent.evt.gattc_evt.conn_handle = connHandle;
+        s1.bleEvent.evt.gatts_evt.conn_handle = connHandle;
         s1.bleEvent.evt.gatts_evt.params.exchange_mtu_request.client_rx_mtu = clientRxMtu;
-        ble_gap_addr_t address = CherrySim::Convert(&cherrySimInstance->currentNode->address);
-        CheckedMemcpy(&s1.bleEvent.evt.gap_evt.params.sec_info_request.peer_addr, &address, sizeof(ble_gap_addr_t));
 
         connection->partner->eventQueue.push_back(s1);
 
@@ -1199,7 +1382,9 @@ extern "C"
     {
         START_OF_FUNCTION();
 
-        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
+        //HINT: No sdBusyProbability is used here, as tests with a network of 50 nodes have shown that NRF_BUSY did not occur
+        //a single time in 4 months
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbabilityUnlikely)) {
             return NRF_ERROR_BUSY;
         }
 
@@ -1227,15 +1412,17 @@ extern "C"
 
         connection->connectionMtu = serverRxMtu - FruityHal::ATT_HEADER_SIZE;
 
+
         simBleEvent s1;
         CheckedMemset(&s1, 0, sizeof(s1));
         s1.globalId = cherrySimInstance->simState.globalEventIdCounter++;
         s1.bleEvent.header.evt_id = BLE_GATTC_EVT_EXCHANGE_MTU_RSP;
         s1.bleEvent.header.evt_len = s1.globalId;
         s1.bleEvent.evt.gattc_evt.conn_handle = connHandle;
+        s1.bleEvent.evt.gattc_evt.error_handle = BLE_GATT_HANDLE_INVALID;
+        s1.bleEvent.evt.gattc_evt.gatt_status = BLE_GATT_STATUS_SUCCESS;
         s1.bleEvent.evt.gattc_evt.params.exchange_mtu_rsp.server_rx_mtu = serverRxMtu;
-        ble_gap_addr_t address = CherrySim::Convert(&cherrySimInstance->currentNode->address);
-        CheckedMemcpy(&s1.bleEvent.evt.gap_evt.params.sec_info_request.peer_addr, &address, sizeof(ble_gap_addr_t));
+
   
         connection->partner->eventQueue.push_back(s1);
 
@@ -1466,26 +1653,77 @@ extern "C"
     uint32_t sd_ble_evt_get(uint8_t* p_dest, uint16_t* p_len)
     {
         START_OF_FUNCTION();
-        if (cherrySimInstance->currentNode->eventQueue.size() > 0) {
 
-            simBleEvent bleEvent = cherrySimInstance->currentNode->eventQueue.front();
-            cherrySimInstance->currentNode->eventQueue.pop_front();
-
-            if (cherrySimInstance->simEventListener != nullptr) {
-                cherrySimInstance->simEventListener->CherrySimBleEventHandler(cherrySimInstance->currentNode, &bleEvent, FruityHal::GetEventBufferSize());
-            }
-
-            //We copy the current event so that we can access it during debugging if we want to get more information
-            CheckedMemcpy(&cherrySimInstance->currentNode->currentEvent, &bleEvent, sizeof(simBleEvent));
-
-            CheckedMemcpy(p_dest, &bleEvent.bleEvent, FruityHal::GetEventBufferSize());
-            *p_len = FruityHal::GetEventBufferSize();
-
-            return NRF_SUCCESS;
+        if (p_len == nullptr)
+        {
+            // [SD]: Invalid or not sufficiently aligned pointer supplied.
+            return NRF_ERROR_INVALID_ADDR;
         }
-        else {
+
+        if (cherrySimInstance->currentNode->eventQueue.empty())
+        {
+            // [SD]: No events ready to be pulled.
             return NRF_ERROR_NOT_FOUND;
         }
+
+        auto simBleEvent = cherrySimInstance->currentNode->eventQueue.front();
+
+        // Compute the number of bytes to copy from the event to the buffer.
+        // The BLE events can contain more data than the native BLE event
+        // structure, where the data member provides that overflow space.
+        constexpr std::size_t eventSize =
+                sizeof(simBleEvent.bleEvent) + sizeof(simBleEvent.bleEventOverflowData);
+
+        // TODO: The actual SoftDevice checks that the event actually fits
+        //       into the buffer. If you compile this check in, the simulator
+        //       fails. This is becaue (in the simulator) we use the evt_len
+        //       field of the header to transport the global event id.
+        //       Tracked in BR-1360.
+        //if (*p_len < simBleEvent.simBleEvent.header.evt_len)
+        //{
+        //    // [SD]: Event ready but could not fit into the supplied buffer.
+        //    return NRF_ERROR_DATA_SIZE;
+        //}
+        // TODO: For now we will use the number of bytes computed above and
+        //       return failure if the buffer was too small. If you arrive
+        //       here during debugging, the buffer you passed in was too small.
+        //       This check (and notice) can be removed after the check above
+        //       works correctly. (BR-1360)
+        if (*p_len < eventSize)
+        {
+            // [SD]: Event ready but could not fit into the supplied buffer.
+            return NRF_ERROR_DATA_SIZE;
+        }
+
+        // We store the current event so that we can access it during debugging
+        // if we want to get more information.
+        cherrySimInstance->currentNode->currentEvent = simBleEvent;
+        cherrySimInstance->currentNode->eventQueue.pop_front();
+
+        if (cherrySimInstance->simEventListener != nullptr)
+        {
+            cherrySimInstance->simEventListener->CherrySimBleEventHandler(
+                    cherrySimInstance->currentNode,
+                    &simBleEvent, sizeof(simBleEvent));
+        }
+
+        // [SD]: Update the pointee of p_len with the used number of bytes.
+        *p_len = std::min<std::uint16_t>(*p_len, eventSize);
+
+        // [SD]: If p_dest is the nullptr, just peek the event length.
+        if (p_dest != nullptr)
+        {
+            CheckedMemcpy(p_dest, &simBleEvent, *p_len);
+        }
+
+        // [SD]: Event pulled and stored into the supplied buffer.
+        return NRF_SUCCESS;
+
+        // References:
+        // [SD] SoftDevice S132:
+        //      https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.s132.api.v5.0.0%2Fgroup___b_l_e___c_o_m_m_o_n___f_u_n_c_t_i_o_n_s.html&cp=4_7_3_6_2_0_2_2_2&anchor=ga412b12b43c253dd744bcf574d6e86f43
+        // [SD] SoftDevice S140:
+        //      https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.s140.api.v6.1.0%2Fgroup___b_l_e___c_o_m_m_o_n___f_u_n_c_t_i_o_n_s.html&cp=4_7_4_3_2_0_2_2_2&anchor=ga412b12b43c253dd744bcf574d6e86f43
     }
 
     //############### Other ###################
@@ -1626,6 +1864,12 @@ extern "C"
     }
 
     uint32_t sd_power_mode_set(uint8_t power_mode)
+    {
+        START_OF_FUNCTION();
+        return 0;
+    }
+
+    uint32_t sd_power_system_off()
     {
         START_OF_FUNCTION();
         return 0;
@@ -1775,28 +2019,20 @@ const char *__asan_default_options() {
 std::map<std::string, int> simStatCounts;
 void sim_collect_statistic_count(const char* key)
 {
-    if (simStatCounts.find(key) != simStatCounts.end())
-    {
-        simStatCounts[key] = simStatCounts[key] + 1;
-    }
-    else {
-        simStatCounts[key] = 1;
-    }
+    simStatCounts[key] += 1;
 }
 
 std::map<std::string, int> simStatAvgCounts;
 std::map<std::string, int> simStatAvgTotal;
 void sim_collect_statistic_avg(const char* key, int value)
 {
-    if (simStatAvgCounts.find(key) != simStatAvgCounts.end())
-    {
-        simStatAvgCounts[key] = simStatAvgCounts[key] + 1;
-        simStatAvgTotal[key] = simStatAvgTotal[key] + value;
-    }
-    else {
-        simStatAvgCounts[key] = 1;
-        simStatAvgTotal[key] = value;
-    }
+    simStatAvgCounts[key] += 1;
+    simStatAvgTotal[key] += value;
+}
+
+void sim_clear_statistics()
+{
+    simStatCounts.clear();
 }
 
 void sim_print_statistics()
@@ -1816,6 +2052,11 @@ void sim_print_statistics()
     }
 
     printf("--------------" EOL);
+}
+
+int sim_get_statistics(const char* key)
+{
+    return simStatCounts[key];
 }
 
 uint32_t sim_get_stack_type()

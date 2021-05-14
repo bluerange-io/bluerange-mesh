@@ -29,26 +29,30 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include "FmTypes.h"
+
+#include <cstddef>
+
 #ifdef SIM_ENABLED
 #include <type_traits>
 #endif
-#include "FmTypes.h"
 
 /**
- * A simple queue implementation of fixed member size and a fixed amount of members.
+ * A simple queue implementation based on a circular buffer of fixed member size and a fixed amount of members.
  */
-template<typename T, int N>
+template <typename T, int N>
 class SimpleQueue
 {
 private:
     T data[N];
-    u32 readHead = 0;
+    u32 readHead  = 0;
     u32 writeHead = 0;
 
-    void IncHead(u32& head)
+    void IncHead(u32 &head)
     {
         head++;
-        if (head >= N) head = 0;
+        if (head >= N)
+            head = 0;
     }
 
 public:
@@ -62,58 +66,108 @@ public:
         }
     }
 
-    T* GetRaw()
+    NO_DISCARD T *GetRaw()
     {
         return data;
     }
 
-    const T* GetRaw() const
+    NO_DISCARD const T *GetRaw() const
     {
         return data;
     }
 
-    size_t GetAmountOfElements() const
+    NO_DISCARD std::size_t GetAmountOfElements() const
     {
-        if (writeHead >= readHead) return writeHead - readHead;
-        else return (N - readHead) + writeHead;
+        if (writeHead >= readHead)
+        {
+            return writeHead - readHead;
+        }
+        else
+        {
+            return (N - readHead) + writeHead;
+        }
     }
 
-    bool IsFull() const
+    NO_DISCARD bool IsFull() const
     {
         return GetAmountOfElements() >= (length - 1);
     }
 
-    bool Push(const T& t)
+    NO_DISCARD bool Push(const T &t)
     {
         if (IsFull())
         {
-            SIMEXCEPTION(IllegalStateException);
             return false;
         }
+
         data[writeHead] = t;
         IncHead(writeHead);
+
         return true;
     }
 
-    bool Pop()
-    {
-        if (GetAmountOfElements() == 0) return false;
-        IncHead(readHead);
-        return true;
-    }
-
-    T Peek() const
+    NO_DISCARD bool Pop()
     {
         if (GetAmountOfElements() == 0)
         {
-            SIMEXCEPTION(IllegalStateException);
+            return false;
         }
-        return data[readHead];
+
+        IncHead(readHead);
+
+        return true;
+    }
+
+    NO_DISCARD bool TryPeek(T & result)
+    {
+        if (GetAmountOfElements() == 0)
+        {
+            return false;
+        }
+
+        result = data[readHead];
+
+        return true;
+    }
+
+    NO_DISCARD bool TryPeekAndPop(T & result)
+    {
+        if (TryPeek(result))
+        {
+            IncHead(readHead);
+            return true;
+        }
+
+        return false;
+    }
+
+    template <typename Predicate>
+    NO_DISCARD T * FindByPredicate(Predicate predicate)
+    {
+        const std::size_t size = GetAmountOfElements();
+
+        if (size == 0)
+        {
+            return nullptr;
+        }
+
+        u32 head = readHead;
+        for (std::size_t index = 0; index < size; ++index)
+        {
+            if (predicate(data[head]))
+            {
+                return &data[head];
+            }
+
+            IncHead(head);
+        }
+
+        return nullptr;
     }
 
     void Reset()
     {
-        readHead = 0;
+        readHead  = 0;
         writeHead = 0;
     }
 };

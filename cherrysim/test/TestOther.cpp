@@ -39,6 +39,7 @@
 #include "RingIndexGenerator.h"
 #include "json.hpp"
 #include "SimpleQueue.h"
+#include "DebugModule.h"
 
 
 extern "C"{
@@ -62,7 +63,7 @@ TEST(TestOther, BatteryTest)
     //Log the battery usage
     for (u32 i = 0; i < tester.sim->GetTotalNodes(); i++) {
         u32 usageMicroAmpere = tester.sim->nodes[i].nanoAmperePerMsTotal / tester.sim->simState.simTimeMs;
-        printf("Average Battery usage for node %d was %u uA" EOL, tester.sim->nodes[i].id, usageMicroAmpere);
+        printf("Average Battery usage for node %d was %u uA" EOL, tester.sim->nodes[i].GetNodeId(), usageMicroAmpere);
     }
 }
 
@@ -70,18 +71,18 @@ TEST(TestOther, TestSimpleQueue)
 {
     SimpleQueue<u32, 4> queue;
 
+    u32 value;
+
     ASSERT_EQ(queue.GetAmountOfElements(), 0);
     ASSERT_EQ(queue.IsFull(), false);
-    {
-        Exceptions::DisableDebugBreakOnException disable;
-        ASSERT_THROW(queue.Peek(), IllegalStateException);
-    }
+    ASSERT_FALSE(queue.TryPeek(value));
     ASSERT_EQ(queue.Pop(), false);
 
     ASSERT_TRUE(queue.Push(1));
     ASSERT_EQ(queue.GetAmountOfElements(), 1);
     ASSERT_EQ(queue.IsFull(), false);
-    ASSERT_EQ(queue.Peek(), 1);
+    ASSERT_TRUE(queue.TryPeek(value));
+    ASSERT_EQ(value, 1);
     ASSERT_EQ(queue.Pop(), true);
     ASSERT_EQ(queue.Pop(), false);
 
@@ -89,9 +90,11 @@ TEST(TestOther, TestSimpleQueue)
     ASSERT_TRUE(queue.Push(2));
     ASSERT_EQ(queue.GetAmountOfElements(), 2);
     ASSERT_EQ(queue.IsFull(), false);
-    ASSERT_EQ(queue.Peek(), 1);
+    ASSERT_TRUE(queue.TryPeek(value));
+    ASSERT_EQ(value, 1);
     ASSERT_EQ(queue.Pop(), true);
-    ASSERT_EQ(queue.Peek(), 2);
+    ASSERT_TRUE(queue.TryPeek(value));
+    ASSERT_EQ(value, 2);
     ASSERT_EQ(queue.Pop(), true);
     ASSERT_EQ(queue.Pop(), false);
 
@@ -100,30 +103,47 @@ TEST(TestOther, TestSimpleQueue)
     ASSERT_TRUE(queue.Push(3));
     ASSERT_EQ(queue.GetAmountOfElements(), 3);
     ASSERT_EQ(queue.IsFull(), true);
-    ASSERT_EQ(queue.Peek(), 1);
+    ASSERT_TRUE(queue.TryPeek(value));
+    ASSERT_EQ(value, 1);
     ASSERT_EQ(queue.Pop(), true);
-    ASSERT_EQ(queue.Peek(), 2);
+    ASSERT_TRUE(queue.TryPeek(value));
+    ASSERT_EQ(value, 2);
     ASSERT_EQ(queue.Pop(), true);
-    ASSERT_EQ(queue.Peek(), 3);
+    ASSERT_TRUE(queue.TryPeek(value));
+    ASSERT_EQ(value, 3);
     ASSERT_EQ(queue.Pop(), true);
     ASSERT_EQ(queue.Pop(), false);
 
     ASSERT_TRUE(queue.Push(1));
     ASSERT_TRUE(queue.Push(2));
     ASSERT_TRUE(queue.Push(3));
-    {
-        Exceptions::DisableDebugBreakOnException disable;
-        ASSERT_THROW(queue.Push(4), IllegalStateException);
-    }
+    ASSERT_FALSE(queue.Push(4));
     ASSERT_EQ(queue.GetAmountOfElements(), 3);
     ASSERT_EQ(queue.IsFull(), true);
-    ASSERT_EQ(queue.Peek(), 1);
+    ASSERT_TRUE(queue.TryPeek(value));
+    ASSERT_EQ(value, 1);
     ASSERT_EQ(queue.Pop(), true);
-    ASSERT_EQ(queue.Peek(), 2);
+    ASSERT_TRUE(queue.TryPeek(value));
+    ASSERT_EQ(value, 2);
     ASSERT_EQ(queue.Pop(), true);
-    ASSERT_EQ(queue.Peek(), 3);
+    ASSERT_TRUE(queue.TryPeek(value));
+    ASSERT_EQ(value, 3);
     ASSERT_EQ(queue.Pop(), true);
     ASSERT_EQ(queue.Pop(), false);
+
+    ASSERT_TRUE(queue.Push(1));
+    ASSERT_TRUE(queue.Push(2));
+    ASSERT_TRUE(queue.Push(3));
+    ASSERT_EQ(queue.GetAmountOfElements(), 3);
+    ASSERT_EQ(queue.IsFull(), true);
+
+    ASSERT_TRUE(queue.TryPeekAndPop(value));
+    ASSERT_EQ(value, 1);
+    ASSERT_TRUE(queue.TryPeekAndPop(value));
+    ASSERT_EQ(value, 2);
+    ASSERT_TRUE(queue.TryPeekAndPop(value));
+    ASSERT_EQ(value, 3);
+    ASSERT_FALSE(queue.TryPeekAndPop(value));
 }
 
 TEST(TestOther, TestSimpleQueueRandomness)
@@ -138,7 +158,9 @@ TEST(TestOther, TestSimpleQueueRandomness)
         ASSERT_EQ(queue.IsFull(), queue.GetAmountOfElements() == queue.length - 1);
         if (queue.GetAmountOfElements() > 0)
         {
-            ASSERT_EQ(queue.Peek(), comparisonQueue.front());
+            u32 value;
+            ASSERT_TRUE(queue.TryPeek(value));
+            ASSERT_EQ(value, comparisonQueue.front());
         }
 
         // Flip coin if we push or pop
@@ -146,13 +168,13 @@ TEST(TestOther, TestSimpleQueueRandomness)
         {
             // push
             const u32 element = mt.NextU32();
-            queue.Push(element);
+            ASSERT_TRUE(queue.Push(element));
             comparisonQueue.push(element);
         }
         else
         {
             // pop
-            queue.Pop();
+            ASSERT_TRUE(queue.Pop());
             comparisonQueue.pop();
         }
     }
@@ -180,11 +202,12 @@ TEST(TestOther, TestRebootReason)
     //After a successful boot, the node should no longer report RebootReason::UNKNOWN but RebootReason::UNKNOWN_BUT_BOOTED
     NodeIndexSetter setter(0);
     tester.sim->ResetCurrentNode(RebootReason::UNKNOWN, false);
+    tester.SimulateForGivenTime(1 * 1000);
     tester.SendTerminalCommand(1, "action this status get_rebootreason");
     tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"type\":\"reboot_reason\",\"nodeId\":1,\"module\":3,\"reason\":22");
 }
 
-#ifndef GITHUB_RELEASE
+#if defined(PROD_SINK_NRF52)
 TEST(TestOther, TestPositionSetting)
 {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
@@ -243,7 +266,7 @@ TEST(TestOther, TestPositionSetting)
     ASSERT_NEAR(tester.sim->nodes[1].y, 20.f / simConfig.mapHeightInMeters,    absError);
     ASSERT_NEAR(tester.sim->nodes[1].z,  1.8 / simConfig.mapElevationInMeters, absError);
 }
-#endif //!GITHUB_RELEASE
+#endif
 
 TEST(TestOther, TestMersenneTwister)
 {
@@ -273,7 +296,7 @@ TEST(TestOther, TestMersenneTwister)
 TEST(TestOther, ConfigurationTest)
 {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    testerConfig.verbose = false;
+    //testerConfig.verbose = true;
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
@@ -322,6 +345,7 @@ TEST(TestOther, TestJsonConfigSerialization)
     simConfig->connectionTimeoutProbabilityPerSec = 12;
     simConfig->sdBleGapAdvDataSetFailProbability = 13;
     simConfig->sdBusyProbability = 14;
+    simConfig->sdBusyProbabilityUnlikely = 15;
     simConfig->simulateAsyncFlash = true;
     simConfig->asyncFlashCommitTimeProbability = 16;
     simConfig->importFromJson = true;
@@ -340,11 +364,12 @@ TEST(TestOther, TestJsonConfigSerialization)
     simConfig->useLogAccumulator = true;
     simConfig->defaultNetworkId = 19;
     new (&simConfig->preDefinedPositions)std::vector<std::pair<double, double>>;
-    simConfig->preDefinedPositions = { {0.1, 0.2},{0.3, 0.4} };
+    simConfig->preDefinedPositions = { {0.1, 0.2},{0.3, 0.4},{0.5, 0.6, 0.7} };
     simConfig->rssiNoise = true;
     simConfig->simulateWatchdog = true;
     simConfig->simulateJittering = true;
     simConfig->verbose = true;
+    simConfig->fastLaneToSimTimeMs = 123;
     simConfig->enableClusteringValidityCheck = true;
     simConfig->enableSimStatistics = true;
     new (&simConfig->storeFlashToFile) std::string;
@@ -383,9 +408,10 @@ TEST(TestOther, TestJsonConfigSerialization)
     ASSERT_EQ(copy.simOtherDelay, 9);
     ASSERT_EQ(copy.playDelay, 10);
     ASSERT_EQ(copy.interruptProbability, 11);
-    ASSERT_NEAR(copy.connectionTimeoutProbabilityPerSec, 12, 0.01);
+    ASSERT_EQ(copy.connectionTimeoutProbabilityPerSec, 12);
     ASSERT_EQ(copy.sdBleGapAdvDataSetFailProbability, 13);
     ASSERT_EQ(copy.sdBusyProbability, 14);
+    ASSERT_EQ(copy.sdBusyProbabilityUnlikely, 15);
     ASSERT_EQ(copy.simulateAsyncFlash, true);
     ASSERT_EQ(copy.asyncFlashCommitTimeProbability, 16);
     ASSERT_EQ(copy.importFromJson, true);
@@ -400,15 +426,19 @@ TEST(TestOther, TestJsonConfigSerialization)
     ASSERT_EQ(copy.logReplayCommands, true);
     ASSERT_EQ(copy.useLogAccumulator, true);
     ASSERT_EQ(copy.defaultNetworkId, 19);
-    ASSERT_EQ(copy.preDefinedPositions.size(), 2);
-    ASSERT_NEAR(copy.preDefinedPositions[0].first, 0.1, 0.01);
-    ASSERT_NEAR(copy.preDefinedPositions[0].second, 0.2, 0.01);
-    ASSERT_NEAR(copy.preDefinedPositions[1].first, 0.3, 0.01);
-    ASSERT_NEAR(copy.preDefinedPositions[1].second, 0.4, 0.01);
+    ASSERT_EQ(copy.preDefinedPositions.size(), 3);
+    ASSERT_NEAR(copy.preDefinedPositions[0].x, 0.1, 0.01);
+    ASSERT_NEAR(copy.preDefinedPositions[0].y, 0.2, 0.01);
+    ASSERT_NEAR(copy.preDefinedPositions[1].x, 0.3, 0.01);
+    ASSERT_NEAR(copy.preDefinedPositions[1].y, 0.4, 0.01);
+    ASSERT_NEAR(copy.preDefinedPositions[2].x, 0.5, 0.01);
+    ASSERT_NEAR(copy.preDefinedPositions[2].y, 0.6, 0.01);
+    ASSERT_NEAR(copy.preDefinedPositions[2].z, 0.7, 0.01);
     ASSERT_EQ(copy.rssiNoise, true);
     ASSERT_EQ(copy.simulateWatchdog, true);
     ASSERT_EQ(copy.simulateJittering, true);
     ASSERT_EQ(copy.verbose, true);
+    ASSERT_EQ(simConfig->fastLaneToSimTimeMs, 123);
     ASSERT_EQ(copy.enableClusteringValidityCheck, true);
     ASSERT_EQ(copy.enableSimStatistics, true);
     ASSERT_EQ(copy.storeFlashToFile, "eee");
@@ -423,7 +453,8 @@ TEST(TestOther, TestJsonConfigSerialization)
     simConfig->siteJsonPath.~basic_string();
 }
 
-#ifndef GITHUB_RELEASE
+
+#if defined(PROD_SINK_NRF52)
 TEST(TestOther, TestReplay)
 {
     std::string logAccumulatorDemonstrator = "";
@@ -502,7 +533,8 @@ TEST(TestOther, TestReplay)
     ASSERT_TRUE(logAccumulatorReplay.find("[!]COMMAND EXECUTION START:[!]index:0,time:32350,cmd:action 0 enroll basic BBBBG 5 118 ED:24:56:91:4E:48:C1:E1:7B:7B:D9:22:17:AE:59:EF FE:47:59:4D:FA:06:61:49:52:28:FD:5B:84:CA:DB:F5 43:BF:7F:7C:7B:AB:B2:C8:C5:3B:22:EB:F3:49:3B:01 05:00:00:00:05:00:00:00:05:00:00:00:05:00:00:00 5 0 CRC: 2568303097[!]COMMAND EXECUTION END[!]") != std::string::npos);
     ASSERT_TRUE(logAccumulatorReplay.find("[!]COMMAND EXECUTION START:[!]index:0,time:42350,cmd:action 0 enroll basic BBBBG 5 118 ED:24:56:91:4E:48:C1:E1:7B:7B:D9:22:17:AE:59:EF FE:47:59:4D:FA:06:61:49:52:28:FD:5B:84:CA:DB:F5 43:BF:7F:7C:7B:AB:B2:C8:C5:3B:22:EB:F3:49:3B:01 05:00:00:00:05:00:00:00:05:00:00:00:05:00:00:00 5 0 CRC: 2568303097[!]COMMAND EXECUTION END[!]") != std::string::npos);
 }
-#endif //GITHUB_RELEASE
+#endif //PROD_SINK_NRF52
+
 
 TEST(TestOther, TestSimCommandCrc)
 {
@@ -614,10 +646,11 @@ TEST(TestOther, TestEncryption) {
     ccm_soft_encrypt(&ccme);
 }
 
-#ifndef GITHUB_RELEASE
+
+#if IS_ACTIVE(CLC_MODULE)
 TEST(TestOther, TestConnectionAllocator) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    testerConfig.verbose = false;
+    //testerConfig.verbose = true;
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
     simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
@@ -662,7 +695,7 @@ TEST(TestOther, TestConnectionAllocator) {
         }
     }
 }
-#endif //GITHUB_RELEASE
+#endif //IS_ACTIVE(CLC_MODULE)
 
 //Tests the implementation of CherrySimTester::SimulateUntilMessagesReceived.
 TEST(TestOther, TestMultiMessageSimulation) {
@@ -780,11 +813,11 @@ TEST(TestOther, TestTimeSync) {
 
     //Check that time is running and simulate 10 seconds of passing time...
     NodeIndexSetter setter(0);
-    auto start = tester.sim->currentNode->gs.timeManager.GetTime();
+    auto start = tester.sim->currentNode->gs.timeManager.GetLocalTime();
     tester.SimulateForGivenTime(10 * 1000);
 
     //... and check that the times have been updated correctly
-    auto end = tester.sim->currentNode->gs.timeManager.GetTime();
+    auto end = tester.sim->currentNode->gs.timeManager.GetLocalTime();
     int diff = end - start;
     
     ASSERT_TRUE(diff >= 9 && diff <= 11);
@@ -890,7 +923,7 @@ TEST(TestOther, TestTimeSyncDuration_long) {
 
     for (u32 i = 0; i < tester.sim->GetTotalNodes(); i++)
     {
-        u32 time = tester.sim->nodes[i].gs.timeManager.GetTime();
+        u32 time = tester.sim->nodes[i].gs.timeManager.GetLocalTime();
         if (time < minTime) minTime = time;
         if (time > maxTime) maxTime = time;
     }
@@ -902,6 +935,7 @@ TEST(TestOther, TestTimeSyncDuration_long) {
     ASSERT_TRUE(timeDiff <= 1);     //We allow 1 second off
 }
 
+#if defined(PROD_SINK_NRF52)
 TEST(TestOther, TestRestrainedKeyGeneration) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     //testerConfig.verbose = true;
@@ -940,6 +974,7 @@ TEST(TestOther, TestRestrainedKeyGeneration) {
     Logger::ConvertBufferToHexString(restrainedKeyBuffer, 16, restrainedKeyHexBuffer, sizeof(restrainedKeyHexBuffer));
     ASSERT_STREQ("60:AB:54:BB:F5:1C:3F:77:FA:BC:80:4C:E0:F4:78:58", restrainedKeyHexBuffer);
 }
+#endif
 
 TEST(TestOther, TestTimeout) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
@@ -1008,10 +1043,11 @@ TEST(TestOther, TestBulkMode) {
     {
         FAIL() << "Bulk Mode should consume very low energy, but consumed: " << usageMicroAmpere;
     }
-    tester.SendTerminalCommand(1, "set_node_key 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00");
-    tester.SimulateGivenNumberOfSteps(1);
 
-    tester.SendTerminalCommand(2, "action this ma connect 00:00:00:01:00:00 1 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00"); //1 = FmKeyId::NODE
+
+
+    //Connect to the node using the default node key (hardcoded in the config, used if no UICR data is present)
+    tester.SendTerminalCommand(2, "action this ma connect 00:00:00:01:00:00 1 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11"); //1 = FmKeyId::NODE
 
     tester.SimulateForGivenTime(10 * 1000);
     u32 dummyVal = 1337;
@@ -1043,7 +1079,7 @@ TEST(TestOther, TestBulkMode) {
 }
 #endif //GITHUB_RELEASE
 
-#ifndef GITHUB_RELEASE
+#if defined(DEV_AUTOMATED_TESTS_MASTER_NRF52)
 TEST(TestOther, TestWatchdog) {
     Exceptions::ExceptionDisabler<WatchdogTriggeredException> wtDisabler;
     Exceptions::ExceptionDisabler<SafeBootTriggeredException> stDisabler;
@@ -1103,10 +1139,11 @@ TEST(TestOther, TestWatchdog) {
         ASSERT_EQ(tester.sim->nodes[0].restartCounter, 1); //watchdogs are disabled, nodes should not starve at all.
     }
 }
-#endif //GITHUB_RELEASE
+#endif //DEV_AUTOMATED_TESTS_MASTER_NRF52
 
 
 #ifndef GITHUB_RELEASE
+#if IS_ACTIVE(CLC_MODULE)
 extern void SetBoard_3(BoardConfiguration *c);
 extern void SetBoard_4(BoardConfiguration *c);
 extern void SetBoard_9(BoardConfiguration *c);
@@ -1195,6 +1232,7 @@ TEST(TestOther, TestBoards) {
     c.boardType = 24;
     SetBoard_24(&c);
 }
+#endif // IS_ACTIVE(CLC_MODULE)
 #endif //GITHUB_RELEASE
 
 TEST(TestOther, TestRingIndexGenerator) {
@@ -1352,7 +1390,7 @@ TEST(TestOther, TestNoOfReceivedMsgs) {
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
     simConfig.terminalId = 0;
     simConfig.SetToPerfectConditions();
-   // testerConfig.verbose = true;
+    // testerConfig.verbose = true;
 
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
@@ -1360,15 +1398,23 @@ TEST(TestOther, TestNoOfReceivedMsgs) {
 
     tester.SimulateUntilClusteringDone(50 * 1000);
 
-    tester.SendTerminalCommand(1, "action 2 status get_errors");
+    // Reset the error log on node 2 such that the count of received messages is accurate.
+    {
+        NodeIndexSetter nodeIndexSetter{1};
+        ASSERT_EQ(GS->node.configuration.nodeId, 2);
+        Logger::GetInstance().GetErrorLog().Reset();
+    }
+
     tester.SendTerminalCommand(1, "action 2 status get_device_info");
     tester.SendTerminalCommand(1, "action 2 status get_device_info");
     tester.SendTerminalCommand(1, "action 2 status get_errors");
 
-    //number of received messages (3)
-    //2 get_devic_info msgs 
-    //1 get_errors msg
-    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":2,\"code\":81,\"extra\":3,\"time\":\\d+");
+    // The number of received messages will be at least 3:
+    // - 2 'get_device_info' messages
+    // - 1 'get_errors' message
+    // It can e.g. happen that a 'set_enrolled_nodes' message gets inbetween the two (depends on
+    // the seed).
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":2,\"code\":81,\"extra\":[3-4],\"time\":\\d+");
 }
 
 #ifndef GITHUB_RELEASE
@@ -1447,7 +1493,7 @@ TEST(TestOther, TestConnectionSupervisionTimeoutWillDisconnect) {
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("C");
     tester.sim->FindNodeById(2)->gs.logger.EnableTag("C");
 
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(100 * 1000);
 
     // With following settings static RSSI is around -89.95dbm which is just above reception level (0.3 probability).
     // With variable noise it should casue connection timeout
@@ -1553,4 +1599,61 @@ TEST(TestOther, TestDataSentSplit) {
 
     Logger::ConvertBufferToBase64String(buffer, len, bufferHex, sizeof(bufferHex));
     tester.SimulateUntilMessageReceived(100 * 1000, 2, "DataSentHandler: %s", bufferHex);
+}
+
+#ifndef GITHUB_RELEASE
+TEST(TestOther, TestNoPacketsDropped) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    // testerConfig.verbose = true;
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.simTickDurationMs = 15;
+    simConfig.SetToPerfectConditions();
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 15 });
+    simConfig.nodeConfigName.insert({ "prod_asset_nrf52", 5 });
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+    tester.SimulateUntilClusteringDone(120 * 1000);
+
+    sim_print_statistics();
+    sim_clear_statistics();
+
+    for (uint32_t i = 0; i < 5; i++)
+    {
+        tester.SimulateForGivenTime(60 * 1000);
+        tester.SendTerminalCommand(1, "action 0 status get_errors");
+    }
+    tester.SimulateForGivenTime(100 * 1000);
+    int errors = sim_get_statistics(Logger::GetErrorLogCustomError(CustomErrorTypes::COUNT_DROPPED_PACKETS));
+    ASSERT_EQ(errors, 0);
+    sim_print_statistics();
+}
+#endif
+
+TEST(TestOther, TestThroughput) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    // testerConfig.verbose = true;
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.SetToPerfectConditions();
+    simConfig.simTickDurationMs = 15;
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateUntilClusteringDone(50 * 1000);
+    tester.sim->FindNodeById(1)->gs.logger.DisableTag("CONN");
+    tester.sim->FindNodeById(2)->gs.logger.DisableTag("CONN");
+
+    tester.SendTerminalCommand(1, "action this debug flood 2 2 10000");
+
+    // Throughput has to be at least as high as now = 3900 byte/s
+    tester.SimulateUntilRegexMessageReceived(40 * 1000, 2, "Counted \\d+ flood payload bytes in \\d+ ms = \\d+ byte/s");
+    {
+        NodeIndexSetter setter(1);
+        DebugModule* test = (DebugModule*)tester.sim->FindNodeById(2)->gs.node.GetModuleById(ModuleId::DEBUG_MODULE);
+        ASSERT_TRUE(test->GetThroughputTestResult() >= 3900);
+    }
 }

@@ -103,6 +103,8 @@ RecordStorage & RecordStorage::GetInstance()
 
 RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, ModuleIdWrapper lockDownModule)
 {
+    if (!GS->config.enableRecordStorage) return RecordStorageResultCode::PERSISTENCE_DISABLED;
+
     if (recordStorageLockDown && lockDownModule != lockDownModuleId)
     {
         SIMEXCEPTION(RecordStorageIsLockedDownException);
@@ -111,8 +113,12 @@ RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 da
     return RecordStorage::SaveRecord(recordId, data, dataLength, callback, userType, nullptr, 0, lockDownModule);
 }
 
-RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength, ModuleIdWrapper lockDownModule)
+RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength, ModuleIdWrapper lockDownModule, bool alwaysPersist)
 {
+    //If persistence is disabled we do not store the entry
+    //This can however be overwritten if alwaysPersist is true
+    if (!GS->config.enableRecordStorage && !alwaysPersist) return RecordStorageResultCode::PERSISTENCE_DISABLED;
+
     if (recordStorageLockDown && lockDownModule != lockDownModuleId)
     {
         SIMEXCEPTION(RecordStorageIsLockedDownException);
@@ -141,8 +147,10 @@ RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 da
     }
 }
 
-RecordStorageResultCode RecordStorage::DeactivateRecord(u16 recordId, RecordStorageEventListener* callback, u32 userType, ModuleIdWrapper lockDownModule)
+RecordStorageResultCode RecordStorage::DeactivateRecord(u16 recordId, RecordStorageEventListener* callback, u32 userType, ModuleIdWrapper lockDownModule, bool alwaysPersist)
 {
+    if (!GS->config.enableRecordStorage && !alwaysPersist) return RecordStorageResultCode::PERSISTENCE_DISABLED;
+
     if (recordStorageLockDown && lockDownModule != lockDownModuleId)
     {
         SIMEXCEPTION(RecordStorageIsLockedDownException);
@@ -158,6 +166,34 @@ RecordStorageResultCode RecordStorage::DeactivateRecord(u16 recordId, RecordStor
         op->op.userType = userType;
         op->recordId = recordId;
         op->stage = RecordStorageDeactivateStage::FIRST_STAGE;
+
+        ProcessQueue(false);
+        return RecordStorageResultCode::SUCCESS;
+    }
+    else {
+        return RecordStorageResultCode::BUSY;
+    }
+}
+
+RecordStorageResultCode RecordStorage::ImmortalizeRecord(u16 recordId, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength, ModuleIdWrapper lockDownModule, bool alwaysPersist)
+{
+    if (!GS->config.enableRecordStorage && !alwaysPersist) return RecordStorageResultCode::PERSISTENCE_DISABLED;
+
+    if (recordStorageLockDown && lockDownModule != lockDownModuleId)
+    {
+        SIMEXCEPTION(RecordStorageIsLockedDownException);
+        return RecordStorageResultCode::RECORD_STORAGE_LOCK_DOWN;
+    }
+    //Cache the operation to be processed later
+    u8* buffer = opQueue.Reserve(SIZEOF_RECORD_STORAGE_IMMORTALIZE_RECORD_OP);
+
+    if (buffer != nullptr) {
+        ImmortalizeRecordOperation* op = (ImmortalizeRecordOperation*)buffer;
+        op->op.type = (u8)RecordStorageOperationType::IMMORTALIZE_RECORD;
+        op->op.callback = callback;
+        op->op.userType = userType;
+        op->recordId = recordId;
+        op->stage = RecordStorageImmortalizeStage::FIRST_STAGE;
 
         ProcessQueue(false);
         return RecordStorageResultCode::SUCCESS;
@@ -228,6 +264,7 @@ void RecordStorage::SaveRecordInternal(SaveRecordOperation& op)
             CheckedMemset(buffer, 0xFF, recordLength);
             RecordStorageRecord* newRecord = (RecordStorageRecord*)buffer;
             newRecord->recordActive = 1;
+            newRecord->mortal = 1; //By default a record will be erased by a factory reset
             newRecord->padding = padding; //Padding must be stored so we can substract it later when retrieving the record
             newRecord->recordLength = recordLength;
             newRecord->recordId = op.recordId;
@@ -245,7 +282,8 @@ void RecordStorage::SaveRecordInternal(SaveRecordOperation& op)
             //The crc is calculated over the record header and data, excluding the first two byte (crc and flags)
             newRecord->crc = Utility::CalculateCrc8(((u8*)newRecord) + 2, newRecord->recordLength - 2);
             op.stage = RecordStorageSaveStage::CALLBACKS_AND_FINISH;
-            GS->flashStorage.CacheAndWriteData((u32*)newRecord, (u32*)freeSpace, recordLength, this, (u32)FlashUserTypes::DEFAULT);
+            FlashStorageError result = GS->flashStorage.CacheAndWriteData((u32*)newRecord, (u32*)freeSpace, recordLength, this, (u32)FlashUserTypes::DEFAULT);
+            op.op.flashStorageErrorCode = result;
             return;
 
         }
@@ -296,6 +334,41 @@ void RecordStorage::DeactivateRecordInternal(DeactivateRecordOperation& op)
     }
     
     if (op.stage == RecordStorageDeactivateStage::CALLBACKS_AND_FINISH)
+    {
+        return RecordOperationFinished(op.op, RecordStorageResultCode::SUCCESS);
+    }
+}
+
+//Making a record immortal will set one flag in the header to zero and will let the record outlive factory resets
+void RecordStorage::ImmortalizeRecordInternal(ImmortalizeRecordOperation& op)
+{
+    //If any of the previous operations failed, call the callback with an error code
+    if (op.op.flashStorageErrorCode != FlashStorageError::SUCCESS) {
+        return RecordOperationFinished(op.op, RecordStorageResultCode::BUSY);
+    }
+
+    if (op.stage == RecordStorageImmortalizeStage::IMMORTALIZE) {
+        logt("RS", "ImmortalizeRecord id %u", op.recordId);
+
+        RecordStorageRecord* record = GetRecord(op.recordId);
+
+        if (record == nullptr){
+            return RecordOperationFinished(op.op, RecordStorageResultCode::INTERNAL_ERROR);
+        } else if (record->mortal == 0) {
+            return RecordOperationFinished(op.op, RecordStorageResultCode::SUCCESS);
+        }
+
+        //Only set the bit that we need to be toggled to 0
+        RecordStorageRecord newRecordHeader;
+        CheckedMemset(&newRecordHeader, 0xFF, SIZEOF_RECORD_STORAGE_RECORD_HEADER);
+        newRecordHeader.mortal = 0;
+
+        op.stage = RecordStorageImmortalizeStage::CALLBACKS_AND_FINISH;
+        GS->flashStorage.CacheAndWriteData((u32*)&newRecordHeader, (u32*)record, SIZEOF_RECORD_STORAGE_RECORD_HEADER, this, (u32)FlashUserTypes::DEFAULT);
+        return;
+    }
+    
+    if (op.stage == RecordStorageImmortalizeStage::CALLBACKS_AND_FINISH)
     {
         return RecordOperationFinished(op.op, RecordStorageResultCode::SUCCESS);
     }
@@ -740,6 +813,35 @@ RecordStorageRecord* RecordStorage::GetRecord(u16 recordId) const
     return result;
 }
 
+bool RecordStorage::HasMortalRecords()
+{
+    //Go through all pages
+    for (u32 i = 0; i < RECORD_STORAGE_NUM_PAGES; i++)
+    {
+        //Check if this page is active
+        RecordStoragePage& page = getPage(i);
+        if (GetPageState(page) != RecordStoragePageState::ACTIVE) continue;
+
+        //Get first record
+        RecordStorageRecord* record = (RecordStorageRecord*)page.data;
+
+        //Iterate through all valid records
+        while(IsRecordValid(page, record))
+        {
+            if(record->mortal) return true;
+
+            //Pick the next record on this page
+            record = (RecordStorageRecord*)((u8*)record + record->recordLength);
+        }
+
+
+        //Check if it is valid
+        if (IsRecordValid(page, record)) return true;
+    }
+
+    return false;
+}
+
 //Returns a pointer to the free space, otherwise returns nullptr
 u8* RecordStorage::GetFreeRecordSpace(u16 dataLength) const
 {
@@ -892,6 +994,11 @@ void RecordStorage::FlashStorageItemExecuted(FlashStorageTaskItem* task, FlashSt
             {
                 op->flashStorageErrorCode = errorCode;
                 DeactivateRecordInternal(*(DeactivateRecordOperation*)op);
+            }
+            else if (op->type == (u8)RecordStorageOperationType::IMMORTALIZE_RECORD)
+            {
+                op->flashStorageErrorCode = errorCode;
+                ImmortalizeRecordInternal(*(ImmortalizeRecordOperation*)op);
             }
         }
 

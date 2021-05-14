@@ -37,9 +37,6 @@
 #include "MersenneTwister.h"
 #include "json.hpp"
 #include "MoveAnimation.h"
-#ifndef GITHUB_RELEASE
-#include "ClcMock.h"
-#endif //GITHUB_RELEASE
 
 extern "C" {
 #include <ble_hci.h>
@@ -68,7 +65,14 @@ constexpr int PACKET_STAT_SIZE = 10*1024;
 //A BLE Event that is sent by the Simulator is wrapped
 struct simBleEvent {
     ble_evt_t bleEvent;
-    u8 data[NRF_SDH_BLE_GATT_MAX_MTU_SIZE]; //overflow area for ble_evt_t as sizeof(ble_evt_t) does not include write data, this must be added using the MTU
+    // The overflow area for ble_evt_t, as sizeof(ble_evt_t) does not include
+    // the memory used for storing write data. The ble_evt_t is used more like
+    // an event header with additional data written directly after it.
+    // Use the maximum MTU as the size of the overflow area.
+    // IMPORTANT: This must always be the member directly after the ble_evt_t
+    //            member!
+    u8 bleEventOverflowData[NRF_SDH_BLE_GATT_MAX_MTU_SIZE];
+
     u32 size;
     u32 globalId;
     u32 additionalInfo; //Can be used to store a pointer or other information
@@ -122,6 +126,8 @@ struct SoftdeviceConnection {
     u32 connectionSupervisionTimeoutMs = 0;
     bool isCentral = false;
     u32 lastReceivedPacketTimestampMs = 0;
+    u32 connectionSetupTimeMs = 0;
+    u32 lastConnectionTimestampMs = 0;
 
     SoftDeviceBufferedPacket reliableBuffers[SIM_NUM_RELIABLE_BUFFERS] = {};
     SoftDeviceBufferedPacket unreliableBuffers[SIM_NUM_UNRELIABLE_BUFFERS] = {};
@@ -129,6 +135,10 @@ struct SoftdeviceConnection {
     //Clustering validity
     i16 validityClusterSizeToSend;
 
+    // Connection Parameter Update (only used when isCentral == true)
+    bool connParamUpdateRequestPending = false;
+    u32 connParamUpdateRequestTimeoutDs = 0;
+    FruityHal::BleGapConnParams connParamUpdateRequestParameters = {};
 };
 
 struct CharacteristicDB_t
@@ -220,19 +230,18 @@ struct InterruptSettings
 
 struct FeaturesetPointers;
 
+using TerminalId = std::uint32_t;
+
 struct NodeEntry {
     u32 index;
-    int id;
     float x = 0;
     float y = 0;
     float z = 0;
+    bool jsonDataImported = false;
     std::string nodeConfiguration = "";
     FeaturesetPointers* featuresetPointers = nullptr;
     FruityHal::BleGapAddr address;
     GlobalState gs;
-#ifndef GITHUB_RELEASE
-    ClcMock clcMock;
-#endif //GITHUB_RELEASE
     NRF_FICR_Type ficr;
     NRF_UICR_Type uicr;
     NRF_GPIO_Type gpio;
@@ -241,7 +250,9 @@ struct NodeEntry {
     SoftdeviceState state;
     std::deque<simBleEvent> eventQueue;
     simBleEvent currentEvent; //The event currently being processed, as a simBleEvent, this can have some additional data attached to it useful for debugging
-    bool ledOn;
+    bool led1On = false;
+    bool led2On = false;
+    bool led3On = false;
     u32 nanoAmperePerMsTotal;
     u8 *moduleMemoryBlock = nullptr;
 
@@ -286,6 +297,38 @@ struct NodeEntry {
     bool timeslotCloseSessionRequested = false;
     bool timeslotRequested = false;
     bool timeslotActive = false;
+
+    //This memory is retained in the RAM during soft reboots but will be lost
+    //If the node is powered off and on again
+    struct {
+        RamRetainStruct ramRetainStruct;
+        RamRetainStruct ramRetainStructPreviousBoot;
+        u32 rebootMagicNumber;
+        u32 watchdogExtraInfoFlags;
+        TemporaryEnrollment temporaryEnrollment;
+    } retainedRamMemory;
+
+    float GetXinMeters() const;
+    float GetYinMeters() const;
+    float GetZinMeters() const;
+
+    void Initialize(u32 nodeIndex);
+
+    [[nodiscard]] constexpr NodeId GetNodeId() const
+    {
+        return this->gs.node.configuration.nodeId;
+    }
+
+    [[nodiscard]] constexpr NetworkId GetNetworkId() const
+    {
+        return this->gs.node.configuration.networkId;
+    }
+
+    [[nodiscard]] constexpr TerminalId GetTerminalId() const
+    {
+        return static_cast<TerminalId>(this->index + 1);
+    }
+
 };
 
 
@@ -296,6 +339,27 @@ struct SimulatorState {
     u32 globalEventIdCounter = 0;
     u32 globalPacketIdCounter = 0;
 };
+
+struct DevicePosition {
+    double x = 0;
+    double y = 0;
+    double z = 0;
+};
+
+namespace nlohmann {
+    template <>
+    struct adl_serializer<DevicePosition> {
+        static void to_json(nlohmann::json& j, const DevicePosition& p) {
+            j = nlohmann::json{ p.x, p.y, p.z };
+        }
+
+        static void from_json(const nlohmann::json& j, DevicePosition& p) {
+            if (j.size() >= 1) j.at(0).get_to(p.x);
+            if (j.size() >= 2) j.at(1).get_to(p.y);
+            if (j.size() >= 3) j.at(2).get_to(p.z);
+        }
+    };
+}
 
 struct SimConfiguration {
     // CAREFUL!
@@ -310,12 +374,13 @@ struct SimConfiguration {
     uint32_t    mapElevationInMeters               = 0;
     uint32_t    simTickDurationMs                  = 0;
     int32_t     terminalId                         = 0; //Enter -1 to disable, 0 for all nodes, or a specific id
-    int32_t     simOtherDelay                      = 0; // Enter 1 - 100000 to send sim_other message only each ... simulation steps, this increases the speed significantly
+    int32_t     simOtherDelay                      = 0; // deprecated and retained only for compatibility reasons
     int32_t     playDelay                          = 0; //Allows us to view the simulation slower than simulated, is added after each step
     uint32_t    interruptProbability               = 0; // The probability that a queued interrupt is simulated.
-    float       connectionTimeoutProbabilityPerSec = 0; //Every minute or so: 0.00001;
+    uint32_t    connectionTimeoutProbabilityPerSec = 0; // UINT32_MAX * 0.00001; //Simulates a connection timout around every minute
     uint32_t    sdBleGapAdvDataSetFailProbability  = 0; // UINT32_MAX * 0.0001; //Simulate fails on setting adv Data
     uint32_t    sdBusyProbability                  = 0; // UINT32_MAX * 0.0001; //Simulates getting back busy errors from softdevice
+    uint32_t    sdBusyProbabilityUnlikely          = 0; // UINT32_MAX * 0.0001; //Simulates getting back busy errors from softdevice for methods where it is very unlikely to get a BUSY error
     bool        simulateAsyncFlash                 = false;
     uint32_t    asyncFlashCommitTimeProbability    = 0; // 0 - UINT32_MAX where UINT32_MAX is instant commit in the next simulation step
     bool        importFromJson                     = false; //Set to true and specify siteJsonPath and devicesJsonPath to read a scenario from json
@@ -330,17 +395,18 @@ struct SimConfiguration {
     bool        logReplayCommands                  = false; //If set, lines are logged out that can be used as input for the replay feature.
     bool        useLogAccumulator                  = false; //If set, all logs are written to CherrySim::logAccumulator
     u32         defaultNetworkId                   = 0;
-    std::vector<std::pair<double, double>> preDefinedPositions;
+    std::vector<DevicePosition> preDefinedPositions;
     bool        rssiNoise                          = false;
     bool        simulateWatchdog                   = false;
     bool        simulateJittering                  = false;
     bool        verbose                            = false;
+    uint32_t    fastLaneToSimTimeMs                = 0; //Set to a value bigger than 0 to speed up the simulation until this simulation time was reached (disables native rendering & terminal in the meantime)
 
     bool        enableClusteringValidityCheck      = false; //Enable automatic checking of the clustering after each step
     bool        enableSimStatistics                = false;
     std::string storeFlashToFile                   = "";
 
-    bool        verboseCommands                    = false;
+    bool        verboseCommands                    = false; // deprecated but retained only for compatability reasons. Should be removed in ticket BR-2321
 
 
     //BLE Stack capabilities

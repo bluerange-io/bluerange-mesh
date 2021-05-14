@@ -68,6 +68,15 @@ void SetFeaturesetConfiguration_prod_ruuvi_weather_nrf52(ModuleConfiguration* co
     {
         Conf::GetInstance().defaultLedMode = LedMode::OFF;
         Conf::GetInstance().terminalMode = TerminalMode::DISABLED;
+
+        // Set the discovery timeout by default to reduce battery usage.
+        Conf::GetInstance().highDiscoveryTimeoutSec = 60;
+
+        // Set a long-term connection interval which gets used after the connection has been established for some time.
+        Conf::GetInstance().meshMinLongTermConnectionInterval =
+            MSEC_TO_UNITS(90, CONFIG_UNIT_1_25_MS);
+        Conf::GetInstance().meshMaxLongTermConnectionInterval =
+            MSEC_TO_UNITS(90, CONFIG_UNIT_1_25_MS);
     }
     else if (config->moduleId == ModuleId::NODE)
     {

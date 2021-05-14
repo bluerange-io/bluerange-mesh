@@ -34,3 +34,5 @@
 #define ACTIVATE_JSON_LOGGING 1 //Undefine to remove json communication over uart
 #define ACTIVATE_UART 1 //Undefine to remove the UART terminal
 #define ACTIVATE_SEGGER_RTT 1 //Undefine to disable debugging over Segger Rtt
+
+#define ACTIVATE_VENDOR_TEMPLATE_MODULE 1

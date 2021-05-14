@@ -111,6 +111,7 @@ enum class AppDisconnectReason : u8 {
     EN_OCEAN_ENROLLED_AND_IN_MESH = 38,
     MULTIPLE_MA_ON_ASSET = 39,
     HANDLE_PACKET_SENT_ERROR = 40,
+    MTU_UPGRADE_FAILED = 41,
 };
 
 
@@ -215,6 +216,17 @@ class BaseConnection
         virtual void ReceiveDataHandler(BaseConnectionSendData* sendData, u8 const * data) = 0;
         //Can be called by subclasses to use the ConnPacketHeader reassembly
         u8 const * ReassembleData(BaseConnectionSendData* sendData, u8 const * data);
+
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+        /// Called in response to a connection parameter update.
+        virtual void GapConnParamUpdateHandler(
+                const FruityHal::BleGapConnParams & params);
+        /// Called on the device in the central role, when the remote device
+        /// in the peripheral role requests an update of the connection
+        /// parameters.
+        virtual void GapConnParamUpdateRequestHandler(
+                const FruityHal::BleGapConnParams & params);
+#endif
 
         //Helpers
         virtual void PrintStatus() = 0;

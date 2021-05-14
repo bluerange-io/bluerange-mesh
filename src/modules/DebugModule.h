@@ -82,6 +82,7 @@ class DebugModule: public Module
         u32 firstFloodPacketMs = 0;
         u32 autoFloodSum = 0;
         u32 lastFloodPacketMs = 0;
+        u32 throughputInBytesPerSecond = 0;
 
         //Variables for counter mode
         NodeId counterDestinationId = 0;
@@ -97,6 +98,13 @@ class DebugModule: public Module
         u16 pingCount;
         u16 pingCountResponses;
         bool syncTest;
+
+        //Debug logging of received advertisement messages
+        struct {
+            DeviceIdentifier type;
+            u8 value[10];
+            u16 advMessageTypeFilter;
+        } scanLogIdentifier = {};
 
 #ifdef SIM_ENABLED
         u32 queueFloodCounterLow    = 0;
@@ -220,6 +228,9 @@ class DebugModule: public Module
 
         void CauseStackOverflow() const;
 
+        void PrintAdvMessageHeader(const char* type, const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent);
+        void PrintAdvMessage(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent);
+
     public:
         DECLARE_CONFIG_AND_PACKED_STRUCT(DebugModuleConfiguration);
 
@@ -270,6 +281,8 @@ class DebugModule: public Module
 
         void TimerEventHandler(u16 passedTimeDs) override final;
 
+        void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override final;
+
         void SendStatistics(NodeId receiver) const;
 
 #if IS_ACTIVE(BUTTONS)
@@ -294,5 +307,7 @@ class DebugModule: public Module
         //Priority
         virtual DeliveryPriority GetPriorityOfMessage(const u8* data, MessageLength size) override;
 #endif
+        
+        u32 GetThroughputTestResult();
         
 };

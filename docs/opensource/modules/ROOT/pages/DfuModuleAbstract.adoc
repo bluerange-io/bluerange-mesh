@@ -1,4 +1,4 @@
-= DFU Module (Abstract)
+= DfuModule (Abstract)
 
 NOTE: The _DfuModule_ with _ModuleId_ 4 is not open source at the moment, but can be used by our customers. Don't hesitate to contact M-Way Solutions GmbH.
 

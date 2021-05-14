@@ -52,6 +52,8 @@ typedef struct BoardConfiguration
     //Custom boardTypes should start from 10000
     uint16_t boardType;
 
+    const char*  boardName;
+
     //Default board is pca10031, modify SET_BOARD if different board is required
     //Or flash config data to UICR
     int8_t led1Pin;
@@ -89,6 +91,12 @@ typedef struct BoardConfiguration
     uint32_t voltageDividerR1;
     uint32_t voltageDividerR2;
     uint8_t dcDcEnabled;
+
+    // If set to value different than 0, turns on some battery opimizations
+    uint8_t powerOptimizationEnabled;
+
+    int8_t powerButton;
+    uint8_t powerButtonActiveHigh : 8;
 } BoardConfiguration;
 #pragma pack(pop)
 

@@ -9,12 +9,13 @@ You have three possibilities:
 
 * xref:#Precompiled[Flashing the precompiled firmware] will take you about *5 minutes*.
 * If you want to *compile it yourself* you need to xref:#Toolchain[setup the Toolchain with VsCode & Compile FruityMesh]. This will take you a few more minutes until everything is ready to go.
-* We also offer a *simulator* that allows you to do a lot of the development work on your computer instead of on the hardware itself. You can set up mesh networks of hundreds of nodes at the same time while being able to control and debug them all. Take a look at xref:CherrySim.adoc[CherrySim] for building and usage instructions.
+* We also offer a *simulator* that allows you to do a lot of the development work on your computer instead of on the hardware itself. You can set up mesh networks of hundreds of nodes at the same time while being able to control and debug them all. Take a look at xref:CherrySim.adoc[CherrySim] for building and usage instructions. It is possible to do most of the development work without even having access to a hardware development kit.
 
 [#Precompiled]
 == Flashing Precompiled Firmware
 The precompiled firmware can be flashed in three easy steps. You can download it from our link:https://github.com/mwaylabs/fruitymesh/releases[GitHub Release Page].
 
+[#NrfTools]
 === Download nRF5 Command Line Tools
 The nRF Command Line Tools are handy for flashing the compiled firmware on a device. You can download them here for the operating system of your choice and install them:
 
@@ -22,7 +23,8 @@ https://www.nordicsemi.com/Software-and-tools/Development-Tools/nRF-Command-Line
 
 The tools come with a bundled installation of the Segger Utilities, which are necessary for flashing and debugging nRF Hardware.
 
-You should add the *bin/* folder of the installation to your operating system PATH variable to make development easier.
+On Windows you should add the *bin/* folder of the installation to your operating system PATH variable to make development easier.
+On Mac OS X this is already done by the installer.
 
 === Flash SoftDevice & Application
 Plug in your nrf52 development board via USB, then open a command prompt in the downloaded folder and type in the following command for flashing:
@@ -50,11 +52,38 @@ FruityMesh is built using the GCC compiler toolchain together with CMake and GNU
 ==== GNU ARM Embedded Toolchain
 Download Version 4.9 of the GNU ARM Embedded Toolchain. This includes the compiler gcc, linker, and multiple utilities like objcopy, addr2line and gdb - the GNU debugger:
 
-https://launchpad.net/gcc-arm-embedded/4.9/4.9-2015-q3-update/
+You can choose any location for the setup of fruitymesh. In this example we will create a folder in our `home/user` folder by checking out the fruitymesh GitHub repository:
 
-Unzip the downloaded package into a folder of your choice.
+==== Windows
+`cd %HOMEPATH%`
+and 
+`git clone https://github.com/mwaylabs/fruitymesh.git`
+
+Download the compiler from https://launchpad.net/gcc-arm-embedded/4.9/4.9-2015-q3-update/ and unzip the files to the cloned fruitymesh folder.
 
 WARNING: Do not choose a newer version, as this might fail to compile.
+
+==== Mac/Linux
+`cd ~`
+and 
+`git clone https://github.com/mwaylabs/fruitymesh.git`
+
+Download the compiler from https://launchpad.net/gcc-arm-embedded/4.9/4.9-2015-q3-update/ and unzip the files to the cloned fruitymesh folder.
+
+WARNING: Do not choose a newer version, as this might fail to compile.
+
+Open your default shell PATH file:
+
+For Z shell:
+`nano ~/.zshrc`
+
+For Bash shell
+`nano ~/.bash_profile`
+
+And add the following line to to the file. Do not forget to change the path according to your GNU ARM Embedded Toolchain location.
+`export PATH="$PATH:<fruitymesh-folder>/gcc-arm-none-eabi-4_9-2015q3/bin"`
+
+For macOS user with Apple silicons the installation of rosetta is required to make gcc work: `softwareupdate --install-rosetta`
 
 ==== Installing CMake
 
@@ -94,7 +123,7 @@ Next, you must install some extensions:
 
 ==== Configure the Project
 
-In order to configure the project, you should create the file `<fruitymesh>/.vscode/settings.json`. Create the folder if it does not yet exist and make sure to replace the path with the correct path that points to your GCC installation. (In case of problems see xref:VsCodeSetup.adoc#Troubleshooting[Troubleshooting])
+In order to configure the project, you should create the file `<fruitymesh-folder>/.vscode/settings.json`. Create the folder if it does not yet exist and make sure to replace the path with the correct path that points to your GCC installation. (In case of problems see xref:VsCodeSetup.adoc#Troubleshooting[Troubleshooting])
 
 [source,C++]
 .settings.json
@@ -128,6 +157,8 @@ This should automatically trigger the CMake configuration and load all available
 
 image:vscode_featuresets.png[featuresets]
 
+If you haven't already installed the nRF5 Command Line Tools, you can do so xref:#NrfTools[here].
+
 You are now able to build the binary targets by clicking on the build button next to the featureset. There are also a number of Utility targets. If you right click a Utility target and choose "Run Utility", it will first build the target and then flash the application and SoftDevice on any attached development board.
 
 For more information about VsCode, how to setup Debugging or for some Troubleshooting, make sure to also read the xref:VsCodeSetup.adoc[VsCode Setup] page.
@@ -137,7 +168,7 @@ You can now continue with the xref:#GetStarted[Get Started] section.
 === Option 2: Manual CMake Project Configuration
 If you want to build FruityMesh on the command line, use the following instructions. Further explanation can be found under xref:BuildingWithCMake.adoc[Building With CMake]
 
-Open a command line in `<fruitymesh>/_build/commandline` and execute the following command within that directory. Make sure to replace the path to GCC to fit your installation (use forward slashes "*/*"):
+Open a command line in `<fruitymesh-folder>/_build/commandline` and execute the following command within that directory. Make sure to replace the path to GCC to fit your installation (use forward slashes "*/*"):
 
 `cmake "../../" -DBUILD_FEATURESETS=ON -DGCC_PATH="C:/<yourpath>/gcc-arm-none-eabi-4_9" -G "Unix Makefiles"`
 
@@ -192,6 +223,8 @@ TIP: OSX users: To find out which serial port to open, you can list all devices 
 TIP: On Windows you can find the correct COM port to connect to by opening the device manager and then under (COM & LPT) you should see a JLink entry with the COM number at the end (e.g. COM3). All the serial settings can be found in PuTTY under Connection/Serial.
 
 TIP: You can also use the Segger RTT viewer to connect to the terminal of the node. Just open the viewer and select the correct settings while the debugger is connected to your computer.
+
+Once FruityMesh is running, make sure to take a look at our native simulator xref:CherrySim.adoc[CherrySim] which you can use to fully develop FruityMesh based applications on your development machine without the need to work on the hardware itself. This greatly simplifies debugging and error analysis.
 
 === Reset Development Kit
 Once your terminal is connected to the serial port, press the reset button on the Development Kit and the Terminal should provide you with some output similar to this:

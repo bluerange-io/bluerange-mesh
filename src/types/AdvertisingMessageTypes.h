@@ -53,11 +53,16 @@ constexpr u32 ADV_PACKET_MAX_SIZE = 31;
 //type across advertising and connection packets if we need to unify these.
 enum class ServiceDataMessageType : u16
 {
-    INVALID      = 0,
-    // depricated : JOIN_ME_V0   = 0x01,
-    LEGACY_ASSET = 0x02,
-    MESH_ACCESS  = 0x03,
-    ASSET        = 0x04,
+    INVALID                = 0x00,
+    JOIN_ME_V0_DEPRECATED  = 0x01, //Deprecated: Was moved to ManufacturerSpecificType
+    LEGACY_ASSET_V1        = 0x02, //Deprecated: Replaced by LEGACY_ASSET_V2
+    MESH_ACCESS            = 0x03,
+    LEGACY_ASSET_V2        = 0x04, //Deprecated: Replaced by ASSET_BLE and ASSET_INS
+    SENSOR_MESSAGE         = 0x05,
+    ASSET_BLE              = 0x06,
+    ASSET_INS              = 0x07,
+    // Note: When adding a new type, think about using using something bigger than e.g. 200
+    // so that we can have a contiguous space with ManufacturerSpecificMessageType and we have u16 here
 };
 
 enum class ManufacturerSpecificMessageType : u8
@@ -190,9 +195,63 @@ STATIC_ASSERT_SIZE(AdvPacketJoinMeV0, 31);
 
 #pragma pack(push)
 #pragma pack(1)
+
+#define SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA_PAYLOAD 7
+struct AdvPacketAssetBleServiceDataPayload {
+
+    NetworkId networkId; //Either 0 if roaming in the organization or != 0 if part of a network and statically attached
+
+    // The received signal strength will be measured 
+    // on the mesh node receiver side, but is considered as part of the payload,
+    // later on, when the tracked asset packets are assembled.
+    i8 rssi37;
+    i8 rssi38;
+    i8 rssi39;
+
+    u8 reserved[2];
+};
+STATIC_ASSERT_SIZE(AdvPacketAssetBleServiceDataPayload, SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA_PAYLOAD);
+
+struct AdvPacketAssetInsServiceDataPayload {
+
+    u8 insMeta; // Encoded INS meta data
+    u16 ins1; // Encoded INS state estimate data
+    u16 ins2;
+    u16 ins3;
+};
+STATIC_ASSERT_SIZE(AdvPacketAssetInsServiceDataPayload, SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA_PAYLOAD);
+
 //Service Data (max. 24 byte)
 #define SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA 24
+
 struct AdvPacketAssetServiceData
+{
+    //6 byte header
+    AdvStructureServiceDataAndType data;
+
+    //1 byte flags
+    u8 moving : 1;
+    u8 hasFreeInConnection : 1;
+    u8 interestedInConnection : 1;
+    u8 channel : 2; // 0 = unknown, 1 = 37, 2 = 38, 3 = 39
+    u8 reservedBits : 3;
+
+    u16 nodeId; //Either a nodeId of a network (networkId must be != 0) or a organization wide unique nodeId
+
+    u8 payload[SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA_PAYLOAD];
+
+    u8 reserved[3];
+    u8 reservedEncryptionCounter; // Potentially reserved for encryption counter
+    u32 mic; //Encryption is probably done using a synchronized time, not yet specified. For now, not encrypted if mic is 0
+};
+STATIC_ASSERT_SIZE(AdvPacketAssetServiceData, SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA);
+
+//Service Data (max. 24 byte)
+#define SIZEOF_ADV_STRUCTURE_LEGACY_V2_ASSET_SERVICE_DATA 24
+
+//Legacy support! This message is no longer sent out by our new assets, however old assets
+//must still be supported and thus this message must still be scannable.
+struct AdvPacketLegacyV2AssetServiceData
 {
     //6 byte header
     AdvStructureServiceDataAndType data;
@@ -218,7 +277,7 @@ struct AdvPacketAssetServiceData
 
     u8 reservedForTimeOrCounter[3]; //This is reserved for some kind of replay protection. DO NOT USE FOR ANYTHING ELSE! We need AT LEAST 3 bytes for this!
 };
-STATIC_ASSERT_SIZE(AdvPacketAssetServiceData, SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA);
+STATIC_ASSERT_SIZE(AdvPacketAssetServiceData, SIZEOF_ADV_STRUCTURE_LEGACY_V2_ASSET_SERVICE_DATA);
 
 //Service Data (max. 24 byte)
 #define SIZEOF_ADV_STRUCTURE_LEGACY_ASSET_SERVICE_DATA 24
@@ -252,8 +311,45 @@ struct AdvPacketLegacyAssetServiceData
 };
 STATIC_ASSERT_SIZE(AdvPacketLegacyAssetServiceData, SIZEOF_ADV_STRUCTURE_LEGACY_ASSET_SERVICE_DATA);
 
-#pragma pack(pop)
+//Service Data (max. 24 byte)
+#define SIZEOF_ADV_STRUCTURE_SENSOR_MESSAGE_SERVICE_DATA 15
+struct AdvPacketSensorMessageServiceData
+{
+    //6 byte header
+    AdvStructureServiceDataAndType data;
 
+    //1 byte flags
+    u8 isEncrypted : 1;
+    u8 isOemProduct : 1;
+    u8 reservedBits : 6;
+
+    // If isEncrypted bit is true then first struct is used otherwise second.
+    union
+    {
+        struct
+        {
+            u32 MIC;
+            NodeId nodeId;
+        }encrypted;
+        struct
+        {
+            u32 serialNumberIndex;
+            NodeId nodedId;
+        }unencrypted;
+    }encryptedField;
+
+    // The module that generated this value
+    ModuleId moduleId;
+
+    // The module that generated this value
+    SensorType sensorType;
+
+    // Payload placeholder
+    u8 payload[1];
+};
+STATIC_ASSERT_SIZE(AdvPacketSensorMessageServiceData, SIZEOF_ADV_STRUCTURE_SENSOR_MESSAGE_SERVICE_DATA + 1);
+
+#pragma pack(pop)
 
 //End Packing
 #pragma pack(pop)

@@ -51,6 +51,13 @@ static std::mutex terminalMutex;
 #include <unistd.h>
 #endif
 
+#if IS_ACTIVE(SOCKET_TERM)
+#include <SocketTerm.h>
+#endif
+
+#if IS_ACTIVE(APP_UART)
+#include "AppUartModule.h"
+#endif
 
 extern "C"
 {
@@ -114,6 +121,9 @@ void Terminal::Init()
 #endif
 #if IS_ACTIVE(STDIO)
     StdioInit();
+#endif
+#if IS_ACTIVE(SOCKET_TERM)
+    SocketTerm::SocketTermInitNode(cherrySimInstance->currentNode);
 #endif
 
     terminalIsInitialized = true;
@@ -267,8 +277,14 @@ void Terminal::PutString(const char* buffer)
 #if IS_ACTIVE(SEGGER_RTT)
     Terminal::SeggerRttPutString(buffer);
 #endif
+#if IS_ACTIVE(APP_UART)
+    Terminal::AppUartPutString(buffer);
+#endif
 #if IS_ACTIVE(STDIO)
     Terminal::StdioPutString(buffer);
+#endif
+#if IS_ACTIVE(SOCKET_TERM)
+    SocketTerm::PutString(cherrySimInstance->currentNode, buffer, strlen(buffer));
 #endif
 #if IS_ACTIVE(VIRTUAL_COM_PORT)
     FruityHal::VirtualComWriteData((const u8*)buffer, strlen(buffer));
@@ -351,8 +367,14 @@ void Terminal::CheckAndProcessLine()
 #if IS_ACTIVE(SEGGER_RTT)
     SeggerRttCheckAndProcessLine();
 #endif
+#if IS_ACTIVE(APP_UART)
+    AppUartCheckAndProcessLine();
+#endif
 #if IS_ACTIVE(STDIO)
     StdioCheckAndProcessLine();
+#endif
+#if IS_ACTIVE(SOCKET_TERM)
+    SocketTermCheckAndProcessLine();
 #endif
 #if IS_ACTIVE(VIRTUAL_COM_PORT)
     VirtualComCheckAndProcessLine();
@@ -467,6 +489,19 @@ i32 Terminal::TokenizeLine(char* line, u16 lineLength)
 
     return commandArgsSize;
 }
+
+#ifdef SIM_ENABLED
+bool Terminal::IsTermActive()
+{
+#if IS_ACTIVE(STDIO)
+    if (stdioActive && cherrySimInstance->IsSimTermOfCurrentNodeActive()) return true;
+#endif
+#if IS_ACTIVE(SOCKET_TERM)
+    return SocketTerm::IsTermActive(cherrySimInstance->currentNode);
+#endif
+    return false;
+}
+#endif
 
 // ############################### UART
 // Uart communication expects a \r delimiter after a line to process the command
@@ -757,10 +792,50 @@ void Terminal::SeggerRttPutChar(char character)
 }
 #endif
 
+//############################ APP UART
+#define ________________APP_UART___________________
+
+#if IS_ACTIVE(APP_UART)
+
+void Terminal::AppUartCheckAndProcessLine()
+{
+    AppUartModule* appUartModule = reinterpret_cast<AppUartModule*>(GS->node.GetModuleById(APP_UART_MODULE_ID));
+    if (!appUartModule->GetLineToReadAvailable())
+        return;
+
+    readBufferOffset = appUartModule->GetReadBufferOffset();
+    CheckedMemcpy(readBuffer, appUartModule->GetReadBuffer(), readBufferOffset);
+    // App Uart readBuffer does not contain \r or \n
+    readBuffer[readBufferOffset] = '\0';
+    lineToReadAvailable = true;
+    ProcessLine(readBuffer);
+    // Reset buffer
+    readBufferOffset = 0;
+    lineToReadAvailable = false;
+}
+
+void Terminal::AppUartPutString(const char* message)
+{
+    if (strlen(message) == 0)
+        return;
+    AppUartModule* appUartModule = (AppUartModule*)(GS->node.GetModuleById(APP_UART_MODULE_ID));
+    // If the sending process itself generates a log, it will send a log of the sending process forever.
+    if (!appUartModule)
+        return;
+    appUartModule->PutAppLogQueue(message, strlen(message));
+}
+
+#endif
+
 
 //############################ STDIO
 #define ________________STDIO___________________
 #if IS_ACTIVE(STDIO)
+
+//By default stdio is active if it is compiled in
+//it can get deactivated to improve performance
+bool Terminal::stdioActive = true;
+
 #if !defined(_WIN32)
 static int _kbhit(void)
 {
@@ -839,9 +914,83 @@ std::vector<std::string> tokenize(const std::string& message)
     return retVal;
 }
 
+/// Returns true if the command was a simulator command. If an error occured, e.g. because the CRC did not match,
+/// the return value is still true.
+bool Terminal::TryProcessSimulatorCommand(const std::string &command)
+{
+    // Return false if command does not start with 'sim '.
+    if (command.find("sim ") != 0)
+    {
+        return false;
+    }
+
+    // Simulator commands are immediately redirected to cherrySim.
+    // This way, sim commands don't have to follow the same simulated
+    // restrictions like command length and amount of tokens.
+    std::cout << "SIM COMMAND: " << command << std::endl;
+
+    std::vector<std::string> tokens = tokenize(command);
+
+    if (tokens[tokens.size() - 2] == "CRC:")
+    {
+        bool      didError  = false;
+        const u32 passedCrc = Utility::StringToU32(tokens[tokens.size() - 1].data(), &didError);
+
+        const bool skipCrcCheck = tokens.back() == "skip";
+
+        // Remove 'CRC:' and the actual CRC value from the tokens
+        tokens.pop_back();
+        tokens.pop_back();
+
+        if (!skipCrcCheck)
+        {
+            u32 expectedCrc = 0;
+            for (size_t i = 0; i < tokens.size(); i++)
+            {
+                expectedCrc = Utility::CalculateCrc32String(tokens[i].data(), expectedCrc);
+                if (i != tokens.size() - 1)
+                {
+                    expectedCrc = Utility::CalculateCrc32String(" ", expectedCrc);
+                }
+            }
+
+            if (didError || passedCrc != expectedCrc)
+            {
+                OnCrcInvalid();
+                return true;
+            }
+        }
+    }
+
+    // Please note that the 'sim term ...' command is filtered out by the SocketTerm implementation and
+    // processed separately.
+
+    TerminalCommandHandlerReturnType handled = cherrySimInstance->TerminalCommandHandler(tokens);
+    ProcessTerminalCommandHandlerReturnType(handled, 0);
+
+    return true;
+}
+
+void Terminal::LogReplayCommand(const std::string &command)
+{
+    if (cherrySimInstance->simConfig.logReplayCommands)
+    {
+        std::string executionReplayLine =
+            "[!]COMMAND EXECUTION START:[!]index:"
+            + std::to_string(cherrySimInstance->currentNode->index)
+            + ",time:"
+            + std::to_string(cherrySimInstance->simState.simTimeMs)
+            + ",cmd:"
+            + command
+            + "[!]COMMAND EXECUTION END[!]" EOL;
+
+        StdioPutString(executionReplayLine.c_str());
+    }
+}
+
 void Terminal::StdioCheckAndProcessLine()
 {
-    if (cherrySimInstance->simConfig.terminalId != cherrySimInstance->currentNode->id && cherrySimInstance->simConfig.terminalId != 0) return;
+    if (!cherrySimInstance->IsSimTermOfCurrentNodeActive()) return;
 
 #if ((defined(__unix) || defined(_WIN32)))
     if(!meshGwCommunication && _kbhit() != 0){ //FIXME: Not supported by eclipse console
@@ -855,55 +1004,10 @@ void Terminal::StdioCheckAndProcessLine()
     if (GetNextTerminalQueueEntry(entry))
     {
         const std::string& message = entry.terminalCommand;
-        
-        if (cherrySimInstance->simConfig.logReplayCommands)
-        {
-            std::string executionReplayLine = 
-                  "[!]COMMAND EXECUTION START:[!]index:"
-                + std::to_string(cherrySimInstance->currentNode->index)
-                + ",time:"
-                + std::to_string(cherrySimInstance->simState.simTimeMs)
-                + ",cmd:"
-                + message
-                + "[!]COMMAND EXECUTION END[!]" EOL;
-            
-            StdioPutString(executionReplayLine.c_str());
-        }
 
-        const char *simPos = strstr(message.c_str(), "sim ");
-        if (simPos == message.c_str())
-        {
-            //Simulator commands are immediately redirected to cherrySim.
-            //This way, sim commands don't have to follow the same simulated
-            //restrictions like command length and amount of tokens.
-            std::cout << "SIM COMMAND: " << message << std::endl;
-            std::vector<std::string> tokens = tokenize(message);
-            if (tokens[tokens.size() - 2] == "CRC:")
-            {
-                bool didError = false;
-                const u32 passedCrc = Utility::StringToU32(tokens[tokens.size() - 1].data(), &didError);
-                tokens.pop_back();
-                tokens.pop_back();
-                u32 expectedCrc = 0;
-                for (size_t i = 0; i < tokens.size(); i++)
-                {
-                    expectedCrc = Utility::CalculateCrc32String(tokens[i].data(), expectedCrc);
-                    if (i != tokens.size() - 1)
-                    {
-                        expectedCrc = Utility::CalculateCrc32String(" ", expectedCrc);
-                    }
-                }
-                if (didError || passedCrc != expectedCrc)
-                {
-                    OnCrcInvalid();
-                    return;
-                }
-            }
+        LogReplayCommand(message);
 
-            TerminalCommandHandlerReturnType handled = cherrySimInstance->TerminalCommandHandler(tokens);
-            ProcessTerminalCommandHandlerReturnType(handled, 0);
-        }
-        else
+        if (!TryProcessSimulatorCommand(message))
         {
             //Other commands are simulated via the internal buffers of the Terminal.
             if (message.size() >= TERMINAL_READ_BUFFER_LENGTH)
@@ -939,6 +1043,35 @@ void Terminal::StdioPutString(const char*message)
 
 #endif
 
+
+//############################ SOCKET
+#define ________________SOCKET_TERM___________________
+#if IS_ACTIVE(SOCKET_TERM)
+
+void Terminal::SocketTermCheckAndProcessLine()
+{
+    auto buffer = std::string(static_cast<std::size_t>(TERMINAL_READ_BUFFER_LENGTH), '\0');
+    u32  length = SocketTerm::CheckAndGetLine(cherrySimInstance->currentNode, buffer.data(), buffer.size());
+    buffer.resize(length);
+
+    if (length)
+    {
+        LogReplayCommand(buffer);
+
+        if (!TryProcessSimulatorCommand(buffer))
+        {
+            const u16 len = (u16)(buffer.size() + 1);
+            CheckedMemcpy(readBuffer, buffer.c_str(), len);
+            readBufferOffset = (u8)len;
+
+            // printf("SocketTerm %u IN: %s" EOL, cherrySimInstance->currentNode->id, buffer);
+            Terminal::ProcessLine(readBuffer);
+        }
+    }
+}
+
+#endif
+
 //############################ VIRTUAL COM PORT
 #define ________________VIRTUAL_COM_PORT___________________
 
@@ -964,7 +1097,7 @@ void Terminal::VirtualComPortEventHandler(bool portOpened)
 {
     //Once the Virtual Com Port is opened by another device, we send the reboot message
     if(portOpened){
-        Utility::LogRebootJson();
+        Utility::LogRebootJson(true);
     }
 }
 #endif

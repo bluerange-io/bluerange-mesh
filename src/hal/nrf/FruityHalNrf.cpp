@@ -66,8 +66,8 @@ extern "C" {
 #include <app_util_platform.h>
 #include <nrf_uart.h>
 #include <nrf_mbr.h>
-#include <nrf_wdt.h>
 #include <nrf_drv_gpiote.h>
+#include <nrf_wdt.h>
 #include <nrf_delay.h>
 #include <nrf_sdm.h>
 #ifdef NRF52
@@ -159,9 +159,6 @@ struct NrfHalMemory
 #endif // IS_ACTIVE(TIMESLOT)
 };
 
-
-
-
 //#################### Event Buffer ###########################
 //A global buffer for the current event, which must be 4-byte aligned
 
@@ -195,6 +192,15 @@ static FruityHal::BleGattEror nrfErrToGenericGatt(u32 code);
 static const char* getBleEventNameString(u16 bleEventId);
 u32 ClearGeneralPurposeRegister(u32 gpregId, u32 mask);
 u32 WriteGeneralPurposeRegister(u32 gpregId, u32 mask);
+static uint32_t sdAppEvtWaitAnomaly87();
+#if IS_ACTIVE(ASSET_MODULE)
+//Both twiTurnOnAnomaly89() and twiTurnOffAnomaly89() is only added if ACTIVATE_ASSET_MODULE is active because currently
+//twi is only activated for ASSET_MODULE so to avoid the cpp warning of unused functions. Tracked in BR-2082.
+#if !defined(SIM_ENABLED)
+static void twiTurnOffAnomaly89();
+static void twiTurnOnAnomaly89();
+#endif //!defined(SIM_ENABLED)
+#endif //IS_ACTIVE(ASSET_MODULE)
 
 #define __________________BLE_STACK_INIT____________________
 // ############### BLE Stack Initialization ########################
@@ -252,6 +258,13 @@ static inline nrf_gpio_pin_pull_t GenericPullModeToNrf(FruityHal::GpioPullMode m
     if (mode == FruityHal::GpioPullMode::GPIO_PIN_PULLUP) return NRF_GPIO_PIN_PULLUP;
     else if (mode == FruityHal::GpioPullMode::GPIO_PIN_PULLDOWN) return NRF_GPIO_PIN_PULLDOWN;
     else return NRF_GPIO_PIN_NOPULL;
+}
+
+static inline nrf_gpio_pin_sense_t GenericSenseModeToNrf(FruityHal::GpioSenseMode mode)
+{
+    if (mode == FruityHal::GpioSenseMode::GPIO_PIN_LOWSENSE) return NRF_GPIO_PIN_SENSE_LOW;
+    else if (mode == FruityHal::GpioSenseMode::GPIO_PIN_HIGHSENSE) return NRF_GPIO_PIN_SENSE_HIGH;
+    else return NRF_GPIO_PIN_NOSENSE;
 }
 
 static inline nrf_gpiote_polarity_t GenericPolarityToNrf(FruityHal::GpioTransistion transition)
@@ -540,7 +553,6 @@ void FruityHal::EventLooper()
     //Check for waiting events from the application
     ProcessAppEvents();
 
-
     while (true)
     {
         //Fetch BLE events
@@ -572,6 +584,7 @@ void FruityHal::EventLooper()
         }
     }
 
+    GS->inPullEventsLoop = true;
     // Pull event from soc
     while(true){
         uint32_t evt_id;
@@ -583,8 +596,9 @@ void FruityHal::EventLooper()
             ::DispatchSystemEvents(nrfSystemEventToGeneric(evt_id)); // Call handler
         }
     }
+    GS->inPullEventsLoop = false;
 
-    u32 err = sd_app_evt_wait();
+    u32 err = sdAppEvtWaitAnomaly87();
     FRUITYMESH_ERROR_CHECK(err); // OK
     err = sd_nvic_ClearPendingIRQ(SD_EVT_IRQn);
     FRUITYMESH_ERROR_CHECK(err);  // OK
@@ -602,18 +616,21 @@ u16 FruityHal::GetEventBufferSize()
 //This will get called for all events on the ble stack and also for all other interrupts
 static void nrf_sdh_fruitymesh_evt_handler(void * p_context)
 {
+    GS->fruitymeshEventLooperTriggerTimestamp = FruityHal::GetRtcMs();
     ProcessAppEvents();
 }
 
 //This is called for all BLE related events
 static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 {
+    GS->bleEventLooperTriggerTimestamp = FruityHal::GetRtcMs();
     FruityHal::DispatchBleEvents(p_ble_evt);
 }
 
 //This is called for all SoC related events
 static void soc_evt_handler(uint32_t evt_id, void * p_context)
 {
+    GS->socEventLooperTriggerTimestamp = FruityHal::GetRtcMs();
     ::DispatchSystemEvents(nrfSystemEventToGeneric(evt_id));
 }
 
@@ -627,7 +644,14 @@ NRF_SDH_STACK_OBSERVER(m_nrf_sdh_fruitymesh_evt_handler, NRF_SDH_BLE_STACK_OBSER
 //This is our main() after the stack was initialized and is called in a while loop
 void FruityHal::EventLooper()
 {
-    FruityHal::VirtualComProcessEvents();
+    GS->eventLooperTriggerTimestamp = GetRtcMs();
+
+    // If the Virtual COM Port events are not processed in the main context, some unknown issue arises when FruityMesh
+    // is running with the Nordic Secure Bootloader (e.g. the intermediate bootloader of the Laird BL654 dongles).
+    // The issue manifests in Windows not being able to recognize the USB device and leads to FruityDeploy failing
+    // during flashing of the USB sticks. The issue only impacts the flashing process on Windows, not actual
+    // functionality of the Mesh Bridge. See BR-2164.
+    FruityHal::VirtualComEventLoop();
 
     //Call all main context handlers so that they can do low priority long-running processing
     for (u32 i = 0; i < GS->numMainContextHandlers; i++)
@@ -635,7 +659,7 @@ void FruityHal::EventLooper()
         GS->mainContextHandlers[i]();
     }
 
-    u32 err = sd_app_evt_wait();
+    u32 err = sdAppEvtWaitAnomaly87();
     FRUITYMESH_ERROR_CHECK(err); // OK
 }
 
@@ -691,6 +715,7 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
                     (err != NRF_ERROR_RESOURCES)) FRUITYMESH_ERROR_CHECK(err);
             }
 #endif
+            GS->advertismentReceivedTimestamp = GetRtcMs();
             GapAdvertisementReportEvent are(&bleEvent);
             DispatchEvent(are);
         }
@@ -725,6 +750,20 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
             DispatchEvent(csue);
         }
         break;
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+    case BLE_GAP_EVT_CONN_PARAM_UPDATE:
+        {
+            FruityHal::GapConnParamUpdateEvent cpue(&bleEvent);
+            DispatchEvent(cpue);
+        }
+        break;
+    case BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST:
+        {
+            FruityHal::GapConnParamUpdateRequestEvent cpure(&bleEvent);
+            DispatchEvent(cpure);
+        }
+        break;
+#endif
     case BLE_GATTC_EVT_WRITE_RSP:
         {
 #ifdef SIM_ENABLED
@@ -742,12 +781,14 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
         break;
     case BLE_GATTS_EVT_WRITE:
         {
+            GS->lastSendTimestamp = GetRtcMs();
             FruityHal::GattsWriteEvent gwe(&bleEvent);
             DispatchEvent(gwe);
         }
         break;
     case BLE_GATTC_EVT_HVX:
         {
+            GS->lastSendTimestamp = GetRtcMs();
             FruityHal::GattcHandleValueEvent hve(&bleEvent);
             DispatchEvent(hve);
         }
@@ -758,6 +799,7 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
 #ifdef SIM_ENABLED
             //if (cherrySimInstance->currentNode->id == 37 && bleEvent.evt.common_evt.conn_handle == 680) printf("%04u Q@NODE %u WRITE_CMD_TX_COMPLETE %u received" EOL, cherrySimInstance->globalBreakCounter++, cherrySimInstance->currentNode->id, bleEvent.evt.common_evt.params.tx_complete.count);
 #endif
+            GS->lastReceivedTimestamp = GetRtcMs();
             FruityHal::GattDataTransmittedEvent gdte(&bleEvent);
             DispatchEvent(gdte);
         }
@@ -861,6 +903,15 @@ FruityHal::GapConnParamUpdateEvent::GapConnParamUpdateEvent(void const * _evt)
     }
 }
 
+FruityHal::GapConnParamUpdateRequestEvent::GapConnParamUpdateRequestEvent(void const * _evt)
+    :GapEvent(_evt)
+{
+    if (((NrfHalMemory*)GS->halMemory)->currentEvent->header.evt_id != BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST)
+    {
+        SIMEXCEPTION(IllegalArgumentException); //LCOV_EXCL_LINE assertion
+    }
+}
+
 FruityHal::GapEvent::GapEvent(void const * _evt)
     : BleEvent(_evt)
 {
@@ -871,9 +922,44 @@ u16 FruityHal::GapEvent::GetConnectionHandle() const
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.conn_handle;
 }
 
+u16 FruityHal::GapConnParamUpdateEvent::GetMinConnectionInterval() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.min_conn_interval;
+}
+
 u16 FruityHal::GapConnParamUpdateEvent::GetMaxConnectionInterval() const
 {
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.max_conn_interval;
+}
+
+u16 FruityHal::GapConnParamUpdateEvent::GetSlaveLatency() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.slave_latency;
+}
+
+u16 FruityHal::GapConnParamUpdateEvent::GetConnectionSupervisionTimeout() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.conn_sup_timeout;
+}
+
+u16 FruityHal::GapConnParamUpdateRequestEvent::GetMinConnectionInterval() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.min_conn_interval;
+}
+
+u16 FruityHal::GapConnParamUpdateRequestEvent::GetMaxConnectionInterval() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.max_conn_interval;
+}
+
+u16 FruityHal::GapConnParamUpdateRequestEvent::GetSlaveLatency() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.slave_latency;
+}
+
+u16 FruityHal::GapConnParamUpdateRequestEvent::GetConnectionSupervisionTimeout() const
+{
+    return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.conn_param_update.conn_params.conn_sup_timeout;
 }
 
 FruityHal::GapRssiChangedEvent::GapRssiChangedEvent(void const * _evt)
@@ -1498,6 +1584,13 @@ ErrorType FruityHal::BleGapConnectionParamsUpdate(u16 conn_handle, BleGapConnPar
     return nrfErrToGeneric(sd_ble_gap_conn_param_update(conn_handle, &gapConnectionParams));
 }
 
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+ErrorType FruityHal::BleGapRejectConnectionParamsUpdate(u16 conn_handle)
+{
+    return nrfErrToGeneric(sd_ble_gap_conn_param_update(conn_handle, nullptr));
+}
+#endif
+
 ErrorType FruityHal::BleGapConnectionPreferredParamsSet(BleGapConnParams const & params)
 {
     ble_gap_conn_params_t gapConnectionParams = translate(params);
@@ -1796,7 +1889,7 @@ void button_interrupt_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t ac
 
 ErrorType FruityHal::WaitForEvent()
 {
-    return nrfErrToGeneric(sd_app_evt_wait());
+    return nrfErrToGeneric(sdAppEvtWaitAnomaly87());
 }
 
 ErrorType FruityHal::InitializeButtons()
@@ -1836,6 +1929,10 @@ ErrorType FruityHal::GetRandomBytes(u8 * p_data, u8 len)
 //################################################
 #define _________________VIRTUAL_COM_PORT_____________________
 
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+static_assert(TERMINAL_READ_BUFFER_LENGTH == VIRTUAL_COM_LINE_BUFFER_SIZE, "Buffer sizes should match");
+#endif
+
 void FruityHal::VirtualComInitBeforeStack()
 {
 #if IS_ACTIVE(VIRTUAL_COM_PORT)
@@ -1848,10 +1945,10 @@ void FruityHal::VirtualComInitAfterStack(void (*portEventHandler)(bool))
     virtualComStart(portEventHandler);
 #endif
 }
-void FruityHal::VirtualComProcessEvents()
+void FruityHal::VirtualComEventLoop()
 {
 #if IS_ACTIVE(VIRTUAL_COM_PORT)
-    virtualComCheck();
+    virtualComEventLoop();
 #endif
 }
 ErrorType FruityHal::VirtualComCheckAndProcessLine(u8* buffer, u16 bufferLength)
@@ -1878,7 +1975,10 @@ extern "C"{
     void app_timer_handler(void * p_context){
         UNUSED_PARAMETER(p_context);
         
+        // This line must be kept to provide recalculations of global time
         FruityHal::GetRtcMs();
+
+        GS->timestampInAppTimerHandler = FruityHal::GetRtcMs();
 
         //We just increase the time that has passed since the last handler
         //And call the timer from our main event handling queue
@@ -2104,6 +2204,18 @@ void FruityHal::SystemReset(bool softdeviceEnabled)
         NVIC_SystemReset();
 }
 
+void FruityHal::SystemEnterOff(bool softdeviceEnabled)
+{
+    if (softdeviceEnabled)
+    {
+        sd_power_system_off();
+    }
+    else
+    {
+        nrf_power_system_off();
+    }
+}
+
 // Retrieves the reboot reason from the RESETREAS register
 RebootReason FruityHal::GetRebootReason()
 {
@@ -2161,28 +2273,91 @@ bool FruityHal::SetRetentionRegisterTwo(u8 val)
 #endif
 }
 
+#ifndef SIM_ENABLED
+extern "C"{
+    void WDT_IRQHandler(void)
+    {
+        if (nrf_wdt_int_enable_check(NRF_WDT_INT_TIMEOUT_MASK) == true)
+        {
+            u32 currentTime = FruityHal::GetRtcMs();
+            if (currentTime - GS->lastSendTimestamp > 30 * 60 * 1000) *GS->watchdogExtraInfoFlagsPtr |= 1 << 0;
+            if (currentTime - GS->lastReceivedTimestamp > 30 * 60 * 1000) *GS->watchdogExtraInfoFlagsPtr |= 1 << 1;
+            if (GS->fruityMeshBooted)  *GS->watchdogExtraInfoFlagsPtr |= 1 << 2;
+            if (GS->modulesBooted) *GS->watchdogExtraInfoFlagsPtr |= 1 << 3;
+            if (currentTime - GS->timestampInAppTimerHandler > 60 * 1000) *GS->watchdogExtraInfoFlagsPtr |= 1 << 4;
+            if (currentTime - GS->lastReceivedFromSinkTimestamp > 30 * 60 * 1000) *GS->watchdogExtraInfoFlagsPtr |= 1 << 5;
+            if (currentTime - GS->eventLooperTriggerTimestamp > 60 * 1000) *GS->watchdogExtraInfoFlagsPtr |= 1 << 6;
+            if (currentTime - GS->fruitymeshEventLooperTriggerTimestamp > 10 * 60 * 1000) *GS->watchdogExtraInfoFlagsPtr |= 1 << 7;
+            if (currentTime - GS->bleEventLooperTriggerTimestamp > 10 * 60 * 1000) *GS->watchdogExtraInfoFlagsPtr |= 1 << 8;
+            if (currentTime - GS->socEventLooperTriggerTimestamp > 10 * 60 * 1000) *GS->watchdogExtraInfoFlagsPtr |= 1 << 9;
+
+            BaseConnections connections = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
+            u8 handshakedConnections = 0;
+            u8 meshaccessConnections = 0;
+            for(int i=0; i<connections.count; i++){
+                BaseConnectionHandle handle = connections.handles[i];
+                if (handle)
+                {
+                    ConnectionState cs = handle.GetConnectionState();
+                    if (cs == ConnectionState::HANDSHAKE_DONE) 
+                    {
+                        if (handle.GetConnection()->connectionType == ConnectionType::FRUITYMESH)
+                        {
+                            handshakedConnections++;
+                        }
+                        else if (handle.GetConnection()->connectionType == ConnectionType::MESH_ACCESS)
+                        {
+                            meshaccessConnections++;
+                        }
+                    }
+                }
+            }
+
+            // Requires 3 bits at maximum
+            *GS->watchdogExtraInfoFlagsPtr |= handshakedConnections << 10;
+
+            // Requires 2 bits at maximum
+            *GS->watchdogExtraInfoFlagsPtr |= meshaccessConnections << 13;
+
+            if (GS->inGetRandomLoop) *GS->watchdogExtraInfoFlagsPtr |= 1 << 15;
+            if (GS->inPullEventsLoop) *GS->watchdogExtraInfoFlagsPtr |= 1 << 16;
+            if (GS->safeBootEnabled) *GS->watchdogExtraInfoFlagsPtr |= 1 << 17;
+
+            nrf_wdt_event_clear(NRF_WDT_EVENT_TIMEOUT);
+        }
+    }
+}
+#endif //SIM_ENABLED
+
 //Starts the Watchdog with a static interval so that changing a config can do no harm
 void FruityHal::StartWatchdog(bool safeBoot)
-{
-    if (GET_WATCHDOG_TIMEOUT() != 0)
-    {
-        //Configure Watchdog to default: Run while CPU sleeps
-        nrf_wdt_behaviour_set(NRF_WDT_BEHAVIOUR_RUN_SLEEP);
-        //Configure Watchdog timeout
-        if (!safeBoot) {
-            nrf_wdt_reload_value_set(GET_WATCHDOG_TIMEOUT());
-        }
-        else {
-            nrf_wdt_reload_value_set(GET_WATCHDOG_TIMEOUT_SAFE_BOOT());
-        }
-        // Configure Reload Channels
-        nrf_wdt_reload_request_enable(NRF_WDT_RR0);
+{    
+    if (GET_WATCHDOG_TIMEOUT() == 0) return;
 
-        //Enable
-        nrf_wdt_task_trigger(NRF_WDT_TASK_START);
-
-        logt("FH", "Watchdog started");
+    //Configure Watchdog to default: Run while CPU sleeps
+    nrf_wdt_behaviour_set(NRF_WDT_BEHAVIOUR_RUN_SLEEP);
+    //Configure Watchdog timeout
+    if (!safeBoot) {
+        nrf_wdt_reload_value_set(GET_WATCHDOG_TIMEOUT());
     }
+    else {
+        nrf_wdt_reload_value_set(GET_WATCHDOG_TIMEOUT_SAFE_BOOT());
+    }
+    // Configure Reload Channels
+    nrf_wdt_reload_request_enable(NRF_WDT_RR0);
+
+#ifndef SIM_ENABLED
+    // Configure interrupt
+    NVIC_SetPriority(WDT_IRQn, 3);
+    NVIC_ClearPendingIRQ(WDT_IRQn);
+    NVIC_EnableIRQ(WDT_IRQn);
+    nrf_wdt_int_enable(NRF_WDT_INT_TIMEOUT_MASK);
+#endif //SIM_ENABLED
+
+    //Enable
+    nrf_wdt_task_trigger(NRF_WDT_TASK_START);
+
+    logt("FH", "Watchdog started");
 }
 
 //Feeds the Watchdog to keep it quiet
@@ -2284,6 +2459,11 @@ void FruityHal::GpioConfigureInput(u32 pin, GpioPullMode mode)
     nrf_gpio_cfg_input(pin, GenericPullModeToNrf(mode));
 }
 
+void FruityHal::GpioConfigureInputSense(u32 pin, GpioPullMode mode, GpioSenseMode sense)
+{
+    nrf_gpio_cfg_sense_input(pin, GenericPullModeToNrf(mode), GenericSenseModeToNrf(sense));
+}
+
 void FruityHal::GpioConfigureDefault(u32 pin)
 {
     nrf_gpio_cfg_default(pin);
@@ -2292,11 +2472,23 @@ void FruityHal::GpioConfigureDefault(u32 pin)
 void FruityHal::GpioPinSet(u32 pin)
 {
     nrf_gpio_pin_set(pin);
+
+#ifdef SIM_ENABLED
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led1Pin) cherrySimInstance->currentNode->led1On = true;
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led2Pin) cherrySimInstance->currentNode->led2On = true;
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led3Pin) cherrySimInstance->currentNode->led3On = true;
+#endif
 }
 
 void FruityHal::GpioPinClear(u32 pin)
 {
     nrf_gpio_pin_clear(pin);
+
+#ifdef SIM_ENABLED
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led1Pin) cherrySimInstance->currentNode->led1On = false;
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led2Pin) cherrySimInstance->currentNode->led2On = false;
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led3Pin) cherrySimInstance->currentNode->led3On = false;
+#endif
 }
 
 u32 FruityHal::GpioPinRead(u32 pin)
@@ -2308,6 +2500,12 @@ u32 FruityHal::GpioPinRead(u32 pin)
 void FruityHal::GpioPinToggle(u32 pin)
 {
     nrf_gpio_pin_toggle(pin);
+
+#ifdef SIM_ENABLED
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led1Pin) cherrySimInstance->currentNode->led1On = !cherrySimInstance->currentNode->led1On;
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led2Pin) cherrySimInstance->currentNode->led2On = !cherrySimInstance->currentNode->led2On;
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led3Pin) cherrySimInstance->currentNode->led3On = !cherrySimInstance->currentNode->led2On;
+#endif
 }
 
 static void GpioteHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
@@ -2683,7 +2881,7 @@ void FruityHal::BleStackErrorHandler(u32 id, u32 info)
 
 const char* getBleEventNameString(u16 bleEventId)
 {
-#if defined(TERMINAL_ENABLED)
+#if IS_ACTIVE(ENUM_TO_STRING)
     switch (bleEventId)
     {
     case BLE_EVT_USER_MEM_REQUEST:
@@ -3477,6 +3675,42 @@ ErrorType FruityHal::TwiInit(i32 sclPin, i32 sdaPin)
     return nrfErrToGeneric(errCode);
 }
 
+void FruityHal::TwiUninit()
+{
+#ifndef SIM_ENABLED
+    nrf_drv_twi_disable(&twi);
+    nrf_drv_twi_uninit(&twi);
+    NrfHalMemory *halMemory = (NrfHalMemory *)GS->halMemory;
+    halMemory->twiInitDone = false;
+#else
+    cherrySimInstance->currentNode->twiWasInit = false;
+#endif
+}
+
+//Difference between TwiStart and TwiInit is that it first
+//uninitialises Twi afterwards switch off and later switch on
+//TWI register and then initialises twi. This should be used
+//When Twi and gpiote both are configured, so we avoid unwanted
+//power consumption due to twi bus register
+void FruityHal::TwiStart(i32 sclPin, i32 sdaPin)
+{
+#ifndef SIM_ENABLED
+    TwiUninit();
+    twiTurnOnAnomaly89();
+    TwiInit(sclPin, sdaPin);
+#endif
+}
+
+//Manually switch off twi register so we are not consuming power when not being 
+//used. TwiStart() should be used to restart the twi bus if we want to switch
+//it back on
+void FruityHal::TwiStop()
+{
+#ifndef SIM_ENABLED
+    twiTurnOffAnomaly89();
+#endif
+}
+
 void FruityHal::TwiGpioAddressPinSetAndWait(bool high, i32 sdaPin)
 {
 #ifndef SIM_ENABLED
@@ -3510,7 +3744,10 @@ ErrorType FruityHal::TwiRegisterWrite(u8 slaveAddress, u8 const * pTransferData,
         return nrfErrToGeneric(errCode);
     }
     // wait for transmission complete
-    while(halMemory->twiXferDone == false);
+    while(halMemory->twiXferDone == false)
+    {
+        sdAppEvtWaitAnomaly87();
+    }
     halMemory->twiXferDone = false;
 #endif
     return nrfErrToGeneric(errCode);
@@ -3534,7 +3771,10 @@ ErrorType FruityHal::TwiRegisterRead(u8 slaveAddress, u8 reg, u8 * pReceiveData,
     }
 
     // wait for transmission and read complete
-    while(halMemory->twiXferDone == false);
+    while(halMemory->twiXferDone == false)
+    {
+        sdAppEvtWaitAnomaly87();
+    }
     halMemory->twiXferDone = false;
 #endif
     return nrfErrToGeneric(errCode);
@@ -3565,7 +3805,10 @@ ErrorType FruityHal::TwiRead(u8 slaveAddress, u8 * pReceiveData, u8 length)
     }
 
     // wait for transmission and read complete
-    while (halMemory->twiXferDone == false);
+    while (halMemory->twiXferDone == false)
+    {
+        sdAppEvtWaitAnomaly87();
+    }
     halMemory->twiXferDone = false;
 #endif
     return nrfErrToGeneric(errCode);
@@ -3660,7 +3903,7 @@ ErrorType FruityHal::SpiTransfer(u8* const p_toWrite, u8 count, u8* const p_toRe
         //Locks if run in interrupt context
         while (!halMemory->spiXferDone)
         {
-            sd_app_evt_wait();
+            sdAppEvtWaitAnomaly87();
         }
         nrf_gpio_pin_set((u32)slaveSelectPin);
         retVal = NRF_SUCCESS;
@@ -4140,3 +4383,72 @@ void FruityHal::RadioHandleBleAdvTxStart(u8 *packet)
 }
 
 #endif // IS_ACTIVE(TIMESLOT)
+
+/// Implements fix for anomaly 87 (CPU: Unexpected wake from System ON Idle
+/// when using FPU). See [1] for details.
+///
+/// This function should be called instead of sd_app_evt_wait.
+///
+/// [1] https://infocenter.nordicsemi.com/topic/errata_nRF52832_EngC/ERR/nRF52832/EngineeringC/latest/anomaly_832_87.html?cp=4_2_1_2_1_24
+static uint32_t sdAppEvtWaitAnomaly87()
+{
+#if !defined(SIM_ENABLED)
+    CRITICAL_REGION_ENTER();
+    __set_FPSCR(__get_FPSCR() & ~(0x0000009F));
+    (void) __get_FPSCR();
+    NVIC_ClearPendingIRQ(FPU_IRQn);
+    CRITICAL_REGION_EXIT();
+#endif
+
+    return sd_app_evt_wait();
+}
+
+#if IS_ACTIVE(ASSET_MODULE)
+//Both twiTurnOnAnomaly89() and twiTurnOffAnomaly89() is only added if ACTIVATE_ASSET_MODULE is active because currently
+//twi is only activated for ASSET_MODULE so to avoid the cpp warning of unused functions. Tracked in BR-2082.
+#if !defined(SIM_ENABLED)
+/// Implements fix for anomaly 89 (CPU:Consumes static current
+/// when using GPIOTE and TWI togther
+/// https://infocenter.nordicsemi.com/topic/errata_nRF52832_EngC/ERR/nRF52832/EngineeringC/latest/anomaly_832_89.html
+static void twiTurnOnAnomaly89()
+{
+    switch (TWI_INSTANCE_ID)
+    {
+        case 0:
+            // The intermediate read is required due to the issue explained in the
+            // [Application Note 321 ARM Cortex-M Programming Guide to Memory Barrier Instructions](https://developer.arm.com/documentation/dai0321/a/)
+            // on section 3.6, page 18, look for 'The memory barrier instructions DMB and DSB'.
+            // In a nutshell it flushes a write-cache internal to the CPU which could swallow
+            // the first write.
+            *(volatile uint32_t *)(0x40003000 + 0xFFC) = 0;
+            *(volatile uint32_t *)(0x40003000 + 0xFFC);
+            *(volatile uint32_t *)(0x40003000 + 0xFFC) = 1;
+            break;
+        case 1:
+            *(volatile uint32_t *)(0x40004000 + 0xFFC) = 0;
+            *(volatile uint32_t *)(0x40004000 + 0xFFC);
+            *(volatile uint32_t *)(0x40004000 + 0xFFC) = 1;
+            break;
+        default:
+            logt("ERROR", "Invalid TWI instance");
+    }
+}
+/// Implements fix for anomaly 89 (CPU:Consumes static current
+/// when using GPIOTE and TWI togther
+/// https://infocenter.nordicsemi.com/topic/errata_nRF52832_EngC/ERR/nRF52832/EngineeringC/latest/anomaly_832_89.html
+static void twiTurnOffAnomaly89()
+{
+    switch (TWI_INSTANCE_ID)
+    {
+        case 0:
+            *(volatile uint32_t *)(0x40003000 + 0xFFC) = 0;
+            break;
+        case 1:
+            *(volatile uint32_t *)(0x40004000 + 0xFFC) = 0;
+            break;
+        default:
+            logt("ERROR", "Invalid TWI instance");
+    }
+}
+#endif //!defined(SIM_ENABLED)
+#endif //IS_ACTIVE(ASSET_MODULE)

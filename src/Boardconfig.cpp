@@ -58,6 +58,7 @@ void Boardconf::ResetToDefaultConfiguration()
     }
 
     //Set everything else to safe defaults
+    configuration.boardName = nullptr;
     configuration.led1Pin = -1;
     configuration.led2Pin = -1;
     configuration.led3Pin = -1;
@@ -80,6 +81,7 @@ void Boardconf::ResetToDefaultConfiguration()
     configuration.voltageDividerR1 = 0;
     configuration.voltageDividerR2 = 0;
     configuration.dcDcEnabled = false;
+    configuration.powerOptimizationEnabled = false;
 
     //Now, we load all Default boards (nRf Development kits)
     SetBoard_4(&configuration);

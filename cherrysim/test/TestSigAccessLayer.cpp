@@ -189,7 +189,7 @@ TEST(TestSigAccessLayer, TestProvisionChangeOnEnrollment)
 
     tester.SendTerminalCommand(1, "action this enroll basic BBBBB 93 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "reboot");
-    ASSERT_EQ(tester.sim->nodes[0].restartCounter, 2);
+    ASSERT_EQ(tester.sim->FindUniqueNodeById(93)->restartCounter, 2);
 
     {
         NodeIndexSetter setter(0);

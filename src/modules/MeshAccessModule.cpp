@@ -50,7 +50,7 @@ MeshAccessModule::MeshAccessModule()
     discoveryJobHandle = nullptr;
     logNearby = false;
     gattRegistered = false;
-    CheckedMemset(&meshAccessSerialConnectMessage, 0, sizeof(meshAccessSerialConnectMessage));
+    CheckedMemset(&latestMeshAccessSerialConnectMessage, 0, sizeof(latestMeshAccessSerialConnectMessage));
 
     //Set defaults
     ResetToDefaultConfiguration();
@@ -96,12 +96,12 @@ void MeshAccessModule::TimerEventHandler(u16 passedTimeDs)
             {
                 if (conn.GetConnectionState() == ConnectionState::HANDSHAKE_DONE)
                 {
-                    if (meshAccessSerialConnectMessage.nodeIdAfterConnect != 0 &&
-                        meshAccessSerialConnectMessage.nodeIdAfterConnect != conn.GetVirtualPartnerId())
+                    if (latestMeshAccessSerialConnectMessage.nodeIdAfterConnect != 0 &&
+                        latestMeshAccessSerialConnectMessage.nodeIdAfterConnect != conn.GetVirtualPartnerId())
                     {
                         SIMEXCEPTION(IllegalStateException);
                     }
-                    conn.KeepAliveFor(SEC_TO_DS(meshAccessSerialConnectMessage.connectionInitialKeepAliveSeconds));
+                    conn.KeepAliveFor(SEC_TO_DS(latestMeshAccessSerialConnectMessage.connectionInitialKeepAliveSeconds));
                     SendMeshAccessSerialConnectResponse(MeshAccessSerialConnectError::SUCCESS, conn.GetVirtualPartnerId());
                     ResetSerialConnectAttempt(false);
                 }
@@ -256,6 +256,11 @@ void MeshAccessModule::UpdateMeshAccessBroadcastPacket(u16 advIntervalMs)
             }
         }
     }
+
+    if (GS->config.enableMeshBridgeMode && !GS->config.configuration.isSerialNumberIndexOverwritten) {
+        DisableBroadcast();
+        return;
+    }
     
     //build advertising packet
     AdvJob job = {
@@ -331,6 +336,15 @@ void MeshAccessModule::UpdateMeshAccessBroadcastPacket(u16 advIntervalMs)
 
     u32 length = SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_UUID16 + SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA;
     job.advDataLength = length;
+
+    //To be easily recognizable, we also add a scan response so that we can
+    //identify our device easily in 3rd party apps
+    const char* serial = RamConfig->GetSerialNumber();
+    u8 serialLength = strlen(serial);
+    job.scanData[0] = 1 + serialLength;
+    job.scanData[1] = (u8)BleGapAdType::TYPE_SHORT_LOCAL_NAME;
+    CheckedMemcpy(job.scanData + 2, serial, strlen(serial));
+    job.scanDataLength = job.scanData[0] + 1;
 
     //Either update the job or create it if not done
     if(discoveryJobHandle == nullptr){
@@ -472,7 +486,7 @@ void MeshAccessModule::ReceivedMeshAccessConnectMessage(ConnPacketModule const *
     logt("MAMOD", "Received connect task");
     MeshAccessModuleConnectMessage const * message = (MeshAccessModuleConnectMessage const *) packet->data;
 
-    u32 uniqueConnId = MeshAccessConnection::ConnectAsMaster(&message->targetAddress, 10, 4, message->fmKeyId, message->key.data(), (MeshAccessTunnelType)message->tunnelType);
+    u32 uniqueConnId = MeshAccessConnection::ConnectAsMaster(&message->targetAddress, 10, 5, message->fmKeyId, message->key.data(), (MeshAccessTunnelType)message->tunnelType);
 
     MeshAccessConnection* conn = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(uniqueConnId).GetConnection();
     if(conn != nullptr){
@@ -510,29 +524,41 @@ void MeshAccessModule::ReceivedMeshAccessConnectionStateMessage(ConnPacketModule
 void MeshAccessModule::ReceivedMeshAccessSerialConnectMessage(ConnPacketModule const * packet, MessageLength packetLength)
 {
     MeshAccessModuleSerialConnectMessage const * message = (MeshAccessModuleSerialConnectMessage const *)packet->data;
+
+    if (packetLength < SIZEOF_MA_MODULE_SERIAL_CONNECT_MESSAGE_V1) return;
+
+    u32 minLength =  (packetLength < sizeof(latestMeshAccessSerialConnectMessage)) ? packetLength.GetRaw() : sizeof(latestMeshAccessSerialConnectMessage);
+
+    //Check if the same request is in progress or cancel any other previous request
     if (meshAccessSerialConnectMessageReceiveTimeDs != 0 && 
-        (meshAccessSerialConnectMessage != *message
+        (
+            memcmp(&latestMeshAccessSerialConnectMessage, message, minLength) != 0
             || meshAccessSerialConnectSender != packet->header.sender
-            || meshAccessSerialConnectRequestHandle != packet->requestHandle))
+            || meshAccessSerialConnectRequestHandle != packet->requestHandle)
+        )
     {
         SendMeshAccessSerialConnectResponse(MeshAccessSerialConnectError::OVERWRITTEN_BY_OTHER_REQUEST);
     }
     ResetSerialConnectAttempt(true);
-    meshAccessSerialConnectMessage = *message;
-    if (Utility::CompareMem(0xFF, meshAccessSerialConnectMessage.key, sizeof(meshAccessSerialConnectMessage.key)) 
-        && meshAccessSerialConnectMessage.fmKeyId != FmKeyId::NODE /*We shouldn't use our own node key as a key for an outgoing connection...*/)
-    {
-        //If no key is specified, we take our local key.
-        GS->node.GetKey(meshAccessSerialConnectMessage.fmKeyId, meshAccessSerialConnectMessage.key);
-    }
+    latestMeshAccessSerialConnectMessage = *message;
     meshAccessSerialConnectMessageReceiveTimeDs = GS->appTimerDs;
     meshAccessSerialConnectSender = packet->header.sender;
     meshAccessSerialConnectRequestHandle = packet->requestHandle;
+
+    // => This data will be checked as soon as a broadcast message is received
+    // But in case the BLE address was already given, we immediately schedule a connect
+    if (
+        packetLength >= SIZEOF_MA_MODULE_SERIAL_CONNECT_MESSAGE_V2
+        && !Utility::CompareMem(0x00, message->targetAddress.addr.data(), message->targetAddress.addr.size())
+    ) {
+        logt("MAMOD", "Doing instant serial_connect to BLE address");
+        OnFoundSerialIndexWithAddr(message->targetAddress, message->serialNumberIndexToConnectTo);
+    }
 }
 
 void MeshAccessModule::ResetSerialConnectAttempt(bool cleanupConnection)
 {
-    CheckedMemset(&meshAccessSerialConnectMessage, 0, sizeof(meshAccessSerialConnectMessage));
+    CheckedMemset(&latestMeshAccessSerialConnectMessage, 0, sizeof(latestMeshAccessSerialConnectMessage));
     meshAccessSerialConnectMessageReceiveTimeDs = 0;
     meshAccessSerialConnectSender = 0;
     meshAccessSerialConnectRequestHandle = 0;
@@ -568,14 +594,12 @@ void MeshAccessModule::SendMeshAccessSerialConnectResponse(MeshAccessSerialConne
 
 void MeshAccessModule::OnFoundSerialIndexWithAddr(const FruityHal::BleGapAddr& addr, u32 serialNumberIndex)
 {
-    if (meshAccessSerialConnectMessage.serialNumberIndexToConnectTo == serialNumberIndex &&
-            meshAccessSerialConnectMessage.serialNumberIndexToConnectTo != 0 && 
-                (
-                    GS->cm.GetConnectionByUniqueId(meshAccessSerialConnectConnectionId).GetConnection() == nullptr
-                )
-            )
-        {
-            meshAccessSerialConnectConnectionId = MeshAccessConnection::ConnectAsMaster(&addr, 10, 4, meshAccessSerialConnectMessage.fmKeyId, meshAccessSerialConnectMessage.key, MeshAccessTunnelType::LOCAL_MESH, meshAccessSerialConnectMessage.nodeIdAfterConnect);
+    if (
+        latestMeshAccessSerialConnectMessage.serialNumberIndexToConnectTo == serialNumberIndex
+        && latestMeshAccessSerialConnectMessage.serialNumberIndexToConnectTo != 0
+        && GS->cm.GetConnectionByUniqueId(meshAccessSerialConnectConnectionId).GetConnection() == nullptr
+    ) {
+            meshAccessSerialConnectConnectionId = MeshAccessConnection::ConnectAsMaster(&addr, 10, 5, latestMeshAccessSerialConnectMessage.fmKeyId, latestMeshAccessSerialConnectMessage.key, MeshAccessTunnelType::LOCAL_MESH, latestMeshAccessSerialConnectMessage.nodeIdAfterConnect);
 
             MeshAccessConnection* maconn = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(meshAccessSerialConnectConnectionId).GetConnection();
             if (maconn != nullptr)
@@ -695,20 +719,20 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
         //Allows us to connect to any node when giving the GAP Address
         FruityHal::BleGapAddr addr;
         CheckedMemset(&addr, 0, sizeof(addr));
-        Logger::ParseEncodedStringToBuffer(commandArgs[1], addr.addr.data(), 6);
+        Logger::ParseEncodedStringToBuffer(commandArgs[1], addr.addr.data(), addr.addr.size());
         addr.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
-        Utility::SwapBytes(addr.addr.data(), 6);
+        Utility::SwapBytes(addr.addr.data(), addr.addr.size());
 
         FmKeyId fmKeyId = FmKeyId::NETWORK;
-        if(commandArgsSize > 2){
+        if (commandArgsSize > 2) {
             fmKeyId = (FmKeyId)Utility::StringToU32(commandArgs[2]);
         }
 
-        MeshAccessConnection::ConnectAsMaster(&addr, 10, 4, fmKeyId, nullptr, MeshAccessTunnelType::REMOTE_MESH);
+        MeshAccessConnection::ConnectAsMaster(&addr, 10, 5, fmKeyId, nullptr, MeshAccessTunnelType::REMOTE_MESH);
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-    else if(TERMARGS(0, "malog"))
+    else if (TERMARGS(0, "malog"))
     {
         if (commandArgsSize >= 2)
         {
@@ -728,19 +752,19 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
         {
             logNearby = !logNearby;
         }
-        
+
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
 #endif
 
     //React on commands, return true if handled, false otherwise
-    if(commandArgsSize >= 4 && TERMARGS(0, "action") && TERMARGS(2, moduleName))
+    if (commandArgsSize >= 4 && TERMARGS(0, "action") && TERMARGS(2, moduleName))
     {
         NodeId destinationNode = Utility::TerminalArgumentToNodeId(commandArgs[1]);
 
         //action this ma connect AA:BB:CC:DD:EE:FF fmKeyId nodeKey
-        if(TERMARGS(3,"connect"))
+        if (TERMARGS(3, "connect"))
         {
             if (commandArgsSize < 5) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
             MeshAccessModuleConnectMessage data;
@@ -749,13 +773,14 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
 
             //Allows us to connect to any node when giving the GAP Address
             data.targetAddress.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
-            Logger::ParseEncodedStringToBuffer(commandArgs[4], data.targetAddress.addr.data(), 6);
-            Utility::SwapBytes(data.targetAddress.addr.data(), 6);
+            Logger::ParseEncodedStringToBuffer(commandArgs[4], data.targetAddress.addr.data(), data.targetAddress.addr.size());
+            Utility::SwapBytes(data.targetAddress.addr.data(), data.targetAddress.addr.size());
 
-            if(commandArgsSize > 5) data.fmKeyId = (FmKeyId)Utility::StringToU32(commandArgs[5]);
-            if(commandArgsSize > 6){
-                Logger::ParseEncodedStringToBuffer(commandArgs[6], data.key.data(), 16);
-            } else {
+            if (commandArgsSize > 5) data.fmKeyId = (FmKeyId)Utility::StringToU32(commandArgs[5]);
+            if (commandArgsSize > 6) {
+                Logger::ParseEncodedStringToBuffer(commandArgs[6], data.key.data(), data.key.size());
+            }
+            else {
                 //Set to invalid key so that the receiving node knows it should select from its own keys
                 CheckedMemset(data.key.data(), 0xFF, data.key.size());
             }
@@ -774,7 +799,7 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
 
             return TerminalCommandHandlerReturnType::SUCCESS;
         }
-        else if(TERMARGS(3,"disconnect"))
+        else if (TERMARGS(3, "disconnect"))
         {
             if (commandArgsSize < 5) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
             MeshAccessModuleDisconnectMessage data;
@@ -782,8 +807,8 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
 
             //Allows us to connect to any node when giving the GAP Address
             data.targetAddress.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
-            Logger::ParseEncodedStringToBuffer(commandArgs[4], data.targetAddress.addr.data(), 6);
-            Utility::SwapBytes(data.targetAddress.addr.data(), 6);
+            Logger::ParseEncodedStringToBuffer(commandArgs[4], data.targetAddress.addr.data(), data.targetAddress.addr.size());
+            Utility::SwapBytes(data.targetAddress.addr.data(), data.targetAddress.addr.size());
 
             u8 requestHandle = (commandArgsSize > 5) ? Utility::StringToU8(commandArgs[5]) : 0;
 
@@ -801,8 +826,8 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
         }
         else if (TERMARGS(3, "serial_connect"))
         {
-            //   0       1    2        3            4          5        6            7                           8                       9
-            //action [nodeId] ma serial_connect [to serial] [fmKeyId] [key] [nodeId after connect] [connection initial keep alive] {requestHandle}
+            //   0       1    2        3            4          5        6            7                           8                       9                10
+            //action [nodeId] ma serial_connect [to serial] [fmKeyId] [key] [nodeId after connect] [connection initial keep alive] {requestHandle=0} {bleAddress=""}
 
             if (commandArgsSize < 9) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
@@ -817,6 +842,12 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
             message.connectionInitialKeepAliveSeconds = (commandArgsSize > 8) ? Utility::StringToU32(commandArgs[8], &didError) : 0;
 
             u8 requestHandle = (commandArgsSize > 9) ? Utility::StringToU8(commandArgs[9], &didError) : 0;
+            if (commandArgsSize > 10) {
+                //Currently, we only support random static adresses as most other calls only support these as well.
+                message.targetAddress.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
+                Logger::ParseEncodedStringToBuffer(commandArgs[10], message.targetAddress.addr.data(), message.targetAddress.addr.size(), &didError);
+                Utility::SwapBytes(message.targetAddress.addr.data(), message.targetAddress.addr.size());
+            }
 
             if (didError
                 || message.nodeIdAfterConnect < NODE_ID_GLOBAL_DEVICE_BASE
@@ -902,7 +933,7 @@ void MeshAccessModule::GapAdvertisementReportEventHandler(const FruityHal::GapAd
         }
 
         if (advertisementReportEvent.GetDataLength() >= SIZEOF_ADV_STRUCTURE_LEGACY_ASSET_SERVICE_DATA
-            && packet->data.messageType == ServiceDataMessageType::LEGACY_ASSET)
+            && packet->data.messageType == ServiceDataMessageType::LEGACY_ASSET_V1)
         {
             const AdvPacketLegacyAssetServiceData* assetPacket = (const AdvPacketLegacyAssetServiceData*)&packet->data;
             OnFoundSerialIndexWithAddr(addr, assetPacket->serialNumberIndex);
@@ -915,20 +946,4 @@ bool MeshAccessModule::IsZeroKeyConnectable(const ConnectionDirection direction)
     return (GS->node.configuration.enrollmentState == EnrollmentState::NOT_ENROLLED
         || direction == ConnectionDirection::DIRECTION_OUT)
         && allowUnenrolledUnsecureConnections;
-}
-
-bool MeshAccessModuleSerialConnectMessage::operator==(const MeshAccessModuleSerialConnectMessage & other) const
-{
-    if (serialNumberIndexToConnectTo      != other.serialNumberIndexToConnectTo     ) return false;
-    if (fmKeyId                           != other.fmKeyId                          ) return false;
-    //if (memcmp(key, other.key, sizeof(key)) != 0                                  ) return false; //The key is ignored on purpose, as FF:FF:...:FF is replaced by the local key.
-    if (nodeIdAfterConnect                != other.nodeIdAfterConnect               ) return false;
-    if (connectionInitialKeepAliveSeconds != other.connectionInitialKeepAliveSeconds) return false;
-
-    return true;
-}
-
-bool MeshAccessModuleSerialConnectMessage::operator!=(const MeshAccessModuleSerialConnectMessage & other) const
-{
-    return !(*this == other);
 }

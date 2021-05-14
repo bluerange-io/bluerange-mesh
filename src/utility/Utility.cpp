@@ -126,10 +126,12 @@ u32 Utility::GetRandomInteger(void)
     ErrorType err = ErrorType::BUSY;
     u32 randomNumber = 0;
 
+    GS->inGetRandomLoop = true;
     while(err != ErrorType::SUCCESS){
         //A busy loop is fine here because the nordic spec guarantees us, that we will, at some point, get a random number. If not, the node itself is broken.
         err = FruityHal::GetRandomBytes((u8*) &randomNumber, 4);
     }
+    GS->inGetRandomLoop = false;
 
     return randomNumber;
 }
@@ -300,7 +302,7 @@ u32 Utility::GetIndexForSerial(const char* serialNumber, bool *didError){
 void Utility::GenerateBeaconSerialForIndex(u32 index, char* serialBuffer)
 {
     CheckedMemset(serialBuffer, 0x00, NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH);
-    u32 numChars = index < 24300000UL ? 5 : 7; //Small serial numbers use 5 characters, the extended range uses 7 characters
+    u32 numChars = index < SHORT_SERIAL_NUMBER_INDEX_MAX ? 5 : 7; //Small serial numbers use 5 characters, the extended range uses 7 characters
     for(u32 i=0; i< numChars; i++){
         u32 rest = (u32)(index % strlen(serialAlphabet));
         serialBuffer[numChars - i - 1] = serialAlphabet[rest];
@@ -318,8 +320,8 @@ u16 Utility::ByteToAsciiHex(u8 b) {
 }
 
 //Converts a series of 2,4,6 or 8 hex-chars to an unsigned int
-u32 Utility::ByteFromAsciiHex(char* asciiHex, u8 numChars){
-    char* h = asciiHex;
+u32 Utility::ByteFromAsciiHex(const char* asciiHex, u8 numChars){
+    const char* h = asciiHex;
     //convert x tuples
     u32 result = 0;
     for(int i=0; i<numChars; i+=2){
@@ -329,12 +331,16 @@ u32 Utility::ByteFromAsciiHex(char* asciiHex, u8 numChars){
             byte += (h[i] - 48) << 4;
         } else if(h[i] >= 65 && h[i] <= 90){
             byte += (h[i] - 55) << 4;
+        } else if(h[i] >= 97 && h[i] <= 122){
+            byte += (h[i] - 87) << 4;
         }
         //Convert and add second char
         if(h[i+1] >= 48 && h[i+1] <= 57){
             byte += (h[i+1] - 48);
         } else if(h[i+1] >= 65 && h[i+1] <= 90){
             byte += (h[i+1] - 55);
+        } else if(h[i+1] >= 97 && h[i+1] <= 122){
+            byte += (h[i+1] - 87);
         }
 
         result |= byte << i*4;
@@ -343,9 +349,17 @@ u32 Utility::ByteFromAsciiHex(char* asciiHex, u8 numChars){
     return result;
 }
 
-void Utility::LogRebootJson()
+void Utility::LogRebootJson(bool rebootReasonCleared)
 {
-    logjson("MAIN", "{\"type\":\"reboot\",\"reason\":%u,\"code1\":%u,\"stack\":%u,\"version\":%u,\"blversion\":%u}" SEP, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1, GS->ramRetainStructPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion());
+    if (rebootReasonCleared)
+    {
+        // We already cleared ramRetainStruct and we should use copy of that struct.
+        logjson("MAIN", "{\"type\":\"reboot\",\"reason\":%u,\"code1\":%u,\"stack\":%u,\"version\":%u,\"blversion\":%u}" SEP, (u32)GS->ramRetainStructPreviousBootPtr->rebootReason, GS->ramRetainStructPreviousBootPtr->code1, GS->ramRetainStructPreviousBootPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion());
+    }
+    else
+    {
+        logjson("MAIN", "{\"type\":\"reboot\",\"reason\":%u,\"code1\":%u,\"stack\":%u,\"version\":%u,\"blversion\":%u}" SEP, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1, GS->ramRetainStructPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion());
+    }
 }
 
 bool Utility::Contains(const u8 * data, const u32 length, const u8 searchValue)

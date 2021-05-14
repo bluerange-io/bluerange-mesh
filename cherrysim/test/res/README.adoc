@@ -1,0 +1,32 @@
+= Res Folder
+
+This folder contains additional data that is used by some of the CherrySim tests.
+
+== Site and Device Data
+Sites and devices can be obtained from our platform REST endpoints or by using the FruityMap. They can then be cleaned up e.g. by this little Javascript snippet that extracts the necessary values from the json that are used by CherrySim:
+
+----
+<script>
+
+var inputData = '{"inputDataJsonGoesHere":123}';
+
+var inputJson = JSON.parse(inputData);
+var outputJson = {"results":[]};
+
+inputJson.results.forEach ((device, index) => {
+	outputJson.results[index] = {};
+	outputJson.results[index].platform = device.platform;
+    
+    outputJson.results[index].properties = {
+    	x:device.properties.x,
+    	y:device.properties.y,
+    	z:device.properties.z,
+    	onMap:device.properties.onMap,
+    	cherrySimFeatureSet:device.properties.cherrySimFeatureSet
+    };
+});
+
+document.write(JSON.stringify(outputJson));
+
+</script>
+----

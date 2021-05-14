@@ -177,6 +177,7 @@ ErrorType FruityHal::StopTimer(swTimer timer){ return ErrorType::SUCCESS; }
 
 void FruityHal::SystemReset(){ }
 void FruityHal::SystemReset(bool softdeviceEnabled){ }
+void FruityHal::SystemEnterOff(bool softdeviceEnabled){ }
 RebootReason FruityHal::GetRebootReason(){ return RebootReason::UNKNOWN; }
 ErrorType FruityHal::ClearRebootReason(){ return ErrorType::SUCCESS; }
 void FruityHal::StartWatchdog(bool safeBoot){ }
@@ -210,6 +211,9 @@ ErrorType FruityHal::TwiRegisterRead(u8 slaveAddress, u8 reg, u8 * pReceiveData,
 ErrorType FruityHal::TwiRead(u8 slaveAddress, u8 * pReceiveData, u8 length) { return ErrorType::SUCCESS; }
 bool FruityHal::TwiIsInitialized(void) { return false; }
 void FruityHal::TwiGpioAddressPinSetAndWait(bool high, i32 sdaPin) { }
+void FruityHal::TwiUninit() {}
+void FruityHal::TwiStart(i32 sclPin, i32 sdaPin) {}
+void FruityHal::TwiStop() {}
 
 //spi
 void FruityHal::SpiInit(i32 sckPin, i32 misoPin, i32 mosiPin) { }
@@ -220,10 +224,12 @@ void FruityHal::SpiConfigureSlaveSelectPin(i32 pin) { }
 // ######################### GPIO ############################
 void FruityHal::GpioConfigureOutput(u32 pin){ }
 void FruityHal::GpioConfigureInput(u32 pin, GpioPullMode mode){ }
+void FruityHal::GpioConfigureInputSense(u32 pin, GpioPullMode mode, GpioSenseMode sense){ }
 void FruityHal::GpioConfigureDefault(u32 pin){ }
 void FruityHal::GpioPinSet(u32 pin){ }
 void FruityHal::GpioPinClear(u32 pin){ }
 void FruityHal::GpioPinToggle(u32 pin){ }
+u32 FruityHal::GpioPinRead(u32 pin){ return 0; }
 ErrorType FruityHal::GpioConfigureInterrupt(u32 pin, GpioPullMode mode, GpioTransistion trigger, GpioInterruptHandler handler){ return ErrorType::SUCCESS; }
 
 // ######################### ADC ############################

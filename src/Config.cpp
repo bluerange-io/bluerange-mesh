@@ -127,7 +127,6 @@ void Conf::LoadDefaults(){
     configuration.amountOfPreferredPartnerIds = 0;
 
     terminalMode = TerminalMode::JSON;
-    defaultLedMode = LedMode::CONNECTIONS;
 
     enableSinkRouting = true;
     //Check if the BLE stack supports the number of connections and correct if not
@@ -136,8 +135,15 @@ void Conf::LoadDefaults(){
     meshMaxInConnections = 2;
 #endif
 
-    meshMinConnectionInterval = 12; //FIXME_HAL: 12 units = 15ms (1.25ms steps)
-    meshMaxConnectionInterval = 12; //FIXME_HAL: 12 units = 15ms (1.25ms steps)
+    meshMinConnectionInterval = (u16)MSEC_TO_UNITS(15, CONFIG_UNIT_1_25_MS);
+    meshMaxConnectionInterval = (u16)MSEC_TO_UNITS(15, CONFIG_UNIT_1_25_MS);
+
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+    // Initialize the long term connection intervals to the same values as the
+    // 'normal' intervals.
+    meshMinLongTermConnectionInterval = meshMinConnectionInterval;
+    meshMaxLongTermConnectionInterval = meshMaxConnectionInterval;
+#endif
 
     meshScanIntervalHigh = 120; //FIXME_HAL: 120 units = 75ms (0.625ms steps)
     meshScanWindowHigh = 12; //FIXME_HAL: 12 units = 7.5ms (0.625ms steps)
@@ -326,6 +332,9 @@ void Conf::SetSerialNumberIndex(u32 serialNumber)
     configuration.overwrittenSerialNumberIndex = serialNumber;
     configuration.isSerialNumberIndexOverwritten = true;
 
+    GS->temporaryEnrollmentPtr->serialNumberIndex = serialNumber;
+    GS->temporaryEnrollmentPtr->crc32 = Utility::CalculateCrc32((u8*)GS->temporaryEnrollmentPtr, sizeof(TemporaryEnrollment) - sizeof(u32));
+
     RecordStorageResultCode err = SaveConfigToFlash(this, (u32)RecordTypeConf::SET_SERIAL, nullptr, 0);
     if (err != RecordStorageResultCode::SUCCESS)
     {
@@ -356,6 +365,9 @@ void Conf::GetRestrainedKey(u8* buffer) const
 void Conf::SetNodeKey(const u8 * key)
 {
     CheckedMemcpy(configuration.nodeKey, key, 16);
+
+    CheckedMemcpy(GS->temporaryEnrollmentPtr->nodeKey, key, 16);
+    GS->temporaryEnrollmentPtr->crc32 = Utility::CalculateCrc32((u8*)GS->temporaryEnrollmentPtr, sizeof(TemporaryEnrollment) - sizeof(u32));
 
     SaveConfigToFlash(nullptr, 0, nullptr, 0);
 }

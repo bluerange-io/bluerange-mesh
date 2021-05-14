@@ -189,7 +189,7 @@ class EnrollmentModule: public Module
 #pragma pack(1)
         struct TemporaryEnrollmentData{
             EnrollmentStates state;
-            MessageLength packetLength;
+            u16 rawPacketLength;
             ConnPacketModuleStart requestHeader;
             union {
                 EnrollmentModuleSetEnrollmentBySerialMessage requestData;
@@ -198,6 +198,11 @@ class EnrollmentModule: public Module
             u32 endTimeDs;
 
             u32 uniqueConnId;
+
+            NO_DISCARD MessageLength GetPacketLength() const
+            {
+                return {rawPacketLength};
+            }
         };
         //Make sure the union data follows immediately after the requestHeader. This allows us to cast the requestHeader from a ConnPacketModuleStart into a ConnPacketModule.
         static_assert(offsetof(TemporaryEnrollmentData, requestHeader) + sizeof(TemporaryEnrollmentData::requestHeader) == offsetof(TemporaryEnrollmentData, requestData ), "Wrong packing in TemporaryEnrollmentData");
@@ -234,6 +239,8 @@ class EnrollmentModule: public Module
         void SaveEnrollment(ConnPacketModuleStart* packet, MessageLength packetLength);
 
         void SaveUnenrollment(ConnPacketModuleStart* packet, MessageLength packetLength);
+
+        void CommitTemporaryEnrollment(SaveEnrollmentAction* userData, EnrollmentModuleSaveActions action);
 
         void EnrollmentConnectionConnectedHandler();
 

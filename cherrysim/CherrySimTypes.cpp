@@ -11,7 +11,7 @@
 // ** Licensees holding valid commercial Bluerange licenses may use this file in
 // ** accordance with the commercial license agreement provided with the
 // ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
+// ** a written agreement between them and M-Way Solutions GmbH.
 // ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
 // ** information use the contact form at https://www.bluerange.io/contact.
 // **
@@ -29,6 +29,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "CherrySimTypes.h"
+#include "CherrySim.h"
 #include <cstdio>
 
 void to_json(nlohmann::json& j, const SimConfiguration & config)
@@ -47,6 +48,7 @@ void to_json(nlohmann::json& j, const SimConfiguration & config)
         { "connectionTimeoutProbabilityPerSec", config.connectionTimeoutProbabilityPerSec},
         { "sdBleGapAdvDataSetFailProbability" , config.sdBleGapAdvDataSetFailProbability },
         { "sdBusyProbability"                 , config.sdBusyProbability                 },
+        { "sdBusyProbabilityUnlikely"         , config.sdBusyProbabilityUnlikely         },
         { "simulateAsyncFlash"                , config.simulateAsyncFlash                },
         { "asyncFlashCommitTimeProbability"   , config.asyncFlashCommitTimeProbability   },
         { "importFromJson"                    , config.importFromJson                    },
@@ -62,6 +64,7 @@ void to_json(nlohmann::json& j, const SimConfiguration & config)
         { "simulateWatchdog"                  , config.simulateWatchdog                  },
         { "simulateJittering"                 , config.simulateJittering                 },
         { "verbose"                           , config.verbose                           },
+        { "fastLaneToSimTimeMs"               , config.fastLaneToSimTimeMs               },
         { "enableClusteringValidityCheck"     , config.enableClusteringValidityCheck     },
         { "enableSimStatistics"               , config.enableSimStatistics               },
         { "storeFlashToFile"                  , config.storeFlashToFile                  },
@@ -74,7 +77,7 @@ void from_json(const nlohmann::json & j, SimConfiguration & config)
 {
     for (nlohmann::json::const_iterator it = j.begin(); it != j.end(); ++it)
     {
-        
+
              if(it.key() == "nodeConfigName"                    ) j.at("nodeConfigName").get_to(config.nodeConfigName);
         else if(it.key() == "seed"                              ) config.seed                              = *it;
         else if(it.key() == "mapWidthInMeters"                  ) config.mapWidthInMeters                  = *it;
@@ -88,6 +91,7 @@ void from_json(const nlohmann::json & j, SimConfiguration & config)
         else if(it.key() == "connectionTimeoutProbabilityPerSec") config.connectionTimeoutProbabilityPerSec= *it;
         else if(it.key() == "sdBleGapAdvDataSetFailProbability" ) config.sdBleGapAdvDataSetFailProbability = *it;
         else if(it.key() == "sdBusyProbability"                 ) config.sdBusyProbability                 = *it;
+        else if(it.key() == "sdBusyProbabilityUnlikely"         ) config.sdBusyProbabilityUnlikely         = *it;
         else if(it.key() == "simulateAsyncFlash"                ) config.simulateAsyncFlash                = *it;
         else if(it.key() == "asyncFlashCommitTimeProbability"   ) config.asyncFlashCommitTimeProbability   = *it;
         else if(it.key() == "importFromJson"                    ) config.importFromJson                    = *it;
@@ -107,6 +111,7 @@ void from_json(const nlohmann::json & j, SimConfiguration & config)
         else if(it.key() == "simulateWatchdog"                  ) config.simulateWatchdog                  = *it;
         else if(it.key() == "simulateJittering"                 ) config.simulateJittering                 = *it;
         else if(it.key() == "verbose"                           ) config.verbose                           = *it;
+        else if(it.key() == "fastLaneToSimTimeMs"               ) config.fastLaneToSimTimeMs               = *it;
         else if(it.key() == "enableClusteringValidityCheck"     ) config.enableClusteringValidityCheck     = *it;
         else if(it.key() == "enableSimStatistics"               ) config.enableSimStatistics               = *it;
         else if(it.key() == "storeFlashToFile"                  ) config.storeFlashToFile                  = *it;
@@ -114,6 +119,27 @@ void from_json(const nlohmann::json & j, SimConfiguration & config)
         else if(it.key() == "defaultBleStackType"               ) config.defaultBleStackType               = *it;
         else SIMEXCEPTION(UnknownJsonEntryException);
     }
+}
+
+void NodeEntry::Initialize(u32 nodeIndex)
+{
+    this->index                        = nodeIndex;
+    this->gs.node.configuration.nodeId = static_cast<NodeId>(nodeIndex + 1);
+
+    // Initialize FICR memory
+    CheckedMemset(&ficr, 0xFF, sizeof(ficr));
+
+    // Initialize UICR memory
+    CheckedMemset(&uicr, 0xFF, sizeof(uicr));
+
+    // Initialize flash memory
+    CheckedMemset(&flash, 0xFF, sizeof(flash));
+    // TODO: We could load a softdevice and app image into flash, would that help for something?
+
+    // Generate device address based on the id works for up to 65535 adresses
+    address.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
+    address.addr.fill(0x00);
+    CheckedMemcpy(address.addr.data() + sizeof(u16), &this->gs.node.configuration.nodeId, sizeof(u16));
 }
 
 void SimConfiguration::SetToPerfectConditions()
@@ -127,4 +153,19 @@ void SimConfiguration::SetToPerfectConditions()
     this->receptionProbabilityClose = UINT32_MAX;
     this->receptionProbabilityFar = UINT32_MAX;
     this->receptionProbabilityVeryFar = UINT32_MAX;
+}
+
+float NodeEntry::GetXinMeters() const
+{
+    return this->x * cherrySimInstance->simConfig.mapWidthInMeters;
+}
+
+float NodeEntry::GetYinMeters() const
+{
+    return this->y * cherrySimInstance->simConfig.mapHeightInMeters;
+}
+
+float NodeEntry::GetZinMeters() const
+{
+    return this->z * cherrySimInstance->simConfig.mapElevationInMeters;
 }

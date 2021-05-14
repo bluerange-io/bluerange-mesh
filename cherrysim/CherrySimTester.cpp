@@ -11,7 +11,7 @@
 // ** Licensees holding valid commercial Bluerange licenses may use this file in
 // ** accordance with the commercial license agreement provided with the
 // ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
+// ** a written agreement between them and M-Way Solutions GmbH.
 // ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
 // ** information use the contact form at https://www.bluerange.io/contact.
 // **
@@ -40,7 +40,7 @@
 #include <iostream>
 #include "FruityHal.h"
 #include "Utility.h"
- 
+
 /***
 This class is a wrapper around the simulator and provides methods for injecting data into the simulator
 and several simulation function to simulate until some event happens.
@@ -78,7 +78,7 @@ void operator delete(void * p) throw()
 int main(int argc, char **argv) {
 
     //A workaround to find out if the Visual Studio Test Explorer is executing us (either on first run through list_tests or the second real run for testing)
-    bool runByVisualStudioTestExplorer = argc >= 2 && (std::string(argv[1]).find("gtest_output=xml:") != std::string::npos || (std::string(argv[1]).find("gtest_list_tests") != std::string::npos));
+    bool runByVisualStudioTestExplorer = argc >= 2 && (std::string(argv[1]).find("gtest_output=xml:") != std::string::npos || (std::string(argv[1]).find("gtest_list_tests") != std::string::npos) || (std::string(argv[1]).find("gtest_filter") != std::string::npos));
 
     //Initialize google tests
     //WARNING: Will modify the arc and argv and will remove all the GTEST command line parameters
@@ -202,6 +202,61 @@ int main(int argc, char **argv) {
 #endif
 
 
+NodeEntryPredicate &NodeEntryPredicate::operator=(int magicTerminalId)
+{
+    if (magicTerminalId == 0)
+    {
+        *this = AllowAll();
+    }
+    else if (magicTerminalId > 0)
+    {
+        *this = AllowTerminalId(static_cast<TerminalId>(magicTerminalId));
+    }
+    else if (magicTerminalId == -1)
+    {
+        *this = AllowNone();
+    }
+    else
+    {
+        throw std::invalid_argument{"terminalId"};
+    }
+    return *this;
+}
+
+NodeEntryPredicate NodeEntryPredicate::AllowAll()
+{
+    return NodeEntryPredicate{&TheAllowAllPredicate};
+}
+
+NodeEntryPredicate NodeEntryPredicate::AllowNone()
+{
+    return NodeEntryPredicate{&TheAllowNonePredicate};
+}
+
+NodeEntryPredicate NodeEntryPredicate::AllowNodeIndex(u32 nodeIndex)
+{
+    return NodeEntryPredicate{[nodeIndex](const NodeEntry *nodeEntry) { return nodeEntry->index == nodeIndex; }};
+}
+
+NodeEntryPredicate NodeEntryPredicate::AllowTerminalId(TerminalId terminalId)
+{
+    return NodeEntryPredicate{
+        [terminalId](const NodeEntry *nodeEntry) { return nodeEntry->GetTerminalId() == terminalId; }};
+}
+
+NodeEntryPredicate NodeEntryPredicate::AllowNodeId(NodeId nodeId)
+{
+    return NodeEntryPredicate{[nodeId](const NodeEntry *nodeEntry) { return nodeEntry->GetNodeId() == nodeId; }};
+}
+
+NodeEntryPredicate NodeEntryPredicate::AllowNodeId(NodeId nodeId, NetworkId networkId)
+{
+    return NodeEntryPredicate{[nodeId, networkId](const NodeEntry *nodeEntry) {
+        return nodeEntry->GetNodeId() == nodeId && nodeEntry->GetNetworkId() == networkId;
+    }};
+}
+
+
 CherrySimTesterConfig CherrySimTester::CreateDefaultTesterConfiguration()
 {
     CherrySimTesterConfig config;
@@ -224,7 +279,7 @@ SimConfiguration CherrySimTester::CreateDefaultSimConfiguration()
 
     simConfig.simOtherDelay = 1; // Enter 1 - 100000 to send sim_other message only each ... simulation steps, this increases the speed significantly
     simConfig.playDelay = 0; //Allows us to view the simulation slower than simulated, is added after each step
-    
+
     simConfig.interruptProbability = UINT32_MAX / 10;
 
     simConfig.connectionTimeoutProbabilityPerSec = 0; //Every minute or so: UINT32_MAX * 0.00001;
@@ -244,6 +299,8 @@ SimConfiguration CherrySimTester::CreateDefaultSimConfiguration()
 
     simConfig.rssiNoise = false;
 
+    simConfig.fastLaneToSimTimeMs = 0;
+
     simConfig.verboseCommands = true;
     simConfig.enableSimStatistics = false;
 
@@ -253,13 +310,13 @@ SimConfiguration CherrySimTester::CreateDefaultSimConfiguration()
 
 CherrySimTester::CherrySimTester(CherrySimTesterConfig testerConfig, SimConfiguration simConfig)
       : config(testerConfig),
-      simConfig(simConfig) 
+      simConfig(simConfig)
 {
     sim = new CherrySim(simConfig);
     sim->SetCherrySimEventListener(this);
     sim->Init();
     sim->RegisterTerminalPrintListener(this);
-    
+
 }
 
 CherrySimTester::CherrySimTester(CherrySimTester && other)
@@ -373,7 +430,7 @@ void CherrySimTester::SimulateBroadcastMessage(double x, double y, ble_gap_evt_a
             }
         }
     }
-    
+
 }
 void CherrySimTester::SimulateUntilClusteringDoneWithExpectedNumberOfClusters(int timeoutMs, u32 clusters)
 {
@@ -406,7 +463,7 @@ void CherrySimTester::SimulateForGivenTime(int numMilliseconds)
     }
 }
 
-void CherrySimTester::SimulateUntilMessageReceived(int timeoutMs, NodeId nodeId, const char* messagePart, ...)
+void CherrySimTester::SimulateUntilMessageReceived(int timeoutMs, TerminalId terminalId, const char* messagePart, ...)
 {
     if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
     char buffer[2048];
@@ -415,12 +472,12 @@ void CherrySimTester::SimulateUntilMessageReceived(int timeoutMs, NodeId nodeId,
     vsnprintf(buffer, 2048, messagePart, aptr);
     va_end(aptr);
     std::vector<SimulationMessage> messages;
-    messages.push_back(SimulationMessage(nodeId, buffer));
+    messages.push_back(SimulationMessage(terminalId, buffer));
 
     SimulateUntilMessagesReceived(timeoutMs, messages);
 }
 
-void CherrySimTester::SimulateUntilMessageReceivedWithCallback(int timeoutMs, NodeId nodeId, std::function<void()> executePerStep, const char* messagePart, ...)
+void CherrySimTester::SimulateUntilMessageReceivedWithCallback(int timeoutMs, TerminalId terminalId, std::function<void()> executePerStep, const char* messagePart, ...)
 {
     if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
     char buffer[2048];
@@ -429,7 +486,7 @@ void CherrySimTester::SimulateUntilMessageReceivedWithCallback(int timeoutMs, No
     vsnprintf(buffer, 2048, messagePart, aptr);
     va_end(aptr);
     std::vector<SimulationMessage> messages;
-    messages.push_back(SimulationMessage(nodeId, buffer));
+    messages.push_back(SimulationMessage(terminalId, buffer));
 
     SimulateUntilMessagesReceived(timeoutMs, messages, executePerStep);
 }
@@ -443,7 +500,7 @@ void CherrySimTester::SimulateUntilMessagesReceived(int timeoutMs, std::vector<S
     _SimulateUntilMessageReceived(timeoutMs, executePerStep);
 }
 
-void CherrySimTester::SimulateUntilRegexMessageReceived(int timeoutMs, NodeId nodeId, const char * messagePart, ...)
+void CherrySimTester::SimulateUntilRegexMessageReceived(int timeoutMs, TerminalId terminalId, const char * messagePart, ...)
 {
     if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
     char buffer[2048];
@@ -452,7 +509,7 @@ void CherrySimTester::SimulateUntilRegexMessageReceived(int timeoutMs, NodeId no
     vsnprintf(buffer, 2048, messagePart, aptr);
     va_end(aptr);
     std::vector<SimulationMessage> messages;
-    messages.push_back(SimulationMessage(nodeId, buffer));
+    messages.push_back(SimulationMessage(terminalId, buffer));
     SimulateUntilRegexMessagesReceived(timeoutMs, messages);
 }
 
@@ -481,6 +538,7 @@ void CherrySimTester::_SimulateUntilMessageReceived(int timeoutMs, std::function
 
         //Watch if a timeout occurs
         if (startTimeMs + timeoutMs < (i32)sim->simState.simTimeMs) {
+            awaitedTerminalOutputs = nullptr;
             SIMEXCEPTION(TimeoutException); //Timeout waiting for message
         }
     }
@@ -521,61 +579,121 @@ void CherrySimTester::SimulateForever()
 }
 #endif //!CI_PIPELINE
 
-//Sends a TerminalCommand to the currentNode as part of the current time step, use nodeId = 0 to send to all nodes
-void CherrySimTester::SendTerminalCommand(NodeId nodeId, const char* message, ...)
+
+static std::string CherrySimTesterFormatVa(const char *formatString, va_list originalArguments)
 {
-    //TODO: Check what happens if we execute multiple terminal commands without simulating that node
-    //TODO: Should put the terminal command in a buffer and the node should then fetch it
+    // Make a copy of the argument list for measurement
+    va_list copiedArguments;
+    va_copy(copiedArguments, originalArguments);
 
-    char buffer[2048];
-    va_list aptr;
-    va_start(aptr, message);
-    vsnprintf(buffer, 2048, message, aptr);
-    va_end(aptr);
+    // Measure how much space would be needed for the string without the trailing nul character
+    const int requiredBytesWithoutNul = vsnprintf(nullptr, 0, formatString, copiedArguments);
 
-    const std::string originalCommand = buffer;
-    const u32 crc = Utility::CalculateCrc32String(originalCommand.c_str());
-    const std::string crcCommand = originalCommand + std::string(" CRC: ") + std::to_string(crc);
-    if (nodeId == 0) {
-        for (u32 i = 0; i < sim->GetTotalNodes(); i++) {
-            NodeIndexSetter setter(i);
-            if (!GS->terminal.terminalIsInitialized) {
-                //you have not activated the terminal of that node either through the config or through the sim config
-                SIMEXCEPTION(IllegalStateException); //Terminal of node is not active, cannot send message
-            }
-            std::string commandToSend = originalCommand;
-            if (GS->terminal.IsCrcChecksEnabled() && originalCommand.find(" CRC: ") == std::string::npos && appendCrcToMessages)
-            {
-                commandToSend = crcCommand;
-            }
-            if (config.verbose) {
-                printf("NODE %d TERM_IN: %s" EOL, sim->currentNode->id, commandToSend.c_str());
-            }
-            GS->terminal.PutIntoTerminalCommandQueue(commandToSend, false);
-        }
-    } else if (nodeId > 0 && nodeId < sim->GetTotalNodes() + 1) {
-        NodeIndexSetter setter(nodeId - 1);
-        if (!GS->terminal.terminalIsInitialized) {
-            //you have not activated the terminal of that node either through the config or through the sim config
-            SIMEXCEPTION(IllegalStateException); //Terminal of node is not active, cannot send message
-        }
-        std::string commandToSend = originalCommand;
-        if (GS->terminal.IsCrcChecksEnabled() && originalCommand.find(" CRC: ") == std::string::npos && appendCrcToMessages)
+    // Cleanup the copied argument list
+    va_end(copiedArguments);
+
+    if (requiredBytesWithoutNul < 0)
+    {
+        SIMEXCEPTION(IllegalStateException);
+    }
+
+    // Allocate the string with extra space for the trailing nul character (idiosyncrasy of vsnprintf)
+    std::string result(static_cast<std::size_t>(requiredBytesWithoutNul + 1), '\0');
+    // Actually format the string into the allocated buffer
+    const int usedBytesWithoutNul = vsnprintf(result.data(), result.size(), formatString, originalArguments);
+
+    // Make sure we used the same amount of space as was estimated before
+    if (usedBytesWithoutNul != requiredBytesWithoutNul)
+    {
+        SIMEXCEPTION(IllegalStateException);
+    }
+
+    // Make the string have the correct size (without the trailing nul character)
+    result.resize(usedBytesWithoutNul);
+    return result;
+}
+
+#define CHERRYSIM_SEND_TERMINAL_COMMAND_VA(result_name, va_list_name, message_name)                                    \
+    va_list va_list_name;                                                                                              \
+    va_start(va_list_name, message_name);                                                                              \
+    const auto result_name = CherrySimTesterFormatVa(message_name, va_list_name);                                      \
+    va_end(va_list_name);
+
+void CherrySimTester::SendTerminalCommand(TerminalId terminalId, const char *message, ...)
+{
+    CHERRYSIM_SEND_TERMINAL_COMMAND_VA(originalCommand, aptr, message)
+
+    if (terminalId == 0)
+    {
+        SIMEXCEPTION(InvalidTerminalIdException);
+    }
+    else
+    {
+        if (NodeEntry * nodeEntry = sim->FindUniqueNodeByTerminalId(terminalId))
         {
-            commandToSend = crcCommand;
+            DoSendTerminalCommand(*nodeEntry, originalCommand);
         }
-        if (config.verbose) {
-            printf("NODE %d TERM_IN: %s" EOL, sim->currentNode->id, commandToSend.c_str());
+        else
+        {
+            SIMEXCEPTION(TerminalIdNotFoundException);
         }
-        GS->terminal.PutIntoTerminalCommandQueue(commandToSend, false);
-    } else {
-        SIMEXCEPTION(IllegalStateException); //Wrong nodeId given for SendTerminalCommand
     }
 }
 
-void CherrySimTester::SendButtonPress(NodeId nodeId, u8 buttonId, u32 holdTimeDs)
+void CherrySimTester::SendTerminalCommandToNodeId(NodeId nodeId, const char *message, ...)
 {
-    NodeIndexSetter setter(nodeId);
+    CHERRYSIM_SEND_TERMINAL_COMMAND_VA(originalCommand, aptr, message)
+
+    if (auto *nodeEntry = sim->FindUniqueNodeById(nodeId))
+    {
+        DoSendTerminalCommand(*nodeEntry, originalCommand);
+    }
+    else
+    {
+        SIMEXCEPTION(NodeIdNotFoundException);
+    }
+}
+
+void CherrySimTester::SendTerminalCommandToAllNodes(const char *message, ...)
+{
+    CHERRYSIM_SEND_TERMINAL_COMMAND_VA(originalCommand, aptr, message)
+
+    for (u32 rawNodeIndex = 0; rawNodeIndex < sim->GetTotalNodes(); rawNodeIndex++)
+    {
+        DoSendTerminalCommand(sim->nodes[rawNodeIndex], originalCommand);
+    }
+}
+
+void CherrySimTester::DoSendTerminalCommand(const NodeEntry &nodeEntry, const std::string &originalCommand) const
+{
+    const u32 crc                = Utility::CalculateCrc32String(originalCommand.c_str());
+    const std::string crcCommand = originalCommand + std::string(" CRC: ") + std::to_string(crc);
+
+    NodeIndexSetter setter(nodeEntry.index);
+
+    if (!GS->terminal.terminalIsInitialized)
+    {
+        // The terminal of the node is not active, cannot send the message. It must either be activated before
+        // sending a message to it.
+        SIMEXCEPTION(IllegalStateException);
+    }
+
+    std::string commandToSend = originalCommand;
+    if (GS->terminal.IsCrcChecksEnabled() && originalCommand.find(" CRC: ") == std::string::npos && appendCrcToMessages)
+    {
+        commandToSend = crcCommand;
+    }
+    if (config.verbose)
+    {
+        printf("NODE %d TERM_IN: %s" EOL, sim->currentNode->GetNodeId(), commandToSend.c_str());
+    }
+    GS->terminal.PutIntoTerminalCommandQueue(commandToSend, false);
+}
+
+void CherrySimTester::SendButtonPress(TerminalId terminalId, u8 buttonId, u32 holdTimeDs)
+{
+    const auto * nodeEntry = cherrySimInstance->FindUniqueNodeByTerminalId(terminalId);
+    NodeIndexSetter setter(nodeEntry->index);
     if (buttonId == 1) {
         GS->button1HoldTimeDs = holdTimeDs;
     }
@@ -590,8 +708,12 @@ void CherrySimTester::SendButtonPress(NodeId nodeId, u8 buttonId, u32 holdTimeDs
 void CherrySimTester::TerminalPrintHandler(NodeEntry* currentNode, const char* message)
 {
     //Send to console
-    if (config.verbose && (config.terminalFilter == 0 || config.terminalFilter == currentNode->id)) {
-        printf("%s", message);
+    if (config.verbose && config.terminalFilter(currentNode)) {
+        // Important: The check _must_ succeed if both are 0, otherwise the
+        // configuration will not be printed in (e.g.) the System Test pipeline.
+        if (sim->simConfig.fastLaneToSimTimeMs <= sim->simState.simTimeMs) {
+            printf("%s", message);
+        }
     }
 
     //If we are not waiting for some specific terminal output, return
@@ -607,7 +729,7 @@ void CherrySimTester::TerminalPrintHandler(NodeEntry* currentNode, const char* m
         std::vector<SimulationMessage>& awaited = *this->awaitedTerminalOutputs;
         for (unsigned int i = 0; i < awaited.size(); i++) {
             if (!awaited[i].IsFound()) {
-                if (sim->currentNode->id == awaited[i].GetNodeId())
+                if (awaited[i].AppliesToNodeEntry(sim->currentNode))
                 {
                     if (awaited[i].CheckAndSet(awaitedMessageResult.data(), useRegex))
                     {
@@ -616,9 +738,9 @@ void CherrySimTester::TerminalPrintHandler(NodeEntry* currentNode, const char* m
                 }
             }
         }
-        
+
         awaitedMessagesFound = std::all_of(awaited.begin(), awaited.end(), [](const SimulationMessage& sm) {return sm.IsFound(); });
-        
+
         awaitedMessagePointer = 0;
     }
 }
@@ -657,8 +779,13 @@ void CherrySimTester::CherrySimEventHandler(const char* eventType) {
 
 };
 
-SimulationMessage::SimulationMessage(NodeId nodeId, const std::string& messagePart)
-    :nodeId(nodeId), messagePart(messagePart)
+SimulationMessage::SimulationMessage(TerminalId terminalId, const std::string &messagePart)
+    : SimulationMessage(NodeEntryPredicate::AllowTerminalId(terminalId), messagePart)
+{
+}
+
+SimulationMessage::SimulationMessage(NodeEntryPredicate predicate, const std::string &messagePart)
+    : predicate{std::move(predicate)}, messagePart(messagePart)
 {
 }
 
@@ -669,7 +796,7 @@ bool SimulationMessage::CheckAndSet(const std::string & message, bool useRegex)
     }
 
     if (
-        (useRegex && MatchesRegex(message)) || 
+        (useRegex && MatchesRegex(message)) ||
         (!useRegex && Matches(message))) {
         MakeFound(message);
         return true;
@@ -690,11 +817,6 @@ const std::string& SimulationMessage::GetCompleteMessage() const
         SIMEXCEPTION(IllegalStateException); //Message was not found yet!
     }
     return messageComplete;
-}
-
-NodeId SimulationMessage::GetNodeId() const
-{
-    return nodeId;
 }
 
 bool SimulationMessage::Matches(const std::string & message)

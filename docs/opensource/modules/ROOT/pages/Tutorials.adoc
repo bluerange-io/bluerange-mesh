@@ -10,7 +10,7 @@ about modules and about how you can write your own, have a look at this
 tutorial that will guide you through the necessary steps on how to
 create a Module that can send and receive ping requests.
 
-Tutorial: xref:Implementing-a-Custom-Module.adoc[Implementing a Custom Module]
+Tutorial: xref:ImplementingCustomModule.adoc[Implementing a Custom Module]
 
 == Hardware
 FruityMesh can not just be used with Nordics nRF52-DK and nRF52840-DK.

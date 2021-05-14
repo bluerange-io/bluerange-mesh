@@ -51,6 +51,13 @@ std::set<int> CherrySimUtils::GenerateRandomNumbers(const int min, const int max
 
 std::string CherrySimUtils::GetNormalizedPath()
 {
+    //Check if the working directory was given as an environment variable
+    //Should be given as /path/to/cherrysim without trailing /
+    if(const char* env_p = std::getenv("CHERRYSIM_WORKDIR"))
+    {
+        return env_p;
+    }
+
 #ifdef __GNUC__
     //Unfortunately the sanitizer goes wild for std::filesystem::path on our used GCC version, so we have to do it by hand...
     std::string path = __FILE__;

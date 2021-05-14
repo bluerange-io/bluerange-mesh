@@ -82,6 +82,10 @@ int main(int argc, char** argv) {
         {
             shortLived = true;
         }
+        else if (s == "disableStdio")
+        {
+            Terminal::stdioActive = false;
+        }
         else
         {
             if (i != 0) std::cerr << "WARNING: unknown parameter " << s << "\n";
@@ -97,7 +101,8 @@ int main(int argc, char** argv) {
     Exceptions::ExceptionDisabler<ErrorCodeUnknownException> ecue;
     Exceptions::ExceptionDisabler<CRCMissingException> crcme;
     Exceptions::ExceptionDisabler<CRCInvalidException> crcie;
-    Exceptions::ExceptionDisabler<CommandNotFoundException> disabler;
+    Exceptions::ExceptionDisabler<CommandNotFoundException> cnfe;
+    Exceptions::ExceptionDisabler<TooManyArgumentsException> tmae;
 
     //Failing a SystemTest just because one Error Message was logged somewhere is
     //probably too harsh and will lead to more issues than it solves in the future.
@@ -105,8 +110,8 @@ int main(int argc, char** argv) {
 
     //@ReplayFeature@ <- Don't change this, it's a label used in the documentation.
     //You may use the following line to enable the replay feature. As this change
-    //should not get commited anyway, you may use absolut paths.
-    //simConfig.replayPath = "C:/Path/to/some/log/file/MyLog.log";
+    //should not get commited anyway, you may use absolut or a relative path.
+    //simConfig.replayPath = "../../cherry-sim.log";
 
     CherrySimRunner* runner = new CherrySimRunner(runnerConfig, simConfig, meshGwCommunication);
     printf("Launching Runner..." EOL);
@@ -158,7 +163,7 @@ void CherrySimRunner::TerminalReaderMain() {
         }
 
         sim->receivedDataFromMeshGw = true;
-        sim->FindNodeById(MESH_GW_NODE)->gs.terminal.PutIntoTerminalCommandQueue(input, false);
+        sim->FindUniqueNodeById(MESH_GW_NODE)->gs.terminal.PutIntoTerminalCommandQueue(input, false);
     }
 }
 
@@ -184,13 +189,9 @@ SimConfiguration CherrySimRunner::CreateDefaultRunConfiguration()
 
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 7 });
-#ifndef GITHUB_RELEASE
-    simConfig.nodeConfigName.insert({ "prod_vs_nrf52", 1 }); // vs node ids are before assetNodes and clcNodes
-    simConfig.nodeConfigName.insert({ "prod_clc_mesh_nrf52", 1 });//clc node ids are before assetNodes
-#endif
 
-    simConfig.simOtherDelay = 1; // Enter 1 - 100000 to send sim_other message only each ... simulation steps, this increases the speed significantly
-    simConfig.playDelay = 10; //Allows us to view the simulation slower than simulated, is added after each step
+    simConfig.simOtherDelay = 100000; // Enter 1 - 100000 to send sim_other message only each ... simulation steps, this increases the speed significantly
+    simConfig.playDelay = 0; //Allows us to view the simulation slower than simulated, is added after each step
 
     simConfig.interruptProbability = UINT32_MAX / 10;
 
@@ -213,6 +214,8 @@ SimConfiguration CherrySimRunner::CreateDefaultRunConfiguration()
 
     simConfig.verboseCommands = true;
     simConfig.enableSimStatistics = true;
+
+    simConfig.fastLaneToSimTimeMs = 0;
 
     simConfig.logReplayCommands = true;
 
@@ -336,8 +339,9 @@ bool CherrySimRunner::Simulate()
 
 void CherrySimRunner::TerminalPrintHandler(NodeEntry* currentNode, const char* message)
 {
-    if (runnerConfig.verbose) {
-        //Send to console
+    // Important: The check _must_ succeed if both are 0, otherwise the
+    // configuration will not be printed in (e.g.) the System Test pipeline.
+    if (runnerConfig.verbose && sim->simConfig.fastLaneToSimTimeMs <= sim->simState.simTimeMs && Terminal::stdioActive) {
         printf("%s", message);
     }
 }

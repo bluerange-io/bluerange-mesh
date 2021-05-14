@@ -81,8 +81,9 @@ const std::vector<std::string> templates{
 /* IO MODULE */
 /*************/
 //Documented
-    "action [[[0-4]]] io led {{{on|off|cluster}}}",
+    "action [[[0-4]]] io led {{{on|off|connections}}}",
     "action [[[0-4]]] io pinset [[[1-128]]] {{{low|high}}}",
+    "action [[[0-4]]] io identify {{{on|off}}}",
 //Undocumented
 
 /**********************/
@@ -431,6 +432,11 @@ void StartTestMonkey(bool onlyValidCommands, bool allCommandsInOrder, bool reduc
     Exceptions::ExceptionDisabler<RecordStorageIsLockedDownException> recordStorageIsLockedDownException;
     Exceptions::ExceptionDisabler<WrongCommandParameterException> wrongCommandParameterException;
     Exceptions::ExceptionDisabler<InternalTerminalCommandErrorException> internalTerminalCommandErrorException;
+    // Added this as sendMeshMessage may return error which in turn will cause log error exception
+    Exceptions::ExceptionDisabler<ErrorLoggedException> ErrorLoggedException;
+    Exceptions::ExceptionDisabler<JsonParseException> JsonParseExceptionException;
+    // The tester creates commands with random target terminal ids
+    Exceptions::ExceptionDisabler<InvalidTerminalIdException> disableInvalidTerminalIdException;
     Exceptions::DisableDebugBreakOnException antiDebugBreak;
     constexpr u32 amountOfNodes = 3;
 

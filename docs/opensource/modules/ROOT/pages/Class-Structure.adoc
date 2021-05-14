@@ -24,7 +24,7 @@ Other classes, all derived from _BaseConnection_ are also in this folder and the
 == src/modules/
 This folder contains a number of modules that provide specific functionality apart from the meshing protocol. To implement a new module, use a template in the `fruitymesh/src_examples/` folder to get started and have a look at the xref:StatusReporterModule.adoc[StatusReporterModule] to get an idea of how to implement additional functionality.
 
-If you want to learn more about modules, either read the xref:Modules.adoc[Modules] chapter or have at look at this tutorial about xref:Implementing-a-Custom-Module.adoc[Implementing a Custom Module].
+If you want to learn more about modules, either read the xref:Modules.adoc[Modules] chapter or have at look at this tutorial about xref:ImplementingCustomModule.adoc[Implementing a Custom Module].
 
 == src/utility/
 A basic circular queue implementation, a file system, utility classes, implementation of the terminal, logger, etc.

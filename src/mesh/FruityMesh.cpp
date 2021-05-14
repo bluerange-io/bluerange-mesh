@@ -53,6 +53,7 @@
 #include <FmTypes.h>
 #include <FlashStorage.h>
 #include <Timeslot.h>
+#include <DeviceOff.h>
 
 #ifndef GITHUB_RELEASE
 #if IS_ACTIVE(ASSET_MODULE)
@@ -115,6 +116,7 @@ void BootFruityMesh()
             SIMEXCEPTION(SafeBootTriggeredException);
         }
     }
+    GS->safeBootEnabled = safeBootEnabled;
 
     //Resetting the GPREGRET2 Retained register will block the nordic secure DFU bootloader
     //from starting the DFU process
@@ -127,6 +129,8 @@ void BootFruityMesh()
     //configuration to proceed initializing everything else
     //Load board configuration from flash only if it is not in safe boot mode
     Boardconf::GetInstance().Initialize();
+
+    GS->deviceOff.HandleReset();
 
     //Configure LED pins as output
     GS->ledRed.Init(Boardconfig->led1Pin, Boardconfig->ledActiveHigh);
@@ -144,7 +148,6 @@ void BootFruityMesh()
 
     //Load the configuration from flash only if it is not in safeBoot mode
     Conf::GetInstance().Initialize(safeBootEnabled);
-
 
     //Initialize the UART Terminal
     Terminal::GetInstance().Init();
@@ -175,7 +178,6 @@ void BootFruityMesh()
     Logger::GetInstance().EnableTag("DISCONNECT");
 //    Logger::GetInstance().EnableTag("JOIN");
     Logger::GetInstance().EnableTag("GATTCTRL");
-    Logger::GetInstance().EnableTag("CONN");
 //    Logger::GetInstance().EnableTag("CONN_DATA");
     Logger::GetInstance().EnableTag("MACONN");
     Logger::GetInstance().EnableTag("EINK");
@@ -200,7 +202,7 @@ void BootFruityMesh()
 //    Logger::GetInstance().EnableTag("VSMOD");
     Logger::GetInstance().EnableTag("VSDBG");
 //    Logger::GetInstance().EnableTag("VSCOMM");
-    Logger::GetInstance().EnableTag("ASMOD");
+//    Logger::GetInstance().EnableTag("ASMOD");
 //    Logger::GetInstance().EnableTag("GYRO");
 //    Logger::GetInstance().EnableTag("EVENTS");
 //    Logger::GetInstance().EnableTag("SC");
@@ -208,6 +210,7 @@ void BootFruityMesh()
 //    Logger::GetInstance().EnableTag("WMMOD");
 //    Logger::GetInstance().EnableTag("BME");
 //    Logger::GetInstance().EnableTag("ADVS");
+      Logger::GetInstance().EnableTag("OFF");
 #endif
     
     //Log the reboot reason to our ram log so that it is automatically queried by the sink
@@ -224,12 +227,19 @@ void BootFruityMesh()
         SIMEXCEPTION(IllegalStateException);
     }
 
-    Utility::LogRebootJson();
+    Utility::LogRebootJson(false);
 
     //Stacktrace can be evaluated using addr2line -e FruityMesh.out 1D3FF
     //Note: Convert to hex first!
     if(FruityHal::GetBootloaderAddress() != 0xFFFFFFFF) logt("MAIN", "UICR boot address is %x, bootloader v%u", (u32)FruityHal::GetBootloaderAddress(), FruityHal::GetBootloaderVersion());
     logt("MAIN", "Reboot reason was %u, SafeBootEnabled:%u, stacktrace %u", (u32)GS->ramRetainStructPtr->rebootReason, safeBootEnabled, GS->ramRetainStructPtr->stacktrace[0]);
+
+    if (GS->ramRetainStructPtr->rebootReason == RebootReason::WATCHDOG)
+    {
+        Logger::GetInstance().LogCustomError(CustomErrorTypes::WATCHDOG_REBOOT, *GS->watchdogExtraInfoFlagsPtr);
+        logt("MAIN", "Watchdog timeouts mask: %d", *GS->watchdogExtraInfoFlagsPtr);
+    }
+    *GS->watchdogExtraInfoFlagsPtr = 0;
 
     //Start Watchdog and feed it
     FruityHal::StartWatchdog(safeBootEnabled);
@@ -443,6 +453,18 @@ void DispatchEvent(const FruityHal::GapConnectionSecurityUpdateEvent & e)
 {
     GAPController::GetInstance().GapConnectionSecurityUpdateEventHandler(e);
 }
+
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+void DispatchEvent(const FruityHal::GapConnParamUpdateEvent & e)
+{
+    GAPController::GetInstance().GapConnParamUpdateEventHandler(e);
+}
+
+void DispatchEvent(const FruityHal::GapConnParamUpdateRequestEvent & e)
+{
+    GAPController::GetInstance().GapConnParamUpdateRequestEventHandler(e);
+}
+#endif
 
 void DispatchEvent(const FruityHal::GattcWriteResponseEvent & e)
 {

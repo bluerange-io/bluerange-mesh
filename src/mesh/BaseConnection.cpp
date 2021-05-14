@@ -11,7 +11,7 @@
 // ** Licensees holding valid commercial Bluerange licenses may use this file in
 // ** accordance with the commercial license agreement provided with the
 // ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
+// ** a written agreement between them and M-Way Solutions GmbH.
 // ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
 // ** information use the contact form at https://www.bluerange.io/contact.
 // **
@@ -134,7 +134,7 @@ bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8 const 
         //TODO: Error handling: What should happen when the queue is full?
         //Currently, additional packets are dropped
         logt("CM", "Send queue is already full");
-        SIMSTATCOUNT("sendQueueFull");
+        SIMSTATCOUNT(Logger::GetErrorLogCustomError(CustomErrorTypes::COUNT_DROPPED_PACKETS));
 
         //For safety, we try to fill the transmitbuffers if it got stuck
         if(fillTxBuffers) FillTransmitBuffers();
@@ -217,12 +217,15 @@ void BaseConnection::FillTransmitBuffers()
                     processedMessageLength);
         }
 
-        if(err == ErrorType::SUCCESS) 
+        if(err == ErrorType::SUCCESS)
         {
             SizedData sizedData;
             sizedData.data = data;
             sizedData.length = processedMessageLength.GetRaw();
-            queueOrigins.Push(queuePriorityPair.priority);
+            if (queueOrigins.Push(queuePriorityPair.priority) == false)
+            {
+                SIMEXCEPTION(IllegalStateException);
+            }
             activeQueue->IncrementLookAhead();
             PacketSuccessfullyQueuedWithSoftdevice(&sizedData);
         }
@@ -272,7 +275,7 @@ void BaseConnection::HandlePacketSent(u8 sentUnreliable, u8 sentReliable)
     //TODO: we must not send more than 100 packets from one queue, otherwise, the handles between
     //TODO: We should think about the terminology of "Splits", "Messages", and "Packets". How do we want to use these terms in the future?
     //the queues will not match anymore to the sequence in that the packets were sent
-    
+
     //We must iterate in a loop to delete all packets if more than one was sent
     u8 numSent = sentUnreliable + sentReliable;
 
@@ -294,10 +297,13 @@ void BaseConnection::HandlePacketSent(u8 sentUnreliable, u8 sentReliable)
             return;
         }
 
-        const DeliveryPriority queueOrigin = queueOrigins.Peek();
-        queueOrigins.Pop();
-        //Find the queue from which the packet was sent
-        ChunkedPacketQueue* activeQueue = queue.GetQueueByPriority(queueOrigin);
+        ChunkedPacketQueue *const activeQueue = [this]() {
+            DeliveryPriority deliveryPriority = {};
+            FRUITYMESH_ERROR_CHECK(queueOrigins.TryPeekAndPop(deliveryPriority) ? (u32)ErrorType::SUCCESS
+                                                                                : (u32)ErrorType::INVALID_STATE);
+
+            return queue.GetQueueByPriority(deliveryPriority);
+        }();
 
         if(activeQueue->HasPackets() == false)
         {
@@ -364,9 +370,9 @@ void BaseConnection::HandlePacketQueuingFail(u32 err)
     packetFailedToQueueCounter++;
 
     if (
-        err != (u32)ErrorType::DATA_SIZE && 
-        err != (u32)ErrorType::TIMEOUT && 
-        err != (u32)ErrorType::INVALID_ADDR && 
+        err != (u32)ErrorType::DATA_SIZE &&
+        err != (u32)ErrorType::TIMEOUT &&
+        err != (u32)ErrorType::INVALID_ADDR &&
         err != (u32)ErrorType::INVALID_PARAM) {
         //The remaining errors can happen if the gap connection is temporarily lost during reestablishing
         return;
@@ -433,6 +439,8 @@ u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 c
     }
 
     //Intermediate packets must always be a full MTU
+    //This is not strictly necessary but the implementation should guarantee this
+    //This handling will lead to a splitPacketMissing exception as well as it drops intermediate packets
     if(packetHeader->splitMessageType == MessageType::SPLIT_WRITE_CMD && sendData->dataLength != connectionPayloadSize){
         GS->logger.LogCustomError(CustomErrorTypes::WARN_SPLIT_PACKET_NOT_IN_MTU, sendData->dataLength.GetRaw());
         packetReassemblyPosition = 0;
@@ -514,8 +522,7 @@ void BaseConnection::ConnectionSuccessfulHandler(u16 connectionHandle)
 void BaseConnection::GapReconnectionSuccessfulHandler(const FruityHal::GapConnectedEvent& connectedEvent){
     logt("CONN", "Reconnection Successful");
 
-    connectionMtu = MAX_DATA_SIZE_PER_WRITE;
-    connectionPayloadSize = MAX_DATA_SIZE_PER_WRITE;
+    //=> We expect the MTU to be the exact same value as the previous connection, otherwhise it gets dropped, so we do not need to reset it here even though a new gap connection will start with a smaller MTU
 
     connectionHandle = connectedEvent.GetConnectionHandle();
 
@@ -553,6 +560,49 @@ bool BaseConnection::GapDisconnectionHandler(FruityHal::BleHciError hciDisconnec
 
     return true;
 }
+
+#if IS_ACTIVE(CONN_PARAM_UPDATE)
+void BaseConnection::GapConnParamUpdateHandler(
+        const FruityHal::BleGapConnParams & params)
+{
+#if IS_ACTIVE(CONN_PARAM_UPDATE_LOGGING)
+    logt(
+        "CONN",
+        "Connection parameter update on connection with id=%u "
+        "(max=%u, min=%u, sl=%u, st=%u) as %s",
+        connectionId, params.maxConnInterval, params.minConnInterval,
+        params.slaveLatency, params.connSupTimeout,
+        (direction == ConnectionDirection::DIRECTION_OUT) ? "central" : "peripheral"
+    );
+#endif
+}
+
+void BaseConnection::GapConnParamUpdateRequestHandler(
+        const FruityHal::BleGapConnParams & params)
+{
+#if IS_ACTIVE(CONN_PARAM_UPDATE_LOGGING)
+    logt(
+        "CONN",
+        "Connection parameter update request on connection with id=%u "
+        "(max=%u, min=%u, sl=%u, st=%u) as %s",
+        connectionId, params.maxConnInterval, params.minConnInterval,
+        params.slaveLatency, params.connSupTimeout,
+        (direction == ConnectionDirection::DIRECTION_OUT) ? "central" : "peripheral"
+    );
+#endif
+
+    // Connection parameter update _requests_ are only happening on devices in
+    // the central role, as a result of the remote peripheral device requesting
+    // the parameter change.
+    if (direction != ConnectionDirection::DIRECTION_OUT)
+    {
+#if IS_ACTIVE(CONN_PARAM_UPDATE_LOGGING)
+        logt("ERROR", "Received connection parameter update request as peripheral.");
+#endif
+        SIMEXCEPTION(IllegalStateException);
+    }
+}
+#endif
 
 #define __________________HELPER______________________
 /*######## HELPERS ###################################*/
