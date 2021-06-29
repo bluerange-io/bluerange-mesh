@@ -378,6 +378,10 @@ endif()
   set_target_properties(event event_core event_extra gtest gtest_main PROPERTIES FOLDER Dependencies)
   set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT cherrySim_runner)
   
+  if(FM_NATIVE_RENDERER_MOCK_ENABLED)
+    add_compile_definitions(FM_NATIVE_RENDERER_MOCK_ENABLED)
+  endif()
+
   if(FM_NATIVE_RENDERER_ENABLED)
     add_compile_definitions(FM_NATIVE_RENDERER_ENABLED)
     add_subdirectory(BBERenderer)

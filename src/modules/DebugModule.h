@@ -82,6 +82,7 @@ class DebugModule: public Module
         u32 firstFloodPacketMs = 0;
         u32 autoFloodSum = 0;
         u32 lastFloodPacketMs = 0;
+        u32 throughputInBytesPerSecond = 0;
 
         //Variables for counter mode
         NodeId counterDestinationId = 0;
@@ -294,5 +295,7 @@ class DebugModule: public Module
         //Priority
         virtual DeliveryPriority GetPriorityOfMessage(const u8* data, MessageLength size) override;
 #endif
+        
+        u32 GetThroughputTestResult();
         
 };

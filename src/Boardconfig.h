@@ -92,6 +92,9 @@ typedef struct BoardConfiguration
 
     // If set to value different than 0, turns on some battery opimizations
     uint8_t powerOptimizationEnabled;
+
+    int8_t powerButton;
+    uint8_t powerButtonActiveHigh : 8;
 } BoardConfiguration;
 #pragma pack(pop)
 

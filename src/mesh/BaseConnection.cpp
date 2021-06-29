@@ -134,7 +134,7 @@ bool BaseConnection::QueueData(const BaseConnectionSendData &sendData, u8 const 
         //TODO: Error handling: What should happen when the queue is full?
         //Currently, additional packets are dropped
         logt("CM", "Send queue is already full");
-        SIMSTATCOUNT("sendQueueFull");
+        SIMSTATCOUNT(Logger::GetErrorLogCustomError(CustomErrorTypes::COUNT_DROPPED_PACKETS));
 
         //For safety, we try to fill the transmitbuffers if it got stuck
         if(fillTxBuffers) FillTransmitBuffers();
@@ -433,6 +433,8 @@ u8 const * BaseConnection::ReassembleData(BaseConnectionSendData* sendData, u8 c
     }
 
     //Intermediate packets must always be a full MTU
+    //This is not strictly necessary but the implementation should guarantee this
+    //This handling will lead to a splitPacketMissing exception as well as it drops intermediate packets
     if(packetHeader->splitMessageType == MessageType::SPLIT_WRITE_CMD && sendData->dataLength != connectionPayloadSize){
         GS->logger.LogCustomError(CustomErrorTypes::WARN_SPLIT_PACKET_NOT_IN_MTU, sendData->dataLength.GetRaw());
         packetReassemblyPosition = 0;
@@ -514,8 +516,7 @@ void BaseConnection::ConnectionSuccessfulHandler(u16 connectionHandle)
 void BaseConnection::GapReconnectionSuccessfulHandler(const FruityHal::GapConnectedEvent& connectedEvent){
     logt("CONN", "Reconnection Successful");
 
-    connectionMtu = MAX_DATA_SIZE_PER_WRITE;
-    connectionPayloadSize = MAX_DATA_SIZE_PER_WRITE;
+    //=> We expect the MTU to be the exact same value as the previous connection, otherwhise it gets dropped, so we do not need to reset it here even though a new gap connection will start with a smaller MTU
 
     connectionHandle = connectedEvent.GetConnectionHandle();
 

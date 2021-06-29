@@ -256,3 +256,6 @@ The simulator additionally allows the usage of container classes like std::vecto
 
 == Licence
 FruityMesh is published under the GPLv3 version, which is available in the repository.
+
+== Watchdog timeout handler
+For debugging purposes watchdog timeout handler was implemented. Also added a custom error type `WATCHDOG_REBOOT`. It is reported after watchdog reset with `watchdogExtraInfoFlags` as a extra info.

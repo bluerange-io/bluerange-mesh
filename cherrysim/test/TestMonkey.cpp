@@ -432,6 +432,8 @@ void StartTestMonkey(bool onlyValidCommands, bool allCommandsInOrder, bool reduc
     Exceptions::ExceptionDisabler<RecordStorageIsLockedDownException> recordStorageIsLockedDownException;
     Exceptions::ExceptionDisabler<WrongCommandParameterException> wrongCommandParameterException;
     Exceptions::ExceptionDisabler<InternalTerminalCommandErrorException> internalTerminalCommandErrorException;
+    // Added this as sendMeshMessage may return error which in turn will cause log error exception
+    Exceptions::ExceptionDisabler<ErrorLoggedException> ErrorLoggedException;
     Exceptions::DisableDebugBreakOnException antiDebugBreak;
     constexpr u32 amountOfNodes = 3;
 

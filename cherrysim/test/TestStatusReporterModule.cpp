@@ -314,7 +314,8 @@ TEST(TestStatusReporterModule, TestConnectionRssiReportingWithNoise) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    // Very long time for clustering as distance between nodes is at limit of reception
+    tester.SimulateUntilClusteringDone(1000 * 1000);
 
     tester.SimulateGivenNumberOfSteps(100);
 

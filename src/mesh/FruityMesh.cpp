@@ -53,6 +53,7 @@
 #include <FmTypes.h>
 #include <FlashStorage.h>
 #include <Timeslot.h>
+#include <DeviceOff.h>
 
 #ifndef GITHUB_RELEASE
 #if IS_ACTIVE(ASSET_MODULE)
@@ -115,6 +116,7 @@ void BootFruityMesh()
             SIMEXCEPTION(SafeBootTriggeredException);
         }
     }
+    GS->safeBootEnabled = safeBootEnabled;
 
     //Resetting the GPREGRET2 Retained register will block the nordic secure DFU bootloader
     //from starting the DFU process
@@ -127,6 +129,8 @@ void BootFruityMesh()
     //configuration to proceed initializing everything else
     //Load board configuration from flash only if it is not in safe boot mode
     Boardconf::GetInstance().Initialize();
+
+    GS->deviceOff.HandleReset();
 
     //Configure LED pins as output
     GS->ledRed.Init(Boardconfig->led1Pin, Boardconfig->ledActiveHigh);
@@ -144,7 +148,6 @@ void BootFruityMesh()
 
     //Load the configuration from flash only if it is not in safeBoot mode
     Conf::GetInstance().Initialize(safeBootEnabled);
-
 
     //Initialize the UART Terminal
     Terminal::GetInstance().Init();
@@ -224,12 +227,19 @@ void BootFruityMesh()
         SIMEXCEPTION(IllegalStateException);
     }
 
-    Utility::LogRebootJson();
+    Utility::LogRebootJson(false);
 
     //Stacktrace can be evaluated using addr2line -e FruityMesh.out 1D3FF
     //Note: Convert to hex first!
     if(FruityHal::GetBootloaderAddress() != 0xFFFFFFFF) logt("MAIN", "UICR boot address is %x, bootloader v%u", (u32)FruityHal::GetBootloaderAddress(), FruityHal::GetBootloaderVersion());
     logt("MAIN", "Reboot reason was %u, SafeBootEnabled:%u, stacktrace %u", (u32)GS->ramRetainStructPtr->rebootReason, safeBootEnabled, GS->ramRetainStructPtr->stacktrace[0]);
+
+    if (GS->ramRetainStructPtr->rebootReason == RebootReason::WATCHDOG)
+    {
+        Logger::GetInstance().LogCustomError(CustomErrorTypes::WATCHDOG_REBOOT, *GS->watchdogExtraInfoFlagsPtr);
+        logt("MAIN", "Watchdog timeouts mask: %d", *GS->watchdogExtraInfoFlagsPtr);
+    }
+    *GS->watchdogExtraInfoFlagsPtr = 0;
 
     //Start Watchdog and feed it
     FruityHal::StartWatchdog(safeBootEnabled);

@@ -105,8 +105,8 @@ int main(int argc, char** argv) {
 
     //@ReplayFeature@ <- Don't change this, it's a label used in the documentation.
     //You may use the following line to enable the replay feature. As this change
-    //should not get commited anyway, you may use absolut paths.
-    //simConfig.replayPath = "C:/Path/to/some/log/file/MyLog.log";
+    //should not get commited anyway, you may use absolut or a relative path.
+    //simConfig.replayPath = "../../cherry-sim.log";
 
     CherrySimRunner* runner = new CherrySimRunner(runnerConfig, simConfig, meshGwCommunication);
     printf("Launching Runner..." EOL);
@@ -215,6 +215,8 @@ SimConfiguration CherrySimRunner::CreateDefaultRunConfiguration()
 
     simConfig.verboseCommands = true;
     simConfig.enableSimStatistics = true;
+
+    simConfig.fastLaneToSimTimeMs = 0;
 
     simConfig.logReplayCommands = true;
 
@@ -338,8 +340,9 @@ bool CherrySimRunner::Simulate()
 
 void CherrySimRunner::TerminalPrintHandler(NodeEntry* currentNode, const char* message)
 {
-    if (runnerConfig.verbose) {
-        //Send to console
+    // Important: The check _must_ succeed if both are 0, otherwise the
+    // configuration will not be printed in (e.g.) the System Test pipeline.
+    if (sim->simConfig.fastLaneToSimTimeMs <= sim->simState.simTimeMs) {
         printf("%s", message);
     }
 }

@@ -208,9 +208,14 @@ CherrySim is great for debugging issues that only arise with multiple nodes. As 
 All parts of CherrySim use a pseudo random number generator that is initialized with a user-given seed. This means that the simulation will always produce the exact same results on each run. This is great for debugging a complex problem as the simulation can be restarted multiple times. To get a different behaviour, the simulation can be restarted with a different seed.
 
 === Replay
-Due to the reproducible, deterministic nature of CherrySim, it is possible to replay a log file of a previous CherrySim execution if that run was configured with `simConfig.logReplayCommands = true`. If you want to do this, all you have to do is set `simConfig.replayPath` to a path of a log file. In practice you probably want to use this feature in CherrySimRunner. A designated line was created to help you with this, look for the String "@ReplayFeature@" inside `CherrySimRunner.cpp` for more information.
+Due to the reproducible, deterministic nature of CherrySim, it is possible to replay a log file of a previous CherrySim execution if that run was configured with `simConfig.logReplayCommands = true`. If you want to do this, all you have to do is set `simConfig.replayPath` to a path of a log file. In practice you probably want to use this feature in CherrySimRunner. A designated line was created to help you with this, look for the String "@ReplayFeature@" inside `CherrySimRunner.cpp` for more information. If you copy the log file to the root of the repository with the name `cherry-sim.log`, you can simply uncomment the line.
 
 CherrySim will load the previous simulator configuration from your log file. If it was a recording of e.g. a live session with a gateway, you might want to set `playDelay` to 0 and `realTime` to false. This will make the simulation run as fast as possible. You can find the configuration at the beginning of the log file.
+
+Make sure to modify the configuration in the replay log file and not in the code as the default configuration in the code will be overwritten with the configuration of the replay log file to reproduce the exact same conditions that were used when the replay log file was generated.
+
+=== Fast Lane
+We have included a fastLane option that allows you to speed up the simulation until a certain time is reached. This is very useful when debugging a replay log and when there is an error that only occurs after an extended time of simulating. It is available as part of the `SimConfiguration` and you can set it to a value in milliseconds. The simulator will completely disable the terminal output and will only render a new Native Renderer frame from time to time. Then, after the given time was reached, the terminal will be enabled and the Native Renderer will resume drawing all frames.
 
 === Globally Available Variables
 There are a number of global variables that are helpful for inspecting the state of the simulation:

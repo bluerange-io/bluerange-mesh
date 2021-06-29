@@ -179,43 +179,53 @@ void Logger::LogTag_f(LogType logType, const char* file, i32 line, const char* t
 #endif
 }
 
-void Logger::UartError_f(UartErrorType type) const
+static const char* GetUartErrorString(Logger::UartErrorType uartError)
 {
-    switch (type)
+    #if IS_ACTIVE(ENUM_TO_STRING)
+    switch (uartError)
     {
-        case UartErrorType::SUCCESS:
-            logjson("ERROR", "{\"type\":\"error\",\"code\":0,\"text\":\"OK\"}" SEP);
+        case Logger::UartErrorType::SUCCESS:
+            return "OK";
             break;
-        case UartErrorType::COMMAND_NOT_FOUND:
-            logjson("ERROR", "{\"type\":\"error\",\"code\":1,\"text\":\"Command not found\"}" SEP);
+        case Logger::UartErrorType::COMMAND_NOT_FOUND:
+            return "Command not found";
             break;
-        case UartErrorType::ARGUMENTS_WRONG:
-            logjson("ERROR", "{\"type\":\"error\",\"code\":2,\"text\":\"Wrong Arguments\"}" SEP);
+        case Logger::UartErrorType::ARGUMENTS_WRONG:
+            return "Wrong Arguments";
             break;
-        case UartErrorType::TOO_MANY_ARGUMENTS:
-            logjson("ERROR", "{\"type\":\"error\",\"code\":3,\"text\":\"Too many arguments\"}" SEP);
+        case Logger::UartErrorType::TOO_MANY_ARGUMENTS:
+            return "Too many arguments";
             break;
-        case UartErrorType::TOO_FEW_ARGUMENTS:
-            logjson("ERROR", "{\"type\":\"error\",\"code\":4,\"text\":\"Too few arguments\"}" SEP);
+        case Logger::UartErrorType::TOO_FEW_ARGUMENTS:
+            return "Too few arguments";
             break;
 #if IS_INACTIVE(SAVE_SPACE)
-        case UartErrorType::WARN_DEPRECATED:
-            logjson("ERROR", "{\"type\":\"error\",\"code\":5,\"text\":\"Warning: Command is marked deprecated!\"}" SEP);
+        case Logger::UartErrorType::WARN_DEPRECATED:
+            return "Warning: Command is marked deprecated!";
             break;
 #endif
-        case UartErrorType::CRC_INVALID:
-            logjson("ERROR", "{\"type\":\"error\",\"code\":6,\"text\":\"crc invalid\"}" SEP);
+        case Logger::UartErrorType::CRC_INVALID:
+            return "crc invalid";
             break;
-        case UartErrorType::CRC_MISSING:
-            logjson("ERROR", "{\"type\":\"error\",\"code\":7,\"text\":\"crc missing\"}" SEP);
+        case Logger::UartErrorType::CRC_MISSING:
+            return "crc missing";
             break;
-        case UartErrorType::INTERNAL_ERROR:
-            logjson("ERROR", "{\"type\":\"error\",\"code\":8,\"text\":\"internal error\"}" SEP);
+        case Logger::UartErrorType::INTERNAL_ERROR:
+            return "internal error";
             break;
         default:
-            logjson("ERROR", "{\"type\":\"error\",\"code\":%u,\"text\":\"Unknown Error\"}" SEP, (u32)type);
+            return "unknown error";
             break;
     }
+    #else
+    return "?";
+    #endif
+}
+
+void Logger::UartError_f(UartErrorType type) const
+{
+    logjson("ERROR", "{\"type\":\"error\",\"code\":%u,\"text\":\"%s\"}" SEP,
+        (u32)type, GetUartErrorString(type));
 }
 
 void Logger::EnableTag(const char* tag)
@@ -416,7 +426,7 @@ TerminalCommandHandlerReturnType Logger::TerminalCommandHandler(const char* comm
 
 const char* Logger::GetErrorLogErrorType(LoggingError type)
 {
-#if defined(TERMINAL_ENABLED)
+#if IS_ACTIVE(ENUM_TO_STRING)
     switch (type)
     {
     case LoggingError::GENERAL_ERROR:
@@ -440,7 +450,7 @@ const char* Logger::GetErrorLogErrorType(LoggingError type)
 
 const char* Logger::GetErrorLogCustomError(CustomErrorTypes type)
 {
-#if defined(TERMINAL_ENABLED)
+#if IS_ACTIVE(ENUM_TO_STRING)
     switch (type)
     {
     case CustomErrorTypes::FATAL_BLE_GATTC_EVT_TIMEOUT_FORCED_US:
@@ -463,8 +473,8 @@ const char* Logger::GetErrorLogCustomError(CustomErrorTypes type)
         return "WARN_GATT_WRITE_ERROR";
     case CustomErrorTypes::WARN_TX_WRONG_DATA:
         return "WARN_TX_WRONG_DATA";
-    case CustomErrorTypes::WARN_RX_WRONG_DATA:
-        return "WARN_RX_WRONG_DATA";
+    case CustomErrorTypes::DEPRECATED_WARN_RX_WRONG_DATA:
+        return "DEPRECATED_WARN_RX_WRONG_DATA";
     case CustomErrorTypes::WARN_CLUSTER_UPDATE_FLOW_MISMATCH:
         return "WARN_CLUSTER_UPDATE_FLOW_MISMATCH";
     case CustomErrorTypes::WARN_VITAL_PRIO_QUEUE_FULL:
@@ -541,8 +551,8 @@ const char* Logger::GetErrorLogCustomError(CustomErrorTypes type)
         return "FATAL_RECORD_STORAGE_ERASE_CYCLES_HIGH";
     case CustomErrorTypes::FATAL_RECORD_STORAGE_COULD_NOT_FIND_SWAP_PAGE:
         return "FATAL_RECORD_STORAGE_COULD_NOT_FIND_SWAP_PAGE";
-    case CustomErrorTypes::WARN_MTU_UPGRADE_FAILED:
-        return "WARN_MTU_UPGRADE_FAILED";
+    case CustomErrorTypes::FATAL_MTU_UPGRADE_FAILED:
+        return "FATAL_MTU_UPGRADE_FAILED";
     case CustomErrorTypes::WARN_ENROLLMENT_ERASE_FAILED:
         return "WARN_ENROLLMENT_ERASE_FAILED";
     case CustomErrorTypes::FATAL_RECORD_STORAGE_UNLOCK_FAILED:
@@ -601,6 +611,8 @@ const char* Logger::GetErrorLogCustomError(CustomErrorTypes type)
         return "INFO_UPTIME_RELATIVE";
     case CustomErrorTypes::INFO_UPTIME_ABSOLUTE:
         return "INFO_UPTIME_ABSOLUTE";
+    case CustomErrorTypes::COUNT_WARN_RX_WRONG_DATA:
+        return "COUNT_WARN_RX_WRONG_DATA";
     default:
         SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
         return "UNKNOWN_ERROR";
@@ -612,7 +624,7 @@ const char* Logger::GetErrorLogCustomError(CustomErrorTypes type)
 
 const char* Logger::GetGattStatusErrorString(FruityHal::BleGattEror gattStatusCode)
 {
-#if defined(TERMINAL_ENABLED)
+#if IS_ACTIVE(ENUM_TO_STRING)
     switch (gattStatusCode)
     {
     case FruityHal::BleGattEror::SUCCESS:
@@ -684,7 +696,7 @@ const char* Logger::GetGattStatusErrorString(FruityHal::BleGattEror gattStatusCo
 
 const char* Logger::GetGeneralErrorString(ErrorType ErrorCode)
 {
-#if defined(TERMINAL_ENABLED)
+#if IS_ACTIVE(ENUM_TO_STRING)
     switch ((u32)ErrorCode)
     {
     case (u32)ErrorType::SUCCESS:
@@ -744,7 +756,7 @@ const char* Logger::GetGeneralErrorString(ErrorType ErrorCode)
 
 const char* Logger::GetHciErrorString(FruityHal::BleHciError hciErrorCode)
 {
-#if defined(TERMINAL_ENABLED)
+#if IS_ACTIVE(ENUM_TO_STRING)
     switch (hciErrorCode)
     {
     case FruityHal::BleHciError::SUCCESS:
@@ -835,7 +847,7 @@ const char* Logger::GetHciErrorString(FruityHal::BleHciError hciErrorCode)
 
 const char* Logger::GetErrorLogRebootReason(RebootReason type)
 {
-#if defined(TERMINAL_ENABLED)
+#if IS_ACTIVE(ENUM_TO_STRING)
     switch (type)
     {
     case RebootReason::UNKNOWN:
@@ -887,7 +899,7 @@ const char* Logger::GetErrorLogRebootReason(RebootReason type)
 
 const char * Logger::GetErrorLogError(LoggingError type, u32 code)
 {
-#if defined(TERMINAL_ENABLED)
+#if IS_ACTIVE(ENUM_TO_STRING)
     switch (type)
     {
     case LoggingError::GENERAL_ERROR:

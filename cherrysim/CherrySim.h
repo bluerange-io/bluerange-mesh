@@ -143,6 +143,7 @@ TESTER_PUBLIC:
     bool AnimationLoadJsonFromPath(const char* path);
 
     bool ShouldSimIvTrigger(u32 ivMs);
+    bool ShouldSimConnectionIvTrigger(u32 ivMs, SoftdeviceConnection * connection);
 
     void StoreFlashToFile();
     void LoadFlashFromFile();

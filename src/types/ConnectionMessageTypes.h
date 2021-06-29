@@ -87,7 +87,7 @@ enum class MessageType : u8
     UPDATE_CONNECTION_INTERVAL = 31, //Instructs a node to use a different connection interval
     ASSET_LEGACY = 32,
     CAPABILITY = 33,
-    ASSET_GENERIC = 34,
+    ASSET_GENERIC = 34, // Deprecated as of 14.04.2021 (sent as ModuleMessage in AssetScanningModule)
     SIG_MESH_SIMPLE = 35, //A lightweight wrapper for SIG mesh access layer messages
 
     //Module messages all use the same ConnPacketModule header
@@ -740,6 +740,26 @@ typedef struct
 }ConnPacketUpdateConnectionInterval;
 STATIC_ASSERT_SIZE(ConnPacketUpdateConnectionInterval, SIZEOF_CONN_PACKET_UPDATE_CONNECTION_INTERVAL);
 
+enum class TrackedAssetMessageType : u8
+{
+    BLE    = 0x00,
+    INS    = 0x01
+};
+struct TrackedAssetMessage
+{
+    u8 moving : 1;
+    u8 hasFreeInConnection : 1;
+    u8 interestedInConnection : 1;
+    u8 reservedBits : 5;
+
+    NodeId nodeId;
+    i8 rssi;
+
+    TrackedAssetMessageType messageType;
+    u8 payload[SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA_PAYLOAD];
+};
+constexpr size_t SIZEOF_TRACKED_ASSET_MESSAGE = 12;
+constexpr size_t SIZEOF_TRACKED_ASSET_MESSAGE_WITH_CONN_PACKET_HEADER = SIZEOF_TRACKED_ASSET_MESSAGE + SIZEOF_CONN_PACKET_HEADER;
 
 //End Packing
 #pragma pack(pop)

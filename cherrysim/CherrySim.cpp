@@ -107,7 +107,7 @@ extern "C"{
 #include "BBERenderer.h"
 
 BBERenderer* bbeRenderer = nullptr;
-bool bbeRendererWasDestroyed = false;
+bool bbeRendererWasDestroyed = false; //Can be set to true in order to not create the native renderer on startup
 #endif
 
 using json = nlohmann::json;
@@ -144,6 +144,16 @@ struct FlashFileHeader
 bool CherrySim::ShouldSimIvTrigger(u32 ivMs)
 {
     return (currentNode->state.timeMs % ivMs) == 0;
+}
+
+bool CherrySim::ShouldSimConnectionIvTrigger(u32 ivMs, SoftdeviceConnection * connection)
+{
+    if (currentNode->state.timeMs >= (connection->lastConnectionTimestampMs + ivMs))
+    {
+        connection->lastConnectionTimestampMs = currentNode->state.timeMs;
+        return true;
+    }
+    return false;
 }
 
 void CherrySim::StoreFlashToFile()
@@ -969,7 +979,14 @@ void CherrySim::SimulateStepForAllNodes()
 #ifdef FM_NATIVE_RENDERER_ENABLED
     if (bbeRenderer && bbeRenderer->keepAlive())
     {
-        bbeRenderer->frame();
+        //Only draw a frame from time to time if fastLane is active, otherwhise always draw
+        if (
+            (simConfig.fastLaneToSimTimeMs > simState.simTimeMs && (simState.simTimeMs % (simConfig.simTickDurationMs * 500) == 0))
+            || simConfig.fastLaneToSimTimeMs < simState.simTimeMs
+            || simState.simTimeMs == simConfig.simTickDurationMs //Draw the first frame
+        ) {
+            bbeRenderer->frame();
+        }
     }
     else if(bbeRenderer)
     {
@@ -1041,7 +1058,7 @@ TerminalCommandHandlerReturnType CherrySim::TerminalCommandHandler(const std::ve
             printf("Map Width (sim width): %u\n", simConfig.mapWidthInMeters);
             printf("Map Height (sim height): %u\n", simConfig.mapHeightInMeters);
             printf("Map Elevation (sim elevation): %u\n", simConfig.mapElevationInMeters);
-            printf("ConnectionLossProbability (sim lossprob): %f\n", simConfig.connectionTimeoutProbabilityPerSec);
+            printf("ConnectionLossProbability (sim lossprob): %u\n", simConfig.connectionTimeoutProbabilityPerSec);
             printf("Play delay (sim delay): %d\n", simConfig.playDelay);
             printf("Import Json (sim json): %u\n", simConfig.importFromJson);
             printf("Site json (sim site): %s\n", simConfig.siteJsonPath.c_str());
@@ -2217,6 +2234,7 @@ void CherrySim::ConnectMasterToSlave(NodeEntry* master, NodeEntry* slave)
     freeInConnection->connectionMtu = GATT_MTU_SIZE_DEFAULT;
     freeInConnection->isCentral = false;
     freeInConnection->lastReceivedPacketTimestampMs = simState.simTimeMs;
+    freeInConnection->connectionSetupTimeMs = simState.simTimeMs;
 
     //Generate an event for the current node
     simBleEvent s2;
@@ -2270,6 +2288,7 @@ void CherrySim::ConnectMasterToSlave(NodeEntry* master, NodeEntry* slave)
     freeOutConnection->connectionMtu = GATT_MTU_SIZE_DEFAULT;
     freeOutConnection->isCentral = true;
     freeOutConnection->lastReceivedPacketTimestampMs = simState.simTimeMs;
+    freeOutConnection->connectionSetupTimeMs = simState.simTimeMs;
 
     //Save connection references
     freeInConnection->partnerConnection = freeOutConnection;
@@ -2468,7 +2487,7 @@ void CherrySim::SimulateConnections() {
             if (connectionIntervalMs == (int)7.5f) connectionIntervalMs = 10;
 
             //Each connecitonInterval, we see if there are any packets to send
-            if (ShouldSimIvTrigger(connectionIntervalMs)) {
+            if (ShouldSimConnectionIvTrigger(connectionIntervalMs, connection)) {
 
                 //Depending on the number of connections, we send a random amount of packets from the unreliable buffers
                 u8 numConnections = GetNumSimConnections(currentNode);
@@ -2822,8 +2841,9 @@ void CherrySim::SimulateBatteryUsage()
     u32 adv200Ms = 110 * 1000 / divider; //110 uA advertising at 200ms interval
     u32 adv400Ms = 84 * 1000 / divider; //84 uA advertising at 400ms interval
     u32 adv1000Ms = 70 * 1000 / divider; //70 uA advertising at 1000ms interval
-    u32 adv2000Ms = 50 * 1000 / divider; //50 uA advertising at 2000ms interval
-    u32 adv4000Ms = 63 * 1000 / divider; //63 uA advertising at 4000ms interval
+    u32 adv2000Ms = 63 * 1000 / divider; //63 uA advertising at 2000ms interval 
+    u32 adv4000Ms = 50 * 1000 / divider; //50 uA advertising at 4000ms interval
+    u32 adv8000Ms = 45 * 1000 / divider; //45 uA advertising at 8000ms interval (imaginary value)
     u32 adv30000Ms = 30 * 1000 / divider; //30 uA advertising at 30000ms interval
     u32 conn100Ms = 130 * 1000 / divider; //70 uA per connection at 100ms interval
     u32 conn7_5Ms = 1000 * 1000 / divider; //1000 uA per connection at 7.5ms interval (imaginary value)
@@ -2839,9 +2859,9 @@ void CherrySim::SimulateBatteryUsage()
     //Next, we add up all the numbers for all active features
     currentNode->nanoAmperePerMsTotal += idleDraw;
 
-    if (currentNode->ledOn) {
-        currentNode->nanoAmperePerMsTotal += ledUsage;
-    }
+    if (currentNode->led1On) currentNode->nanoAmperePerMsTotal += ledUsage;
+    if (currentNode->led2On) currentNode->nanoAmperePerMsTotal += ledUsage;
+    if (currentNode->led3On) currentNode->nanoAmperePerMsTotal += ledUsage;
 
     if (currentNode->state.advertisingActive) {
         if (currentNode->state.advertisingIntervalMs == 20) currentNode->nanoAmperePerMsTotal += adv20Ms;
@@ -2849,8 +2869,9 @@ void CherrySim::SimulateBatteryUsage()
         else if (currentNode->state.advertisingIntervalMs == 200) currentNode->nanoAmperePerMsTotal += adv200Ms;
         else if (currentNode->state.advertisingIntervalMs == 400) currentNode->nanoAmperePerMsTotal += adv400Ms;
         else if (currentNode->state.advertisingIntervalMs == 1000) currentNode->nanoAmperePerMsTotal += adv1000Ms;
-        else if (currentNode->state.advertisingIntervalMs == 4000) currentNode->nanoAmperePerMsTotal += adv4000Ms;
         else if (currentNode->state.advertisingIntervalMs == 2000) currentNode->nanoAmperePerMsTotal += adv2000Ms;
+        else if (currentNode->state.advertisingIntervalMs == 4000) currentNode->nanoAmperePerMsTotal += adv4000Ms;
+        else if (currentNode->state.advertisingIntervalMs == 8000) currentNode->nanoAmperePerMsTotal += adv8000Ms;
         else if (currentNode->state.advertisingIntervalMs == 30000) currentNode->nanoAmperePerMsTotal += adv30000Ms;
         else {
             printf("Adv interval not integrated into battery test, %u" EOL, (u32)currentNode->state.advertisingIntervalMs);
@@ -3566,7 +3587,7 @@ float CherrySim::GetReceptionRssi(const NodeEntry* sender, const NodeEntry* rece
     {
         return rssi;
     }
-    const float randomNoise = (float)cherrySimInstance->simState.rnd.NextU32(0, 7) - 3.f;
+    const float randomNoise = (float)cherrySimInstance->simState.rnd.NextU32(0, 3) - 3.f;
     return rssi + randomNoise;
 }
 

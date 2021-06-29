@@ -115,6 +115,7 @@ CREATEEXCEPTION(CorruptOrOutdatedSavefile);
 CREATEEXCEPTION(ZeroTimeoutNotSupportedException);
 CREATEEXCEPTION(ErrorLoggedException);
 CREATEEXCEPTION(InterruptDeadlockException);
+CREATEEXCEPTION(DeviceNotAvailableException);
 //LCOV_EXCL_STOP debug code
 
 #undef CREATEEXCEPTION //Exceptions must be created above!

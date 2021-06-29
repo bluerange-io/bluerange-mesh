@@ -66,7 +66,7 @@ void StatusReporterModule::ResetToDefaultConfiguration()
     configuration.connectionReportingIntervalDs = 0;
     configuration.nearbyReportingIntervalDs = 0;
     configuration.deviceInfoReportingIntervalDs = 0;
-    configuration.liveReportingState = LiveReportTypes::LEVEL_INFO;
+    configuration.liveReportingState = LiveReportTypes::LEVEL_WARN;
 
     CheckedMemset(nodeMeasurements, 0x00, sizeof(nodeMeasurements));
 
@@ -722,6 +722,11 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
                 {
                     const StatusReporterModuleKeepAliveMessage* msg = (const StatusReporterModuleKeepAliveMessage*)&packet->data;
                     comesFromSink = msg->fromSink;
+                }
+
+                if (comesFromSink)
+                {
+                    GS->sinkNodeId = packet->header.sender;
                 }
 
                 if (connection != nullptr && comesFromSink)

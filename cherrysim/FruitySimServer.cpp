@@ -264,7 +264,7 @@ std::string FruitySimServer::GenerateDevicesJson()
         device["uuid"] = uuid;
         device["deviceId"] = node->gs.config.GetSerialNumber();
         device["platform"] = "BLENODE";
-        device["ledOn"] = node->ledOn;
+        device["ledOn"] = node->led1On || node->led2On || node->led3On;
         device["inConnectionHasMasterBit"] = false;
         device["inConnectionPartnerHasMasterBit"] = false;
 

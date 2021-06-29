@@ -244,6 +244,8 @@ SimConfiguration CherrySimTester::CreateDefaultSimConfiguration()
 
     simConfig.rssiNoise = false;
 
+    simConfig.fastLaneToSimTimeMs = 0;
+
     simConfig.verboseCommands = true;
     simConfig.enableSimStatistics = false;
 
@@ -481,6 +483,7 @@ void CherrySimTester::_SimulateUntilMessageReceived(int timeoutMs, std::function
 
         //Watch if a timeout occurs
         if (startTimeMs + timeoutMs < (i32)sim->simState.simTimeMs) {
+            awaitedTerminalOutputs = nullptr;
             SIMEXCEPTION(TimeoutException); //Timeout waiting for message
         }
     }
@@ -591,7 +594,11 @@ void CherrySimTester::TerminalPrintHandler(NodeEntry* currentNode, const char* m
 {
     //Send to console
     if (config.verbose && (config.terminalFilter == 0 || config.terminalFilter == currentNode->id)) {
-        printf("%s", message);
+        // Important: The check _must_ succeed if both are 0, otherwise the
+        // configuration will not be printed in (e.g.) the System Test pipeline.
+        if (sim->simConfig.fastLaneToSimTimeMs <= sim->simState.simTimeMs) {
+            printf("%s", message);
+        }
     }
 
     //If we are not waiting for some specific terminal output, return

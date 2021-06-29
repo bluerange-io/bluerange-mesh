@@ -47,6 +47,7 @@ void to_json(nlohmann::json& j, const SimConfiguration & config)
         { "connectionTimeoutProbabilityPerSec", config.connectionTimeoutProbabilityPerSec},
         { "sdBleGapAdvDataSetFailProbability" , config.sdBleGapAdvDataSetFailProbability },
         { "sdBusyProbability"                 , config.sdBusyProbability                 },
+        { "sdBusyProbabilityUnlikely"         , config.sdBusyProbabilityUnlikely         },
         { "simulateAsyncFlash"                , config.simulateAsyncFlash                },
         { "asyncFlashCommitTimeProbability"   , config.asyncFlashCommitTimeProbability   },
         { "importFromJson"                    , config.importFromJson                    },
@@ -62,6 +63,7 @@ void to_json(nlohmann::json& j, const SimConfiguration & config)
         { "simulateWatchdog"                  , config.simulateWatchdog                  },
         { "simulateJittering"                 , config.simulateJittering                 },
         { "verbose"                           , config.verbose                           },
+        { "fastLaneToSimTimeMs"               , config.fastLaneToSimTimeMs               },
         { "enableClusteringValidityCheck"     , config.enableClusteringValidityCheck     },
         { "enableSimStatistics"               , config.enableSimStatistics               },
         { "storeFlashToFile"                  , config.storeFlashToFile                  },
@@ -88,6 +90,7 @@ void from_json(const nlohmann::json & j, SimConfiguration & config)
         else if(it.key() == "connectionTimeoutProbabilityPerSec") config.connectionTimeoutProbabilityPerSec= *it;
         else if(it.key() == "sdBleGapAdvDataSetFailProbability" ) config.sdBleGapAdvDataSetFailProbability = *it;
         else if(it.key() == "sdBusyProbability"                 ) config.sdBusyProbability                 = *it;
+        else if(it.key() == "sdBusyProbabilityUnlikely"         ) config.sdBusyProbabilityUnlikely         = *it;
         else if(it.key() == "simulateAsyncFlash"                ) config.simulateAsyncFlash                = *it;
         else if(it.key() == "asyncFlashCommitTimeProbability"   ) config.asyncFlashCommitTimeProbability   = *it;
         else if(it.key() == "importFromJson"                    ) config.importFromJson                    = *it;
@@ -107,6 +110,7 @@ void from_json(const nlohmann::json & j, SimConfiguration & config)
         else if(it.key() == "simulateWatchdog"                  ) config.simulateWatchdog                  = *it;
         else if(it.key() == "simulateJittering"                 ) config.simulateJittering                 = *it;
         else if(it.key() == "verbose"                           ) config.verbose                           = *it;
+        else if(it.key() == "fastLaneToSimTimeMs"               ) config.fastLaneToSimTimeMs               = *it;
         else if(it.key() == "enableClusteringValidityCheck"     ) config.enableClusteringValidityCheck     = *it;
         else if(it.key() == "enableSimStatistics"               ) config.enableSimStatistics               = *it;
         else if(it.key() == "storeFlashToFile"                  ) config.storeFlashToFile                  = *it;

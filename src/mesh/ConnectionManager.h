@@ -151,7 +151,8 @@ public:
     //This method will check and moduleId parameter and will send a ConnPacketModule instead if the given id is not a VendorModuleId
     ErrorTypeUnchecked SendModuleActionMessage(MessageType messageType, VendorModuleId moduleId, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool lookback) const;
 
-    void BroadcastMeshPacket(u8* data, u16 dataLength, bool reliable) const;
+    // Returns false if data was not send for at least one connection
+    bool BroadcastMeshPacket(u8* data, u16 dataLength, bool reliable) const;
 
     void RouteMeshData(BaseConnection* connection, BaseConnectionSendData* sendData, u8 const * data) const;
     void BroadcastMeshData(const BaseConnection* ignoreConnection, BaseConnectionSendData* sendData, u8 const * data, RoutingDecision routingDecision) const;

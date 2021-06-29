@@ -11,7 +11,7 @@
 // ** Licensees holding valid commercial Bluerange licenses may use this file in
 // ** accordance with the commercial license agreement provided with the
 // ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
+// ** a written agreement between them and M-Way Solutions GmbH.
 // ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
 // ** information use the contact form at https://www.bluerange.io/contact.
 // **
@@ -27,30 +27,21 @@
 // **
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
-#include <FruityHal.h>
-#include <Boardconfig.h>
-//Laird BLE654 USB Dongle R1.0 451-00004
-void SetBoard_24(BoardConfiguration* c)
+
+#pragma once
+
+#include <PrimitiveTypes.h>
+
+/**
+ * The DeviceOff can be used for turning device off and saving energy.
+ */
+class DeviceOff
 {
-    if(c->boardType == 24)
-    {
-        c->led1Pin =  13;
-        c->led2Pin =  -1;
-        c->led3Pin =  -1;
-        c->ledActiveHigh =  true;
-        c->button1Pin =  -1;
-        c->buttonsActiveHigh =  false;
-        c->uartRXPin =  -1;
-        c->uartTXPin =  -1;
-        c->uartCTSPin =  -1;
-        c->uartRTSPin =  -1;
-        c->uartBaudRate = (u32)FruityHal::UartBaudrate::BAUDRATE_1M;
-        c->dBmRX = -90;
-        c->calibratedTX =  -63;
-        c->lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_SYNTH;
-        c->lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_50_PPM;
-        c->dcDcEnabled = false;
-        c->powerOptimizationEnabled = false;
-        c->powerButton =  -1;
-    }
-}
+    private:
+        u32 buttonPressedTimeDs = 0;
+
+    public:
+        DeviceOff();
+        void HandleReset();
+        void TimerHandler(u16 passedTimeDs);
+};

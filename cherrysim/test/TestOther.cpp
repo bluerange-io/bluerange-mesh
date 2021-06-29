@@ -39,6 +39,7 @@
 #include "RingIndexGenerator.h"
 #include "json.hpp"
 #include "SimpleQueue.h"
+#include "DebugModule.h"
 
 
 extern "C"{
@@ -273,7 +274,7 @@ TEST(TestOther, TestMersenneTwister)
 TEST(TestOther, ConfigurationTest)
 {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    testerConfig.verbose = false;
+    //testerConfig.verbose = true;
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
@@ -322,6 +323,7 @@ TEST(TestOther, TestJsonConfigSerialization)
     simConfig->connectionTimeoutProbabilityPerSec = 12;
     simConfig->sdBleGapAdvDataSetFailProbability = 13;
     simConfig->sdBusyProbability = 14;
+    simConfig->sdBusyProbabilityUnlikely = 15;
     simConfig->simulateAsyncFlash = true;
     simConfig->asyncFlashCommitTimeProbability = 16;
     simConfig->importFromJson = true;
@@ -345,6 +347,7 @@ TEST(TestOther, TestJsonConfigSerialization)
     simConfig->simulateWatchdog = true;
     simConfig->simulateJittering = true;
     simConfig->verbose = true;
+    simConfig->fastLaneToSimTimeMs = 123;
     simConfig->enableClusteringValidityCheck = true;
     simConfig->enableSimStatistics = true;
     new (&simConfig->storeFlashToFile) std::string;
@@ -383,9 +386,10 @@ TEST(TestOther, TestJsonConfigSerialization)
     ASSERT_EQ(copy.simOtherDelay, 9);
     ASSERT_EQ(copy.playDelay, 10);
     ASSERT_EQ(copy.interruptProbability, 11);
-    ASSERT_NEAR(copy.connectionTimeoutProbabilityPerSec, 12, 0.01);
+    ASSERT_EQ(copy.connectionTimeoutProbabilityPerSec, 12);
     ASSERT_EQ(copy.sdBleGapAdvDataSetFailProbability, 13);
     ASSERT_EQ(copy.sdBusyProbability, 14);
+    ASSERT_EQ(copy.sdBusyProbabilityUnlikely, 15);
     ASSERT_EQ(copy.simulateAsyncFlash, true);
     ASSERT_EQ(copy.asyncFlashCommitTimeProbability, 16);
     ASSERT_EQ(copy.importFromJson, true);
@@ -409,6 +413,7 @@ TEST(TestOther, TestJsonConfigSerialization)
     ASSERT_EQ(copy.simulateWatchdog, true);
     ASSERT_EQ(copy.simulateJittering, true);
     ASSERT_EQ(copy.verbose, true);
+    ASSERT_EQ(simConfig->fastLaneToSimTimeMs, 123);
     ASSERT_EQ(copy.enableClusteringValidityCheck, true);
     ASSERT_EQ(copy.enableSimStatistics, true);
     ASSERT_EQ(copy.storeFlashToFile, "eee");
@@ -620,7 +625,7 @@ TEST(TestOther, TestEncryption) {
 #if IS_ACTIVE(CLC_MODULE)
 TEST(TestOther, TestConnectionAllocator) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    testerConfig.verbose = false;
+    //testerConfig.verbose = true;
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
     simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
@@ -1452,7 +1457,7 @@ TEST(TestOther, TestConnectionSupervisionTimeoutWillDisconnect) {
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("C");
     tester.sim->FindNodeById(2)->gs.logger.EnableTag("C");
 
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(100 * 1000);
 
     // With following settings static RSSI is around -89.95dbm which is just above reception level (0.3 probability).
     // With variable noise it should casue connection timeout
@@ -1558,4 +1563,61 @@ TEST(TestOther, TestDataSentSplit) {
 
     Logger::ConvertBufferToBase64String(buffer, len, bufferHex, sizeof(bufferHex));
     tester.SimulateUntilMessageReceived(100 * 1000, 2, "DataSentHandler: %s", bufferHex);
+}
+
+// Can be enabled when BR-453 is resolved
+TEST(TestOther, DISABLED_TestNoPacketsDropped) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    // testerConfig.verbose = true;
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.simTickDurationMs = 15;
+    simConfig.SetToPerfectConditions();
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 15 });
+    simConfig.nodeConfigName.insert({ "prod_asset_nrf52", 5 });
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+    tester.SimulateUntilClusteringDone(50 * 1000);
+
+    // tester.SendTerminalCommand(1, "action 0 status get_errors");
+    sim_print_statistics();
+    sim_clear_statistics();
+
+    for (uint32_t i = 0; i < 5; i++)
+    {
+        tester.SimulateForGivenTime(60 * 1000);
+        tester.SendTerminalCommand(1, "action 0 status get_errors");
+    }
+    tester.SimulateForGivenTime(100 * 1000);
+    int errors = sim_get_statistics(Logger::GetErrorLogCustomError(CustomErrorTypes::COUNT_DROPPED_PACKETS));
+    ASSERT_EQ(errors, 0);
+    sim_print_statistics();
+}
+
+TEST(TestOther, TestThroughput) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    // testerConfig.verbose = true;
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.SetToPerfectConditions();
+    simConfig.simTickDurationMs = 15;
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateUntilClusteringDone(50 * 1000);
+    tester.sim->FindNodeById(1)->gs.logger.DisableTag("CONN");
+    tester.sim->FindNodeById(2)->gs.logger.DisableTag("CONN");
+
+    tester.SendTerminalCommand(1, "action this debug flood 2 2 10000");
+
+    // Throughput has to be at least as high as now = 3900 byte/s
+    tester.SimulateUntilRegexMessageReceived(40 * 1000, 2, "Counted \\d+ flood payload bytes in \\d+ ms = \\d+ byte/s");
+    {
+        NodeIndexSetter setter(1);
+        DebugModule* test = (DebugModule*)tester.sim->FindNodeById(2)->gs.node.GetModuleById(ModuleId::DEBUG_MODULE);
+        ASSERT_TRUE(test->GetThroughputTestResult() >= 3900);
+    }
 }

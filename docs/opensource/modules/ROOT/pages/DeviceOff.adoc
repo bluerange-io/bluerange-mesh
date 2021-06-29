@@ -1,0 +1,7 @@
+= DeviceOff
+
+== Purpose
+The _DeviceOff_ allows turning device off. It can help to save energy when device is battery powered or limit radio traffic.
+
+== Functionality
+To turn on this feature the _powerButton_ needs to be configured in the `BoardConfiguration` for the board. When the _powerButton_ is pressed for over 1 second the device resets and enters a system off mode. The only way to get out of that mode is to press _powerButton_ for over 1 second or to execute pin reset. Note that the device will postopne booting until the _powerButton_ is pressed. If the _powerButton_ is pressed for less than 1 second, while in off mode, device will start booting, but will immediately go to system off mode again.

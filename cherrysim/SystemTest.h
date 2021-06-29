@@ -147,6 +147,8 @@ extern "C" {
 #define ACTIVATE_CONN_PARAM_UPDATE         1
 #define ACTIVATE_CONN_PARAM_UPDATE_LOGGING 1
 
+#define ACTIVATE_DEV_SENSOR_BROADCAST_MESSAGE 1
+
 #define NRF_GPIOTE_POLARITY_TOGGLE 1
 #define NRF_GPIOTE_POLARITY_HITOLO 2
 #define NRF_GPIOTE_POLARITY_LOTOHI 3
@@ -226,6 +228,13 @@ typedef enum
     NRF_GPIO_PIN_PULLDOWN = 1,
     NRF_GPIO_PIN_PULLUP   = 3
 } nrf_gpio_pin_pull_t;
+
+typedef enum
+{
+    NRF_GPIO_PIN_NOSENSE    = 0,
+    NRF_GPIO_PIN_SENSE_LOW  = 3,
+    NRF_GPIO_PIN_SENSE_HIGH = 2,
+} nrf_gpio_pin_sense_t;
 
 //Sample rates for Lis2dh12 sensor
 typedef enum {
@@ -346,6 +355,7 @@ void nrf_gpio_pin_toggle(uint32_t pin_number);
 void nrf_gpio_cfg_default(uint32_t pin_number);
 void nrf_gpio_cfg_output(uint32_t pin_number);
 void nrf_gpio_cfg_input(uint32_t pin_number, nrf_gpio_pin_pull_t pull_config);
+void nrf_gpio_cfg_sense_input(uint32_t pin_number, nrf_gpio_pin_pull_t pull_config, nrf_gpio_pin_sense_t sense_config);
 uint32_t nrf_gpio_pin_read(uint32_t pin_number);
 void nrf_uart_baudrate_set(NRF_UART_Type *p_reg, nrf_uart_baudrate_t baudrate);
 void nrf_uart_configure(NRF_UART_Type *p_reg, nrf_uart_parity_t parity, nrf_uart_hwfc_t hwfc);
@@ -365,6 +375,7 @@ void nrf_wdt_reload_value_set(uint32_t reload_value);
 void nrf_wdt_reload_request_enable(int rr_regist);
 void nrf_delay_ms(uint32_t volatile number_of_ms);
 uint8_t nrf_uart_rxd_get(NRF_UART_Type * p_reg);
+void nrf_power_system_off();
 
 //Unfortunatly can't return RebootReason, as this would create a circular dependency.
 uint8_t ST_getRebootReason();
@@ -801,6 +812,7 @@ uint32_t sd_ble_gap_rssi_start(uint16_t conn_handle, uint8_t threshold_dbm, uint
 uint32_t sd_ble_gap_rssi_stop(uint16_t conn_handle);
 uint32_t sd_power_dcdc_mode_set(uint8_t dcdc_mode);
 uint32_t sd_power_mode_set(uint8_t power_mode);
+uint32_t sd_power_system_off();
 uint32_t sd_flash_page_erase(uint32_t page_number);
 uint32_t sd_flash_write(uint32_t * const p_dst, uint32_t const * const p_src, uint32_t size);
 uint32_t sd_rand_application_vector_get(uint8_t * p_buff, uint8_t length);
@@ -834,7 +846,9 @@ uint32_t sd_radio_request(nrf_radio_request_t const * request);
 
 void sim_collect_statistic_count(const char* key);
 void sim_collect_statistic_avg(const char* key, int value);
+void sim_clear_statistics();
 void sim_print_statistics();
+int sim_get_statistics(const char* key);
 
 uint32_t sim_get_stack_type();
 

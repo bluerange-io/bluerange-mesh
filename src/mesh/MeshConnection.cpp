@@ -501,6 +501,10 @@ void MeshConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, u8 con
     }
 
     ConnPacketHeader const * packetHeader = (ConnPacketHeader const *)data;
+    if (packetHeader->sender == GS->sinkNodeId)
+    {
+        GS->lastReceivedFromSinkTimestamp = FruityHal::GetRtcMs();
+    }
 
     char stringBuffer[200];
     Logger::ConvertBufferToHexString(data, sendData->dataLength, stringBuffer, sizeof(stringBuffer));
@@ -529,8 +533,7 @@ void MeshConnection::ReceiveMeshMessageHandler(BaseConnectionSendData* sendData,
     if(!IsValidMessageType(packetHeader->messageType)){
         logt("ERROR", "POSSIBLE WRONG DATA RECEIVED!");
 
-        //TODO set the extra value of the LogCustomError back to the message type after the currently occurring issue is fixed.
-        GS->logger.LogCustomError(CustomErrorTypes::WARN_RX_WRONG_DATA, (u32)sendData->dataLength.GetRaw());
+        GS->logger.LogCustomCount(CustomErrorTypes::COUNT_WARN_RX_WRONG_DATA);
     }
     //Print packet as hex
     {
@@ -577,11 +580,13 @@ void MeshConnection::StartHandshake()
     //Before starting our mesh handshake, we upgrade to a higher MTU if possible
     ErrorType err = GS->cm.RequestDataLengthExtensionAndMtuExchange(this);
 
-    //If we could not upgrade the MTU, we continue with our handshake
+    //If we could not upgrade the MTU, we drop the connection
+    //Tests have shown that this does not happen in a mesh with 50 nodes over 4 months
+    //If it ever happens, we log a fatal error and can then improve the MTU upgrade process
     if(err != ErrorType::SUCCESS){
-        GS->logger.LogCustomError(CustomErrorTypes::WARN_MTU_UPGRADE_FAILED, (u32)err);
+        GS->logger.LogCustomError(CustomErrorTypes::FATAL_MTU_UPGRADE_FAILED, (u32)err);
 
-        ConnectionMtuUpgradedHandler(MAX_DATA_SIZE_PER_WRITE);
+        DisconnectAndRemove(AppDisconnectReason::MTU_UPGRADE_FAILED);
     }
 
     // => The ConnectionMtuUpgradedHandler will be called next
@@ -722,17 +727,17 @@ void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendD
 
                 //Send an update to the connected cluster to increase the size by one
                 //This is also the ACK message for our connecting node
-                ConnPacketClusterAck1 packet;
+                ConnPacketClusterAck1 outPacket;
 
-                packet.header.messageType = MessageType::CLUSTER_ACK_1;
-                packet.header.sender = GS->node.configuration.nodeId;
-                packet.header.receiver = this->partnerId;
+                outPacket.header.messageType = MessageType::CLUSTER_ACK_1;
+                outPacket.header.sender = GS->node.configuration.nodeId;
+                outPacket.header.receiver = this->partnerId;
 
-                packet.payload.hopsToSink = GET_DEVICE_TYPE() == DeviceType::SINK ? 0 : -1;
+                outPacket.payload.hopsToSink = GET_DEVICE_TYPE() == DeviceType::SINK ? 0 : -1;
 
-                logt("HANDSHAKE", "OUT => %d CLUSTER_ACK_1, hops:%d", packet.header.receiver, packet.payload.hopsToSink);
+                logt("HANDSHAKE", "OUT => %d CLUSTER_ACK_1, hops:%d", outPacket.header.receiver, outPacket.payload.hopsToSink);
 
-                SendHandshakeMessage((u8*) &packet, SIZEOF_CONN_PACKET_CLUSTER_ACK_1, true);
+                SendHandshakeMessage((u8*) &outPacket, SIZEOF_CONN_PACKET_CLUSTER_ACK_1, true);
                 
                 //Kill other Connections and check if this connection has been removed in the process
                 GS->cm.ForceDisconnectOtherMeshConnections(this, AppDisconnectReason::I_AM_SMALLER);
@@ -844,12 +849,16 @@ void MeshConnection::SendReconnectionHandshakePacket()
     //Before starting our mesh handshake, we upgrade to a higher MTU if possible
     ErrorType err = GS->cm.RequestDataLengthExtensionAndMtuExchange(this);
 
-    //If we could not upgrade the MTU, we continue with our handshake
-    if(err != ErrorType::SUCCESS){
-        GS->logger.LogCustomError(CustomErrorTypes::WARN_MTU_UPGRADE_FAILED, (u32)err);
+    //If we could not upgrade the MTU, we drop the connection
+    //Tests have shown that this does not happen in a mesh with 50 nodes over 4 months
+    //If it ever happens, we log a fatal error and can then improve the MTU upgrade process
+    if (err != ErrorType::SUCCESS) {
+        GS->logger.LogCustomError(CustomErrorTypes::FATAL_MTU_UPGRADE_FAILED, (u32)err);
 
-        ConnectionMtuUpgradedHandler(MAX_DATA_SIZE_PER_WRITE);
+        DisconnectAndRemove(AppDisconnectReason::MTU_UPGRADE_FAILED);
     }
+
+    // => The ConnectionMtuUpgradedHandler will be called next
 }
 
 ErrorType MeshConnection::SendReconnectionHandshakePacketAfterMtuExchange()

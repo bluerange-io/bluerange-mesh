@@ -362,6 +362,8 @@ void ConnectionManager::SendMeshMessage(u8* data, u16 dataLength) const
 
 ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, bool reliable, bool loopback, bool toMeshAccess) const
 {
+    ErrorType err = ErrorType::SUCCESS;
+
     if (dataLength > MAX_MESH_PACKET_SIZE)
     {
         SIMEXCEPTION(PacketTooBigException);
@@ -420,11 +422,22 @@ ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, b
             }
             if (packetHeader->receiver == NODE_ID_ANYCAST_THEN_BROADCAST) {
                 packetHeader->receiver = NODE_ID_BROADCAST;
-                mach.SendData(data, dataLength, reliable);
-                return ErrorType::SUCCESS;
+                bool result = mach.SendData(data, dataLength, reliable);
+                if (result)
+                {
+                    return ErrorType::SUCCESS;
+                }
+                else
+                {
+                    return ErrorType::INTERNAL;
+                }
             }
             else {
-                mach.SendData(data, dataLength, reliable);
+                bool result = mach.SendData(data, dataLength, reliable);
+                if (result == false)
+                {
+                    err = ErrorType::INTERNAL;
+                }
             }
 
         }
@@ -438,12 +451,20 @@ ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, b
 
         if (GS->config.enableSinkRouting && dest)
         {
-            dest.SendData(data, dataLength, reliable);
+            bool result = dest.SendData(data, dataLength, reliable);
+            if (result == false)
+            {
+                err = ErrorType::INTERNAL;
+            }
         }
         // If message was adressed to sink but there is no route to sink broadcast message
         else
         {
-            BroadcastMeshPacket(data, dataLength, reliable);
+            bool result = BroadcastMeshPacket(data, dataLength, reliable);
+            if (result == false)
+            {
+                err = ErrorType::INTERNAL;
+            }
         }
     }
     else if(packetHeader->receiver == NODE_ID_LOCAL_LOOPBACK)
@@ -472,13 +493,21 @@ ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, b
 
         //Send to receiver or broadcast if not directly connected to us
         if(receiverConn){
-            receiverConn.SendData(data, dataLength, reliable);
+            bool result = receiverConn.SendData(data, dataLength, reliable);
+            if (result == false)
+            {
+                err = ErrorType::INTERNAL;
+            }
         } else {
-            BroadcastMeshPacket(data, dataLength, reliable);
+            bool result = BroadcastMeshPacket(data, dataLength, reliable);
+            if (result == false)
+            {
+                err = ErrorType::INTERNAL;
+            }
         }
     }
 
-    return ErrorType::SUCCESS;
+    return err;
 }
 
 void ConnectionManager::DispatchMeshMessage(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packet, bool checkReceiver) const
@@ -578,20 +607,29 @@ ErrorTypeUnchecked ConnectionManager::SendModuleActionMessage(MessageType messag
     return (ErrorTypeUnchecked)GS->cm.SendMeshMessageInternal(buffer, SIZEOF_CONN_PACKET_MODULE_VENDOR + additionalDataSize, false, loopback, true);
 }
 
-void ConnectionManager::BroadcastMeshPacket(u8* data, u16 dataLength, bool reliable) const
+bool ConnectionManager::BroadcastMeshPacket(u8* data, u16 dataLength, bool reliable) const
 {
+    bool ret = true;
     MeshConnections conn = GetMeshConnections(ConnectionDirection::INVALID);
     ConnPacketHeader* packetHeader = (ConnPacketHeader*)data;
     for(u32 i=0; i< conn.count; i++){
+        // We might have connections that will be dropped, because eg. nodes are in the same cluster. This is very rare,
+        // but can happen right after or during clustering. We don't want to send data over those connections.
+        if (conn.handles[i].IsHandshakeDone() == false) continue;
+
         if (packetHeader->receiver == NODE_ID_ANYCAST_THEN_BROADCAST) {
             packetHeader->receiver = NODE_ID_BROADCAST;
-            conn.handles[i].SendData(data, dataLength, reliable);
-            return;
+            bool result = conn.handles[i].SendData(data, dataLength, reliable);
+            ret = result && ret;
+            return ret;
         }
         else {
-            conn.handles[i].SendData(data, dataLength, reliable);
+            bool result = conn.handles[i].SendData(data, dataLength, reliable);
+            ret = result && ret; 
         }
     }
+
+    return ret;
 }
 
 ConnectionManager & ConnectionManager::GetInstance()
@@ -1582,7 +1620,7 @@ void ConnectionManager::TimerEventHandler(u16 passedTimeDs)
                     // Implementation error! This means that we tried to send out a correction
                     // that wasn't even written by the MessageSentHandler. Must not happen!
                     // IOT-4554: Activate the following line once this ticket is fixed!
-                    // SIMEXCEPTION(IllegalStateException);
+                    SIMEXCEPTION(IllegalStateException);
                 }
 #endif
 

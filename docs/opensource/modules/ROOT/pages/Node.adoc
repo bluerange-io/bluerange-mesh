@@ -318,6 +318,7 @@ human-readable format. This is only an approximate
 calculation. It is just to verify if the time was set correctly.
 Internally, the nodes work with Unix time stamps.
 
+[#queryingActiveModules]
 == Querying Active Modules
 
 `get_modules [nodeId]`

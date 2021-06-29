@@ -58,7 +58,7 @@ class RecordStorageEventListener;
 #define FM_VERSION_MINOR 0
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 830
+#define FM_VERSION_PATCH 1220
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -567,4 +567,15 @@ class Conf
 // Set the Terminal to enabled if one of the log transports is defined
 #if (ACTIVATE_SEGGER_RTT == 1) || (ACTIVATE_UART == 1) || (ACTIVATE_STDIO == 1)
 #define TERMINAL_ENABLED
+#endif
+
+// Activate enum-to-string functions by default if the terminal is enabled.
+// They can be explicitly disabled (per-featureset) by defining
+// ACTIVATE_ENUM_TO_STRING to 0 in the featureset header.
+#ifndef ACTIVATE_ENUM_TO_STRING
+    #ifdef TERMINAL_ENABLED
+        #define ACTIVATE_ENUM_TO_STRING 1
+    #else
+        #define ACTIVATE_ENUM_TO_STRING 0
+    #endif
 #endif

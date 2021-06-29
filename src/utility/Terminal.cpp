@@ -964,7 +964,7 @@ void Terminal::VirtualComPortEventHandler(bool portOpened)
 {
     //Once the Virtual Com Port is opened by another device, we send the reboot message
     if(portOpened){
-        Utility::LogRebootJson();
+        Utility::LogRebootJson(true);
     }
 }
 #endif

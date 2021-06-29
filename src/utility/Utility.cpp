@@ -126,10 +126,12 @@ u32 Utility::GetRandomInteger(void)
     ErrorType err = ErrorType::BUSY;
     u32 randomNumber = 0;
 
+    GS->inGetRandomLoop = true;
     while(err != ErrorType::SUCCESS){
         //A busy loop is fine here because the nordic spec guarantees us, that we will, at some point, get a random number. If not, the node itself is broken.
         err = FruityHal::GetRandomBytes((u8*) &randomNumber, 4);
     }
+    GS->inGetRandomLoop = false;
 
     return randomNumber;
 }
@@ -343,9 +345,17 @@ u32 Utility::ByteFromAsciiHex(char* asciiHex, u8 numChars){
     return result;
 }
 
-void Utility::LogRebootJson()
+void Utility::LogRebootJson(bool rebootReasonCleared)
 {
-    logjson("MAIN", "{\"type\":\"reboot\",\"reason\":%u,\"code1\":%u,\"stack\":%u,\"version\":%u,\"blversion\":%u}" SEP, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1, GS->ramRetainStructPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion());
+    if (rebootReasonCleared)
+    {
+        // We already cleared ramRetainStruct and we should use copy of that struct.
+        logjson("MAIN", "{\"type\":\"reboot\",\"reason\":%u,\"code1\":%u,\"stack\":%u,\"version\":%u,\"blversion\":%u}" SEP, (u32)GS->ramRetainStructPreviousBootPtr->rebootReason, GS->ramRetainStructPreviousBootPtr->code1, GS->ramRetainStructPreviousBootPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion());
+    }
+    else
+    {
+        logjson("MAIN", "{\"type\":\"reboot\",\"reason\":%u,\"code1\":%u,\"stack\":%u,\"version\":%u,\"blversion\":%u}" SEP, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1, GS->ramRetainStructPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion());
+    }
 }
 
 bool Utility::Contains(const u8 * data, const u32 length, const u8 searchValue)

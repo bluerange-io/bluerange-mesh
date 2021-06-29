@@ -93,6 +93,41 @@ Where "code" can have one of the following values:
 |3|RECORD_STORAGE_ERROR, the module does exist and does have a configuration but the record storage was unable to save the config. The best course of action is probably to try again later as the node seems to be busy right now.
 |===
 
+=== Module List (version 2)
+This is the response to the xref:Node.adoc#queryingActiveModules[_get_modules_] command. 
+
+The Module List message provides information about available modules on a given device with some details like their _moduleId_, their version and whether they are currently active. This information can be used to find out, what a node is capable of doing.
+
+[source,Javascript]
+----
+{
+    "nodeId": 1,
+    "type": "module_list",
+    "modules": [
+        {
+            "id": 1,
+            "version": 2,
+            "active": 1
+        },
+        {
+            "id": 2,
+            "version": 1,
+            "active": 0
+        },
+        // ...
+    ]
+----
+
+[cols="4,2,10"]
+|===
+|name|bytes|Description
+|ModuleIdWrapper|4| Module ID.
+|moduleVersion|1| Module version.
+|moduleActive|1 bit| 1 if active, 0 if not active.
+|reserved|7 bits| Reserved for future use.
+|...||
+|===
+
 == Module Commands
 Most module commands are structured in the same way.
 You have to give the nodeId that should process the command, specify the

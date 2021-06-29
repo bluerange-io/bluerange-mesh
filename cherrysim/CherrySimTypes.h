@@ -68,7 +68,14 @@ constexpr int PACKET_STAT_SIZE = 10*1024;
 //A BLE Event that is sent by the Simulator is wrapped
 struct simBleEvent {
     ble_evt_t bleEvent;
-    u8 data[NRF_SDH_BLE_GATT_MAX_MTU_SIZE]; //overflow area for ble_evt_t as sizeof(ble_evt_t) does not include write data, this must be added using the MTU
+    // The overflow area for ble_evt_t, as sizeof(ble_evt_t) does not include
+    // the memory used for storing write data. The ble_evt_t is used more like
+    // an event header with additional data written directly after it.
+    // Use the maximum MTU as the size of the overflow area.
+    // IMPORTANT: This must always be the member directly after the ble_evt_t
+    //            member!
+    u8 bleEventOverflowData[NRF_SDH_BLE_GATT_MAX_MTU_SIZE];
+
     u32 size;
     u32 globalId;
     u32 additionalInfo; //Can be used to store a pointer or other information
@@ -122,6 +129,8 @@ struct SoftdeviceConnection {
     u32 connectionSupervisionTimeoutMs = 0;
     bool isCentral = false;
     u32 lastReceivedPacketTimestampMs = 0;
+    u32 connectionSetupTimeMs = 0;
+    u32 lastConnectionTimestampMs = 0;
 
     SoftDeviceBufferedPacket reliableBuffers[SIM_NUM_RELIABLE_BUFFERS] = {};
     SoftDeviceBufferedPacket unreliableBuffers[SIM_NUM_UNRELIABLE_BUFFERS] = {};
@@ -245,7 +254,9 @@ struct NodeEntry {
     SoftdeviceState state;
     std::deque<simBleEvent> eventQueue;
     simBleEvent currentEvent; //The event currently being processed, as a simBleEvent, this can have some additional data attached to it useful for debugging
-    bool ledOn;
+    bool led1On = false;
+    bool led2On = false;
+    bool led3On = false;
     u32 nanoAmperePerMsTotal;
     u8 *moduleMemoryBlock = nullptr;
 
@@ -317,9 +328,10 @@ struct SimConfiguration {
     int32_t     simOtherDelay                      = 0; // Enter 1 - 100000 to send sim_other message only each ... simulation steps, this increases the speed significantly
     int32_t     playDelay                          = 0; //Allows us to view the simulation slower than simulated, is added after each step
     uint32_t    interruptProbability               = 0; // The probability that a queued interrupt is simulated.
-    float       connectionTimeoutProbabilityPerSec = 0; //Every minute or so: 0.00001;
+    uint32_t    connectionTimeoutProbabilityPerSec = 0; // UINT32_MAX * 0.00001; //Simulates a connection timout around every minute
     uint32_t    sdBleGapAdvDataSetFailProbability  = 0; // UINT32_MAX * 0.0001; //Simulate fails on setting adv Data
     uint32_t    sdBusyProbability                  = 0; // UINT32_MAX * 0.0001; //Simulates getting back busy errors from softdevice
+    uint32_t    sdBusyProbabilityUnlikely          = 0; // UINT32_MAX * 0.0001; //Simulates getting back busy errors from softdevice for methods where it is very unlikely to get a BUSY error
     bool        simulateAsyncFlash                 = false;
     uint32_t    asyncFlashCommitTimeProbability    = 0; // 0 - UINT32_MAX where UINT32_MAX is instant commit in the next simulation step
     bool        importFromJson                     = false; //Set to true and specify siteJsonPath and devicesJsonPath to read a scenario from json
@@ -339,6 +351,7 @@ struct SimConfiguration {
     bool        simulateWatchdog                   = false;
     bool        simulateJittering                  = false;
     bool        verbose                            = false;
+    uint32_t    fastLaneToSimTimeMs                = 0; //Set to a value bigger than 0 to speed up the simulation until this simulation time was reached (disables native rendering & terminal in the meantime)
 
     bool        enableClusteringValidityCheck      = false; //Enable automatic checking of the clustering after each step
     bool        enableSimStatistics                = false;

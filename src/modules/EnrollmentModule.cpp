@@ -752,7 +752,7 @@ void EnrollmentModule::StoreTemporaryEnrollmentDataAndDispatch(ConnPacketModule 
     //we have to temporarily save the enrollment data until the other module has answered
     ted.state = EnrollmentStates::PREENROLLMENT_RUNNING;
     ted.endTimeDs = GS->appTimerDs + ENROLLMENT_MODULE_PRE_ENROLLMENT_TIMEOUT_DS;
-    ted.packetLength = packetLength;
+    ted.rawPacketLength = packetLength.GetRaw();
     CheckedMemcpy(&ted.requestHeader, packet, packetLength.GetRaw());
 
     DispatchPreEnrollment(nullptr, PreEnrollmentReturnCode::DONE);
@@ -783,7 +783,7 @@ void EnrollmentModule::DispatchPreEnrollment(Module* lastModuleCalled, PreEnroll
     for (u32 i = moduleIndex; i < GS->amountOfModules; i++) {
         if (!GS->activeModules[i]->configurationPointer->moduleActive) continue;
 
-        PreEnrollmentReturnCode err = GS->activeModules[i]->PreEnrollmentHandler((ConnPacketModule*)&ted.requestHeader, ted.packetLength);
+        PreEnrollmentReturnCode err = GS->activeModules[i]->PreEnrollmentHandler((ConnPacketModule*)&ted.requestHeader, ted.GetPacketLength());
 
         if (err == PreEnrollmentReturnCode::WAITING) {
             // => The module must call the DispatchPreEnrollment function after it has received the result
@@ -802,7 +802,7 @@ void EnrollmentModule::DispatchPreEnrollment(Module* lastModuleCalled, PreEnroll
     logt("ENROLLMOD", "PreEnrollment succeeded");
 
     if (ted.requestHeader.actionType == (u8)EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_SERIAL) {
-        SaveEnrollment(&ted.requestHeader, ted.packetLength);
+        SaveEnrollment(&ted.requestHeader, ted.GetPacketLength());
     }
     else {
         //First, clear all settings that are stored on the chip
@@ -1133,7 +1133,7 @@ void EnrollmentModule::RecordStorageEventHandler(u16 recordId, RecordStorageResu
         {
             if (ted.requestHeader.actionType == (u8)EnrollmentModuleTriggerActionMessages::REMOVE_ENROLLMENT)
             {
-                SaveUnenrollment(&ted.requestHeader, ted.packetLength);
+                SaveUnenrollment(&ted.requestHeader, ted.GetPacketLength());
             }
         }
         else

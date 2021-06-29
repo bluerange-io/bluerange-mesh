@@ -85,6 +85,7 @@ extern "C"
     void nrf_gpio_cfg_default(uint32_t pin_number) {}
     void nrf_gpio_cfg_output(uint32_t pin_number) {}
     void nrf_gpio_cfg_input(uint32_t pin_number, nrf_gpio_pin_pull_t pull_config) {}
+    void nrf_gpio_cfg_sense_input(uint32_t pin_number, nrf_gpio_pin_pull_t pull_config, nrf_gpio_pin_sense_t sense_config) {}
     void nrf_uart_baudrate_set(NRF_UART_Type *p_reg, nrf_uart_baudrate_t baudrate) {}
     uint32_t nrf_gpio_pin_read(uint32_t pin) { return 1; }
     void nrf_uart_configure(NRF_UART_Type *p_reg, nrf_uart_parity_t parity, nrf_uart_hwfc_t hwfc) {}
@@ -204,6 +205,11 @@ extern "C"
             ResetUart(state);
         }
         return retVal;
+    }
+
+    void nrf_power_system_off()
+    {
+        START_OF_FUNCTION();
     }
 
     uint8_t ST_getRebootReason()
@@ -1334,10 +1340,11 @@ extern "C"
     {
         START_OF_FUNCTION();
 
-        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
+        //HINT: No sdBusyProbability is used here, as tests with a network of 50 nodes have shown that NRF_BUSY did not occur
+        //a single time in 4 months
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbabilityUnlikely)) {
             return NRF_ERROR_BUSY;
         }
-
 
         SoftdeviceConnection* connection = cherrySimInstance->FindConnectionByHandle(cherrySimInstance->currentNode, connHandle);
 
@@ -1366,7 +1373,9 @@ extern "C"
     {
         START_OF_FUNCTION();
 
-        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbability)) {
+        //HINT: No sdBusyProbability is used here, as tests with a network of 50 nodes have shown that NRF_BUSY did not occur
+        //a single time in 4 months
+        if (PSRNG(cherrySimInstance->simConfig.sdBusyProbabilityUnlikely)) {
             return NRF_ERROR_BUSY;
         }
 
@@ -1633,26 +1642,77 @@ extern "C"
     uint32_t sd_ble_evt_get(uint8_t* p_dest, uint16_t* p_len)
     {
         START_OF_FUNCTION();
-        if (cherrySimInstance->currentNode->eventQueue.size() > 0) {
 
-            simBleEvent bleEvent = cherrySimInstance->currentNode->eventQueue.front();
-            cherrySimInstance->currentNode->eventQueue.pop_front();
-
-            if (cherrySimInstance->simEventListener != nullptr) {
-                cherrySimInstance->simEventListener->CherrySimBleEventHandler(cherrySimInstance->currentNode, &bleEvent, FruityHal::GetEventBufferSize());
-            }
-
-            //We copy the current event so that we can access it during debugging if we want to get more information
-            CheckedMemcpy(&cherrySimInstance->currentNode->currentEvent, &bleEvent, sizeof(simBleEvent));
-
-            CheckedMemcpy(p_dest, &bleEvent.bleEvent, FruityHal::GetEventBufferSize());
-            *p_len = FruityHal::GetEventBufferSize();
-
-            return NRF_SUCCESS;
+        if (p_len == nullptr)
+        {
+            // [SD]: Invalid or not sufficiently aligned pointer supplied.
+            return NRF_ERROR_INVALID_ADDR;
         }
-        else {
+
+        if (cherrySimInstance->currentNode->eventQueue.empty())
+        {
+            // [SD]: No events ready to be pulled.
             return NRF_ERROR_NOT_FOUND;
         }
+
+        auto simBleEvent = cherrySimInstance->currentNode->eventQueue.front();
+
+        // Compute the number of bytes to copy from the event to the buffer.
+        // The BLE events can contain more data than the native BLE event
+        // structure, where the data member provides that overflow space.
+        constexpr std::size_t eventSize =
+                sizeof(simBleEvent.bleEvent) + sizeof(simBleEvent.bleEventOverflowData);
+
+        // TODO: The actual SoftDevice checks that the event actually fits
+        //       into the buffer. If you compile this check in, the simulator
+        //       fails. This is becaue (in the simulator) we use the evt_len
+        //       field of the header to transport the global event id.
+        //       Tracked in BR-1360.
+        //if (*p_len < simBleEvent.simBleEvent.header.evt_len)
+        //{
+        //    // [SD]: Event ready but could not fit into the supplied buffer.
+        //    return NRF_ERROR_DATA_SIZE;
+        //}
+        // TODO: For now we will use the number of bytes computed above and
+        //       return failure if the buffer was too small. If you arrive
+        //       here during debugging, the buffer you passed in was too small.
+        //       This check (and notice) can be removed after the check above
+        //       works correctly. (BR-1360)
+        if (*p_len < eventSize)
+        {
+            // [SD]: Event ready but could not fit into the supplied buffer.
+            return NRF_ERROR_DATA_SIZE;
+        }
+
+        // We store the current event so that we can access it during debugging
+        // if we want to get more information.
+        cherrySimInstance->currentNode->currentEvent = simBleEvent;
+        cherrySimInstance->currentNode->eventQueue.pop_front();
+
+        if (cherrySimInstance->simEventListener != nullptr)
+        {
+            cherrySimInstance->simEventListener->CherrySimBleEventHandler(
+                    cherrySimInstance->currentNode,
+                    &simBleEvent, sizeof(simBleEvent));
+        }
+
+        // [SD]: Update the pointee of p_len with the used number of bytes.
+        *p_len = std::min<std::uint16_t>(*p_len, eventSize);
+
+        // [SD]: If p_dest is the nullptr, just peek the event length.
+        if (p_dest != nullptr)
+        {
+            CheckedMemcpy(p_dest, &simBleEvent, *p_len);
+        }
+
+        // [SD]: Event pulled and stored into the supplied buffer.
+        return NRF_SUCCESS;
+
+        // References:
+        // [SD] SoftDevice S132:
+        //      https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.s132.api.v5.0.0%2Fgroup___b_l_e___c_o_m_m_o_n___f_u_n_c_t_i_o_n_s.html&cp=4_7_3_6_2_0_2_2_2&anchor=ga412b12b43c253dd744bcf574d6e86f43
+        // [SD] SoftDevice S140:
+        //      https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.s140.api.v6.1.0%2Fgroup___b_l_e___c_o_m_m_o_n___f_u_n_c_t_i_o_n_s.html&cp=4_7_4_3_2_0_2_2_2&anchor=ga412b12b43c253dd744bcf574d6e86f43
     }
 
     //############### Other ###################
@@ -1793,6 +1853,12 @@ extern "C"
     }
 
     uint32_t sd_power_mode_set(uint8_t power_mode)
+    {
+        START_OF_FUNCTION();
+        return 0;
+    }
+
+    uint32_t sd_power_system_off()
     {
         START_OF_FUNCTION();
         return 0;
@@ -1942,28 +2008,20 @@ const char *__asan_default_options() {
 std::map<std::string, int> simStatCounts;
 void sim_collect_statistic_count(const char* key)
 {
-    if (simStatCounts.find(key) != simStatCounts.end())
-    {
-        simStatCounts[key] = simStatCounts[key] + 1;
-    }
-    else {
-        simStatCounts[key] = 1;
-    }
+    simStatCounts[key] += 1;
 }
 
 std::map<std::string, int> simStatAvgCounts;
 std::map<std::string, int> simStatAvgTotal;
 void sim_collect_statistic_avg(const char* key, int value)
 {
-    if (simStatAvgCounts.find(key) != simStatAvgCounts.end())
-    {
-        simStatAvgCounts[key] = simStatAvgCounts[key] + 1;
-        simStatAvgTotal[key] = simStatAvgTotal[key] + value;
-    }
-    else {
-        simStatAvgCounts[key] = 1;
-        simStatAvgTotal[key] = value;
-    }
+    simStatAvgCounts[key] += 1;
+    simStatAvgTotal[key] += value;
+}
+
+void sim_clear_statistics()
+{
+    simStatCounts.clear();
 }
 
 void sim_print_statistics()
@@ -1983,6 +2041,11 @@ void sim_print_statistics()
     }
 
     printf("--------------" EOL);
+}
+
+int sim_get_statistics(const char* key)
+{
+    return simStatCounts[key];
 }
 
 uint32_t sim_get_stack_type()

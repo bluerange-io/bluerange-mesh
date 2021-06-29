@@ -48,6 +48,9 @@ Some results of battery measurements for bulk factory mode are available. The no
 == Mesh Discovery
 Measuring mesh discovery consumption is a little tricky because of the SoftDevice scheduling. Sometimes discovery will use less energy while the device has a connection in contrast to a device without connections because the different tasks (scanning/advertising/connection events/...) will collide. Some important measurements are carried out to evaluate the tradeoff between fast connection and low power measurement of mesh.
 
+== Device Off
+If the device is turned off using the xref:fruitymesh::DeviceOff.adoc[DeviceOff] feature it will enter a sleep mode and won't do any of the meshing funcionality. It should draw less than 10uA, the exact current draw depends on hardware itself however. It is useful to use this feature e.g. for transportation of devices where the batteries are already included. 
+
 === NRF51
 ==== Ultra High Discovery with:
 

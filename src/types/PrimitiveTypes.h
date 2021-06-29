@@ -183,6 +183,7 @@ enum class ModuleId : u8 {
     ET_MODULE = 156, //Placeholder for Partner
     MODBUS_MODULE = 157,
     BP_MODULE = 158,
+    ASSET_SCANNING_MODULE = 159,
 
     //Other Modules, this range can be used for experimenting but must not be used if FruityMesh
     //nodes are to be used in a network with nodes of different vendors as their moduleIds will clash
@@ -227,6 +228,10 @@ static_assert(sizeof(ModuleIdWrapperUnion) == 4, "You have a weird compiler");
 
 constexpr VendorModuleId GET_VENDOR_MODULE_ID(u16 vendorId, u8 subId) { return ( ((u8)ModuleId::VENDOR_MODULE_ID_PREFIX) | ((u8)subId << 8) | ((u16)vendorId << 16) ); }
 
+enum class SensorType : u8 {
+    CO2_SENSOR = 0x30, // Measured CO2 concentration in ppm
+};
+
 // The reason why the device was rebooted
 enum class RebootReason : u8 {
     UNKNOWN = 0,
@@ -251,12 +256,14 @@ enum class RebootReason : u8 {
     SET_SERIAL_SUCCESS = 19,
     SET_SERIAL_FAILED = 20,
     SEND_TO_BOOTLOADER = 21,
-    UNKNOWN_BUT_BOOTED = 22,
+    UNKNOWN_BUT_BOOTED = 22,    // This is set after successful boot when we can't figure out reset reason eg. after flashing.
     STACK_OVERFLOW = 23,
     NO_CHUNK_FOR_NEW_CONNECTION = 24,
     IMPLEMENTATION_ERROR_NO_QUEUE_SPACE_AFTER_CHECK = 25,
     IMPLEMENTATION_ERROR_SPLIT_WITH_NO_LOOK_AHEAD = 26,
     CONFIG_MIGRATION = 27,
+    DEVICE_OFF = 28,
+    DEVICE_WAKE_UP = 29,
 
     USER_DEFINED_START = 200,
     USER_DEFINED_END = 255,
@@ -266,26 +273,33 @@ enum class RebootReason : u8 {
 //Live reports are sent through the mesh as soon as something notable happens
 //Could be some info, a warning or an error
 
-enum class LiveReportTypes : u8 {
-    LEVEL_ERROR = 0,
-    LEVEL_WARN = 50,
+enum class LiveReportTypes : u8
+{
+    //##### Error Reporting disabled #####
+    LEVEL_OFF = 0,
+
+    //##### Fatal Error Level (Below 50) #####
+
+    LEVEL_FATAL = 50,
+
+    //##### Warning Level (Below 100) #####
     HANDSHAKED_MESH_DISCONNECTED = 51, //extra is partnerid, extra2 is appDisconnectReason
     WARN_GAP_DISCONNECTED = 52, //extra is partnerid, extra2 is hci code
+    LEVEL_WARN = 100,
 
-    //########
-    LEVEL_INFO = 100,
+    //##### Info Level (below 150) #####
     GAP_CONNECTED_INCOMING = 101, //extra is connHandle, extra2 is 4 bytes of gap addr
     GAP_TRYING_AS_MASTER = 102, //extra is partnerId, extra2 is 4 bytes of gap addr
     GAP_CONNECTED_OUTGOING = 103, //extra is connHandle, extra2 is 4 byte of gap addr
     //Deprecated: GAP_DISCONNECTED = 104,
-
     HANDSHAKE_FAIL = 105, //extra is tempPartnerId, extra2 is handshakeFailCode
     MESH_CONNECTED = 106, //extra is partnerid, extra2 is asWinner
     //Deprecated: MESH_DISCONNECTED = 107,
+    LEVEL_INFO = 150,
 
-    //########
-    LEVEL_DEBUG = 150,
+    //##### Debug Level (Everything else) #####
     DECISION_RESULT = 151, //extra is decision type, extra2 is preferredPartner
+    LEVEL_DEBUG
 };
 
 enum class LiveReportHandshakeFailCode : u8

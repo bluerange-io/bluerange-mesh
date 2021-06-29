@@ -52,6 +52,7 @@
 #include "Node.h"
 #include "ConnectionAllocator.h"
 #include "ModuleAllocator.h"
+#include "DeviceOff.h"
 #if IS_ACTIVE(SIG_MESH)
 #include "SigAccessLayer.h"
 #endif
@@ -136,6 +137,8 @@ class GlobalState
         LedWrapper ledRed;
         LedWrapper ledGreen;
         LedWrapper ledBlue;
+
+        DeviceOff deviceOff;
         //########## END Singletons ###############
 
         //########## Modules ###############
@@ -189,12 +192,31 @@ class GlobalState
         RamRetainStruct* ramRetainStructPtr;
         u32* rebootMagicNumberPtr; //Used to save a magic number for rebooting in safe mode
 
+        // Watchdog debug flags and timestamps
+        u32* watchdogExtraInfoFlagsPtr;
+        u32 lastSendTimestamp;
+        u32 lastReceivedTimestamp;
+        bool fruityMeshBooted = false;
+        bool modulesBooted = false;
+        u32 timestampInAppTimerHandler;
+        NodeId sinkNodeId;
+        u32 lastReceivedFromSinkTimestamp;
+        u32 eventLooperTriggerTimestamp;
+        u32 fruitymeshEventLooperTriggerTimestamp;
+        u32 bleEventLooperTriggerTimestamp;
+        u32 socEventLooperTriggerTimestamp;
+        u32 advertismentReceivedTimestamp;
+        bool inGetRandomLoop;
+        bool inPullEventsLoop;
+        bool safeBootEnabled;
+
         u8 scanBuffer[BLE_GAP_SCAN_PACKET_BUFFER_SIZE];
 
 #ifdef SIM_ENABLED
         RamRetainStruct ramRetainStruct;
         RamRetainStruct ramRetainStructPreviousBoot;
         u32 rebootMagicNumber;
+        u32 watchdogExtraInfoFlags;
 #endif
         RamRetainStruct * ramRetainStructPreviousBootPtr;
 

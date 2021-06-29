@@ -185,7 +185,6 @@ TEST(TestClustering, TestClusteringWithManySdBusy) {
         simConfig.seed = i + 1;
         simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 10 });
         simConfig.sdBusyProbability = UINT32_MAX / 2;
-        simConfig.connectionTimeoutProbabilityPerSec = 0;
         simConfig.terminalId = -1;
         //testerConfig.verbose = true;
 
@@ -410,7 +409,7 @@ TEST(TestClustering, TestBasicClusteringWithNodeResetAndConnectionTimeouts_sched
 
         simConfig.mapWidthInMeters = 400;
         simConfig.mapHeightInMeters = 300;
-        simConfig.connectionTimeoutProbabilityPerSec = 0.0005;
+        simConfig.connectionTimeoutProbabilityPerSec = 0.0005 * UINT32_MAX;
         simConfig.seed = seed;
         simConfig.simulateJittering = true;
 
@@ -462,7 +461,7 @@ TEST(TestClustering, TestBasicClusteringWithNodeResetAndConnectionTimeouts_sched
 //Test if meshing works if we put load on the network
 TEST(TestClustering, TestMeshingUnderLoad) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    testerConfig.verbose = false;
+    //testerConfig.verbose = true;
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 50 } );
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
@@ -483,7 +482,7 @@ TEST(TestClustering, SimulateLongevity_long) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 50 } );
-    simConfig.connectionTimeoutProbabilityPerSec = 0.00001;
+    simConfig.connectionTimeoutProbabilityPerSec = 0.00001 * UINT32_MAX;
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
@@ -625,7 +624,8 @@ TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
     }
 }
 
-extern std::map<std::string, int> simStatCounts;
+//This test was written to make sure that the mesh can still cluster if the vital queue is flooded
+//with other packets.
 TEST(TestClustering, TestVitalPrioQueueFull) {
     for (int seed = 0; seed < 3; seed++) {
         CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
@@ -647,20 +647,23 @@ TEST(TestClustering, TestVitalPrioQueueFull) {
         ASSERT_TRUE(mod != nullptr);
         tester.SimulateUntilClusteringDone(1000 * 1000 /*Such a high value because for some RNG seeds an emergency disconnect might be required which takes quite a bit of time.*/,
             [&]() {
-            NodeIndexSetter setter(0);
-            mod->SendQueueFloodMessage(DeliveryPriority::VITAL);
-        }); 
+                NodeIndexSetter setter(0);
+                mod->SendQueueFloodMessage(DeliveryPriority::VITAL);
+                mod->SendQueueFloodMessage(DeliveryPriority::VITAL);
+                mod->SendQueueFloodMessage(DeliveryPriority::VITAL);
+                mod->SendQueueFloodMessage(DeliveryPriority::VITAL);
+            });
     }
-    
-    ASSERT_TRUE(simStatCounts.find("vitalPrioQueueFull") != simStatCounts.end());
-    ASSERT_TRUE(simStatCounts["vitalPrioQueueFull"] > 3);
+    //We check that we indeed generated enough packets to fill up the queue. If this test fails, it might mean that message transmission was optimized
+    //and we are not properly flooding with enough packets in the lines above.
+    ASSERT_TRUE(sim_get_statistics("vitalPrioQueueFull") > 3);
 }
 
 TEST(TestClustering, TestInfluceOfNodeWithWrongNetworkKey) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 
-    simConfig.connectionTimeoutProbabilityPerSec = 0.001;
+    simConfig.connectionTimeoutProbabilityPerSec = 0.001 * UINT32_MAX;
 
     //testerConfig.verbose = true;
     testerConfig.terminalFilter = 1;
@@ -696,7 +699,7 @@ TEST(TestClustering, TestEmergencyDisconnect) {
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     u32 numNodes = 10;
     simConfig.terminalId = 0;
-    testerConfig.verbose = false;
+    //testerConfig.verbose = true;
     
     //Place Node 0 in the middle and the others in a circle around it.
     simConfig.preDefinedPositions.push_back({ 0.5, 0.5 });
@@ -726,6 +729,372 @@ TEST(TestClustering, TestEmergencyDisconnect) {
     {
         tester.SimulateUntilMessageReceived(200 * 1000, 1, "Emergency disconnect");
     }
+}
+
+TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+
+    simConfig.SetToPerfectConditions();
+    // testerConfig.verbose = true;
+    // testerConfig.terminalFilter = 1;
+    simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 5 } );
+    // Place nodes close to each other so that faked JOIN_ME packets would affect all the nodes. 
+    simConfig.preDefinedPositions = { {0.5, 0.5}, {0.55, 0.5}, {0.5, 0.55}, {0.55, 0.55}, {0.5, 0.45} };
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    Exceptions::ExceptionDisabler<ErrorLoggedException> ele; //Due to the wrong network key, some absolutely sane errors might be logged. These however should not fail our test.
+
+    //Enroll node 2 in same network with different networkkey
+    tester.SendTerminalCommand(3, "action this enroll basic BBBBD 2 %u 11:99:99:99:99:99:99:99:99:99:99:99:99:99:99:99 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0", simConfig.defaultNetworkId);
+    tester.SimulateUntilMessageReceived(10 * 1000, 3, "reboot");
+    tester.SendTerminalCommand(3, "action this enroll basic BBBBD 2 %u 11:99:99:99:99:99:99:99:99:99:99:99:99:99:99:99 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0", simConfig.defaultNetworkId);
+    tester.SimulateUntilMessageReceived(100 * 1000, 3, "enroll_response");
+
+    u16 nodeId = 3;
+    u16 clusterSize = 1;
+    u32 clusterId = simConfig.defaultNetworkId;
+    u32 failCounter = 0;
+    bool clusteringDone = false;
+    tester.SendTerminalCommand(3, "action this adv add 02:01:06:1B:FF:4D:02:F0:0A:00:01:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:19:00:04:01:FF:FF:01:00:00:00:00:00 10", 
+                                                                (u8)(nodeId & 0xFF), (u8)((nodeId >> 8) & 0xFF),
+                                                                (u8)(clusterId & 0xFF), (u8)((clusterId >> 8) & 0xFF), (u8)((clusterId >> 16) & 0xFF), (u8)((clusterId >> 24) & 0xFF),
+                                                                (u8)(clusterSize & 0xFF), (u8)((clusterSize >> 8) & 0xFF));
+
+    // TEST #1
+    // Track node 4 cluster information and make node 3 advertise fake JOIN_ME data
+    
+    // Simulation time for this subtest
+    u32 timeoutSec = tester.sim->simState.simTimeMs + 100 * 1000;
+
+    // Expected clustering time
+    u32 clusteringTimeoutSec = tester.sim->simState.simTimeMs + 20 * 1000;
+    
+    // reset all nodes to cause reclustering
+    tester.SendTerminalCommand(0, "reset");
+
+    failCounter = 0;
+    while (tester.sim->simState.simTimeMs < timeoutSec) {
+        if (tester.sim->simState.simTimeMs >= clusteringTimeoutSec){
+            uint8_t clusteredNodesCounter = 0;
+            // Check if clustering was disturbed by fake JOIN_ME packet.
+            for (int i = 0; i < 5; i++)
+            {
+                NodeIndexSetter setter(i);
+                if (i == 2)
+                {
+                    ASSERT_EQ(tester.sim->currentNode->gs.node.GetClusterSize(), 1);
+                }
+                else
+                {
+                    if (clusteringDone)
+                    {
+                        ASSERT_EQ(tester.sim->currentNode->gs.node.GetClusterSize(), 4);
+                    }
+                    else
+                    {
+                        if (tester.sim->currentNode->gs.node.GetClusterSize() == 4) clusteredNodesCounter++;
+                    }
+                }
+            }
+            if (clusteredNodesCounter == 4) clusteringDone = true;
+        }
+
+        // Set up fake JOIN_ME packet for node 3
+        {
+            nodeId = 4;
+            NodeIndexSetter setter(3);
+            clusterSize = tester.sim->currentNode->gs.node.GetClusterSize();
+            clusterId = tester.sim->currentNode->gs.node.clusterId;
+        }
+
+        tester.SendTerminalCommand(3, "action this adv set 0 02:01:06:1B:FF:4D:02:F0:0A:00:01:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:19:00:04:01:FF:FF:01:00:00:00:00:00 10", 
+                                                                (u8)(nodeId & 0xFF), (u8)((nodeId >> 8) & 0xFF),
+                                                                (u8)(clusterId & 0xFF), (u8)((clusterId >> 8) & 0xFF), (u8)((clusterId >> 16) & 0xFF), (u8)((clusterId >> 24) & 0xFF),
+                                                                (u8)(clusterSize & 0xFF), (u8)((clusterSize >> 8) & 0xFF));
+        tester.SimulateForGivenTime(5 * 1000);
+
+        // Check if all the nodes are getting fake JOIN_ME packets
+        for (int i = 1; i < 6; i++)
+        {
+            if (i == 3) continue;
+            tester.SendTerminalCommand(i, "bufferstat");
+            try
+            {
+                Exceptions::DisableDebugBreakOnException disabler;
+                tester.SimulateUntilMessageReceived(500, i, "=> %d, clstId:%u, clstSize:%d", nodeId, clusterId, clusterSize);
+            }
+            catch (TimeoutException& e)
+            {
+                // Not all the nodes may receive fake JOIN_ME packets everytime, we accept that sometimes nodes are not getting those. 
+                failCounter++;
+                if (failCounter > 100) SIMEXCEPTION(IllegalStateException);
+            }
+        }
+    }
+    ASSERT_TRUE(clusteringDone);
+
+    // TEST #2
+    // Fake being a bigger cluster
+    
+    // Simulation time for this subtest
+    timeoutSec = tester.sim->simState.simTimeMs + 100 * 1000;
+
+    // Expected clustering time
+    clusteringTimeoutSec = tester.sim->simState.simTimeMs + 20 * 1000;
+
+    // reset all nodes to cause reclustering
+    tester.SendTerminalCommand(0, "reset");
+
+    // Set up fake JOIN_ME packet for node 3
+    nodeId = 3;
+    clusterSize = 10;
+    clusterId = 0x01ABCDEF;
+    tester.SendTerminalCommand(3, "action this adv set 0 02:01:06:1B:FF:4D:02:F0:0A:00:01:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:19:00:04:01:FF:FF:01:00:00:00:00:00 10", 
+                                                            (u8)(nodeId & 0xFF), (u8)((nodeId >> 8) & 0xFF),
+                                                            (u8)(clusterId & 0xFF), (u8)((clusterId >> 8) & 0xFF), (u8)((clusterId >> 16) & 0xFF), (u8)((clusterId >> 24) & 0xFF),
+                                                            (u8)(clusterSize & 0xFF), (u8)((clusterSize >> 8) & 0xFF));
+
+    failCounter = 0;
+    clusteringDone = false;
+    while (tester.sim->simState.simTimeMs < timeoutSec) {
+        if (tester.sim->simState.simTimeMs >= clusteringTimeoutSec){
+            uint8_t clusteredNodesCounter = 0;
+            // Check if clustering was disturbed by fake JOIN_ME packet.
+            for (int i = 0; i < 5; i++)
+            {
+                NodeIndexSetter setter(i);
+                if (i == 2)
+                {
+                    ASSERT_EQ(tester.sim->currentNode->gs.node.GetClusterSize(), 1);
+                }
+                else
+                {
+                    if (clusteringDone)
+                    {
+                        ASSERT_EQ(tester.sim->currentNode->gs.node.GetClusterSize(), 4);
+                    }
+                    else
+                    {
+                        if (tester.sim->currentNode->gs.node.GetClusterSize() == 4) clusteredNodesCounter++;
+                    }
+                }
+            }
+            if (clusteredNodesCounter == 4) clusteringDone = true;
+        }
+        tester.SimulateForGivenTime(5 * 1000);
+
+        // Check if all the nodes are getting fake JOIN_ME packets
+        for (int i = 1; i < 6; i++)
+        {
+            if (i == 3) continue;
+            tester.SendTerminalCommand(i, "bufferstat");
+            try
+            {
+                Exceptions::DisableDebugBreakOnException disabler;
+                tester.SimulateUntilMessageReceived(500, i, "=> %d, clstId:%u, clstSize:%d", nodeId, clusterId, clusterSize);
+            }
+            catch (TimeoutException& e)
+            {
+                // Not all the nodes may receive fake JOIN_ME packets everytime, we accept that sometimes nodes are not getting those. 
+                failCounter++;
+                if (failCounter > 100) SIMEXCEPTION(IllegalStateException);
+            }
+        }
+    }
+    ASSERT_TRUE(clusteringDone);
+    
+
+    // TEST #3
+    // Follow other nodes cluster information and advertise the same with different node id
+    
+    // Simulation time for this subtest
+    timeoutSec = tester.sim->simState.simTimeMs + 100 * 1000;
+
+    // Expected clustering time
+    clusteringTimeoutSec = tester.sim->simState.simTimeMs + 30 * 1000;
+    
+    // reset all nodes to cause reclustering
+    tester.SendTerminalCommand(0, "reset");
+
+    static uint8_t currentFollowedNodeId = 0;
+    failCounter = 0;
+    clusteringDone = false;
+    while (tester.sim->simState.simTimeMs < timeoutSec) {
+        if (tester.sim->simState.simTimeMs >= clusteringTimeoutSec){
+            uint8_t clusteredNodesCounter = 0;
+            // Check if clustering was disturbed by fake JOIN_ME packet.
+            for (int i = 0; i < 5; i++)
+            {
+                NodeIndexSetter setter(i);
+                if (i == 2)
+                {
+                    ASSERT_EQ(tester.sim->currentNode->gs.node.GetClusterSize(), 1);
+                }
+                else
+                {
+                    if (clusteringDone)
+                    {
+                        ASSERT_EQ(tester.sim->currentNode->gs.node.GetClusterSize(), 4);
+                    }
+                    else
+                    {
+                        if (tester.sim->currentNode->gs.node.GetClusterSize() == 4) clusteredNodesCounter++;
+                    }
+                }
+            }
+            if (clusteredNodesCounter == 4) clusteringDone = true;
+        }
+
+        // Set up fake JOIN_ME packet for node 3
+        {
+            NodeIndexSetter setter(currentFollowedNodeId);
+            nodeId = currentFollowedNodeId + 1;
+            clusterSize = tester.sim->currentNode->gs.node.GetClusterSize();
+            clusterId = tester.sim->currentNode->gs.node.clusterId;
+
+            currentFollowedNodeId++;
+            // Skip attacking node
+            if (currentFollowedNodeId == 3) currentFollowedNodeId++;
+            currentFollowedNodeId %= 5;
+        }
+
+        tester.SendTerminalCommand(3, "action this adv set 0 02:01:06:1B:FF:4D:02:F0:0A:00:01:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:19:00:04:01:FF:FF:01:00:00:00:00:00 10", 
+                                                                (u8)(nodeId & 0xFF), (u8)((nodeId >> 8) & 0xFF),
+                                                                (u8)(clusterId & 0xFF), (u8)((clusterId >> 8) & 0xFF), (u8)((clusterId >> 16) & 0xFF), (u8)((clusterId >> 24) & 0xFF),
+                                                                (u8)(clusterSize & 0xFF), (u8)((clusterSize >> 8) & 0xFF));
+        tester.SimulateForGivenTime(5 * 1000);
+
+        // Check if all the nodes are getting fake JOIN_ME packets
+        for (int i = 1; i < 6; i++)
+        {
+            if (i == 3) continue;
+            tester.SendTerminalCommand(i, "bufferstat");
+            try
+            {
+                Exceptions::DisableDebugBreakOnException disabler;
+                tester.SimulateUntilMessageReceived(500, i, "=> %d, clstId:%u, clstSize:%d", nodeId, clusterId, clusterSize);
+            }
+            catch (TimeoutException& e)
+            {
+                // Not all the nodes may receive fake JOIN_ME packets everytime, we accept that sometimes nodes are not getting those. 
+                failCounter++;
+                if (failCounter > 100) SIMEXCEPTION(IllegalStateException);
+            }
+        }
+    }
+    ASSERT_TRUE(clusteringDone);
+    
+
+    // TEST #4
+    // Change JOIN_ME packet very often to generate a lot of traffic.
+    
+    // Simulation time for this subtest
+    timeoutSec = tester.sim->simState.simTimeMs + 100 * 1000;
+
+    // Expected clustering time
+    clusteringTimeoutSec = tester.sim->simState.simTimeMs + 30 * 1000;
+    
+    // reset all nodes to cause reclustering
+    tester.SendTerminalCommand(0, "reset");
+
+    failCounter = 0;
+    clusteringDone = false;
+    while (tester.sim->simState.simTimeMs < timeoutSec) {
+        if (tester.sim->simState.simTimeMs >= clusteringTimeoutSec){
+            uint8_t clusteredNodesCounter = 0;
+            // Check if clustering was disturbed by fake JOIN_ME packet.
+            for (int i = 0; i < 5; i++)
+            {
+                NodeIndexSetter setter(i);
+                if (i == 2)
+                {
+                    ASSERT_EQ(tester.sim->currentNode->gs.node.GetClusterSize(), 1);
+                }
+                else
+                {
+                    if (clusteringDone)
+                    {
+                        ASSERT_EQ(tester.sim->currentNode->gs.node.GetClusterSize(), 4);
+                    }
+                    else
+                    {
+                        if (tester.sim->currentNode->gs.node.GetClusterSize() == 4) clusteredNodesCounter++;
+                    }
+                }
+            }
+            if (clusteredNodesCounter == 4) clusteringDone = true;
+        }
+
+        // Set up fake JOIN_ME packet for node 3
+        {
+            nodeId += 1;
+            clusterSize += 1;
+            clusterId += 10;
+        }
+
+        {
+            NodeIndexSetter setter(2);
+            tester.sim->currentNode->gs.node.configuration.nodeId = nodeId;
+        }
+
+        tester.SendTerminalCommand(3, "action this adv set 0 02:01:06:1B:FF:4D:02:F0:0A:00:01:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:19:00:04:01:FF:FF:01:00:00:00:00:00 10", 
+                                                                (u8)(nodeId & 0xFF), (u8)((nodeId >> 8) & 0xFF),
+                                                                (u8)(clusterId & 0xFF), (u8)((clusterId >> 8) & 0xFF), (u8)((clusterId >> 16) & 0xFF), (u8)((clusterId >> 24) & 0xFF),
+                                                                (u8)(clusterSize & 0xFF), (u8)((clusterSize >> 8) & 0xFF));
+
+        // Shorter simulation steps to change JOIN_ME more often
+        tester.SimulateForGivenTime(5 * 100);
+
+        // Check if all the nodes are getting fake JOIN_ME packets
+        for (int i = 1; i < 6; i++)
+        {
+            if (i == 3) continue;
+            tester.SendTerminalCommand(i, "bufferstat");
+            try
+            {
+                Exceptions::DisableDebugBreakOnException disabler;
+                tester.SimulateUntilMessageReceived(500, i, "=> %d, clstId:%u, clstSize:%d", nodeId, clusterId, clusterSize);
+            }
+            catch (TimeoutException& e)
+            {
+                // Not all the nodes may receive fake JOIN_ME packets everytime, we accept that sometimes nodes are not getting those. 
+                failCounter++;
+                if (failCounter > 200) SIMEXCEPTION(IllegalStateException);
+            }
+        }
+    }
+    ASSERT_TRUE(clusteringDone);
+}
+
+//This tests that our implementation does not break if methods return busy that are very unlikely to return busy
+//based on our tests in a live network
+TEST(TestClustering, TestUnlikelySdBusy) {
+
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose = true;
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 10 });
+    simConfig.sdBusyProbabilityUnlikely = 0.2 * UINT32_MAX;
+    simConfig.connectionTimeoutProbabilityPerSec = 0.001 * UINT32_MAX;
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    //Simulate for some time and expect that some errors will have been generated in that time
+    tester.SimulateForGivenTime(30 * 1000);
+
+    //We enhance our meshing conditions to make sure a mesh can be built
+    simConfig.SetToPerfectConditions();
+
+    //We should be able to build a functional mesh even with unlikely errors that happened before
+    tester.SimulateUntilClusteringDone(100 * 1000);
+
+    //Request the Error Log
+    tester.SendTerminalCommand(1, "action 0 status get_errors");
+
+    //This error log should contain at least one failed MTU upgrade which happens with the sdBusyProbabilityUnlikely
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, "FATAL_MTU_UPGRADE_FAILED");
 }
 
 

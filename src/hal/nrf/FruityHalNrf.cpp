@@ -66,8 +66,8 @@ extern "C" {
 #include <app_util_platform.h>
 #include <nrf_uart.h>
 #include <nrf_mbr.h>
-#include <nrf_wdt.h>
 #include <nrf_drv_gpiote.h>
+#include <nrf_wdt.h>
 #include <nrf_delay.h>
 #include <nrf_sdm.h>
 #ifdef NRF52
@@ -158,9 +158,6 @@ struct NrfHalMemory
     nrf_radio_request_t timeslotRadioRequest;
 #endif // IS_ACTIVE(TIMESLOT)
 };
-
-
-
 
 //#################### Event Buffer ###########################
 //A global buffer for the current event, which must be 4-byte aligned
@@ -253,6 +250,13 @@ static inline nrf_gpio_pin_pull_t GenericPullModeToNrf(FruityHal::GpioPullMode m
     if (mode == FruityHal::GpioPullMode::GPIO_PIN_PULLUP) return NRF_GPIO_PIN_PULLUP;
     else if (mode == FruityHal::GpioPullMode::GPIO_PIN_PULLDOWN) return NRF_GPIO_PIN_PULLDOWN;
     else return NRF_GPIO_PIN_NOPULL;
+}
+
+static inline nrf_gpio_pin_sense_t GenericSenseModeToNrf(FruityHal::GpioSenseMode mode)
+{
+    if (mode == FruityHal::GpioSenseMode::GPIO_PIN_LOWSENSE) return NRF_GPIO_PIN_SENSE_LOW;
+    else if (mode == FruityHal::GpioSenseMode::GPIO_PIN_HIGHSENSE) return NRF_GPIO_PIN_SENSE_HIGH;
+    else return NRF_GPIO_PIN_NOSENSE;
 }
 
 static inline nrf_gpiote_polarity_t GenericPolarityToNrf(FruityHal::GpioTransistion transition)
@@ -541,7 +545,6 @@ void FruityHal::EventLooper()
     //Check for waiting events from the application
     ProcessAppEvents();
 
-
     while (true)
     {
         //Fetch BLE events
@@ -573,6 +576,7 @@ void FruityHal::EventLooper()
         }
     }
 
+    GS->inPullEventsLoop = true;
     // Pull event from soc
     while(true){
         uint32_t evt_id;
@@ -584,6 +588,7 @@ void FruityHal::EventLooper()
             ::DispatchSystemEvents(nrfSystemEventToGeneric(evt_id)); // Call handler
         }
     }
+    GS->inPullEventsLoop = false;
 
     u32 err = sdAppEvtWaitAnomaly87();
     FRUITYMESH_ERROR_CHECK(err); // OK
@@ -603,18 +608,21 @@ u16 FruityHal::GetEventBufferSize()
 //This will get called for all events on the ble stack and also for all other interrupts
 static void nrf_sdh_fruitymesh_evt_handler(void * p_context)
 {
+    GS->fruitymeshEventLooperTriggerTimestamp = FruityHal::GetRtcMs();
     ProcessAppEvents();
 }
 
 //This is called for all BLE related events
 static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 {
+    GS->bleEventLooperTriggerTimestamp = FruityHal::GetRtcMs();
     FruityHal::DispatchBleEvents(p_ble_evt);
 }
 
 //This is called for all SoC related events
 static void soc_evt_handler(uint32_t evt_id, void * p_context)
 {
+    GS->socEventLooperTriggerTimestamp = FruityHal::GetRtcMs();
     ::DispatchSystemEvents(nrfSystemEventToGeneric(evt_id));
 }
 
@@ -628,6 +636,8 @@ NRF_SDH_STACK_OBSERVER(m_nrf_sdh_fruitymesh_evt_handler, NRF_SDH_BLE_STACK_OBSER
 //This is our main() after the stack was initialized and is called in a while loop
 void FruityHal::EventLooper()
 {
+    GS->eventLooperTriggerTimestamp = GetRtcMs();
+
     FruityHal::VirtualComProcessEvents();
 
     //Call all main context handlers so that they can do low priority long-running processing
@@ -692,6 +702,7 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
                     (err != NRF_ERROR_RESOURCES)) FRUITYMESH_ERROR_CHECK(err);
             }
 #endif
+            GS->advertismentReceivedTimestamp = GetRtcMs();
             GapAdvertisementReportEvent are(&bleEvent);
             DispatchEvent(are);
         }
@@ -757,12 +768,14 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
         break;
     case BLE_GATTS_EVT_WRITE:
         {
+            GS->lastSendTimestamp = GetRtcMs();
             FruityHal::GattsWriteEvent gwe(&bleEvent);
             DispatchEvent(gwe);
         }
         break;
     case BLE_GATTC_EVT_HVX:
         {
+            GS->lastSendTimestamp = GetRtcMs();
             FruityHal::GattcHandleValueEvent hve(&bleEvent);
             DispatchEvent(hve);
         }
@@ -773,6 +786,7 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
 #ifdef SIM_ENABLED
             //if (cherrySimInstance->currentNode->id == 37 && bleEvent.evt.common_evt.conn_handle == 680) printf("%04u Q@NODE %u WRITE_CMD_TX_COMPLETE %u received" EOL, cherrySimInstance->globalBreakCounter++, cherrySimInstance->currentNode->id, bleEvent.evt.common_evt.params.tx_complete.count);
 #endif
+            GS->lastReceivedTimestamp = GetRtcMs();
             FruityHal::GattDataTransmittedEvent gdte(&bleEvent);
             DispatchEvent(gdte);
         }
@@ -1944,7 +1958,10 @@ extern "C"{
     void app_timer_handler(void * p_context){
         UNUSED_PARAMETER(p_context);
         
+        // This line must be kept to provide recalculations of global time
         FruityHal::GetRtcMs();
+
+        GS->timestampInAppTimerHandler = FruityHal::GetRtcMs();
 
         //We just increase the time that has passed since the last handler
         //And call the timer from our main event handling queue
@@ -2170,6 +2187,18 @@ void FruityHal::SystemReset(bool softdeviceEnabled)
         NVIC_SystemReset();
 }
 
+void FruityHal::SystemEnterOff(bool softdeviceEnabled)
+{
+    if (softdeviceEnabled)
+    {
+        sd_power_system_off();
+    }
+    else
+    {
+        nrf_power_system_off();
+    }
+}
+
 // Retrieves the reboot reason from the RESETREAS register
 RebootReason FruityHal::GetRebootReason()
 {
@@ -2227,28 +2256,91 @@ bool FruityHal::SetRetentionRegisterTwo(u8 val)
 #endif
 }
 
+#ifndef SIM_ENABLED
+extern "C"{
+    void WDT_IRQHandler(void)
+    {
+        if (nrf_wdt_int_enable_check(NRF_WDT_INT_TIMEOUT_MASK) == true)
+        {
+            u32 currentTime = FruityHal::GetRtcMs();
+            if (currentTime - GS->lastSendTimestamp > 30 * 60 * 1000) *GS->watchdogExtraInfoFlagsPtr |= 1 << 0;
+            if (currentTime - GS->lastReceivedTimestamp > 30 * 60 * 1000) *GS->watchdogExtraInfoFlagsPtr |= 1 << 1;
+            if (GS->fruityMeshBooted)  *GS->watchdogExtraInfoFlagsPtr |= 1 << 2;
+            if (GS->modulesBooted) *GS->watchdogExtraInfoFlagsPtr |= 1 << 3;
+            if (currentTime - GS->timestampInAppTimerHandler > 60 * 1000) *GS->watchdogExtraInfoFlagsPtr |= 1 << 4;
+            if (currentTime - GS->lastReceivedFromSinkTimestamp > 30 * 60 * 1000) *GS->watchdogExtraInfoFlagsPtr |= 1 << 5;
+            if (currentTime - GS->eventLooperTriggerTimestamp > 60 * 1000) *GS->watchdogExtraInfoFlagsPtr |= 1 << 6;
+            if (currentTime - GS->fruitymeshEventLooperTriggerTimestamp > 10 * 60 * 1000) *GS->watchdogExtraInfoFlagsPtr |= 1 << 7;
+            if (currentTime - GS->bleEventLooperTriggerTimestamp > 10 * 60 * 1000) *GS->watchdogExtraInfoFlagsPtr |= 1 << 8;
+            if (currentTime - GS->socEventLooperTriggerTimestamp > 10 * 60 * 1000) *GS->watchdogExtraInfoFlagsPtr |= 1 << 9;
+
+            BaseConnections connections = GS->cm.GetBaseConnections(ConnectionDirection::INVALID);
+            u8 handshakedConnections = 0;
+            u8 meshaccessConnections = 0;
+            for(int i=0; i<connections.count; i++){
+                BaseConnectionHandle handle = connections.handles[i];
+                if (handle)
+                {
+                    ConnectionState cs = handle.GetConnectionState();
+                    if (cs == ConnectionState::HANDSHAKE_DONE) 
+                    {
+                        if (handle.GetConnection()->connectionType == ConnectionType::FRUITYMESH)
+                        {
+                            handshakedConnections++;
+                        }
+                        else if (handle.GetConnection()->connectionType == ConnectionType::MESH_ACCESS)
+                        {
+                            meshaccessConnections++;
+                        }
+                    }
+                }
+            }
+
+            // Requires 3 bits at maximum
+            *GS->watchdogExtraInfoFlagsPtr |= handshakedConnections << 10;
+
+            // Requires 2 bits at maximum
+            *GS->watchdogExtraInfoFlagsPtr |= meshaccessConnections << 13;
+
+            if (GS->inGetRandomLoop) *GS->watchdogExtraInfoFlagsPtr |= 1 << 15;
+            if (GS->inPullEventsLoop) *GS->watchdogExtraInfoFlagsPtr |= 1 << 16;
+            if (GS->safeBootEnabled) *GS->watchdogExtraInfoFlagsPtr |= 1 << 17;
+
+            nrf_wdt_event_clear(NRF_WDT_EVENT_TIMEOUT);
+        }
+    }
+}
+#endif //SIM_ENABLED
+
 //Starts the Watchdog with a static interval so that changing a config can do no harm
 void FruityHal::StartWatchdog(bool safeBoot)
-{
-    if (GET_WATCHDOG_TIMEOUT() != 0)
-    {
-        //Configure Watchdog to default: Run while CPU sleeps
-        nrf_wdt_behaviour_set(NRF_WDT_BEHAVIOUR_RUN_SLEEP);
-        //Configure Watchdog timeout
-        if (!safeBoot) {
-            nrf_wdt_reload_value_set(GET_WATCHDOG_TIMEOUT());
-        }
-        else {
-            nrf_wdt_reload_value_set(GET_WATCHDOG_TIMEOUT_SAFE_BOOT());
-        }
-        // Configure Reload Channels
-        nrf_wdt_reload_request_enable(NRF_WDT_RR0);
+{    
+    if (GET_WATCHDOG_TIMEOUT() == 0) return;
 
-        //Enable
-        nrf_wdt_task_trigger(NRF_WDT_TASK_START);
-
-        logt("FH", "Watchdog started");
+    //Configure Watchdog to default: Run while CPU sleeps
+    nrf_wdt_behaviour_set(NRF_WDT_BEHAVIOUR_RUN_SLEEP);
+    //Configure Watchdog timeout
+    if (!safeBoot) {
+        nrf_wdt_reload_value_set(GET_WATCHDOG_TIMEOUT());
     }
+    else {
+        nrf_wdt_reload_value_set(GET_WATCHDOG_TIMEOUT_SAFE_BOOT());
+    }
+    // Configure Reload Channels
+    nrf_wdt_reload_request_enable(NRF_WDT_RR0);
+
+#ifndef SIM_ENABLED
+    // Configure interrupt
+    NVIC_SetPriority(WDT_IRQn, 3);
+    NVIC_ClearPendingIRQ(WDT_IRQn);
+    NVIC_EnableIRQ(WDT_IRQn);
+    nrf_wdt_int_enable(NRF_WDT_INT_TIMEOUT_MASK);
+#endif //SIM_ENABLED
+
+    //Enable
+    nrf_wdt_task_trigger(NRF_WDT_TASK_START);
+
+    logt("FH", "Watchdog started");
 }
 
 //Feeds the Watchdog to keep it quiet
@@ -2350,6 +2442,11 @@ void FruityHal::GpioConfigureInput(u32 pin, GpioPullMode mode)
     nrf_gpio_cfg_input(pin, GenericPullModeToNrf(mode));
 }
 
+void FruityHal::GpioConfigureInputSense(u32 pin, GpioPullMode mode, GpioSenseMode sense)
+{
+    nrf_gpio_cfg_sense_input(pin, GenericPullModeToNrf(mode), GenericSenseModeToNrf(sense));
+}
+
 void FruityHal::GpioConfigureDefault(u32 pin)
 {
     nrf_gpio_cfg_default(pin);
@@ -2358,11 +2455,23 @@ void FruityHal::GpioConfigureDefault(u32 pin)
 void FruityHal::GpioPinSet(u32 pin)
 {
     nrf_gpio_pin_set(pin);
+
+#ifdef SIM_ENABLED
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led1Pin) cherrySimInstance->currentNode->led1On = true;
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led2Pin) cherrySimInstance->currentNode->led2On = true;
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led3Pin) cherrySimInstance->currentNode->led3On = true;
+#endif
 }
 
 void FruityHal::GpioPinClear(u32 pin)
 {
     nrf_gpio_pin_clear(pin);
+
+#ifdef SIM_ENABLED
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led1Pin) cherrySimInstance->currentNode->led1On = false;
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led2Pin) cherrySimInstance->currentNode->led2On = false;
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led3Pin) cherrySimInstance->currentNode->led3On = false;
+#endif
 }
 
 u32 FruityHal::GpioPinRead(u32 pin)
@@ -2374,6 +2483,12 @@ u32 FruityHal::GpioPinRead(u32 pin)
 void FruityHal::GpioPinToggle(u32 pin)
 {
     nrf_gpio_pin_toggle(pin);
+
+#ifdef SIM_ENABLED
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led1Pin) cherrySimInstance->currentNode->led1On = !cherrySimInstance->currentNode->led1On;
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led2Pin) cherrySimInstance->currentNode->led2On = !cherrySimInstance->currentNode->led2On;
+    if ((int8_t)pin == cherrySimInstance->currentNode->gs.boardconf.configuration.led3Pin) cherrySimInstance->currentNode->led3On = !cherrySimInstance->currentNode->led2On;
+#endif
 }
 
 static void GpioteHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
@@ -2749,7 +2864,7 @@ void FruityHal::BleStackErrorHandler(u32 id, u32 info)
 
 const char* getBleEventNameString(u16 bleEventId)
 {
-#if defined(TERMINAL_ENABLED)
+#if IS_ACTIVE(ENUM_TO_STRING)
     switch (bleEventId)
     {
     case BLE_EVT_USER_MEM_REQUEST:

@@ -186,7 +186,7 @@ TEST(TestModule, TestSetAndGetConfiguration) {
     statusConfig.connectionReportingIntervalDs = 0;
     statusConfig.nearbyReportingIntervalDs = 0;
     statusConfig.deviceInfoReportingIntervalDs = 0;
-    statusConfig.liveReportingState = LiveReportTypes::LEVEL_ERROR;
+    statusConfig.liveReportingState = LiveReportTypes::LEVEL_FATAL;
 
     static_assert(sizeof(StatusReporterModuleConfiguration) == 13, "Size changed from when test was written, change defaults");
 
@@ -200,7 +200,7 @@ TEST(TestModule, TestSetAndGetConfiguration) {
 
     //Read the config back and check if it is the same
     tester.SendTerminalCommand(1, "get_config 2 status");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"config\",\"module\":3,\"requestHandle\":0,\"config\":\"03:02:01:00:00:00:0A:00:00:00:00:00:00\"}");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"config\",\"module\":3,\"requestHandle\":0,\"config\":\"03:02:01:00:00:00:0A:00:00:00:00:00:32\"}");
 
     VendorTemplateModuleConfiguration templateConfig;
     templateConfig.moduleId = VENDOR_TEMPLATE_MODULE_ID;

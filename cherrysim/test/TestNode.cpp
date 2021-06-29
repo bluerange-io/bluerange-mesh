@@ -263,6 +263,7 @@ TEST(TestNode, TestCRCValidation)
     }
 }
 
+// Reenable after BR-476 is fixed
 TEST(TestNode, TestGenerateLoad) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
@@ -467,19 +468,23 @@ TEST(TestNode, DISABLED_TestDiscoverySettingEnrolled) {
     tester.SimulateUntilMessagesReceived(10 * 1000, messagesHigh2);
 }
 
+//This test checks that all nodes receive the number of enrolled nodes, even if they are currently not connected to the mesh
 TEST(TestNode, TestDiscoveryRestartingAndStoppingDiscovery) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.nodeConfigName.clear();
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2});
+    simConfig.SetToPerfectConditions();
+    simConfig.preDefinedPositions = { {0.2, 0.2}, {0.2, 0.25}, {0.25, 0.2} };
     //testerConfig.verbose = true;
+
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
     tester.SendTerminalCommand(1, "action this enroll basic BBBBB 1 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
     tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
     tester.SendTerminalCommand(3, "action this enroll basic BBBBD 3 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(100 * 1000);
 
 
     std::vector<SimulationMessage> messagesOFF = {
@@ -493,47 +498,80 @@ TEST(TestNode, TestDiscoveryRestartingAndStoppingDiscovery) {
         SimulationMessage(3, "-- DISCOVERY HIGH --"), };
 
     //Remove one of the nodes, set number of enrolled nodes and then expect to enter discovery off when number of nodes is reached.
-    tester.SendTerminalCommand(1, "action 2 enroll remove BBBBC");
+    tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 11 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
+    //Wait until we are sure the node is not part of the mesh anymore
     tester.SimulateForGivenTime(10 * 1000);
-    tester.SendTerminalCommand(1, "action 0 node set_enrolled_nodes %d", cherrySimInstance->GetTotalNodes());
+    //Tell the other two nodes that we have a total of 3 nodes in our mesh
+    tester.SendTerminalCommand(1, "action this node set_enrolled_nodes %d", 3);
+    tester.SendTerminalCommand(3, "action this node set_enrolled_nodes %d", 3);
     tester.SimulateForGivenTime(10 * 1000);
+    //Enroll the missing node again in the same network
     tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
-    tester.SimulateUntilMessagesReceived(100 * 1000, messagesOFF);
+    //All nodes should go to discovery idle state after some time
+    {
+        std::vector<SimulationMessage> msgs = {
+        SimulationMessage(1, "-- DISCOVERY IDLE --"),
+        SimulationMessage(2, "-- DISCOVERY IDLE --"),
+        SimulationMessage(3, "-- DISCOVERY IDLE --"), };
+        tester.SimulateUntilMessagesReceived(100 * 1000, msgs);
+    }
 
-    //Reset node 1 to enter and expect that other node will enter high discovery and then discovery off after reclustering
+    //Reset node 1 to enter and expect that other node will enter high discovery
     tester.SendTerminalCommand(1, "reset");
-    tester.SimulateUntilMessagesReceived(100 * 1000, messagesHIGH);
-    tester.SimulateUntilMessagesReceived(100 * 1000, messagesOFF);
+    {
+        std::vector<SimulationMessage> msgs = {
+        SimulationMessage(1, "-- DISCOVERY HIGH --"),
+        SimulationMessage(2, "-- DISCOVERY HIGH --"),
+        SimulationMessage(3, "-- DISCOVERY HIGH --"), };
+        tester.SimulateUntilMessagesReceived(100 * 1000, msgs);
+    }
+    //After reclustering, they should go back to idle state
+    {
+        std::vector<SimulationMessage> msgs = {
+        SimulationMessage(1, "-- DISCOVERY IDLE --"),
+        SimulationMessage(2, "-- DISCOVERY IDLE --"),
+        SimulationMessage(3, "-- DISCOVERY IDLE --"), };
+        tester.SimulateUntilMessagesReceived(100 * 1000, msgs);
+    }
 }
 
-TEST(TestNode, TestDiscoveryOffWillAllowConnectingNewNodes) {
+// Can be enabled again after BR-1438 is fixed
+TEST(TestNode, DISABLED_TestDiscoveryOffWillAllowConnectingNewNodes) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.nodeConfigName.clear();
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2});
+    simConfig.SetToPerfectConditions();
+    simConfig.preDefinedPositions = { {0.2, 0.2}, {0.2, 0.25}, {0.25, 0.2} };
     //testerConfig.verbose = true;
+    
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
     tester.SendTerminalCommand(1, "action this enroll basic BBBBB 1 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
     tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
     tester.SendTerminalCommand(3, "action this enroll basic BBBBD 3 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(100 * 1000);
     
     // remove node from network
-    tester.SendTerminalCommand(1, "action 2 enroll remove BBBBC");
-    tester.SimulateForGivenTime(20 * 1000);
+    tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 11 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
+    tester.SimulateForGivenTime(10 * 1000);
+
+    tester.SendTerminalCommand(2, "status");
 
     //Set number of enrolled nodes to numNodes - 1 (1 removed node) and wait for discovery off state
-    tester.SendTerminalCommand(1, "action 0 node set_enrolled_nodes %d", cherrySimInstance->GetTotalNodes() - 1);
+
+    tester.SendTerminalCommand(1, "action this node set_enrolled_nodes %d", 2);
+    tester.SendTerminalCommand(3, "action this node set_enrolled_nodes %d", 2);
+
     std::vector<SimulationMessage> messagesOff = {
         SimulationMessage(1, "-- DISCOVERY IDLE --"),
         SimulationMessage(3, "-- DISCOVERY IDLE --"), };
     tester.SimulateUntilMessagesReceived(10 * 1000, messagesOff);
     
-    // enroll node again and expect it will join network
+    // enroll node again in the same network and expect it will join network
     tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
-    tester.SimulateUntilMessageReceived(20 * 1000, 2, "ClusterSize set to %d", cherrySimInstance->GetTotalNodes());
+    tester.SimulateUntilMessageReceived(20 * 1000, 2, "ClusterSize set to %d", 3);
 }
 
 //Tests sending various length packets (split/not split) over normal prio queue concurrently
@@ -716,7 +754,7 @@ TEST(TestNode, TestRapidDisconnections) {
     tester.SimulateForGivenTime(11 * 1000);
 
     //Simulate very frequent connection losses
-    tester.sim->simConfig.connectionTimeoutProbabilityPerSec = 0.1;
+    tester.sim->simConfig.connectionTimeoutProbabilityPerSec = 0.1 * UINT32_MAX;
 
     //We just simulate for some time to see if sth. in the node crashes
     tester.SimulateForGivenTime(20 * 1000);

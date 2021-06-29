@@ -801,7 +801,9 @@ bool MeshAccessConnection::ShouldSendDataToNodeId(NodeId nodeId) const
         //Organization wide NodeIds. These are commonly used for assets that connect via MeshAccessConnections
         || (nodeId >= NODE_ID_GLOBAL_DEVICE_BASE && nodeId < (NODE_ID_GLOBAL_DEVICE_BASE + NODE_ID_GLOBAL_DEVICE_BASE_SIZE))
         //DFU messages are typically sent to group ids. They must be allowed.
-        || (nodeId >= NODE_ID_GROUP_BASE && nodeId < (NODE_ID_GROUP_BASE + NODE_ID_GROUP_BASE_SIZE));
+        || (nodeId >= NODE_ID_GROUP_BASE && nodeId < (NODE_ID_GROUP_BASE + NODE_ID_GROUP_BASE_SIZE))
+        //Connections using the network key with tunnel type REMOTE_MESH are allowed to send messages to the remote node.
+        || (fmKeyId == FmKeyId::NETWORK && tunnelType == MeshAccessTunnelType::REMOTE_MESH && direction == ConnectionDirection::DIRECTION_OUT);
 }
 
 
@@ -935,7 +937,9 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
     //TO_HEX(data, sendData->dataLength);
     //logt("MACONN", "RX DATA %s", dataHex);
 
-    //Check if packet must be decrypted first
+    // If the connection is encrypted (on peripheral after successfully sending
+    // the ANONCE packet, on the central before sending the SNONCE packet),
+    // try to decrypt the data.
     DYNAMIC_ARRAY(decryptedData, sendData->dataLength.GetRaw());
     if(encryptionState == EncryptionState::ENCRYPTED){
         bool valid = DecryptPacket(data, decryptedData, sendData->dataLength);
@@ -943,8 +947,18 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
         data = decryptedData;
 
         if(!valid){
-            logt("WARNING", "Invalid packet");
-            OnCorruptedMessage();
+            if(connectionState < ConnectionState::HANDSHAKE_DONE){
+                // Failed decryption during the handshake leads to disconnection.
+                logt("WARNING", "Invalid packet during handshake");
+                DisconnectAndRemove(AppDisconnectReason::INVALID_HANDSHAKE_PACKET);
+            }
+            else{
+                // The first failed decryption on an established connection
+                // (e.g. due to a dropped packet) leads to reset of the
+                // encryption and connection state (see OnCorruptedMessage).
+                logt("WARNING", "Invalid packet");
+                OnCorruptedMessage();
+            }
             return;
         }
     }

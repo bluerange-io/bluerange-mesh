@@ -40,6 +40,7 @@
 #include <ScanController.h>
 #include <FlashStorage.h>
 #include "GlobalState.h"
+
 constexpr u8 DEBUG_MODULE_CONFIG_VERSION = 2;
 
 #if IS_ACTIVE(EINK_MODULE)
@@ -183,7 +184,8 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
     //Auto counting for flood packets
     if(lastFloodPacketMs && lastFloodPacketMs + 3000 < FruityHal::GetRtcMs()){
         const u32 passedTimeMs = FruityHal::GetRtcDifferenceMs(lastFloodPacketMs, firstFloodPacketMs);
-        trace("Counted %u flood payload bytes in %u ms = %u byte/s" EOL, autoFloodSum, passedTimeMs, autoFloodSum * 1000 / passedTimeMs);
+        throughputInBytesPerSecond = autoFloodSum * 1000 / passedTimeMs;
+        trace("Counted %u flood payload bytes in %u ms = %u byte/s" EOL, autoFloodSum, passedTimeMs, throughputInBytesPerSecond);
         firstFloodPacketMs = lastFloodPacketMs = 0;
         autoFloodSum = 0;
     }
@@ -436,7 +438,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
                 if(commandArgsSize > 7) data.timeoutSec = Utility::StringToU16(commandArgs[7]);
                 else data.timeoutSec = 10;
 
-                SendModuleActionMessage(
+                ErrorTypeUnchecked err = SendModuleActionMessage(
                     MessageType::MODULE_TRIGGER_ACTION,
                     destinationNode,
                     (u8)DebugModuleTriggerActionMessages::SET_FLOOD_MODE,
@@ -445,8 +447,15 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
                     SIZEOF_DEBUG_MODULE_SET_FLOOD_MODE_MESSAGE,
                     false
                 );
+                if (err == ErrorTypeUnchecked::SUCCESS)
+                {
+                    return TerminalCommandHandlerReturnType::SUCCESS;
+                }
+                else
+                {
+                    return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
+                }
 
-                return TerminalCommandHandlerReturnType::SUCCESS;
             }
             else if (TERMARGS(3, "ping") && commandArgsSize >= 6)
             {
@@ -1443,3 +1452,8 @@ void DebugModule::CauseStackOverflow() const
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
+
+u32 DebugModule::GetThroughputTestResult()
+{
+    return throughputInBytesPerSecond;
+}

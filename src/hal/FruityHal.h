@@ -294,6 +294,12 @@ namespace FruityHal
         GPIO_PIN_PULLUP            = 2
     };
 
+    enum class GpioSenseMode {
+        GPIO_PIN_NOSENSE              = 0,
+        GPIO_PIN_LOWSENSE             = 1,
+        GPIO_PIN_HIGHSENSE            = 2
+    };
+
     enum class GpioTransistion {
         GPIO_TRANSITION_TOGGLE      = 0,
         GPIO_TRANSITION_LOW_TO_HIGH = 1,
@@ -420,6 +426,7 @@ namespace FruityHal
 
     void SystemReset();
     void SystemReset(bool softdeviceEnabled);
+    void SystemEnterOff(bool softdeviceEnabled);
     RebootReason GetRebootReason();
     ErrorType ClearRebootReason();
     void StartWatchdog(bool safeBoot);
@@ -428,6 +435,7 @@ namespace FruityHal
     void DelayMs(u32 delayMs);
     void EcbEncryptBlock(const u8 * p_key, const u8 * p_clearText, u8 * p_cipherText);
     u8 ConvertPortToGpio(u8 port, u8 pin);
+    
 
     // ######################### FLASH ############################
 
@@ -460,6 +468,7 @@ namespace FruityHal
     // ######################### GPIO ############################
     void GpioConfigureOutput(u32 pin);
     void GpioConfigureInput(u32 pin, GpioPullMode mode);
+    void GpioConfigureInputSense(u32 pin, GpioPullMode mode, GpioSenseMode sense);
     void GpioConfigureDefault(u32 pin);
     void GpioPinSet(u32 pin);
     void GpioPinClear(u32 pin);

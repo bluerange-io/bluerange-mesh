@@ -111,6 +111,7 @@ enum class AppDisconnectReason : u8 {
     EN_OCEAN_ENROLLED_AND_IN_MESH = 38,
     MULTIPLE_MA_ON_ASSET = 39,
     HANDLE_PACKET_SENT_ERROR = 40,
+    MTU_UPGRADE_FAILED = 41,
 };
 
 

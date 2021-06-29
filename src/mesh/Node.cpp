@@ -2227,6 +2227,8 @@ void Node::TimerEventHandler(u16 passedTimeDs)
         }
     }
 
+    // Handle Device off
+    GS->deviceOff.TimerHandler(passedTimeDs);
 }
 
 void Node::KeepHighDiscoveryActive()

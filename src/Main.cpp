@@ -38,6 +38,7 @@ int main(void)
     GS->halMemory = halMemory;
     
     BootFruityMesh();
+    GS->fruityMeshBooted = true;
     
     const u32 moduleMemoryBlockSize = INITIALIZE_MODULES(false);
     //We must make sure that the memory block for allocating modules is aligned on an 8 byte boundary
@@ -45,6 +46,7 @@ int main(void)
     alignas(8) u8 moduleMemoryBlock[moduleMemoryBlockSize];
     GS->moduleAllocator.SetMemory(moduleMemoryBlock, moduleMemoryBlockSize);
     BootModules();
+    GS->modulesBooted = true;
     
     StartFruityMesh();
 }

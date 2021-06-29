@@ -81,7 +81,10 @@ Below is a list of all messages that we have currently openly specified. These a
 |0x01|Placeholder for xref:#JoinMe[JOIN_ME Packet] (Currently based on Manufacturer Data)
 |0x02|Legacy Asset Tracking Broadcast (Deprecated for new type 0x04)
 |0x03|xref:MeshAccessModule.adoc#MeshAccessBroadcast[MeshAccess Broadcast]
-|0x04|xref:AssetModule.adoc#AssetBroadcast[Asset Tracking Broadcast]
+|0x04|Legacy Asset Tracking Broadcast (Deprecated for new types 0x06 and 0x07)
+|0x05|Sensor Broadcast
+|0x06|Asset BLE Broadcast
+|0x07|Asset INS Broadcast
 |===
 
 === Other Advertising Packets
