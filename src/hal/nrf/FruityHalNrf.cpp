@@ -136,28 +136,29 @@ struct GpioteHandlerValues
 
 struct NrfHalMemory
 {
-    std::array <app_timer_t, APP_TIMER_MAX_TIMERS> swTimers;
-    ble_db_discovery_t discoveredServices;
-    volatile bool twiXferDone;
-    bool twiInitDone;
-    volatile bool spiXferDone;
-    bool spiInitDone;
-    volatile bool nrfSerialDataAvailable = false;
-    volatile bool nrfSerialErrorDetected = false;
-    bool overflowPending;
-    u32 time_ms;
-    GpioteHandlerValues GpioHandler[MAX_GPIOTE_HANDLERS];
-    u8 gpioteHandlersCreated;
-    ble_evt_t const * currentEvent;
-    u8 timersCreated;
+    std::array <app_timer_t, APP_TIMER_MAX_TIMERS> swTimers                   = {};
+    ble_db_discovery_t discoveredServices                                     = {};
+    volatile bool twiXferDone                                                 = false;
+    bool twiInitDone                                                          = false;
+    volatile bool spiXferDone                                                 = false;
+    bool spiInitDone                                                          = false;
+    volatile bool nrfSerialDataAvailable                                      = false;
+    volatile bool nrfSerialErrorDetected                                      = false;
+    bool overflowPending                                                      = false;
+    u32 time_ms                                                               = 0;
+    GpioteHandlerValues GpioHandler[MAX_GPIOTE_HANDLERS]                      = {};
+    u8 gpioteHandlersCreated                                                  = 0;
+    ble_evt_t const * currentEvent                                            = nullptr;
+    u8 timersCreated                                                          = 0;
 #if SDK == 15
-    ble_gap_adv_data_t advData;
+    ble_gap_adv_data_t advData                                                = {};
 #endif
 #if IS_ACTIVE(TIMESLOT)
-    nrf_radio_signal_callback_return_param_t timeslotRadioCallbackReturnParam;
-    nrf_radio_request_t timeslotRadioRequest;
+    nrf_radio_signal_callback_return_param_t timeslotRadioCallbackReturnParam = {};
+    nrf_radio_request_t timeslotRadioRequest                                  = {};
 #endif // IS_ACTIVE(TIMESLOT)
 };
+static_assert(alignof(NrfHalMemory) <= 4, "The HAL Memory is allocated in a memory block with an alignment of 4. Thus the alignment must not be greater!");
 
 //#################### Event Buffer ###########################
 //A global buffer for the current event, which must be 4-byte aligned
@@ -3868,6 +3869,11 @@ void FruityHal::SpiConfigureSlaveSelectPin(i32 pin)
 u32 FruityHal::GetHalMemorySize()
 {
     return sizeof(NrfHalMemory);
+}
+
+void FruityHal::InitHalMemory()
+{
+    new (GS->halMemory) NrfHalMemory();
 }
 
 #if IS_ACTIVE(TIMESLOT)
