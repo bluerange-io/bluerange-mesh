@@ -124,7 +124,7 @@ int FruitySimServer::StartServer()
     char const SrvAddress[] = "0.0.0.0";
     std::uint16_t SrvPort = 5555;
     server = new std::unique_ptr<evhttp, decltype(&evhttp_free)>(evhttp_start(SrvAddress, SrvPort), &evhttp_free);
-    if (!server)
+    if (!server->get())
     {
         std::cerr << "Failed to init http server." << std::endl;
         return -1;
@@ -227,6 +227,7 @@ std::string FruitySimServer::GenerateSiteJson()
 
     site["heightInMeter"] = cherrySimInstance->simConfig.mapHeightInMeters;
     site["lengthInMeter"] = cherrySimInstance->simConfig.mapWidthInMeters;
+    site["elevationInMeter"] = cherrySimInstance->simConfig.mapElevationInMeters;
     site["name"] = "SimulatorSite";
     site["pixelPerMeter"] = 5;
 
@@ -311,6 +312,13 @@ std::string FruitySimServer::GenerateDevicesJson()
             sprintf(advData, "Not advertising");
         }
 
+        //Collect a bit more data about the node
+        char info[200];
+        sprintf(info, "%s,\nFeatureset: %s", advData, node->nodeConfiguration.c_str());
+
+        device["lastSentMessageTimestampMs"] = 0;
+        device["lastSentAdvertisingMessage"] = info;
+
         device["details"] = {
             {"platform", "BLENODE"},
             {"clusterId", node->gs.node.clusterId},
@@ -319,7 +327,6 @@ std::string FruitySimServer::GenerateDevicesJson()
             {"serialNumber", node->gs.config.GetSerialNumber()},
             {"connections", json::array()},
             {"nonConnections", json::array()},
-            {"lastSentAdvertisingMessage", advData},
             {"freeIn", node->gs.cm.freeMeshInConnections},
             {"freeOut", node->gs.cm.freeMeshOutConnections}
         };

@@ -211,6 +211,9 @@ ErrorType FruityHal::TwiRegisterRead(u8 slaveAddress, u8 reg, u8 * pReceiveData,
 ErrorType FruityHal::TwiRead(u8 slaveAddress, u8 * pReceiveData, u8 length) { return ErrorType::SUCCESS; }
 bool FruityHal::TwiIsInitialized(void) { return false; }
 void FruityHal::TwiGpioAddressPinSetAndWait(bool high, i32 sdaPin) { }
+void FruityHal::TwiUninit() {}
+void FruityHal::TwiStart(i32 sclPin, i32 sdaPin) {}
+void FruityHal::TwiStop() {}
 
 //spi
 void FruityHal::SpiInit(i32 sckPin, i32 misoPin, i32 mosiPin) { }

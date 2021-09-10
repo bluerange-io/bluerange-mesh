@@ -10,7 +10,8 @@ https://cmake.org/[CMake] is a system that manages the build process. It is cros
 4. (For Firmware) Make sure the correct Embedded Toolchain is installed, as described in xref:Quick-Start.adoc#Toolchain[Quick Start].
 
 [#BuildingSimulator]
-== Creating native build files for the simulator (x86)
+== Simulator
+=== Creating native build files for x86
 
 As is always the case with CMake, an "out-of-source build" should be preferred. This means that you create the project files in a directory that is separate from the rest of the repository. While it is possible to create such an "out-of-source build" in a directory within the repository, a sibling directory is preferred as some build configurations might not work properly with in-repo directories.
 
@@ -18,12 +19,15 @@ As is always the case with CMake, an "out-of-source build" should be preferred. 
 2. Open the Command Line / Terminal in this directory
 3. Execute the following: `cmake ../fruitymesh` (assuming the repository has the default "fruitymesh" name).
 
+TIP: On Windows, we do recommend that you download the free link:https://visualstudio.microsoft.com/de/downloads/[Visual Studio Community Edition]. In order to create the build files, you should use `cmake ../fruitymesh -A Win32` which will generate the whole Visual Studio Solution for you that you only need to open and hit `Play`.
+
 The necessary build files are created inside the sibling directory. To make sure that everything worked as intended try to compile and run the cherrySim_runner and cherrySim_tester projects. In case you are using visual studio, open the Solution file (.sln), right click the projects on the left side and select "start up project".
 
 [#BuildingFirmware]
-== Creating native build files for the chip firmware
+== Firmware
+=== Creating native build files for the MCU firmware
 
-Building the feature sets is mostly the same as with the simulator. The only difference is that some extra parameters need to be passed to cmake:
+Building the native featuresets for your development board is mostly the same as with the simulator. The only difference is that some extra parameters need to be passed to cmake:
 
 `cmake ../fruitymesh -DBUILD_FEATURESETS=ON -DGCC_PATH="C:/path/to/gcc-arm-none-eabi-4_9" -G "Unix Makefiles"`
 

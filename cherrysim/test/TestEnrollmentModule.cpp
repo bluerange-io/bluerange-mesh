@@ -39,12 +39,12 @@
 TEST(TestEnrollmentModule, TestCommands) {
     //Configure a clc sink and a mesh clc beacon
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    //testerConfig.verbose = true;
 
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
     simConfig.nodeConfigName.insert( { "prod_clc_mesh_nrf52", 1 } );
     simConfig.SetToPerfectConditions();
-    testerConfig.verbose = false;
 
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
@@ -52,7 +52,7 @@ TEST(TestEnrollmentModule, TestCommands) {
     tester.SimulateUntilClusteringDone(100 * 1000);
 
     //First, enroll the mesh node into a different network
-    tester.SendTerminalCommand(0, "action 0 enroll basic %s 123 456 11:22:33:44:55:66:77:88:11:22:33:44:55:66:77:88", tester.sim->nodes[1].gs.config.GetSerialNumber());
+    tester.SendTerminalCommandToAllNodes("action 0 enroll basic %s 123 456 11:22:33:44:55:66:77:88:11:22:33:44:55:66:77:88", tester.sim->FindUniqueNodeByTerminalId(2)->gs.config.GetSerialNumber());
 
     tester.SimulateForGivenTime(50000);
 
@@ -61,7 +61,7 @@ TEST(TestEnrollmentModule, TestCommands) {
     ASSERT_TRUE(tester.sim->nodes[1].gs.node.configuration.nodeId == 123);
 
     //Next, press the button for two seconds and check if the node entered to unenrolled state
-    tester.SendButtonPress(1, 1, 23);
+    tester.SendButtonPress(2, 1, 23);
 
     tester.SimulateUntilMessageReceived(100 * 1000, 2, "Unenrollment successful");
 
@@ -392,5 +392,229 @@ TEST(TestEnrollmentModule, TestRequestProposals) {
         SimulationMessage(2, "{\"nodeId\":1,\"type\":\"request_proposals\",\"serialNumbers\":[\"BBBBD\", \"BBBBF\", \"BBBBG\", \"BBBBH\", \"BBBBJ\", \"BBBBK\", \"BBBBL\", \"BBBBM\", \"BBBBN\", \"BBBBP\", \"BBBBQ\"], \"module\":5,\"requestHandle\":0}"),
     };
     tester.SimulateUntilMessagesReceived(10 * 1000, messages);
+}
+#endif
+
+#if defined(PROD_SINK_USB_NRF52840)
+//This test should make sure that we can configure a featureset to only use a temporary enrollment
+//that is not persisted in flash
+TEST(TestEnrollmentModule, TestTemporaryEnrollment) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+
+    simConfig.nodeConfigName.insert({ "prod_sink_usb_nrf52840", 1 });
+    simConfig.SetToPerfectConditions();
+    //testerConfig.verbose = true;
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    //Set the default network id to 0
+    tester.sim->nodes[0].uicr.CUSTOMER[9] = 0;
+
+    tester.Start();
+
+    // #####
+    // ##### Make sure that we have an unenrolled node
+    // #####
+
+    //Make sure the node is not enrolled by default
+    tester.SendTerminalCommand(1, "status");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Enrolled 0: networkId:0");
+
+    // #####
+    // ##### Enroll the node in a test network
+    // ##### => Make sure it is enrolled after the reboot
+    // #####
+
+    //printf("\n\n\n\n############################ STEP 1 ##########################\n\n\n\n" EOL);
+
+    //NodeKey AA...., UserBaseKey BB...., OrgaKey CC......
+    tester.SendTerminalCommand(1, "action this enroll basic BBBBB 2 123 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:00 BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:00 CC:CC:CC:CC:CC:CC:CC:CC:CC:CC:CC:CC:CC:CC:CC:00");
+
+    //Give the node some time to enroll and reboot
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":2,"type":"enroll_response_serial","module":5,"requestId":0,"serialNumber":"BBBBB","code":0})");
+
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Reboot reason");
+
+    //Make sure the node is now properly enrolled
+    tester.SendTerminalCommand(1, "status");
+
+    std::vector<SimulationMessage> messages = {
+        SimulationMessage(1, "Node BBBBB (nodeId: 2)"),
+        SimulationMessage(1, "Enrolled 1: networkId:123, deviceType:3, NetKey AA:AA:....:AA:00, UserBaseKey BB:BB:....:BB:00"),
+    };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messages);
+
+    //printf("\n\n\n\n############################ STEP 2 ##########################\n\n\n\n" EOL);
+
+    // #####
+    // ##### Use set_serial to assign a different serial number to the node (bridge mode)
+    // ##### => Make sure Enrollment is still available
+    // #####
+
+    tester.SendTerminalCommand(1, "set_serial CCCCC");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Reboot reason was 20");
+
+    tester.SendTerminalCommand(1, "status");
+
+    messages = {
+        SimulationMessage(1, "Node CCCCC (nodeId: 2)"),
+        SimulationMessage(1, "Enrolled 1: networkId:123, deviceType:3, NetKey AA:AA:....:AA:00, UserBaseKey BB:BB:....:BB:00"),
+    };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messages);
+
+    //printf("\n\n\n\n############################ STEP 3 ##########################\n\n\n\n" EOL);
+
+    // #####
+    // ##### Use set_nodekey to assign a different node key to the node (bridge mode)
+    // ##### => Make sure Enrollment is still available
+    // #####
+
+    tester.SendTerminalCommand(1, "set_node_key DD:DD:DD:DD:DD:DD:DD:DD:DD:DD:DD:DD:DD:DD:DD:00");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Node Key set");
+
+    tester.SendTerminalCommand(1, "status");
+
+    messages = {
+        SimulationMessage(1, "Node CCCCC \\(nodeId: 2\\) vers: \\d+, NodeKey: DD:DD:....:DD:00"),
+        SimulationMessage(1, "Enrolled 1: networkId:123, deviceType:3, NetKey AA:AA:....:AA:00, UserBaseKey BB:BB:....:BB:00"),
+    };
+    tester.SimulateUntilRegexMessagesReceived(10 * 1000, messages);
+
+    //printf("\n\n\n\n############################ STEP 4 ##########################\n\n\n\n" EOL);
+
+    // #####
+    // ##### Do another soft reset
+    // ##### => Make sure Enrollment, node key and serial number are still available
+    // #####
+
+    tester.SendTerminalCommand(1, "reset");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Reboot reason was 7");
+
+    tester.SendTerminalCommand(1, "status");
+
+    messages = {
+        SimulationMessage(1, "Node CCCCC \\(nodeId: 2\\) vers: \\d+, NodeKey: DD:DD:....:DD:00"),
+        SimulationMessage(1, "Enrolled 1: networkId:123, deviceType:3, NetKey AA:AA:....:AA:00, UserBaseKey BB:BB:....:BB:00"),
+    };
+    tester.SimulateUntilRegexMessagesReceived(10 * 1000, messages);
+
+    //printf("\n\n\n\n############################ STEP 5 ##########################\n\n\n\n" EOL);
+
+    // #####
+    // ##### Simulate a power loss
+    // ##### => Make sure Enrollment is gone
+    // #####
+
+    {
+        NodeIndexSetter setter(0);
+        tester.sim->ResetCurrentNode(RebootReason::UNKNOWN, false, true);
+        tester.SimulateForGivenTime(1 * 1000);
+    }
+
+    //Check that the enrollment is gone after a power loss
+    tester.SendTerminalCommand(1, "status");
+
+    messages = {
+        SimulationMessage(1, "Node BBBBB \\(nodeId: 1\\) vers: \\d+, NodeKey: 01:00:....:00:00"),
+        SimulationMessage(1, "Enrolled 0: networkId:0, deviceType:3, NetKey 04:00:....:00:00, UserBaseKey FF:FF:....:FF:FF"),
+    };
+    tester.SimulateUntilRegexMessagesReceived(10 * 1000, messages);
+
+    //printf("\n\n\n\n############################ STEP 6 ##########################\n\n\n\n" EOL);
+
+    // #####
+    // ##### Enroll Again
+    // ##### => Make sure enrollment works again
+    // #####
+
+    //NodeKey AA...., UserBaseKey BB...., OrgaKey CC......
+    tester.SendTerminalCommand(1, "action this enroll basic BBBBB 2 123 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:00 BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:00 CC:CC:CC:CC:CC:CC:CC:CC:CC:CC:CC:CC:CC:CC:CC:00");
+
+    //Give the node some time to enroll and reboot
+    tester.SimulateForGivenTime(10 * 1000);
+
+    //Make sure the node is now properly enrolled
+    tester.SendTerminalCommand(1, "status");
+    messages = {
+        SimulationMessage(1, "Node BBBBB (nodeId: 2)"),
+        SimulationMessage(1, "Enrolled 1: networkId:123, deviceType:3, NetKey AA:AA:....:AA:00, UserBaseKey BB:BB:....:BB:00"),
+    };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messages);
+
+    //printf("\n\n\n\n############################ STEP 7 ##########################\n\n\n\n" EOL);
+
+    // #####
+    // ##### Unenroll
+    // ##### => Make sure enrollment is gone
+    // #####
+
+    tester.SendTerminalCommand(1, "action this enroll remove BBBBB");
+
+    //Check that the unenrollment message is generated
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"remove_enroll_response_serial","module":5,"requestId":0,"serialNumber":"BBBBB","code":0})");
+
+    //Next, it must reboot
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Reboot reason was 16");
+
+    //Make sure the node is now properly enrolled
+    tester.SendTerminalCommand(1, "status");
+
+    messages = {
+        SimulationMessage(1, "Node BBBBB \\(nodeId: 1\\) vers: \\d+, NodeKey: 01:00:....:00:00"),
+        SimulationMessage(1, "Enrolled 0: networkId:0, deviceType:3, NetKey 04:00:....:00:00, UserBaseKey FF:FF:....:FF:FF"),
+    };
+    tester.SimulateUntilRegexMessagesReceived(10 * 1000, messages);
+
+}
+#endif
+
+#ifdef PROD_SINK_USB_NRF52840
+//This test makes sure that a factory reset is triggered if there is a persistent
+//enrollment on a node but its featureset specifies that it should not use persistence
+//This is mostly relevant for migration
+TEST(TestEnrollmentModule, TestFactoryResetForTemporaryEnrollment)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+
+    simConfig.nodeConfigName.insert({ "prod_sink_usb_nrf52840", 1 });
+    simConfig.SetToPerfectConditions();
+    testerConfig.verbose = true;
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    //Set the default network id to 0
+    tester.sim->nodes[0].uicr.CUSTOMER[9] = 0;
+
+    //Write an enrollment in the flash config
+    NodeConfiguration config;
+    CheckedMemset(&config, 0x00, sizeof(config));
+    config.moduleId = ModuleId::NODE;
+    config.moduleVersion = NODE_MODULE_CONFIG_VERSION;
+    config.moduleActive = 1;
+    config.enrollmentState = EnrollmentState::ENROLLED;
+    config.nodeId = 1;
+    config.networkId = 123;
+    config.bleAddress.addr_type = FruityHal::BleGapAddrType::INVALID;
+    STATIC_ASSERT_SIZE(config, 68); //Must be changed once the configuration changes
+    NodeIndexSetter setter(0);
+    tester.sim->WriteRecordToFlash((u16)ModuleId::NODE, (u8*)&config, sizeof(config));
+
+
+    tester.Start();
+
+    //First, make sure our stored enrollment was available
+    tester.SendTerminalCommand(1, "status");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Enrolled 1: networkId:123");
+
+    //Next, the node should reboot because of a FACTORY_RESET
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Reboot reason was 30");
+
+    //After the reboot, the enrollment should be gone
+    tester.SendTerminalCommand(1, "status");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Enrolled 0: networkId:0");
 }
 #endif

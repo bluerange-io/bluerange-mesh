@@ -124,6 +124,16 @@ struct BleGapAddr
 public:
     BleGapAddrType addr_type;
     BleGapAddrBytes addr;
+
+    constexpr bool operator==(const BleGapAddr &other) const
+    {
+        return addr_type == other.addr_type && addr == other.addr;
+    }
+
+    constexpr bool operator!=(const BleGapAddr &other) const
+    {
+        return !operator==(other);
+    }
 };
 
 struct BleGapScanParams

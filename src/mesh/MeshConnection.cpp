@@ -483,7 +483,7 @@ void MeshConnection::DataSentHandler(const u8 * data, MessageLength length, u32 
 #ifdef SIM_ENABLED
             correctionTicksSuccessfullyWritten = true;
 #endif
-            correctionTicks = GS->timeManager.GetTimePoint() - syncSendingOrdered;
+            correctionTicks = GS->timeManager.GetLocalTimePoint() - syncSendingOrdered;
         }
     }
 }

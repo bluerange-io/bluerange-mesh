@@ -203,7 +203,7 @@ void BootFruityMesh()
 //    Logger::GetInstance().EnableTag("VSMOD");
     Logger::GetInstance().EnableTag("VSDBG");
 //    Logger::GetInstance().EnableTag("VSCOMM");
-    Logger::GetInstance().EnableTag("ASMOD");
+//    Logger::GetInstance().EnableTag("ASMOD");
 //    Logger::GetInstance().EnableTag("GYRO");
 //    Logger::GetInstance().EnableTag("EVENTS");
 //    Logger::GetInstance().EnableTag("SC");

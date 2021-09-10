@@ -57,6 +57,7 @@ void SetFeaturesetConfiguration_github_sink_nrf52(ModuleConfiguration* config, v
     {
         Conf::GetInstance().defaultLedMode = LedMode::CONNECTIONS;
         Conf::GetInstance().terminalMode = TerminalMode::JSON;
+        Conf::GetInstance().enableMeshBridgeMode = true;
     }
     else if (config->moduleId == ModuleId::NODE)
     {

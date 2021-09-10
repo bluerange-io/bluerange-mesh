@@ -320,8 +320,8 @@ u16 Utility::ByteToAsciiHex(u8 b) {
 }
 
 //Converts a series of 2,4,6 or 8 hex-chars to an unsigned int
-u32 Utility::ByteFromAsciiHex(char* asciiHex, u8 numChars){
-    char* h = asciiHex;
+u32 Utility::ByteFromAsciiHex(const char* asciiHex, u8 numChars){
+    const char* h = asciiHex;
     //convert x tuples
     u32 result = 0;
     for(int i=0; i<numChars; i+=2){
@@ -331,12 +331,16 @@ u32 Utility::ByteFromAsciiHex(char* asciiHex, u8 numChars){
             byte += (h[i] - 48) << 4;
         } else if(h[i] >= 65 && h[i] <= 90){
             byte += (h[i] - 55) << 4;
+        } else if(h[i] >= 97 && h[i] <= 122){
+            byte += (h[i] - 87) << 4;
         }
         //Convert and add second char
         if(h[i+1] >= 48 && h[i+1] <= 57){
             byte += (h[i+1] - 48);
         } else if(h[i+1] >= 65 && h[i+1] <= 90){
             byte += (h[i+1] - 55);
+        } else if(h[i+1] >= 97 && h[i+1] <= 122){
+            byte += (h[i+1] - 87);
         }
 
         result |= byte << i*4;

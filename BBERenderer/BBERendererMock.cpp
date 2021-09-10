@@ -59,9 +59,9 @@ bbe::Vector3 BBERenderer::clusterIdToColor(ClusterId id) const
     return bbe::Vector3{0, 0, 0};
 }
 
-u32 BBERenderer::getClosestIndexToMouse() const
+i32 BBERenderer::getClosestIndexToMouse() const
 {
-    u32 closestIndex = 0;
+    i32 closestIndex = 0;
     return closestIndex;
 }
 

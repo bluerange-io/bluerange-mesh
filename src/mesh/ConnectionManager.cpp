@@ -1597,7 +1597,7 @@ void ConnectionManager::TimerEventHandler(u16 passedTimeDs)
             {
                 alignas(u32) TimeSyncInitial dataToSend = GS->timeManager.GetTimeSyncIntialMessage(conn->partnerId);
 
-                conn->syncSendingOrdered = GS->timeManager.GetTimePoint();
+                conn->syncSendingOrdered = GS->timeManager.GetLocalTimePoint();
 
                 logt("TSYNC", "Sending out TimeSyncInitial, NodeId: %u, partner: %u", (u32)GS->node.configuration.nodeId, (u32)conn->partnerId);
 

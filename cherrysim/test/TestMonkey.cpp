@@ -434,6 +434,9 @@ void StartTestMonkey(bool onlyValidCommands, bool allCommandsInOrder, bool reduc
     Exceptions::ExceptionDisabler<InternalTerminalCommandErrorException> internalTerminalCommandErrorException;
     // Added this as sendMeshMessage may return error which in turn will cause log error exception
     Exceptions::ExceptionDisabler<ErrorLoggedException> ErrorLoggedException;
+    Exceptions::ExceptionDisabler<JsonParseException> JsonParseExceptionException;
+    // The tester creates commands with random target terminal ids
+    Exceptions::ExceptionDisabler<InvalidTerminalIdException> disableInvalidTerminalIdException;
     Exceptions::DisableDebugBreakOnException antiDebugBreak;
     constexpr u32 amountOfNodes = 3;
 

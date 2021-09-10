@@ -303,20 +303,15 @@ The node includes functionality to send sensor messages and actuator messages in
 
 [#TimeSynchronization]
 == Time Synchronization
-To synchronize a time over the mesh, the
-time needs first to be set on the local node using the _settime_ command.
-The time is stored internally as an unsigned 32-bit integer.
+To synchronize a time over the mesh, the time needs first to be set on the local node using the _settime_ command. The time is stored internally as an unsigned 32-bit integer together with an additional variable that stores the extra number of crystal ticks for better accuracy. The number of offset minutes is used to pass additional time zone information, e.g. pass 120 to get a time zone offset of 2 hours.
 
 `settime [u32 unixTimestampSec] [i16 offsetMinutes]`
 
-Afterwards, the time of the local node can be queried using:
+Afterwards, the local time of the local node can be queried on the terminal using:
 
 `gettime`
 
-The output gives the current time and date of the node in a
-human-readable format. This is only an approximate
-calculation. It is just to verify if the time was set correctly.
-Internally, the nodes work with Unix time stamps.
+The output gives the local time and date of the node in a human-readable format. This is only an approximate calculation. It is just to verify if the time was set correctly. Internally, the nodes work with Unix time stamps.
 
 [#queryingActiveModules]
 == Querying Active Modules

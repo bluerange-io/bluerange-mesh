@@ -36,24 +36,29 @@
 #include <mini-printf.h>
 
 #ifdef SIM_ENABLED
+#include <CherrySim.h>
 #include "json.hpp"
 #endif
 
 // Size for tracing messages to the log transport, if it is too short, messages will get truncated
 constexpr size_t TRACE_BUFFER_SIZE = 500;
 
-Logger::Logger()
+Logger::Logger() : errorLog{}
 {
-    CheckedMemset(errorLog, 0, sizeof(errorLog));
 }
 
-Logger & Logger::GetInstance()
+Logger &Logger::GetInstance()
 {
     return GS->logger;
 }
 
 void Logger::Log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJsonEvent, const char* file, i32 line, const char* message, ...)
 {
+#ifdef SIM_ENABLED
+    //Early return improves the simulator performance if the terminal is not active in the simulator
+    if (!GS->terminal.IsTermActive()) return;
+#endif
+
     char mhTraceBuffer[TRACE_BUFFER_SIZE] = {};
 
     //Variable argument list must be passed to vnsprintf
@@ -99,7 +104,9 @@ void Logger::Log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJs
         }
 
 #ifdef SIM_ENABLED
-        currentString += mhTraceBuffer;
+        //Accumulate the messages in another buffer used for validating the json content
+        //This is only enabled if stdout is active to improve performance
+        if(Terminal::stdioActive) currentString += mhTraceBuffer;
 #endif
         log_transport_putstring(mhTraceBuffer);
 
@@ -111,8 +118,13 @@ void Logger::Log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJs
                 currentJsonCrc = 0;
             }
 #ifdef SIM_ENABLED
-            nlohmann::json j = nlohmann::json::parse(currentString);
-            currentString = "";
+            //Check that we have a valid json
+            //As this costs quite a bit of performance it is only enabled if stdout is active
+            if (Terminal::stdioActive) {
+                nlohmann::json j = nlohmann::json::parse(currentString, nullptr, false);
+                if(j.is_discarded()) SIMEXCEPTION(JsonParseException);
+                currentString = "";
+            }
 #endif
         }
 
@@ -124,6 +136,11 @@ void Logger::Log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJs
 
 void Logger::LogTag_f(LogType logType, const char* file, i32 line, const char* tag, const char* message, ...) const
 {
+#ifdef SIM_ENABLED
+    //Early return improves the simulator performance if the terminal is not active in the simulator
+    if (!GS->terminal.IsTermActive()) return;
+#endif
+
 #if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
     if (
             //UART communication (json mode)
@@ -266,6 +283,11 @@ void Logger::EnableTag(const char* tag)
 
 bool Logger::IsTagEnabled(const char* tag) const
 {
+#ifdef SIM_ENABLED
+    //Early return improves the simulator performance if the terminal is not active in the simulator
+    if (!GS->terminal.IsTermActive()) return false;
+#endif
+
 #if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
 
     if (strcmp(tag, "ERROR") == 0 || strcmp(tag, "WARNING") == 0) {
@@ -401,24 +423,6 @@ TerminalCommandHandlerReturnType Logger::TerminalCommandHandler(const char* comm
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-    else if (TERMARGS(0, "errors"))
-    {
-        for(int i=0; i<errorLogPosition; i++){
-            if(errorLog[i].errorType == LoggingError::HCI_ERROR)
-            {
-                trace("HCI %u %s @%u" EOL, errorLog[i].errorCode, Logger::GetHciErrorString((FruityHal::BleHciError)errorLog[i].errorCode), errorLog[i].timestamp);
-            }
-            else if(errorLog[i].errorType == LoggingError::GENERAL_ERROR)
-            {
-                trace("GENERAL %u %s @%u" EOL, errorLog[i].errorCode, Logger::GetGeneralErrorString((ErrorType)errorLog[i].errorCode), errorLog[i].timestamp);
-            } else {
-                trace("CUSTOM %u %u @%u" EOL, (u32)errorLog[i].errorType, errorLog[i].errorCode, errorLog[i].timestamp);
-            }
-        }
-
-        return TerminalCommandHandlerReturnType::SUCCESS;
-    }
-
 #endif
     return TerminalCommandHandlerReturnType::UNKNOWN;
 }
@@ -613,6 +617,8 @@ const char* Logger::GetErrorLogCustomError(CustomErrorTypes type)
         return "INFO_UPTIME_ABSOLUTE";
     case CustomErrorTypes::COUNT_WARN_RX_WRONG_DATA:
         return "COUNT_WARN_RX_WRONG_DATA";
+    case CustomErrorTypes::WATCHDOG_REBOOT:
+        return "WATCHDOG_REBOOT";
     default:
         SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
         return "UNKNOWN_ERROR";
@@ -888,9 +894,39 @@ const char* Logger::GetErrorLogRebootReason(RebootReason type)
         return "FACTORY_RESET_FAILED";
     case RebootReason::FACTORY_RESET_SUCCEEDED_FAILSAFE:
         return "FACTORY_RESET_SUCCEEDED_FAILSAFE";
+    case RebootReason::SET_SERIAL_SUCCESS:
+        return "SET_SERIAL_SUCCESS";
+    case RebootReason::SET_SERIAL_FAILED:
+        return "SET_SERIAL_FAILED";
+    case RebootReason::SEND_TO_BOOTLOADER:
+        return "SEND_TO_BOOTLOADER";
+    case RebootReason::UNKNOWN_BUT_BOOTED:
+        return "UNKNOWN_BUT_BOOTED";
+    case RebootReason::STACK_OVERFLOW:
+        return "STACK_OVERFLOW";
+    case RebootReason::NO_CHUNK_FOR_NEW_CONNECTION:
+        return "NO_CHUNK_FOR_NEW_CONNECTION";
+    case RebootReason::IMPLEMENTATION_ERROR_NO_QUEUE_SPACE_AFTER_CHECK:
+        return "IMPLEMENTATION_ERROR_NO_QUEUE_SPACE_AFTER_CHECK";
+    case RebootReason::IMPLEMENTATION_ERROR_SPLIT_WITH_NO_LOOK_AHEAD:
+        return "IMPLEMENTATION_ERROR_SPLIT_WITH_NO_LOOK_AHEAD";
+    case RebootReason::CONFIG_MIGRATION:
+        return "CONFIG_MIGRATION";
+    case RebootReason::DEVICE_OFF:
+        return "DEVICE_OFF";
+    case RebootReason::DEVICE_WAKE_UP:
+        return "DEVICE_WAKE_UP";
+    case RebootReason::FACTORY_RESET:
+        return "FACTORY_RESET";
     default:
-        SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
-        return "UNDEFINED";
+        {
+            if(type >= RebootReason::USER_DEFINED_START && type < RebootReason::USER_DEFINED_END){
+                return "USER_DEFINED";
+            }
+
+            SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
+            return "UNDEFINED";
+        }
     }
 #else
     return nullptr;
@@ -947,13 +983,7 @@ void Logger::BlePrettyPrintAdvData(SizedData advData) const
 
 void Logger::LogError(LoggingError errorType, u32 errorCode, u32 extraInfo)
 {
-    errorLog[errorLogPosition].errorType = errorType;
-    errorLog[errorLogPosition].errorCode = errorCode;
-    errorLog[errorLogPosition].extraInfo = extraInfo;
-    errorLog[errorLogPosition].timestamp = GS->node.IsInit() ? GS->timeManager.GetTime() : 0;
-
-    //Will fill the error log until the last entry (last entry does get overwritten with latest value)
-    if(errorLogPosition < NUM_ERROR_LOG_ENTRIES-1) errorLogPosition++;
+    errorLog.PushError(ErrorLogEntry{errorType, errorCode, extraInfo, GS->node.IsInit() ? GS->timeManager.GetUtcTime() : 0});
 }
 
 void Logger::LogCustomError(CustomErrorTypes customErrorType, u32 extraInfo)
@@ -961,25 +991,10 @@ void Logger::LogCustomError(CustomErrorTypes customErrorType, u32 extraInfo)
     LogError(LoggingError::CUSTOM, (u32)customErrorType, extraInfo);
 }
 
-//can be called multiple times and will increment the extra each time this happens
+// can be called multiple times and will increment the extra each time this happens
 void Logger::LogCount(LoggingError errorType, u32 errorCode, u32 amount)
 {
-    //Check if the erroLogEntry exists already and increment the extra if yes
-    for (u32 i = 0; i < errorLogPosition; i++) {
-        if (errorLog[i].errorType == errorType && errorLog[i].errorCode == errorCode) {
-            errorLog[i].extraInfo += amount;
-            return;
-        }
-    }
-
-    //Create the entry
-    errorLog[errorLogPosition].errorType = errorType;
-    errorLog[errorLogPosition].errorCode = errorCode;
-    errorLog[errorLogPosition].extraInfo = amount;
-    errorLog[errorLogPosition].timestamp = GS->timeManager.GetTime();
-
-    //Will fill the error log until the last entry (last entry does get overwritten with latest value)
-    if (errorLogPosition < NUM_ERROR_LOG_ENTRIES - 1) errorLogPosition++;
+    errorLog.PushCount(ErrorLogEntry{errorType, errorCode, amount, GS->node.IsInit() ? GS->timeManager.GetUtcTime() : 0});
 }
 
 void Logger::LogCustomCount(CustomErrorTypes customErrorType, u32 amount)
@@ -987,8 +1002,13 @@ void Logger::LogCustomCount(CustomErrorTypes customErrorType, u32 amount)
     LogCount(LoggingError::CUSTOM, (u32)customErrorType, amount);
 }
 
-const char* base64Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-void convertBase64Block(const u8 * srcBuffer, u32 blockLength, char* dstBuffer)
+bool Logger::PopErrorLogEntry(ErrorLogEntry &entry)
+{
+    return errorLog.PopEntry(entry);
+}
+
+const char *base64Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+void convertBase64Block(const u8 *srcBuffer, u32 blockLength, char *dstBuffer)
 {
     if (blockLength == 0 || blockLength > 3) {
         //blockLength must be 1, 2 or 3

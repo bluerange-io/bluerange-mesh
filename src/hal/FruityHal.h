@@ -458,6 +458,9 @@ namespace FruityHal
     ErrorType TwiRead(u8 slaveAddress, u8 * pReceiveData, u8 length);
     bool TwiIsInitialized(void);
     void TwiGpioAddressPinSetAndWait(bool high, i32 sdaPin);
+    void TwiUninit();
+    void TwiStart(i32 sclPin, i32 sdaPin);
+    void TwiStop();
 
     //spi
     void SpiInit(i32 sckPin, i32 misoPin, i32 mosiPin);

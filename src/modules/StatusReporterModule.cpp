@@ -127,7 +127,7 @@ void StatusReporterModule::TimerEventHandler(u16 passedTimeDs)
         if(timeSinceLastPeriodicTimeSendDs > TIME_BETWEEN_PERIODIC_TIME_SENDS_DS){
             timeSinceLastPeriodicTimeSendDs = 0;
 
-            constexpr size_t bufferSize = sizeof(ComponentMessageHeader) + sizeof(GS->timeManager.GetTime());
+            constexpr size_t bufferSize = sizeof(ComponentMessageHeader) + sizeof(GS->timeManager.GetLocalTime());
             alignas(u32) u8 buffer[bufferSize];
             CheckedMemset(buffer, 0x00, sizeof(buffer));
 
@@ -143,10 +143,15 @@ void StatusReporterModule::TimerEventHandler(u16 passedTimeDs)
             outPacket->componentHeader.component = (u16)StatusReporterModuleComponent::TIME;
             outPacket->componentHeader.registerAddress = (u16)StatusReporterModuleRegister::TIME;
 
-            *(decltype(GS->timeManager.GetTime())*)outPacket->payload = GS->timeManager.GetTime();
+            *(decltype(GS->timeManager.GetLocalTime())*)outPacket->payload = GS->timeManager.GetLocalTime();
 
             GS->cm.SendMeshMessage(buffer, bufferSize);
         }
+    }
+
+    if (SHOULD_IV_TRIGGER(GS->appTimerDs, passedTimeDs, 5)) // deciseconds
+    {
+        GetErrorsTickHandler();
     }
 }
 
@@ -355,47 +360,71 @@ void StatusReporterModule::SendRebootReason(NodeId toNode, u8 requestHandle) con
         false
     );
 }
-void StatusReporterModule::SendErrors(NodeId toNode, u8 requestHandle) const
+
+void StatusReporterModule::SendErrors(NodeId toNode, u8 requestHandle)
 {
+    auto &logger = Logger::GetInstance();
 
     //If our time is synced we report the absolute uptime, otherwhise the relative uptime is all we know
-    if (GS->timeManager.IsTimeSynced()) {
-        GS->logger.LogCustomError(CustomErrorTypes::INFO_UPTIME_ABSOLUTE, GS->timeManager.GetTime());
-    }
-    else {
-        GS->logger.LogCustomError(CustomErrorTypes::INFO_UPTIME_RELATIVE, DS_TO_SEC(GS->appTimerDs));
-    }
+    CustomErrorTypes timeSyncType = GS->timeManager.IsTimeSynced() ? CustomErrorTypes::INFO_UPTIME_ABSOLUTE : CustomErrorTypes::INFO_UPTIME_RELATIVE;
+    logger.LogCustomError(timeSyncType, GS->timeManager.GetUtcTime());
 
 #ifndef SIM_ENABLED
     //Also report how big the stack grew.
-    GS->logger.LogCustomError(CustomErrorTypes::INFO_UNUSED_STACK_BYTES, Utility::GetAmountOfUnusedStackBytes());
+    logger.LogCustomError(CustomErrorTypes::INFO_UNUSED_STACK_BYTES, Utility::GetAmountOfUnusedStackBytes());
 #endif
 
-    //Log another error so that we know this is the last entry of the error log
-    GS->logger.LogCustomError(CustomErrorTypes::INFO_ERRORS_REQUESTED, GS->logger.errorLogPosition);
+    // Log another error so that we know this is the last entry of the error log
+    logger.LogCustomError(CustomErrorTypes::INFO_ERRORS_REQUESTED,
+                          Logger::GetInstance().GetErrorLog().Size());
 
-    StatusReporterModuleErrorLogEntryMessage data;
-    for(int i=0; i< GS->logger.errorLogPosition; i++){
-        data.errorType = (u8)GS->logger.errorLog[i].errorType;
-        data.extraInfo = GS->logger.errorLog[i].extraInfo;
-        data.errorCode = GS->logger.errorLog[i].errorCode;
-        data.timestamp = GS->logger.errorLog[i].timestamp;
-
-        SendModuleActionMessage(
-            MessageType::MODULE_ACTION_RESPONSE,
-            toNode,
-            (u8)StatusModuleActionResponseMessages::ERROR_LOG_ENTRY,
-            requestHandle,
-            (u8*)&data,
-            SIZEOF_STATUS_REPORTER_MODULE_ERROR_LOG_ENTRY_MESSAGE,
-            false
-        );
-    }
-
-    //Reset the error log
-    GS->logger.errorLogPosition = 0;
+    // Setup the fields required by GetErrorsTickHandler for sending the entries to the node which
+    // requested them.
+    getErrorsCurrentDestination = toNode;
+    getErrorsCurrentRequestHandle = requestHandle;
+    getErrorsRemainingPops = logger.GetErrorLog().Size();
 }
 
+void StatusReporterModule::GetErrorsTickHandler()
+{
+    if (getErrorsCurrentDestination == NODE_ID_INVALID)
+    {
+        return;
+    }
+
+    if (getErrorsRemainingPops > 0)
+    {
+        ErrorLogEntry entry = {};
+
+        if (Logger::GetInstance().PopErrorLogEntry(entry))
+        {
+            --getErrorsRemainingPops;
+
+            StatusReporterModuleErrorLogEntryMessage data;
+            data.errorType = static_cast<u8>(entry.errorType);
+            data.extraInfo = entry.extraInfo;
+            data.errorCode = entry.errorCode;
+            data.timestamp = entry.timestamp;
+
+            SendModuleActionMessage(
+                    MessageType::MODULE_ACTION_RESPONSE, getErrorsCurrentDestination,
+                    (u8) StatusModuleActionResponseMessages::ERROR_LOG_ENTRY, getErrorsCurrentRequestHandle,
+                    (u8 *) &data, SIZEOF_STATUS_REPORTER_MODULE_ERROR_LOG_ENTRY_MESSAGE, false);
+        }
+        else
+        {
+            // Popping failed, meaning that the error log is empty. Someone has removed entries
+            // from the error log besides us.
+            getErrorsRemainingPops = 0;
+        }
+    }
+
+    // Check if there are more entries to send.
+    if (getErrorsRemainingPops == 0)
+    {
+        getErrorsCurrentDestination = NODE_ID_INVALID;
+    }
+}
 
 void StatusReporterModule::SendLiveReport(LiveReportTypes type, u16 requestHandle, u32 extra, u32 extra2) const
 {
@@ -1139,4 +1168,23 @@ MeshAccessAuthorization StatusReporterModule::CheckMeshAccessPacketAuthorization
 bool StatusReporterModule::IsInterestedInMeshAccessConnection()
 {
     return IsPeriodicTimeSendActive();
+}
+
+CapabilityEntry StatusReporterModule::GetCapability(u32 index, bool firstCall)
+{
+    logt("STATUSMOD", "Status module capability request %u", (u32)index);
+
+    if (index == 0) {
+        // metadata of periodic test used for factory test with actuator SET_PERIODIC_TEST controlling IsPeriodicTimeSendActive()
+        CapabilityEntry retVal;
+        CheckedMemset(&retVal, 0, sizeof(retVal));
+        retVal.type = CapabilityEntryType::METADATA;
+        strcpy(retVal.manufacturer, "M-Way Solutions GmbH");
+        strcpy(retVal.modelName, "BlueRange Node Status");
+        strcpy(retVal.revision, "0");
+        return retVal;
+    }
+
+    // end of capabilities
+    return Module::GetCapability(index, firstCall);
 }

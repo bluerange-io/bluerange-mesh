@@ -28,7 +28,7 @@ information.
 WARNING are always printed.)
 * *debug all* : Toggles logging of all messages, no matter what their
 tag is (these are a lot of messages).
-* *settime [unix timestamp]*: Sets the time for the current node.
+* *settime [unix timestamp] [offset minutes]*: Sets the time for the current node.
 * *sendtime*: Broadcasts the current time over the mesh.
 * *gettime*: Displays the current time.
 * *startterm*: Displays a prompt and echos back the user's input

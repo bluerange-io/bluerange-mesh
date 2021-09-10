@@ -117,6 +117,7 @@ TEST_P(MultiStackFixture, TestBasicClustering) {
     printf("Average clustering time %d seconds" EOL, clusteringTimeTotalMs / clusteringIterations / 1000);
 }
 
+#if defined(PROD_SINK_NRF52) && defined(PROD_MESH_NRF52)
 //Tests that the exemplary devices.json and site.json for the github release still work
 TEST_P(MultiStackFixture, TestGithubExample) {
     std::string site = CherrySimUtils::GetNormalizedPath() + "/test/res/github_example/site.json";
@@ -172,6 +173,7 @@ TEST_P(MultiStackFixture, TestSinglePointFailureNetwork) {
     constexpr u32 maxRecordedClusteringMedianMs = 48500; //The maximum median recorded over 1000 different seed offsets
     DoClusteringTestImportedFromJson(site, device, 5, 1000 * 1000, maxRecordedClusteringMedianMs * 2, GetParam());
 }
+#endif
 
 TEST(TestClustering, TestClusteringWithManySdBusy) {
     int clusteringTimeTotalMs = 0;
@@ -555,19 +557,19 @@ TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
         tester.Start();
 
         tester.sim->simConfig.terminalId = 0;
-        tester.SendTerminalCommand(0, "debug flash");
+        tester.SendTerminalCommandToAllNodes("debug flash");
         tester.SimulateGivenNumberOfSteps(1);
-        tester.SendTerminalCommand(0, "debug maconn");
+        tester.SendTerminalCommandToAllNodes("debug maconn");
         tester.SimulateGivenNumberOfSteps(1);
-        tester.SendTerminalCommand(0, "debug sec");
+        tester.SendTerminalCommandToAllNodes("debug sec");
         tester.SimulateGivenNumberOfSteps(1);
-        tester.SendTerminalCommand(0, "debug conn");
+        tester.SendTerminalCommandToAllNodes("debug conn");
         tester.SimulateGivenNumberOfSteps(1);
-        tester.SendTerminalCommand(0, "debug node");
+        tester.SendTerminalCommandToAllNodes("debug node");
         tester.SimulateGivenNumberOfSteps(1);
-        tester.SendTerminalCommand(0, "debug rconn");
+        tester.SendTerminalCommandToAllNodes("debug rconn");
         tester.SimulateGivenNumberOfSteps(1);
-        tester.SendTerminalCommand(0, "debug statusmod");
+        tester.SendTerminalCommandToAllNodes("debug statusmod");
         tester.SimulateGivenNumberOfSteps(1);
         
         //Disable terminal again
@@ -600,7 +602,7 @@ TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
                 if (!hopsFound) {
                     if (hopsToSink == conn->hopsToSink) hopsFound = true;
                     else if (conn->hopsToSink != -1) {
-                        FAIL() << "Hops to sink not correct for node " << node->id;
+                        FAIL() << "Hops to sink not correct for node " << node->GetNodeId();
                     }
                 }
                 else {
@@ -618,7 +620,7 @@ TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
                 }
             }
             else if (!hopsFound) {
-                FAIL() << "Wrong hop amount to sink for node " << node->id;
+                FAIL() << "Wrong hop amount to sink for node " << node->GetNodeId();
             }
         }
     }
@@ -659,7 +661,7 @@ TEST(TestClustering, TestVitalPrioQueueFull) {
     ASSERT_TRUE(sim_get_statistics("vitalPrioQueueFull") > 3);
 }
 
-TEST(TestClustering, TestInfluceOfNodeWithWrongNetworkKey) {
+TEST(TestClustering, TestInfluenceOfNodeWithWrongNetworkKey) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 
@@ -681,15 +683,18 @@ TEST(TestClustering, TestInfluceOfNodeWithWrongNetworkKey) {
 
     //Simulate for 200 seconds and see if any exception occurs
     //Reset some nodes every once in a while (connection loss is also included)
-    while (tester.sim->simState.simTimeMs < 200 * 1000) {
+    while (tester.sim->simState.simTimeMs < 200 * 1000)
+    {
         tester.SimulateForGivenTime(10 * 1000);
 
         u32 numNodesToReset = (u32)(PSRNGINT(0, (tester.sim->GetTotalNodes() / 2)));
 
-        auto nodeIdsToReset = CherrySimUtils::GenerateRandomNumbers(1, tester.sim->GetTotalNodes(), numNodesToReset);
+        auto terminalIdsToReset =
+            CherrySimUtils::GenerateRandomNumbers(1, tester.sim->GetTotalNodes(), numNodesToReset);
 
-        for (auto const nodeId : nodeIdsToReset) {
-            tester.SendTerminalCommand(nodeId, "reset");
+        for (auto const terminalId : terminalIdsToReset)
+        {
+            tester.SendTerminalCommand(static_cast<TerminalId>(terminalId), "reset");
         }
     }
 }
@@ -772,7 +777,7 @@ TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
     u32 clusteringTimeoutSec = tester.sim->simState.simTimeMs + 20 * 1000;
     
     // reset all nodes to cause reclustering
-    tester.SendTerminalCommand(0, "reset");
+    tester.SendTerminalCommandToAllNodes("reset");
 
     failCounter = 0;
     while (tester.sim->simState.simTimeMs < timeoutSec) {
@@ -845,7 +850,7 @@ TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
     clusteringTimeoutSec = tester.sim->simState.simTimeMs + 20 * 1000;
 
     // reset all nodes to cause reclustering
-    tester.SendTerminalCommand(0, "reset");
+    tester.SendTerminalCommandToAllNodes("reset");
 
     // Set up fake JOIN_ME packet for node 3
     nodeId = 3;
@@ -916,7 +921,7 @@ TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
     clusteringTimeoutSec = tester.sim->simState.simTimeMs + 30 * 1000;
     
     // reset all nodes to cause reclustering
-    tester.SendTerminalCommand(0, "reset");
+    tester.SendTerminalCommandToAllNodes("reset");
 
     static uint8_t currentFollowedNodeId = 0;
     failCounter = 0;
@@ -997,7 +1002,7 @@ TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
     clusteringTimeoutSec = tester.sim->simState.simTimeMs + 30 * 1000;
     
     // reset all nodes to cause reclustering
-    tester.SendTerminalCommand(0, "reset");
+    tester.SendTerminalCommandToAllNodes("reset");
 
     failCounter = 0;
     clusteringDone = false;

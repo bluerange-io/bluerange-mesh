@@ -258,4 +258,6 @@ The simulator additionally allows the usage of container classes like std::vecto
 FruityMesh is published under the GPLv3 version, which is available in the repository.
 
 == Watchdog timeout handler
-For debugging purposes watchdog timeout handler was implemented. Also added a custom error type `WATCHDOG_REBOOT`. It is reported after watchdog reset with `watchdogExtraInfoFlags` as a extra info.
+For better analysis, the watchdog timeout handler was implemented. This interrupt handler triggers shortly before a watchdog reboot. The result is reported upon next boot by using the custom error type `WATCHDOG_REBOOT`. This error log entry is reported after the reboot reason WATCHDOG and contains a bitmask with extra information. This represents a number of collected runtime information and will be gradually extended. It is helpful to analyse why a device was rebooted by the watchdog.
+
+To decode the watchdog bitmask extra easily, use `watchdogExtraDecoder.py`, found under `util/watchdog`. It can be used directly from the command line. Just pass the extra info as an argument, e.g. `python util/watchdog/watchdogExtraDecoder.py 123`. It can also be run by using an online IDE e.g. https://replit.com/languages/python3 when assigning the extra value directly to the watchdogFlags variable in the beginning of the script.

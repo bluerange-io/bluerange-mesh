@@ -193,6 +193,14 @@ static const char* getBleEventNameString(u16 bleEventId);
 u32 ClearGeneralPurposeRegister(u32 gpregId, u32 mask);
 u32 WriteGeneralPurposeRegister(u32 gpregId, u32 mask);
 static uint32_t sdAppEvtWaitAnomaly87();
+#if IS_ACTIVE(ASSET_MODULE)
+//Both twiTurnOnAnomaly89() and twiTurnOffAnomaly89() is only added if ACTIVATE_ASSET_MODULE is active because currently
+//twi is only activated for ASSET_MODULE so to avoid the cpp warning of unused functions. Tracked in BR-2082.
+#if !defined(SIM_ENABLED)
+static void twiTurnOffAnomaly89();
+static void twiTurnOnAnomaly89();
+#endif //!defined(SIM_ENABLED)
+#endif //IS_ACTIVE(ASSET_MODULE)
 
 #define __________________BLE_STACK_INIT____________________
 // ############### BLE Stack Initialization ########################
@@ -493,6 +501,8 @@ static FruityHal::SystemEvents nrfSystemEventToGeneric(u32 event)
 //Checks for high level application events generated e.g. by low level interrupt events
 void ProcessAppEvents()
 {
+    FruityHal::VirtualComProcessEvents();
+
     for (u32 i = 0; i < GS->numApplicationInterruptHandlers; i++)
     {
         GS->applicationInterruptHandlers[i]();
@@ -638,7 +648,6 @@ void FruityHal::EventLooper()
 {
     GS->eventLooperTriggerTimestamp = GetRtcMs();
 
-    FruityHal::VirtualComProcessEvents();
 
     //Call all main context handlers so that they can do low priority long-running processing
     for (u32 i = 0; i < GS->numMainContextHandlers; i++)
@@ -1915,6 +1924,10 @@ ErrorType FruityHal::GetRandomBytes(u8 * p_data, u8 len)
 
 //################################################
 #define _________________VIRTUAL_COM_PORT_____________________
+
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+static_assert(TERMINAL_READ_BUFFER_LENGTH == VIRTUAL_COM_LINE_BUFFER_SIZE, "Buffer sizes should match");
+#endif
 
 void FruityHal::VirtualComInitBeforeStack()
 {
@@ -3658,6 +3671,42 @@ ErrorType FruityHal::TwiInit(i32 sclPin, i32 sdaPin)
     return nrfErrToGeneric(errCode);
 }
 
+void FruityHal::TwiUninit()
+{
+#ifndef SIM_ENABLED
+    nrf_drv_twi_disable(&twi);
+    nrf_drv_twi_uninit(&twi);
+    NrfHalMemory *halMemory = (NrfHalMemory *)GS->halMemory;
+    halMemory->twiInitDone = false;
+#else
+    cherrySimInstance->currentNode->twiWasInit = false;
+#endif
+}
+
+//Difference between TwiStart and TwiInit is that it first
+//uninitialises Twi afterwards switch off and later switch on
+//TWI register and then initialises twi. This should be used
+//When Twi and gpiote both are configured, so we avoid unwanted
+//power consumption due to twi bus register
+void FruityHal::TwiStart(i32 sclPin, i32 sdaPin)
+{
+#ifndef SIM_ENABLED
+    TwiUninit();
+    twiTurnOnAnomaly89();
+    TwiInit(sclPin, sdaPin);
+#endif
+}
+
+//Manually switch off twi register so we are not consuming power when not being 
+//used. TwiStart() should be used to restart the twi bus if we want to switch
+//it back on
+void FruityHal::TwiStop()
+{
+#ifndef SIM_ENABLED
+    twiTurnOffAnomaly89();
+#endif
+}
+
 void FruityHal::TwiGpioAddressPinSetAndWait(bool high, i32 sdaPin)
 {
 #ifndef SIM_ENABLED
@@ -3691,7 +3740,10 @@ ErrorType FruityHal::TwiRegisterWrite(u8 slaveAddress, u8 const * pTransferData,
         return nrfErrToGeneric(errCode);
     }
     // wait for transmission complete
-    while(halMemory->twiXferDone == false);
+    while(halMemory->twiXferDone == false)
+    {
+        sdAppEvtWaitAnomaly87();
+    }
     halMemory->twiXferDone = false;
 #endif
     return nrfErrToGeneric(errCode);
@@ -3715,7 +3767,10 @@ ErrorType FruityHal::TwiRegisterRead(u8 slaveAddress, u8 reg, u8 * pReceiveData,
     }
 
     // wait for transmission and read complete
-    while(halMemory->twiXferDone == false);
+    while(halMemory->twiXferDone == false)
+    {
+        sdAppEvtWaitAnomaly87();
+    }
     halMemory->twiXferDone = false;
 #endif
     return nrfErrToGeneric(errCode);
@@ -3746,7 +3801,10 @@ ErrorType FruityHal::TwiRead(u8 slaveAddress, u8 * pReceiveData, u8 length)
     }
 
     // wait for transmission and read complete
-    while (halMemory->twiXferDone == false);
+    while (halMemory->twiXferDone == false)
+    {
+        sdAppEvtWaitAnomaly87();
+    }
     halMemory->twiXferDone = false;
 #endif
     return nrfErrToGeneric(errCode);
@@ -4340,3 +4398,53 @@ static uint32_t sdAppEvtWaitAnomaly87()
 
     return sd_app_evt_wait();
 }
+
+#if IS_ACTIVE(ASSET_MODULE)
+//Both twiTurnOnAnomaly89() and twiTurnOffAnomaly89() is only added if ACTIVATE_ASSET_MODULE is active because currently
+//twi is only activated for ASSET_MODULE so to avoid the cpp warning of unused functions. Tracked in BR-2082.
+#if !defined(SIM_ENABLED)
+/// Implements fix for anomaly 89 (CPU:Consumes static current
+/// when using GPIOTE and TWI togther
+/// https://infocenter.nordicsemi.com/topic/errata_nRF52832_EngC/ERR/nRF52832/EngineeringC/latest/anomaly_832_89.html
+static void twiTurnOnAnomaly89()
+{
+    switch (TWI_INSTANCE_ID)
+    {
+        case 0:
+            // The intermediate read is required due to the issue explained in the
+            // [Application Note 321 ARM Cortex-M Programming Guide to Memory Barrier Instructions](https://developer.arm.com/documentation/dai0321/a/)
+            // on section 3.6, page 18, look for 'The memory barrier instructions DMB and DSB'.
+            // In a nutshell it flushes a write-cache internal to the CPU which could swallow
+            // the first write.
+            *(volatile uint32_t *)(0x40003000 + 0xFFC) = 0;
+            *(volatile uint32_t *)(0x40003000 + 0xFFC);
+            *(volatile uint32_t *)(0x40003000 + 0xFFC) = 1;
+            break;
+        case 1:
+            *(volatile uint32_t *)(0x40004000 + 0xFFC) = 0;
+            *(volatile uint32_t *)(0x40004000 + 0xFFC);
+            *(volatile uint32_t *)(0x40004000 + 0xFFC) = 1;
+            break;
+        default:
+            logt("ERROR", "Invalid TWI instance");
+    }
+}
+/// Implements fix for anomaly 89 (CPU:Consumes static current
+/// when using GPIOTE and TWI togther
+/// https://infocenter.nordicsemi.com/topic/errata_nRF52832_EngC/ERR/nRF52832/EngineeringC/latest/anomaly_832_89.html
+static void twiTurnOffAnomaly89()
+{
+    switch (TWI_INSTANCE_ID)
+    {
+        case 0:
+            *(volatile uint32_t *)(0x40003000 + 0xFFC) = 0;
+            break;
+        case 1:
+            *(volatile uint32_t *)(0x40004000 + 0xFFC) = 0;
+            break;
+        default:
+            logt("ERROR", "Invalid TWI instance");
+    }
+}
+#endif //!defined(SIM_ENABLED)
+#endif //IS_ACTIVE(ASSET_MODULE)

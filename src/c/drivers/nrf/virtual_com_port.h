@@ -30,8 +30,14 @@
 
 #pragma once
 
+#if __cplusplus
+extern "C" {
+#endif
+
+#include <stdint.h>
+
 //Maximum size of input received as one line
-#define VIRTUAL_COM_LINE_BUFFER_SIZE 250
+#define VIRTUAL_COM_LINE_BUFFER_SIZE 300
 
 
 uint32_t virtualComInit();
@@ -43,3 +49,7 @@ uint32_t virtualComCheck();
 uint32_t virtualComCheckAndProcessLine(uint8_t* buffer, uint16_t bufferLength);
 
 uint32_t virtualComWriteData(const uint8_t* buffer, uint16_t bufferLength);
+
+#if __cplusplus
+};
+#endif

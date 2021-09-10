@@ -101,6 +101,7 @@
 //Some config stuff
 //#define ACTIVATE_LOGGING
 #define ACTIVATE_STDIO 1
+#define ACTIVATE_SOCKET_TERM 1
 
 
 #include <stdint.h>
@@ -557,7 +558,6 @@ typedef struct {
     lis2dh12_read_ptr   read_reg;
     /** Customizable optional pointer **/
     void *handle;
-    bool moving;
 } lis2dh12_ctx_t;
 
 typedef struct {
@@ -682,6 +682,8 @@ typedef union {
 #define PROPERTY_ENABLE            0x01
 #define PROPERTY_DISABLE        0x00
 #define WATERMARK_LEVEL            0x1E
+
+bool is_lis2dh12_moving_in_simulation();
 int32_t lis2dh12_device_id_get(lis2dh12_ctx_t *ctx, uint8_t *buff);
 int32_t lis2dh12_fifo_mode_set(lis2dh12_ctx_t *ctx, lis2dh12_fm_t val);
 int32_t lis2dh12_write_reg(lis2dh12_ctx_t* ctx, uint8_t reg, uint8_t* data,

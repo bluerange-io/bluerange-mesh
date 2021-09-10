@@ -125,6 +125,8 @@ class IoModule: public Module
 
         void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader) override final;
 
+        MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData * sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) override final;
+
         #ifdef TERMINAL_ENABLED
         TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
         #endif

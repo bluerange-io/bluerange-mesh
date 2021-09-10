@@ -210,14 +210,11 @@ class GlobalState
         bool inPullEventsLoop;
         bool safeBootEnabled;
 
+        //Temporary Enrollment
+        TemporaryEnrollment* temporaryEnrollmentPtr;
+
         u8 scanBuffer[BLE_GAP_SCAN_PACKET_BUFFER_SIZE];
 
-#ifdef SIM_ENABLED
-        RamRetainStruct ramRetainStruct;
-        RamRetainStruct ramRetainStructPreviousBoot;
-        u32 rebootMagicNumber;
-        u32 watchdogExtraInfoFlags;
-#endif
         RamRetainStruct * ramRetainStructPreviousBootPtr;
 
         FruityHal::UartEventHandler   uartEventHandler = nullptr;

@@ -37,9 +37,6 @@
 #include "MersenneTwister.h"
 #include "json.hpp"
 #include "MoveAnimation.h"
-#if IS_ACTIVE(CLC_MODULE)
-#include "ClcMock.h"
-#endif //ACTIVATE_CLC_MODULE
 
 extern "C" {
 #include <ble_hci.h>
@@ -233,19 +230,18 @@ struct InterruptSettings
 
 struct FeaturesetPointers;
 
+using TerminalId = std::uint32_t;
+
 struct NodeEntry {
     u32 index;
-    int id;
     float x = 0;
     float y = 0;
     float z = 0;
+    bool jsonDataImported = false;
     std::string nodeConfiguration = "";
     FeaturesetPointers* featuresetPointers = nullptr;
     FruityHal::BleGapAddr address;
     GlobalState gs;
-#if IS_ACTIVE(CLC_MODULE)
-    ClcMock clcMock;
-#endif //ACTIVATE_CLC_MODULE
     NRF_FICR_Type ficr;
     NRF_UICR_Type uicr;
     NRF_GPIO_Type gpio;
@@ -301,6 +297,38 @@ struct NodeEntry {
     bool timeslotCloseSessionRequested = false;
     bool timeslotRequested = false;
     bool timeslotActive = false;
+
+    //This memory is retained in the RAM during soft reboots but will be lost
+    //If the node is powered off and on again
+    struct {
+        RamRetainStruct ramRetainStruct;
+        RamRetainStruct ramRetainStructPreviousBoot;
+        u32 rebootMagicNumber;
+        u32 watchdogExtraInfoFlags;
+        TemporaryEnrollment temporaryEnrollment;
+    } retainedRamMemory;
+
+    float GetXinMeters() const;
+    float GetYinMeters() const;
+    float GetZinMeters() const;
+
+    void Initialize(u32 nodeIndex);
+
+    [[nodiscard]] constexpr NodeId GetNodeId() const
+    {
+        return this->gs.node.configuration.nodeId;
+    }
+
+    [[nodiscard]] constexpr NetworkId GetNetworkId() const
+    {
+        return this->gs.node.configuration.networkId;
+    }
+
+    [[nodiscard]] constexpr TerminalId GetTerminalId() const
+    {
+        return static_cast<TerminalId>(this->index + 1);
+    }
+
 };
 
 
@@ -311,6 +339,27 @@ struct SimulatorState {
     u32 globalEventIdCounter = 0;
     u32 globalPacketIdCounter = 0;
 };
+
+struct DevicePosition {
+    double x = 0;
+    double y = 0;
+    double z = 0;
+};
+
+namespace nlohmann {
+    template <>
+    struct adl_serializer<DevicePosition> {
+        static void to_json(nlohmann::json& j, const DevicePosition& p) {
+            j = nlohmann::json{ p.x, p.y, p.z };
+        }
+
+        static void from_json(const nlohmann::json& j, DevicePosition& p) {
+            if (j.size() >= 1) j.at(0).get_to(p.x);
+            if (j.size() >= 2) j.at(1).get_to(p.y);
+            if (j.size() >= 3) j.at(2).get_to(p.z);
+        }
+    };
+}
 
 struct SimConfiguration {
     // CAREFUL!
@@ -346,7 +395,7 @@ struct SimConfiguration {
     bool        logReplayCommands                  = false; //If set, lines are logged out that can be used as input for the replay feature.
     bool        useLogAccumulator                  = false; //If set, all logs are written to CherrySim::logAccumulator
     u32         defaultNetworkId                   = 0;
-    std::vector<std::pair<double, double>> preDefinedPositions;
+    std::vector<DevicePosition> preDefinedPositions;
     bool        rssiNoise                          = false;
     bool        simulateWatchdog                   = false;
     bool        simulateJittering                  = false;

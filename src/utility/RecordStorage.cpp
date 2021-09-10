@@ -103,6 +103,8 @@ RecordStorage & RecordStorage::GetInstance()
 
 RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, ModuleIdWrapper lockDownModule)
 {
+    if (!GS->config.enableRecordStorage) return RecordStorageResultCode::PERSISTENCE_DISABLED;
+
     if (recordStorageLockDown && lockDownModule != lockDownModuleId)
     {
         SIMEXCEPTION(RecordStorageIsLockedDownException);
@@ -113,6 +115,8 @@ RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 da
 
 RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength, ModuleIdWrapper lockDownModule)
 {
+    if (!GS->config.enableRecordStorage) return RecordStorageResultCode::PERSISTENCE_DISABLED;
+
     if (recordStorageLockDown && lockDownModule != lockDownModuleId)
     {
         SIMEXCEPTION(RecordStorageIsLockedDownException);
@@ -143,6 +147,8 @@ RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 da
 
 RecordStorageResultCode RecordStorage::DeactivateRecord(u16 recordId, RecordStorageEventListener* callback, u32 userType, ModuleIdWrapper lockDownModule)
 {
+    if (!GS->config.enableRecordStorage) return RecordStorageResultCode::PERSISTENCE_DISABLED;
+
     if (recordStorageLockDown && lockDownModule != lockDownModuleId)
     {
         SIMEXCEPTION(RecordStorageIsLockedDownException);
@@ -245,7 +251,8 @@ void RecordStorage::SaveRecordInternal(SaveRecordOperation& op)
             //The crc is calculated over the record header and data, excluding the first two byte (crc and flags)
             newRecord->crc = Utility::CalculateCrc8(((u8*)newRecord) + 2, newRecord->recordLength - 2);
             op.stage = RecordStorageSaveStage::CALLBACKS_AND_FINISH;
-            GS->flashStorage.CacheAndWriteData((u32*)newRecord, (u32*)freeSpace, recordLength, this, (u32)FlashUserTypes::DEFAULT);
+            FlashStorageError result = GS->flashStorage.CacheAndWriteData((u32*)newRecord, (u32*)freeSpace, recordLength, this, (u32)FlashUserTypes::DEFAULT);
+            op.op.flashStorageErrorCode = result;
             return;
 
         }
@@ -738,6 +745,25 @@ RecordStorageRecord* RecordStorage::GetRecord(u16 recordId) const
     }
 
     return result;
+}
+
+bool RecordStorage::HasValidRecords()
+{
+    //Go through all pages
+    for (u32 i = 0; i < RECORD_STORAGE_NUM_PAGES; i++)
+    {
+        //Check if this page is active
+        RecordStoragePage& page = getPage(i);
+        if (GetPageState(page) != RecordStoragePageState::ACTIVE) continue;
+
+        //Get first record
+        RecordStorageRecord* record = (RecordStorageRecord*)page.data;
+
+        //Check if it is valid
+        if (IsRecordValid(page, record)) return true;
+    }
+
+    return false;
 }
 
 //Returns a pointer to the free space, otherwise returns nullptr

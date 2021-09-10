@@ -240,6 +240,8 @@ class EnrollmentModule: public Module
 
         void SaveUnenrollment(ConnPacketModuleStart* packet, MessageLength packetLength);
 
+        void CommitTemporaryEnrollment(SaveEnrollmentAction* userData, EnrollmentModuleSaveActions action);
+
         void EnrollmentConnectionConnectedHandler();
 
         void EnrollNodeViaMeshAccessConnection(FruityHal::BleGapAddr& addr, const meshAccessServiceAdvMessage* advMessage);

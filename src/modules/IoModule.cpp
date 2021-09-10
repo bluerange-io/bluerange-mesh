@@ -417,6 +417,53 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
     }
 }
 
+MeshAccessAuthorization IoModule::CheckMeshAccessPacketAuthorization(BaseConnectionSendData *sendData, u8 const *data,
+                                                                     FmKeyId fmKeyId, DataDirection direction)
+{
+    const auto *packet = (ConnPacketHeader const *)data;
+
+    if (packet->messageType == MessageType::MODULE_TRIGGER_ACTION ||
+        packet->messageType == MessageType::MODULE_ACTION_RESPONSE)
+    {
+        const auto *mod = (ConnPacketModule const *)data;
+        if (mod->moduleId == moduleId)
+        {
+            // MeshAccess connections using the organization key are allowed to change the LED mode and trigger
+            // identification.
+            if (fmKeyId == FmKeyId::ORGANIZATION)
+            {
+                if (packet->messageType == MessageType::MODULE_TRIGGER_ACTION)
+                {
+                    switch (mod->actionType)
+                    {
+                    case (u8)IoModuleTriggerActionMessages::SET_LED:
+                    case (u8)IoModuleTriggerActionMessages::SET_IDENTIFICATION:
+                        return MeshAccessAuthorization::WHITELIST;
+
+                    default:
+                        return MeshAccessAuthorization::UNDETERMINED;
+                    }
+                }
+
+                if (packet->messageType == MessageType::MODULE_ACTION_RESPONSE)
+                {
+                    switch (mod->actionType)
+                    {
+                    case (u8)IoModuleActionResponseMessages::SET_LED_RESPONSE:
+                    case (u8)IoModuleActionResponseMessages::SET_IDENTIFICATION_RESPONSE:
+                        return MeshAccessAuthorization::WHITELIST;
+
+                    default:
+                        return MeshAccessAuthorization::UNDETERMINED;
+                    }
+                }
+            }
+        }
+    }
+
+    return MeshAccessAuthorization::UNDETERMINED;
+}
+
 bool IoModule::IsIdentificationActive() const
 {
     // The remaining time is non-zero if and only if identification is

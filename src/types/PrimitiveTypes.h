@@ -264,6 +264,9 @@ enum class RebootReason : u8 {
     CONFIG_MIGRATION = 27,
     DEVICE_OFF = 28,
     DEVICE_WAKE_UP = 29,
+    FACTORY_RESET = 30,
+
+    //INFO: Make sure to add new enum values to the Logger.cpp class
 
     USER_DEFINED_START = 200,
     USER_DEFINED_END = 255,

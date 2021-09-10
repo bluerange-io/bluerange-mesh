@@ -211,7 +211,7 @@ TEST(TestStatusReporterModule, TestHopsToSinkFixing) {
     // get_erros will collect errors from the node but will also clear them
     tester.SendTerminalCommand(2, "action this status get_errors");
     // This must not check for the exact number in "extra" as during meshing and simulation, a different invalid amount of hops may be recorded.
-    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":2,\"code\":44,\"extra\":");
+    tester.SimulateUntilMessageReceived(30 * 1000, 2, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":2,\"code\":44,\"extra\":");
 
     tester.SendTerminalCommand(1, "action max_hops status keep_alive");
     tester.SimulateForGivenTime(1000 * 10);
@@ -386,5 +386,68 @@ TEST(TestStatusReporterModule, TestUptimeReporting) {
     //Now, the absolute time should be reported and should be 5 digits long
     tester.SendTerminalCommand(1, "action 2 status get_errors");
     tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"("type":"error_log_entry","nodeId":2,"module":3,"errType":2,"code":86,"extra":\d\d\d\d\d,"time":\d+,"typeStr":"CUSTOM","codeStr":"INFO_UPTIME_ABSOLUTE")");
+}
 
+TEST(TestStatusReporterModule, TestCapabilitySending) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.SetToPerfectConditions();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateUntilClusteringDone(50 * 1000);
+
+    {
+        // configure the node
+        NodeIndexSetter setter(1);
+        GS->logger.EnableTag("NODE");
+        GS->logger.EnableTag("ERROR");
+        GS->logger.EnableTag("STATUSMOD");
+    }
+
+    tester.SendTerminalCommand(1, "request_capability 2");
+
+    // start of capabilities
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "Capabilities are requested");
+
+    // software capability of Node module
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":\\d+,\"capabilityType\":2,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"BlueRange Node\",\"revision\":\"\\d+.\\d+.\\d+\"\\}");
+    // metadata capability of Status module
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":\\d+,\"capabilityType\":3,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"BlueRange Node Status\",\"revision\":\"0\"\\}");
+
+    // end of capabilities
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"nodeId\":2,\"type\":\"capability_end\",\"amount\":\\d+\\}");
+}
+
+
+TEST(TestStatusReporterModule, TestErrorLogTimes) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.SetToPerfectConditions();
+    simConfig.terminalId = 1;
+    //testerConfig.verbose = true;
+
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    //Simulate for a given long enough time for the two nodes to cluster
+    tester.SimulateForGivenTime(30 * 1000);
+
+    //Make sure that relative time is sent in seconds
+    tester.SendTerminalCommand(1, "action 2 status get_errors");
+    //Wait until we receive an error log entry with a relative time of around 30 seconds
+    tester.SimulateUntilRegexMessageReceived(30 * 1000, 1, R"(error_log_entry.*time":3[0-9],.*INFO_UPTIME_RELATIVE)");
+
+    //Make sure that absolute time is sent as UTC time in seconds, wait a bit until time is synced
+    tester.SendTerminalCommand(1, "settime 10000 120");
+    tester.SimulateForGivenTime(30 * 1000);
+    tester.SendTerminalCommand(1, "action 2 status get_errors");
+    tester.SimulateUntilRegexMessageReceived(30 * 1000, 1, R"(error_log_entry.*time":100[0-9]{2},.*INFO_UPTIME_ABSOLUTE)");
 }

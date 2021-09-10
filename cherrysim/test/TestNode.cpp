@@ -37,6 +37,7 @@
 #include "Config.h"
 #include "Node.h"
 
+#if defined(PROD_SINK_NRF52)
 TEST(TestNode, TestCommands) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
@@ -85,7 +86,7 @@ TEST(TestNode, TestCommands) {
 
     tester.SendTerminalCommand(1, "settime 1337 0");
     tester.SimulateGivenNumberOfSteps(1);
-    ASSERT_EQ(tester.sim->FindNodeById(1)->gs.timeManager.GetTime(), 1337);
+    ASSERT_EQ(tester.sim->FindNodeById(1)->gs.timeManager.GetLocalTime(), 1337);
 
     tester.SendTerminalCommand(1, "gettime");
     tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "Time is currently approx. 1970 years, 1 days, 00h:22m:17s,\\d+ ticks");
@@ -204,6 +205,7 @@ TEST(TestNode, TestCommands) {
     ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[6]), 107);
     ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[7]), 108);
 }
+#endif
 
 TEST(TestNode, TestCRCValidation)
 {

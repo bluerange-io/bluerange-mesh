@@ -624,7 +624,7 @@ void EnrollmentModule::SaveEnrollment(ConnPacketModuleStart* packet, MessageLeng
     //Stop advertising immediately
     GS->advertisingController.Deactivate();
     //Save the new node config to flash
-    GS->recordStorage.SaveRecord(
+    RecordStorageResultCode result = GS->recordStorage.SaveRecord(
         (u16)ModuleId::NODE,
         (u8*)&(GS->node.configuration),
         sizeof(NodeConfiguration),
@@ -633,6 +633,35 @@ void EnrollmentModule::SaveEnrollment(ConnPacketModuleStart* packet, MessageLeng
         (u8*)&userData,
         sizeof(SaveEnrollmentAction),
         Utility::GetWrappedModuleId(moduleId));
+
+    if (result == RecordStorageResultCode::PERSISTENCE_DISABLED) {
+        CommitTemporaryEnrollment(&userData, EnrollmentModuleSaveActions::SAVE_ENROLLMENT_ACTION);
+    }
+
+    logt("ENROLLMOD", "Save Result %u", (u8)result);
+}
+
+void EnrollmentModule::CommitTemporaryEnrollment(SaveEnrollmentAction* userData, EnrollmentModuleSaveActions action)
+{
+    //Store the enrollment data in the .noinit section of the RAM to persist across reboots
+    GS->temporaryEnrollmentPtr->enrollmentState = GS->node.configuration.enrollmentState;
+    GS->temporaryEnrollmentPtr->nodeId = GS->node.configuration.nodeId;
+    GS->temporaryEnrollmentPtr->networkId = GS->node.configuration.networkId;
+    CheckedMemcpy(GS->temporaryEnrollmentPtr->networkKey, GS->node.configuration.networkKey, sizeof(GS->node.configuration.networkKey));
+    CheckedMemcpy(GS->temporaryEnrollmentPtr->userBaseKey, GS->node.configuration.userBaseKey, sizeof(GS->node.configuration.userBaseKey));
+    CheckedMemcpy(GS->temporaryEnrollmentPtr->organizationKey, GS->node.configuration.organizationKey, sizeof(GS->node.configuration.organizationKey));
+
+    GS->temporaryEnrollmentPtr->crc32 = Utility::CalculateCrc32((u8*)GS->temporaryEnrollmentPtr, sizeof(TemporaryEnrollment) - sizeof(u32));
+
+    //In case persistence is disabled, we have a successful temporary enrollment
+    //We need to call the 
+    RecordStorageEventHandler(
+        (u16)ModuleId::NODE,
+        RecordStorageResultCode::SUCCESS,
+        (u32)action,
+        (u8*)userData,
+        sizeof(SaveEnrollmentAction)
+    );
 }
 
 void EnrollmentModule::Unenroll(ConnPacketModule const * packet, MessageLength packetLength)
@@ -733,7 +762,7 @@ void EnrollmentModule::SaveUnenrollment(ConnPacketModuleStart* packet, MessageLe
     userData.requestHandle = packet->requestHandle;
 
     //Save the new node config to flash
-    GS->recordStorage.SaveRecord(
+    RecordStorageResultCode result = GS->recordStorage.SaveRecord(
         (u16)ModuleId::NODE,
         (u8*)&(GS->node.configuration),
         sizeof(NodeConfiguration),
@@ -742,6 +771,12 @@ void EnrollmentModule::SaveUnenrollment(ConnPacketModuleStart* packet, MessageLe
         (u8*)&userData,
         sizeof(SaveEnrollmentAction),
         Utility::GetWrappedModuleId(moduleId));
+
+    if (result == RecordStorageResultCode::PERSISTENCE_DISABLED) {
+        CommitTemporaryEnrollment(&userData, EnrollmentModuleSaveActions::SAVE_REMOVE_ENROLLMENT_ACTION);
+    }
+
+    logt("ENROLLMOD", "Save Result %u", (u8)result);
 }
 
 #define _____________PRE_ENROLLMENT_____________

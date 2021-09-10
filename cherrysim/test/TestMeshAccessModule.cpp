@@ -106,16 +106,21 @@ TEST(TestMeshAccessModule, TestReceivingClusterUpdate)
 }
 #endif //GITHUB_RELEASE
 
-#ifndef GITHUB_RELEASE
+#if defined(PROD_SINK_NRF52)
 TEST(TestMeshAccessModule, TestAdvertisement) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.SetToPerfectConditions();
     simConfig.terminalId = 0;
     //testerConfig.verbose = true;
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
+
+    //We must set the serial or the sink will not broadcast any MeshAccess packets
+    tester.SendTerminalCommand(1, "set_serial BBBBB");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Reboot reason");
 
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("MAMOD");
     tester.sim->FindNodeById(2)->gs.logger.EnableTag("MAMOD");
@@ -124,10 +129,10 @@ TEST(TestMeshAccessModule, TestAdvertisement) {
     tester.SendTerminalCommand(2, "malog");
 
     //Test if we receive the advertisement packets, once with sink 0, once with sink 1.
-    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "Serial BBBBC, Addr 00:00:00:02:00:00, networkId \\d+, enrolled \\d+, sink 0, deviceType 1, connectable \\d+, rssi ");
-    tester.SimulateUntilRegexMessageReceived(10 * 1000, 2, "Serial BBBBB, Addr 00:00:00:01:00:00, networkId \\d+, enrolled \\d+, sink 1, deviceType 3, connectable \\d+, rssi ");
+    tester.SimulateUntilRegexMessageReceived(20 * 1000, 1, "Serial BBBBC, Addr 00:00:00:02:00:00, networkId \\d+, enrolled \\d+, sink 0, deviceType 1, connectable \\d+, rssi ");
+    tester.SimulateUntilRegexMessageReceived(20 * 1000, 2, "Serial BBBBB, Addr 00:00:00:01:00:00, networkId \\d+, enrolled \\d+, sink 1, deviceType 3, connectable \\d+, rssi ");
 }
-#endif //GITHUB_RELEASE
+#endif
 
 #ifndef GITHUB_RELEASE
 TEST(TestMeshAccessModule, TestAdvertisementLegacy)
@@ -233,6 +238,7 @@ TEST(TestMeshAccessModule, TestUnsecureNoneKeyConnection) {
     
 }
 
+#if defined(PROD_SINK_NRF52)
 TEST(TestMeshAccessModule, TestRestrainedAccess) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
@@ -246,14 +252,20 @@ TEST(TestMeshAccessModule, TestRestrainedAccess) {
     tester.sim->nodes[1].uicr.CUSTOMER[9] = 123; // Change default network id of node 2
 
     tester.Start();
-    tester.SendTerminalCommand(2, "set_node_key 00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF");
+
+    //Serial must be set so that the sink advertises MeshAccess broadcasts
+    tester.SendTerminalCommand(1, "set_serial BBBBB");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Reboot reason was");
+
+    tester.SendTerminalCommand(1, "set_node_key 00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF");
     tester.SimulateGivenNumberOfSteps(1);
 
     //Wait for establishing mesh access connection                          5 = FmKeyId::RESTRAINED
-    tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 5 2A:FC:35:99:4C:86:11:48:58:4C:C6:D9:EE:D4:A2:B6");
+    tester.SendTerminalCommand(2, "action this ma connect 00:00:00:01:00:00 5 2A:FC:35:99:4C:86:11:48:58:4C:C6:D9:EE:D4:A2:B6");
 
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Received remote mesh data");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "Received remote mesh data");
 }
+#endif
 
 #ifndef GITHUB_RELEASE
 TEST(TestMeshAccessModule, TestSerialConnect) {
@@ -463,7 +475,7 @@ TEST(TestMeshAccessModule, TestActionViaNetworkKeyRemoteMeshOnNonPartnerNode)
 {
     //Set up a test with two nodes that are close together
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    testerConfig.verbose = true;
+    // testerConfig.verbose = true;
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
     simConfig.preDefinedPositions = { {0.5, 0.5},{0.6, 0.6},{0.7, 0.7} };
@@ -746,3 +758,157 @@ TEST(TestMeshAccessModule, TestMeshAccessConnectionUsingInvalidKeyData)
     // DISCONNECTED).
     tester.SimulateUntilRegexMessageReceived(5000, 1, R"("nodeId":1,"type":"ma_conn_state","module":10,"requestHandle":0,"partnerId":[^,]*,"state":0)");
 }
+
+
+#if defined(PROD_SINK_NRF52) && defined(PROD_SINK_USB_NRF52840)
+TEST(TestMeshAccessModule, TestMeshBridgeMode) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+    simConfig.SetToPerfectConditions();
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_sink_usb_nrf52840", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    //By default all nodes are unenrolled
+    tester.sim->nodes[0].uicr.CUSTOMER[9] = 0;
+    tester.sim->nodes[1].uicr.CUSTOMER[9] = 0;
+    tester.sim->nodes[2].uicr.CUSTOMER[9] = 0;
+
+    tester.Start();
+
+    //Third node is used to monitor the MeshAccessBroadcast messages of the other two nodes
+    tester.SendTerminalCommand(3, "malog");
+
+    //Enroll both sink nodes in a different network
+    tester.SendTerminalCommand(1, "action this enroll basic BBBBB 1 123 AA:BB:CC:DD:AA:BB:CC:DD:AA:BB:CC:DD:AA:BB:CC:DD");
+    tester.SendTerminalCommand(2, "action this enroll basic BBBBC 1 234 AA:BB:CC:DD:AA:BB:CC:DD:AA:BB:CC:DD:AA:BB:CC:DD");
+
+    //Make sure both are not broadcasting any meshaccess messages
+    {
+        Exceptions::DisableDebugBreakOnException ddboe;
+
+        std::vector<SimulationMessage> messages = {
+            SimulationMessage(3, "Serial BBBBB, Addr 00:00:00:01:00:00, networkId 123"),
+            SimulationMessage(3, "Serial BBBBC, Addr 00:00:00:02:00:00, networkId 234"),
+        };
+        ASSERT_THROW(tester.SimulateUntilMessagesReceived(10 * 1000, messages), TimeoutException);
+        ASSERT_FALSE(messages[0].IsFound());
+        ASSERT_FALSE(messages[1].IsFound());
+    }
+
+    //Set the serial for both nodes
+    tester.SendTerminalCommand(1, "set_serial CCCCC");
+    tester.SendTerminalCommand(2, "set_serial DDDDD");
+
+    //Make sure they are now advertising MeshAccesBroadcast messages
+    std::vector<SimulationMessage> messages = {
+        SimulationMessage(3, "Serial CCCCC, Addr 00:00:00:01:00:00, networkId 123"),
+        SimulationMessage(3, "Serial DDDDD, Addr 00:00:00:02:00:00, networkId 234"),
+    };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messages);
+
+    //Do a soft reset
+    tester.SendTerminalCommand(1, "reset");
+    tester.SendTerminalCommand(2, "reset");
+
+    //Make sure they are still broadcasting mesh access messages
+    messages = {
+        SimulationMessage(3, "Serial CCCCC, Addr 00:00:00:01:00:00, networkId 123"),
+        SimulationMessage(3, "Serial DDDDD, Addr 00:00:00:02:00:00, networkId 234"),
+    };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messages);
+
+    //Simulate a power loss for both sink nodes
+    {
+        NodeIndexSetter setter(0);
+        tester.sim->ResetCurrentNode(RebootReason::UNKNOWN, false, true);
+    }
+    {
+        NodeIndexSetter setter(1);
+        tester.sim->ResetCurrentNode(RebootReason::UNKNOWN, false, true);
+    }
+    tester.SimulateForGivenTime(1 * 1000);
+
+    //Only prod_sink_nrf52 should broadcast packets now as it remembers its enrollment, prod_sink_usb_nrf52840 uses a temporary enrollment
+    tester.SimulateUntilMessageReceived(10 * 1000, 3, "Serial CCCCC, Addr 00:00:00:01:00:00, networkId 123");
+    {
+        Exceptions::DisableDebugBreakOnException ddboe;
+        ASSERT_THROW(tester.SimulateUntilMessageReceived(10 * 1000, 3, "Serial DDDDD, Addr 00:00:00:02:00:00, networkId 234"), TimeoutException);
+        ASSERT_THROW(tester.SimulateUntilMessageReceived(10 * 1000, 3, "Serial BBBBC, Addr 00:00:00:02:00:00, networkId 234"), TimeoutException);
+    }
+}
+
+//This tests that ma serial_connect works when the BLE address is specified as well
+TEST(TestMeshAccessModule, TestSerialConnectWithBleAddress) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+    simConfig.preDefinedPositions = { {0.45, 0.45}, {0.5, 0.5}, {0.55, 0.55} };
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_asset_nrf52", 1 });
+    simConfig.SetToPerfectConditions();
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    //Enroll all in the same network with same orga key
+    tester.SendTerminalCommand(1, "action this enroll basic BBBBB 1 10 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33");
+    tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33");
+    tester.SendTerminalCommand(3, "action this enroll basic BBBBD 33123 10 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33");
+
+    //Wait until rebooted and clustered
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Reboot");
+    tester.SimulateUntilClusteringDone(100 * 1000);
+
+    //Tell node 2 to use serial_connect to connect to the asset tag
+    tester.SendTerminalCommand(1, "action 2 ma serial_connect BBBBD 4 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 33123 10 7 00:00:00:03:00:00");
+
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "Doing instant serial_connect to BLE address");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"type":"serial_connect_response","module":10,"nodeId":2,"requestHandle":7,"code":0,"partnerId":33123})");
+
+    //Make sure we can properly send and receive data from the asset tag
+    tester.SendTerminalCommand(1, "action 33123 status get_device_info");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"("serialNumber":"BBBBD")");
+}
+
+//This tests that the ma serial_connect will fall back to scanning even if the wrong BLE address is given
+TEST(TestMeshAccessModule, TestSerialConnectWithWrongBleAddress) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+    simConfig.preDefinedPositions = { {0.45, 0.45}, {0.5, 0.5}, {0.55, 0.55} };
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_asset_nrf52", 1 });
+    simConfig.SetToPerfectConditions();
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    //Enroll all in the same network with same orga key
+    tester.SendTerminalCommand(1, "action this enroll basic BBBBB 1 10 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33");
+    tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33");
+    tester.SendTerminalCommand(3, "action this enroll basic BBBBD 33123 10 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33");
+
+    //Wait until rebooted and clustered
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Reboot");
+    tester.SimulateUntilClusteringDone(100 * 1000);
+
+    //Tell node 2 to use serial_connect to connect to the asset tag
+    tester.SendTerminalCommand(1, "action 2 ma serial_connect BBBBD 4 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 33123 10 7 AB:CD:EF:12:34:56");
+
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "Doing instant serial_connect to BLE address");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"type":"serial_connect_response","module":10,"nodeId":2,"requestHandle":7,"code":0,"partnerId":33123})");
+
+    //Make sure we can properly send and receive data from the asset tag
+    tester.SendTerminalCommand(1, "action 33123 status get_device_info");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"("serialNumber":"BBBBD")");
+}
+#endif

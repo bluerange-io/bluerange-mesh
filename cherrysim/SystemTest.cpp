@@ -494,6 +494,13 @@ extern "C"
         return NRF_SUCCESS;
     }
 
+    bool is_lis2dh12_moving_in_simulation()
+    {
+        //Check if the node was moved within the last 100ms
+        return cherrySimInstance->currentNode->lastMovementSimTimeMs != 0
+            && cherrySimInstance->currentNode->lastMovementSimTimeMs + 100 >= cherrySimInstance->simState.simTimeMs;
+    }
+
 
     int32_t lis2dh12_device_id_get(lis2dh12_ctx_t *ctx, uint8_t *buff)
     {
@@ -644,14 +651,18 @@ extern "C"
             return (int32_t)ErrorType::NULL_ERROR;
         }
         axis3bit16_t* buffer = (axis3bit16_t*)buff;
-        if (ctx->moving)
+
+        //Check if there was movement in the last 100ms
+        if (is_lis2dh12_moving_in_simulation())
         {
+            //TODO: Use realistic values
             buffer->i16bit[0] = (i16)cherrySimInstance->simState.rnd.NextU32();
             buffer->i16bit[1] = (i16)cherrySimInstance->simState.rnd.NextU32();
             buffer->i16bit[2] = (i16)cherrySimInstance->simState.rnd.NextU32();
         }
         else
         {
+            //TODO: Use realistic values
             buffer->i16bit[0] = 0;
             buffer->i16bit[1] = 0;
             buffer->i16bit[2] = 0;
@@ -1358,10 +1369,8 @@ extern "C"
         s1.globalId = cherrySimInstance->simState.globalEventIdCounter++;
         s1.bleEvent.header.evt_id = BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST;
         s1.bleEvent.header.evt_len = s1.globalId;
-        s1.bleEvent.evt.gattc_evt.conn_handle = connHandle;
+        s1.bleEvent.evt.gatts_evt.conn_handle = connHandle;
         s1.bleEvent.evt.gatts_evt.params.exchange_mtu_request.client_rx_mtu = clientRxMtu;
-        ble_gap_addr_t address = CherrySim::Convert(&cherrySimInstance->currentNode->address);
-        CheckedMemcpy(&s1.bleEvent.evt.gap_evt.params.sec_info_request.peer_addr, &address, sizeof(ble_gap_addr_t));
 
         connection->partner->eventQueue.push_back(s1);
 
@@ -1403,15 +1412,17 @@ extern "C"
 
         connection->connectionMtu = serverRxMtu - FruityHal::ATT_HEADER_SIZE;
 
+
         simBleEvent s1;
         CheckedMemset(&s1, 0, sizeof(s1));
         s1.globalId = cherrySimInstance->simState.globalEventIdCounter++;
         s1.bleEvent.header.evt_id = BLE_GATTC_EVT_EXCHANGE_MTU_RSP;
         s1.bleEvent.header.evt_len = s1.globalId;
         s1.bleEvent.evt.gattc_evt.conn_handle = connHandle;
+        s1.bleEvent.evt.gattc_evt.error_handle = BLE_GATT_HANDLE_INVALID;
+        s1.bleEvent.evt.gattc_evt.gatt_status = BLE_GATT_STATUS_SUCCESS;
         s1.bleEvent.evt.gattc_evt.params.exchange_mtu_rsp.server_rx_mtu = serverRxMtu;
-        ble_gap_addr_t address = CherrySim::Convert(&cherrySimInstance->currentNode->address);
-        CheckedMemcpy(&s1.bleEvent.evt.gap_evt.params.sec_info_request.peer_addr, &address, sizeof(ble_gap_addr_t));
+
   
         connection->partner->eventQueue.push_back(s1);
 

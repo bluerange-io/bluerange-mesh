@@ -159,12 +159,12 @@ enum class MeshAccessSerialConnectError : u8 {
         u8 key[16];
         NodeId nodeIdAfterConnect;
         u32 connectionInitialKeepAliveSeconds;
-
-        bool operator==(const MeshAccessModuleSerialConnectMessage& other) const;
-        bool operator!=(const MeshAccessModuleSerialConnectMessage& other) const;
-
+        FruityHal::BleGapAddr targetAddress;
     };
-    STATIC_ASSERT_SIZE(MeshAccessModuleSerialConnectMessage, 30);
+    STATIC_ASSERT_SIZE(MeshAccessModuleSerialConnectMessage, 37);
+
+    constexpr int SIZEOF_MA_MODULE_SERIAL_CONNECT_MESSAGE_V1 = 30;
+    constexpr int SIZEOF_MA_MODULE_SERIAL_CONNECT_MESSAGE_V2 = 37;
 
     struct MeshAccessModuleSerialConnectResponse
     {
@@ -222,7 +222,7 @@ class MeshAccessModule: public Module
         bool logNearby;
         char logWildcard[6];
 
-        MeshAccessModuleSerialConnectMessage meshAccessSerialConnectMessage;
+        MeshAccessModuleSerialConnectMessage latestMeshAccessSerialConnectMessage;
         u32 meshAccessSerialConnectMessageReceiveTimeDs = 0;
         static constexpr u32 meshAccessSerialConnectMessageTimeoutDs = SEC_TO_DS(15);
         NodeId meshAccessSerialConnectSender = 0;

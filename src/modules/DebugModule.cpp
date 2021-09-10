@@ -123,7 +123,7 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
 #if IS_ACTIVE(TIME_SYNC_TEST_CODE) && !defined(SIM_ENABLED)
 
     /*When time is synced, this will switch on green led after every 10 sec for 2 sec from the start of the minute*/
-    u32 seconds = GS->timeManager.GetTime();
+    u32 seconds = GS->timeManager.GetLocalTime();
     char timestring[80];
     if (seconds % 60 == 0 && !syncTest && GS->timeManager.IsTimeSynced()) {
         //Enable LED
@@ -138,7 +138,7 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
     if (syncTest)
     {
         if (seconds % 10 == 0) {
-            GS->timeManager.convertTimestampToString(timestring);
+            GS->timeManager.convertLocalTimeToString(timestring);
 
             trace("Time is currently %s" EOL, timestring);
 
@@ -1117,8 +1117,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
                 logt("DEBUGMOD", "Resetting connection loss counter");
 
                 GS->node.connectionLossCounter = 0;
-                GS->logger.errorLogPosition = 0;
-
+                Logger::GetInstance().GetErrorLog().Reset();
             }
             else if (actionType == DebugModuleTriggerActionMessages::SEND_MAX_MESSAGE) {
                 DebugModuleSendMaxMessageResponse message;

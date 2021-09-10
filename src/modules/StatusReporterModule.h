@@ -272,13 +272,21 @@ private:
         u8 number_of_adc_channels;
         i16 m_buffer[BATTERY_SAMPLES_IN_BUFFER];
 
+        NodeId getErrorsCurrentDestination = NODE_ID_INVALID;
+        u8 getErrorsCurrentRequestHandle = 0;
+        u32 getErrorsRemainingPops = 0;
+
         void SendStatus(NodeId toNode, u8 requestHandle, MessageType messageType) const;
         void SendDeviceInfoV2(NodeId toNode, u8 requestHandle, MessageType messageType) const;
         void SendNearbyNodes(NodeId toNode, u8 requestHandle, MessageType messageType);
         void SendAllConnections(NodeId toNode, u8 requestHandle, MessageType messageType) const;
         constexpr static u32 CONNECTION_INDEX_INVALID = 0xFFFFFFFF;
         void SendAllConnectionsVerbose(NodeId toNode, u8 requestHandle, u32 connectionIndex) const;
-        void SendErrors(NodeId toNode, u8 requestHandle) const;
+
+        void SendErrors(NodeId toNode, u8 requestHandle);
+        void GetErrorsTickHandler();
+        NO_DISCARD bool GetErrorsTrySendPendingEntry() const;
+
         void SendRebootReason(NodeId toNode, u8 requestHandle) const;
 
         void StartConnectionRSSIMeasurement(MeshConnection& connection) const;
@@ -332,5 +340,8 @@ private:
         MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) override final;
 
         bool IsInterestedInMeshAccessConnection() override final;
+
+        // Device Capabilities
+        CapabilityEntry GetCapability(u32 index, bool firstCall) override final;
 };
 

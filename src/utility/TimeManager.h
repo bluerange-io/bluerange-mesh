@@ -70,23 +70,38 @@ private:
 public:
     TimeManager();
 
-    u32 GetTime();
-    TimePoint GetTimePoint();
+    //Returns the UTC time in seconds
+    //either since the node has started or the absolute unix timestamp if the time was synced
+    u32 GetUtcTime();
+
+    //Returns the Local time in seconds (uses the time offset)
+    //either since the node has started or the absolute unix timestamp if the time was synced
+    u32 GetLocalTime();
+
+    //Similar to GetLocalTime, but will additionally return the number of extra crystal ticks that can be added to the full seconds
+    TimePoint GetLocalTimePoint();
+
+    //Allows to set the time
     void SetTime(u32 syncTime, u32 timeSinceSyncTime, i16 offset, u32 additionalTicks = 0);
     void SetTime(const TimeSyncInitial& timeSyncIntitialMessage);
     void SetTime(const TimeSyncInterNetwork& timeSyncInterNetwork);
+
+    //Checks if the time has ever been synced
     bool IsTimeSynced() const;
+
+    //Checks if the sync has received an additional time correction
     bool IsTimeCorrected() const;
 
     void AddTicks(u32 ticks);
     void AddCorrection(u32 ticks);
+
     void ProcessTicks();
     
     void HandleUpdateTimestampMessages(ConnPacketHeader const * packetHeader, MessageLength dataLength);
 
     //Trivial implementation for converting the timestamp in human readable format
     //This does not pay respect to any leap seconds, gap years, whatever
-    void convertTimestampToString(char* buffer);
+    void convertLocalTimeToString(char* buffer);
 
     TimeSyncInitial GetTimeSyncIntialMessage(NodeId receiver) const;
     TimeSyncInterNetwork GetTimeSyncInterNetworkMessage(NodeId receiver) const;

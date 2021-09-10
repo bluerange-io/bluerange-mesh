@@ -111,6 +111,18 @@ TEST(TestUtility, TestGenerateBeaconSerialForIndex) {
     ASSERT_EQ(serial.serialIndex, (1 << 31) | (0x2 << 15) | (3));
 }
 
+TEST(TestUtility, TestByteToAsciiHex) {
+    ASSERT_EQ(Utility::ByteToAsciiHex(0xAB), 0x4241);
+    ASSERT_EQ(Utility::ByteToAsciiHex(0x9A), 0x4139);
+    ASSERT_EQ(Utility::ByteToAsciiHex(0x12), 0x3231);
+}
+
+TEST(TestUtility, TestByteFromAsciiHex) {
+    ASSERT_EQ(Utility::ByteFromAsciiHex("01234567", 8), 0x67452301);
+    ASSERT_EQ(Utility::ByteFromAsciiHex("89ABCDEF", 8), 0xEFCDAB89);
+    ASSERT_EQ(Utility::ByteFromAsciiHex("89abcdef", 8), 0xEFCDAB89);
+}
+
 TEST(TestUtility, TestIsPowerOfTwo) {
     for (u32 i = 0; i < 32; i++) {
         ASSERT_TRUE(Utility::IsPowerOfTwo(1ul << i));

@@ -657,4 +657,47 @@ TEST(TestMoveAnimation, TestLoadFromFile)
         ASSERT_NEAR(tester.sim->nodes[1].z, 0.0, acceptableError);
     }
 }
+
+
+//Lets an asset tag move from left to right while also increasing its z coordinate
+TEST(TestMoveAnimation, TestMovementZ) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 6 });
+    simConfig.nodeConfigName.insert({ "prod_asset_nrf52", 1 });
+    simConfig.terminalId = 0;
+    simConfig.mapWidthInMeters = 10;
+    simConfig.mapHeightInMeters = 10;
+    simConfig.mapElevationInMeters = 50;
+    simConfig.preDefinedPositions = {
+        {0.5, 0.5},
+        {0.0, 0.1, 0.0}, {0.2, 0.1, 0.2}, {0.4, 0.1, 0.4}, {0.6, 0.1, 0.6}, {0.8, 0.1, 0.8}, {1.0, 0.1, 1.0},
+        {0.2, 0.2, 0}
+    };
+    //testerConfig.verbose = true;
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    //tester.sim->nodes[1].uicr.CUSTOMER[1] = 20; //Set the asset tab board id to an id that supports Accelerometer
+    tester.Start();
+
+    Exceptions::DisableDebugBreakOnException disabler;
+
+    //RSSI of the asset should be around -60
+    tester.SendTerminalCommand(2, "malog BBBBK");
+    tester.SimulateUntilRegexMessageReceived(20 * 1000, 2, "Serial BBBBK.*rssi -6\\d");
+
+    //No mesh access message should be received by a node that is positioned very high in the building
+    tester.SendTerminalCommand(7, "malog BBBBK");
+    ASSERT_THROW(tester.SimulateUntilRegexMessageReceived(20 * 1000, 7, "Serial BBBBK, Addr"), TimeoutException);
+    
+    //We move the asset tag to the upmost floor
+    tester.SendTerminalCommand(1, "sim animation create animation_a");
+    tester.SendTerminalCommand(1, "sim animation add_keypoint animation_a 0.4 0.4 1.0 5");
+    tester.SendTerminalCommand(1, "sim animation start BBBBK animation_a");
+
+    //The node on the highest floor should now receive the messages
+    tester.SimulateUntilRegexMessageReceived(20 * 1000, 7, "Serial BBBBK.*rssi -7\\d");
+}
+
 #endif

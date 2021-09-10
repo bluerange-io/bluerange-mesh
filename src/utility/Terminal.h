@@ -157,6 +157,12 @@ public:
 #endif
     bool IsCrcChecksEnabled();
 
+#ifdef SIM_ENABLED
+    //Used to improve the performance to only execute some calls in the simulator
+    //if the mentioned terminal is active
+    bool IsTermActive();
+#endif
+
     //##### UART ######
 #if IS_ACTIVE(UART)
 private:
@@ -188,13 +194,31 @@ public:
 
     //###### Stdio ######
 #if IS_ACTIVE(STDIO)
+public:
+    static bool stdioActive;
+
+private:
+    bool TryProcessSimulatorCommand(const std::string &command);
+
+    void LogReplayCommand(const std::string &command);
+
 private:
     void StdioInit();
     void StdioCheckAndProcessLine();
+
 public:
     void PutIntoTerminalCommandQueue(std::string &message, bool skipCrc);
     bool GetNextTerminalQueueEntry(TerminalCommandQueueEntry &out);
     void StdioPutString(const char* message);
+
+#endif
+
+    //###### Socket Term ######
+    //The SocketTerm implements TCP socket based communication for the CherrySim
+    //This makes it possible to connect to multiple nodes at the same time
+#if IS_ACTIVE(SOCKET_TERM)
+private:
+    void SocketTermCheckAndProcessLine();
 
 #endif
 

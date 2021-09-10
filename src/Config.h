@@ -58,7 +58,7 @@ class RecordStorageEventListener;
 #define FM_VERSION_MINOR 0
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 1220
+#define FM_VERSION_PATCH 1700
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -357,6 +357,17 @@ class Conf
         NodeId defaultNodeId = 0;
         //Used to set a static random BLE address (loaded from DeviceConfiguration if type set to 0xFF)
         FruityHal::BleGapAddr staticAccessAddress;
+        
+        //By default, the RecordStorage library is used to persist settings in flash, this can be disabled.
+        //If disabled, enrollments will be stored in RAM across soft reboots
+        //The enrollment will be lost after power was lost for a short time
+        bool enableRecordStorage = true;
+
+        //Set this to true in your featureset to use the node as a mesh bridge (e.g. attached to a gateway)
+        //It is then possible to overwrite its serial number and node key and it will not allow connections before
+        //this data is available
+        bool enableMeshBridgeMode = false;
+
         //##################
 
         void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
@@ -565,7 +576,7 @@ class Conf
 #endif
 
 // Set the Terminal to enabled if one of the log transports is defined
-#if (ACTIVATE_SEGGER_RTT == 1) || (ACTIVATE_UART == 1) || (ACTIVATE_STDIO == 1)
+#if (ACTIVATE_SEGGER_RTT == 1) || (ACTIVATE_UART == 1) || (ACTIVATE_STDIO == 1) || (ACTIVATE_VIRTUAL_COM_PORT == 1)
 #define TERMINAL_ENABLED
 #endif
 

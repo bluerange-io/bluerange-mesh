@@ -20,7 +20,7 @@ exception can be met.
 
 NOTE: The modification to the GPL is included to allow you to distribute a
 combined work that includes Nordic SDK without being obliged to provide the
-source code for proprietary components outside of FruityMesh.
+source code for proprietary components outside of FruityMesh. 
 
 ----------------------------------------------------------------------------
 

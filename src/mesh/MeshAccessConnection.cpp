@@ -752,8 +752,8 @@ bool MeshAccessConnection::DecryptPacket(u8 const * data, u8 * decryptedOut, Mes
     //logt("MACONN", "MIC nonce %u, Keystream %s", decryptionNonce[1], keystream2Hex);
 
 
-    TO_HEX_2(data, dataLength.GetRaw() - MESH_ACCESS_MIC_LENGTH);
-    logt("MACONN", "Decrypted as %s (%u) micValid %u", dataHex, dataLength.GetRaw() - MESH_ACCESS_MIC_LENGTH, micCheck == 0);
+    TO_HEX(decryptedOut, dataLength.GetRaw() - MESH_ACCESS_MIC_LENGTH);
+    logt("MACONN", "Decrypted as %s (%u) micValid %u", decryptedOutHex, dataLength.GetRaw() - MESH_ACCESS_MIC_LENGTH, micCheck == 0);
 
     return micCheck == 0;
 }

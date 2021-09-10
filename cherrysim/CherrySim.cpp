@@ -32,6 +32,7 @@
 #include <CherrySim.h>
 #include <CherrySimUtils.h>
 #include <FruitySimServer.h>
+#include <SocketTerm.h>
 #include <FruityHal.h>
 #include <FruityMesh.h>
 
@@ -67,14 +68,7 @@ extern "C"{
 #include <Boardconfig.h>
 #include <FlashStorage.h>
 #include <RecordStorage.h>
-#ifndef GITHUB_RELEASE
-#if IS_ACTIVE(CLC_COMM)
-#include <ClcComm.h>
-#endif
-#if IS_ACTIVE(VS_MODULE)
-#include "VsComm.h"
-#endif
-#endif //GITHUB_RELEASE
+
 #include <ConnectionMessageTypes.h>
 
 
@@ -83,13 +77,6 @@ extern "C"{
 #include <EnrollmentModule.h>
 #include <IoModule.h>
 #ifndef GITHUB_RELEASE
-#if IS_ACTIVE(CLC_MODULE)
-#include <ClcModule.h>
-#include "ClcMock.h"
-#endif
-#if IS_ACTIVE(CLC_COMM)
-#include <ClcComm.h>
-#endif
 #include "AssetModule.h"
 #endif //GITHUB_RELEASE
 #include "ConnectionAllocator.h"
@@ -281,6 +268,9 @@ void CherrySim::PrepareSimulatedFeatureSets()
 #ifdef PROD_SINK_NRF52 //PROD_SINK_NRF52
     AddSimulatedFeatureSet(prod_sink_nrf52);
 #endif //PROD_SINK_NRF52
+#ifdef PROD_SINK_USB_NRF52840 //PROD_SINK_USB_NRF52840
+    AddSimulatedFeatureSet(prod_sink_usb_nrf52840);
+#endif //PROD_SINK_USB_NRF52840
 #ifdef DEV_NRF52 //DEV_NRF52
     AddSimulatedFeatureSet(dev_nrf52);
 #endif //DEV_NRF52
@@ -341,10 +331,8 @@ void CherrySim::PrepareSimulatedFeatureSets()
 
 void CherrySim::QueueInterrupts()
 {
-    if (currentNode->lastMovementSimTimeMs != 0 && currentNode->lastMovementSimTimeMs + 2000 > simState.simTimeMs)
-    {
-        QueueAccelerationInterrutCurrentNode();
-    }
+    //Queue interrupts coming from the accelerometer if we are currently moving
+    QueueAccelerationInterruptCurrentNode();
 }
 
 #ifdef GITHUB_RELEASE
@@ -461,8 +449,11 @@ CherrySim::~CherrySim()
     currentNode = nullptr;
     nodeEntryBuffer.clear();
 
-    if(server != nullptr) delete server;
-    server = nullptr;
+    if(webserver != nullptr) delete webserver;
+    webserver = nullptr;
+
+    if(socketTerm != nullptr) delete socketTerm;
+    socketTerm = nullptr;
 
     if (cherrySimInstance == this) cherrySimInstance = nullptr;
 }
@@ -493,11 +484,16 @@ void CherrySim::Init()
         ImportDataFromJson();
     }
 
-    nodeEntryBuffer.resize(GetTotalNodes() * (sizeof(NodeEntry) + alignof(NodeEntry)));
+    u32 totalSize = GetTotalNodes() * (sizeof(NodeEntry) + alignof(NodeEntry));
+    //This will try to allocate a consecutive range of memory to hold the node data
+    //If this call fails because of bad_alloc it means that the OS cannot reserve a consecurive range
+    //long enough to hold the data. Remember that CherrySim is a 32bit process
+    nodeEntryBuffer.resize(totalSize);
     CheckedMemset(nodeEntryBuffer.data(), 0, nodeEntryBuffer.size());
     nodes = (NodeEntry*)nodeEntryBuffer.data();
     for (u32 i = 0; i < GetTotalNodes(); i++)
     {
+        currentNode = &nodes[i]; //currentNode must be set as some initializers use the pointer
         new (&nodes[i]) NodeEntry;
     }
 
@@ -516,13 +512,104 @@ void CherrySim::Init()
 
     //Either use given positions from json or generate them randomly
     if (simConfig.importFromJson) {
-        ImportPositionsFromJson();
+        ImportPositionsAndDataFromJson();
     } else {
         PositionNodesRandomly();
         LoadPresetNodePositions();
     }
 
-    server = new FruitySimServer();
+    //Opens a Webserver to serve the FruityMap for visualization
+    webserver = new FruitySimServer();
+
+    //Opens the socket based Terminal
+    //This is currently only enabled for the runner
+#ifdef CHERRYSIM_RUNNER_ENABLED
+    socketTerm = new SocketTerm();
+    socketTerm->CreateServerSocket();
+#endif
+}
+
+//Checks if a device entry is importable by the simulator
+bool CherrySim::IsUsableDeviceEntry(json deviceJson)
+{
+    if (
+        (
+            deviceJson["platform"] == "BLENODE"
+            || deviceJson["platform"] == "ASSET"
+            || deviceJson["platform"] == "EDGEROUTER"
+            )
+        &&
+        (
+            deviceJson["properties"]["onMap"] == true
+            || deviceJson["properties"]["onMap"] == "true"
+        )
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
+//This will set a number of defaults for an imported json object
+nlohmann::json& CherrySim::NormalizeDeviceEntry(nlohmann::json& device)
+{
+    if (IsUsableDeviceEntry(device))
+    {
+        //##### Add missing entries and set them to useful defaults
+
+        auto & deviceProperties = device["properties"];
+
+        // Collect property keys which are assigned 'the' null value
+        std::vector<std::string> propertiesWithNullValue;
+        for (auto & [key, value] : deviceProperties.items())
+        {
+            if (value.is_null())
+            {
+                propertiesWithNullValue.emplace_back(key);
+            }
+        }
+
+        // Delete all these properties
+        for (const auto & key : propertiesWithNullValue)
+        {
+            deviceProperties.erase(key);
+        }
+
+        if (!deviceProperties.contains("cherrySimFeatureSet"))
+        {
+            if (device["platform"] == "EDGEROUTER") deviceProperties["cherrySimFeatureSet"] = "prod_sink_nrf52";
+            else if (device["platform"] == "BLENODE") deviceProperties["cherrySimFeatureSet"] = "prod_mesh_nrf52";
+            else if (device["platform"] == "ASSET") deviceProperties["cherrySimFeatureSet"] = "prod_asset_nrf52";
+            else SIMEXCEPTION(IllegalStateException);
+        }
+
+        if (!deviceProperties.contains("zNorm"))
+        {
+            deviceProperties["zNorm"] = 0;
+        }
+
+        if (!deviceProperties.contains("onMap"))
+        {
+            deviceProperties["onMap"] = false;
+        }
+
+        //##### Convert the types accordingly
+
+        if (!deviceProperties["x"].is_number()) {
+            deviceProperties["x"] = (float)std::stod(deviceProperties["x"].get<std::string>(), 0);
+        }
+        if (!deviceProperties["y"].is_number()) {
+            deviceProperties["y"] = (float)std::stod(deviceProperties["y"].get<std::string>(), 0);
+        }
+        if (!deviceProperties["zNorm"].is_number()) {
+            deviceProperties["zNorm"] = (float)std::stod(deviceProperties["zNorm"].get<std::string>(), 0);
+        }
+        if (!deviceProperties["onMap"].is_boolean()) {
+            deviceProperties["onMap"] = deviceProperties["onMap"].get<std::string>() == "true";
+        }
+    }
+
+    return device;
 }
 
 //This will load the site data from a json and will read the device json to import all devices
@@ -542,10 +629,14 @@ void CherrySim::ImportDataFromJson()
     {
         //Load the site json
         std::ifstream siteJsonStream(simConfig.siteJsonPath);
+        //Throw an exception if file does not exist or cannot be opened, etc,...
+        if (siteJsonStream.fail()) SIMEXCEPTION(FileException);
         siteJsonStream >> siteJson;
 
         //Load the devices json
         std::ifstream devicesJsonStream(simConfig.devicesJsonPath);
+        //Throw an exception if file does not exist or cannot be opened, etc,...
+        if (devicesJsonStream.fail()) SIMEXCEPTION(FileException);
         devicesJsonStream >> devicesJson;
     }
 
@@ -560,49 +651,32 @@ void CherrySim::ImportDataFromJson()
     //Get some data from the site
     simConfig.mapWidthInMeters = siteJson["results"][0]["lengthInMeter"];
     simConfig.mapHeightInMeters = siteJson["results"][0]["heightInMeter"];
+    simConfig.mapElevationInMeters = siteJson["results"][0].contains("elevationInMeter") ? (uint32_t)siteJson["results"][0]["elevationInMeter"] : 1;
 
     //Get number of nodes
     for (size_t i = 0; i < devicesJson["results"].size(); i++) 
     {
-        if ((devicesJson["results"][i]["platform"] == "BLENODE" ||
-             devicesJson["results"][i]["platform"] == "ASSET" ||
-             devicesJson["results"][i]["platform"] == "EDGEROUTER") &&
-            (devicesJson["results"][i]["properties"]["onMap"] == true || devicesJson["results"][i]["properties"]["onMap"] == "true"))
+        if (IsUsableDeviceEntry(devicesJson["results"][i]))
         {
-            bool available = (devicesJson["results"][i]["properties"].contains("cherrySimFeatureSet"));
-            if (available)
+            json device = NormalizeDeviceEntry(devicesJson["results"][i]);
+            auto featuresetAlreadyInserted = simConfig.nodeConfigName.find(device["properties"]["cherrySimFeatureSet"]);
+
+            if (featuresetAlreadyInserted != simConfig.nodeConfigName.end())
             {
-                auto featuresetAlreadyInserted = simConfig.nodeConfigName.find(devicesJson["results"][i]["properties"]["cherrySimFeatureSet"]);
-                if (featuresetAlreadyInserted != simConfig.nodeConfigName.end())
-                {
-                    u8 count = featuresetAlreadyInserted->second + 1;
-                    simConfig.nodeConfigName.insert_or_assign(devicesJson["results"][i]["properties"]["cherrySimFeatureSet"], count );
-                }
-                else
-                {
-                    simConfig.nodeConfigName.insert({ devicesJson["results"][i]["properties"]["cherrySimFeatureSet"], 1 });
-                }
+                u32 count = featuresetAlreadyInserted->second + 1;
+                simConfig.nodeConfigName.insert_or_assign(device["properties"]["cherrySimFeatureSet"], count);
             }
             else
             {
-                auto featuresetAlreadyInserted = simConfig.nodeConfigName.find((devicesJson["results"][i]["platform"] == "EDGEROUTER") ? "prod_sink_nrf52" : "prod_mesh_nrf52");
-                if (featuresetAlreadyInserted != simConfig.nodeConfigName.end())
-                {
-                    u8 count = featuresetAlreadyInserted->second + 1;
-                    simConfig.nodeConfigName.insert_or_assign((devicesJson["results"][i]["platform"] == "EDGEROUTER") ? "prod_sink_nrf52" : "prod_mesh_nrf52", count);
-                }
-                else
-                {
-                    simConfig.nodeConfigName.insert({(devicesJson["results"][i]["platform"] == "EDGEROUTER") ? "prod_sink_nrf52" : "prod_mesh_nrf52", 1 });
-                }
-
+                simConfig.nodeConfigName.insert({ device["properties"]["cherrySimFeatureSet"], 1 });
             }
         }
     }
 }
 
 //This will read the device json and will set all the node positions from it
-void CherrySim::ImportPositionsFromJson()
+//It will also import other data such as serial number, network ids, ....
+void CherrySim::ImportPositionsAndDataFromJson()
 {
     json devicesJson;
 
@@ -619,35 +693,68 @@ void CherrySim::ImportPositionsFromJson()
     }
 
     //Get other data from our devices
-    int j = 0;
     for (u32 i = 0; i < devicesJson["results"].size(); i++) 
     {
-        if ((devicesJson["results"][i]["platform"] == "BLENODE" ||
-             devicesJson["results"][i]["platform"] == "EDGEROUTER" ||
-             devicesJson["results"][i]["platform"] == "ASSET") &&
-            (devicesJson["results"][i]["properties"]["onMap"] == true || devicesJson["results"][i]["properties"]["onMap"] == "true"))
+        if (IsUsableDeviceEntry(devicesJson["results"][i]))
         {
-            if (std::string("number") == devicesJson["results"][i]["properties"]["x"].type_name())
-            {
-                nodes[j].x = devicesJson["results"][i]["properties"]["x"];
-                nodes[j].y = devicesJson["results"][i]["properties"]["y"];
-                //The z coordinate is optional.
-                auto jsonEntryZ = devicesJson["results"][i]["properties"]["z"];
-                nodes[j].z = jsonEntryZ != nullptr ? (float)jsonEntryZ : 0.0f;
-            }
-            else if (std::string("string") == devicesJson["results"][i]["properties"]["x"].type_name())
-            {
-                nodes[j].x = (float)std::stod(devicesJson["results"][i]["properties"]["x"].get<std::string>(), 0);
-                nodes[j].y = (float)std::stod(devicesJson["results"][i]["properties"]["y"].get<std::string>(), 0);
-                //The z coordinate is optional.
-                auto jsonEntryZ = devicesJson["results"][i]["properties"]["z"];
-                nodes[j].z = jsonEntryZ != nullptr ? (float)std::stod(jsonEntryZ.get<std::string>(), 0) : 0;
+            json device = NormalizeDeviceEntry(devicesJson["results"][i]);
 
-            }
-            else
-                SIMEXCEPTION(NonCompatibleDataTypeException);
+            int nodeIndex = -1;
 
-            j++;
+            //First, we need to find a node with a matching featureset that was not yet configured
+            for (u32 j = 0; j < GetTotalNodes(); j++) {
+                if (!nodes[j].jsonDataImported && nodes[j].nodeConfiguration == device["properties"]["cherrySimFeatureSet"].get<std::string>()) {
+                    nodeIndex = j;
+                    break;
+                }
+            }
+            //Could not properly match node entries, implementation error
+            if (nodeIndex == -1) SIMEXCEPTION(IllegalStateException);
+
+            //Import position
+            nodes[nodeIndex].x = device["properties"]["x"];
+            nodes[nodeIndex].y = device["properties"]["y"];
+            nodes[nodeIndex].z = device["properties"]["zNorm"];
+
+            //Import Serial Number as SerialNumberIndex
+            if (device.contains("deviceId")) {
+                nodes[nodeIndex].uicr.CUSTOMER[12] = Utility::GetIndexForSerial(device["deviceId"].get<std::string>().c_str(), nullptr);
+            }
+
+            //Import Default NodeId
+            if (device["properties"].contains("IOT_NODE_ID")) {
+                nodes[nodeIndex].uicr.CUSTOMER[10] = (u32)std::stol(devicesJson["results"][i]["properties"]["IOT_NODE_ID"].get<std::string>());
+            }
+
+            //Import Node Key
+            if (device["properties"].contains("IOT_NODE_KEY")) {
+                std::string key = device["properties"]["IOT_NODE_KEY"].get<std::string>();
+                const char* chars = key.c_str();
+                nodes[nodeIndex].uicr.CUSTOMER[4] = Utility::ByteFromAsciiHex(chars, 8);
+                nodes[nodeIndex].uicr.CUSTOMER[5] = Utility::ByteFromAsciiHex(chars + 8, 8);
+                nodes[nodeIndex].uicr.CUSTOMER[6] = Utility::ByteFromAsciiHex(chars + 16, 8);
+                nodes[nodeIndex].uicr.CUSTOMER[7] = Utility::ByteFromAsciiHex(chars + 24, 8);
+            }
+
+            //Import NetworkId as defaultNetworkId
+            if (device["properties"].contains("IOT_NETWORK_ID")) {
+                nodes[nodeIndex].uicr.CUSTOMER[9] = (u32)std::stol(device["properties"]["IOT_NETWORK_ID"].get<std::string>());
+            }
+
+            //Import Network Key
+            if (device["properties"].contains("IOT_NETWORK_KEY")) {
+                std::string key = device["properties"]["IOT_NETWORK_KEY"].get<std::string>();
+                const char* chars = key.c_str();
+                nodes[nodeIndex].uicr.CUSTOMER[13] = Utility::ByteFromAsciiHex(chars, 8);
+                nodes[nodeIndex].uicr.CUSTOMER[14] = Utility::ByteFromAsciiHex(chars + 8, 8);
+                nodes[nodeIndex].uicr.CUSTOMER[15] = Utility::ByteFromAsciiHex(chars + 16, 8);
+                nodes[nodeIndex].uicr.CUSTOMER[16] = Utility::ByteFromAsciiHex(chars + 24, 8);
+            }
+
+            nodes[nodeIndex].jsonDataImported = true;
+        }
+        else {
+            printf("Skipped one device entry as it could not be parsed" EOL);
         }
     }
 }
@@ -865,8 +972,9 @@ void CherrySim::LoadPresetNodePositions()
     {
         for (u32 nodeIndex = 0; nodeIndex < std::min(simConfig.preDefinedPositions.size(), (size_t)GetTotalNodes()); nodeIndex++)
         {
-            nodes[nodeIndex].x = (float)simConfig.preDefinedPositions[nodeIndex].first;
-            nodes[nodeIndex].y = (float)simConfig.preDefinedPositions[nodeIndex].second;
+            nodes[nodeIndex].x = (float)simConfig.preDefinedPositions[nodeIndex].x;
+            nodes[nodeIndex].y = (float)simConfig.preDefinedPositions[nodeIndex].y;
+            nodes[nodeIndex].z = (float)simConfig.preDefinedPositions[nodeIndex].z;
         }
     }
 }
@@ -883,6 +991,9 @@ void CherrySim::SimulateStepForAllNodes()
     while (meshGwCommunication && !receivedDataFromMeshGw)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        // Process available events of the socket-based communication. This is required because otherwise the
+        // receivedDataFromMeshGw will never be set to true.
+        socketTerm->ProcessSockets();
     }
 
     if (simConfig.realTime)
@@ -900,7 +1011,10 @@ void CherrySim::SimulateStepForAllNodes()
     CheckForMultiTensorflowUsage();
 
     //Check if the webserver has some open requests to process
-    server->ProcessServerRequests();
+    webserver->ProcessServerRequests();
+
+    //Check if there is Terminal input / ouput waiting to be processed over TCP sockets
+    socketTerm->ProcessSockets();
 
     int64_t sumOfAllSimulatedFrames = 0;
     for (u32 i = 0; i < GetTotalNodes(); i++) {
@@ -947,9 +1061,6 @@ void CherrySim::SimulateStepForAllNodes()
             SimulateConnections();
             SimulateServiceDiscovery();
             SimulateUartInterrupts();
-#if IS_ACTIVE(CLC_MODULE)
-            SimulateClcData();
-#endif
             SimulateTimeslot();
             SimulateConnectionParameterUpdateRequestTimeout();
             try {
@@ -985,7 +1096,10 @@ void CherrySim::SimulateStepForAllNodes()
             || simConfig.fastLaneToSimTimeMs < simState.simTimeMs
             || simState.simTimeMs == simConfig.simTickDurationMs //Draw the first frame
         ) {
-            bbeRenderer->frame();
+            //If render less is active, only draw from time to time
+            if (!renderLess || simState.simTimeMs % (simConfig.simTickDurationMs * 500) == 0) {
+                bbeRenderer->frame();
+            }
         }
     }
     else if(bbeRenderer)
@@ -996,6 +1110,12 @@ void CherrySim::SimulateStepForAllNodes()
         bbeRendererWasDestroyed = true;
     }
 #endif
+
+    //Call all sim step handlers that were registered
+    for (auto & callback : simStepCallbacks)
+    {
+        callback();
+    }
 }
 
 void CherrySim::QuitSimulation()
@@ -1073,6 +1193,10 @@ TerminalCommandHandlerReturnType CherrySim::TerminalCommandHandler(const std::ve
             return TerminalCommandHandlerReturnType::SUCCESS;
         }
         else if (commandArgs.size() >= 3 && commandArgs[1] == "term") {
+            // Please note that the 'sim term ...' command is filtered out by the SocketTerm implementation and
+            // processed separately (i.e. this if branch will _not_ be called if 'sim term ...' is issued on a
+            // socket client).
+
             if (commandArgs[2] == "all") {
                 simConfig.terminalId = 0;
             }
@@ -1187,7 +1311,7 @@ TerminalCommandHandlerReturnType CherrySim::TerminalCommandHandler(const std::ve
         else if (commandArgs[1] == "loss") {
             for (int i = 0; i < currentNode->state.configuredTotalConnectionCount; i++) {
                 if (currentNode->state.connections[i].connectionActive) {
-                    printf("Simulated Connection Loss for node %d to partner %d (handle %d)" EOL, currentNode->id, currentNode->state.connections[i].partner->id, currentNode->state.connections[i].connectionHandle);
+                    printf("Simulated Connection Loss for node %d to partner %d (handle %d)" EOL, currentNode->GetNodeId(), currentNode->state.connections[i].partner->GetNodeId(), currentNode->state.connections[i].connectionHandle);
                     DisconnectSimulatorConnection(&currentNode->state.connections[i], BLE_HCI_CONNECTION_TIMEOUT, BLE_HCI_CONNECTION_TIMEOUT);
                 }
             }
@@ -1574,7 +1698,7 @@ void CherrySim::TerminalPrintHandler(const char* message)
     if (terminalPrintListener != nullptr) {
         // If currentNode is nullptr, then we printed out something that does not belong to any node
         // This is probably some simulator log e.g. a replay command.
-        if (currentNode == nullptr || currentNode->id == simConfig.terminalId || simConfig.terminalId == 0) {
+        if (currentNode == nullptr || IsSimTermOfCurrentNodeActive()) {
             terminalPrintListener->TerminalPrintHandler(currentNode, message);
         }
     }
@@ -1720,9 +1844,9 @@ void CherrySim::QueueInterruptCurrentNode(u32 pin)
     }
 }
 
-void CherrySim::QueueAccelerationInterrutCurrentNode()
+void CherrySim::QueueAccelerationInterruptCurrentNode()
 {
-    if (GS->boardconf.getCustomPinset != nullptr)
+    if (GS->boardconf.getCustomPinset != nullptr && is_lis2dh12_moving_in_simulation())
     {
         Lis2dh12Pins lis2dh12PinConfig;
         lis2dh12PinConfig.pinsetIdentifier = PinsetIdentifier::LIS2DH12;
@@ -1744,25 +1868,9 @@ void CherrySim::InitNode(u32 i)
     nodes[i].~NodeEntry();
     new (&nodes[i]) NodeEntry();
 
-    //Set index and id
-    nodes[i].index = i;
-    nodes[i].id = i + 1;
-
-    //Initialize FICR memory
-    CheckedMemset(&nodes[i].ficr, 0xFF, sizeof(nodes[i].ficr));
-
-    //Initialize UICR memory
-    CheckedMemset(&nodes[i].uicr, 0xFF, sizeof(nodes[i].uicr));
-
-    //Initialize flash memory
-    CheckedMemset(nodes[i].flash, 0xFF, sizeof(nodes[i].flash));
-    //TODO: We could load a softdevice and app image into flash, would that help for something?
-
-    //Generate device address based on the id
-    nodes[i].address.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
-    CheckedMemset(&nodes[i].address.addr, 0x00, 6);
-    CheckedMemcpy(nodes[i].address.addr.data() + 2, &nodes[i].id, 2);
+    nodes[i].Initialize(i);
 }
+
 void CherrySim::SetFeaturesets()
 {
 #ifdef GITHUB_RELEASE
@@ -1968,7 +2076,7 @@ void CherrySim::BootCurrentNode()
 
     //FIXME: Move to runner / tester
     //Lets us do some configuration after the boot
-    Conf::GetInstance().terminalMode = TerminalMode::PROMPT;
+    if(Conf::GetInstance().terminalMode == TerminalMode::DISABLED) Conf::GetInstance().terminalMode = TerminalMode::PROMPT;
 }
 
 void CherrySim::ErasePage(u32 pageAddress)
@@ -2012,14 +2120,19 @@ void CherrySim::WriteRecordToFlash(u16 recordId, u8* data, u16 dataLength) {
     CheckedMemcpy(dest, record, recordLength);
 }
 
-void CherrySim::ResetCurrentNode(RebootReason rebootReason, bool throwException) {
-    if (simConfig.verbose) printf("Node %d resetted\n", currentNode->id);
+void CherrySim::ResetCurrentNode(RebootReason rebootReason, bool throwException, bool powerLoss) {
+    if (simConfig.verbose) printf("Node %d resetted\n", currentNode->GetNodeId());
 
     //Save the node index because it will be gone after node shutdown
     u32 index = currentNode->index;
 
     //Clean up node
     ShutdownCurrentNode();
+
+    //If a power loss should be simulated, we clear the retained RAM
+    if (powerLoss) {
+        currentNode->retainedRamMemory = {};
+    }
 
     //Disconnect all simulator connections to this node
     for (int i = 0; i < currentNode->state.configuredTotalConnectionCount; i++) {
@@ -2029,10 +2142,7 @@ void CherrySim::ResetCurrentNode(RebootReason rebootReason, bool throwException)
 
     //Boot node again
     NodeIndexSetter setter(index);
-    if (rebootReason != RebootReason::UNKNOWN)
-    {
-        currentNode->rebootReason = rebootReason;
-    }
+    currentNode->rebootReason = rebootReason;
     BootCurrentNode();
 
     //throw an exception so we can step out of the current simulation step for that node
@@ -2043,7 +2153,12 @@ void CherrySim::ResetCurrentNode(RebootReason rebootReason, bool throwException)
 }
 
 void CherrySim::ShutdownCurrentNode() {
+    //Clean up everything that is remaining
     delete[] currentNode->moduleMemoryBlock;
+
+    //Delete all simulation step handlers
+    CleanSimulationStepHandlers(currentNode);
+
     //Cast is needed because the following passage from the C++ Standard:
     //"This implies that an object cannot be deleted using a pointer of type void* because there are no objects of type void"
     u32* halMemory = (u32*)GS->halMemory;
@@ -2190,8 +2305,8 @@ void CherrySim::ConnectMasterToSlave(NodeEntry* master, NodeEntry* slave)
     if (this->simConfig.verbose) {
         json j1;
         j1["type"] = "sim_connect";
-        j1["nodeId"] = master->id;
-        j1["partnerId"] = slave->id;
+        j1["nodeId"] = master->GetNodeId();
+        j1["partnerId"] = slave->GetNodeId();
         j1["globalConnectionHandle"] = simState.globalConnHandleCounter;
         j1["rssi"] = (int)GetReceptionRssi(master, slave);
         j1["timeMs"] = simState.simTimeMs;
@@ -2329,8 +2444,8 @@ u32 CherrySim::DisconnectSimulatorConnection(SoftdeviceConnection* connection, u
     {
         json j;
         j["type"] = "sim_disconnect";
-        j["nodeId"] = connection->owningNode->id;
-        j["partnerId"] = partnerNode->id;
+        j["nodeId"] = connection->owningNode->GetNodeId();
+        j["partnerId"] = partnerNode->GetNodeId();
         j["globalConnectionHandle"] = connection->connectionHandle;
         j["timeMs"] = simState.simTimeMs;
         j["reason"] = hciReason;
@@ -2410,7 +2525,7 @@ void CherrySim::SimulateUartInterrupts()
 
 void CherrySim::SendUartCommand(NodeId nodeId, const u8* message, u32 messageLength)
 {
-    SoftdeviceState* state = &(cherrySimInstance->FindNodeById(nodeId)->state);
+    SoftdeviceState* state = &(cherrySimInstance->FindUniqueNodeById(nodeId)->state);
     u32 oldBufferLength = state->uartBufferLength;
     state->uartBufferLength += messageLength;
 
@@ -2419,6 +2534,7 @@ void CherrySim::SendUartCommand(NodeId nodeId, const u8* message, u32 messageLen
     }
     CheckedMemcpy(state->uartBuffer.data() + oldBufferLength, message, messageLength);
 }
+
 //################################## GATT Simulation ######################################
 // Generates writes
 //#########################################################################################
@@ -2621,7 +2737,7 @@ void CherrySim::SimulateConnections() {
             if (currentNode->state.connections[i].connectionActive) {
                 if (PSRNG(simConfig.connectionTimeoutProbabilityPerSec)) {
                     SIMSTATCOUNT("simulatedTimeouts");
-                    printf("Simulated Connection Loss for node %d to partner %d (handle %d)" EOL, currentNode->id, currentNode->state.connections[i].partner->id, currentNode->state.connections[i].connectionHandle);
+                    printf("Simulated Connection Loss for node %d to partner %d (handle %d)" EOL, currentNode->GetNodeId(), currentNode->state.connections[i].partner->GetNodeId(), currentNode->state.connections[i].connectionHandle);
                     DisconnectSimulatorConnection(&currentNode->state.connections[i], BLE_HCI_CONNECTION_TIMEOUT, BLE_HCI_CONNECTION_TIMEOUT);
                 }
             }
@@ -2641,8 +2757,8 @@ void CherrySim::GenerateWrite(SoftDeviceBufferedPacket* bufferedPacket) {
     {
         json j;
         j["type"] = "sim_data";
-        j["nodeId"] = sender->id;
-        j["partnerId"] = receiver->id;
+        j["nodeId"] = sender->GetNodeId();
+        j["partnerId"] = receiver->GetNodeId();
         j["reliable"] = p_write_params.write_op == BLE_GATT_OP_WRITE_REQ;
         j["timeMs"] = simState.simTimeMs;
         char buffer[128];
@@ -2701,8 +2817,8 @@ void CherrySim::GenerateNotification(SoftDeviceBufferedPacket* bufferedPacket) {
     {
         json j;
         j["type"] = "sim_data";
-        j["nodeId"] = sender->id;
-        j["partnerId"] = receiver->id;
+        j["nodeId"] = sender->GetNodeId();
+        j["partnerId"] = receiver->GetNodeId();
         j["reliable"] = false;
         j["timeMs"] = simState.simTimeMs;
         char buffer[128];
@@ -2796,16 +2912,6 @@ void CherrySim::SimulateServiceDiscovery()
 
     GS->dbDiscoveryHandler(&dbEvt);
 }
-
-#if IS_ACTIVE(CLC_MODULE)
-void CherrySim::SimulateClcData() {
-
-    ClcModule* clcMod = (ClcModule*)currentNode->gs.node.GetModuleById(ModuleId::CLC_MODULE);
-    if (ShouldSimIvTrigger(30000) && clcMod != nullptr && currentNode->gs.uartEventHandler != nullptr) {
-        currentNode->clcMock.SendPeriodicData();
-    }
-}
-#endif //IS_ACTIVE(CLC_MODULE)
 
 void CherrySim::SimulateMovement()
 {
@@ -3289,11 +3395,14 @@ void CherrySim::CheckMeshingConsistency()
         NodeEntry* node = &nodes[i];
         ClusterSize realClusterSize = DetermineClusterSizeAndPropagateClusterUpdates(node, nullptr);
 
-        if (realClusterSize != node->state.validityClusterSize) {
-            printf("NODE %d has a real cluster size of %d and predicted size of %d, reported cluster size %d" EOL, node->id, realClusterSize, node->state.validityClusterSize, nodes[i].gs.node.GetClusterSize());
+        if (realClusterSize != node->state.validityClusterSize)
+        {
+            printf(
+                "NODE %d has a real cluster size of %d and predicted size of %d, reported cluster size %d" EOL,
+                node->GetNodeId(), realClusterSize, node->state.validityClusterSize, nodes[i].gs.node.GetClusterSize());
             printf("-------- POTENTIAL CLUSTERING MISMATCH -----------" EOL);
-            //std::cout << "Press Enter to Continue";
-            //std::cin.ignore();
+            // std::cout << "Press Enter to Continue";
+            // std::cin.ignore();
         }
     }
 }
@@ -3308,8 +3417,6 @@ typedef struct MeshConnectionBond
 //the connections will only be returned if they are handshaked
 MeshConnectionBond findBond(NodeEntry* startNode, NodeEntry* partnerNode)
 {
-    //TODO: This currently uses nodeIds for matching, but should use something more safe that cannot change
-
     if (startNode == nullptr || partnerNode == nullptr)    SIMEXCEPTIONFORCE(IllegalStateException);
 
     MeshConnectionBond bond = { nullptr, nullptr };
@@ -3317,7 +3424,7 @@ MeshConnectionBond findBond(NodeEntry* startNode, NodeEntry* partnerNode)
     //Find the connection on the startNode
     MeshConnections conns = startNode->gs.cm.GetMeshConnections(ConnectionDirection::INVALID);
     for (int i = 0; i < conns.count; i++) {
-        if (conns.handles[i].IsHandshakeDone() && conns.handles[i].GetPartnerId() == partnerNode->id) {
+        if (conns.handles[i].IsHandshakeDone() && conns.handles[i].GetPartnerAddress() == partnerNode->address) {
             bond.startConnection = conns.handles[i].GetConnection();
         }
     }
@@ -3325,7 +3432,7 @@ MeshConnectionBond findBond(NodeEntry* startNode, NodeEntry* partnerNode)
     //Find the connection on the partnerNode
     MeshConnections partnerConns = partnerNode->gs.cm.GetMeshConnections(ConnectionDirection::INVALID);
     for (int i = 0; i < partnerConns.count; i++) {
-        if (partnerConns.handles[i].IsHandshakeDone() && partnerConns.handles[i].GetPartnerId() == startNode->id) {
+        if (partnerConns.handles[i].IsHandshakeDone() && partnerConns.handles[i].GetPartnerAddress() == startNode->address) {
             bond.partnerConnection = partnerConns.handles[i].GetConnection();
         }
     }
@@ -3381,7 +3488,7 @@ ClusterSize CherrySim::DetermineClusterSizeAndPropagateClusterUpdates(NodeEntry*
         conn->validityClusterUpdatesToSend += validitySizeToAdd;
 
         //Calculate the cluster size and propagate size changes further
-        NodeEntry* nextPartner = FindNodeById(conn->partnerId);
+        NodeEntry* nextPartner = FindUniqueNodeById(conn->partnerId, node->GetNetworkId());
         size += DetermineClusterSizeAndPropagateClusterUpdates(nextPartner, node);
     }
 
@@ -3481,6 +3588,28 @@ void CherrySim::SetBleStack(NodeEntry* node)
 // 
 //#########################################################################################
 
+void CherrySim::AddSimulationStepHandler(std::function<void(void)> lambda)
+{
+    LambdaWithHandle data;
+    data.owningNode = currentNode;
+    data.lambda = lambda;
+    simStepCallbacks.push_back(data);
+}
+
+void CherrySim::CleanSimulationStepHandlers(NodeEntry* nodeEntry)
+{
+    auto it = std::remove_if(simStepCallbacks.begin(), simStepCallbacks.end(),
+        [nodeEntry](const auto& entry) {
+            return nodeEntry == entry.owningNode;
+        }
+    );
+
+    if (it != simStepCallbacks.end())
+    {
+        simStepCallbacks.erase(it, simStepCallbacks.end());
+    }
+}
+
 bool CherrySim::IsClusteringDone()
 {
     u32 numNoneAssetNodes = GetTotalNodes() - GetAssetNodes();
@@ -3550,7 +3679,7 @@ void CherrySim::ChooseSimulatorTerminal() {
     if (!currentNode->state.initialized) return;
 
     //Enable or disable terminal based on the currently set terminal id
-    if (simConfig.terminalId == 0 || simConfig.terminalId == currentNode->id) {
+    if (IsSimTermOfCurrentNodeActive()) {
         currentNode->gs.terminal.terminalIsInitialized = true;
     }
     else {
@@ -3581,7 +3710,17 @@ float CherrySim::GetReceptionRssi(const NodeEntry* sender, const NodeEntry* rece
     return GetReceptionRssi(sender, receiver, sender->gs.boardconf.configuration.calibratedTX, Conf::defaultDBmTX);
 }
 
-float CherrySim::GetReceptionRssi(const NodeEntry* sender, const NodeEntry* receiver, int8_t senderDbmTx, int8_t senderCalibratedTx) {
+float CherrySim::GetReceptionRssi(const NodeEntry* sender, const NodeEntry* receiver, int8_t senderDbmTx, int8_t senderCalibratedTx)
+{
+    //Early out if the nodes are too far from each other to optimize the performance for bigger scenarios
+    if (
+        abs(sender->x - receiver->x) * simConfig.mapWidthInMeters > 50
+        || abs(sender->y - receiver->y) * simConfig.mapHeightInMeters > 50
+        || abs(sender->z - receiver->z) * simConfig.mapElevationInMeters > 50
+        ) {
+        return -1000;
+    }
+
     const float rssi = GetReceptionRssiNoNoise(sender, receiver, senderDbmTx, senderCalibratedTx);
     if (!simConfig.rssiNoise)
     {
@@ -3615,7 +3754,8 @@ uint32_t CherrySim::CalculateReceptionProbability(const NodeEntry* sendingNode, 
     //TODO: Add some randomness and use a function to do the mapping
     float rssi = GetReceptionRssi(sendingNode, receivingNode);
 
-         if (rssi > -60) return simConfig.receptionProbabilityVeryClose;
+    if (rssi < -100) return 0;
+    else if (rssi > -60) return simConfig.receptionProbabilityVeryClose;
     else if (rssi > -80) return simConfig.receptionProbabilityClose;
     else if (rssi > -85) return simConfig.receptionProbabilityFar;
     else if (rssi > -90) return simConfig.receptionProbabilityVeryFar;
@@ -3631,13 +3771,79 @@ SoftdeviceConnection* CherrySim::FindConnectionByHandle(NodeEntry* node, int con
     return nullptr;
 }
 
-NodeEntry* CherrySim::FindNodeById(int id) {
-    for (u32 i = 0; i < GetTotalNodes(); i++) {
-        if (nodes[i].id == id) {
+bool CherrySim::IsSimTermOfCurrentNodeActive() const
+{
+    if (currentNode == nullptr)
+    {
+        SIMEXCEPTIONFORCE(IllegalStateException);
+    }
+
+    return simConfig.terminalId == 0 || static_cast<TerminalId>(simConfig.terminalId) == currentNode->GetTerminalId();
+}
+
+NodeEntry* CherrySim::FindNodeById(int id)
+{
+    for (u32 i = 0; i < GetTotalNodes(); i++)
+    {
+        if (nodes[i].GetNodeId() == id)
+        {
             return &nodes[i];
         }
     }
     return nullptr;
+}
+
+NodeEntry *CherrySim::FindUniqueNodeById(NodeId nodeId)
+{
+    NodeEntry *nodeEntry = nullptr;
+    for (u32 index = 0; index < GetTotalNodes(); index++)
+    {
+        if (nodes[index].GetNodeId() == nodeId)
+        {
+            if (nodeEntry != nullptr)
+            {
+                SIMEXCEPTIONFORCE(MulipleNodesHaveSameNodeIdException);
+            }
+            nodeEntry = &nodes[index];
+        }
+    }
+    return nodeEntry;
+}
+
+NodeEntry* CherrySim::FindUniqueNodeById(NodeId nodeId, NetworkId networkId)
+{
+    NodeEntry *nodeEntry = nullptr;
+    for (u32 index = 0; index < GetTotalNodes(); index++)
+    {
+        auto &currentNodeEntry = nodes[index];
+        if (currentNodeEntry.GetNodeId() == nodeId && currentNodeEntry.GetNetworkId() == networkId)
+        {
+            if (nodeEntry != nullptr)
+            {
+                SIMEXCEPTIONFORCE(MulipleNodesHaveSameNodeAndNetworkIdException);
+            }
+            nodeEntry = &currentNodeEntry;
+        }
+    }
+    return nodeEntry;
+}
+
+NodeEntry* CherrySim::FindUniqueNodeByTerminalId(TerminalId terminalId)
+{
+    const auto nodeIndex = terminalId - 1;
+    if (nodeIndex > GetTotalNodes())
+    {
+        SIMEXCEPTION(InvalidTerminalIdException);
+        return nullptr;
+    }
+
+    NodeEntry * const nodeEntry = &nodes[nodeIndex];
+    if (nodeEntry->GetTerminalId() != terminalId)
+    {
+        SIMEXCEPTIONFORCE(IllegalStateException);
+    }
+
+    return nodeEntry;
 }
 
 u8 CherrySim::GetNumSimConnections(const NodeEntry* node) {
@@ -3784,7 +3990,7 @@ void CherrySim::PrintPacketStats(NodeId nodeId, const char* statId)
     }
     //We simply select the stat from the given nodeId
     else {
-        NodeEntry* node = FindNodeById(nodeId);
+        NodeEntry* node = FindUniqueNodeById(nodeId);
         if (strcmp("SENT", statId) == 0) stat = node->sentPackets;
         if (strcmp("ROUTED", statId) == 0) stat = node->routedPackets;
     }
@@ -4024,12 +4230,12 @@ bool CherrySim::IsValidMoveAnimationJson(const nlohmann::json &json) const
                 foundErrorInJson = true;
             }
 
-            if (!it2.value().contains("z"))
+            if (!it2.value().contains("zNorm"))
             {
-                printf("Key Point in Animation %s did not contain a z value!" EOL, it.key().c_str());
+                printf("Key Point in Animation %s did not contain a zNorm value!" EOL, it.key().c_str());
                 foundErrorInJson = true;
             }
-            else if (!IsNumberType(it2.value()["z"].type()))
+            else if (!IsNumberType(it2.value()["zNorm"].type()))
             {
                 printf("Z in Key Point in Animation %s is not a number type!" EOL, it.key().c_str());
                 foundErrorInJson = true;
@@ -4091,11 +4297,11 @@ bool CherrySim::AnimationLoadJsonFromPath(const char * path)
         {
             if (it2.value().contains("type"))
             {
-                AnimationAddKeypoint(it.key(), it2.value()["x"], it2.value()["y"], it2.value()["z"], it2.value()["durationSec"], StringToMoveAnimationType(it2.value()["type"]));
+                AnimationAddKeypoint(it.key(), it2.value()["x"], it2.value()["y"], it2.value()["zNorm"], it2.value()["durationSec"], StringToMoveAnimationType(it2.value()["type"]));
             }
             else
             {
-                AnimationAddKeypoint(it.key(), it2.value()["x"], it2.value()["y"], it2.value()["z"], it2.value()["durationSec"]);
+                AnimationAddKeypoint(it.key(), it2.value()["x"], it2.value()["y"], it2.value()["zNorm"], it2.value()["durationSec"]);
             }
         }
     }

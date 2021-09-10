@@ -2,19 +2,24 @@ ifndef::imagesdir[:imagesdir: ../assets/images]
 = CherrySim
 
 == General
-CherrySim uses the codebase of FruityMesh and provides a SoftDevice abstraction layer that simulates Bluetooth connections, advertising, flash access and much more. It gives the possibility to debug, develop and simulate multiple FruityMesh nodes on a development PC.
+CherrySim uses the codebase of FruityMesh and provides a *SoftDevice abstraction layer* that simulates Bluetooth connections, advertising, flash access and much more. It gives the possibility to debug, develop and simulate multiple FruityMesh nodes on a development PC.
+
+We are *developing and debugging most new features using CherrySim* which is a real time saver and swiss army knife. You will be able to do implement most of your application logic in the simulator with the ability to mock away drivers. If you are developing with FruityMesh you should consider using the simulator for your *day-to-day development*.
 
 image:cherrysim.png[cherrysim]
 
 == Functionality
-* Simulates nodes in a time step based simulation
-* Allows easy xref:#Debugging[debugging] of mesh-behaviour with a deterministic pseudo random number generator
+* Simulates all nodes in a time step based simulation
+* Full support for simulating *different featuresets* at the same time creating a heterogenous mesh
+* Allows *easy xref:#Debugging[debugging]* of mesh-behaviour with a deterministic pseudo random number generator
 * Includes CherrySimRunner for xref:#Terminal[manual testing] and simulation
-* xref:#CherrySimTester[CherrySimTester] is used for automatic mesh tests using the google test framework
+* xref:#CherrySimTester[CherrySimTester] is used for *automated testing* using the google test framework
 * Mesh state xref:#Visualization[visualization] in your web browser: http://localhost:5555/
+* xref:#SocketTerm[SocketTerm] for connecting multiple terminals using TCP sockets
+* xref:NativeCherrySimRenderer.adoc[Native Renderer] for *real time visualization*
 
 == Setting up the build environment
-The build environment can be set up by following the instructions under xref:BuildingWithCMake.adoc[Building with CMake].
+The build environment can be set up by following the instructions under xref:BuildingWithCMake.adoc#BuildingSimulator[Building with CMake].
 
 == Building
 See xref:BuildingWithCMake.adoc#BuildingSimulator[here] for a guide how to build the Simulator.
@@ -45,7 +50,9 @@ The simulator has a terminal that allows to input all commands that can be used 
 ----
 sim term [terminalId] // e.g. "sim term 1" to interact with the first node
 ----
-The active terminal can be either 0 to see the terminal output of all nodes at the same time, or you can give the nodeId of a single node. Afterwards, you can directly interact with that node with the usual FruityMesh terminal commands.
+The active terminal can be either 0 to see the terminal output of all nodes at the same time, or you can give the terminal id of a single node. The terminal id is equal to `nodeIndex + 1` (the _default_ node id), see the xref:#FeaturesetSimulation[documentation on featureset simulation] on how the node index is assigned. If you do _not_ change the node id (e.g. via enrollment) after the simulator starts, then the terminal id and node id will be the same. Additionally, the terminal id of a node will stay the same during the whole simulation and is _not_ affected by enrollments. Afterwards, you can directly interact with that node with the usual FruityMesh terminal commands.
+
+In xref:#SocketTerm[socket terminals] only strictly positive terminal ids - referring to a single node - can be used (i.e. you _cannot_ specify `0`).
 
 [source,c++]
 ----
@@ -248,6 +255,20 @@ counter++;
 ----
 Then check the value of the counter in the debugger, set a conditional breakpoint some lines before the error happened and compare the counter value against the count from the previous run.
 
+[#SocketTerm]
+== SocketTerm
+CherrySim by default supports stdio for input and output and you are able to chose a terminal and start entering commands right within the console. This is however quite limited and you are not able to easily connect to multiple terminals at the same time. Therefore, we have implemented `SocketTerm` which allows you to connect to the simulator by using a TCP socket e.g. by using a telnet client or other software such as a gateway.
+
+image:cherrysim_socketterm.png[CherrySim SocketTerm]
+
+By default, CherrySim listens on port `5556`. To open a connection, e.g. use `telnet localhost 5556`. This is very flexible as it also allows you to connect a custom gateway to the simulation or multiple gateways at the same time as CherrySim is also able to simulate multiple networks at the same time. It is a good idea to start CherrySim with the commandline argument `disableStdio`, e.g. `cherrysim_runner.exe disableStdio` as this will considerably improve the performance.
+
+After the session was opened, you will be informed with a message of type `sim_socket_connect` that you are now connected. The first thing you have to do is to select a terminal by using `sim term [terminalId]` to connect to the terminal of a node. The terminal id of a node is equal to `nodeIndex + 1` (the _default_ node id), see the xref:#FeaturesetSimulation[documentation on featureset simulation] on how the node index is assigned. If you do _not_ change the node id (e.g. via enrollment) after the simulator starts, then the terminal id and node id will be the same. Additionally, the terminal id of a node will stay the same during the whole simulation and is _not_ affected by enrollments.
+
+A response of type `sim_term_changed` will inform you if the simulator was able to switch to the terminal or if it e.g. does not exist. Depending on the featureset, the node will have its terminal configured to JSON or PROMPT mode. Be aware that you will not get any echo-back of what you are typing as the SocketTerm is intended for process to process communication. Your telnet client (e.g. Putty) will however have an option to toggle local echo if necessary.
+
+You are now connected to the terminal of the specified node and you are free to open more clients to interact with other nodes at the same time. Only a single client can be connected to the terminal of a single node.
+
 [#CherrySimTester]
 == CherrySimTester
 CherrySimTester is used to write automated tests against the mesh. Typically a test will first set up a mesh network with a few nodes, possibly with different featuresets. Afterwards, it might wait until they are clustered and then send some terminal commands. Next, the simulation might wait for some message to be received so that the test is considered passing. Have a look at the available tests under `<fruitymesh>/cherrysim/test` to get a better understanding.
@@ -287,6 +308,7 @@ The simulator is able to store the flash of all nodes into a file, making it eas
 
 NOTE: This feature only stores the flash, not the RAM of the nodes. This means that if the simulator is shut down and booted up again with this file, all nodes only remember the configuration, not how they meshed up. Such a case is comparable with a complete power shortage of a mesh in the real world.
 
+[#FeaturesetSimulation]
 == Featureset simulation
 The simulator supports simulating an arbitrary amount of different featuresets. To add a new featureset to the list of used featuresets, add it to the list inside `CherrySim::PrepareSimulatedFeatureSets()`.
 
@@ -302,8 +324,11 @@ The simulator is able to store and load its configuration in JSON format. To see
 
 CAUTION: It is very important to keep both the `to_json` and `from_json` functions up to date when something in the configuration changes. This has to be done manually as C++ does not support reflection.
 
-== sim commands
+== Simulator Commands
 The simulator supports the use of special simulator commands. These commands all start with "sim ". They don't necessarily have a node as its execution target but are rather commands that have the simulator itself as target. Additionally, sim commands are treated differently as other messages as in they don't simulate the same restrictions for the length of the command. In fact a sim command can be arbitrarily long. Have a look at the `Terminal.cpp` and search for "sim " (with the space at the end and the quotation marks).
+
+== Working Directory
+If CherrySim has trouble loading some files (mostly with the integrated webserver) you can try to specify the working directory in an environment variable `CHERRYSIM_WORKDIR` without a trailing `/` like this: `/path/to/cherrysim`.
 
 == Legal Disclaimer
 Nordic allowed us in their forums to use their headers in our simulator as long as it

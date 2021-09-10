@@ -32,7 +32,9 @@
 #include "CherrySimTester.h"
 #include "CherrySimUtils.h"
 #include "Logger.h"
+
 #include <string>
+#include <vector>
 
 TEST(TestLogger, TestTags) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
@@ -249,5 +251,92 @@ TEST(TestLogger, TestBase64StringToBuffer)
         checkMemoryGuard(td.memoryGuard_2, sizeof(td.memoryGuard_2));
         checkMemoryGuard(td.memoryGuard_3, sizeof(td.memoryGuard_3));
         checkMemoryGuard(td.memoryGuard_4, sizeof(td.memoryGuard_4));
+    }
+}
+
+TEST(TestLogger, TestErrorLogErrorEntriesAreAppended)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose               = true;
+
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId       = 0;
+    simConfig.nodeConfigName.insert({"prod_sink_nrf52", 1});
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+    tester.SimulateForGivenTime(100);
+
+    {
+        NodeIndexSetter nodeIndexSetter{0};
+        auto &logger = Logger::GetInstance();
+
+        // Log more errors than there is space in the error log
+        for (std::size_t index = 0; index <= 2 * Logger::NUM_ERROR_LOG_ENTRIES; ++index)
+        {
+            logger.LogCustomError(static_cast<CustomErrorTypes>(123), 0x12345 + index);
+        }
+
+        std::vector<ErrorLogEntry> newErrorLogEntries;
+
+        // Fetch all error log entries matching the ones added before from the error log
+        for (ErrorLogEntry entry = {}; logger.PopErrorLogEntry(entry); )
+        {
+            if (entry.errorType == LoggingError::CUSTOM && entry.errorCode == 123)
+            {
+                newErrorLogEntries.emplace_back(entry);
+            }
+        }
+
+        ASSERT_GT(newErrorLogEntries.size(), 0);
+
+        // Check that all other entries are in-order, without gaps
+        for (std::size_t index = 0; index < newErrorLogEntries.size(); ++index)
+        {
+            const auto &entry = newErrorLogEntries[index];
+            EXPECT_EQ(entry.errorType, LoggingError::CUSTOM);
+            EXPECT_EQ(entry.errorCode, 123);
+            EXPECT_EQ(entry.extraInfo, 0x12345 + index);
+        }
+    }
+}
+
+TEST(TestLogger, TestErrorLogCountEntriesAreAccumulatedOrAppended)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose               = true;
+
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId       = 0;
+    simConfig.nodeConfigName.insert({"prod_sink_nrf52", 1});
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+    tester.SimulateForGivenTime(100);
+
+    {
+        NodeIndexSetter nodeIndexSetter{0};
+        auto &logger = Logger::GetInstance();
+
+        // Alternatingly log an error and a count
+        for (std::size_t index = 0; index < 2 * Logger::NUM_ERROR_LOG_ENTRIES; ++index)
+        {
+            logger.LogCustomError(static_cast<CustomErrorTypes>(123), 1);
+            logger.LogCustomCount(static_cast<CustomErrorTypes>(124), 1);
+        }
+
+        std::vector<ErrorLogEntry> countEntries;
+
+        // Fetch all error log entries matching the the counter from the error log
+        for (ErrorLogEntry entry = {}; logger.PopErrorLogEntry(entry); )
+        {
+            if (entry.errorType == LoggingError::CUSTOM && entry.errorCode == 124)
+            {
+                countEntries.emplace_back(entry);
+            }
+        }
+
+        ASSERT_EQ(countEntries.size(), 1);
+        ASSERT_EQ(countEntries[0].extraInfo, 2 * Logger::NUM_ERROR_LOG_ENTRIES);
     }
 }

@@ -22193,7 +22193,7 @@ define("src/app/simulator/view/hud/popupLayer/BeaconConnectionDetailsPopupLayer"
                     + "Free In: " + device.getModel().freeIn + "\n"
                     + "Free Out: " + device.getModel().freeOut + "\n"
                     + "Last Message Timestamp: " + device.getModel().lastSentMessageTimestampMs + "\n"
-                    + "Last Message: " + JSON.stringify(device.getModel().lastSentAdvertisingMessage);
+                    + "Last Message: " + device.getModel().lastSentAdvertisingMessage;
                 return content;
             }
             else {

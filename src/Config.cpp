@@ -332,6 +332,9 @@ void Conf::SetSerialNumberIndex(u32 serialNumber)
     configuration.overwrittenSerialNumberIndex = serialNumber;
     configuration.isSerialNumberIndexOverwritten = true;
 
+    GS->temporaryEnrollmentPtr->serialNumberIndex = serialNumber;
+    GS->temporaryEnrollmentPtr->crc32 = Utility::CalculateCrc32((u8*)GS->temporaryEnrollmentPtr, sizeof(TemporaryEnrollment) - sizeof(u32));
+
     RecordStorageResultCode err = SaveConfigToFlash(this, (u32)RecordTypeConf::SET_SERIAL, nullptr, 0);
     if (err != RecordStorageResultCode::SUCCESS)
     {
@@ -362,6 +365,9 @@ void Conf::GetRestrainedKey(u8* buffer) const
 void Conf::SetNodeKey(const u8 * key)
 {
     CheckedMemcpy(configuration.nodeKey, key, 16);
+
+    CheckedMemcpy(GS->temporaryEnrollmentPtr->nodeKey, key, 16);
+    GS->temporaryEnrollmentPtr->crc32 = Utility::CalculateCrc32((u8*)GS->temporaryEnrollmentPtr, sizeof(TemporaryEnrollment) - sizeof(u32));
 
     SaveConfigToFlash(nullptr, 0, nullptr, 0);
 }

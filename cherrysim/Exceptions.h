@@ -64,19 +64,25 @@ CREATEEXCEPTIONINHERITING(IllegalFruityMeshPacketException                      
 CREATEEXCEPTIONINHERITING(IntegerUnderflowException                                 , IllegalArgumentException);
 
 CREATEEXCEPTION(IllegalStateException);
-CREATEEXCEPTIONINHERITING(ZeroOnNonPodTypeException                , IllegalStateException);
-CREATEEXCEPTIONINHERITING(UartNotSetException                      , IllegalStateException);
-CREATEEXCEPTIONINHERITING(ReceivedWrongTimeSyncPacketException     , IllegalStateException);
-CREATEEXCEPTIONINHERITING(ModuleAllocatorMemoryAlreadySetException , IllegalStateException);
-CREATEEXCEPTIONINHERITING(ErrorCodeUnknownException                , IllegalStateException);
-CREATEEXCEPTIONINHERITING(RecordStorageIsLockedDownException       , IllegalStateException);
-CREATEEXCEPTIONINHERITING(StackOverflowException                   , IllegalStateException);
-CREATEEXCEPTIONINHERITING(AccessToRemovedConnectionException       , IllegalStateException);
-CREATEEXCEPTIONINHERITING(InternalTerminalCommandErrorException    , IllegalStateException);
-CREATEEXCEPTIONINHERITING(FileException                            , IllegalStateException);
-CREATEEXCEPTIONINHERITING(SigProvisioningFailedException           , IllegalStateException);
-CREATEEXCEPTIONINHERITING(SigCreateElementFailedException          , IllegalStateException);
-CREATEEXCEPTIONINHERITING(IncorrectHopsToSinkException             , IllegalStateException);
+CREATEEXCEPTIONINHERITING(ZeroOnNonPodTypeException                    , IllegalStateException);
+CREATEEXCEPTIONINHERITING(UartNotSetException                          , IllegalStateException);
+CREATEEXCEPTIONINHERITING(ReceivedWrongTimeSyncPacketException         , IllegalStateException);
+CREATEEXCEPTIONINHERITING(ModuleAllocatorMemoryAlreadySetException     , IllegalStateException);
+CREATEEXCEPTIONINHERITING(ErrorCodeUnknownException                    , IllegalStateException);
+CREATEEXCEPTIONINHERITING(RecordStorageIsLockedDownException           , IllegalStateException);
+CREATEEXCEPTIONINHERITING(StackOverflowException                       , IllegalStateException);
+CREATEEXCEPTIONINHERITING(AccessToRemovedConnectionException           , IllegalStateException);
+CREATEEXCEPTIONINHERITING(InternalTerminalCommandErrorException        , IllegalStateException);
+CREATEEXCEPTIONINHERITING(FileException                                , IllegalStateException);
+CREATEEXCEPTIONINHERITING(SigProvisioningFailedException               , IllegalStateException);
+CREATEEXCEPTIONINHERITING(SigCreateElementFailedException              , IllegalStateException);
+CREATEEXCEPTIONINHERITING(IncorrectHopsToSinkException                 , IllegalStateException);
+CREATEEXCEPTIONINHERITING(JsonParseException                           , IllegalStateException);
+CREATEEXCEPTIONINHERITING(InvalidTerminalIdException                   , IllegalStateException);
+CREATEEXCEPTIONINHERITING(NodeIdNotFoundException                      , IllegalStateException);
+CREATEEXCEPTIONINHERITING(TerminalIdNotFoundException                  , IllegalStateException);
+CREATEEXCEPTIONINHERITING(MulipleNodesHaveSameNodeIdException          , IllegalStateException);
+CREATEEXCEPTIONINHERITING(MulipleNodesHaveSameNodeAndNetworkIdException, IllegalStateException);
 
 CREATEEXCEPTION(BufferException);
 CREATEEXCEPTIONINHERITING(TriedToReadEmptyBufferException         , BufferException);

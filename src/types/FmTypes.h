@@ -208,6 +208,21 @@ struct RamRetainStruct {
     u32 crc32;
 };
 STATIC_ASSERT_SIZE(RamRetainStruct, RAM_PERSIST_STACKSTRACE_SIZE * 4 + 18);
+
+
+struct TemporaryEnrollment
+{
+    EnrollmentState enrollmentState;
+    u32 serialNumberIndex;
+    NodeId nodeId;
+    NetworkId networkId;
+    u8 nodeKey[16];
+    u8 networkKey[16];
+    u8 userBaseKey[16];
+    u8 organizationKey[16];
+    u32 crc32;
+};
+STATIC_ASSERT_SIZE(TemporaryEnrollment, 13 + 64);
 #pragma pack(pop)
 
 // Header for all module configurations

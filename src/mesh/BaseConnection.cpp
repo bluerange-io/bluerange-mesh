@@ -11,7 +11,7 @@
 // ** Licensees holding valid commercial Bluerange licenses may use this file in
 // ** accordance with the commercial license agreement provided with the
 // ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
+// ** a written agreement between them and M-Way Solutions GmbH.
 // ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
 // ** information use the contact form at https://www.bluerange.io/contact.
 // **
@@ -217,12 +217,15 @@ void BaseConnection::FillTransmitBuffers()
                     processedMessageLength);
         }
 
-        if(err == ErrorType::SUCCESS) 
+        if(err == ErrorType::SUCCESS)
         {
             SizedData sizedData;
             sizedData.data = data;
             sizedData.length = processedMessageLength.GetRaw();
-            queueOrigins.Push(queuePriorityPair.priority);
+            if (queueOrigins.Push(queuePriorityPair.priority) == false)
+            {
+                SIMEXCEPTION(IllegalStateException);
+            }
             activeQueue->IncrementLookAhead();
             PacketSuccessfullyQueuedWithSoftdevice(&sizedData);
         }
@@ -272,7 +275,7 @@ void BaseConnection::HandlePacketSent(u8 sentUnreliable, u8 sentReliable)
     //TODO: we must not send more than 100 packets from one queue, otherwise, the handles between
     //TODO: We should think about the terminology of "Splits", "Messages", and "Packets". How do we want to use these terms in the future?
     //the queues will not match anymore to the sequence in that the packets were sent
-    
+
     //We must iterate in a loop to delete all packets if more than one was sent
     u8 numSent = sentUnreliable + sentReliable;
 
@@ -294,10 +297,13 @@ void BaseConnection::HandlePacketSent(u8 sentUnreliable, u8 sentReliable)
             return;
         }
 
-        const DeliveryPriority queueOrigin = queueOrigins.Peek();
-        queueOrigins.Pop();
-        //Find the queue from which the packet was sent
-        ChunkedPacketQueue* activeQueue = queue.GetQueueByPriority(queueOrigin);
+        ChunkedPacketQueue *const activeQueue = [this]() {
+            DeliveryPriority deliveryPriority = {};
+            FRUITYMESH_ERROR_CHECK(queueOrigins.TryPeekAndPop(deliveryPriority) ? (u32)ErrorType::SUCCESS
+                                                                                : (u32)ErrorType::INVALID_STATE);
+
+            return queue.GetQueueByPriority(deliveryPriority);
+        }();
 
         if(activeQueue->HasPackets() == false)
         {
@@ -364,9 +370,9 @@ void BaseConnection::HandlePacketQueuingFail(u32 err)
     packetFailedToQueueCounter++;
 
     if (
-        err != (u32)ErrorType::DATA_SIZE && 
-        err != (u32)ErrorType::TIMEOUT && 
-        err != (u32)ErrorType::INVALID_ADDR && 
+        err != (u32)ErrorType::DATA_SIZE &&
+        err != (u32)ErrorType::TIMEOUT &&
+        err != (u32)ErrorType::INVALID_ADDR &&
         err != (u32)ErrorType::INVALID_PARAM) {
         //The remaining errors can happen if the gap connection is temporarily lost during reestablishing
         return;

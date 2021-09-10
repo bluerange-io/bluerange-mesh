@@ -55,7 +55,7 @@ void StackWatcher::Check()
 
     if (cleanedStackSize > 12000)
     {
-#if !defined(GITHUB_RELEASE) && !defined(__clang__) && !defined(SANITIZERS_ENABLED)
+#if !defined(GITHUB_RELEASE) && !defined(__clang__) && !defined(SANITIZERS_ENABLED) && !defined(__SANITIZE_ADDRESS__)
         SIMEXCEPTION(StackOverflowException);
 #else
         //The "GITHUB_RELEASE" configuration executes only github featuresets which, by definition, consume much more RAM.

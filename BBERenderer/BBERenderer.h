@@ -25,7 +25,8 @@ private:
 
     bool showConnections = true;
     bool showNodes       = true;
-    bool showPackets     = true;
+    bool showPackets = true;
+    int zPos             = 0;
 
 public:
     explicit BBERenderer(CherrySim* sim);
@@ -45,10 +46,17 @@ public:
 
     bbe::Vector3 clusterIdToColor(ClusterId id) const;
 
-    u32 getClosestIndexToMouse() const;
+    //Returns the node index that has the closest position to the mouse cursor
+    //Will return -1 if no node was found
+    //This will pay attention to the currently selected z position and will only
+    //mark displayed nodes
+    i32 getClosestIndexToMouse() const;
 
     bool isPaused() const;
     void reset();
 
     void addPacket(const NodeEntry* sender, const NodeEntry* receiver);
+
+    bool checkNodeVisible(const NodeEntry* node) const;
+    float getAlpha(const NodeEntry* node, bool veryFaint = false) const;
 };

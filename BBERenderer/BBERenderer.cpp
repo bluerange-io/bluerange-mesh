@@ -2,6 +2,7 @@
 #ifdef CHERRYSIM_TESTER_ENABLED
 #include "gtest/gtest.h"
 #endif
+#include <cmath>
 
 void BBERenderer::resetCamera()
 {
@@ -65,7 +66,7 @@ bool BBERenderer::getPosOfId(NodeId id, bbe::Vector2* pos) const
 {
     for (u32 i = 0; i < sim->GetTotalNodes(); i++)
     {
-        if (id == sim->nodes[i].id)
+        if (id == sim->nodes[i].GetNodeId())
         {
             *pos = getPosOfNodeEntry(sim->nodes[i]);
             return true;
@@ -102,15 +103,17 @@ bbe::Vector3 BBERenderer::clusterIdToColor(ClusterId id) const
     return bbe::Color::HSVtoRGB(hue, s, 1);
 }
 
-u32 BBERenderer::getClosestIndexToMouse() const
+i32 BBERenderer::getClosestIndexToMouse() const
 {
     const bbe::Vector2 mouse = getMouse();
 
-    u32 closestIndex = 0;
-    float closestDistance = mouse.getDistanceTo(getPosOfIndex(0));
+    i32 closestIndex = -1;
+    float closestDistance = FLT_MAX;
 
-    for (u32 i = 1; i < sim->GetTotalNodes(); i++)
+    for (u32 i = 0; i < sim->GetTotalNodes(); i++)
     {
+        if (!checkNodeVisible(&sim->nodes[i])) continue;
+
         const float dist = mouse.getDistanceTo(getPosOfIndex(i));
         if (dist < closestDistance)
         {
@@ -134,6 +137,8 @@ void BBERenderer::reset()
 
 void BBERenderer::addPacket(const NodeEntry* sender, const NodeEntry* receiver)
 {
+    if (!checkNodeVisible(sender)) return;
+
     const bbe::Vector2 start = bbe::Vector2{ sender  ->x, sender  ->y };
     const bbe::Vector2 stop  = bbe::Vector2{ receiver->x, receiver->y };
     const bbe::Vector2 diff = start - stop;
@@ -148,12 +153,17 @@ void BBERenderer::addPacket(const NodeEntry* sender, const NodeEntry* receiver)
 
 void BBERenderer::draw2D(bbe::PrimitiveBrush2D& brush)
 {
+    //Draw the map dimensions
+    brush.setColorRGB(0.1f, 0.1f, 0.1f);
+    brush.fillRect(worldPosToScreenPos({ 0, 0 }), bbe::Vector2({ sim->simConfig.mapWidthInMeters * zoomLevel, sim->simConfig.mapHeightInMeters * zoomLevel }));
+
     if (showConnections)
     {
         //Draw all GAP connections that exist in a red color
-        brush.setColorRGB(1, 0, 0);
         for (u32 i = 0; i < sim->GetTotalNodes(); i++)
         {
+            brush.setColorRGB(1, 0, 0, getAlpha(&sim->nodes[i], true));
+
             for (u32 k = 0; k < SIM_MAX_CONNECTION_NUM; k++)
             {
                 if (sim->nodes[i].state.connections[k].connectionActive)
@@ -163,8 +173,7 @@ void BBERenderer::draw2D(bbe::PrimitiveBrush2D& brush)
             }
         }
 
-        //Redraw all FruityMesh connections in green
-        brush.setColorRGB(0, 1, 0);
+        //Draw all FruityMesh connections
         for (u32 i = 0; i < sim->GetTotalNodes(); i++)
         {
             NodeIndexSetter setter(i);
@@ -177,8 +186,8 @@ void BBERenderer::draw2D(bbe::PrimitiveBrush2D& brush)
                     if (getPosOfId(conns.handles[k].GetPartnerId(), &partnerPos))
                     {
                         //Draw Handshaked connections in green and all other connection states in blue
-                        if (conns.handles[k].GetConnectionState() == ConnectionState::HANDSHAKE_DONE) brush.setColorRGB(0, 1, 0);
-                        else  brush.setColorRGB(0, 0, 1);
+                        if (conns.handles[k].GetConnectionState() == ConnectionState::HANDSHAKE_DONE) brush.setColorRGB(0, 1, 0, getAlpha(&sim->nodes[i], true));
+                        else  brush.setColorRGB(0, 0, 1, getAlpha(&sim->nodes[i], true));
 
                         brush.fillLine(getPosOfIndex(i), partnerPos);
                     }
@@ -197,12 +206,14 @@ void BBERenderer::draw2D(bbe::PrimitiveBrush2D& brush)
         }
     }
 
-    const u32 closestMouseIndex = getClosestIndexToMouse();
+    const i32 closestMouseIndex = getClosestIndexToMouse();
     if (showNodes)
     {
         //Highlight the active node
-        brush.setColorRGB(1, 1, 1);
-        brush.fillCircle(getPosOfIndex(closestMouseIndex) - bbe::Vector2{ 7, 7 }, 14, 14);
+        if (closestMouseIndex >= 0) {
+            brush.setColorRGB(1, 1, 1);
+            brush.fillCircle(getPosOfIndex(closestMouseIndex) - bbe::Vector2{ 7, 7 }, 14, 14);
+        }
 
         for (u32 i = 0; i < sim->GetTotalNodes(); i++)
         {
@@ -212,12 +223,12 @@ void BBERenderer::draw2D(bbe::PrimitiveBrush2D& brush)
                 float led2Value = sim->nodes[i].led2On ? 1.0f : 0.0f;
                 float led3Value = sim->nodes[i].led3On ? 1.0f : 0.0f;
 
-                brush.setColorRGB(led1Value, led2Value, led3Value);
+                brush.setColorRGB(led1Value, led2Value, led3Value, getAlpha(&sim->nodes[i]));
                 brush.fillCircle(getPosOfIndex(i) - bbe::Vector2{ 8, 8 }, 16, 16);
             }
 
             //Draw each node with the color of its cluster
-            brush.setColorRGB(clusterIdToColor(sim->nodes[i].gs.node.clusterId));
+            brush.setColorRGB(clusterIdToColor(sim->nodes[i].gs.node.clusterId), getAlpha(&sim->nodes[i]));
             brush.fillCircle(getPosOfIndex(i) - bbe::Vector2{ 5, 5 }, 10, 10);
         }
     }
@@ -234,46 +245,79 @@ void BBERenderer::draw2D(bbe::PrimitiveBrush2D& brush)
     if (testInfo) testName = testInfo->name();
     ImGui::Text("Test Name:   %s", testName);
 #endif
-    ImGui::Text("Cl. Done:    %s", sim->IsClusteringDone() ? "True" : "False");
-    ImGui::Text("Map Width:   %d", sim->simConfig.mapWidthInMeters);
-    ImGui::Text("Map Height:  %d", sim->simConfig.mapHeightInMeters);
-    ImGui::Text("Time:        %.3fs", sim->simState.simTimeMs / 1000.f);
+    ImGui::Text("Cl. Done:      %s", sim->IsClusteringDone() ? "True" : "False");
+    ImGui::Text("Map Width:     %d m", sim->simConfig.mapWidthInMeters);
+    ImGui::Text("Map Height:    %d m", sim->simConfig.mapHeightInMeters);
+    ImGui::Text("Map Elevation: %d m", sim->simConfig.mapElevationInMeters);
+    ImGui::Text("Time:          %.3f s", sim->simState.simTimeMs / 1000.f);
     ImGui::End();
 
     ImGui::SetNextWindowSize({(float)getScaledWindowWidth() / 5.f, (float)getScaledWindowHeight() / 2});
     ImGui::SetNextWindowPos({ (float)getScaledWindowWidth() * 4.f / 5.f, (float)getScaledWindowHeight() / 2 });
     ImGui::Begin("Mouse Node Stats");
     {
-        NodeIndexSetter setter(closestMouseIndex);
-        ImGui::Text("Serial:            %s", GS->config.GetSerialNumber());
-        ImGui::Text("Featureset:        %s", FEATURESET_NAME);
-        ImGui::Text("Node ID:           %d", GS->node.configuration.nodeId);
-        ImGui::Text("Network ID:        %d", GS->node.configuration.networkId);
-        ImGui::Text("Cluster ID:        %u", GS->node.clusterId);
-        ImGui::Text("Cluster size:      %d", GS->node.GetClusterSize());
-        ImGui::Text("Free In:           %d", GS->cm.freeMeshInConnections);
-        ImGui::Text("Free Out:          %d", GS->cm.freeMeshOutConnections);
+        if (closestMouseIndex >= 0) {
+            NodeIndexSetter setter(closestMouseIndex);
+            ImGui::Text("Serial:            %s", GS->config.GetSerialNumber());
+            ImGui::Text("Featureset:        %s", FEATURESET_NAME);
+            ImGui::Text("Node ID:           %d", GS->node.configuration.nodeId);
+            ImGui::Text("Network ID:        %d", GS->node.configuration.networkId);
+            ImGui::Text("Cluster ID:        %u", GS->node.clusterId);
+            ImGui::Text("Cluster size:      %d", GS->node.GetClusterSize());
+            ImGui::Text("Free In:           %d", GS->cm.freeMeshInConnections);
+            ImGui::Text("Free Out:          %d", GS->cm.freeMeshOutConnections);
+            ImGui::Text("PosX/Y:            %.01f m, %.01f m", cherrySimInstance->currentNode->GetXinMeters(), cherrySimInstance->currentNode->GetYinMeters());
+            ImGui::Text("PosZ:              %.01f m", cherrySimInstance->currentNode->GetZinMeters());
+        }
+        else {
+            ImGui::Text("No node selected");
+        }
     }
     ImGui::End();
 
     ImGui::SetNextWindowSize({ (float)getScaledWindowWidth() * 4.f / 5.f, (float)getScaledWindowHeight() / 13.f });
     ImGui::SetNextWindowPos({ 0, (float)getScaledWindowHeight() * 12.f / 13.f});
     ImGui::Begin("Control");
-    if (ImGui::Button("Reset Camera"))
+    if (ImGui::Button("Reset View"))
     {
         resetCamera();
     }
-    ImGui::SameLine(0, 100);
+    ImGui::SameLine(0, 20);
     ImGui::Checkbox("Paused", &paused);
-    ImGui::SameLine(0, 100);
+    ImGui::SameLine(0, 20);
     ImGui::Checkbox("Show Connections", &showConnections);
-    ImGui::SameLine(0, 100);
+    ImGui::SameLine(0, 20);
     ImGui::Checkbox("Show Nodes", &showNodes);
-    ImGui::SameLine(0, 100);
+    ImGui::SameLine(0, 20);
     ImGui::Checkbox("Show Packets", &showPackets);
+    ImGui::SameLine(0, 20);
+    ImGui::Checkbox("FastForward", &sim->renderLess);
+    ImGui::SameLine(0, 20);
+    ImGui::SetNextItemWidth(100);
+    ImGui::SliderInt("Z-pos", &zPos, 0, sim->simConfig.mapElevationInMeters, "%d m");
     ImGui::End();
+
 }
 
 void BBERenderer::onEnd()
 {
+}
+
+bool BBERenderer::checkNodeVisible(const NodeEntry* node) const
+{
+    //A node is visible if it is within +/-5 m of the currently selected Zpos
+    return std::abs(zPos - node->GetZinMeters()) < 5.0f;
+}
+
+float BBERenderer::getAlpha(const NodeEntry* node, bool veryFaint) const
+{
+    //Visible nodes have 100% alpha
+    if (checkNodeVisible(node)) return 1.0f;
+    //Nodes with more than 50 meter distance are shown faded
+    else if (std::abs(zPos - node->GetZinMeters()) < 50.0f) {
+        if (veryFaint) return 0.01f;
+        else return 0.1;
+    }
+    //Everything that is more far is not displayed at all
+    else return 0.0;
 }
