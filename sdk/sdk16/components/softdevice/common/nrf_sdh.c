@@ -41,6 +41,10 @@
 #include "sdk_common.h"
 #if NRF_MODULE_ENABLED(NRF_SDH)
 
+#ifdef FEATURESET
+#include <Boardconfig.h>
+#endif
+
 #include "nrf_sdh.h"
 
 #include <stdint.h>
@@ -73,11 +77,14 @@ NRF_LOG_MODULE_REGISTER();
     #include "app_scheduler.h"
 #endif
 
+// ########################### Modification
+/*
 #if (   (NRF_SDH_CLOCK_LF_SRC      == NRF_CLOCK_LF_SRC_RC)          \
      && (NRF_SDH_CLOCK_LF_ACCURACY != NRF_CLOCK_LF_ACCURACY_500_PPM))
     #warning Please select NRF_CLOCK_LF_ACCURACY_500_PPM when using NRF_CLOCK_LF_SRC_RC
 #endif
-
+*/
+// ########################### Modification End
 
 // Create section "sdh_req_observers".
 NRF_SECTION_SET_DEF(sdh_req_observers, nrf_sdh_req_observer_t, NRF_SDH_REQ_OBSERVER_PRIO_LEVELS);
@@ -199,6 +206,9 @@ ret_code_t nrf_sdh_enable_request(void)
     // Notify observers about starting SoftDevice enable process.
     sdh_state_observer_notify(NRF_SDH_EVT_STATE_ENABLE_PREPARE);
 
+// ########################### Modification
+// For FruityMesh, we load the BoardConfiguration at runtime
+#ifndef FEATURESET
     nrf_clock_lf_cfg_t const clock_lf_cfg =
     {
         .source       = NRF_SDH_CLOCK_LF_SRC,
@@ -206,6 +216,23 @@ ret_code_t nrf_sdh_enable_request(void)
         .rc_temp_ctiv = NRF_SDH_CLOCK_LF_RC_TEMP_CTIV,
         .accuracy     = NRF_SDH_CLOCK_LF_ACCURACY
     };
+#else
+    // Configure the clock source
+	nrf_clock_lf_cfg_t clock_lf_cfg;
+	if(fmBoardConfigPtr->lfClockSource == NRF_CLOCK_LF_SRC_XTAL || fmBoardConfigPtr->lfClockSource == NRF_CLOCK_LF_SRC_SYNTH){
+		clock_lf_cfg.source = fmBoardConfigPtr->lfClockSource;
+		clock_lf_cfg.rc_ctiv = 0; //Must be 0 for this clock source
+		clock_lf_cfg.rc_temp_ctiv = 0; //Must be 0 for this clock source
+		clock_lf_cfg.accuracy = fmBoardConfigPtr->lfClockAccuracy;
+	} else {
+		//Use the internal clock of the nrf52 with recommended settings
+		clock_lf_cfg.source = NRF_CLOCK_LF_SRC_RC;
+		clock_lf_cfg.rc_ctiv = 16; //recommended setting for nrf52
+		clock_lf_cfg.rc_temp_ctiv = 2; //recommended setting for nrf52
+		clock_lf_cfg.accuracy = NRF_CLOCK_LF_ACCURACY_500_PPM; //ppm of the internal clock source for all nrf52 (due to chip errata)
+	}
+#endif
+ // ########################### Modification end
 
     CRITICAL_REGION_ENTER();
 #ifdef ANT_LICENSE_KEY
