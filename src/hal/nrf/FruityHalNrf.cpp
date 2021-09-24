@@ -127,6 +127,14 @@ extern "C" {
 static_assert(SD_EVT_IRQ_PRIORITY == APP_TIMER_CONFIG_IRQ_PRIORITY, "Check irq priorities");
 #endif
 
+#if (SDK == 16)
+
+NRF_BLE_GQ_DEF(m_ble_gatt_queue,
+               NRF_SDH_BLE_CENTRAL_LINK_COUNT,
+               NRF_BLE_GQ_QUEUE_SIZE);
+
+#endif
+
 constexpr u8 MAX_GPIOTE_HANDLERS = 4;
 struct GpioteHandlerValues
 {
@@ -150,7 +158,7 @@ struct NrfHalMemory
     u8 gpioteHandlersCreated;
     ble_evt_t const * currentEvent;
     u8 timersCreated;
-#if SDK == 15
+#if SDK == 15 || SDK == 16
     ble_gap_adv_data_t advData;
 #endif
 #if IS_ACTIVE(TIMESLOT)
@@ -699,7 +707,7 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
         break;
     case BLE_GAP_EVT_ADV_REPORT:
         {
-#if (SDK == 15)
+#if (SDK == 15 || SDK == 16)
             //In the later version of the SDK, we need to call sd_ble_gap_scan_start again with a nullpointer to continue to receive scan data
             if (bleEvent.evt.gap_evt.params.adv_report.type.status != BLE_GAP_ADV_DATA_STATUS_INCOMPLETE_MORE_DATA)
             {
@@ -988,7 +996,7 @@ i8 FruityHal::GapAdvertisementReportEvent::GetRssi() const
 
 const u8 * FruityHal::GapAdvertisementReportEvent::GetData() const
 {
-#if (SDK == 15)
+#if (SDK == 15 || SDK == 16)
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.data.p_data;
 #else
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.data;
@@ -997,7 +1005,7 @@ const u8 * FruityHal::GapAdvertisementReportEvent::GetData() const
 
 u32 FruityHal::GapAdvertisementReportEvent::GetDataLength() const
 {
-#if (SDK == 15)
+#if (SDK == 15 || SDK == 16)
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.data.len;
 #else
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.dlen;
@@ -1018,7 +1026,7 @@ FruityHal::BleGapAddrType FruityHal::GapAdvertisementReportEvent::GetPeerAddrTyp
 
 bool FruityHal::GapAdvertisementReportEvent::IsConnectable() const
 {
-#if (SDK == 15)
+#if (SDK == 15 || SDK == 16)
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.type.connectable == 0x01;
 #else
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.adv_report.type == BLE_GAP_ADV_TYPE_ADV_IND;
@@ -1099,7 +1107,7 @@ FruityHal::GapTimeoutSource FruityHal::GapTimeoutEvent::GetSource() const
 {
     switch (((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gap_evt.params.timeout.src)
     {
-#if (SDK != 15)
+#if (SDK == 14)
     case BLE_GAP_TIMEOUT_SRC_ADVERTISING:
         return GapTimeoutSource::ADVERTISING;
 #endif
@@ -1333,7 +1341,7 @@ ErrorType FruityHal::BleGapScanStart(BleGapScanParams const &scanParams)
     scan_params.timeout = scanParams.timeout;
     scan_params.window = scanParams.window;
 
-#if (SDK == 15)    
+#if (SDK == 15 || SDK == 16)    
     scan_params.report_incomplete_evts = 0;
     scan_params.filter_policy = BLE_GAP_SCAN_FP_ACCEPT_ALL;
     scan_params.extended = 0;
@@ -1345,7 +1353,7 @@ ErrorType FruityHal::BleGapScanStart(BleGapScanParams const &scanParams)
     scan_params.use_whitelist = 0;
 #endif
 
-#if (SDK == 15)
+#if (SDK == 15 || SDK == 16)
     ble_data_t scan_data;
     scan_data.len = BLE_GAP_SCAN_BUFFER_MAX;
     scan_data.p_data = GS->scanBuffer;
@@ -1369,7 +1377,7 @@ static u8 AdvertisingTypeToNrf(FruityHal::BleGapAdvType type)
 {
     switch (type)
     {
-#if SDK == 15
+#if SDK == 15 || SDK == 16
         case FruityHal::BleGapAdvType::ADV_IND:
             return BLE_GAP_ADV_TYPE_CONNECTABLE_SCANNABLE_UNDIRECTED;
         case FruityHal::BleGapAdvType::ADV_DIRECT_IND:
@@ -1396,7 +1404,7 @@ static u8 AdvertisingTypeToNrf(FruityHal::BleGapAdvType type)
 ErrorType FruityHal::BleGapAdvStart(u8 * advHandle, BleGapAdvParams const &advParams)
 {
     u32 err;
-#if (SDK == 15)
+#if (SDK == 15 || SDK == 16)
     // logt("FH", "adv used: %u", (u32)myData.used);
     ble_gap_adv_params_t adv_params;
     CheckedMemset(&adv_params, 0x00, sizeof(adv_params));
@@ -1431,14 +1439,14 @@ ErrorType FruityHal::BleGapAdvStart(u8 * advHandle, BleGapAdvParams const &advPa
     adv_params.type = AdvertisingTypeToNrf(advParams.type);
     err = sd_ble_gap_adv_start(&adv_params, BLE_CONN_CFG_TAG_FM);
     logt("FH", "Adv start (%u) typ %u, iv %u, mask %u", err, adv_params.type, adv_params.interval, *((u8*)&adv_params.channel_mask));
-#endif // (SDK == 15)
+#endif // (SDK == 15 || SDK == 16)
     return nrfErrToGeneric(err);
 }
 
 ErrorType FruityHal::BleGapAdvDataSet(u8 * p_advHandle, u8 *advData, u8 advDataLength, u8 *scanData, u8 scanDataLength)
 {
     u32 err = 0;
-#if (SDK == 15)
+#if (SDK == 15 || SDK == 16)
     NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
     halMemory->advData.adv_data.p_data = (u8 *)advData;
     halMemory->advData.adv_data.len = advDataLength;
@@ -1462,14 +1470,14 @@ ErrorType FruityHal::BleGapAdvDataSet(u8 * p_advHandle, u8 *advData, u8 advDataL
             );
 
     logt("FH", "Adv data set (%u)", err);
-#endif // (SDK == 15)
+#endif // (SDK == 15 || SDK == 16)
     return nrfErrToGeneric(err);
 }
 
 ErrorType FruityHal::BleGapAdvStop(u8 advHandle)
 {
     u32 err;
-#if (SDK == 15)
+#if (SDK == 15 || SDK == 16)
     err = sd_ble_gap_adv_stop(advHandle);
 #else
     err = sd_ble_gap_adv_stop();
@@ -1493,7 +1501,7 @@ ErrorType FruityHal::BleGapConnect(FruityHal::BleGapAddr const &peerAddress, Ble
     p_scan_params.timeout = scanParams.timeout;
     p_scan_params.window = scanParams.window;
 
-#if (SDK == 15)    
+#if (SDK == 15 || SDK == 16)    
     p_scan_params.report_incomplete_evts = 0;
     p_scan_params.filter_policy = BLE_GAP_SCAN_FP_ACCEPT_ALL;
     p_scan_params.extended = 0;
@@ -1683,7 +1691,24 @@ ErrorType FruityHal::DiscovereServiceInit(DBDiscoveryHandler dbEventHandler)
 {
 #ifndef  SIM_ENABLED
     dbDiscoveryHandler = dbEventHandler;
+
+#if (SDK == 16)
+
+    ble_db_discovery_init_t db_init;
+
+    memset(&db_init, 0, sizeof(ble_db_discovery_init_t));
+
+    db_init.evt_handler  = DatabaseDiscoveryHandler;
+    db_init.p_gatt_queue = &m_ble_gatt_queue;
+
+    return nrfErrToGeneric(ble_db_discovery_init(&db_init));
+
+#else
+
     return nrfErrToGeneric(ble_db_discovery_init(DatabaseDiscoveryHandler));
+
+#endif
+
 #else
     GS->dbDiscoveryHandler = dbEventHandler;
 #endif
@@ -1785,7 +1810,7 @@ ErrorType FruityHal::BleGattCharAdd(u16 service_handle, BleGattCharMd const & ch
     ble_gatts_char_md_t sd_char_md;
     ble_gatts_attr_t sd_attr_char_value;
     
-    static_assert(SDK <= 15, "Check mapping");
+    static_assert(SDK <= 16, "Check mapping");
 
     CheckedMemcpy(&sd_char_md, &char_md, sizeof(ble_gatts_char_md_t));
     CheckedMemcpy(&sd_attr_char_value, &attr_char_value, sizeof(ble_gatts_attr_t));
@@ -1846,7 +1871,7 @@ ErrorType FruityHal::RadioSetTxPower(i8 tx_power, TxRole role, u16 handle)
     }
 
     u32 err;
-#if (SDK == 15)
+#if (SDK == 15 || SDK == 16)
     u8 txRole;
     if (role == TxRole::CONNECTION) txRole = BLE_GAP_TX_POWER_ROLE_CONN;
     else if (role == TxRole::ADVERTISING) txRole = BLE_GAP_TX_POWER_ROLE_ADV;
@@ -1902,7 +1927,7 @@ ErrorType FruityHal::InitializeButtons()
     buttonConfig.pull = NRF_GPIO_PIN_PULLUP;
     buttonConfig.is_watcher = 0;
     buttonConfig.hi_accuracy = 0;
-#if SDK == 15
+#if SDK == 15 || SDK == 16
     buttonConfig.skip_gpio_setup = 0;
 #endif
 
@@ -2528,7 +2553,7 @@ ErrorType FruityHal::GpioConfigureInterrupt(u32 pin, FruityHal::GpioPullMode mod
     in_config.hi_accuracy = true;
     in_config.pull = GenericPullModeToNrf(mode);
     in_config.sense = GenericPolarityToNrf(trigger);
-#if SDK == 15
+#if SDK == 15 || SDK == 16
     in_config.skip_gpio_setup = 0;
 #endif
 
@@ -3640,7 +3665,7 @@ ErrorType FruityHal::TwiInit(i32 sclPin, i32 sdaPin)
     const nrf_drv_twi_config_t twiConfig = {
             .scl                = (u32)sclPin,
             .sda                = (u32)sdaPin,
-#if SDK == 15
+#if SDK == 15 || SDK == 16
             .frequency          = NRF_DRV_TWI_FREQ_250K,
 #else
             .frequency          = NRF_TWI_FREQ_250K,

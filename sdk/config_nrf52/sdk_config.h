@@ -63,7 +63,11 @@
 #endif
 //#################################################
 
-
+//==========================================================
+// <o> NRF_BLE_GQ_QUEUE_SIZE - Queue size for BLE GATT Queue module. 
+#ifndef NRF_BLE_GQ_QUEUE_SIZE
+#define NRF_BLE_GQ_QUEUE_SIZE 4
+#endif
 
 // <h> Board Support 
 
@@ -1221,6 +1225,40 @@
 #ifndef BLE_RACP_ENABLED
 #define BLE_RACP_ENABLED 0
 #endif
+
+// <q> NRF_BLE_GATT_ENABLED  - nrf_ble_gatt - GATT module
+ 
+
+#ifndef NRF_BLE_GATT_ENABLED
+#define NRF_BLE_GATT_ENABLED 1
+#endif
+
+// <e> NRF_BLE_GQ_ENABLED - nrf_ble_gq - BLE GATT Queue Module
+//==========================================================
+#ifndef NRF_BLE_GQ_ENABLED
+#define NRF_BLE_GQ_ENABLED 1
+#endif
+// <o> NRF_BLE_GQ_DATAPOOL_ELEMENT_SIZE - Default size of a single element in the pool of memory objects. 
+#ifndef NRF_BLE_GQ_DATAPOOL_ELEMENT_SIZE
+#define NRF_BLE_GQ_DATAPOOL_ELEMENT_SIZE 20
+#endif
+
+// <o> NRF_BLE_GQ_DATAPOOL_ELEMENT_COUNT - Default number of elements in the pool of memory objects. 
+#ifndef NRF_BLE_GQ_DATAPOOL_ELEMENT_COUNT
+#define NRF_BLE_GQ_DATAPOOL_ELEMENT_COUNT 8
+#endif
+
+// <o> NRF_BLE_GQ_GATTC_WRITE_MAX_DATA_LEN - Maximal size of the data inside GATTC write request (in bytes). 
+#ifndef NRF_BLE_GQ_GATTC_WRITE_MAX_DATA_LEN
+#define NRF_BLE_GQ_GATTC_WRITE_MAX_DATA_LEN 16
+#endif
+
+// <o> NRF_BLE_GQ_GATTS_HVX_MAX_DATA_LEN - Maximal size of the data inside GATTC notification or indication request (in bytes). 
+#ifndef NRF_BLE_GQ_GATTS_HVX_MAX_DATA_LEN
+#define NRF_BLE_GQ_GATTS_HVX_MAX_DATA_LEN 16
+#endif
+
+// </e>
 
 // <e> NRF_BLE_CONN_PARAMS_ENABLED - ble_conn_params - Initiating and executing a connection parameters negotiation procedure
 //==========================================================
@@ -3764,7 +3802,7 @@
 // <e> NRF_BALLOC_ENABLED - nrf_balloc - Block allocator module
 //==========================================================
 #ifndef NRF_BALLOC_ENABLED
-#define NRF_BALLOC_ENABLED 0
+#define NRF_BALLOC_ENABLED 1
 #endif
 // <e> NRF_BALLOC_CONFIG_DEBUG_ENABLED - Enables debug mode in the module.
 //==========================================================
@@ -3804,6 +3842,13 @@
 
 #ifndef NRF_BALLOC_CONFIG_DATA_TRASHING_CHECK_ENABLED
 #define NRF_BALLOC_CONFIG_DATA_TRASHING_CHECK_ENABLED 0
+#endif
+
+// <q> NRF_BALLOC_CLI_CMDS  - Enable CLI commands specific to the module
+ 
+
+#ifndef NRF_BALLOC_CLI_CMDS
+#define NRF_BALLOC_CLI_CMDS 0
 #endif
 
 // </e>
@@ -4063,9 +4108,19 @@
 // <q> NRF_QUEUE_ENABLED  - nrf_queue - Queue module
  
 
+// <e> NRF_QUEUE_ENABLED - nrf_queue - Queue module
+//==========================================================
 #ifndef NRF_QUEUE_ENABLED
-#define NRF_QUEUE_ENABLED 0
+#define NRF_QUEUE_ENABLED 1
 #endif
+// <q> NRF_QUEUE_CLI_CMDS  - Enable CLI commands specific to the module
+ 
+
+#ifndef NRF_QUEUE_CLI_CMDS
+#define NRF_QUEUE_CLI_CMDS 0
+#endif
+
+// </e>
 
 // <q> NRF_SECTION_ITER_ENABLED  - nrf_section_iter - Section iterator
  
@@ -8507,6 +8562,13 @@
 
 #ifndef NRF_BLE_GATT_BLE_OBSERVER_PRIO
 #define NRF_BLE_GATT_BLE_OBSERVER_PRIO 2
+#endif
+
+// <o> NRF_BLE_GQ_BLE_OBSERVER_PRIO  
+// <i> Priority with which BLE events are dispatched to the GATT Queue module.
+
+#ifndef NRF_BLE_GQ_BLE_OBSERVER_PRIO
+#define NRF_BLE_GQ_BLE_OBSERVER_PRIO 1
 #endif
 
 // <o> NRF_BLE_QWR_BLE_OBSERVER_PRIO  

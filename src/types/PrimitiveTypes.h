@@ -131,6 +131,7 @@ enum class Chipset : NodeId
     CHIP_INVALID = 0,
     //CHIP_NRF51 = 20000, //Deprecated as of 09.04.2020
     CHIP_NRF52 = 20001,
+    CHIP_NRF52833 = 20014,
     CHIP_NRF52840 = 20015,
 };
 

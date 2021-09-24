@@ -28,64 +28,9 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
- * This file is a defintion of hardware/software capabilities of supported platforms.
- * It does not define whether or not a feature is active, but if it could be activated
- * on the given platform. As such, it is not part of configuration and should not
- * vary among featuresets.
- */
 
-#pragma once
-
-#define FEATURE_AVAILABLE(FEATURE) (FEATURE ## _AVAILABLE)
-
-// Chipset string name
-#if defined(NRF52)
-    #define CHIPSET_NAME "NRF52"
-#elif defined(SIM_ENABLED)
-    #define CHIPSET_NAME "SIMULATOR"
-#elif defined(ARM_TEMPLATE)
-    #define CHIPSET_NAME "ARM"
-#else
-    #error "No defined chipset"
-#endif
-
-// Chipset board ID
-#if defined(NRF52832)
-    #define BOARD_TYPE 4
-#elif defined(NRF52833)
-    #define BOARD_TYPE 4
-#elif defined(NRF52840)
-    #define BOARD_TYPE 18
-#elif defined(SIM_ENABLED)
-    #define BOARD_TYPE 19
-#elif defined(ARM_TEMPLATE)
-    #define BOARD_TYPE 1 // just for now
-#else
-    #error "No defined chipset"
-#endif
-
-// INS
-#if defined(NRF52840)
-    #define INS_AVAILABLE 1
-#elif defined(NRF52)
-    #define INS_AVAILABLE 0
-#elif defined(SIM_ENABLED)
-    #define INS_AVAILABLE 1
-#elif defined(ARM_TEMPLATE)
-    #define INS_AVAILABLE 0
-#else
-    #error "No defined chipset"
-#endif
-
-// adc internal measurement
-#if defined(NRF52)
-    #define ADC_INTERNAL_MEASUREMENT_AVAILABLE 1
-#elif defined(SIM_ENABLED)
-    #define ADC_INTERNAL_MEASUREMENT_AVAILABLE 0
-#elif defined(ARM_TEMPLATE)
-    #define ADC_INTERNAL_MEASUREMENT_AVAILABLE 1
-#else
-    #error "No defined chipset"
-#endif
-
+//The following can be undefined to drastically change the size of the firmware
+#define ACTIVATE_LOGGING 1 //Undefine to remove most human readable logs
+#define ACTIVATE_JSON_LOGGING 1 //Undefine to remove json communication over uart
+#define ACTIVATE_UART 1 //Undefine to remove the UART terminal
+#define ACTIVATE_SEGGER_RTT 1 //Undefine to disable debugging over Segger Rtt

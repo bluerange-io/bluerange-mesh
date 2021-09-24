@@ -120,11 +120,11 @@ if(BUILD_FEATURESETS)
        message(FATAL_ERROR "Featureset ${FEATURE_SET} failed to set mandatory variable: PLATFORM")
     endif()
 
-    if (${PLATFORM} STREQUAL "NRF52832" OR ${PLATFORM} STREQUAL "NRF52840")
+    if (${PLATFORM} STREQUAL "NRF52832" OR ${PLATFORM} STREQUAL "NRF52840" OR ${PLATFORM} STREQUAL "NRF52833")
       set(CHIP NRF)
     elseif(${PLATFORM} STREQUAL "ARM")
       set(CHIP ARM)
-    endif (${PLATFORM} STREQUAL "NRF52832" OR ${PLATFORM} STREQUAL "NRF52840")
+    endif (${PLATFORM} STREQUAL "NRF52832" OR ${PLATFORM} STREQUAL "NRF52840" OR ${PLATFORM} STREQUAL "NRF52833")
     
     # We block malloc usage as all the allocations should be done statically or on the stack
     if(NOT DEFINED ALLOW_MALLOC)
@@ -140,6 +140,13 @@ if(BUILD_FEATURESETS)
       target_compile_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m4")
       target_link_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m4")
       list(APPEND SDK_14_TARGETS ${FEATURE_SET})
+
+    elseif (${PLATFORM} STREQUAL "NRF52833")
+      target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__HEAP_SIZE=4096>)
+      target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__STACK_SIZE=4096>)
+      target_compile_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m4")
+      target_link_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m4")
+      list(APPEND SDK_16_TARGETS ${FEATURE_SET})
 
     elseif (${PLATFORM} STREQUAL "NRF52840")
       target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__HEAP_SIZE=4096>)
@@ -191,6 +198,8 @@ if(BUILD_FEATURESETS)
     if (${PLATFORM} STREQUAL "NRF52832")
       set(MAX_SIZE 167936) #max app size 4096 * 41
     # TODO: Is that still relevant? we have more space on that chip
+    elseif (${PLATFORM} STREQUAL "NRF52833")
+      set(MAX_SIZE 167936) #max app size 4096 * 41
     elseif (${PLATFORM} STREQUAL "NRF52840")
       set(MAX_SIZE 167936) #max app size 4096 * 41
     elseif (${PLATFORM} STREQUAL "ARM")
@@ -218,6 +227,9 @@ if(BUILD_FEATURESETS)
     if (${CHIP} STREQUAL "NRF")
       if (${PLATFORM} STREQUAL "NRF52832")
         set(SOFTDEVICE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/softdevice/s132_nrf52_5.1.0_softdevice.hex)
+        set(FAMILY NRF52)
+      elseif (${PLATFORM} STREQUAL "NRF52833")
+        set(SOFTDEVICE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/softdevice/s140_nrf52_7.0.1_softdevice.hex)
         set(FAMILY NRF52)
       elseif (${PLATFORM} STREQUAL "NRF52840")
         set(SOFTDEVICE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/softdevice/s140_nrf52840_6.1.0_softdevice.hex)

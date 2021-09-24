@@ -173,6 +173,7 @@ enum class FeatureSetGroup : NodeId
     /*FruityDeploy-FeatureSetGroup*/NRF52_DEV_GITHUB      = 20031,
     /*FruityDeploy-FeatureSetGroup*/NRF52840_DEV_GITHUB   = 20032,
     /*FruityDeploy-FeatureSetGroup*/NRF52_RV_WEATHER_MESH = 20033,
+    /*FruityDeploy-FeatureSetGroup*/NRF52833_DEV_GITHUB   = 20034,    
 };
 
 //Sets the maximum number of firmware group ids that can be compiled into the firmware
