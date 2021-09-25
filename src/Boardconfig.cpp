@@ -36,6 +36,7 @@
 
 extern void SetBoard_4(BoardConfiguration* c);
 extern void SetBoard_18(BoardConfiguration* c);
+extern void SetBoard_28(BoardConfiguration* c);
 extern void SetBoard_19(BoardConfiguration* c);
 
 void* fmBoardConfigPtr;
@@ -85,6 +86,7 @@ void Boardconf::ResetToDefaultConfiguration()
     //Now, we load all Default boards (nRf Development kits)
     SetBoard_4(&configuration);
     SetBoard_18(&configuration);
+    SetBoard_28(&configuration);
 
 #ifdef SIM_ENABLED
 #ifndef GITHUB_RELEASE
