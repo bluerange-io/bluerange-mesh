@@ -530,6 +530,7 @@ namespace FruityHal
     void GetDeviceAddress(u8 * p_address);
 
     u32 GetHalMemorySize();
+    void InitHalMemory();
 
     // ######################### Timeslot API ############################
 
