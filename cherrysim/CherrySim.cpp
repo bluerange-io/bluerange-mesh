@@ -2061,6 +2061,7 @@ void CherrySim::BootCurrentNode()
     u32* halMemory = new u32[halMemorySize];
     CheckedMemset(halMemory, 0, halMemorySize * sizeof(u32));
     GS->halMemory = halMemory;
+    FruityHal::InitHalMemory();
 
     //############## Boot the node using the FruityMesh boot routine
     BootFruityMesh();
