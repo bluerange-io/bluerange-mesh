@@ -155,6 +155,7 @@ TESTER_PUBLIC:
     std::string AnimationGetName(u32 serialNumber);
     void AnimationStart(u32 serialNumber, const std::string& name);
     void AnimationStop(u32 serialNumber);
+    void AnimationShake(u32 serialNumber);
     bool AnimationLoadJsonFromPath(const char* path);
 
     void StoreFlashToFile();

@@ -700,4 +700,32 @@ TEST(TestMoveAnimation, TestMovementZ) {
     tester.SimulateUntilRegexMessageReceived(20 * 1000, 7, "Serial BBBBK.*rssi -7\\d");
 }
 
+
+//Lets an asset tag move from left to right while also increasing its z coordinate
+TEST(TestMoveAnimation, TestShakeAnimation) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_asset_nrf52", 1 });
+    simConfig.terminalId = 0;
+    simConfig.mapWidthInMeters = 10;
+    simConfig.mapHeightInMeters = 10;
+    //testerConfig.verbose = true;
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.sim->nodes[1].uicr.CUSTOMER[1] = 20; //Set the asset tag board id to an id that supports Accelerometer
+
+    tester.Start();
+
+    tester.SimulateForGivenTime(10 * 1000);
+
+    //In the beginning the asset tag does not report movement
+    tester.SimulateUntilMessageReceived(60 * 1000, 1, R"("moving":0)");
+
+    tester.SendTerminalCommand(1, "sim animation shake BBBBC");
+
+    //After shaking the asset tag, it should report movement
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"("moving":1)");
+}
+
 #endif

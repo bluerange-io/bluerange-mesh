@@ -127,7 +127,7 @@ void Node::ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfig
         u32 crc32 = Utility::CalculateCrc32((u8*)GS->temporaryEnrollmentPtr, sizeof(TemporaryEnrollment) - sizeof(u32));
         
         //Erase persistent data if there is any available on the device
-        if (GS->recordStorage.HasValidRecords()) {
+        if (GS->recordStorage.HasMortalRecords()) {
             GS->recordStorage.LockDownAndClearAllSettings(Utility::GetWrappedModuleId(ModuleId::NODE), this, (u32)NodeSaveActions::FACTORY_RESET);
         }
 
@@ -2454,10 +2454,28 @@ CapabilityEntry Node::GetCapability(u32 index, bool firstCall)
 
         CapabilityEntry retVal;
         CheckedMemset(&retVal, 0, sizeof(retVal));
-        retVal.type = CapabilityEntryType::SOFTWARE;
+        retVal.type = CapabilityEntryType::PROPERTY;
         strcpy(retVal.manufacturer, "M-Way Solutions GmbH");
         strcpy(retVal.modelName,    "Featureset");
         CheckedMemcpy(retVal.revision, FEATURESET_NAME, lengthToCopy);
+        return retVal;
+    }
+
+    else if (index == 2)
+    {
+        CapabilityEntry retVal;
+        CheckedMemset(&retVal, 0, sizeof(retVal));
+        retVal.type = CapabilityEntryType::PROPERTY;
+        strcpy(retVal.manufacturer, "M-Way Solutions GmbH");
+        strcpy(retVal.modelName, "Board Id");
+        if (GS->boardconf.configuration.boardName == nullptr)
+        {
+            snprintf(retVal.revision, sizeof(retVal.revision), "%s (%u)", "UNKNOWN", GS->boardconf.configuration.boardType);
+        }
+        else
+        {
+            snprintf(retVal.revision, sizeof(retVal.revision), "%s (%u)", GS->boardconf.configuration.boardName, GS->boardconf.configuration.boardType);
+        }
         return retVal;
     }
     else
@@ -2995,7 +3013,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         CheckedMemset(&message, 0, sizeof(message));
         message.header.header.messageType = MessageType::CAPABILITY;
         message.header.header.sender      = configuration.nodeId;
-        message.header.header.receiver    = Utility::StringToU16(commandArgs[1]);
+        message.header.header.receiver    = Utility::TerminalArgumentToNodeId(commandArgs[1]);
         message.header.actionType         = CapabilityActionType::REQUESTED;
 
         //We don't allow broadcasts of the capability request

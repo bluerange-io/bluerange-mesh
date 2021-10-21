@@ -213,11 +213,8 @@ TEST(TestMeshAccessModule, TestUnsecureNoneKeyConnection) {
     //Wait for establishing mesh access connection
     tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 0"); //0 = FmKeyId::ZERO
 
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Received remote mesh data");
-
-
-
-
+    tester.SimulateUntilRegexMessageReceived(20 * 1000, 1, "\\{\"nodeId\":1,\"type\":\"ma_conn_state\",\"module\":10,\"requestHandle\":0,\"partnerId\":\\d+,\"state\":4\\}");
+    
     //Disable unsecure connections.
     {
         NodeIndexSetter setter(0);
@@ -263,7 +260,7 @@ TEST(TestMeshAccessModule, TestRestrainedAccess) {
     //Wait for establishing mesh access connection                          5 = FmKeyId::RESTRAINED
     tester.SendTerminalCommand(2, "action this ma connect 00:00:00:01:00:00 5 2A:FC:35:99:4C:86:11:48:58:4C:C6:D9:EE:D4:A2:B6");
 
-    tester.SimulateUntilMessageReceived(10 * 1000, 2, "Received remote mesh data");
+    tester.SimulateUntilRegexMessageReceived(20 * 1000, 2, "\\{\"nodeId\":2,\"type\":\"ma_conn_state\",\"module\":10,\"requestHandle\":0,\"partnerId\":\\d+,\"state\":4\\}");
 }
 #endif
 

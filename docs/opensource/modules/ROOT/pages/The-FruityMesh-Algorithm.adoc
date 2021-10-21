@@ -47,13 +47,13 @@ broadcast through the exisiting connections.
 
 image:clustering.png[cluster forming]
 
-After a few xref:Specification.adoc#_JOIN_ME_Packet_(MessageType_1)[JOIN_ME] packets
+After a few xref:Specification.adoc#JoinMe[JOIN_ME] packets
 have been collected, they are processed in the ClusterScore function to
 determine the best connection partner. A node never tries to connect
 to a node with the same _clusterId_ to prevent loops.
 
 == Handshake
-After receiving the xref:Specification.adoc#_JOIN_ME_Packet_(MessageType_1)[JOIN ME] packets, some time has passed
+After receiving the xref:Specification.adoc#JoinMe[JOIN ME] packets, some time has passed
 and the other node might already be in another cluster or in a different
 state than before. This is why the two nodes will first do a handshake
 after connecting to pass the latest information to each other. Only

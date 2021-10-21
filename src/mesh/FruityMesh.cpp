@@ -178,7 +178,6 @@ void BootFruityMesh()
     Logger::GetInstance().EnableTag("DISCONNECT");
 //    Logger::GetInstance().EnableTag("JOIN");
     Logger::GetInstance().EnableTag("GATTCTRL");
-    Logger::GetInstance().EnableTag("CONN");
 //    Logger::GetInstance().EnableTag("CONN_DATA");
     Logger::GetInstance().EnableTag("MACONN");
     Logger::GetInstance().EnableTag("EINK");
@@ -211,6 +210,7 @@ void BootFruityMesh()
 //    Logger::GetInstance().EnableTag("WMMOD");
 //    Logger::GetInstance().EnableTag("BME");
 //    Logger::GetInstance().EnableTag("ADVS");
+      Logger::GetInstance().EnableTag("OFF");
 #endif
     
     //Log the reboot reason to our ram log so that it is automatically queried by the sink

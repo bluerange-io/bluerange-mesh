@@ -141,6 +141,7 @@ public:
     void HandshakeANonce(ConnPacketEncryptCustomStart const * inPacket);
     void OnANonceReceived(ConnPacketEncryptCustomANonce const * inPacket);
     void OnSNonceReceived(ConnPacketEncryptCustomSNonce const * inPacket);
+    void OnEncryptCustomDoneReceived(ConnPacketEncryptCustomDone const* inPacket);
     void OnHandshakeComplete();
 
     void SendClusterState();

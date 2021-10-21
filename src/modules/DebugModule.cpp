@@ -39,13 +39,14 @@
 #include <AdvertisingController.h>
 #include <ScanController.h>
 #include <FlashStorage.h>
-#include "GlobalState.h"
+#include <MeshAccessModule.h>
+#include <GlobalState.h>
 
 constexpr u8 DEBUG_MODULE_CONFIG_VERSION = 2;
 
 #if IS_ACTIVE(EINK_MODULE)
 #ifndef GITHUB_RELEASE
-#include "EinkModule.h"
+#include <EinkModule.h>
 #endif //GITHUB_RELEASE
 #endif
 
@@ -251,6 +252,279 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
         floodMode = FloodMode::OFF;
     }
 #endif
+}
+
+void DebugModule::PrintAdvMessageHeader(const char* type, const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent)
+{
+#if IS_ACTIVE(LOGGING)
+    u16 dataLength = advertisementReportEvent.GetDataLength();
+    const u8* data = advertisementReportEvent.GetData();
+    TO_HEX(data, dataLength);
+
+    //Convert the BLE address (Bytes must be swapped for correct display)
+    char addrHex[FH_BLE_GAP_ADDR_LEN * 3 + 1];
+    u8 addr[FH_BLE_GAP_ADDR_LEN];
+    CheckedMemcpy(addr, advertisementReportEvent.GetPeerAddr().data(), FH_BLE_GAP_ADDR_LEN);
+    Utility::SwapBytes(addr, FH_BLE_GAP_ADDR_LEN);
+    Logger::ConvertBufferToHexString(addr, FH_BLE_GAP_ADDR_LEN, addrHex, sizeof(addrHex));
+
+    trace("%s" EOL,
+        type
+    );
+    trace("    > mac:%s, rssi:%d, connectable:%u" EOL,
+        addrHex,
+        advertisementReportEvent.GetRssi(),
+        advertisementReportEvent.IsConnectable()
+    );
+    trace("    > raw:%s (%u)" EOL,
+        dataHex,
+        dataLength
+    );
+#endif //IS_ACTIVE(LOGGING)
+}
+
+void DebugModule::PrintAdvMessage(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent)
+{
+    u16 dataLength = advertisementReportEvent.GetDataLength();
+    const u8* data = advertisementReportEvent.GetData();
+
+    bool knownFormat = false;
+
+    //Checks if the message is using the M-Way Solutions Service UUID header & Service Data field
+    if(
+        dataLength > 12
+        && memcmp(data, "\x02\x01\x06\x03\x03\x12\xFE", 7) == 0
+        && memcmp(data + 8, "\x16\x12\xFE", 3) == 0
+    ) {
+        u16 messageType = 0;
+        CheckedMemcpy(&messageType, data + 11, sizeof(u16));
+
+        //Legacy Asset Broadcast Message
+        if(
+            dataLength >= SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_UUID16 + SIZEOF_ADV_STRUCTURE_LEGACY_ASSET_SERVICE_DATA
+            && messageType == (u16)ServiceDataMessageType::LEGACY_ASSET_V1
+            && (scanLogIdentifier.advMessageTypeFilter == 0 || scanLogIdentifier.advMessageTypeFilter == (u16)ServiceDataMessageType::LEGACY_ASSET_V1)
+        ) {
+        
+            knownFormat = true;
+
+            const AdvPacketLegacyAssetServiceData* payload = (const AdvPacketLegacyAssetServiceData*) (data + 7);
+
+            char serialString[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
+            Utility::GenerateBeaconSerialForIndex(payload->serialNumberIndex, serialString);
+
+            //Check if the user filtered by a serial number
+            if (scanLogIdentifier.type == DeviceIdentifier::SERIAL_NUMBER_INDEX && memcmp(&payload->serialNumberIndex, scanLogIdentifier.value, sizeof(u32)) != 0) return;
+
+            PrintAdvMessageHeader("LEGACY_ASSET_V1(2)", advertisementReportEvent);
+
+            trace("    > freeIn:%u, wantsConn:%u, serial:%s, speed:%u, nodeId:%u, networkId:%u" EOL,
+                payload->hasFreeInConnection,
+                payload->interestedInConnection,
+                serialString,
+                payload->speed,
+                payload->nodeId,
+                payload->networkId
+            );
+        }
+        //MeshAccess Broadcast Message
+        else if(
+            dataLength > SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_UUID16 + SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA_LEGACY
+            && messageType == (u16)ServiceDataMessageType::MESH_ACCESS
+            && (scanLogIdentifier.advMessageTypeFilter == 0 || scanLogIdentifier.advMessageTypeFilter == (u16)ServiceDataMessageType::MESH_ACCESS)
+        ){
+            knownFormat = true;
+
+            const advStructureMeshAccessServiceData* payload = (const advStructureMeshAccessServiceData*)(data + 7);
+
+            //Check if the user filtered by a serial number
+            if (scanLogIdentifier.type == DeviceIdentifier::SERIAL_NUMBER_INDEX && memcmp(&payload->serialIndex, scanLogIdentifier.value, sizeof(u32)) != 0) return;
+
+            char serialString[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
+            Utility::GenerateBeaconSerialForIndex(payload->serialIndex, serialString);
+
+            PrintAdvMessageHeader("MESH_ACCESS(3)", advertisementReportEvent);
+
+            trace("    > networkId:%u, connectable:%u, enrolled:%u, sink:%u, zeroKey:%u, conn:%u, wantsConn:%u, serial:%s" EOL,
+                payload->networkId,
+                payload->IsConnectable,
+                payload->isEnrolled,
+                payload->isSink,
+                payload->isZeroKeyConnectable,
+                payload->IsConnectable,
+                payload->interestedInConnection,
+                serialString
+            );
+        }
+        //Legacy Asset V2 Broadcast Message
+        else if(
+            dataLength >= SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_UUID16 + SIZEOF_ADV_STRUCTURE_LEGACY_V2_ASSET_SERVICE_DATA
+            && messageType == (u16)ServiceDataMessageType::LEGACY_ASSET_V2
+            && (scanLogIdentifier.advMessageTypeFilter == 0 || scanLogIdentifier.advMessageTypeFilter == (u16)ServiceDataMessageType::LEGACY_ASSET_V2)
+        ) {
+            knownFormat = true;
+
+            const AdvPacketLegacyV2AssetServiceData* payload = (const AdvPacketLegacyV2AssetServiceData*) (data + 7);
+
+            //Check if the user filtered by a serial number
+            if (scanLogIdentifier.type == DeviceIdentifier::SERIAL_NUMBER_INDEX && memcmp(&payload->serialNumberIndex, scanLogIdentifier.value, sizeof(u32)) != 0) return;
+
+            PrintAdvMessageHeader("LEGACY_ASSET_V2(4)", advertisementReportEvent);
+
+            char serialString[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
+            Utility::GenerateBeaconSerialForIndex(payload->serialNumberIndex, serialString);
+
+            trace("    > moving:%u, freeIn:%u, wantsConn:%u, nodeId:%u, networkId:%u, serial:%s" EOL,
+                payload->moving,
+                payload->hasFreeInConnection,
+                payload->interestedInConnection,
+                payload->assetNodeId,
+                payload->networkId,
+                serialString
+            );
+        }
+        //Sensor Broadcast Message
+        else if(
+            dataLength >= SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_UUID16 + SIZEOF_ADV_STRUCTURE_SENSOR_MESSAGE_SERVICE_DATA
+            && messageType == (u16)ServiceDataMessageType::SENSOR_MESSAGE
+            && (scanLogIdentifier.advMessageTypeFilter == 0 || scanLogIdentifier.advMessageTypeFilter == (u16)ServiceDataMessageType::SENSOR_MESSAGE)
+        ) {
+            knownFormat = true;
+
+            const AdvPacketSensorMessageServiceData* payload = (const AdvPacketSensorMessageServiceData*) (data + 7);
+
+            //Check if the user filtered by a serial number
+            if (scanLogIdentifier.type == DeviceIdentifier::SERIAL_NUMBER_INDEX && memcmp(&payload->encryptedField.unencrypted.serialNumberIndex, scanLogIdentifier.value, sizeof(u32)) != 0) return;
+
+            PrintAdvMessageHeader("SENSOR_MESSAGE(5)", advertisementReportEvent);
+            
+            if (!payload->isEncrypted)
+            {
+                char serialString[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
+                Utility::GenerateBeaconSerialForIndex(payload->encryptedField.unencrypted.serialNumberIndex, serialString);
+
+                trace("    > enc:%u, serial:%s, nodeId:%u" EOL,
+                    payload->isEncrypted,
+                    serialString,
+                    payload->encryptedField.unencrypted.nodedId
+                );
+            }
+        }
+        //Asset Ble Broadcast Message
+        else if(
+            dataLength >= SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_UUID16 + SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA
+            && messageType == (u16)ServiceDataMessageType::ASSET_BLE
+            && (scanLogIdentifier.advMessageTypeFilter == 0 || scanLogIdentifier.advMessageTypeFilter == (u16)ServiceDataMessageType::ASSET_BLE)
+            && scanLogIdentifier.type != DeviceIdentifier::SERIAL_NUMBER_INDEX
+        ) {
+            knownFormat = true;
+
+            const AdvPacketAssetServiceData* payload = (const AdvPacketAssetServiceData*) (data + 7);
+            const AdvPacketAssetBleServiceDataPayload* blePayload = (const AdvPacketAssetBleServiceDataPayload*)payload->payload;
+            
+            PrintAdvMessageHeader("ASSET_BLE(6)", advertisementReportEvent);
+            
+            trace("    > moving:%u, freeIn:%u, wantsConn:%u, nodeId:%u, networkId:%u" EOL,
+                payload->moving,
+                payload->hasFreeInConnection,
+                payload->interestedInConnection,
+                payload->nodeId,
+                blePayload->networkId
+            );
+        }
+        //Asset Ins Broadcast Message
+        else if(
+            dataLength >= SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_UUID16 + SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA
+            && messageType == (u16)ServiceDataMessageType::ASSET_INS
+            && (scanLogIdentifier.advMessageTypeFilter == 0 || scanLogIdentifier.advMessageTypeFilter == (u16)ServiceDataMessageType::ASSET_INS)
+            && scanLogIdentifier.type != DeviceIdentifier::SERIAL_NUMBER_INDEX
+        ) {
+            knownFormat = true;
+
+            const AdvPacketAssetServiceData* payload = (const AdvPacketAssetServiceData*) (data + 7);
+            const AdvPacketAssetInsServiceDataPayload* insPayload = (const AdvPacketAssetInsServiceDataPayload*)payload->payload;
+
+            PrintAdvMessageHeader("ASSET_INS(7)", advertisementReportEvent);
+            
+            trace("    > moving:%u, freeIn:%u, wantsConn:%u, nodeId:%u, insMeta:%u" EOL,
+                payload->moving,
+                payload->hasFreeInConnection,
+                payload->interestedInConnection,
+                payload->nodeId,
+                insPayload->insMeta
+            );
+        }
+    }
+
+    //Next, we scan for our Manufacturer Specific Format
+    else if(
+        memcmp(data, "\x02\x01\x06", 3) == 0
+        && memcmp(data + 4, "\xFF\x4D\x02\xF0", 3) == 0
+    ){
+        //JOIN_ME Broadcast Message
+        if(
+            dataLength >= SIZEOF_ADV_PACKET_HEADER + SIZEOF_ADV_PACKET_PAYLOAD_JOIN_ME_V0
+            && data[10] == (u8)ManufacturerSpecificMessageType::JOIN_ME_V0
+            && (scanLogIdentifier.advMessageTypeFilter == 0 || scanLogIdentifier.advMessageTypeFilter == (u16)ServiceDataMessageType::JOIN_ME_V0_DEPRECATED)
+            && scanLogIdentifier.type != DeviceIdentifier::SERIAL_NUMBER_INDEX
+        ) {
+            knownFormat = true;
+            const AdvPacketHeader* header = (const AdvPacketHeader*)data;
+            const AdvPacketPayloadJoinMeV0* payload = (const AdvPacketPayloadJoinMeV0*)(data + 11);
+
+            PrintAdvMessageHeader("JOIN_ME(1)", advertisementReportEvent);
+            
+            trace("    > network:%u, sender:%u, clId:%u, clSize:%u, freeIn:%u, freeOut:%u, devType:%u, hops:%u" EOL,
+                header->networkId,
+                payload->sender,
+                payload->clusterId,
+                payload->clusterSize,
+                payload->freeMeshInConnections,
+                payload->freeMeshOutConnections,
+                (u8)payload->deviceType,
+                payload->hopsToSink
+            );
+        }
+    }
+
+    //Some other 3rd Party formats
+    if (
+        dataLength >= 30
+        && memcmp(data, "\x02\x01\x06\x1A\xFF\x4C\x00\x02\x15", 9) == 0
+        && scanLogIdentifier.type != DeviceIdentifier::SERIAL_NUMBER_INDEX
+    ) {
+        PrintAdvMessageHeader("IBEACON", advertisementReportEvent);
+    };
+
+    if(
+        !knownFormat
+        && scanLogIdentifier.advMessageTypeFilter == 0
+        && scanLogIdentifier.type != DeviceIdentifier::SERIAL_NUMBER_INDEX
+    ){
+        PrintAdvMessageHeader("UNKNOWN", advertisementReportEvent);
+    }
+}
+
+void DebugModule::GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent)
+{
+    if(scanLogIdentifier.type != DeviceIdentifier::INVALID)
+    {
+        if(scanLogIdentifier.type == DeviceIdentifier::WILDCARD)
+        {
+            PrintAdvMessage(advertisementReportEvent);
+        }
+        else if(scanLogIdentifier.type == DeviceIdentifier::BLE_GAP_ADDRESS){
+            if(memcmp(scanLogIdentifier.value, advertisementReportEvent.GetPeerAddr().data(), FH_BLE_GAP_ADDR_LEN) == 0)
+            {
+                PrintAdvMessage(advertisementReportEvent);
+            }
+        }
+        else if (scanLogIdentifier.type == DeviceIdentifier::SERIAL_NUMBER_INDEX) {
+            //Each message type needs to check the serial number itself as it is
+            //in different places or not available at all
+            PrintAdvMessage(advertisementReportEvent);
+        }
+    }
 }
 
 u8 modeCounter = 0;
@@ -793,7 +1067,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
         ScanController* scanCtrl = &(GS->scanController);
 
         for (u32 i = 0; i < scanCtrl->jobs.size(); i++) {
-            trace("Job type %u, state %u, window %u, iv %u" EOL, (u32)scanCtrl->jobs[i].type, (u32)scanCtrl->jobs[i].state, scanCtrl->jobs[i].window, scanCtrl->jobs[i].interval);
+            trace("Job type %u, state %u, window %u, iv %u, tMode %u, tLeft %u" EOL, (u32)scanCtrl->jobs[i].type, (u32)scanCtrl->jobs[i].state, scanCtrl->jobs[i].window, scanCtrl->jobs[i].interval, (u8)scanCtrl->jobs[i].timeMode, scanCtrl->jobs[i].timeLeftDs);
         }
 
         return TerminalCommandHandlerReturnType::SUCCESS;
@@ -935,6 +1209,76 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
     {
         CauseStackOverflow();
     }
+
+    if (TERMARGS(0, "scanlog"))
+    {
+        if(commandArgsSize == 1)
+        {
+            scanLogIdentifier.type = DeviceIdentifier::WILDCARD;
+        }
+        //Check which identifier should be used for scanning
+        if(commandArgsSize > 1)
+        {
+            //Off
+            if(TERMARGS(1, "-") || TERMARGS(1, "off")){
+                trace("Scanlog: off" EOL);
+                scanLogIdentifier.type = DeviceIdentifier::INVALID;
+            }
+            //Everything
+            else if(TERMARGS(1, "*")){
+                trace("Scanlog: Everything" EOL);
+                scanLogIdentifier.type = DeviceIdentifier::WILDCARD;
+            }
+            //BLE_GAP_ADDR
+            else if (strstr(commandArgs[1], ":") != nullptr && strlen(commandArgs[1]) == 17) {
+                trace("Scanlog: GAP Addr" EOL);
+                bool didError = false;
+                scanLogIdentifier.type = DeviceIdentifier::BLE_GAP_ADDRESS;
+                Logger::ParseEncodedStringToBuffer(commandArgs[1], scanLogIdentifier.value, sizeof(scanLogIdentifier.value), &didError);
+                Utility::SwapBytes(scanLogIdentifier.value, FH_BLE_GAP_ADDR_LEN);
+
+                if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+                else return TerminalCommandHandlerReturnType::SUCCESS;
+            }
+            //Serial Number
+            else if(Utility::GetIndexForSerial(commandArgs[1]) != INVALID_SERIAL_NUMBER_INDEX){
+                trace("Scanlog: Serial" EOL);
+                scanLogIdentifier.type = DeviceIdentifier::SERIAL_NUMBER_INDEX;
+                u32 serialIndex = Utility::GetIndexForSerial(commandArgs[1]);
+                CheckedMemcpy(scanLogIdentifier.value, &serialIndex, sizeof(u32));
+                
+            }
+            else return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+        }
+        if(commandArgsSize > 2) {
+            scanLogIdentifier.advMessageTypeFilter = Utility::StringToU16(commandArgs[2]);
+        } else {
+            scanLogIdentifier.advMessageTypeFilter = (u16)ServiceDataMessageType::INVALID;
+        }
+
+
+        return TerminalCommandHandlerReturnType::SUCCESS;
+    }
+
+    if (TERMARGS(0, "scanboost"))
+    {
+        u16 timeLeftDs = commandArgsSize > 1 ? SEC_TO_DS(Utility::StringToU16(commandArgs[1])) : SEC_TO_DS(60);
+
+        if(timeLeftDs > SEC_TO_DS(60) * 10) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+
+        ScanJob scanJob = ScanJob();
+        scanJob.timeMode = ScanJobTimeMode::TIMED;
+        scanJob.timeLeftDs = timeLeftDs;
+        scanJob.type = ScanState::CUSTOM;
+        scanJob.interval = MSEC_TO_UNITS(10, CONFIG_UNIT_0_625_MS);
+        scanJob.window = MSEC_TO_UNITS(10, CONFIG_UNIT_0_625_MS);
+        scanJob.state = ScanJobState::ACTIVE;
+        ScanJob* result = GS->scanController.AddJob(scanJob);
+        if(result == nullptr) return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
+
+        return TerminalCommandHandlerReturnType::SUCCESS;
+    }
+
 #endif
 
     //Must be called to allow the module to get and set the config

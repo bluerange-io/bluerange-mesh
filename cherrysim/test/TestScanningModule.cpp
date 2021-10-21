@@ -46,8 +46,6 @@ TEST(TestScanningModule, TestCommands) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-
-
     tester.SimulateUntilClusteringDone(100 * 1000);
 
     //Creates a asset ble event and later checks if this asset is now tracked by the scanning module.
@@ -63,7 +61,7 @@ TEST(TestScanningModule, TestCommands) {
     packet->uuid.len = SIZEOF_ADV_STRUCTURE_UUID16 - 1;
     packet->data.uuid.type = (u8)BleGapAdType::TYPE_SERVICE_DATA;
     packet->data.uuid.uuid = MESH_SERVICE_DATA_SERVICE_UUID16;
-    packet->data.messageType = ServiceDataMessageType::LEGACY_ASSET;
+    packet->data.messageType = ServiceDataMessageType::LEGACY_ASSET_V1;
     assetPacket->serialNumberIndex = 10;
     assetPacket->nodeId = 1337;
 

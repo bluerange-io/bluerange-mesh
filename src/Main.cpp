@@ -36,7 +36,6 @@ int main(void)
     DYNAMIC_ARRAY(halMemory, FruityHal::GetHalMemorySize());
     CheckedMemset(halMemory, 0, FruityHal::GetHalMemorySize());
     GS->halMemory = halMemory;
-    FruityHal::InitHalMemory();
     
     BootFruityMesh();
     GS->fruityMeshBooted = true;

@@ -41,7 +41,7 @@ For a quick start you can flash the precompiled firmware `prod_ruuvi_weather_nrf
 
 == Building and Flashing
 
-Please follow xref:Quick-Start.adoc#_installing_the_toolchain[Quick Start / Compile FruityMesh / Installing the Toolchain] to setup your development environment.
+Please follow xref:Quick-Start.adoc#Toolchain[toolchain installation guide] to setup your development environment.
 The commands in the following text were executed on a machine running Linux, you will have to adapt the paths according to your own setup.
 
 We will begin with a shell in your clone of the https://github.com/mwaylabs/fruitymesh[FruityMesh repository].
@@ -64,7 +64,7 @@ $ mkdir ../fruitymesh_build
 ┗━ ✓
 ```
 
-Then we configure the build directory for building the firmware and specify the path to the ARM GCC 4.9 (downloading and extracting this was part of the xref:Quick-Start.adoc#_installing_the_toolchain[Quick Start] guide).
+Then we configure the build directory for building the firmware and specify the path to the ARM GCC 4.9 (downloading and extracting this was part of the xref:Quick-Start.adoc#Toolchain[Quick Start] guide).
 
 ```
 ┏━ 2021-02-24 16:49:42 user@host:~/doc/code/fruitymesh

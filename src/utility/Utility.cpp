@@ -302,7 +302,7 @@ u32 Utility::GetIndexForSerial(const char* serialNumber, bool *didError){
 void Utility::GenerateBeaconSerialForIndex(u32 index, char* serialBuffer)
 {
     CheckedMemset(serialBuffer, 0x00, NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH);
-    u32 numChars = index < 24300000UL ? 5 : 7; //Small serial numbers use 5 characters, the extended range uses 7 characters
+    u32 numChars = index < SHORT_SERIAL_NUMBER_INDEX_MAX ? 5 : 7; //Small serial numbers use 5 characters, the extended range uses 7 characters
     for(u32 i=0; i< numChars; i++){
         u32 rest = (u32)(index % strlen(serialAlphabet));
         serialBuffer[numChars - i - 1] = serialAlphabet[rest];

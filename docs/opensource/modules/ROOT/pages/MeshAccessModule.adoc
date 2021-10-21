@@ -7,7 +7,7 @@ The _MeshAccessModule_ with _ModuleId_ 10 provides a simple way of accessing the
 == Functionality
 The _MeshAccessModule_ works in conjunction with the xref:MeshAccessConnection.adoc[MeshAccessConnection]. The module provides the necessary services while the connection handles an individual connection after it was set up.
 
-The _MeshAccessConnection_ is able to handle standard mesh packets - including xref:Connections.adoc#_packet_splitting[packet splitting] - and will relay these packets to receivers in the mesh if security permits it (if the partner authenticated itself with the correct key during the initial encryption procedure). A _MeshAccessConnection_ performs first a security handshake before data can be transmitted. After the handshake passes, a node may transmit information about its cluster and update this information once the cluster changes. Cf. xref:Node.adoc#_clusterinfoupdate[ClusterInfoUpdate] packet for more information.
+The _MeshAccessConnection_ is able to handle standard mesh packets - including xref:Connections.adoc#PacketSplitting[packet splitting] - and will relay these packets to receivers in the mesh if security permits it (if the partner authenticated itself with the correct key during the initial encryption procedure). A _MeshAccessConnection_ performs first a security handshake before data can be transmitted. After the handshake passes, a node may transmit information about its cluster and update this information once the cluster changes. Cf. xref:Node.adoc#ClusterInfoUpdate[ClusterInfoUpdate] packet for more information.
 
 There are different types of connection keys used to authenticate when connecting with a node. The _keyId_ is then sent through the mesh depending on the packet type to authenticate the user over the mesh.
 
@@ -16,7 +16,7 @@ If parts of the documentation are obscure, it is advisable to take a look at the
 === Connection Keys
 For the different key types used, refer to the
 encryption types in the
-xref:Specification.adoc#_EncryptionKeys[Specification].
+xref:Specification.adoc#EncryptionKeys[Specification].
 
 === Virtual Partner
 Ids Because mesh packets need a sender and receiver
@@ -64,14 +64,14 @@ All of the MeshAccess data is encoded in little endian.
 
 [#MeshAccessBroadcast]
 === MeshAccess Broadcast Message
-The Mesh Configuration and Access Service is broadcasted by active nodes that provide mesh access to smartphones or other devices through GATT.
+The Mesh Configuration and Access Service is broadcasted by active nodes that provide mesh access to smartphones or other devices through GATT. The MeshAccessBroadcast also has a scan response that reports the serial number of the node as the "Short Local Name". This is helpful for identifying devices when using 3rd party applications.
 
 |===
 |Bytes|Type|Description
 
 |3|Flags|(len, type, flags byte)
-|4|Service UUID complete|(len, type, 2 byte UUID 0xFE12)
-|4|Service Data header|(len, type, 2 byte UUID 0xFE12)
+|4|16bit Service UUID complete list|(len, type 0x03, 2 byte UUID 0xFE12)
+|4|Service Data header|(len, type 0x15, 2 byte UUID 0xFE12)
 |1|messageType|0x03 Mesh Configuration and Access Service (with a new
 service version, the messageType can be changed.
 |1|reserved|Must be 0

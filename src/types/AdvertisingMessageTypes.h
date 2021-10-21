@@ -53,14 +53,16 @@ constexpr u32 ADV_PACKET_MAX_SIZE = 31;
 //type across advertising and connection packets if we need to unify these.
 enum class ServiceDataMessageType : u16
 {
-    INVALID        = 0,
-    // depricated : JOIN_ME_V0   = 0x01,
-    LEGACY_ASSET   = 0x02,
-    MESH_ACCESS    = 0x03,
-    ASSET          = 0x04,
-    SENSOR_MESSAGE = 0x05,
-    ASSET_BLE      = 0x06,
-    ASSET_INS      = 0x07
+    INVALID                = 0x00,
+    JOIN_ME_V0_DEPRECATED  = 0x01, //Deprecated: Was moved to ManufacturerSpecificType
+    LEGACY_ASSET_V1        = 0x02, //Deprecated: Replaced by LEGACY_ASSET_V2
+    MESH_ACCESS            = 0x03,
+    LEGACY_ASSET_V2        = 0x04, //Deprecated: Replaced by ASSET_BLE and ASSET_INS
+    SENSOR_MESSAGE         = 0x05,
+    ASSET_BLE              = 0x06,
+    ASSET_INS              = 0x07,
+    // Note: When adding a new type, think about using using something bigger than e.g. 200
+    // so that we can have a contiguous space with ManufacturerSpecificMessageType and we have u16 here
 };
 
 enum class ManufacturerSpecificMessageType : u8

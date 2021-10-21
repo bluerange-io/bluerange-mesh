@@ -10,19 +10,21 @@ At the same time featureset files describe default behaviours, e.g. terminal ope
 
 All featuresets available on GitHub have the same enrollment data in their default configuration, meaning they don't need to be enrolled and create a mesh right after flashing. This approach is *only* valid for demonstration purposes and should *not* be included in _production_ featuresets.
 
-[code, c++]
-    //Specifies a default enrollment for the github configuration
-    //This is just for illustration purpose so that all nodes are enrolled and connect to each other after flashing
-    //For production, all nodes should have a unique nodeKey in the UICR and should be unenrolled
-    //They can then be enrolled by the user e.g. by using a smartphone application
-    //More info is available as part of the documentation in the Specification and the UICR chapter
-    NodeConfiguration* c = (NodeConfiguration*) config;
-    //Default state will be that the node is already enrolled
-    c->enrollmentState = EnrollmentState::ENROLLED;
-    //Enroll the node by default in networkId 11
-    c->networkId = 11;
-    //Set a default network key of 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22
-    CheckedMemcpy(c->networkKey, "\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22", 16);
+[source,C++]
+----
+//Specifies a default enrollment for the github configuration
+//This is just for illustration purpose so that all nodes are enrolled and connect to each other after flashing
+//For production, all nodes should have a unique nodeKey in the UICR and should be unenrolled
+//They can then be enrolled by the user e.g. by using a smartphone application
+//More info is available as part of the documentation in the Specification and the UICR chapter
+NodeConfiguration* c = (NodeConfiguration*) config;
+//Default state will be that the node is already enrolled
+c->enrollmentState = EnrollmentState::ENROLLED;
+//Enroll the node by default in networkId 11
+c->networkId = 11;
+//Set a default network key of 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22
+CheckedMemcpy(c->networkKey, "\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22", 16);
+----
 
 == Available featuresets
 

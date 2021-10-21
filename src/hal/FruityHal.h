@@ -493,7 +493,7 @@ namespace FruityHal
     // ################# USB CDC (Virtual Com Port) #############
     void VirtualComInitBeforeStack();
     void VirtualComInitAfterStack(void (*portEventHandler)(bool));
-    void VirtualComProcessEvents();
+    void VirtualComEventLoop();
     ErrorType VirtualComCheckAndProcessLine(u8* buffer, u16 bufferLength);
     void VirtualComWriteData(const u8* data, u16 dataLength);
 
@@ -530,7 +530,6 @@ namespace FruityHal
     void GetDeviceAddress(u8 * p_address);
 
     u32 GetHalMemorySize();
-    void InitHalMemory();
 
     // ######################### Timeslot API ############################
 

@@ -58,6 +58,7 @@ void Boardconf::ResetToDefaultConfiguration()
     }
 
     //Set everything else to safe defaults
+    configuration.boardName = nullptr;
     configuration.led1Pin = -1;
     configuration.led2Pin = -1;
     configuration.led3Pin = -1;

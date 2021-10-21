@@ -374,7 +374,7 @@ struct SimConfiguration {
     uint32_t    mapElevationInMeters               = 0;
     uint32_t    simTickDurationMs                  = 0;
     int32_t     terminalId                         = 0; //Enter -1 to disable, 0 for all nodes, or a specific id
-    int32_t     simOtherDelay                      = 0; // Enter 1 - 100000 to send sim_other message only each ... simulation steps, this increases the speed significantly
+    int32_t     simOtherDelay                      = 0; // deprecated and retained only for compatibility reasons
     int32_t     playDelay                          = 0; //Allows us to view the simulation slower than simulated, is added after each step
     uint32_t    interruptProbability               = 0; // The probability that a queued interrupt is simulated.
     uint32_t    connectionTimeoutProbabilityPerSec = 0; // UINT32_MAX * 0.00001; //Simulates a connection timout around every minute
@@ -406,7 +406,7 @@ struct SimConfiguration {
     bool        enableSimStatistics                = false;
     std::string storeFlashToFile                   = "";
 
-    bool        verboseCommands                    = false;
+    bool        verboseCommands                    = false; // deprecated but retained only for compatability reasons. Should be removed in ticket BR-2321
 
 
     //BLE Stack capabilities

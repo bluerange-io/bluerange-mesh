@@ -99,6 +99,13 @@ class DebugModule: public Module
         u16 pingCountResponses;
         bool syncTest;
 
+        //Debug logging of received advertisement messages
+        struct {
+            DeviceIdentifier type;
+            u8 value[10];
+            u16 advMessageTypeFilter;
+        } scanLogIdentifier = {};
+
 #ifdef SIM_ENABLED
         u32 queueFloodCounterLow    = 0;
         u32 queueFloodCounterMedium = 0;
@@ -221,6 +228,9 @@ class DebugModule: public Module
 
         void CauseStackOverflow() const;
 
+        void PrintAdvMessageHeader(const char* type, const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent);
+        void PrintAdvMessage(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent);
+
     public:
         DECLARE_CONFIG_AND_PACKED_STRUCT(DebugModuleConfiguration);
 
@@ -270,6 +280,8 @@ class DebugModule: public Module
         void ResetToDefaultConfiguration() override final;
 
         void TimerEventHandler(u16 passedTimeDs) override final;
+
+        void GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent) override final;
 
         void SendStatistics(NodeId receiver) const;
 

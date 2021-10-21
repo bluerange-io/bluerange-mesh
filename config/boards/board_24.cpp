@@ -34,6 +34,7 @@ void SetBoard_24(BoardConfiguration* c)
 {
     if(c->boardType == 24)
     {
+        c->boardName = "Laird BL654-USB";
         c->led1Pin =  13;
         c->led2Pin =  -1;
         c->led3Pin =  -1;

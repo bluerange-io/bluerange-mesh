@@ -340,7 +340,7 @@ uint32_t virtualComStart(void (*portEventHandler)(bool))
     return NRF_SUCCESS;
 }
 
-uint32_t virtualComCheck()
+uint32_t virtualComEventLoop()
 {
     // Process all queued USB events.
     while (ProcessAppUsbdEventQueue())

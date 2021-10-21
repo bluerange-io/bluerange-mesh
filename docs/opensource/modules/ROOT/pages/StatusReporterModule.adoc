@@ -153,7 +153,7 @@ with alphabet
 MINOR + PATCH)
 |1 |i8 |dbmRx |Receive power in dBm (signed)
 |1 |i8 |dbmTx |Transmit power in dBm (signed)
-|1 |u8 |deviceType |cf. xref:Specification.adoc#_Device_Types[Device Types]
+|1 |u8 |deviceType |cf. xref:Specification.adoc#deviceTypes[Device Types]
 |1 |i8 |calibratedTx |Calibrated TX power at 1m distance (signed)
 |2 |u16 |chipGroupId |Group ID for the chip (e.g. NRF52)
 |2 |u16 |featuresetGroupId |Group ID for the firmware featureset (used

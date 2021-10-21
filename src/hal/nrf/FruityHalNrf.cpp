@@ -136,29 +136,28 @@ struct GpioteHandlerValues
 
 struct NrfHalMemory
 {
-    std::array <app_timer_t, APP_TIMER_MAX_TIMERS> swTimers                   = {};
-    ble_db_discovery_t discoveredServices                                     = {};
-    volatile bool twiXferDone                                                 = false;
-    bool twiInitDone                                                          = false;
-    volatile bool spiXferDone                                                 = false;
-    bool spiInitDone                                                          = false;
-    volatile bool nrfSerialDataAvailable                                      = false;
-    volatile bool nrfSerialErrorDetected                                      = false;
-    bool overflowPending                                                      = false;
-    u32 time_ms                                                               = 0;
-    GpioteHandlerValues GpioHandler[MAX_GPIOTE_HANDLERS]                      = {};
-    u8 gpioteHandlersCreated                                                  = 0;
-    ble_evt_t const * currentEvent                                            = nullptr;
-    u8 timersCreated                                                          = 0;
+    std::array <app_timer_t, APP_TIMER_MAX_TIMERS> swTimers;
+    ble_db_discovery_t discoveredServices;
+    volatile bool twiXferDone;
+    bool twiInitDone;
+    volatile bool spiXferDone;
+    bool spiInitDone;
+    volatile bool nrfSerialDataAvailable = false;
+    volatile bool nrfSerialErrorDetected = false;
+    bool overflowPending;
+    u32 time_ms;
+    GpioteHandlerValues GpioHandler[MAX_GPIOTE_HANDLERS];
+    u8 gpioteHandlersCreated;
+    ble_evt_t const * currentEvent;
+    u8 timersCreated;
 #if SDK == 15
-    ble_gap_adv_data_t advData                                                = {};
+    ble_gap_adv_data_t advData;
 #endif
 #if IS_ACTIVE(TIMESLOT)
-    nrf_radio_signal_callback_return_param_t timeslotRadioCallbackReturnParam = {};
-    nrf_radio_request_t timeslotRadioRequest                                  = {};
+    nrf_radio_signal_callback_return_param_t timeslotRadioCallbackReturnParam;
+    nrf_radio_request_t timeslotRadioRequest;
 #endif // IS_ACTIVE(TIMESLOT)
 };
-static_assert(alignof(NrfHalMemory) <= 4, "The HAL Memory is allocated in a memory block with an alignment of 4. Thus the alignment must not be greater!");
 
 //#################### Event Buffer ###########################
 //A global buffer for the current event, which must be 4-byte aligned
@@ -502,8 +501,6 @@ static FruityHal::SystemEvents nrfSystemEventToGeneric(u32 event)
 //Checks for high level application events generated e.g. by low level interrupt events
 void ProcessAppEvents()
 {
-    FruityHal::VirtualComProcessEvents();
-
     for (u32 i = 0; i < GS->numApplicationInterruptHandlers; i++)
     {
         GS->applicationInterruptHandlers[i]();
@@ -649,6 +646,12 @@ void FruityHal::EventLooper()
 {
     GS->eventLooperTriggerTimestamp = GetRtcMs();
 
+    // If the Virtual COM Port events are not processed in the main context, some unknown issue arises when FruityMesh
+    // is running with the Nordic Secure Bootloader (e.g. the intermediate bootloader of the Laird BL654 dongles).
+    // The issue manifests in Windows not being able to recognize the USB device and leads to FruityDeploy failing
+    // during flashing of the USB sticks. The issue only impacts the flashing process on Windows, not actual
+    // functionality of the Mesh Bridge. See BR-2164.
+    FruityHal::VirtualComEventLoop();
 
     //Call all main context handlers so that they can do low priority long-running processing
     for (u32 i = 0; i < GS->numMainContextHandlers; i++)
@@ -1942,10 +1945,10 @@ void FruityHal::VirtualComInitAfterStack(void (*portEventHandler)(bool))
     virtualComStart(portEventHandler);
 #endif
 }
-void FruityHal::VirtualComProcessEvents()
+void FruityHal::VirtualComEventLoop()
 {
 #if IS_ACTIVE(VIRTUAL_COM_PORT)
-    virtualComCheck();
+    virtualComEventLoop();
 #endif
 }
 ErrorType FruityHal::VirtualComCheckAndProcessLine(u8* buffer, u16 bufferLength)
@@ -3927,11 +3930,6 @@ void FruityHal::SpiConfigureSlaveSelectPin(i32 pin)
 u32 FruityHal::GetHalMemorySize()
 {
     return sizeof(NrfHalMemory);
-}
-
-void FruityHal::InitHalMemory()
-{
-    new (GS->halMemory) NrfHalMemory();
 }
 
 #if IS_ACTIVE(TIMESLOT)

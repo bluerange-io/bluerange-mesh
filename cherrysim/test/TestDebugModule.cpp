@@ -228,3 +228,32 @@ TEST(TestDebugModule, TestQueueFlood) {
     // Also make sure that the low prio queue was able to send at least some minimum.
     ASSERT_TRUE(low > 100);
 }
+
+#if defined(PROD_MESH_NRF52)
+//A very rough test to check that our debug functionality does sth. useful
+TEST(TestDebugModule, TestScanlog) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 1;
+    simConfig.mapWidthInMeters = 10;
+    simConfig.mapHeightInMeters = 10;
+    //testerConfig.verbose = true;
+
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SendTerminalCommand(1, "scanboost 120");
+
+    tester.SendTerminalCommand(1, "scanlog BBBBC");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "MESH_ACCESS");
+
+    tester.SendTerminalCommand(1, "scanlog *");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "JOIN_ME");
+
+    tester.SendTerminalCommand(1, "scanlog 00:00:00:02:00:00");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "MESH_ACCESS");
+
+    tester.SendTerminalCommand(1, "scanlog off");
+}
+#endif

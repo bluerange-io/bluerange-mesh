@@ -199,6 +199,12 @@ Stops an animation on the node with the given xref:Specification.adoc#SerialNumb
 
 [source,c++]
 ----
+sim animation shake [serial] //e.g. sim animation shake BBCBC
+----
+Touches a node without moving it to another position so that its accelerometer wakes up if it uses one.
+
+[source,c++]
+----
 sim animation load_path [path] //e.g. sim animation load_path /path/to/anim.json
 ----
 Loads animations from a JSON file. See "cherrysim/test/res/MoveAnimation.json" for an example.

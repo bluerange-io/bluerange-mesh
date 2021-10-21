@@ -1,8 +1,33 @@
+ifndef::imagesdir[:imagesdir: ../assets/images]
+ifndef::attachmentsdir[:attachmentsdir: ../assets/attachments]
 = Basic Usage
 
 == LED Codes
-When a node is powered up, the red LED is flashing to signal that it is not connected. Once two nodes are connected to each other, they perform a handshake, which is signaled by a blue LED. Once they are connected and the handshake has taken place, they signal their connection with a single short green flash. The number of green flashes corresponds to the number of active connections to other nodes. If your hardware doesn't have colored LEDs, the LEDs are LED1 for red, LED2 for green and LED3 for blue.
+Nodes indicate some of their states by flashing LEDs, if available and enabled.
+The LEDs are named after the colors red, green and blue.
+If the hardware doesn't include colored LEDs (e.g. the nRF52840-DK), the LEDs are configured as LED1 for red, LED2 for green and LED3 for blue.
+Below are some of the node states and the respective LED code.
+Keep in mind that image:led_long_red.png[role=led-symbol] is used to indicate long LED flash (>1 sec) and image:led_short_red.png[role=led-symbol] is used to indicate short LED flash ( <1 sec).
 
+[cols="<7,^2]
+|===
+|State |Sequence
+
+| `powered_up_but_not_connected`: When a node is powered up but is not connected to any other node
+| image:led_long_red.png[role=led-symbol]
+
+| `while_performing_handshake`: When two nodes are connected to each other and performing handshake
+| image:led_long_blue.png[role=led-symbol]
+
+| `handshake_is_complete`: When handshake is complete. The number of LED blinks corresponds to number of active connections to other nodes
+| image:led_short_green.png[role=led-symbol]image:led_short_green.png[role=led-symbol]
+
+| `deviceoff_mode`:  When device is switched to DeviceOff mode
+| image:led_short_red.png[role=led-symbol]image:led_short_red.png[role=led-symbol]
+
+|==
+
+[#TerminalCommands]
 == Terminal Commands
 All classes can implement An interface called
 `TerminalCommandListener` can be implemented for all classes. It allows each class to listen for commands entered via either the UART or Segger RTT terminal. These commands can be entered by the user or by a program such as a MeshGateway that connects a mesh to the internet.
@@ -40,13 +65,12 @@ user input.
 * *get_modules [nodeId]*: Displays a list of modules from the node and
 whether they are active or not.
 
+FruityMesh is structured in Modules. Each module provides its own set of commands. A detailed listing of all available modules and their commands can be found on the xref:Modules.adoc[Modules] page.
+
 ____
-Have a look at the xref:Specification.adoc#_NodeIDs[NodeIDs section] for
+Have a look at the xref:Specification.adoc#NodeIds[NodeIDs section] for
 some insights on how to address nodes individually or in groups.
 ____
 
 == More Commands
-FruityMesh is structured in Modules. Each module
-provides its own set of commands. A detailed listing of all available
-modules and their commands can be found on the
-xref:Modules.adoc[Modules] page.
+

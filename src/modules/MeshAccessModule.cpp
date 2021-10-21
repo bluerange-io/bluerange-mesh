@@ -337,6 +337,15 @@ void MeshAccessModule::UpdateMeshAccessBroadcastPacket(u16 advIntervalMs)
     u32 length = SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_UUID16 + SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA;
     job.advDataLength = length;
 
+    //To be easily recognizable, we also add a scan response so that we can
+    //identify our device easily in 3rd party apps
+    const char* serial = RamConfig->GetSerialNumber();
+    u8 serialLength = strlen(serial);
+    job.scanData[0] = 1 + serialLength;
+    job.scanData[1] = (u8)BleGapAdType::TYPE_SHORT_LOCAL_NAME;
+    CheckedMemcpy(job.scanData + 2, serial, strlen(serial));
+    job.scanDataLength = job.scanData[0] + 1;
+
     //Either update the job or create it if not done
     if(discoveryJobHandle == nullptr){
         discoveryJobHandle = GS->advertisingController.AddJob(job);
@@ -924,7 +933,7 @@ void MeshAccessModule::GapAdvertisementReportEventHandler(const FruityHal::GapAd
         }
 
         if (advertisementReportEvent.GetDataLength() >= SIZEOF_ADV_STRUCTURE_LEGACY_ASSET_SERVICE_DATA
-            && packet->data.messageType == ServiceDataMessageType::LEGACY_ASSET)
+            && packet->data.messageType == ServiceDataMessageType::LEGACY_ASSET_V1)
         {
             const AdvPacketLegacyAssetServiceData* assetPacket = (const AdvPacketLegacyAssetServiceData*)&packet->data;
             OnFoundSerialIndexWithAddr(addr, assetPacket->serialNumberIndex);

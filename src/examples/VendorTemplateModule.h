@@ -32,13 +32,15 @@
 
 #include <Module.h>
 
+//This should be set to the correct vendor and subId
+constexpr VendorModuleId VENDOR_TEMPLATE_MODULE_ID = GET_VENDOR_MODULE_ID(0xABCD, 1);
+
+#if IS_ACTIVE(VENDOR_TEMPLATE_MODULE)
+
 /*
  * This is a template for a FruityMesh module.
  * A comment should be here to provide a least a short description of its purpose.
  */
-
-//This should be set to the correct vendor and subId
-constexpr VendorModuleId VENDOR_TEMPLATE_MODULE_ID = GET_VENDOR_MODULE_ID(0xABCD, 1);
 
 constexpr u8 VENDOR_TEMPLATE_MODULE_CONFIG_VERSION = 1;
 
@@ -97,4 +99,8 @@ public:
     #ifdef TERMINAL_ENABLED
     TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
     #endif
+
+    CapabilityEntry GetCapability(u32 index, bool firstCall) override;
 };
+
+#endif //IS_ACTIVE(VENDOR_TEMPLATE_MODULE)

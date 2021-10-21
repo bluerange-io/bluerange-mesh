@@ -95,7 +95,8 @@ class RecordStorageEventListener;
 enum class RecordStorageOperationType : u8
 {
     SAVE_RECORD,
-    DEACTIVATE_RECORD
+    DEACTIVATE_RECORD,
+    IMMORTALIZE_RECORD
 };
 
 enum class RecordStorageSaveStage : u16
@@ -110,6 +111,13 @@ enum class RecordStorageDeactivateStage : u16
 {
     FIRST_STAGE          = 0,
     DEACTIVATE           = 0,
+    CALLBACKS_AND_FINISH = 1,
+};
+
+enum class RecordStorageImmortalizeStage : u16
+{
+    FIRST_STAGE          = 0,
+    IMMORTALIZE           = 0,
     CALLBACKS_AND_FINISH = 1,
 };
 
@@ -140,7 +148,8 @@ constexpr int SIZEOF_RECORD_STORAGE_RECORD_HEADER = 8;
 typedef struct
 {
         u8 crc;
-        u8 reserved : 5;
+        u8 mortal : 1; //By default set to 1, signifies that a record will be erase by a factory reset.
+        u8 reserved : 4; //By default stored as binary ones because of flash
         u8 padding : 2;
         u8 recordActive : 1;
         u16 recordLength;
@@ -195,6 +204,17 @@ typedef struct
 
 }DeactivateRecordOperation;
 STATIC_ASSERT_SIZE(DeactivateRecordOperation, SIZEOF_RECORD_STORAGE_DEACTIVATE_RECORD_OP);
+
+constexpr int SIZEOF_RECORD_STORAGE_IMMORTALIZE_RECORD_OP = (SIZEOF_RECORD_STORAGE_OPERATION + 6);
+typedef struct
+{
+    RecordStorageOperation op;
+    RecordStorageImmortalizeStage stage;
+    u16 recordId;
+    u16 reserved;
+
+}ImmortalizeRecordOperation;
+STATIC_ASSERT_SIZE(DeactivateRecordOperation, SIZEOF_RECORD_STORAGE_IMMORTALIZE_RECORD_OP);
 #pragma pack(pop)
 
 enum class RecordStorageResultCode : u8
@@ -256,6 +276,8 @@ class RecordStorage : public FlashStorageEventListener
         void SaveRecordInternal(SaveRecordOperation& op);
         //Removes a record
         void DeactivateRecordInternal(DeactivateRecordOperation& op);
+        //Makes a record immortal
+        void ImmortalizeRecordInternal(ImmortalizeRecordOperation& op);
                 
         void DefragmentPage(RecordStoragePage& pageToDefragment, bool force);
         void RepairPages();
@@ -299,18 +321,26 @@ class RecordStorage : public FlashStorageEventListener
         //Stores a record (Operation is queued)
         RecordStorageResultCode SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, ModuleIdWrapper lockDownModule = INVALID_WRAPPED_MODULE_ID);
         //Allows to cache some information until store completes
-        RecordStorageResultCode SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength, ModuleIdWrapper lockDownModule = INVALID_WRAPPED_MODULE_ID);
+        RecordStorageResultCode SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength, ModuleIdWrapper lockDownModule = INVALID_WRAPPED_MODULE_ID, bool alwaysPersist = false);
         //Removes a record (Operation is queued)
-        RecordStorageResultCode DeactivateRecord(u16 recordId, RecordStorageEventListener * callback, u32 userType, ModuleIdWrapper lockDownModule = INVALID_WRAPPED_MODULE_ID);
+        RecordStorageResultCode DeactivateRecord(u16 recordId, RecordStorageEventListener * callback, u32 userType, ModuleIdWrapper lockDownModule = INVALID_WRAPPED_MODULE_ID, bool alwaysPersist = false);
         //Retrieves a record
         RecordStorageRecord* GetRecord(u16 recordId) const;
         //Retrieves the data of a record
         SizedData GetRecordData(u16 recordId) const;
         //Returns if there is any valid record stored (e.g. not factory state)
-        bool HasValidRecords();
+        //Will also return true if the record has already been deleted in a later version
+        bool HasMortalRecords();
         //Resets all settings
         RecordStorageResultCode LockDownAndClearAllSettings(ModuleIdWrapper responsibleModuleForLockDown, RecordStorageEventListener * callback, u32 userType);
         
+        //Allows us to protect a record from a factory reset, it can still be manually deleted
+        //WARNING: Only use this if you really know what you are doing, resetting the device will
+        //not bring your device in a clean factory state and you might permanently break it.
+        //Beware of undead records as they might haunt you
+        //This feature is currently only partly implemented (do not use it yet) an will be completed in BR-2371
+        RecordStorageResultCode ImmortalizeRecord(u16 recordId, RecordStorageEventListener* callback, u32 userType, u8* userData = nullptr, u16 userDataLength = 0, ModuleIdWrapper lockDownModule = INVALID_WRAPPED_MODULE_ID, bool alwaysPersist = false);
+
         //Listener
         void FlashStorageItemExecuted(FlashStorageTaskItem* task, FlashStorageError errorCode) override;
         void FlashStorageQueueEmptyHandler();

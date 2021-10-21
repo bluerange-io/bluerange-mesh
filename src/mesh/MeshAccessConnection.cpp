@@ -366,20 +366,8 @@ void MeshAccessConnection::OnANonceReceived(ConnPacketEncryptCustomANonce const 
         (u8*)packet,
         SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE,
         false);
-
-    connectionState = ConnectionState::HANDSHAKE_DONE;
-
-    //Needed by our packet splitting methods, payload is now less than before because of MIC
-    connectionPayloadSize = connectionMtu - MESH_ACCESS_MIC_LENGTH;
-
-    //Send the current mesh state to our partner
-    SendClusterState();
-
-    NotifyConnectionStateSubscriber(ConnectionState::HANDSHAKE_DONE);
-
-    logt("MACONN", "Handshake done as Central");
-
-    OnHandshakeComplete();
+    
+    // => Continues after MessageType::ENCRYPT_CUSTOM_DONE is received
 }
 
 //This method is called by the Peripheral after the SNonce was received
@@ -436,6 +424,25 @@ void MeshAccessConnection::OnSNonceReceived(ConnPacketEncryptCustomSNonce const 
     OnHandshakeComplete();
 }
 
+void MeshAccessConnection::OnEncryptCustomDoneReceived(ConnPacketEncryptCustomDone const* inPacket)
+{
+    if (inPacket != nullptr && inPacket->status == (u8)ErrorType::SUCCESS)
+    {
+        connectionState = ConnectionState::HANDSHAKE_DONE;
+
+        //Needed by our packet splitting methods, payload is now less than before because of MIC
+        connectionPayloadSize = connectionMtu - MESH_ACCESS_MIC_LENGTH;
+
+        //Send the current mesh state to our partner
+        SendClusterState();
+
+        NotifyConnectionStateSubscriber(ConnectionState::HANDSHAKE_DONE);
+
+        logt("MACONN", "Handshake done as Central");
+
+        OnHandshakeComplete();
+    }
+}
 //This method is called by both the Peripheral and the Central after the connectionState was set to HANDSHAKE_DONE for the first time.
 void MeshAccessConnection::OnHandshakeComplete()
 {
@@ -976,12 +983,20 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
     }
     else if(connectionState == ConnectionState::HANDSHAKING)
     {
-        if(sendData->dataLength >= SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_ANONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_ANONCE){
-            OnANonceReceived((ConnPacketEncryptCustomANonce const *) data);
+        if(sendData->dataLength >= SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_ANONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_ANONCE)
+        {
+            OnANonceReceived((ConnPacketEncryptCustomANonce const*)data);
         }
-        else if(sendData->dataLength >= SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_SNONCE){
-            OnSNonceReceived((ConnPacketEncryptCustomSNonce const *) data);
-        } else {
+        else if(sendData->dataLength >= SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_SNONCE)
+        {
+            OnSNonceReceived((ConnPacketEncryptCustomSNonce const*)data);
+        }
+        else if(sendData->dataLength >= SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_DONE && packetHeader->messageType == MessageType::ENCRYPT_CUSTOM_DONE)
+        {
+            OnEncryptCustomDoneReceived((ConnPacketEncryptCustomDone const*) data);
+        }
+        else 
+        {
             logt("ERROR", "Wrong handshake packet");
             DisconnectAndRemove(AppDisconnectReason::INVALID_HANDSHAKE_PACKET);
         }

@@ -1517,7 +1517,8 @@ TerminalCommandHandlerReturnType CherrySim::TerminalCommandHandler(const std::ve
                 else if (animationSubCommand == "is_running"
                       || animationSubCommand == "get_name"
                       || animationSubCommand == "start"
-                      || animationSubCommand == "stop")
+                      || animationSubCommand == "stop"
+                      || animationSubCommand == "shake")
                 {
                     bool didError = false;
                     const u32 serialNumber = Utility::GetIndexForSerial(commandArgs[3].c_str(), &didError);
@@ -1579,6 +1580,12 @@ TerminalCommandHandlerReturnType CherrySim::TerminalCommandHandler(const std::ve
                     {
                         //sim animation stop BBCBC
                         AnimationStop(serialNumber);
+                        return TerminalCommandHandlerReturnType::SUCCESS;
+                    }
+                    else if (animationSubCommand == "shake")
+                    {
+                        //sim animation shake BBCBC
+                        AnimationShake(serialNumber);
                         return TerminalCommandHandlerReturnType::SUCCESS;
                     }
                 }
@@ -2061,7 +2068,6 @@ void CherrySim::BootCurrentNode()
     u32* halMemory = new u32[halMemorySize];
     CheckedMemset(halMemory, 0, halMemorySize * sizeof(u32));
     GS->halMemory = halMemory;
-    FruityHal::InitHalMemory();
 
     //############## Boot the node using the FruityMesh boot routine
     BootFruityMesh();
@@ -2098,7 +2104,7 @@ void CherrySim::WriteRecordToFlash(u16 recordId, u8* data, u16 dataLength) {
     u16 recordLength = dataLength + SIZEOF_RECORD_STORAGE_RECORD_HEADER + padding;
 
     DYNAMIC_ARRAY(buffer, recordLength);
-    CheckedMemset(buffer, 0x00, recordLength);
+    CheckedMemset(buffer, 0xFF, recordLength);
 
     RecordStorageRecord* record = (RecordStorageRecord*)buffer;
     record->padding = padding;
@@ -2218,7 +2224,7 @@ void CherrySim::SimulateBroadcast() {
     if (currentNode->state.advertisingActive) {
         if (ShouldSimIvTrigger(currentNode->state.advertisingIntervalMs)) {
             //Distribute the event to all nodes in range
-            for (u32 i = 0; i < GetTotalNodes(); i++) {
+            for (u32 i = 0; i < GetTotalNodes() - GetAssetNodes(); i++) {
                 if (i != currentNode->index) {
 
                     //If the other node is scanning
@@ -4131,6 +4137,17 @@ void CherrySim::AnimationStop(u32 serialNumber)
         SIMEXCEPTIONFORCE(IllegalStateException);
     }
     entry->animation = MoveAnimation();
+}
+
+void CherrySim::AnimationShake(u32 serialNumber)
+{
+    NodeEntry* entry = GetNodeEntryBySerialNumber(serialNumber);
+    if (entry == nullptr)
+    {
+        SIMEXCEPTIONFORCE(IllegalStateException);
+    }
+    //We only touch the last movement time so that the accelerometer wakes up
+    entry->lastMovementSimTimeMs = simState.simTimeMs;
 }
 
 MoveAnimationType StringToMoveAnimationType(const std::string& s)

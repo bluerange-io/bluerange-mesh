@@ -89,6 +89,22 @@ typedef u16 NodeId;
 typedef u32 ClusterId;
 typedef i16 ClusterSize;
 
+//All possible identifiers to (more or less) uniquely identify the device
+//Data is Little Endian for each of the parts of an identifier
+//Most identifiers have a textual representation so they can be entered on the terminal
+enum class DeviceIdentifier : u8
+{
+    INVALID                 = 0, //Invalid Identifier. Written as -
+    SERIAL_NUMBER_INDEX     = 1, //u32 index of the serial number. Written as e.g. 0x00123456
+    SERIAL_NUMBER_STRING    = 2, //serial number as an ASCII string, either 5 or 7 characters long, usually \0 terminated. Written as e.g. BBCDF or BBCDFGG
+    BLE_GAP_ADDRESS         = 3, //Also known as MAC_ADDRESS to the platform, 7 bytes (see FruityHal::BleGapAddr). Written as e.g. AA:BB:CC:DD:EE:FF
+    CUSTOM_IDENTIFIER       = 4, //u8 length + variable length custom identifier. Written as Base64, e.g. EjRWAA== (must end with =)
+    NODE_ID                 = 5, //u16 nodeId. Written as e.g. 123
+    MESH_ADDRESS            = 6, //u16 nodeId + u16 networkId, networkId may be 0 if nodeId is in the orga-wide range. Written as e.g. 1234,111
+    DEVICE_UUID             = 7, //DeviceUuid given by the BlueRange platform. Written as e.g. 123e4567-e89b-12d3-a456-426614174000
+    WILDCARD                = 8, //A special value that accepts each and every device and identifier type. Written as *
+};
+
 /*## Available Node ids #############################################################*/
 // Refer to protocol specification @https://github.com/mwaylabs/fruitymesh/wiki/Protocol-Specification
 
@@ -184,6 +200,7 @@ enum class ModuleId : u8 {
     MODBUS_MODULE = 157,
     BP_MODULE = 158,
     ASSET_SCANNING_MODULE = 159,
+    MULTI_ASSET_MODULE = 160,
 
     //Other Modules, this range can be used for experimenting but must not be used if FruityMesh
     //nodes are to be used in a network with nodes of different vendors as their moduleIds will clash

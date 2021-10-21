@@ -141,6 +141,8 @@ extern "C" {
 #define ACTIVATE_INS 1
 #endif //PROD_ASSET_INS_NRF52840
 
+#define ACTIVATE_VENDOR_TEMPLATE_MODULE 1
+
 #define ACTIVATE_RUUVI_WEATHER_MODULE 1
 
 #define ACTIVATE_UNSECURE_MEMORY_READBACK 1
@@ -149,6 +151,13 @@ extern "C" {
 #define ACTIVATE_CONN_PARAM_UPDATE_LOGGING 1
 
 #define ACTIVATE_DEV_SENSOR_BROADCAST_MESSAGE 1
+
+#define ACTIVATE_LOGGING 1
+
+#define ACTIVATE_TIMESLOT 1
+
+#define ACTIVATE_MULTI_ASSET_MODULE 1
+
 
 #define NRF_GPIOTE_POLARITY_TOGGLE 1
 #define NRF_GPIOTE_POLARITY_HITOLO 2
@@ -870,12 +879,6 @@ bool IsEmpty(const uint8_t* data, uint32_t length);
 #ifdef __cplusplus
 }
 #endif
-
-
-//Enable all necessary modules and parts
-#define ACTIVATE_LOGGING 1
-
-#define ACTIVATE_TIMESLOT 1
 
 
 #endif

@@ -196,7 +196,7 @@ void ScanningModule::HandleAssetLegacyPackets(const FruityHal::GapAdvertisementR
             && packet->uuid.len == SIZEOF_ADV_STRUCTURE_UUID16-1
             && packet->data.uuid.type == (u8)BleGapAdType::TYPE_SERVICE_DATA
             && packet->data.uuid.uuid == MESH_SERVICE_DATA_SERVICE_UUID16
-            && packet->data.messageType == ServiceDataMessageType::LEGACY_ASSET
+            && packet->data.messageType == ServiceDataMessageType::LEGACY_ASSET_V1
     ){
         char serial[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
         Utility::GenerateBeaconSerialForIndex(assetPacket->serialNumberIndex, serial);
@@ -257,7 +257,7 @@ void ScanningModule::HandleAssetPackets(const FruityHal::GapAdvertisementReportE
         && packet->uuid.len == SIZEOF_ADV_STRUCTURE_UUID16 - 1
         && packet->data.uuid.type == (u8)BleGapAdType::TYPE_SERVICE_DATA
         && packet->data.uuid.uuid == MESH_SERVICE_DATA_SERVICE_UUID16
-        && packet->data.messageType == ServiceDataMessageType::ASSET
+        && packet->data.messageType == ServiceDataMessageType::LEGACY_ASSET_V2
         ) {
         logt("SCANMOD", "RX ASSETLEGACY ADV: nodeId %u, batteryPower %u, absolutePositionX %u, absolutePositionY %u, pressure %u, rssi %d", 
             assetPacket->assetNodeId,

@@ -123,6 +123,12 @@ void DeviceOff::HandleReset(void) {
         Sleep();
     }
 
+    if (IsDeviceOffReason(rebootReason) && GS->node.configuration.enrollmentState == EnrollmentState::NOT_ENROLLED)
+    {
+        WaitForPowerButton(1000);
+        Sleep();
+    }
+
     if(IsSystemOffReset(otherrebootReason) && IsPowerButtonPressed()) {
         if(!WaitForPowerButton(1000)) {
             Sleep();
@@ -150,20 +156,12 @@ void DeviceOff::TimerHandler(u16 passedTimeDs)
         {
             // Blink twice before going to system off mode
             GS->ledRed.On();
-            GS->ledGreen.On();
-            GS->ledBlue.On();
-            FruityHal::DelayMs(100);
+            FruityHal::DelayMs(500);
             GS->ledRed.Off();
-            GS->ledGreen.Off();
-            GS->ledBlue.Off();
-            FruityHal::DelayMs(100);
+            FruityHal::DelayMs(500);
             GS->ledRed.On();
-            GS->ledGreen.On();
-            GS->ledBlue.On();
-            FruityHal::DelayMs(100);
+            FruityHal::DelayMs(500);
             GS->ledRed.Off();
-            GS->ledGreen.Off();
-            GS->ledBlue.Off();
             GS->node.Reboot(1, RebootReason::DEVICE_OFF);
         }
     }

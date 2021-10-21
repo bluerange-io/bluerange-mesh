@@ -44,7 +44,7 @@ uint32_t virtualComInit();
 
 uint32_t virtualComStart(void (*portEventHandler)(bool));
 
-uint32_t virtualComCheck();
+uint32_t virtualComEventLoop();
 
 uint32_t virtualComCheckAndProcessLine(uint8_t* buffer, uint16_t bufferLength);
 

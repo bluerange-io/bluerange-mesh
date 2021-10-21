@@ -731,9 +731,11 @@ TEST(TestNode, TestCapabilitySending) {
     std::vector<SimulationMessage> msgs = {
         SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":0,\"capabilityType\":2,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"BlueRange Node\",\"revision\":\"\\d+.\\d+.\\d+\"\\}"),
 #ifndef GITHUB_RELEASE
-        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":1,\"capabilityType\":2,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Featureset\",\"revision\":\"prod_mesh_nrf52\"\\}"),
+        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":1,\"capabilityType\":4,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Featureset\",\"revision\":\"prod_mesh_nrf52\"\\}"),
+        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":2,\"capabilityType\":4,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Board Id\",\"revision\":\"Simulator Board \\(19\\)\"\\}"),
 #else
-        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":1,\"capabilityType\":2,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Featureset\",\"revision\":\"github_dev_nrf52\"\\}"),
+        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":1,\"capabilityType\":4,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Featureset\",\"revision\":\"github_dev_nrf52\"\\}"),
+        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":2,\"capabilityType\":4,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Board Id\",\"revision\":\"UNKNOWN \\(19\\)\"\\}"),
 #endif
         SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_end\",\"amount\":\\d+\\}"),
     };

@@ -52,6 +52,8 @@ typedef struct BoardConfiguration
     //Custom boardTypes should start from 10000
     uint16_t boardType;
 
+    const char*  boardName;
+
     //Default board is pca10031, modify SET_BOARD if different board is required
     //Or flash config data to UICR
     int8_t led1Pin;

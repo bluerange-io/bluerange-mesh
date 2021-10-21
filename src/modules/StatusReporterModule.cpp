@@ -1132,21 +1132,36 @@ MeshAccessAuthorization StatusReporterModule::CheckMeshAccessPacketAuthorization
 {
     ConnPacketHeader const * packet = (ConnPacketHeader const *)data;
 
-    if (packet->messageType == MessageType::MODULE_TRIGGER_ACTION
-        || packet->messageType == MessageType::MODULE_ACTION_RESPONSE)
+    ConnPacketModule const *mod = (ConnPacketModule const *)data;
+    if (mod->moduleId == moduleId)
     {
-        ConnPacketModule const * mod = (ConnPacketModule const *)data;
-        if (mod->moduleId == moduleId)
+        // The Gateway uses get_status, get_device_info and set_init via the organization key.
+        if (fmKeyId == FmKeyId::ORGANIZATION)
         {
-            //The Gateway queries get_status and get_device_info through the orga key.
-            if (fmKeyId == FmKeyId::ORGANIZATION)
+            if (packet->messageType == MessageType::MODULE_TRIGGER_ACTION)
             {
-                static_assert((u8)StatusModuleTriggerActionMessages::GET_STATUS         == (u8)StatusModuleActionResponseMessages::STATUS,         "The following check assumes that both have the same value in both directions");
-                static_assert((u8)StatusModuleTriggerActionMessages::GET_DEVICE_INFO_V2 == (u8)StatusModuleActionResponseMessages::DEVICE_INFO_V2, "The following check assumes that both have the same value in both directions");
-                if (mod->actionType == (u8)StatusModuleTriggerActionMessages::GET_STATUS
-                    || mod->actionType == (u8)StatusModuleTriggerActionMessages::GET_DEVICE_INFO_V2)
+                switch (mod->actionType)
                 {
+                case (u8)StatusModuleTriggerActionMessages::GET_STATUS:
+                case (u8)StatusModuleTriggerActionMessages::GET_DEVICE_INFO_V2:
+                case (u8)StatusModuleTriggerActionMessages::SET_INITIALIZED:
                     return MeshAccessAuthorization::WHITELIST;
+
+                default:
+                    return MeshAccessAuthorization::UNDETERMINED;
+                }
+            }
+            else if (packet->messageType == MessageType::MODULE_ACTION_RESPONSE)
+            {
+                switch (mod->actionType)
+                {
+                case (u8)StatusModuleActionResponseMessages::STATUS:
+                case (u8)StatusModuleActionResponseMessages::DEVICE_INFO_V2:
+                case (u8)StatusModuleActionResponseMessages::SET_INITIALIZED_RESULT:
+                    return MeshAccessAuthorization::WHITELIST;
+
+                default:
+                    return MeshAccessAuthorization::UNDETERMINED;
                 }
             }
         }

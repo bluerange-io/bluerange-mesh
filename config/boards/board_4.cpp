@@ -37,6 +37,7 @@ void SetBoard_4(BoardConfiguration* c)
 {
     if(c->boardType == 4)
     {
+        c->boardName = "nRF52-DK";
         c->led1Pin =  17;
         c->led2Pin =  18;
         c->led3Pin =  19;
