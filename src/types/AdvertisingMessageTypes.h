@@ -208,9 +208,13 @@ struct AdvPacketAssetBleServiceDataPayload {
     i8 rssi38;
     i8 rssi39;
 
-    u8 reserved[2];
+    u8 reserved1;
+    u8 reserved2 : 3;
+    u8 positionCounter : 5;
 };
 STATIC_ASSERT_SIZE(AdvPacketAssetBleServiceDataPayload, SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA_PAYLOAD);
+
+constexpr u8 ADV_PACKET_ASSET_BLE_SERVICE_DATA_PAYLOAD_POSITION_COUNTER_MAX = 31u;
 
 struct AdvPacketAssetInsServiceDataPayload {
 
@@ -234,14 +238,17 @@ struct AdvPacketAssetServiceData
     u8 hasFreeInConnection : 1;
     u8 interestedInConnection : 1;
     u8 channel : 2; // 0 = unknown, 1 = 37, 2 = 38, 3 = 39
-    u8 reservedBits : 3;
+    u8 moveMod : 1; // A modifier that specifies the exact type of movement
+    u8 reservedBits : 2;
 
     u16 nodeId; //Either a nodeId of a network (networkId must be != 0) or a organization wide unique nodeId
 
     u8 payload[SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA_PAYLOAD];
 
-    u8 reserved[3];
-    u8 reservedEncryptionCounter; // Potentially reserved for encryption counter
+    /// If not encrypted, this field contains the organization identifier (generated from the organization key).
+    /// If encrypted, this field is reserved.
+    u32 organizationIdentifierOrReserved;
+
     u32 mic; //Encryption is probably done using a synchronized time, not yet specified. For now, not encrypted if mic is 0
 };
 STATIC_ASSERT_SIZE(AdvPacketAssetServiceData, SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA);

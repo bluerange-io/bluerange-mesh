@@ -213,8 +213,6 @@ class EnrollmentModule: public Module
         //This can be used for an enrollment request
         TemporaryEnrollmentData ted;
 
-
-
         //Save a few nearby node serials in this proposal message
         static constexpr int ENROLLMENT_PROPOSAL_MESSAGE_NUM_ENTRIES = 3;
         u8 proposalIndexCounter = 0;

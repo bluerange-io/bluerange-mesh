@@ -261,7 +261,8 @@ bool FruityHal::IsUartTimedOutAndClear(){ return false; }
 FruityHal::UartReadCharResult FruityHal::UartReadChar(){ UartReadCharResult ret; ret.hasNewChar = false; return ret; }
 
 u32 FruityHal::GetMasterBootRecordSize(){ return 0; }
-u32 FruityHal::GetSoftDeviceSize(){ return 0; }
+u32 FruityHal::GetLicenseSectionAdress(u32 sdBaseAddr) { return 0; }
+u32 FruityHal::GetSoftDeviceSize(u32 sdBaseAddress){ return 0; }
 u32 FruityHal::GetSoftDeviceVersion(){ return 0; }
 BleStackType FruityHal::GetBleStackType(){ return BleStackType::INVALID; }
 void FruityHal::BleStackErrorHandler(u32 id, u32 info){ }

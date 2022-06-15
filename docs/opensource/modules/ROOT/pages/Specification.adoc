@@ -206,10 +206,10 @@ There are different node ID ranges that are used for different purposes:
 |NODE_ID_VIRTUAL_BASE|2000...19999| Virtual addresses to address smartphones connected to the mesh (dynamically assigned, aka. virtual partner id)
 |NODE_ID_GROUP_BASE|20000...20999| Address groups of devices (statically assigned at compile time)
 |NODE_ID_LOCAL_LOOPBACK|30000| Address for the current node itself (similar to localhost)
-|NODE_ID_HOPS_BASE|30001...30999| Specify the number of hops that a packet can travel. (30 001 e.g. specifies that the packet must only reach the direct neighbours)
-|NODE_ID_SHORTEST_SINK|31000| Used to send a packet to all sink nodes (see xref:#deviceTypes[Device Types])
+|NODE_ID_HOPS_BASE|30001...30999| Specify the number of hops that a packet can travel. Used for xref:SinkRouting.adoc[sink routing]. (30 001 e.g. specifies that the packet must only reach the direct neighbours)
+|NODE_ID_SHORTEST_SINK|31000| Used to send a packet to sink nodes (the closest one if xref:SinkRouting.adoc[sink routing] is enabled or all if disabled) (see xref:#deviceTypes[Device Types])
 |NODE_ID_APP_BASE|32000| NodeId given to non-mesh devices that can connect via a MeshAccessConnection (e.g. a Smartphone). This is replaced by a virtual partner id during communication.
-|NODE_ID_GLOBAL_DEVICE_BASE|33000...39999| Assign nodeIds uniquely over multiple meshes for the same organization (used for assets that roam between different networks)
+|NODE_ID_GLOBAL_DEVICE_BASE|33000...57999| Assign nodeIds uniquely over multiple meshes for the same organization (used for assets that roam between different networks)
 |NODE_ID_INVALID|65535| Invalid node ID, which is used for internal errors
 |-|others| All other node IDs are currently reserved
 |===
@@ -220,12 +220,14 @@ The serial numbers use a special alphabet of ASCII characters that is easily rea
 
 There are two types of serial number ranges. There is a range of two billion serial numbers that is exclusively managed by M-Way Solutions. This range contains serial numbers with 5 characters and also serial numbers with 7 characters. Parts of this range are licensed to partners. The second range can be used for projects working with the open source version of FruityMesh completely free of charge. This is always a 7 character serial number.
 
+[#MwaySerialRange]
 === M-Way Solutions Proprietary Serial Number Range
 The serialNumberIndex of this range starts with 0 for the serial number `BBBBB` and increments up to `0x7FFFFFFF` for the serial number `D8PJQ8K`. This range should not be used without consulting us beforehand because serial numbers will clash otherwise. We assign sub-ranges to our partners which allows them to use serial numbers with 5 characters.
 
 === Open Source Testing Range
 To provide beginners with an easy method for testing FruityMesh, we decided to open source a part of our proprietary range that contains nicely readable serial numbers. This range starts from `2673000` (`FMBBB`) and ranges until `2699999` (`FM999`).By default, the serial number is generated randomly (from the unique deviceId stored in the chipset) within this testing range if there is no UICR data available (see _generateRandomSerialAndNodeId_ in the Config class). This makes it easier to start testing FruityMesh. You should not distribute products that use a serial number from this range as it will clash with others.
 
+[#OpenSourceProductSerialRange]
 === Open Source Serial Number Range for Products
 The open sourced serial number range that you can use for final products uses serial numbers with 7 characters to avoid a clash between different vendors. A serial number is constructed by setting the most significant bit of the serialNumberIndex to 1. The next 16 bits must be set to a https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers/[two byte company identifier assigned by the Bluetooth SIG]. The remaining 15 bits are used to generate the individual serial numbers for this vendorId. This gives each vendor the possibility to generate around 32 thousand unique serial numbers. (See _VendorSerial_ type).
 
@@ -310,7 +312,7 @@ There are different device types that are given to nodes with specific functiona
 position that will not change much over time.
 |2 |DEVICE_TYPE_ROAMING |A node that can move around freely.
 |3 |DEVICE_TYPE_SINK |A node that is installed at a fixed place and
-collects all the data (typically a MeshGateway).
+collects all the data (typically a MeshGateway). The target of xref:SinkRouting.adoc[sink routing].
 |4 |DEVICE_TYPE_ASSET |A node that moves around and broadcasts its
 presence so that it can be detected by a mesh.
 |5 |DEVICE_TYPE_LEAF |A node that will only connect to the mesh as a

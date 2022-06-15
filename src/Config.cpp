@@ -313,6 +313,11 @@ u32 Conf::GetSerialNumberIndex() const
     }
 }
 
+u32 Conf::GetFactorySerialNumberIndex() const
+{
+    return serialNumberIndex;
+}
+
 const char * Conf::GetSerialNumber() const
 {
     Utility::GenerateBeaconSerialForIndex(GetSerialNumberIndex(), _serialNumber);
@@ -338,8 +343,14 @@ void Conf::SetSerialNumberIndex(u32 serialNumber)
     RecordStorageResultCode err = SaveConfigToFlash(this, (u32)RecordTypeConf::SET_SERIAL, nullptr, 0);
     if (err != RecordStorageResultCode::SUCCESS)
     {
-        //Rebooting in this case is the safest bet. The initialization sequence will just restart by the other side.
-        GS->node.Reboot(SEC_TO_DS(1), RebootReason::SET_SERIAL_FAILED);
+        if(err == RecordStorageResultCode::PERSISTENCE_DISABLED)
+        {
+            //If persistence is disabled, the featureset will probably use the temporary enrollment above
+            GS->node.Reboot(SEC_TO_DS(1), RebootReason::SET_SERIAL_SUCCESS);
+        } else {
+            //Rebooting in this case is the safest bet. The initialization sequence will just restart by the other side.
+            GS->node.Reboot(SEC_TO_DS(1), RebootReason::SET_SERIAL_FAILED);
+        }
     }
 }
 

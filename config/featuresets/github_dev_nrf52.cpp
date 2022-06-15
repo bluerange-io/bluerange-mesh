@@ -40,6 +40,10 @@
 #include "VendorTemplateModule.h"
 #include "GlobalState.h"
 
+#if IS_ACTIVE(APP_UART)
+#include "AppUartModule.h"
+#endif
+
 // This is an example featureset for the nRF52832
 // It has logging activated and is perfect for playing around with FruityMesh
 // It also has a default enrollment hardcoded so that all mesh nodes are
@@ -96,6 +100,10 @@ u32 InitializeModules_github_dev_nrf52(bool createModule)
     size += GS->InitializeModule<EnrollmentModule>(createModule);
     size += GS->InitializeModule<IoModule>(createModule);
 
+#if IS_ACTIVE(APP_UART)
+    size += GS->InitializeModule<AppUartModule>(createModule);
+#endif
+
     //Each Vendor module needs a RecordStorage id if it wants to store a persistent configuration
     //see the section for VendorModules in RecordStorage.h for more info
     size += GS->InitializeModule<VendorTemplateModule>(createModule, RECORD_STORAGE_RECORD_ID_VENDOR_MODULE_CONFIG_BASE + 0);
@@ -127,4 +135,8 @@ u32 GetWatchdogTimeout_github_dev_nrf52()
 u32 GetWatchdogTimeoutSafeBoot_github_dev_nrf52()
 {
     return 0; //Safe Boot Mode disabled by default, activate if desired
+}
+LicenseState GetLicenseState_github_dev_nrf52()
+{
+    return LicenseState::VALID_BUT_NOT_AVAILABLE;
 }

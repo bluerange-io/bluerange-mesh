@@ -52,7 +52,21 @@ SECTIONS
 	{
 		__application_start_address = .;
 		KEEP(*(.isr_vector))
-		
+		FILL(0xff)
+		. = __application_start_address + 0x200; /* constant offset to keep license at same address */
+
+		/* Start of License Data */
+		/* License section MUST be 0xFF filled in flash */
+		__license_data_start_address = .;
+		KEEP(*(.LicenseCompatibleMagicNumber))
+		FILL(0xff)  /* fill unused area to have consistent checksum */
+
+		/*
+		* Can be used for debugging, must not be used for production
+		* As this area needs to be filled with 0xFF
+		* KEEP(*(.License))
+		*/
+
 		. = __application_start_address + 0x400; /* constant offset to keep version at same address */
 
 		KEEP(*(.Version))
@@ -151,15 +165,13 @@ SECTIONS
 		__application_ram_start_address = .;
    	} > RAM
 
-	.eh_frame : ONLY_IF_RW
+	.eh_frame ALIGN(4): ONLY_IF_RW
 	{
-		. = ALIGN(4);
 		*(.eh_frame)
 	} > RAM
 
-	.gcc_except_table : ONLY_IF_RW
+	.gcc_except_table ALIGN(4): ONLY_IF_RW
 	{
-		. = ALIGN(4);
 		*(.gcc_except_table .gcc_except_table.*)
 	} > RAM
 

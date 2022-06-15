@@ -58,7 +58,7 @@ typedef struct
     u8 isEnrolled : 1; // Flag if this beacon is enrolled
     u8 isSink : 1;
     u8 isZeroKeyConnectable : 1;
-    u8 IsConnectable : 1;
+    u8 hasFreeInConnection : 1;
     u8 interestedInConnection : 1;
     u8 reserved : 3;
     u32 serialIndex; //SerialNumber index of the beacon
@@ -128,6 +128,11 @@ enum class MeshAccessSerialConnectError : u8 {
     OVERWRITTEN_BY_OTHER_REQUEST = 2,
 };
 
+enum class MeshAccessSerialConnectMode : u8 {
+    DEFAULT,
+    FORCE,
+};
+
 //####### Module messages (these need to be packed)
 #pragma pack(push)
 #pragma pack(1)
@@ -160,11 +165,13 @@ enum class MeshAccessSerialConnectError : u8 {
         NodeId nodeIdAfterConnect;
         u32 connectionInitialKeepAliveSeconds;
         FruityHal::BleGapAddr targetAddress;
+        MeshAccessSerialConnectMode connectMode;
     };
-    STATIC_ASSERT_SIZE(MeshAccessModuleSerialConnectMessage, 37);
+    STATIC_ASSERT_SIZE(MeshAccessModuleSerialConnectMessage, 38);
 
     constexpr int SIZEOF_MA_MODULE_SERIAL_CONNECT_MESSAGE_V1 = 30;
     constexpr int SIZEOF_MA_MODULE_SERIAL_CONNECT_MESSAGE_V2 = 37;
+    constexpr int SIZEOF_MA_MODULE_SERIAL_CONNECT_MESSAGE_V3 = 38;
 
     struct MeshAccessModuleSerialConnectResponse
     {

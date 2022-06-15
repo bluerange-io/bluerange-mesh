@@ -1,10 +1,22 @@
+# This CMakeLists file is used to build the following combination
+# NRF52840_XXAA, SDK15, S140 v6
+
+set_property_multi("${SDK_15_TARGETS}" "FM_MAX_APP_SIZE" 254000) # Calculated with a chunk size of 128 for updates
+
 target_compile_definitions_multi("${SDK_15_TARGETS}" "S140")
 target_compile_definitions_multi("${SDK_15_TARGETS}" "NRF52")
 target_compile_definitions_multi("${SDK_15_TARGETS}" "NRF52840_XXAA")
 target_compile_definitions_multi("${SDK_15_TARGETS}" "NRF52840")
 target_compile_definitions_multi("${SDK_15_TARGETS}" "SDK=15")
+
+target_compile_definitions_multi("${SDK_15_TARGETS}" "SOFTDEVICE_PRESENT")
+target_compile_definitions_multi("${SDK_15_TARGETS}" "BLE_STACK_SUPPORT_REQD")
+
+target_compile_options_multi("${SDK_15_TARGETS}"  "-mcpu=cortex-m4")
 target_compile_options_multi("${SDK_15_TARGETS}" "-mfloat-abi=hard")
 target_compile_options_multi("${SDK_15_TARGETS}" "-mfpu=fpv4-sp-d16")
+
+target_link_options_multi("${SDK_15_TARGETS}" "-mcpu=cortex-m4")
 target_link_options_multi("${SDK_15_TARGETS}" "-mfloat-abi=hard")
 target_link_options_multi("${SDK_15_TARGETS}" "-mfpu=fpv4-sp-d16")
 target_link_options_multi("${SDK_15_TARGETS}" "-T${PROJECT_SOURCE_DIR}/linker/gcc_nrf52840_s140v6_256kb.ld")

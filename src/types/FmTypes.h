@@ -121,6 +121,9 @@ constexpr size_t BLE_GAP_SCAN_PACKET_BUFFER_SIZE = 31;
 // An invalid entry or an empty word
 constexpr u32 EMPTY_WORD = 0xFFFFFFFFUL;
 
+// Default value when we intends to use slave latency provided in the Config.h
+constexpr u16 GAP_CONTROLLER_USE_CONFIGURED_SLAVE_LATENCY = 0xFFFFUL; 
+
 // Set in the first 4 bytes of UICR if factory settings are available
 constexpr u32 UICR_SETTINGS_MAGIC_WORD = 0xF07700;
 
@@ -176,6 +179,9 @@ enum class FeatureSetGroup : NodeId
     /*FruityDeploy-FeatureSetGroup*/NRF52_RV_WEATHER_MESH = 20033,
     /*FruityDeploy-FeatureSetGroup*/NRF52840_LVE_NBT      = 20034,
     /*FruityDeploy-FeatureSetGroup*/NRF52_MULTI_ASSET     = 20035,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_ASSET        = 20036,
+    /*FruityDeploy-FeatureSetGroup*/DEV_NRF52832_SDK_17   = 20037,
+    /*FruityDeploy-FeatureSetGroup*/DEV_NRF52840_SDK_17   = 20038,
 };
 
 //Sets the maximum number of firmware group ids that can be compiled into the firmware

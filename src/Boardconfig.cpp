@@ -45,6 +45,11 @@ Boardconf::Boardconf()
     CheckedMemset(&configuration, 0x00, sizeof(configuration));
 }
 
+//A dummy so that we cannot have nullptr access issues
+void SetCustomPins_dummy(CustomPins* pinConfig) {
+
+}
+
 void Boardconf::ResetToDefaultConfiguration()
 {
     //Set a default boardType for all different platforms in case we do not have the boardType in UICR
@@ -82,6 +87,8 @@ void Boardconf::ResetToDefaultConfiguration()
     configuration.voltageDividerR2 = 0;
     configuration.dcDcEnabled = false;
     configuration.powerOptimizationEnabled = false;
+
+    getCustomPinset = &SetCustomPins_dummy;
 
     //Now, we load all Default boards (nRf Development kits)
     SetBoard_4(&configuration);

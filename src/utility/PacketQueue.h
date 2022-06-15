@@ -46,7 +46,7 @@ public:
     PacketQueue();
     PacketQueue(u32* buffer, u16 bufferLength);
     u8* Reserve(u16 dataLength);
-    bool Put(u8* data, u16 dataLength);
+    bool Put(const u8* data, u16 dataLength);
     SizedData PeekNext() const;
     SizedData PeekNext(u8 pos) const;
     void DiscardNext();

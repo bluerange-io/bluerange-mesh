@@ -43,6 +43,7 @@ action [nodeId] io pinset [pinNumber] [mode] ...
 action 0 io pinset 21 high 22 low
 ----
 
+[#Identify]
 === Start identification
 Starts identification procedure which will blink all board LEDs with a 200ms period for a total of 30 seconds. Can also be handled by other modules to start custom identification. This mode overrules curent led mode.
 
@@ -54,3 +55,10 @@ action [nodeId] io identify [mode = on / off]
 //Trigger identification
 action 0 io identify on
 ----
+
+
+[#ImplementationDetails]
+=== Implementation Details
+
+The `SET_LED(_RESPONSE)` and `SET_IDENTIFICATION(_RESPONSE)` messages are also transmitted over via `MeshAccessConnections` which are established with the `FmKeyId::ORGANIZATION`.
+This is required for devices which are not part of the mesh network, but instead part of the overall organization.

@@ -36,3 +36,6 @@
 #define ACTIVATE_SEGGER_RTT 1 //Undefine to disable debugging over Segger Rtt
 
 #define ACTIVATE_VENDOR_TEMPLATE_MODULE 1
+
+// Uncomment for testing the AppUartModule example
+//#define ACTIVATE_APP_UART 1

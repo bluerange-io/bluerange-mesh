@@ -129,7 +129,7 @@ public:
 
     /*############### Connect ##################*/
     //Returns the unique connection id that was created
-    static u32 ConnectAsMaster(FruityHal::BleGapAddr const * address, u16 connIntervalMs, u16 connectionTimeoutSec, FmKeyId fmKeyId, u8 const * customKey, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualId = 0);
+    static u32 ConnectAsMaster(FruityHal::BleGapAddr const * address, u16 connIntervalMs, u16 connectionTimeoutSec, FmKeyId fmKeyId, u8 const * customKey, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualId = 0, u16 overwriteSlaveLatency = GAP_CONTROLLER_USE_CONFIGURED_SLAVE_LATENCY, bool maxScanDutyCycle = false);
 
     //Will create a connection that collects potential candidates and connects to them
     static u16 SearchAndConnectAsMaster(NetworkId networkId, u32 serialNumberIndex, u16 searchTimeDs, u16 connIntervalMs, u16 connectionTimeoutSec);

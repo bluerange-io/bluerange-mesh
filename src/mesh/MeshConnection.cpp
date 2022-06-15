@@ -418,8 +418,7 @@ bool MeshConnection::QueueVitalPrioData()
         }
 
         //Use this to queue the clusterUpdate in the vital prio queue
-        BaseConnectionSendData sendData;
-        CheckedMemset(&sendData, 0x00, sizeof(BaseConnectionSendData));
+        BaseConnectionSendData sendData = {};
 
         sendData.characteristicHandle = partnerWriteCharacteristicHandle;
         sendData.dataLength = SIZEOF_CONN_PACKET_CLUSTER_INFO_UPDATE;

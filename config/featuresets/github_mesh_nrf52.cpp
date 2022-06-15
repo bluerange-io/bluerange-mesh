@@ -119,3 +119,7 @@ u32 GetWatchdogTimeoutSafeBoot_github_mesh_nrf52()
 {
     return 0; //Safe Boot Mode disabled by default, activate if desired
 }
+LicenseState GetLicenseState_github_mesh_nrf52()
+{
+    return LicenseState::VALID_BUT_NOT_AVAILABLE;
+}

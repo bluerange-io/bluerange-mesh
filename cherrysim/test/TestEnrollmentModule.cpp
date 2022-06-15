@@ -28,6 +28,8 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
+
+#include <HelperFunctions.h>
 #include <CherrySimTester.h>
 #include <CherrySimUtils.h>
 #include <Node.h>
@@ -156,7 +158,7 @@ TEST(TestEnrollmentModule, TestEnrollmentBasicExistingMesh) {
     simConfig.terminalId = 0;
     simConfig.defaultNetworkId = 0;
     simConfig.preDefinedPositions = { {0.997185, 0.932557},{0.715971, 0.802758},{0.446135, 0.522125},{0.865020, 0.829147},{0.935539, 0.846311},{0.783314, 0.612539},{0.910448, 0.698930},{0.593066, 0.671654},{0.660636, 0.598495},{0.939128, 0.778389} };
-    testerConfig.verbose = false;
+    //testerConfig.verbose = false;
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9 });
     simConfig.SetToPerfectConditions();
@@ -200,7 +202,7 @@ TEST(TestEnrollmentModule, TestEnrollmentBasicExistingMeshLong) {
     simConfig.terminalId = 0;
     simConfig.defaultNetworkId = 0;
     simConfig.preDefinedPositions = { {0.997185, 0.932557},{0.715971, 0.802758},{0.446135, 0.522125},{0.865020, 0.829147},{0.935539, 0.846311},{0.783314, 0.612539},{0.910448, 0.698930},{0.593066, 0.671654},{0.660636, 0.598495},{0.939128, 0.778389} };
-    testerConfig.verbose = false;
+    //testerConfig.verbose = false;
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9 });
     simConfig.SetToPerfectConditions();
@@ -249,7 +251,7 @@ TEST(TestEnrollmentModule, TestReceivingEnrollmentOverMeshResponses) {
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 3});
     simConfig.SetToPerfectConditions();
-    testerConfig.verbose = false;
+    //testerConfig.verbose = false;
 
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     //Change the default network id of node 3 so that only node 1, 2, and 3 are able to create a mesh.
@@ -257,13 +259,17 @@ TEST(TestEnrollmentModule, TestReceivingEnrollmentOverMeshResponses) {
     tester.Start();
 
     //Wait until nodes 1, 2 and 3 are connected
-    tester.SimulateForGivenTime(15 * 1000);
+    tester.SimulateUntilClusteringDoneWithExpectedNumberOfClusters(1 * 60 * 1000, 2);
 
-    //Connect node 1 via a mesh access connection to node 2
-    tester.SendTerminalCommand(1, "action 3 enroll basic BBBBF 4 3678 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 04:00:00:00:04:00:00:00:04:00:00:00:04:00:00:00 10 0 1");
-    
-    //Response is sent from the node that executed the enrollment
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":3,\"type\":\"enroll_response_serial\",\"module\":5,\"requestId\":1,\"serialNumber\":\"BBBBF\",\"code\":0}");
+    RetryOrFail<TimeoutException>(
+        32, [&] {
+            //Request enrollment of the currently unenrolled node from node 1 on node 3
+            tester.SendTerminalCommand(1, "action 3 enroll basic BBBBF 4 3678 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 04:00:00:00:04:00:00:00:04:00:00:00:04:00:00:00 10 0 1");
+        },
+        [&] {
+            //Response is sent from the node that executed the enrollment
+            tester.SimulateUntilMessageReceived(1 * 60 * 1000, 1, "{\"nodeId\":3,\"type\":\"enroll_response_serial\",\"module\":5,\"requestId\":1,\"serialNumber\":\"BBBBF\",\"code\":0}");
+        });
 }
 
 TEST(TestEnrollmentModule, TestEnrollmentMultipleTimes) {
@@ -331,7 +337,7 @@ TEST(TestEnrollmentModule, TestRequestProposals) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
-    testerConfig.verbose = false;
+    //testerConfig.verbose = false;
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9 });
     //Place Node 0 and 1 in the middle, Node 2 far away, and the others in a circle around them.
@@ -349,6 +355,9 @@ TEST(TestEnrollmentModule, TestRequestProposals) {
     }
 
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    // This test relies on the propagation constant being 2.5
+    tester.sim->propagationConstant = 2.5;
 
     //Set all the networkids except the middle ones to 0.
     for (u32 i = 2; i < tester.sim->GetTotalNodes(); i++)
@@ -377,12 +386,13 @@ TEST(TestEnrollmentModule, TestRequestProposals) {
     
     {
         //Send the previous command again and make sure that no request_proposals_responses about serialIndex 2 are deliverd (because it is too far away)
-        Exceptions::DisableDebugBreakOnException ddboe;
+        Exceptions::ExceptionDisabler<TimeoutException> te;
         tester.SendTerminalCommand(1, "action 0 enroll request_proposals BBBBD BBBBF BBBBG");
         messages = {
             SimulationMessage(1, "\"type\":\"request_proposals_response\",\"serialNumber\":\"BBBBD\",\"module\":5,\"requestHandle\":0}"),
         };
-        ASSERT_THROW(tester.SimulateUntilMessagesReceived(10 * 1000, messages), TimeoutException);
+        tester.SimulateUntilMessagesReceived(10 * 1000, messages);
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
     }
 
     //Test the command with the maximum number (11) of allowed indices.
@@ -454,7 +464,7 @@ TEST(TestEnrollmentModule, TestTemporaryEnrollment) {
     // #####
 
     tester.SendTerminalCommand(1, "set_serial CCCCC");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Reboot reason was 20");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Reboot reason was 19");
 
     tester.SendTerminalCommand(1, "status");
 
@@ -582,7 +592,7 @@ TEST(TestEnrollmentModule, TestFactoryResetForTemporaryEnrollment)
 
     simConfig.nodeConfigName.insert({ "prod_sink_usb_nrf52840", 1 });
     simConfig.SetToPerfectConditions();
-    testerConfig.verbose = true;
+    //testerConfig.verbose = true;
 
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 

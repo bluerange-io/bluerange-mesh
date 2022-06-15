@@ -164,10 +164,20 @@ TEST(TestSigAccessLayer, TestDirectMethodAccess)
 
     {
         NodeIndexSetter setter(0);
-        Exceptions::DisableDebugBreakOnException disabler;
-        ASSERT_THROW(SigAccessLayer::GetInstance().CreateElement(), SigCreateElementFailedException);
-        ASSERT_THROW(SigAccessLayer::GetInstance().ProvisionNode(0x1234), SigProvisioningFailedException);
-        ASSERT_THROW(SigAccessLayer::GetInstance().ProvisionNodeWithNodeId(10), SigProvisioningFailedException);
+        {
+            Exceptions::ExceptionDisabler<SigCreateElementFailedException> scefe;
+
+            SigAccessLayer::GetInstance().CreateElement();
+            ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(SigCreateElementFailedException)));
+        }
+        {
+            Exceptions::ExceptionDisabler<SigProvisioningFailedException> spfe;
+            SigAccessLayer::GetInstance().ProvisionNode(0x1234);
+            ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(SigProvisioningFailedException)));
+
+            SigAccessLayer::GetInstance().ProvisionNodeWithNodeId(10);
+            ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(SigProvisioningFailedException)));
+        }
     }
 }
 

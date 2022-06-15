@@ -28,6 +28,8 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
+
+#include <HelperFunctions.h>
 #include <fstream>
 #include <CherrySimTester.h>
 #include <Logger.h>
@@ -40,7 +42,7 @@
 #include "json.hpp"
 #include "SimpleQueue.h"
 #include "DebugModule.h"
-
+#include "PathLossModel.h"
 
 extern "C"{
 #include <ccm_soft.h>
@@ -374,8 +376,13 @@ TEST(TestOther, TestJsonConfigSerialization)
     simConfig->enableSimStatistics = true;
     new (&simConfig->storeFlashToFile) std::string;
     simConfig->storeFlashToFile = "eee";
+    simConfig->floorBiasInMeters = 1.2f;
+    simConfig->ceilingHeightInMeters = 3.1f;
+    simConfig->ceilingAttenuationDb = 4.5f;
+    simConfig->perfectReceptionProbabilityForAdvertising = true;
+    simConfig->perfectReceptionProbabilityForConnection = true;
     simConfig->verboseCommands = true;
-    simConfig->defaultBleStackType = BleStackType::NRF_SD_132_ANY;
+    simConfig->simulateAdvertisingIndexStep = 32;
 
     for (size_t i = 0; i < sizeof(memoryArea) / sizeof(*memoryArea); i++)
     {
@@ -442,8 +449,13 @@ TEST(TestOther, TestJsonConfigSerialization)
     ASSERT_EQ(copy.enableClusteringValidityCheck, true);
     ASSERT_EQ(copy.enableSimStatistics, true);
     ASSERT_EQ(copy.storeFlashToFile, "eee");
+    ASSERT_NEAR(copy.floorBiasInMeters, 1.2f, 0.01f);
+    ASSERT_NEAR(copy.ceilingHeightInMeters, 3.1f, 0.01f);
+    ASSERT_NEAR(copy.ceilingAttenuationDb, 4.5f, 0.01f);
+    ASSERT_EQ(copy.perfectReceptionProbabilityForAdvertising, true);
+    ASSERT_EQ(copy.perfectReceptionProbabilityForConnection, true);
     ASSERT_EQ(copy.verboseCommands, true);
-    ASSERT_EQ(copy.defaultBleStackType, BleStackType::NRF_SD_132_ANY);
+    ASSERT_EQ(copy.simulateAdvertisingIndexStep, 32);
 
     simConfig->storeFlashToFile.~basic_string();
     simConfig->nodeConfigName.~map();
@@ -550,8 +562,9 @@ TEST(TestOther, TestSimCommandCrc)
     tester.SimulateGivenNumberOfSteps(1); //Test that no exception occures.
     tester.SendTerminalCommand(1, "sim animation create geofence-move-inside-2 CRC: 1337"); //Incorrect CRC
     {
-        Exceptions::DisableDebugBreakOnException disabler;
-        ASSERT_THROW(tester.SimulateGivenNumberOfSteps(1), CRCInvalidException);
+        Exceptions::ExceptionDisabler<CRCInvalidException> ed;
+        tester.SimulateGivenNumberOfSteps(1);
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(CRCInvalidException)));
     }
 }
 
@@ -716,7 +729,7 @@ TEST(TestOther, TestMultiMessageSimulation) {
         SimulationMessage(2, "Handshake done"),
     };
 
-    tester.SimulateUntilMessagesReceived(10 * 1000, msgs);
+    tester.SimulateUntilMessagesReceived(20 * 1000, msgs);
 
     for (unsigned i = 0; i < msgs.size(); i++) {
         std::string completeMsg = msgs[i].GetCompleteMessage();
@@ -737,7 +750,7 @@ TEST(TestOther, TestGattcEvtTimeoutReporting) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(20 * 1000);
 
     //Find the mesh connection to the other node
     NodeIndexSetter setter(0);
@@ -780,7 +793,7 @@ TEST(TestOther, TestGattcEvtTimeoutReporting) {
 
 TEST(TestOther, TestTimeSync) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-//    testerConfig.verbose = true;
+    //testerConfig.verbose = true;
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
@@ -986,16 +999,20 @@ TEST(TestOther, TestTimeout) {
     tester.Start();
 
     {
-        Exceptions::DisableDebugBreakOnException disable;
-        ASSERT_THROW(tester.SimulateUntilMessageReceived(10 * 1000, 1, "I will never be printed!"), TimeoutException);
-        ASSERT_THROW(tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "I will never be printed!"), TimeoutException);
+        Exceptions::ExceptionDisabler<TimeoutException> te;
+        tester.SimulateUntilMessageReceived(10 * 1000, 1, "I will never be printed!");
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
+        tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "I will never be printed!");
         {
+            ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
             std::vector<SimulationMessage> sm = { SimulationMessage(1, "I will never be printed!") };
-            ASSERT_THROW(tester.SimulateUntilMessagesReceived(10 * 1000, sm), TimeoutException);
+            tester.SimulateUntilMessagesReceived(10 * 1000, sm);
+            ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
         }
         {
             std::vector<SimulationMessage> sm = { SimulationMessage(1, "I will never be printed!") };
-            ASSERT_THROW(tester.SimulateUntilRegexMessagesReceived(10 * 1000, sm), TimeoutException);
+            tester.SimulateUntilRegexMessagesReceived(10 * 1000, sm);
+            ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
         }
     }
 }
@@ -1003,7 +1020,7 @@ TEST(TestOther, TestTimeout) {
 
 TEST(TestOther, TestLegacyUicrSerialNumberSupport) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    //testerConfig.verbose = true;
+    // testerConfig.verbose = true;
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
     simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
@@ -1011,8 +1028,8 @@ TEST(TestOther, TestLegacyUicrSerialNumberSupport) {
 
     const char* serialNumber = "BRTCR";
 
-    tester.sim->nodes[0].uicr.CUSTOMER[12] = EMPTY_WORD;
-    CheckedMemcpy(tester.sim->nodes[0].uicr.CUSTOMER + 2, serialNumber, 6);
+    tester.sim->WriteSerialNumberToUicr(serialNumber, 0);
+    tester.sim->GenerateLicense(0);
 
     tester.Start();
 
@@ -1032,7 +1049,7 @@ TEST(TestOther, TestBulkMode) {
     simConfig.nodeConfigName.insert({ "prod_pcbridge_nrf52", 1});
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
-    CheckedMemset(tester.sim->nodes[0].uicr.CUSTOMER, 0xFF, sizeof(tester.sim->nodes[1].uicr.CUSTOMER));    //invalidate UICR
+    CheckedMemset(tester.sim->nodes[0].uicr.CUSTOMER, 0xFF, sizeof(tester.sim->nodes[0].uicr.CUSTOMER));    //invalidate UICR
 
     tester.Start();
 
@@ -1044,15 +1061,21 @@ TEST(TestOther, TestBulkMode) {
         FAIL() << "Bulk Mode should consume very low energy, but consumed: " << usageMicroAmpere;
     }
 
-
-
     //Connect to the node using the default node key (hardcoded in the config, used if no UICR data is present)
-    tester.SendTerminalCommand(2, "action this ma connect 00:00:00:01:00:00 1 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11"); //1 = FmKeyId::NODE
-
-    tester.SimulateForGivenTime(10 * 1000);
-    u32 dummyVal = 1337;
-    tester.SendTerminalCommand(2, "action 2002 bulk get_memory %u 4", (u32)(&dummyVal));
-    tester.SimulateUntilRegexMessageReceived(10 * 1000, 2, "\\{\"nodeId\":2002,\"type\":\"get_memory_result\",\"addr\":\\d+,\"data\":\"39:05:00:00\"\\}");
+    RetryOrFail<TimeoutException>(
+        32,
+        [&] {
+            tester.SendTerminalCommand(2, "action this ma connect 00:00:00:01:00:00 1 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 0"); // 1 = FmKeyId::NODE
+            tester.SimulateForGivenTime(10 * 1000);
+        },
+        [&] {
+            // Keep the 'dummyVal' in the same stack frame as the 'Simulate...' that executes the
+            // 'bulk get_memory' command, otherwise you'll read from some old (likely reused)
+            // stack-location.
+            u32 dummyVal = 1337;
+            tester.SendTerminalCommand(2, "action 2002 bulk get_memory %u 4", (u32)(&dummyVal));
+            tester.SimulateUntilRegexMessageReceived(10 * 1000, 2, "\\{\"nodeId\":2002,\"type\":\"get_memory_result\",\"addr\":\\d+,\"data\":\"39:05:00:00\"\\}");
+        });
 
     u8 data[1024];
     for (size_t i = 0; i < sizeof(data); i++)
@@ -1079,11 +1102,11 @@ TEST(TestOther, TestBulkMode) {
 }
 #endif //GITHUB_RELEASE
 
-#if defined(DEV_AUTOMATED_TESTS_MASTER_NRF52)
+#if defined(DEV_AUTO_TEST_MASTER_NRF52)
 TEST(TestOther, TestWatchdog) {
     Exceptions::ExceptionDisabler<WatchdogTriggeredException> wtDisabler;
     Exceptions::ExceptionDisabler<SafeBootTriggeredException> stDisabler;
-    const char* usedFeatureset = "dev_automated_tests_master_nrf52"; //Has a very small watchdog time which is convenient for this test and its duration.
+    const char* usedFeatureset = "dev_auto_test_master_nrf52"; //Has a very small watchdog time which is convenient for this test and its duration.
     constexpr unsigned long long starvationTimeNormalMode = 60UL * 2UL * 1000UL;
     constexpr unsigned long long starvationTimeSafeBoot = 20UL * 1000UL;
     {
@@ -1139,7 +1162,7 @@ TEST(TestOther, TestWatchdog) {
         ASSERT_EQ(tester.sim->nodes[0].restartCounter, 1); //watchdogs are disabled, nodes should not starve at all.
     }
 }
-#endif //DEV_AUTOMATED_TESTS_MASTER_NRF52
+#endif //DEV_AUTO_TEST_MASTER_NRF52
 
 
 #ifndef GITHUB_RELEASE
@@ -1390,7 +1413,7 @@ TEST(TestOther, TestNoOfReceivedMsgs) {
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
     simConfig.terminalId = 0;
     simConfig.SetToPerfectConditions();
-    // testerConfig.verbose = true;
+    //testerConfig.verbose = true;
 
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
@@ -1414,7 +1437,7 @@ TEST(TestOther, TestNoOfReceivedMsgs) {
     // - 1 'get_errors' message
     // It can e.g. happen that a 'set_enrolled_nodes' message gets inbetween the two (depends on
     // the seed).
-    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":2,\"code\":81,\"extra\":[3-4],\"time\":\\d+");
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":2,\"code\":81,\"extra\":[3-9],\"time\":\\d+");
 }
 
 #ifndef GITHUB_RELEASE
@@ -1435,6 +1458,7 @@ TEST(TestOther, TestSimulatorFlashToFileStorage) {
         simConfig.storeFlashToFile = testFilePath;
         simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
         simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2});
+        simConfig.SetToPerfectConditions();
         CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
         tester.Start();
         
@@ -1442,8 +1466,9 @@ TEST(TestOther, TestSimulatorFlashToFileStorage) {
         {
             {
                 //Make sure that the nodes are unable to cluster
-                Exceptions::DisableDebugBreakOnException ddboe;
-                ASSERT_THROW(tester.SimulateUntilClusteringDone(10 * 1000), TimeoutException);
+                Exceptions::ExceptionDisabler<TimeoutException> te;
+                tester.SimulateUntilClusteringDone(10 * 1000);
+                ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
             }
 
             std::vector<std::string> messages = {
@@ -1461,20 +1486,55 @@ TEST(TestOther, TestSimulatorFlashToFileStorage) {
                 }
             }
 
-            tester.SimulateUntilClusteringDone(10 * 1000);
+            tester.SimulateUntilClusteringDone(1 * 60 * 1000);
 
         }
         else if (i == 1)
         {
-            tester.SimulateUntilClusteringDone(10 * 1000);
+            tester.SimulateUntilClusteringDone(1 * 60 * 1000);
         }
     }
 
 }
 
+TEST(TestOther, TestPathLossModelRssiFromDistance)
+{
+    const PathLossModelParameters parameters = {
+        .receivedPowerAtReferenceDistanceDbm = -55.0f,
+        .propagationConstant                 = 2.0f,
+    };
+
+    ASSERT_FLOAT_EQ(ComputeRssiFromDistance(1.0f, parameters), -55.0f);
+    ASSERT_FLOAT_EQ(ComputeRssiFromDistance(10.0f, parameters), -75.0f);
+}
+
+TEST(TestOther, TestPathLossModelNoiseIsStandardNormal)
+{
+    MersenneTwister rng{1};
+
+    const float expected_mean = 0.0f, expected_stddev = 1.0f;
+
+    float incremental_mean = 0.0f, variance_accumulator = 0.0f;
+
+    const std::size_t sampleCount = 1000000;
+    for (std::size_t index = 0; index < sampleCount; ++index)
+    {
+        const float value = GenerateRssiNoise(rng, expected_stddev, expected_mean);
+
+        const float old_incremental_mean = incremental_mean;
+        incremental_mean += (value - incremental_mean) / static_cast<float>(index + 1);
+        variance_accumulator += (value - old_incremental_mean) * (value - incremental_mean);
+    }
+
+    const float stddev = std::sqrt(variance_accumulator / static_cast<float>(sampleCount));
+
+    ASSERT_TRUE(std::abs(incremental_mean - expected_mean) < 0.01f);
+    ASSERT_TRUE(std::abs(stddev - expected_stddev) < 0.01f);
+}
+
 TEST(TestOther, TestConnectionSupervisionTimeoutWillDisconnect) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    // testerConfig.verbose = true;
+    //testerConfig.verbose = true;
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
@@ -1489,6 +1549,14 @@ TEST(TestOther, TestConnectionSupervisionTimeoutWillDisconnect) {
     simConfig.rssiNoise = true;
 
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    // Before the RSSI noise was computed as a random number between 0 and 3 (inclusive). After the change to normally
+    // distributed, zero-mean noise, this test breaks. It is still useful however and we now adjust the distribution
+    // parameters such that the 0.3 probability holds.
+    tester.sim->rssiNoiseMean = -0.6f;
+    tester.sim->rssiNoiseStddev = 1.0f;
+    tester.sim->propagationConstant = 2.5f;
+
     tester.Start();
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("C");
     tester.sim->FindNodeById(2)->gs.logger.EnableTag("C");
@@ -1503,7 +1571,7 @@ TEST(TestOther, TestConnectionSupervisionTimeoutWillDisconnect) {
 
 TEST(TestOther, TestConnectionSupervisionTimeoutWontDisconnect) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    // testerConfig.verbose = true;
+    //testerConfig.verbose = true;
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
@@ -1524,22 +1592,23 @@ TEST(TestOther, TestConnectionSupervisionTimeoutWontDisconnect) {
     // With no variable noise we never get reception probability to 0 so there is almost no chance all packets will be lost with connection timeout
     tester.sim->SetPosition(1, 0, 0.25, 0);
     {
-        Exceptions::DisableDebugBreakOnException ddboe;
-        ASSERT_THROW(tester.SimulateUntilMessageReceived(1000 * 1000, 2, "Disconnected device %d", FruityHal::BleHciError::CONNECTION_TIMEOUT), TimeoutException);
+        Exceptions::ExceptionDisabler<TimeoutException> te;
+        tester.SimulateUntilMessageReceived(1000 * 1000, 2, "Disconnected device %d", FruityHal::BleHciError::CONNECTION_TIMEOUT);
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
     }
 }
 #endif //GITHUB_RELEASE
 
 TEST(TestOther, TestDataSentSplit) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    // testerConfig.verbose = true;
+    //testerConfig.verbose = true;
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
     simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(100 * 1000);
     
     alignas(4) u8 buffer[MAX_MESH_PACKET_SIZE];
 
@@ -1604,7 +1673,7 @@ TEST(TestOther, TestDataSentSplit) {
 #ifndef GITHUB_RELEASE
 TEST(TestOther, TestNoPacketsDropped) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    // testerConfig.verbose = true;
+    //testerConfig.verbose = true;
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.simTickDurationMs = 15;
     simConfig.SetToPerfectConditions();
@@ -1633,7 +1702,7 @@ TEST(TestOther, TestNoPacketsDropped) {
 
 TEST(TestOther, TestThroughput) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    // testerConfig.verbose = true;
+    //testerConfig.verbose = true;
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.SetToPerfectConditions();
     simConfig.simTickDurationMs = 15;
@@ -1656,4 +1725,78 @@ TEST(TestOther, TestThroughput) {
         DebugModule* test = (DebugModule*)tester.sim->FindNodeById(2)->gs.node.GetModuleById(ModuleId::DEBUG_MODULE);
         ASSERT_TRUE(test->GetThroughputTestResult() >= 3900);
     }
+}
+
+TEST(TestOther, TestNodeEntryFloorNumberComputation)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose = true;
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.SetToPerfectConditions();
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    simConfig.floorBiasInMeters = 0.5f;
+    simConfig.ceilingHeightInMeters = 2.0f;
+    simConfig.mapElevationInMeters = 20.0f;
+    simConfig.preDefinedPositions = { {0.5, 0.5, 0.0}, };
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateGivenNumberOfSteps(1);
+    ASSERT_EQ(tester.sim->nodes[0].currentFloorNumber, -1);
+
+    tester.sim->nodes[0].z = 0.6f / simConfig.mapElevationInMeters;
+    tester.SimulateGivenNumberOfSteps(1);
+    ASSERT_EQ(tester.sim->nodes[0].currentFloorNumber, 0);
+
+    tester.sim->nodes[0].z = 1.6f / simConfig.mapElevationInMeters;
+    tester.SimulateGivenNumberOfSteps(1);
+    ASSERT_EQ(tester.sim->nodes[0].currentFloorNumber, 0);
+
+    tester.sim->nodes[0].z = 2.6f / simConfig.mapElevationInMeters;
+    tester.SimulateGivenNumberOfSteps(1);
+    ASSERT_EQ(tester.sim->nodes[0].currentFloorNumber, 1);
+
+    tester.sim->nodes[0].z = 18.6f / simConfig.mapElevationInMeters;
+    tester.SimulateGivenNumberOfSteps(1);
+    ASSERT_EQ(tester.sim->nodes[0].currentFloorNumber, 9);
+
+    tester.sim->nodes[0].z = 30.6f / simConfig.mapElevationInMeters;
+    tester.SimulateGivenNumberOfSteps(1);
+    ASSERT_EQ(tester.sim->nodes[0].currentFloorNumber, 15);
+}
+
+TEST(TestOther, TestRssiPenaltyFromCeilingPenetration)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose = true;
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.SetToPerfectConditions();
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2 });
+    simConfig.ceilingHeightInMeters = 0.5f;
+    simConfig.mapElevationInMeters = 1.0f;
+    simConfig.preDefinedPositions = { {0.5, 0.5, 0.4}, {0.5, 0.5, 0.6}, };
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateGivenNumberOfSteps(1);
+
+    {
+        NodeIndexSetter nodeIndexSetter{0};
+        ASSERT_EQ(cherrySimInstance->currentNode->currentFloorNumber, 0);
+    }
+
+    {
+        NodeIndexSetter nodeIndexSetter{1};
+        ASSERT_EQ(cherrySimInstance->currentNode->currentFloorNumber, 1);
+    }
+
+    cherrySimInstance->simConfig.ceilingAttenuationDb = 0.0f;
+    const float baseRssi = cherrySimInstance->GetReceptionRssiNoNoise(&cherrySimInstance->nodes[0], &cherrySimInstance->nodes[1]);
+
+    cherrySimInstance->simConfig.ceilingAttenuationDb = 20.0f;
+    const float rssiWithAttenuation = cherrySimInstance->GetReceptionRssiNoNoise(&cherrySimInstance->nodes[0], &cherrySimInstance->nodes[1]);
+
+    ASSERT_NEAR(baseRssi - 20.0f, rssiWithAttenuation, 0.01f);
 }

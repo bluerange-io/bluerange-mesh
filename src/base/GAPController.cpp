@@ -83,7 +83,7 @@ void GAPController::BleConfigureGAP() const{
 }
 
 //Connect to a specific peripheral
-ErrorType GAPController::ConnectToPeripheral(const FruityHal::BleGapAddr &address, u16 connectionInterval, u16 timeout) const
+ErrorType GAPController::ConnectToPeripheral(const FruityHal::BleGapAddr &address, u16 connectionInterval, u16 timeout, u16 overWriteSlaveLatency, bool maxScanDutyCycle) const
 {
     ErrorType err = ErrorType::SUCCESS;
 
@@ -92,15 +92,21 @@ ErrorType GAPController::ConnectToPeripheral(const FruityHal::BleGapAddr &addres
     FruityHal::BleGapConnParams connectionParams;
     CheckedMemset(&connectionParams, 0x00, sizeof(connectionParams));
 
-    scanParams.interval = Conf::meshConnectingScanInterval;
-    scanParams.window = Conf::meshConnectingScanWindow;
+    if (maxScanDutyCycle) {
+        scanParams.interval = Conf::maxScanDutyCycleConnectingScanInterval;
+        scanParams.window = Conf::maxScanDutyCycleConnectingScanWindow;
+    }
+    else {
+        scanParams.interval = Conf::meshConnectingScanInterval;
+        scanParams.window = Conf::meshConnectingScanWindow;
+    }
     scanParams.timeout = timeout;
 
     connectionParams.minConnInterval = connectionInterval;
     connectionParams.maxConnInterval = connectionInterval;
-    connectionParams.slaveLatency = Conf::meshPeripheralSlaveLatency;
-    connectionParams.connSupTimeout = Conf::meshConnectionSupervisionTimeout;
 
+    connectionParams.slaveLatency = (overWriteSlaveLatency == GAP_CONTROLLER_USE_CONFIGURED_SLAVE_LATENCY) ? Conf::GetInstance().meshPeripheralSlaveLatency : overWriteSlaveLatency;
+    connectionParams.connSupTimeout = Conf::meshConnectionSupervisionTimeout;
     //Connect to the peripheral
     err = FruityHal::BleGapConnect(address, scanParams, connectionParams);
     if(err != ErrorType::SUCCESS){

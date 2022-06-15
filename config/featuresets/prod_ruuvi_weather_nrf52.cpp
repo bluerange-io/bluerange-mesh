@@ -140,3 +140,7 @@ u32 GetWatchdogTimeoutSafeBoot_prod_ruuvi_weather_nrf52()
 {
     return 0;
 }
+LicenseState GetLicenseState_prod_ruuvi_weather_nrf52()
+{
+    return LicenseState::VALID_BUT_NOT_AVAILABLE;
+}

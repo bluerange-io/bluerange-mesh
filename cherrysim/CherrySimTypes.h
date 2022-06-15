@@ -234,9 +234,14 @@ using TerminalId = std::uint32_t;
 
 struct NodeEntry {
     u32 index;
+
     float x = 0;
     float y = 0;
     float z = 0;
+
+    /// Caches the index of the floor the node is currently on.
+    i8 currentFloorNumber = 0;
+
     bool jsonDataImported = false;
     std::string nodeConfiguration = "";
     FeaturesetPointers* featuresetPointers = nullptr;
@@ -275,6 +280,7 @@ struct NodeEntry {
     bool bme280WasInit       = false;
     bool discoveryAlwaysBusy = false;
 
+    bool lis2dh12InertialInterruptEnabled = false;
     u32 lastMovementSimTimeMs = 0;
 
     u32 fakeDfuVersion = 0;
@@ -328,7 +334,6 @@ struct NodeEntry {
     {
         return static_cast<TerminalId>(this->index + 1);
     }
-
 };
 
 
@@ -406,11 +411,23 @@ struct SimConfiguration {
     bool        enableSimStatistics                = false;
     std::string storeFlashToFile                   = "";
 
+    /// The base height of the lowest floor. This is subtracted from the height of an asset tag before the floor computation takes place.
+    float       floorBiasInMeters                  = 0.0f;
+    /// The height of all ceilings in meters. This value, together with `mapElevationInMeters` defines how many floors are available.
+    float       ceilingHeightInMeters              = 3.0f;
+    /// The attenuation in dB per penetrated ceiling.
+    float       ceilingAttenuationDb               = 0.0f;
+
+    bool        perfectReceptionProbabilityForAdvertising = false;
+    bool        perfectReceptionProbabilityForConnection  = false;
+
     bool        verboseCommands                    = false; // deprecated but retained only for compatability reasons. Should be removed in ticket BR-2321
 
-
-    //BLE Stack capabilities
-    BleStackType defaultBleStackType          = BleStackType::INVALID;
+    /// To speed up the simulator when running with many advertising nodes, this parameter changes
+    /// the index step in the loop iterating over all potential delivery partners.
+    /// The value can be understood as the reciprocal of the fraction of nodes considered for
+    /// advertisement delivery, i.e. three means that a third of all nodes will be considered.
+    uint32_t simulateAdvertisingIndexStep = 1;
 
     void SetToPerfectConditions();
 };

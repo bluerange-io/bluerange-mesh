@@ -28,6 +28,8 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
+
+#include <HelperFunctions.h>
 #include <CherrySimTester.h>
 #include <CherrySimUtils.h>
 #include <Node.h>
@@ -82,9 +84,10 @@ TEST(TestBeaconingModule, TestIfMessageIsBroadcastedAfterAdd) {
         //Test that too many byte lead to a terminal command error
         Exceptions::ExceptionDisabler<ErrorLoggedException> ele;
         Exceptions::ExceptionDisabler<BufferTooSmallException> btse;
-        Exceptions::DisableDebugBreakOnException disabler;
+        Exceptions::ExceptionDisabler<WrongCommandParameterException> wcpe;
         tester.SendTerminalCommand(1, "action 3 adv add 02:01:06:1A:FF:4C:00:02:15:F0:01:8B:9B:75:09:4C:31:A9:05:1A:27:D3:9C:00:3C:EA:60:00:32:81:00:00 13");
-        ASSERT_THROW(tester.SimulateGivenNumberOfSteps(1), WrongCommandParameterException);
+        tester.SimulateGivenNumberOfSteps(1);
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(WrongCommandParameterException)));
     }
 
     //Test that also fewer than 31 bytes can be advertised
@@ -149,8 +152,9 @@ TEST(TestBeaconingModule, TestIfMessageIsBroadcastedAfterSet) {
     tester.SimulateForGivenTime(10 * 1000);
     //Make sure that the advertisement does not happen anymore
     {
-        Exceptions::DisableDebugBreakOnException disabler;
-        ASSERT_THROW(tester.SimulateUntilBleEventReceived(100 * 1000, 1, BLE_GAP_EVT_ADV_REPORT, data2, sizeof(data2)), TimeoutException);
+        Exceptions::ExceptionDisabler<TimeoutException> te;
+        tester.SimulateUntilBleEventReceived(100 * 1000, 1, BLE_GAP_EVT_ADV_REPORT, data2, sizeof(data2));
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
     }
 
     //The behaviour of the adv set command must be the same after the reboot.
@@ -163,9 +167,10 @@ TEST(TestBeaconingModule, TestIfMessageIsBroadcastedAfterSet) {
         //Test that too many byte lead to a terminal command error
         Exceptions::ExceptionDisabler<ErrorLoggedException> ele;
         Exceptions::ExceptionDisabler<BufferTooSmallException> btse;
-        Exceptions::DisableDebugBreakOnException disabler;
+        Exceptions::ExceptionDisabler<WrongCommandParameterException>wcpe;
         tester.SendTerminalCommand(1, "action 3 adv set 0 02:01:06:1A:FF:4C:00:02:15:F0:01:8B:9B:75:09:4C:31:A9:05:1A:27:D3:9C:00:3C:EA:60:00:32:81:00:00 13");
-        ASSERT_THROW(tester.SimulateGivenNumberOfSteps(1), WrongCommandParameterException);
+        tester.SimulateGivenNumberOfSteps(1);
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(WrongCommandParameterException)));
     }
 
     //Test that also fewer than 31 bytes can be advertised
@@ -209,12 +214,17 @@ TEST(TestBeaconingModule, TestAddAndSetOnAssetOverMeshAccessSerialConnectWithOrg
 
     tester.SimulateUntilMessageReceived(100 * 1000, 1, "clusterSize\":2"); // Wait until the nodes have clustered.
 
-    // Initiate a connection from the sink on the mesh node to the asset tag using the organization key.
-    tester.SendTerminalCommand(
-        1, "action 2 ma serial_connect BBBBD 4 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 33000 20 13");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1,
-                                        R"({"type":"serial_connect_response","module":10,"nodeId":2,)"
-                                        R"("requestHandle":13,"code":0,"partnerId":33000})");
+    RetryOrFail<TimeoutException>(
+        32, [&] {
+            // Initiate a connection from the sink on the mesh node to the asset tag using the organization key.
+            tester.SendTerminalCommand(
+                1, "action 2 ma serial_connect BBBBD 4 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 33000 20 13");
+        },
+        [&] {
+            tester.SimulateUntilMessageReceived(10 * 1000, 1,
+                                                R"({"type":"serial_connect_response","module":10,"nodeId":2,)"
+                                                R"("requestHandle":13,"code":0,"partnerId":33000})");
+        });
 
     // Add an advertisement with all-zero payload.
     tester.SendTerminalCommand(

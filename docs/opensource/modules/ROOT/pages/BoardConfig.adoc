@@ -44,4 +44,4 @@ lis2dh12PinConfig.sensorIdentifier = SensorIdentifier::LIS2DH12;
 GS->boardconf.getCustomPinset(&lis2dh12PinConfig);
 ----
 
-'NOTE: An example implementation of custom pin settings could be find in board_4.cpp in the source code'
+NOTE: An example implementation of custom pin settings can be found in `config/boards/board_4.cpp`.

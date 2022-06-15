@@ -75,10 +75,16 @@ void operator delete(void * p) throw()
 #endif
 
 #ifdef CHERRYSIM_TESTER_ENABLED
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
+    // Copy all arguments passed to the executable into a vector
+    std::vector<std::string> args;
+    std::copy(&argv[1], &argv[argc], std::back_inserter(args));
 
     //A workaround to find out if the Visual Studio Test Explorer is executing us (either on first run through list_tests or the second real run for testing)
-    bool runByVisualStudioTestExplorer = argc >= 2 && (std::string(argv[1]).find("gtest_output=xml:") != std::string::npos || (std::string(argv[1]).find("gtest_list_tests") != std::string::npos) || (std::string(argv[1]).find("gtest_filter") != std::string::npos));
+    const bool runByVisualStudioTestExplorer = std::any_of(begin(args), end(args), [](const auto &arg) {
+        return (arg.find("gtest_output=xml:") != std::string::npos) || (arg.find("gtest_list_tests") != std::string::npos) || (arg.find("gtest_filter") != std::string::npos);
+    });
 
     //Initialize google tests
     //WARNING: Will modify the arc and argv and will remove all the GTEST command line parameters
@@ -119,29 +125,32 @@ int main(int argc, char **argv) {
     uint32_t seedIncrement = 0;
     uint32_t numRuns = 1;
     bool didError = false;
-    for (int i = 0; i < argc; i++)
+    for (const auto &arg : args)
     {
-        std::string s = argv[i];
-        if (s == "GitLab")
+        if (arg == "GitLab")
         {
             GitLab = true;
             ::testing::GTEST_FLAG(catch_exceptions) = 1;
             ::testing::GTEST_FLAG(filter) = "*";
             ::testing::GTEST_FLAG(break_on_failure) = false;
         }
-        else if (s == "Scheduled")
+        else if (arg == "Scheduled")
         {
             Scheduled = true;
         }
-        else if (std::regex_search(s, matches, seedStartRegex))
+        else if (arg == "verboseTestsByDefault")
+        {
+            CherrySimTester::EnableVerboseTestsByDefault();
+        }
+        else if (std::regex_search(arg, matches, seedStartRegex))
         {
             seedOffset = Utility::StringToU32(matches[1].str().c_str(), &didError);
         }
-        else if (std::regex_search(s, matches, seedIncrementRegex))
+        else if (std::regex_search(arg, matches, seedIncrementRegex))
         {
             seedIncrement = Utility::StringToU32(matches[1].str().c_str(), &didError);
         }
-        else if (std::regex_search(s, matches, numRunsRegex))
+        else if (std::regex_search(arg, matches, numRunsRegex))
         {
             numRuns = Utility::StringToU32(matches[1].str().c_str(), &didError);
         }
@@ -257,10 +266,13 @@ NodeEntryPredicate NodeEntryPredicate::AllowNodeId(NodeId nodeId, NetworkId netw
 }
 
 
+bool CherrySimTester::verboseTestsByDefault = false;
+
+
 CherrySimTesterConfig CherrySimTester::CreateDefaultTesterConfiguration()
 {
     CherrySimTesterConfig config;
-    config.verbose = false;
+    config.verbose = verboseTestsByDefault;
     config.terminalFilter = 0;
 
     return config;
@@ -291,9 +303,6 @@ SimConfiguration CherrySimTester::CreateDefaultSimConfiguration()
     simConfig.importFromJson = false;
     simConfig.siteJsonPath = "C:\\Users\\MariusHeil\\Desktop\\testsite.json";
     simConfig.devicesJsonPath = "C:\\Users\\MariusHeil\\Desktop\\testdevices.json";
-
-
-    simConfig.defaultBleStackType = BleStackType::NRF_SD_132_ANY;
 
     simConfig.defaultNetworkId = 10;
 
@@ -381,6 +390,7 @@ void CherrySimTester::SimulateUntilClusteringDone(int timeoutMs, std::function<v
         //Watch if a timeout occurs
         if (startTimeMs + timeoutMs < (i32)sim->simState.simTimeMs) {
             SIMEXCEPTION(TimeoutException); //Timeout waiting for clustering
+            break;
         }
     }
 }
@@ -396,6 +406,7 @@ void CherrySimTester::SimulateUntilClusteringDoneWithDifferentNetworkIds(int tim
         //Watch if a timeout occurs
         if (startTimeMs + timeoutMs < (i32)sim->simState.simTimeMs) {
             SIMEXCEPTION(TimeoutException); //Timeout waiting for clustering
+            break;
         }
     }
 }
@@ -411,7 +422,7 @@ void CherrySimTester::SimulateBroadcastMessage(double x, double y, ble_gap_evt_a
         //If the other node is scanning
         if (sim->nodes[i].state.scanningActive) {
             //If the random value hits the probability, the event is sent
-            uint32_t probability = sim->CalculateReceptionProbability(sim->currentNode, &(sim->nodes[i]));
+            uint32_t probability = sim->CalculateReceptionProbabilityForAdvertisement(sim->currentNode, &(sim->nodes[i]));
             if (PSRNG(probability) || ignoreDropProb) {
                 simBleEvent s;
                 s.globalId = sim->simState.globalEventIdCounter++;
@@ -540,6 +551,7 @@ void CherrySimTester::_SimulateUntilMessageReceived(int timeoutMs, std::function
         if (startTimeMs + timeoutMs < (i32)sim->simState.simTimeMs) {
             awaitedTerminalOutputs = nullptr;
             SIMEXCEPTION(TimeoutException); //Timeout waiting for message
+            break;
         }
     }
     awaitedTerminalOutputs = nullptr;
@@ -563,6 +575,7 @@ void CherrySimTester::SimulateUntilBleEventReceived(int timeoutMs, NodeId nodeId
         //Watch if a timeout occurs
         if (timeoutMs != 0 && startTimeMs + timeoutMs < (i32)sim->simState.simTimeMs) {
             SIMEXCEPTION(TimeoutException); //Timeout waiting for clustering
+            break;
         }
     }
     awaitedBleEventNodeId = 0;
@@ -779,6 +792,21 @@ void CherrySimTester::CherrySimEventHandler(const char* eventType) {
 
 };
 
+void CherrySimTester::EnableVerboseTestsByDefault()
+{
+    verboseTestsByDefault = true;
+}
+
+bool CherrySimTester::IsVerbose() const
+{
+    return config.verbose;
+}
+
+void CherrySimTester::SetVerbose(bool verbose)
+{
+    config.verbose = verbose;
+}
+
 SimulationMessage::SimulationMessage(TerminalId terminalId, const std::string &messagePart)
     : SimulationMessage(NodeEntryPredicate::AllowTerminalId(terminalId), messagePart)
 {
@@ -839,4 +867,60 @@ bool SimulationMessage::MatchesRegex(const std::string & message)
 {
     std::regex reg(messagePart);
     return std::regex_search(message, reg);
+}
+
+
+
+void CherrySimTester::DfuStartFromTerminalCommandFile(CherrySimTester& tester, std::string file, TerminalId targetTerminalId)
+{
+    const std::string updateCommands = cherrySimInstance->LoadFileContents(file.c_str());
+    std::istringstream iss(updateCommands);
+
+    for (std::string line; std::getline(iss, line);)
+    {
+        if (line.rfind("dfu_start", 0) == 0) {
+            tester.SendTerminalCommand(targetTerminalId, line.c_str());
+        }
+    }
+}
+
+void CherrySimTester::DfuDataFromTerminalCommandFile(CherrySimTester& tester, std::string file, TerminalId targetTerminalId)
+{
+    const std::string updateCommands = cherrySimInstance->LoadFileContents(file.c_str());
+    std::istringstream iss(updateCommands);
+
+    for (std::string line; std::getline(iss, line);)
+    {
+        if (line.rfind("dfu_data", 0) == 0) {
+            tester.SendTerminalCommand(targetTerminalId, line.c_str());
+            tester.SimulateGivenNumberOfSteps(1);
+        }
+    }
+}
+
+void CherrySimTester::DfuAllTransmittedFromTerminalCommandFile(CherrySimTester& tester, std::string file, TerminalId targetTerminalId)
+{
+    const std::string updateCommands = cherrySimInstance->LoadFileContents(file.c_str());
+    std::istringstream iss(updateCommands);
+
+    for (std::string line; std::getline(iss, line);)
+    {
+        if (line.rfind("dfu_all_transmitted", 0) == 0) {
+            tester.SendTerminalCommand(targetTerminalId, line.c_str());
+        }
+    }
+}
+
+
+void CherrySimTester::DfuApplyFromTerminalCommandFile(CherrySimTester& tester, std::string file, TerminalId targetTerminalId)
+{
+    const std::string updateCommands = cherrySimInstance->LoadFileContents(file.c_str());
+    std::istringstream iss(updateCommands);
+
+    for (std::string line; std::getline(iss, line);)
+    {
+        if (line.rfind("dfu_apply", 0) == 0) {
+            tester.SendTerminalCommand(targetTerminalId, line.c_str());
+        }
+    }
 }

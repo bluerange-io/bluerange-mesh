@@ -28,6 +28,8 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
+
+#include <HelperFunctions.h>
 #include "Utility.h"
 #include "CherrySimTester.h"
 #include "CherrySimUtils.h"
@@ -41,10 +43,12 @@ TEST(TestDebugModule, TestCommands) {
     simConfig.terminalId = 0;
     //testerConfig.verbose = true;
     simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 2 } );
+    simConfig.mapWidthInMeters = 10;
+    simConfig.mapHeightInMeters = 10;
     simConfig.SetToPerfectConditions();
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(1 * 60 * 1000);
 
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("DEBUGMOD");
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("WATCHDOG");
@@ -106,10 +110,10 @@ TEST(TestDebugModule, TestCommands) {
     tester.SendTerminalCommand(1, "heap");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"stack\":");
 
-    tester.SendTerminalCommand(1, "readblock 1");
+    tester.SendTerminalCommand(1, "readblock flash 1");
     tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "[0-9A-Za-z/=:]{20}");
 
-    tester.SendTerminalCommand(1, "readblock 1 2");
+    tester.SendTerminalCommand(1, "readblock flash 1 2");
     tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "[0-9A-Za-z/=:]{20}");
 
     tester.SendTerminalCommand(1, "memorymap");
@@ -165,7 +169,7 @@ TEST(TestDebugModule, TestReadMemory) {
         tester.sim->nodes[1].flash[i] = i;
     }
 
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(100 * 1000);
 
     //Query a readback of parts of the flash memory and check if we get the correct data back
     tester.SendTerminalCommand(1, "action 2 debug readmem 0 5");

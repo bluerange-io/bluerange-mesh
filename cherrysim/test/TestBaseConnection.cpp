@@ -44,7 +44,7 @@ TEST(TestBaseConnection, TestSimpleTransmissions) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
     tester.Start();
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(1 * 60 * 1000);
 
     //We modify the MTU of the connection and set it so that it is too small for a normal packet
     //smallest value is 10 and componsated with three 3 byte ATT_HEADER_SIZE, so payload mtu would be 7 

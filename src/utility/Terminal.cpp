@@ -56,7 +56,7 @@ static std::mutex terminalMutex;
 #endif
 
 #if IS_ACTIVE(APP_UART)
-#include "AppUartModule.h"
+#include <AppUartModule.h>
 #endif
 
 extern "C"

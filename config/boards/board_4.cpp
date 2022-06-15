@@ -55,7 +55,8 @@ void SetBoard_4(BoardConfiguration* c)
         c->lfClockAccuracy = (u8)FruityHal::ClockAccuracy::CLOCK_ACCURACY_20_PPM;
         c->dcDcEnabled = true;
         c->powerOptimizationEnabled = false;
-        c->powerButton =  -1;
+        c->powerButton =  16;
+        c->powerButtonActiveHigh = false;
         GS->boardconf.getCustomPinset = &SetCustomPins_4;
     }
 }

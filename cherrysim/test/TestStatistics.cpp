@@ -71,8 +71,8 @@ TEST(TestStatistics, TestNumberClusteringMessagesSent) {
     //This check surpassed 1000 cases. See IOT-3997
     CheckAndClearStat(stat, MessageType::MODULE_GENERAL, ModuleId::STATUS_REPORTER_MODULE, 10, 2000, (u8)StatusReporterModule::StatusModuleGeneralMessages::LIVE_REPORT);
 
-    CheckAndClearStat(stat, MessageType::MODULE_TRIGGER_ACTION, ModuleId::INVALID_MODULE, 10, 50);
-    CheckAndClearStat(stat, MessageType::MODULE_ACTION_RESPONSE, ModuleId::INVALID_MODULE, 10, 50);
+    CheckAndClearStat(stat, MessageType::MODULE_TRIGGER_ACTION, ModuleId::INVALID_MODULE, 9, 50);
+    CheckAndClearStat(stat, MessageType::MODULE_ACTION_RESPONSE, ModuleId::INVALID_MODULE, 9, 50);
 
     //After checking for all expected messages, the stat should be empty
     checkStatEmpty(stat);

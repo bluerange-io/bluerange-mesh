@@ -315,7 +315,7 @@ void MeshAccessModule::UpdateMeshAccessBroadcastPacket(u16 advIntervalMs)
     serviceData->isSink = GET_DEVICE_TYPE() == DeviceType::SINK ? 1 : 0;
     serviceData->isZeroKeyConnectable = IsZeroKeyConnectable(ConnectionDirection::DIRECTION_IN) ? 1 : 0;
     const u32 totalInConnections = GS->cm.GetBaseConnections(ConnectionDirection::DIRECTION_IN).count;
-    serviceData->IsConnectable = totalInConnections < Conf::GetInstance().totalInConnections ? 1 : 0;
+    serviceData->hasFreeInConnection = totalInConnections < Conf::GetInstance().totalInConnections ? 1 : 0;
     u8 interestedInConnection = 0;
     if (GET_DEVICE_TYPE() == DeviceType::ASSET)
     {
@@ -485,8 +485,16 @@ void MeshAccessModule::ReceivedMeshAccessConnectMessage(ConnPacketModule const *
 {
     logt("MAMOD", "Received connect task");
     MeshAccessModuleConnectMessage const * message = (MeshAccessModuleConnectMessage const *) packet->data;
+    //Overwrites the tunnel type to peer to peer because no other tunnel type is allowed
+    //if FmKeyId::NODE (1) is provided
+    MeshAccessTunnelType tunnelType = (MeshAccessTunnelType)message->tunnelType;
+    if (message->fmKeyId == FmKeyId::NODE)
+    {
+        tunnelType = MeshAccessTunnelType::PEER_TO_PEER;
+        logt("WARNING", "Using MeshAccessTunnelType::PEER_TO_PEER (%u) because FmKeyId (%u) does not allow others!",(u32)tunnelType,(u32)message->fmKeyId);
+    }
 
-    u32 uniqueConnId = MeshAccessConnection::ConnectAsMaster(&message->targetAddress, 10, 5, message->fmKeyId, message->key.data(), (MeshAccessTunnelType)message->tunnelType);
+    u32 uniqueConnId = MeshAccessConnection::ConnectAsMaster(&message->targetAddress, 10, 5, message->fmKeyId, message->key.data(), tunnelType);
 
     MeshAccessConnection* conn = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(uniqueConnId).GetConnection();
     if(conn != nullptr){
@@ -545,6 +553,10 @@ void MeshAccessModule::ReceivedMeshAccessSerialConnectMessage(ConnPacketModule c
     meshAccessSerialConnectSender = packet->header.sender;
     meshAccessSerialConnectRequestHandle = packet->requestHandle;
 
+    if (packetLength < SIZEOF_MA_MODULE_SERIAL_CONNECT_MESSAGE_V3) {
+        latestMeshAccessSerialConnectMessage.connectMode = MeshAccessSerialConnectMode::DEFAULT;
+    }
+
     // => This data will be checked as soon as a broadcast message is received
     // But in case the BLE address was already given, we immediately schedule a connect
     if (
@@ -553,6 +565,11 @@ void MeshAccessModule::ReceivedMeshAccessSerialConnectMessage(ConnPacketModule c
     ) {
         logt("MAMOD", "Doing instant serial_connect to BLE address");
         OnFoundSerialIndexWithAddr(message->targetAddress, message->serialNumberIndexToConnectTo);
+    }
+    else if (latestMeshAccessSerialConnectMessage.connectMode != MeshAccessSerialConnectMode::DEFAULT) {
+        // If the BLE address was not given, then the connection mode must not be FORCE
+        logt("MAMOD", "Connection mode of serial_connect reset to DEFAULT (%u)", static_cast<unsigned>(MeshAccessSerialConnectMode::DEFAULT));
+        latestMeshAccessSerialConnectMessage.connectMode = MeshAccessSerialConnectMode::DEFAULT;
     }
 }
 
@@ -599,7 +616,12 @@ void MeshAccessModule::OnFoundSerialIndexWithAddr(const FruityHal::BleGapAddr& a
         && latestMeshAccessSerialConnectMessage.serialNumberIndexToConnectTo != 0
         && GS->cm.GetConnectionByUniqueId(meshAccessSerialConnectConnectionId).GetConnection() == nullptr
     ) {
-            meshAccessSerialConnectConnectionId = MeshAccessConnection::ConnectAsMaster(&addr, 10, 5, latestMeshAccessSerialConnectMessage.fmKeyId, latestMeshAccessSerialConnectMessage.key, MeshAccessTunnelType::LOCAL_MESH, latestMeshAccessSerialConnectMessage.nodeIdAfterConnect);
+            const bool forceMode = latestMeshAccessSerialConnectMessage.connectMode == MeshAccessSerialConnectMode::FORCE;
+
+            const u16 timeout = forceMode ? 15 : 5;
+            const bool maxScanDutyCycle = forceMode;
+
+            meshAccessSerialConnectConnectionId = MeshAccessConnection::ConnectAsMaster(&addr, 10, timeout, latestMeshAccessSerialConnectMessage.fmKeyId, latestMeshAccessSerialConnectMessage.key, MeshAccessTunnelType::LOCAL_MESH, latestMeshAccessSerialConnectMessage.nodeIdAfterConnect, Conf::serialConnectSlaveLatency, maxScanDutyCycle);
 
             MeshAccessConnection* maconn = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(meshAccessSerialConnectConnectionId).GetConnection();
             if (maconn != nullptr)
@@ -826,8 +848,8 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
         }
         else if (TERMARGS(3, "serial_connect"))
         {
-            //   0       1    2        3            4          5        6            7                           8                       9                10
-            //action [nodeId] ma serial_connect [to serial] [fmKeyId] [key] [nodeId after connect] [connection initial keep alive] {requestHandle=0} {bleAddress=""}
+            //   0       1    2        3            4          5        6            7                           8                       9                10               11
+            //action [nodeId] ma serial_connect [to serial] [fmKeyId] [key] [nodeId after connect] [connection initial keep alive] {requestHandle=0} {bleAddress=""} {connectMode=0}
 
             if (commandArgsSize < 9) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
@@ -848,6 +870,8 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
                 Logger::ParseEncodedStringToBuffer(commandArgs[10], message.targetAddress.addr.data(), message.targetAddress.addr.size(), &didError);
                 Utility::SwapBytes(message.targetAddress.addr.data(), message.targetAddress.addr.size());
             }
+
+            message.connectMode = static_cast<MeshAccessSerialConnectMode>((commandArgsSize > 11) ? Utility::StringToU8(commandArgs[11], &didError) : 0);
 
             if (didError
                 || message.nodeIdAfterConnect < NODE_ID_GLOBAL_DEVICE_BASE

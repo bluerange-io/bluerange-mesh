@@ -53,8 +53,6 @@ public:
 
     volatile bool running = true;
 
-    static constexpr int32_t MESH_GW_NODE = 1;
-
     explicit CherrySimRunner(const CherrySimRunnerConfig &runnerConfig, const SimConfiguration &simConfig, bool meshGwCommunication);
 
     void Start();
@@ -70,6 +68,8 @@ public:
 
     void TerminalReaderMain();
 
+    NodeEntry* GetSinkNodeForTerminalMainReader();
+
     static SimConfiguration CreateDefaultRunConfiguration();
 
 private:
@@ -77,5 +77,6 @@ private:
     CherrySimRunnerConfig runnerConfig;
     SimConfiguration simConfig;
 
+    std::chrono::steady_clock::time_point lastRealTimeViolation;
 };
 

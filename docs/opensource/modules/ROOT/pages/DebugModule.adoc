@@ -172,10 +172,10 @@ memorymap
 Sometimes it is useful to read back some of the memory contents of a node while being connected.
 [source, C++]
 ----
-readblock [number | "uicr" | "ficr" | "ram"] [numBlocks]
+readblock ["flash" | "uicr" | "ficr" | "ram"] [blockId] [numBlocks]
 
 //Read the first block of memory of the flash
-readblock 0 1
+readblock flash 0 1
 ----
 
 === More

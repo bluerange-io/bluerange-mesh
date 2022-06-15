@@ -306,6 +306,8 @@ private:
         decltype(ComponentMessageHeader::requestHandle) periodicTimeSendRequestHandle = 0;
         bool IsPeriodicTimeSendActive();
 
+        void HandleJoinMeAdvertisement(i8 rssi, const AdvPacketJoinMeV0 & packet);
+
     public:
 
         static constexpr int SIZEOF_STATUS_REPORTER_MODULE_CONNECTIONS_MESSAGE = 12;

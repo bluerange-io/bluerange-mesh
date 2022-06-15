@@ -28,6 +28,8 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
+
+#include <HelperFunctions.h>
 #include "Utility.h"
 #include "CherrySimTester.h"
 #include "CherrySimUtils.h"
@@ -128,7 +130,7 @@ TEST(TestStatusReporterModule, TestPeriodicTimeSend) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(100 * 1000);
     tester.sim->FindNodeById(2)->gs.logger.EnableTag("STATUSMOD");
 
     //Send a write command
@@ -151,7 +153,7 @@ TEST(TestStatusReporterModule, TestGetConnectionsVerbose) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(100 * 1000);
 
     //Send a write command
     tester.SendTerminalCommand(1, "action 2 status get_connections_verbose");
@@ -221,8 +223,9 @@ TEST(TestStatusReporterModule, TestHopsToSinkFixing) {
 
     // We expect that incorrect hops error wont be received as hopsToSink should have been fixed together with first keep_alive message.
     {
-        Exceptions::DisableDebugBreakOnException disabler;
-        ASSERT_THROW(tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":%u,\"code\":%u", LoggingError::CUSTOM, CustomErrorTypes::FATAL_INCORRECT_HOPS_TO_SINK), TimeoutException);
+        Exceptions::ExceptionDisabler<TimeoutException> te;
+        tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":%u,\"code\":%u", LoggingError::CUSTOM, CustomErrorTypes::FATAL_INCORRECT_HOPS_TO_SINK);
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
     }
 }
 #endif //GITHUB_RELEASE
@@ -261,7 +264,7 @@ TEST(TestStatusReporterModule, TestConnectionRssiReportingWithoutNoise) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(100 * 1000);
 
     tester.SimulateGivenNumberOfSteps(100);
 
@@ -304,7 +307,7 @@ TEST(TestStatusReporterModule, TestConnectionRssiReportingWithoutNoise) {
 
 #ifndef GITHUB_RELEASE
 TEST(TestStatusReporterModule, TestConnectionRssiReportingWithNoise) {
-    //Test Rssi reporting when RssiNoise is disabled 
+    //Test Rssi reporting when RssiNoise is enabled
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     //testerConfig.verbose = true;
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
@@ -317,7 +320,8 @@ TEST(TestStatusReporterModule, TestConnectionRssiReportingWithNoise) {
     // Very long time for clustering as distance between nodes is at limit of reception
     tester.SimulateUntilClusteringDone(1000 * 1000);
 
-    tester.SimulateGivenNumberOfSteps(100);
+    // Simulate for some time to somewhat stabilize the exponential moving average RSSI of a connection
+    tester.SimulateForGivenTime(10 * 1000);
 
     int rssiCalculated = (int)tester.sim->GetReceptionRssi(tester.sim->FindNodeById(1), tester.sim->FindNodeById(2));
 
@@ -350,7 +354,7 @@ TEST(TestStatusReporterModule, TestConnectionRssiReportingWithNoise) {
     }
 
     /*Check if the reported RSSI is equal to calculated one when rssi noise is inactive*/
-    if (std::abs(rssiReported - rssiCalculated) > 15) {
+    if (std::abs(rssiReported - rssiCalculated) > 20) {
         FAIL() << "RSSI calculated is not nearly equal to RSSI reported";
     }
 }
@@ -371,7 +375,7 @@ TEST(TestStatusReporterModule, TestUptimeReporting) {
     tester.SimulateUntilClusteringDone(50 * 1000);
 
     //Add some more uptime so that we are sure to have a two digit uptime
-    tester.SimulateForGivenTime(10 * 1000);
+    tester.SimulateForGivenTime(30 * 1000);
 
     //Request the error log from node 2
     tester.SendTerminalCommand(1, "action 2 status get_errors");
@@ -381,11 +385,12 @@ TEST(TestStatusReporterModule, TestUptimeReporting) {
 
     //Now, we set the time of the sink node and wait until it got synchronized in the mesh
     tester.SendTerminalCommand(1, "settime 10000 0");
-    tester.SimulateForGivenTime(30 * 1000);
+    tester.SimulateForGivenTime(20 * 1000);
 
-    //Now, the absolute time should be reported and should be 5 digits long
+    //Now, the absolute time should be reported and should be 4 digits long
+    //As the node was simulated more seconds before setting a time of 10000 than after that time
     tester.SendTerminalCommand(1, "action 2 status get_errors");
-    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"("type":"error_log_entry","nodeId":2,"module":3,"errType":2,"code":86,"extra":\d\d\d\d\d,"time":\d+,"typeStr":"CUSTOM","codeStr":"INFO_UPTIME_ABSOLUTE")");
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"("type":"error_log_entry","nodeId":2,"module":3,"errType":2,"code":86,"extra":\d\d\d\d,"time":\d+,"typeStr":"CUSTOM","codeStr":"INFO_UPTIME_ABSOLUTE")");
 }
 
 TEST(TestStatusReporterModule, TestCapabilitySending) {
@@ -457,7 +462,7 @@ TEST(TestStatusReporterModule, TestErrorLogTimes) {
 TEST(TestStatusReporterModule, TestActionsOnAssetOverMeshAccessSerialConnectWithOrgaKey)
 {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    testerConfig.verbose               = true;
+    //testerConfig.verbose               = true;
     SimConfiguration simConfig         = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId               = 0;
     simConfig.defaultNetworkId         = 0;
@@ -485,13 +490,18 @@ TEST(TestStatusReporterModule, TestActionsOnAssetOverMeshAccessSerialConnectWith
 
     tester.SimulateUntilMessageReceived(100 * 1000, 1, "clusterSize\":2"); // Wait until the nodes have clustered.
 
-    // Initiate a connection from the sink on the mesh node to the asset tag using the organization key.
-    tester.SendTerminalCommand(
-        1, "action 2 ma serial_connect BBBBD 4 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 33000 20 13");
-    tester.SimulateUntilMessageReceived(
-        10 * 1000, 1,
-        R"({"type":"serial_connect_response","module":10,"nodeId":2,)"
-        R"("requestHandle":13,"code":0,"partnerId":33000})");
+    RetryOrFail<TimeoutException>(
+        32, [&] {
+            // Initiate a connection from the sink on the mesh node to the asset tag using the organization key.
+            tester.SendTerminalCommand(
+                1, "action 2 ma serial_connect BBBBD 4 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 33000 20 13");
+        },
+        [&] {
+            tester.SimulateUntilMessageReceived(
+                10 * 1000, 1,
+                R"({"type":"serial_connect_response","module":10,"nodeId":2,)"
+                R"("requestHandle":13,"code":0,"partnerId":33000})");
+        });
 
     tester.SendTerminalCommand(1, "action 33000 status get_status");
     // Wait for the response on the sink.
@@ -506,3 +516,55 @@ TEST(TestStatusReporterModule, TestActionsOnAssetOverMeshAccessSerialConnectWith
     tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"type":"set_init_result","nodeId":33000,"module":3})");
 }
 #endif
+
+TEST(TestStatusReporterModule, TestNearbyNodesReportsOnlyWithSameNetworkId)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose               = true;
+    SimConfiguration simConfig         = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId               = 0;
+    simConfig.defaultNetworkId         = 0;
+    simConfig.preDefinedPositions      = {{0.1, 0.1}, {0.2, 0.1}, {0.3, 0.1}};
+    simConfig.nodeConfigName.insert({"prod_sink_nrf52", 1});
+    simConfig.nodeConfigName.insert({"prod_mesh_nrf52", 2});
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateGivenNumberOfSteps(10);
+
+    tester.SendTerminalCommand(
+        1, "action this enroll basic BBBBB 1 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 "
+           "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 "
+           "01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00 10 0 0");
+    tester.SendTerminalCommand(
+        2, "action this enroll basic BBBBC 2 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 "
+           "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 "
+           "02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 10 0 0");
+    tester.SendTerminalCommand(
+        3, "action this enroll basic BBBBD 3 20000 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 "
+           "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 "
+           "03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0 0");
+
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, "clusterSize\":2"); // Wait until the nodes have clustered.
+
+    for (unsigned trial = 0; trial < 10; ++trial)
+    {
+        tester.SimulateForGivenTime(5000);
+
+        RetryOrFail<TimeoutException>(
+            32, [&] {
+                tester.SendTerminalCommand(1, "action 2 status get_nearby");
+            },
+            [&] {
+                tester.SimulateUntilRegexMessageReceived(1000, 1, R"("nodeId":2,"type":"nearby_nodes","module":[0-9]+,"nodes":\[.*"nodeId":1,)");
+            });
+
+        {
+            Exceptions::ExceptionDisabler<TimeoutException> te;
+
+            tester.SendTerminalCommand(2, "action 2 status get_nearby");
+            tester.SimulateUntilRegexMessageReceived(1000, 2, R"("nodeId":2,"type":"nearby_nodes","module":[0-9]+,"nodes":\[.*"nodeId":3,)");
+            ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
+        }
+    }
+}

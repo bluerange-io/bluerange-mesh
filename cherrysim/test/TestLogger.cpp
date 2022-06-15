@@ -157,19 +157,28 @@ TEST(TestLogger, TestBase64StringToBuffer)
     CheckedMemset(buffer, 0, sizeof(buffer));
 
     {
-        Exceptions::DisableDebugBreakOnException disable;
-        base64 = "Malformed";
-        ASSERT_THROW(Logger::ParseEncodedStringToBuffer(base64.c_str(), buffer, sizeof(buffer)), IllegalArgumentException);
-        CheckedMemset(buffer, 0, sizeof(buffer));
-
-        base64 = "TooBig==";
-        ASSERT_THROW(Logger::ParseEncodedStringToBuffer(base64.c_str(), buffer, 0), BufferTooSmallException);
-        ASSERT_STREQ((char*)buffer, "");
-        CheckedMemset(buffer, 0, sizeof(buffer));
-
-        base64 = "VGhpcyBpcyB0b28gbG9uZyBidXQgcGFydHMgd2lsbCByZW1haW4gLSBvaCBoaSB0aGVyZSB5b3UgY2xldmVyIGd1eSEgIDotKQ==";
-        ASSERT_THROW(Logger::ParseEncodedStringToBuffer(base64.c_str(), buffer, 34), BufferTooSmallException);
-        ASSERT_STREQ((char*)buffer, "This is too long but parts will re");
+        {
+            Exceptions::ExceptionDisabler<IllegalArgumentException> iae;
+            base64 = "Malformed";
+            Logger::ParseEncodedStringToBuffer(base64.c_str(), buffer, sizeof(buffer));
+            ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(IllegalArgumentException)));
+        }
+        {
+            base64 = "TooBig==";
+            CheckedMemset(buffer, 0, sizeof(buffer));
+            Exceptions::ExceptionDisabler<BufferTooSmallException> btbe;
+            Logger::ParseEncodedStringToBuffer(base64.c_str(), buffer, 0);
+            ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(IllegalArgumentException)));
+            ASSERT_STREQ((char*)buffer, "");
+        }
+        {
+            CheckedMemset(buffer, 0, sizeof(buffer));
+            Exceptions::ExceptionDisabler<BufferTooSmallException> btse;
+            base64 = "VGhpcyBpcyB0b28gbG9uZyBidXQgcGFydHMgd2lsbCByZW1haW4gLSBvaCBoaSB0aGVyZSB5b3UgY2xldmVyIGd1eSEgIDotKQ==";
+            Logger::ParseEncodedStringToBuffer(base64.c_str(), buffer, 34);
+            ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(BufferTooSmallException)));
+            ASSERT_STREQ((char*)buffer, "This is too long but parts will re");
+        }
     }
 
     std::string data = "";

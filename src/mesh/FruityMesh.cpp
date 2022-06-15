@@ -37,7 +37,6 @@
 #include "Boardconfig.h"
 #include "GlobalState.h"
 
-
 #include <Module.h>
 #include <Node.h>
 #include <StatusReporterModule.h>
@@ -137,8 +136,11 @@ void BootFruityMesh()
     GS->ledGreen.Init(Boardconfig->led2Pin, Boardconfig->ledActiveHigh);
     GS->ledBlue.Init(Boardconfig->led3Pin, Boardconfig->ledActiveHigh);
 
-    //Blink LEDs once during boot as a signal for the user
-    GS->ledRed.On();
+    //ATTENTION: Do not change LED blink codes as the user relies on these
+    //they are also documented in the user manual
+    //If the board has a green or blue LED, we only blink these LEDs once for half a second
+    //If the board only has a red led, we use it as it is the best we can do
+    if(Boardconfig->led2Pin == -1 && Boardconfig->led3Pin == -1) GS->ledRed.On();
     GS->ledGreen.On();
     GS->ledBlue.On();
     FruityHal::DelayMs(500);
@@ -198,6 +200,7 @@ void BootFruityMesh()
     Logger::GetInstance().EnableTag("DFUMOD");
     Logger::GetInstance().EnableTag("CLCMOD");
     Logger::GetInstance().EnableTag("MAMOD");
+    Logger::GetInstance().EnableTag("LICENSE");
 //    Logger::GetInstance().EnableTag("CLCCOMM");
 //    Logger::GetInstance().EnableTag("VSMOD");
     Logger::GetInstance().EnableTag("VSDBG");
@@ -320,7 +323,7 @@ void BootModules()
 
     //Configure a periodic timer that will call the TimerEventHandlers
 #ifndef SIM_ENABLED
-    logt("ERROR", "Timer start");
+    logt("MAIN", "Timer start");
     FruityHal::StartTimers();
 #endif
 
@@ -328,11 +331,29 @@ void BootModules()
     const ErrorType err = FruityHal::ClearRebootReason();
     if (err != ErrorType::SUCCESS)
     {
-        logt("ERROR", "Failed to clear reboot reason becasue %u", (u32)err);
+        logt("ERROR", "Failed to clear reboot reason because %u", (u32)err);
     }
     CheckedMemset(GS->ramRetainStructPtr, 0, sizeof(RamRetainStruct));
     GS->ramRetainStructPtr->rebootReason = RebootReason::UNKNOWN_BUT_BOOTED;
     GS->ramRetainStructPtr->crc32 = Utility::CalculateCrc32((u8*)GS->ramRetainStructPtr, sizeof(RamRetainStruct) - 4);
+    
+    DeviceConfiguration config;
+    if (FruityHal::GetDeviceConfiguration(config) == ErrorType::SUCCESS)
+    {
+        LicenseState state = GET_LICENSE_STATE();
+        if (state > LicenseState::VALID_RANGE_END) {
+            logt("WARNING", "License is not valid (%u).", (u32)state);
+            SIMEXCEPTION(LicenseNotValidException);
+        } else {
+            logt("MAIN", "License check successful (%u)", (u32)state);
+        }
+
+        GS->logger.LogCustomError(CustomErrorTypes::INFO_LICENSE_CHECK, (u32)state);
+    }
+    else
+    {
+        // Here we boot in bulk mode. We don't check license in this mode.
+    }
 }
 
 void StartFruityMesh()            //LCOV_EXCL_LINE Simulated in a different way
@@ -609,13 +630,28 @@ void HardFaultErrorHandler(stacked_regs_t* stack)
     ramRetainStruct.code1 = stack->pc;
     ramRetainStruct.code2 = stack->lr;
     ramRetainStruct.code3 = stack->psr;
-
+    // If the hardfault is caught in a loop and watchdog trigger, this function call is likely the culprit and might
+    // not be inlined anymore
     if (Utility::IsStackOverflowDetected())
     {
         ramRetainStruct.rebootReason = RebootReason::STACK_OVERFLOW;
     }
 
-    ramRetainStruct.crc32 = Utility::CalculateCrc32((u8*)&ramRetainStruct, sizeof(RamRetainStruct) -4);
+    // The call to CalculateCrc32 is not valid inside a HARDFAULT-handler as it executes a return-instruction.
+    // This lambda will be inlined - it is copy-pasta from the code of CalculateCrc32.
+    ramRetainStruct.crc32 = [] (const u8* message, const u32 messageLength, const u32 previousCrc = 0) {
+        u32 crc = ~previousCrc;
+        for(u32 i = 0; i < messageLength; i++) {
+            u32 byte = message[i];
+            crc = crc ^ byte;
+            for (u32 j = 0; j < 8; j++) {
+                u32 mask = -(crc & 1);
+                crc = (crc >> 1) ^ (0xEDB88320 & mask);
+            }
+        }
+        return ~crc;
+    }((u8*)&ramRetainStruct, sizeof(RamRetainStruct) -4);
+
     
     if(Conf::debugMode){
         GS->ledBlue.Off();

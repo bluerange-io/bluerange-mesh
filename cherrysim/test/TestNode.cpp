@@ -28,6 +28,8 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
+
+#include <HelperFunctions.h>
 #include "Utility.h"
 #include "CherrySimTester.h"
 #include "CherrySimUtils.h"
@@ -62,11 +64,11 @@ TEST(TestNode, TestCommands) {
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "Cleaning up conn ");
     tester.SimulateUntilClusteringDone(100 * 1000);
 
-    tester.SimulateGivenNumberOfSteps(10);
+    tester.SimulateGivenNumberOfSteps(100);
 
-    tester.SendTerminalCommand(1, "action 2 node discovery idle");
+    tester.SendTerminalCommand(2, "action 2 node discovery idle");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "-- DISCOVERY IDLE --");
-    tester.SendTerminalCommand(1, "action 2 node discovery on");
+    tester.SendTerminalCommand(2, "action 2 node discovery on");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "-- DISCOVERY HIGH --");
 
     tester.SendTerminalCommand(1, "reset");
@@ -227,8 +229,9 @@ TEST(TestNode, TestCRCValidation)
     //...and don't return any CRC.
     tester.SendTerminalCommand(1, "action this status get_status");
     {
-        Exceptions::DisableDebugBreakOnException disable;
-        ASSERT_THROW(tester.SimulateUntilMessageReceived(1 * 1000, 1, "CRC:"), TimeoutException);
+        Exceptions::ExceptionDisabler<TimeoutException> te;
+        tester.SimulateUntilMessageReceived(1 * 1000, 1, "CRC:");
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
     }
 
     //Enable CRC checks
@@ -245,10 +248,11 @@ TEST(TestNode, TestCRCValidation)
 
     //Missing CRC is no longer accepted
     {
-        Exceptions::DisableDebugBreakOnException disable;
+        Exceptions::ExceptionDisabler<CRCMissingException> cme;
         tester.appendCrcToMessages = false;
         tester.SendTerminalCommand(1, "action this status get_status");
-        ASSERT_THROW(tester.SimulateGivenNumberOfSteps(1), CRCMissingException);
+        tester.SimulateGivenNumberOfSteps(1);
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(CRCMissingException)));
         tester.appendCrcToMessages = true;
 
         //Empty the Command Buffer
@@ -259,9 +263,10 @@ TEST(TestNode, TestCRCValidation)
 
     //Invalid CRC is not accepted
     {
-        Exceptions::DisableDebugBreakOnException disable;
+        Exceptions::ExceptionDisabler<CRCInvalidException> cie;
         tester.SendTerminalCommand(1, "action this status get_status CRC: 12345");
-        ASSERT_THROW(tester.SimulateGivenNumberOfSteps(1), CRCInvalidException);
+        tester.SimulateGivenNumberOfSteps(1);
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(CRCInvalidException)));
     }
 }
 
@@ -383,7 +388,7 @@ TEST(TestNode, TestDiscoveryStates) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(100 * 1000);
 
     // Expect discovery high on startup
     tester.SendTerminalCommand(2, "reset");
@@ -422,8 +427,9 @@ TEST(TestNode, TestDiscoveryStates) {
     tester.sim->FindNodeById(2)->gs.config.highDiscoveryTimeoutSec = 10;
     tester.SendTerminalCommand(2, "action this node discovery on");
     {
-        Exceptions::DisableDebugBreakOnException disable;
-        ASSERT_THROW(tester.SimulateUntilMessageReceived(100 * 1000, 2, "-- DISCOVERY LOW --"), TimeoutException);
+        Exceptions::ExceptionDisabler<TimeoutException> te;
+        tester.SimulateUntilMessageReceived(100 * 1000, 2, "-- DISCOVERY LOW --");
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
     }
 }
 
@@ -434,7 +440,7 @@ TEST(TestNode, DISABLED_TestDiscoverySettingEnrolled) {
     simConfig.nodeConfigName.clear();
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
-    // testerConfig.verbose = true;
+    //testerConfig.verbose = true;
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
     tester.SimulateUntilClusteringDone(10 * 1000);
@@ -527,13 +533,25 @@ TEST(TestNode, TestDiscoveryRestartingAndStoppingDiscovery) {
         SimulationMessage(3, "-- DISCOVERY HIGH --"), };
         tester.SimulateUntilMessagesReceived(100 * 1000, msgs);
     }
-    //After reclustering, they should go back to idle state
+    //After reclustering, they should go back to idle state. It is possible that the messages are mixed with the 'HIGH' messages.
     {
-        std::vector<SimulationMessage> msgs = {
-        SimulationMessage(1, "-- DISCOVERY IDLE --"),
-        SimulationMessage(2, "-- DISCOVERY IDLE --"),
-        SimulationMessage(3, "-- DISCOVERY IDLE --"), };
-        tester.SimulateUntilMessagesReceived(100 * 1000, msgs);
+        for (int retry = 0; retry < 100; ++retry)
+        {
+            tester.SimulateForGivenTime(1000);
+
+            bool allIdle = true;
+
+            for (u32 nodeIndex = 0; nodeIndex < 3; ++nodeIndex)
+            {
+                NodeIndexSetter nodeIndexSetter{nodeIndex};
+                allIdle = allIdle && (cherrySimInstance->currentNode->gs.node.currentDiscoveryState == DiscoveryState::IDLE);
+            }
+
+            if (allIdle)
+            {
+                break;
+            }
+        }
     }
 }
 
@@ -588,7 +606,7 @@ TEST(TestNode, TestMeshConnectionPacketQueuing) {
     simConfig.SetToPerfectConditions();
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(1 * 60 * 1000);
 
     alignas(4) u8 buffer[100];
     constexpr u32 padding = 3;
@@ -653,16 +671,20 @@ TEST(TestNode, TestMeshAccessConnectionPacketQueuing) {
 
     tester.Start();
 
-    //Connect to node 2 using a mesh access connection and the network key. Network key is different for github release (and source dist tester)!
+    RetryOrFail<TimeoutException>(
+        32, [&] {
+//Connect to node 2 using a mesh access connection and the network key. Network key is different for github release (and source dist tester)!
 #ifdef GITHUB_RELEASE
-    tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 2 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22");
+            tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 2 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22");
 #else
-    tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 2 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
+            tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 2 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
 #endif //GITHUB_RELEASE
-    
-    //Wait until connection was set up
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Received remote mesh data");
-    
+        },
+        [&] {
+            //Wait until connection was set up
+            tester.SimulateUntilMessageReceived(10 * 1000, 1, "Received remote mesh data");
+        });
+
     alignas(4) u8 buffer[100];
     constexpr u32 padding = 3;
 
@@ -721,7 +743,7 @@ TEST(TestNode, TestCapabilitySending) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
     tester.Start();
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(1 * 60 * 1000);
     tester.sim->EnableTagForAll("VSMOD");
 
     tester.SendTerminalCommand(1, "request_capability 2");
@@ -752,7 +774,7 @@ TEST(TestNode, TestRapidDisconnections) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(1 * 60 * 1000);
 
     //Simulate for some time so that the mesh connection is deemed stable
     tester.SimulateForGivenTime(11 * 1000);
@@ -782,7 +804,7 @@ TEST(TestNode, TestReconnectionPacketQueuing) {
 
     tester.sim->nodes[1].gs.logger.EnableTag("DEBUGMOD");
 
-    tester.SimulateUntilClusteringDone(10 * 1000);
+    tester.SimulateUntilClusteringDone(1 * 60 * 1000);
 
     //Start a counter that can be used to check if all packets are arriving
     tester.SendTerminalCommand(1, "action this debug counter 2 10 100000");
@@ -812,7 +834,12 @@ TEST(TestNode, TestReestablishmentTimesOut) {
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 3});
     simConfig.SetToPerfectConditions();
+
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    // This test relies on the old propagation constant of 2.5 instead of the new default
+    tester.sim->propagationConstant = 2.5f;
+
     tester.Start();
 
     //Wait until nodes 2, 3, and 4 are connected
@@ -826,11 +853,13 @@ TEST(TestNode, TestReestablishmentTimesOut) {
     //Remove enrollment of node 4 to make it inactive
     tester.SendTerminalCommand(4, "action this enroll remove BBBBF");
 
-    tester.SimulateUntilMessageReceived(5 * 1000, 4, "reboot");
-
-    //Check that the reestablishment is tried a few times
-    tester.SimulateUntilMessageReceived(5 * 1000, 3, "Connection Timeout");
-    tester.SimulateUntilMessageReceived(5 * 1000, 3, "Connection Timeout");
+    // It can happen that the reboot happens (is reported) _after_ the connection timeout(s) occur on node 3 (as the connection is forcefully disconnected before).
+    std::vector<SimulationMessage> messages = {
+        SimulationMessage{4, "reboot"},
+        SimulationMessage{3, "Connection Timeout"},
+        SimulationMessage{3, "Connection Timeout"},
+    };
+    tester.SimulateUntilMessagesReceived(20 * 1000, messages);
 
     //Wait until node 3 adjusted its clusterSize (meaning it dropped the connection etc.)
     //This should happen after a timeout of currently 10 seconds
@@ -878,9 +907,13 @@ TEST(TestNode, TestNoConnectionParameterUpdateRequestedForStandardFeaturesets)
 
     tester.SimulateUntilClusteringDone(100 * 1000);
 
-    Exceptions::DisableDebugBreakOnException disableDebugBreakOnException;
+    {
+        Exceptions::ExceptionDisabler<TimeoutException> te;
 
-    ASSERT_THROW(tester.SimulateUntilMessageReceived(1000 * 1000, 1, "Started connection parameter update"), TimeoutException);
+        tester.SimulateUntilMessageReceived(1000 * 1000, 1, "Started connection parameter update");
+
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
+    }
 }
 
 TEST(TestNode, TestConnectionParameterUpdateRequested)
@@ -1002,6 +1035,7 @@ TEST(TestNode, TestConnectionParameterUpdateRequestedByPeripheral)
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
+    simConfig.SetToPerfectConditions();
     //testerConfig.verbose = true;
 
     // Create two nodes which have the connection parameter update enabled.

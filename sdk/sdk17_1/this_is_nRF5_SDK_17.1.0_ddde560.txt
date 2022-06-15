@@ -1,0 +1,2 @@
+This is the nRF5_SDK_17.1.0_ddde560, some folders, such as the examples have been removed to reduce the repository size.
+The SDK is part of our repository as some modifications are necessary from time to time to fix bugs in the SDK release.

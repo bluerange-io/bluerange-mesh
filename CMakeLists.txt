@@ -70,7 +70,7 @@ if(BUILD_FEATURESETS)
     message(FATAL_ERROR "Wrong Generator selected: ${CMAKE_GENERATOR} but \"Unix Makefiles\" or \"Ninja\" was expected. Remove all files that were just created and call cmake again with -G \"Unix Makefiles\".")
   endif()
   
-  set(GCC_PATH "" CACHE STRING "Path to GCC 4.9")
+  set(GCC_PATH "" CACHE STRING "Path to GCC 4.9 or 9.3.1 depending on SDK version")
   if(GCC_PATH STREQUAL "")
     message(FATAL_ERROR "GCC_PATH was unspecified! Set it e.g. via -DGCC_PATH=C:/path/to/gcc-arm-embedded-4.9")
   endif()
@@ -109,22 +109,54 @@ if(BUILD_FEATURESETS)
     target_sources(${FEATURE_SET} PRIVATE "./config/featuresets/${FEATURE_SET}.cpp")
 
     # For each feature set, we revert these variables to their default
-    unset(PLATFORM)
+    set(PLATFORM "UNKNOWN_PLATFORM")
+    set(TARGET_SDK "UNKNOWN_TARGET_SDK")
+    set(TARGET_STACK "UNKNOWN_TARGET_STACK")
+    set(TARGET_CHIPSET "UNKNOWN_TARGET_CHIPSET")
     unset(ALLOW_MALLOC)
     set(FAIL_ON_SIZE_TOO_BIG 1)
+    set(MAX_SIZE "UNKNOWN_MAX_SIZE")
     
     # Includes our <featureset>.cmake
     include(${f})
     
-    if(NOT DEFINED PLATFORM)
-       message(FATAL_ERROR "Featureset ${FEATURE_SET} failed to set mandatory variable: PLATFORM")
+    set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_SDK "${TARGET_SDK}")
+    set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_CHIPSET "${TARGET_CHIPSET}")
+    set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_STACK "${TARGET_STACK}")
+    set_property(TARGET ${FEATURE_SET} PROPERTY FM_FAIL_ON_SIZE_TOO_BIG "${FAIL_ON_SIZE_TOO_BIG}")
+
+    # For SDK 14 and 15, the featuresets only defined the platform.
+    # The Stack, Chipset and SDK were automatically selected, this is some migration code
+    if(${TARGET_SDK} STREQUAL "NRF_SDK_17_1_0")
+      list(APPEND SDK_17_1_TARGETS ${FEATURE_SET})
+    elseif(${PLATFORM} STREQUAL "NRF52832")
+      set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_SDK "NRF_SDK_14_0_0")
+      set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_CHIPSET "NRF52832_XXAA")
+      set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_STACK "NRF_S132_V5_1_0")
+      set_property(TARGET ${FEATURE_SET} PROPERTY FM_MAX_APP_SIZE 167936) # Max app size 4096 * 41
+      list(APPEND SDK_14_TARGETS ${FEATURE_SET})
+    elseif(${PLATFORM} STREQUAL "NRF52840")
+      set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_SDK "NRF_SDK_15_2_0")
+      set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_CHIPSET "NRF52832_XXAA")
+      set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_STACK "NRF_S140_V6_1_0")
+      set_property(TARGET ${FEATURE_SET} PROPERTY FM_MAX_APP_SIZE 254000) # Calculated with a chunk size of 128 for updates
+      list(APPEND SDK_15_TARGETS ${FEATURE_SET})
+    elseif(${PLATFORM} STREQUAL "ARM")
+      set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_SDK "NO_SDK")
+      set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_CHIPSET "NO_CHIPSET")
+      set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_STACK "NO_STACK")
+      set_property(TARGET ${FEATURE_SET} PROPERTY FM_MAX_APP_SIZE 167936) # Used the same value as for NRF52832 for no specific reason
+      list(APPEND ARM_TARGETS ${FEATURE_SET})
+    else()
+      message(FATAL_ERROR "Featureset ${FEATURE_SET} unsed unsupported SDK or PLATFORM")
     endif()
 
-    if (${PLATFORM} STREQUAL "NRF52832" OR ${PLATFORM} STREQUAL "NRF52840")
-      set(CHIP NRF)
-    elseif(${PLATFORM} STREQUAL "ARM")
+    if(${PLATFORM} STREQUAL "ARM")
       set(CHIP ARM)
-    endif (${PLATFORM} STREQUAL "NRF52832" OR ${PLATFORM} STREQUAL "NRF52840")
+    else()
+      # Currently, we do not support any other chip family within this cmake build
+      set(CHIP NRF)
+    endif ()
     
     # We block malloc usage as all the allocations should be done statically or on the stack
     if(NOT DEFINED ALLOW_MALLOC)
@@ -133,32 +165,9 @@ if(BUILD_FEATURESETS)
     endif()
     
     target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-x assembler-with-cpp>)
-
-    if (${PLATFORM} STREQUAL "NRF52832")
-      target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__HEAP_SIZE=4096>)
-      target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__STACK_SIZE=4096>)
-      target_compile_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m4")
-      target_link_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m4")
-      list(APPEND SDK_14_TARGETS ${FEATURE_SET})
-
-    elseif (${PLATFORM} STREQUAL "NRF52840")
-      target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__HEAP_SIZE=4096>)
-      target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__STACK_SIZE=4096>)
-      target_compile_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m4")
-      target_link_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m4")
-      list(APPEND SDK_15_TARGETS ${FEATURE_SET})
-
-    elseif (${PLATFORM} STREQUAL "ARM")
-      target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__HEAP_SIZE=4096>)
-      target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__STACK_SIZE=4096>)
-      target_compile_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m4")
-      target_link_options(${FEATURE_SET} PRIVATE "-mcpu=cortex-m4")
-      list(APPEND ARM_TARGETS ${FEATURE_SET})
-
-    else(${PLATFORM} STREQUAL "NRF52832")
-      message(FATAL_ERROR "Unknown PLATFORM: ${PLATFORM}")
-    endif(${PLATFORM} STREQUAL "NRF52832")
-    
+    target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__HEAP_SIZE=4096>)
+    target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__STACK_SIZE=4096>)
+        
     # Some options to optimize the size of our binary
     target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
     target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-use-cxa-atexit>)
@@ -187,36 +196,15 @@ if(BUILD_FEATURESETS)
       BYPRODUCTS "${CMAKE_CURRENT_BINARY_DIR}/${FEATURE_SET}.hex"
     )
     
-    # In order to support firmware updates, we limit the binary to half of the empty space in the flash that is available for the application
-    if (${PLATFORM} STREQUAL "NRF52832")
-      set(MAX_SIZE 167936) #max app size 4096 * 41
-    # TODO: Is that still relevant? we have more space on that chip
-    elseif (${PLATFORM} STREQUAL "NRF52840")
-      set(MAX_SIZE 167936) #max app size 4096 * 41
-    elseif (${PLATFORM} STREQUAL "ARM")
-      set(MAX_SIZE 167936) #use the same value as for NRF52832 - main chip
-    else(${PLATFORM} STREQUAL "NRF52832")
-      message(FATAL_ERROR "Unknown PLATFORM: ${PLATFORM}")
-    endif(${PLATFORM} STREQUAL "NRF52832")
-    
-    # Checks if the created binary exceeds the available space
-    add_custom_command(TARGET ${FEATURE_SET} POST_BUILD
-      COMMAND ${GCC_PATH}/bin/arm-none-eabi-size${exe_suffix} ARGS ${CMAKE_CURRENT_BINARY_DIR}/${FEATURE_SET}.out
-      COMMAND ${Python3_EXECUTABLE} ARGS ${CMAKE_CURRENT_SOURCE_DIR}/CMake/CheckSize.py ${GCC_PATH}/bin/arm-none-eabi-size${exe_suffix} ${CMAKE_CURRENT_BINARY_DIR}/${FEATURE_SET}.out ${MAX_SIZE} ${FAIL_ON_SIZE_TOO_BIG}
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      COMMENT "Checking Size ${FEATURE_SET}"
-      VERBATIM
-    )
-
-    # Depending on the platform, we set some compile options
-    if (${CHIP} STREQUAL "NRF")
-      target_compile_definitions_multi("${FEATURE_SET}" "SOFTDEVICE_PRESENT")
-      target_compile_options_multi("${FEATURE_SET}" "-DBLE_STACK_SUPPORT_REQD")
-    endif (${CHIP} STREQUAL "NRF")
-    
     # Depending on the given platform, we select the correct BLE Stack
     if (${CHIP} STREQUAL "NRF")
-      if (${PLATFORM} STREQUAL "NRF52832")
+      if(${TARGET_STACK} STREQUAL "NRF_S132_V7_3_0")
+        set(SOFTDEVICE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/sdk/sdk17_1/components/softdevice/s132/hex/s132_nrf52_7.3.0_softdevice.hex)
+        set(FAMILY NRF52)
+      elseif(${TARGET_STACK} STREQUAL "NRF_S140_V7_3_0")
+        set(SOFTDEVICE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/sdk/sdk17_1/components/softdevice/s140/hex/s140_nrf52_7.3.0_softdevice.hex)
+        set(FAMILY NRF52)
+      elseif (${PLATFORM} STREQUAL "NRF52832")
         set(SOFTDEVICE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/softdevice/s132_nrf52_5.1.0_softdevice.hex)
         set(FAMILY NRF52)
       elseif (${PLATFORM} STREQUAL "NRF52840")
@@ -224,7 +212,7 @@ if(BUILD_FEATURESETS)
         set(FAMILY NRF52)
       else(${PLATFORM} STREQUAL "NRF52832")
         message(FATAL_ERROR "Unknown PLATFORM version for softdevice: ${PLATFORM}")
-      endif(${PLATFORM} STREQUAL "NRF52832")
+      endif()
 
       # This step creates a merged hex file with BLE stack and application
       add_custom_command(TARGET ${FEATURE_SET} POST_BUILD
@@ -282,6 +270,42 @@ if(BUILD_FEATURESETS)
   add_subdirectory(config)
   add_subdirectory(src)
   add_subdirectory(sdk)
+
+foreach(f ${FEATURE_SET_MAKE_FILES})
+  get_filename_component(FEATURE_SET ${f} NAME_WE)
+
+  # Skip other featuresets of only_featureset is used
+  if(NOT ONLY_FEATURESET STREQUAL "")
+    if(NOT ONLY_FEATURESET STREQUAL ${FEATURE_SET})
+      continue()
+    endif()
+  endif()
+
+  get_property(TARGET_STACK TARGET ${FEATURE_SET} PROPERTY FM_TARGET_STACK)
+  get_property(TARGET_CHIPSET TARGET ${FEATURE_SET} PROPERTY FM_TARGET_CHIPSET)
+  get_property(TARGET_SDK TARGET ${FEATURE_SET} PROPERTY FM_TARGET_SDK)
+
+  get_property(MAX_APP_SIZE TARGET ${FEATURE_SET} PROPERTY FM_MAX_APP_SIZE)
+  get_property(FAIL_ON_SIZE_TOO_BIG TARGET ${FEATURE_SET} PROPERTY FM_FAIL_ON_SIZE_TOO_BIG)
+
+  # Print information about the target that is being built
+  add_custom_command(TARGET ${FEATURE_SET} PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --blue
+      "Built Featureset:${FEATURE_SET} for Chipset:${TARGET_CHIPSET}, SDK:${TARGET_SDK}, Stack:${TARGET_STACK}, using ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}"
+  )
+
+  # In order to support firmware updates for BlueRange firmware, we limit the binary
+  # to half of the empty space in the flash that is available for the application.
+  # This checks if the created binary exceeds the available space (50%) so that
+  # we can update the application during runtime
+  add_custom_command(TARGET ${FEATURE_SET} POST_BUILD
+    COMMAND ${GCC_PATH}/bin/arm-none-eabi-size${exe_suffix} ARGS ${CMAKE_CURRENT_BINARY_DIR}/${FEATURE_SET}.out
+    COMMAND ${Python3_EXECUTABLE} ARGS ${CMAKE_CURRENT_SOURCE_DIR}/CMake/CheckSize.py ${GCC_PATH}/bin/arm-none-eabi-size${exe_suffix} ${CMAKE_CURRENT_BINARY_DIR}/${FEATURE_SET}.out ${MAX_APP_SIZE} ${FAIL_ON_SIZE_TOO_BIG}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Checking Size ${FEATURE_SET}"
+    VERBATIM
+  )
+endforeach()
 
 # Next, here are the steps for building our simulator
 else(BUILD_FEATURESETS)
@@ -356,15 +380,15 @@ endif()
          "--suppress=redundantInitialization"
          "--suppress=useInitializationList"
          "--suppress=useStlAlgorithm"
-	)
+  )
   if(DEFINED fruityins_SOURCE_DIR)
-	  list(APPEND cppcheck_command "--suppress=*:${fruityins_SOURCE_DIR}/*")
+    list(APPEND cppcheck_command "--suppress=*:${fruityins_SOURCE_DIR}/*")
   endif()
-	if(CI_PIPELINE)
-	  list(APPEND cppcheck_command "--error-exitcode=1")
-	endif()
-    set_target_properties(cherrySim_runner cherrySim_tester PROPERTIES CXX_CPPCHECK "${cppcheck_command}")
-	message(STATUS "Found cppcheck!")
+  if(CI_PIPELINE)
+    list(APPEND cppcheck_command "--error-exitcode=1")
+  endif()
+  set_target_properties(cherrySim_runner cherrySim_tester PROPERTIES CXX_CPPCHECK "${cppcheck_command}")
+  message(STATUS "Found cppcheck!")
   elseif(CI_PIPELINE OR FORCE_CPPCHECK)
     message(FATAL_ERROR "CppCheck could not be found but is required.")
   else()

@@ -49,8 +49,8 @@
 #define DISCARD(value) static_cast<void>(value)
 
 // The [[fallthrough]] attribute is a C++17 feature
-// and thus is only supported in the Simulator.
-#ifdef SIM_ENABLED
+// and only supported by some compilers
+#if defined(SIM_ENABLED) || __GNUC__ >= 9
 #define FALLTHROUGH [[fallthrough]]
 #else
 #define FALLTHROUGH
@@ -127,7 +127,7 @@ constexpr NodeId NODE_ID_APP_BASE = 32000; //Custom GATT services, connections w
 constexpr NodeId NODE_ID_APP_BASE_SIZE = 1000;
 
 constexpr NodeId NODE_ID_GLOBAL_DEVICE_BASE = 33000; //Can be used to assign nodeIds that are valid organization wide (e.g. for assets)
-constexpr NodeId NODE_ID_GLOBAL_DEVICE_BASE_SIZE = 7000;
+constexpr NodeId NODE_ID_GLOBAL_DEVICE_BASE_SIZE = 25000;
 
 constexpr NodeId NODE_ID_CLC_SPECIFIC = 40000; //see usage in CLC module
 constexpr NodeId NODE_ID_RESERVED = 40001; //Yet unassigned nodIds
@@ -201,6 +201,8 @@ enum class ModuleId : u8 {
     BP_MODULE = 158,
     ASSET_SCANNING_MODULE = 159,
     MULTI_ASSET_MODULE = 160,
+    LICENSE_MODULE = 161,
+    BEACON_SCANNING_MODULE = 162,
 
     //Other Modules, this range can be used for experimenting but must not be used if FruityMesh
     //nodes are to be used in a network with nodes of different vendors as their moduleIds will clash
@@ -279,7 +281,7 @@ enum class RebootReason : u8 {
     IMPLEMENTATION_ERROR_NO_QUEUE_SPACE_AFTER_CHECK = 25,
     IMPLEMENTATION_ERROR_SPLIT_WITH_NO_LOOK_AHEAD = 26,
     CONFIG_MIGRATION = 27,
-    DEVICE_OFF = 28,
+    PREPARE_DEVICE_OFF = 28,
     DEVICE_WAKE_UP = 29,
     FACTORY_RESET = 30,
 
@@ -338,6 +340,8 @@ enum class PinsetIdentifier : u16 {
     TLV493D = 3, //Magnetometer
     BMG250 = 4, //Gyroscope
     GDEWO27W3 = 5, //Eink Display
+    BUZZER = 6, //Buzzer (similar to a speaker)
+    VIBRATION = 7 //Vibration Motor
 };
 
 struct CustomPins {
@@ -394,6 +398,14 @@ struct Gdewo27w3Pins : CustomPins {
     i32 busyPin = -1;
     i32 epdEnablePin = -1;
     bool epdEnablePinActiveHigh = true;
+};
+
+struct BuzzerPins : CustomPins {
+    i32 buzzerPin = -1;
+};
+
+struct VibrationPins : CustomPins {
+    i32 vibrationPin = -1;
 };
 
 // Not as primitive as one might hope but other primitive types require this class.
@@ -675,6 +687,35 @@ enum class DfuStartDfuResponseCode : u8
     COMPONENT_NOT_UPDATEABLE = 10,
     MODULE_QUERY_WAITING = 11, //Special code that is used internally if a module queries another controller and continues the process later
     TOO_MANY_CHUNKS = 12,
+};
+
+//Licensing related definitions
+static constexpr u32 IS_LICENSE_COMPATIBLE_MAGIC_NUMBER = 0xFBE1FE75;
+static constexpr u32 LICENSE_MAGIC_NUMBER = 0xF321F654;
+constexpr u32 LICENSE_APP_IV_OFFSET = 0x200;
+constexpr u32 LICENSE_SECTION_SIZE = 256;
+
+//License states
+enum class LicenseState : u8
+{
+    //Valid license states
+    VALID = 0,
+    VALID_BUT_NOT_AVAILABLE = 1, // Returned if the license has been checked differently, e.g. using a migration
+    VALID_PENDING_MIGRATION = 2, //Returned if the license has not yet been migrated
+    VALID_UNSUPPORTED = 3, //Used by our Gateway if the firmware version is too old to support licensing
+
+    VALID_RANGE_END = 9,
+    //Invalid license states
+    INVALID = 10,
+    INVALID_NOT_AVAILABLE = 11,
+
+    UNKNOWN = 255 //Used by other systems if the firmware does not support licensing
+};
+
+enum class LicenseMigrationErrorType : u32 {
+    INVALID = 0,
+    IMAGE_NOT_LICENSE_COMPATIBLE = 1,
+    LICENSE_MIGRATION_COMPARE_FAILED = 2,
 };
 
 enum class NO_DISCARD ErrorType : u32

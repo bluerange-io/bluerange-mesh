@@ -83,3 +83,19 @@ Each featureset has its own cmake file which is located in fruitymesh/config/fea
 
 == ONLY_FEATURESET
 When generating the project files with CMake for building a featureset, it is possible to set the "ONLY_FEATURESET" parameter. If set, only the given featureset (the one that is stored in this parameter) will be generated. There are some advantages to this, for example the generated Makefile shows the done percentage more clearly. If all featuresets are generated, the shown percentage jump in steps of 20, while if only one featureset it generated, the percentage is smoothly rising from one percentage to the next. Another advantage is better intellisense code hints in visual studio code. For example, it indicates better which areas are currently disabled by an `#ifdef`.
+
+== SDK, Chipset, BLE Stack Compatibility
+
+We have historically supported *nRF SDK 14* for building the firmware for nRF52832_XXAA chipsets and have added support for *nRF SDK 15* for building the nRF52840_XXAA targets.
+
+We have now extended this by adding support for the latest *nRF SDK 17* (integration is currently in alpha state) which can be used to build the firmware for both nRF52832 with S132 and nRF52840 with S140 SoftDevice. These are the two chipsets that we and our customers are mostly using and that are thoroughly tested by us. You can however easily extend the CMake build to also build the firmware for other chipsets that are supported by the SDK. Be aware that you should test functionality thoroughly, but most things should be working out of the box.
+
+To try out the SDK 17 integration, e.g. add the following to your featureset and make sure to not use the `PLATFORM` variable anymore.
+
+NOTE: We have manually added the latest SoftDevice version 7.3.0 to the SDK folder for S132 and S140 as it was the latest update available. SDK 17.1 originally shipped with version 7.2.0.
+
+----
+set(TARGET_SDK NRF_SDK_17_1_0)
+set(TARGET_STACK NRF_S140_V7_3_0)
+set(TARGET_CHIPSET NRF52840_XXAA)
+----

@@ -28,6 +28,8 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
+
+#include <HelperFunctions.h>
 #include "MoveAnimation.h"
 #include "Exceptions.h"
 #include "CherrySimTester.h"
@@ -667,6 +669,7 @@ TEST(TestMoveAnimation, TestMovementZ) {
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 6 });
     simConfig.nodeConfigName.insert({ "prod_asset_nrf52", 1 });
     simConfig.terminalId = 0;
+    simConfig.SetToPerfectConditions();
     simConfig.mapWidthInMeters = 10;
     simConfig.mapHeightInMeters = 10;
     simConfig.mapElevationInMeters = 50;
@@ -678,7 +681,12 @@ TEST(TestMoveAnimation, TestMovementZ) {
     //testerConfig.verbose = true;
 
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    // This test relies on the propagation constant being 2.5
+    tester.sim->propagationConstant = 2.5;
+
     //tester.sim->nodes[1].uicr.CUSTOMER[1] = 20; //Set the asset tab board id to an id that supports Accelerometer
+
     tester.Start();
 
     Exceptions::DisableDebugBreakOnException disabler;
@@ -722,10 +730,15 @@ TEST(TestMoveAnimation, TestShakeAnimation) {
     //In the beginning the asset tag does not report movement
     tester.SimulateUntilMessageReceived(60 * 1000, 1, R"("moving":0)");
 
-    tester.SendTerminalCommand(1, "sim animation shake BBBBC");
-
     //After shaking the asset tag, it should report movement
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"("moving":1)");
+    RetryOrFail<TimeoutException>(
+        32,
+        [&] {
+            // It's possible that a mesh access advertisement switch occurs at exactly the wrong time
+            // and shadows the asset tracking advertisement.
+            tester.SendTerminalCommand(1, "sim animation shake BBBBC");
+        },
+        [&] { tester.SimulateUntilMessageReceived(10 * 1000, 1, R"("moving":1)"); });
 }
 
 #endif

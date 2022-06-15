@@ -39,13 +39,12 @@
 
 //This test fixture is used to run a parametrized test based on the chosen BLE Stack
 typedef struct FeaturesetAndBleStack {
-    BleStackType bleStack;
     std::string featuresetName;
 } FeaturesetAndBleStack;
 
 class MultiStackFixture : public ::testing::TestWithParam<FeaturesetAndBleStack> {};
 
-FeaturesetAndBleStack prod_mesh_nrf52 = { BleStackType::NRF_SD_132_ANY, "prod_mesh_nrf52" };
+FeaturesetAndBleStack prod_mesh_nrf52 = { "prod_mesh_nrf52" };
 
 
 
@@ -53,7 +52,7 @@ void DoClusteringTestImportedFromJson(const std::string &site, const std::string
 {
     int clusteringTimeTotalMs = 0;
 
-    printf("Test with %s and stack %u" EOL, config.featuresetName.c_str(), (u32)config.bleStack);
+    printf("Test with %s" EOL, config.featuresetName.c_str());
     std::vector<u32> clusteringTimesMs;
 
     for (u32 i = 0; i < clusteringIterations; i++) {
@@ -66,8 +65,6 @@ void DoClusteringTestImportedFromJson(const std::string &site, const std::string
         simConfig.terminalId = -1;
         //testerConfig.verbose = true;
         printf("ClusterTest Iteration %u, seed %u" EOL, i, simConfig.seed);
-
-        simConfig.defaultBleStackType = config.bleStack;
 
         CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
         tester.Start();
@@ -93,7 +90,7 @@ TEST_P(MultiStackFixture, TestBasicClustering) {
     int clusteringTimeTotalMs = 0;
 
     FeaturesetAndBleStack config = GetParam();
-    printf("Test with %s and stack %u" EOL, config.featuresetName.c_str(), (u32)config.bleStack);
+    printf("Test with %s" EOL, config.featuresetName.c_str());
 
     for (u32 i = 0; i < clusteringIterations; i++) {
         printf("ClusterTest Iteration %u" EOL, i);
@@ -103,7 +100,6 @@ TEST_P(MultiStackFixture, TestBasicClustering) {
         //simConfig.verbose = true;
         //Run with the parametrized config
         simConfig.nodeConfigName.insert({ config.featuresetName.c_str(), 10 });
-        simConfig.defaultBleStackType = config.bleStack;
         simConfig.terminalId = -1;
 
         CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
@@ -270,19 +266,16 @@ TEST_P(MultiStackFixture, TestBasicClusteringWithNodeReset) {
     const int resetTimesPerIteration = 3;
 
     FeaturesetAndBleStack config = GetParam();
-    printf("Test with %s and stack %u" EOL, config.featuresetName.c_str(), (u32)config.bleStack);
+    printf("Test with %s" EOL, config.featuresetName.c_str());
 
     for (u32 i = 0; i < clusteringIterations; i++) {
         printf("ClusterTest Iteration %u" EOL, i);
         CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
         SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
         simConfig.connectionTimeoutProbabilityPerSec = 0; //TODO: do this test with and without timeouts
-        simConfig.seed = i + 1;
+        simConfig.seed = i + 20;
 
         //testerConfig.verbose = true;
-
-        //Run with the parametrized config
-        simConfig.defaultBleStackType = config.bleStack;
 
         simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 20} );
 
@@ -338,9 +331,6 @@ TEST(TestClustering, TestBasicClusteringWithNodeReset_scheduled) {
         simConfig.mapHeightInMeters = 300;
         simConfig.seed = seed;
         simConfig.simulateJittering = true;
-
-        
-        simConfig.defaultBleStackType = prod_mesh_nrf52.bleStack;
 
         printf("%u: Starting clustering with %u nodes, seed %u, featureset %s" EOL, i, numNodes, simConfig.seed, "prod_mesh_nrf52");
         simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", numNodes } );
@@ -414,8 +404,6 @@ TEST(TestClustering, TestBasicClusteringWithNodeResetAndConnectionTimeouts_sched
         simConfig.connectionTimeoutProbabilityPerSec = 0.0005 * UINT32_MAX;
         simConfig.seed = seed;
         simConfig.simulateJittering = true;
-
-        simConfig.defaultBleStackType = prod_mesh_nrf52.bleStack;
 
         printf("Starting clustering with %u nodes, seed %u, featureset %s" EOL, numNodes, simConfig.seed, "prod_mesh_nrf52");
 
@@ -535,7 +523,7 @@ i32 determineHopsToSink(NodeEntry* node)
 TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
 {
     FeaturesetAndBleStack config = GetParam();
-    printf("Test with %s and stack %u" EOL, config.featuresetName.c_str(), (u32)config.bleStack);
+    printf("Test with %s" EOL, config.featuresetName.c_str());
 
     for(int seed=50; seed< 55; seed++) {
         printf("Seed is %d" EOL, seed);
@@ -545,9 +533,6 @@ TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
         SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
         simConfig.terminalId = -1;
         simConfig.seed = seed;
-
-        //Run with the parametrized config
-        simConfig.defaultBleStackType = config.bleStack;
 
         simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
         simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 19 });
@@ -732,7 +717,7 @@ TEST(TestClustering, TestEmergencyDisconnect) {
     //Make sure that emergency disconnects happen regularly.
     for (u32 i = 0; i < 3; i++)
     {
-        tester.SimulateUntilMessageReceived(200 * 1000, 1, "Emergency disconnect");
+        tester.SimulateUntilMessageReceived(5 * 60 * 1000, 1, "Emergency disconnect");
     }
 }
 
@@ -741,8 +726,8 @@ TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
 
     simConfig.SetToPerfectConditions();
-    // testerConfig.verbose = true;
-    // testerConfig.terminalFilter = 1;
+    //testerConfig.verbose = true;
+    //testerConfig.terminalFilter = 1;
     simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 5 } );
     // Place nodes close to each other so that faked JOIN_ME packets would affect all the nodes. 
     simConfig.preDefinedPositions = { {0.5, 0.5}, {0.55, 0.5}, {0.5, 0.55}, {0.55, 0.55}, {0.5, 0.45} };
@@ -1083,6 +1068,8 @@ TEST(TestClustering, TestUnlikelySdBusy) {
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 10 });
     simConfig.sdBusyProbabilityUnlikely = 0.2 * UINT32_MAX;
     simConfig.connectionTimeoutProbabilityPerSec = 0.001 * UINT32_MAX;
+    simConfig.mapWidthInMeters = 15;
+    simConfig.mapHeightInMeters = 15;
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 

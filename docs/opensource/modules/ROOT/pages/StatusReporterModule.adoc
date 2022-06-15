@@ -29,6 +29,7 @@ Information that is bound to change from time to time can be requested using the
 action [nodeId] status get_status
 ----
 
+[#ConnectionInformation]
 === Connection Information
 Information about the mesh connections of a node can be requested with the _get_connections_ or _get_nearby_ commands.
 
@@ -40,7 +41,7 @@ action [nodeId] status get_connections
 
 [source,C++]
 ----
-//Return nearby nodes from the JOIN_ME buffer
+//Retrieve nearby nodes with the same network id
 action [nodeId] status get_nearby
 ----
 
@@ -288,3 +289,19 @@ enum LiveReportTypes {
 |4|extra|Additional data regarding the event, depending on _reportType_
 |4|extra2|Additional data regarding the event, depending on _reportType_
 |===
+
+
+==== Keep Alive
+
+The `SET_KEEP_ALIVE` message is used to validate the `hopsToSink` field on nodes in the mesh network.
+This feature is part of xref:SinkRouting.adoc[sink routing].
+
+[cols="1,2,4"]
+|===
+|Bytes|Type|Description
+
+|8|xref:Specification.adoc#connPacketModule[connPacketModule]|*messageType:* MODULE_TRIGGER_ACTION(51), *actionType:* SET_KEEP_ALIVE(9)
+|1 bit|fromSink|If the sender of the message is a sink
+|7 bits|reserved|Reserved
+|===
+

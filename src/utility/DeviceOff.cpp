@@ -34,31 +34,119 @@
 #include <FruityHal.h>
 #include <GlobalState.h>
 
-static constexpr u32 HOLD_TIME_TO_ENTER_OFF_DS = 10;
+//The time that the power button has to be pressed to switch the device off
+static constexpr u32 HOLD_TIME_TO_ENTER_OFF_DS = SEC_TO_DS(1);
+
+//If the power button is pressed for a longer time, we are not entering power off
+static constexpr u32 HOLD_TIME_TO_ENTER_OFF_DS_MAX = SEC_TO_DS(5);
 
 DeviceOff::DeviceOff()
 {
 }
 
-static bool IsPowerButtonPressed(void) {
-    if (Boardconfig->powerButtonActiveHigh)
-    {
-        return FruityHal::GpioPinRead((u32)Boardconfig->powerButton);
+void DeviceOff::TimerHandler(u16 passedTimeDs)
+{
+    //If autoPowerOff is configured, check if we exceeded our runtime and power off
+    if(
+        //We have a generic powerOff
+        (autoPowerOffTimeDs != 0 && GS->appTimerDs > autoPowerOffTimeDs)
+        || (
+                //This is the power off that only triggers if unenrolled
+                autoPowerOffIfUnenrolledTimeDs != 0
+                && GS->appTimerDs > autoPowerOffIfUnenrolledTimeDs
+                && GS->node.configuration.enrollmentState == EnrollmentState::NOT_ENROLLED
+            )
+    ){
+        logt("WARNING", "Auto Power Off time reached");
+        PrepareSystemOff();
     }
-    else
+
+    // If a power button is configured, check its state
+    if (Boardconfig->powerButton != -1)
     {
+        if (IsPowerButtonPressed()) {
+            powerButtonPressedTimeDs += passedTimeDs;
+        } else {
+            
+            //If the button was pressed for more than a second, we go to system off
+            //If it was pressed for more than 5 seconds, we do not power off
+            if (
+                powerButtonPressedTimeDs >= HOLD_TIME_TO_ENTER_OFF_DS
+                && powerButtonPressedTimeDs < HOLD_TIME_TO_ENTER_OFF_DS_MAX)
+            {
+                PrepareSystemOff();
+            }
+            //If the power button was shortcly pressed, we shortly blink to let the user know the firmware is running
+            else if(powerButtonPressedTimeDs && powerButtonPressedTimeDs < HOLD_TIME_TO_ENTER_OFF_DS)
+            {
+                //ATTENTION: Do not change blink codes as they are documented in the users manual
+                //Shortly blink the green and blue led
+                GS->ledGreen.On();
+                GS->ledBlue.On();
+                FruityHal::DelayMs(200);
+                GS->ledGreen.Off();
+                GS->ledBlue.Off();
+
+            }
+            // => Other power button functionality can be defined elsewhere in the firmware
+
+            powerButtonPressedTimeDs = 0;
+        }
+    }
+}
+
+bool DeviceOff::IsPowerButtonPressed() {
+    if(Boardconfig->powerButton == -1) return false;
+
+    if (Boardconfig->powerButtonActiveHigh){
+        return FruityHal::GpioPinRead((u32)Boardconfig->powerButton);
+    } else {
         return !FruityHal::GpioPinRead((u32)Boardconfig->powerButton);
     }
 }
 
-static void Sleep(void) {
-    logt("OFF", "Entering POWER OFF");
+void DeviceOff::PrepareSystemOff()
+{
+    logt("WARNING", "Preparing Power Off");
 
+    //ATTENTION: Do not change LED blink codes, the user and our manual rely on these!
+
+    //Switch all leds off first
+    GS->ledRed.Off();
+    GS->ledGreen.Off();
+    GS->ledBlue.Off();
+
+    //If the device has a red LED, it will blink red
+    //If the device has no red LED, it will blink all other LEDs
+    //It blinks five times before going to system off mode
+    for(int i=0; i<10; i++){
+        if(Boardconfig->led1Pin == -1) {
+            GS->ledRed.Toggle();
+            GS->ledGreen.Toggle();
+            GS->ledBlue.Toggle();
+        } else {
+            GS->ledRed.Toggle();
+        }
+        FruityHal::DelayMs(500);
+    }
+
+    //First, we are resetting to make sure that nothing is initialized anymore
+    //We are using a special RebootReason which is picked up upon reboot
+    //The device will then go to SYSTEM_OFF once it enters the HandleReset method
+    GS->node.Reboot(1, RebootReason::PREPARE_DEVICE_OFF);
+}
+
+void DeviceOff::GotoSystemOff()
+{
+    //Terminal is not initialized at this point
+    log_rtt("Entering SYSTEM_OFF" EOL);
+
+    //Make sure power button is not pressed anymore so that we do not wake up again
     while(IsPowerButtonPressed()) {}
     
     // Clear reset reason before going to sleep
     CheckedMemset(GS->ramRetainStructPtr, 0, sizeof(RamRetainStruct));
-    GS->ramRetainStructPtr->rebootReason = RebootReason::UNKNOWN_BUT_BOOTED;
+    GS->ramRetainStructPtr->rebootReason = RebootReason::FROM_OFF_STATE;
     GS->ramRetainStructPtr->crc32 = Utility::CalculateCrc32((u8*)GS->ramRetainStructPtr, sizeof(RamRetainStruct) - 4);
     
     // Make sure power button is configured in sense mode and will wake the device up
@@ -72,22 +160,12 @@ static void Sleep(void) {
     }
 
     FruityHal::SystemEnterOff(false);
-
-    // while(true) {}
 }
 
-static bool IsDeviceOffReason(RebootReason resetReason) {
-    return resetReason == RebootReason::DEVICE_OFF;
-}
+bool DeviceOff::CheckPowerButtonLongPress(u32 delayMs) {
+    static const u32 timeQuantum = 100;
 
-static bool IsSystemOffReset(RebootReason resetReason) {
-    return resetReason == RebootReason::FROM_OFF_STATE;
-}
-
-static bool WaitForPowerButton(uint32_t delayMs) {
-    static const uint32_t timeQuantum = 100;
-
-    for (uint32_t i = 0; i < delayMs / timeQuantum; i++) {
+    for (u32 i = 0; i < delayMs / timeQuantum; i++) {
         FruityHal::DelayMs(timeQuantum);
         if(!IsPowerButtonPressed()) {
             return false;
@@ -98,75 +176,60 @@ static bool WaitForPowerButton(uint32_t delayMs) {
 }
 
 void DeviceOff::HandleReset(void) {
-    // Ignore device off if powerButton is not set
+    // Ignore device off functionality if powerButton is not set
     if (Boardconfig->powerButton == -1) return;
 
-    logt("OFF", "Reset");
+    //Terminal is not initialized at this point
+    log_rtt("HandleReset" EOL);
 
+    //Get the stored and the hardware reboot reason
     RebootReason rebootReason = GS->ramRetainStructPtr->rebootReason;
-    if (Boardconfig->powerButtonActiveHigh)
-    {
+    RebootReason halRebootReason = FruityHal::GetRebootReason();
+
+    //Activate GPIO Sensing for Power Button
+    if (Boardconfig->powerButtonActiveHigh) {
         FruityHal::GpioConfigureInputSense((u32)Boardconfig->powerButton, FruityHal::GpioPullMode::GPIO_PIN_PULLDOWN, FruityHal::GpioSenseMode::GPIO_PIN_HIGHSENSE);
-    }
-    else
-    {
+    } else {
         FruityHal::GpioConfigureInputSense((u32)Boardconfig->powerButton, FruityHal::GpioPullMode::GPIO_PIN_PULLUP, FruityHal::GpioSenseMode::GPIO_PIN_LOWSENSE);
     }
-    RebootReason otherrebootReason = FruityHal::GetRebootReason();
 
-    if(IsDeviceOffReason(rebootReason) && (IsPowerButtonPressed())) {
-        WaitForPowerButton(1000);
-        Sleep();
+    //If we rebooted with the intention to go to SYSTEM_OFF, we put the device in SYSTEM_OFF
+    if(rebootReason == RebootReason::PREPARE_DEVICE_OFF) {
+        GotoSystemOff();
     }
 
-    if(IsSystemOffReset(otherrebootReason) && !IsPowerButtonPressed()) {
-        Sleep();
-    }
+    //If we wake up from SYSTEM_OFF and the power button is not pressed anymore,
+    //the user wasn't pressing long enough so we go back to sleep
+    if(halRebootReason == RebootReason::FROM_OFF_STATE) {
+        bool pressedLongEnough = CheckPowerButtonLongPress(1000);
 
-    if (IsDeviceOffReason(rebootReason) && GS->node.configuration.enrollmentState == EnrollmentState::NOT_ENROLLED)
-    {
-        WaitForPowerButton(1000);
-        Sleep();
-    }
+        //Wait until the user has released the button
+        u32 counter = 0;
+        while(IsPowerButtonPressed()){
+            FruityHal::DelayMs(10);
+            //We do an emergency exit in case e.g. someone misconfigured the boardconfig so that the tag
+            //can still boot after 30 minutes and we can release a hotfix. Our system test would however break
+            //as the timeout is too long, so we can detect the issue
+            if(counter > 100 * 60 * 30) break;
+            counter++;
+        };
 
-    if(IsSystemOffReset(otherrebootReason) && IsPowerButtonPressed()) {
-        if(!WaitForPowerButton(1000)) {
-            Sleep();
-        }
-
-        // On wake up set a rebootreason
-        CheckedMemset(GS->ramRetainStructPtr, 0, sizeof(RamRetainStruct));
-        GS->ramRetainStructPtr->rebootReason = RebootReason::DEVICE_WAKE_UP;
-        GS->ramRetainStructPtr->crc32 = Utility::CalculateCrc32((u8*)GS->ramRetainStructPtr, sizeof(RamRetainStruct) - 4);
-        logt("OFF", "Wakeup");
-
-        while(IsPowerButtonPressed());
-    }
-}
-
-void DeviceOff::TimerHandler(u16 passedTimeDs)
-{
-    // Ignore device off if powerButton is not set
-    if (Boardconfig->powerButton == -1) return;
-
-    if (IsPowerButtonPressed())
-    {
-        buttonPressedTimeDs += passedTimeDs;
-        if (buttonPressedTimeDs >= HOLD_TIME_TO_ENTER_OFF_DS)
+        if(pressedLongEnough)
         {
-            // Blink twice before going to system off mode
-            GS->ledRed.On();
-            FruityHal::DelayMs(500);
-            GS->ledRed.Off();
-            FruityHal::DelayMs(500);
-            GS->ledRed.On();
-            FruityHal::DelayMs(500);
-            GS->ledRed.Off();
-            GS->node.Reboot(1, RebootReason::DEVICE_OFF);
+            // On wake up set a rebootreason
+            CheckedMemset(GS->ramRetainStructPtr, 0, sizeof(RamRetainStruct));
+            GS->ramRetainStructPtr->rebootReason = RebootReason::DEVICE_WAKE_UP;
+            GS->ramRetainStructPtr->crc32 = Utility::CalculateCrc32((u8*)GS->ramRetainStructPtr, sizeof(RamRetainStruct) - 4);
+            
+            //Terminal is not initialized at this point
+            log_rtt("Device Wakeup" EOL);
         }
-    }
-    else
-    {
-        buttonPressedTimeDs = 0;
+        else
+        {
+            //Terminal is not initialized at this point
+            log_rtt("Still tired, going back to sleep." EOL);
+
+            GotoSystemOff();
+        }
     }
 }

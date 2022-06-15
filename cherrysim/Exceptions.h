@@ -37,6 +37,9 @@
 #include <typeindex>
 #include "debugbreak.h"
 
+//We accumulate exception for one simulation step when it is disabled and cleared at the start of next simulation step
+extern void LogThrownCherrySimException(std::type_index index);
+
 struct FruityMeshException : public std::exception {};
 
 //LCOV_EXCL_START Debug Code
@@ -83,6 +86,10 @@ CREATEEXCEPTIONINHERITING(NodeIdNotFoundException                      , Illegal
 CREATEEXCEPTIONINHERITING(TerminalIdNotFoundException                  , IllegalStateException);
 CREATEEXCEPTIONINHERITING(MulipleNodesHaveSameNodeIdException          , IllegalStateException);
 CREATEEXCEPTIONINHERITING(MulipleNodesHaveSameNodeAndNetworkIdException, IllegalStateException);
+CREATEEXCEPTIONINHERITING(NoSinkConfiguredForMeshGatewayConfigurationException, IllegalStateException);
+CREATEEXCEPTIONINHERITING(ImageNotLicenseCompatibleException           , IllegalStateException);
+CREATEEXCEPTIONINHERITING(LicenseMigrationFailedException              , IllegalStateException);
+CREATEEXCEPTIONINHERITING(DfuImageCrcException                         , IllegalStateException);
 
 CREATEEXCEPTION(BufferException);
 CREATEEXCEPTIONINHERITING(TriedToReadEmptyBufferException         , BufferException);
@@ -122,6 +129,8 @@ CREATEEXCEPTION(ZeroTimeoutNotSupportedException);
 CREATEEXCEPTION(ErrorLoggedException);
 CREATEEXCEPTION(InterruptDeadlockException);
 CREATEEXCEPTION(DeviceNotAvailableException);
+CREATEEXCEPTION(LicenseNotCreatedException);
+CREATEEXCEPTION(LicenseNotValidException);
 //LCOV_EXCL_STOP debug code
 
 #undef CREATEEXCEPTION //Exceptions must be created above!
@@ -175,6 +184,7 @@ namespace Exceptions {
         else \
         { \
             printf("Exception occured but ignored: " #T " " __FILE__ " %d\n", __LINE__); \
+            LogThrownCherrySimException(typeid(T)); \
         } \
     }
 

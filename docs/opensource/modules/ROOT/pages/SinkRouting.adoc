@@ -1,0 +1,46 @@
+= Sink Routing
+
+== Purpose
+
+The FruityMesh firmware supports routing packets to the closest sink in the mesh network, thus avoiding broadcasting packets through the whole mesh.
+
+
+== Functionality
+
+The `MeshConnection` stores the number of `hopsToSink` or a value smaller than `0` if the sink is not reachable via the connection.
+
+=== Initialization During Clustering
+
+The initial value of the `hopsToSink` field is computed when the clustering is performed, as the cluster acknowledgement and update packets carry the `hopsToSink` value.
+
+As the value (for non-sink nodes) starts out as `-1` (and any value `< 0` is considered to be _unknown_ hops to sink), initially only the sink node itself has a value that is known.
+When clustering begins, only one connection partner will have a known `hopsToSink` value, which is propagated to the other side (and incremented by one).
+
+Please note that currently only one `DeviceType::SINK` is supported per network.
+
+=== Validation During Normal Operation
+
+The value is validated through the `StatusModuleTriggerActionMessages::SET_KEEP_ALIVE` message of the `StatusReporterModule`.
+It uses the hops-counting mechanism of FruityMesh where the special node id range after `NODE_ID_HOPS_BASE` (see xref:Specification.adoc#NodeId[the specification]) is used.
+
+This message is sent periodically by a sink to feed the watchdog, but is additionally used to count the hops to the sink.
+
+When such a message is received on a node via a particular connection, the hops to the sink over this connection are computed via
+
+[source, C++]
+----
+STATUS_REPORTER_MODULE_MAX_HOPS - packetHeader->receiver + 1
+----
+
+where `STATUS_REPORTER_MODULE_MAX_HOPS` is used to initialize the `receiver` field of the message on the sink.
+It is the maximum usable value for the hops-counting mechanism.
+
+Each hop decrements the `receiver` field by one, which means that any node can compute its own depth in the connection tree as seen from the sink which sent the original packet.
+
+In case the values don't match, an error counter (`CustomErrorTypes::FATAL_INCORRECT_HOPS_TO_SINK`) is incremented and the value is updated.
+In the simulator an exception is raised additionally (as the values should always match).
+
+
+== More
+
+Please read the xref:Specification.adoc[] and the documents about the xref:The-FruityMesh-Algorithm.adoc[] and the xref:The-Algorithm-in-Detail.adoc[] for more details.

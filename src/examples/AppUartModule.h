@@ -39,8 +39,8 @@
 #if IS_ACTIVE(APP_UART)
 
 /*
- * This is a template for a FruityMesh module.
- * A comment should be here to provide a least a short description of its purpose.
+ * This module allows sending terminal commands and receiving terminal logs via
+ * a mesh access connection.
  */
 
 // This should be set to the correct vendor and subId
@@ -50,9 +50,9 @@ constexpr u8 APP_UART_MODULE_CONFIG_VERSION = 1;
 
 constexpr u32 APP_UART_LOG_BUFFER_SIZE = 4096;
 
-constexpr u16 LOG_SENT_INTERVAL_DS = 1;
+constexpr u16 APP_UART_LOG_SEND_INTERVAL_DS = 1;
 
-constexpr u8 PARTNER_NUM = 8;
+constexpr u8 APP_UART_MAX_NUM_PARTNERS = 8;
 
 #pragma pack(push)
 #pragma pack(1)
@@ -81,12 +81,10 @@ private:
         u16 connectionHandle;
     };
 
-    AppUartPartner partners[PARTNER_NUM];
+    AppUartPartner partners[APP_UART_MAX_NUM_PARTNERS];
 
     PacketQueue logQueue;
     std::atomic_bool isSendingLog = { false };
-
-    ErrorTypeUnchecked SendAppLogQueue();
 
 public:
     enum AppUartModuleTriggerActionMessages {
@@ -127,7 +125,6 @@ public:
     static constexpr int DATA_MAX_LEN
         = SIZEOF_APP_UART_MODULE_TERMINAL_COMMAND_MESSAGE - SIZEOF_APP_UART_MODULE_TERMINAL_COMMAND_MESSAGE_STATIC;
     typedef struct {
-        // Insert values here
         MessageType splitHeader;
         u8 splitCount;
         u8 partLen;
@@ -160,22 +157,44 @@ public:
     TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override;
 #endif
 
-    MeshAccessConnectionHandle GetMeshAccessConnectionHandleByPartnerId(const NodeId nodeId) const;
-    void pushPartner(const NodeId nodeId);
-    void removePartner(const u16 connectionHandle);
-    bool HasPartner();
-    ErrorTypeUnchecked DoSendAppLogQueue();
-    char* GetReadBuffer() { return readBuffer; }
+    MeshAccessConnectionHandle GetMeshAccessConnectionHandleByPartnerId(NodeId nodeId) const;
+
+    /// Returns the input buffer read by terminal.
+    const char* GetReadBuffer() { return readBuffer; }
+    /// Returns the current offset into the input buffer.
     u16 GetReadBufferOffset() const { return readBufferOffset; }
+    /// Returns true if there is a line available in the input buffer.
     bool GetLineToReadAvailable() const { return lineToReadAvailable; }
-    // Log Queue
-    bool PutAppLogQueue(const char* log, u16 lenth);
-    void DiscardLogQueue();
-    // atomic
+
+    /// Tries to place a log entry in the internal queue.
+    bool PutAppLogQueue(const char* log, u16 length);
+
+private:
+    /// Adds a partner to the list of nodes the logs are sent to.
+    void PushPartner(NodeId nodeId);
+    /// Removes a partner from the list of nodes the logs are sent to.
+    void RemovePartner(u16 connectionHandle);
+
+    /// Checks if there are currently any partners to send logs to.
+    bool HasPartner();
+
+    /// Change the flag indicating if the module is currently sending logs.
     void SetIsSendingLog(bool state) { isSendingLog.store(state, std::memory_order_release); }
+    /// Returns true if the module is currently in the process of sending logs.
     bool GetIsSendingLog() { return isSendingLog.load(std::memory_order_acquire); }
-    //
-    bool CanQueueLog(); // true:can queue log, false: cannot queue log
+
+    /// Validate if queuing is currently possible.
+    bool CanQueueLog();
+
+    /// Initiates sending the queued log messages to the stored partners.
+    ErrorTypeUnchecked DoSendAppLogQueue();
+
+    /// Implements sending the queued log messages to the stored partners. Do not call this method
+    /// directly, call DoSendAppLogQueue instead.
+    ErrorTypeUnchecked SendAppLogQueue();
+
+    /// Clears the internal log queues.
+    void DiscardLogQueue();
 };
 
 #endif // IS_ACTIVE(APP_UART)

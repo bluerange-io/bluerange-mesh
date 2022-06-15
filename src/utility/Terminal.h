@@ -237,9 +237,15 @@ public:
 #endif
 };
 
-//#if IS_ACTIVE(SEGGER_RTT)
-//void SeggerRttPrintf_c(const char* message, ...);
-//#endif
+//A helper macro to add debug logs in both c++ and c code from anywhere using Segger RTT
+#if ACTIVATE_SEGGER_RTT == 1
+extern "C" {
+extern void SeggerRttPrintf_c(const char* message, ...);
+}
+#define log_rtt(...) SeggerRttPrintf_c(__VA_ARGS__)
+#else
+#define log_rtt(...) do {} while(0)
+#endif
 
     //###### Other ######
 #ifdef TERMINAL_ENABLED

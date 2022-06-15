@@ -122,7 +122,9 @@ void Logger::Log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJs
             //As this costs quite a bit of performance it is only enabled if stdout is active
             if (Terminal::stdioActive) {
                 nlohmann::json j = nlohmann::json::parse(currentString, nullptr, false);
-                if(j.is_discarded()) SIMEXCEPTION(JsonParseException);
+                if (j.is_discarded()) {
+                    SIMEXCEPTION(JsonParseException);
+                }
                 currentString = "";
             }
 #endif
@@ -619,6 +621,8 @@ const char* Logger::GetErrorLogCustomError(CustomErrorTypes type)
         return "COUNT_WARN_RX_WRONG_DATA";
     case CustomErrorTypes::WATCHDOG_REBOOT:
         return "WATCHDOG_REBOOT";
+    case CustomErrorTypes::INFO_LICENSE_CHECK:
+        return "INFO_LICENSE_CHECK";
     default:
         SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
         return "UNKNOWN_ERROR";
@@ -912,8 +916,8 @@ const char* Logger::GetErrorLogRebootReason(RebootReason type)
         return "IMPLEMENTATION_ERROR_SPLIT_WITH_NO_LOOK_AHEAD";
     case RebootReason::CONFIG_MIGRATION:
         return "CONFIG_MIGRATION";
-    case RebootReason::DEVICE_OFF:
-        return "DEVICE_OFF";
+    case RebootReason::PREPARE_DEVICE_OFF:
+        return "PREPARE_DEVICE_OFF";
     case RebootReason::DEVICE_WAKE_UP:
         return "DEVICE_WAKE_UP";
     case RebootReason::FACTORY_RESET:
@@ -1049,7 +1053,7 @@ void Logger::ConvertBufferToBase64String(const u8* srcBuffer, MessageLength srcL
     ConvertBufferToBase64String(srcBuffer, srcLength.GetRaw(), dstBuffer, bufferLength);
 }
 
-void Logger::ConvertBufferToHexString(const u8 * srcBuffer, u32 srcLength, char * dstBuffer, u16 bufferLength)
+u32 Logger::ConvertBufferToHexString(const u8 * srcBuffer, u32 srcLength, char * dstBuffer, u16 bufferLength)
 {
     CheckedMemset(dstBuffer, 0x00, bufferLength);
 
@@ -1064,15 +1068,17 @@ void Logger::ConvertBufferToHexString(const u8 * srcBuffer, u32 srcLength, char 
             dstBuffer[-3] = '.';
             dstBuffer[-2] = '.';
             dstBuffer[-1] = '\0';
-            break;
+            return i - 1;
         }
 
     };
+
+    return srcLength;
 }
 
-void Logger::ConvertBufferToHexString(const u8* srcBuffer, MessageLength srcLength, char* dstBuffer, u16 bufferLength)
+u32 Logger::ConvertBufferToHexString(const u8* srcBuffer, MessageLength srcLength, char* dstBuffer, u16 bufferLength)
 {
-    ConvertBufferToHexString(srcBuffer, srcLength.GetRaw(), dstBuffer, bufferLength);
+    return ConvertBufferToHexString(srcBuffer, srcLength.GetRaw(), dstBuffer, bufferLength);
 }
 
 u32 Logger::ParseEncodedStringToBuffer(const char * encodedString, u8 * dstBuffer, u16 dstBufferSize, bool *didError)

@@ -692,6 +692,7 @@ typedef union {
 #define PROPERTY_DISABLE        0x00
 #define WATERMARK_LEVEL            0x1E
 
+bool is_lis2dh12_inertial_interrupt_enabled();
 bool is_lis2dh12_moving_in_simulation();
 int32_t lis2dh12_device_id_get(lis2dh12_ctx_t *ctx, uint8_t *buff);
 int32_t lis2dh12_fifo_mode_set(lis2dh12_ctx_t *ctx, lis2dh12_fm_t val);
@@ -875,6 +876,10 @@ uint32_t InitializeModules_CherrySim(bool createModule);
 
 //Helpers
 bool IsEmpty(const uint8_t* data, uint32_t length);
+
+//Appendix
+extern const uint8_t s132_mbr_and_header_nrf52_v5_1_0[0x4000];
+extern const uint8_t s140_mbr_and_header_nrf52840_v6_1_0[0x4000];
 
 #ifdef __cplusplus
 }

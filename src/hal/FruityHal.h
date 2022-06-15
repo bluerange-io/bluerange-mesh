@@ -513,8 +513,11 @@ namespace FruityHal
     UartReadCharResult UartReadChar();
 
     u32 GetMasterBootRecordSize();
-    u32 GetSoftDeviceSize();
+    //By default this is called with the Master Boot Record size
+    //as this is where the SoftDevice starts
+    u32 GetSoftDeviceSize(u32 sdBaseAddr = FLASH_REGION_START_ADDRESS + GetMasterBootRecordSize());
     u32 GetSoftDeviceVersion();
+    u32 GetLicenseSectionAdress(u32 sdBaseAddr = FLASH_REGION_START_ADDRESS + GetMasterBootRecordSize());
     BleStackType GetBleStackType();
     void BleStackErrorHandler(u32 id, u32 info);
 
@@ -527,9 +530,11 @@ namespace FruityHal
     u32 GetCodePageSize();
     u32 GetCodeSize();
     u32 GetDeviceId();
+    void GetDeviceIdLong(u32 * p_data);
     void GetDeviceAddress(u8 * p_address);
 
     u32 GetHalMemorySize();
+    void InitHalMemory();
 
     // ######################### Timeslot API ############################
 

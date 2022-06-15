@@ -174,7 +174,7 @@ TEST(TestModule, TestSetAndGetConfiguration) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
 
-    tester.SimulateUntilClusteringDone(100 * 60);
+    tester.SimulateUntilClusteringDone(60 * 1000);
 
     StatusReporterModuleConfiguration statusConfig;
     statusConfig.moduleId = ModuleId::STATUS_REPORTER_MODULE;

@@ -123,3 +123,7 @@ u32 GetWatchdogTimeoutSafeBoot_github_sink_usb_nrf52840()
     return 0; //Safe Boot Mode disabled by default, activate if desired
 }
 
+LicenseState GetLicenseState_github_sink_usb_nrf52840()
+{
+    return LicenseState::VALID_BUT_NOT_AVAILABLE;
+}

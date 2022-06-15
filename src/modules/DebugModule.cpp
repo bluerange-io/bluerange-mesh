@@ -185,7 +185,7 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
     //Auto counting for flood packets
     if(lastFloodPacketMs && lastFloodPacketMs + 3000 < FruityHal::GetRtcMs()){
         const u32 passedTimeMs = FruityHal::GetRtcDifferenceMs(lastFloodPacketMs, firstFloodPacketMs);
-        throughputInBytesPerSecond = autoFloodSum * 1000 / passedTimeMs;
+        throughputInBytesPerSecond = autoFloodSum * 1000 / std::max<u32>(passedTimeMs, 1);
         trace("Counted %u flood payload bytes in %u ms = %u byte/s" EOL, autoFloodSum, passedTimeMs, throughputInBytesPerSecond);
         firstFloodPacketMs = lastFloodPacketMs = 0;
         autoFloodSum = 0;
@@ -345,13 +345,12 @@ void DebugModule::PrintAdvMessage(const FruityHal::GapAdvertisementReportEvent& 
 
             PrintAdvMessageHeader("MESH_ACCESS(3)", advertisementReportEvent);
 
-            trace("    > networkId:%u, connectable:%u, enrolled:%u, sink:%u, zeroKey:%u, conn:%u, wantsConn:%u, serial:%s" EOL,
+            trace("    > networkId:%u, hasFreeInConn:%u, enrolled:%u, sink:%u, zeroKey:%u, wantsConn:%u, serial:%s" EOL,
                 payload->networkId,
-                payload->IsConnectable,
+                payload->hasFreeInConnection,
                 payload->isEnrolled,
                 payload->isSink,
                 payload->isZeroKeyConnectable,
-                payload->IsConnectable,
                 payload->interestedInConnection,
                 serialString
             );
@@ -859,19 +858,22 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
     //Reads a page of the memory (0-256) and prints it
     if(TERMARGS(0, "readblock"))
     {
-        if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+        if(commandArgsSize < 3) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
         u16 blockSize = 1024;
 
         u32 offset = FLASH_REGION_START_ADDRESS;
-        if(TERMARGS(1, "uicr")) offset = (u32)FruityHal::GetUserMemoryAddress();
-        if(TERMARGS(1, "ficr")) offset = (u32)FruityHal::GetDeviceMemoryAddress();
-        if(TERMARGS(1, "ram")) offset = (u32)0x20000000;
+        if(TERMARGS(1, "flash")) offset = (u32)FLASH_REGION_START_ADDRESS;
+        else if(TERMARGS(1, "uicr")) offset = (u32)FruityHal::GetUserMemoryAddress();
+        else if(TERMARGS(1, "ficr")) offset = (u32)FruityHal::GetDeviceMemoryAddress();
+        else if(TERMARGS(1, "ram")) offset = (u32)0x20000000;
+        else return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+
         bool didError = false;
 
         u16 numBlocks = 1;
-        if(commandArgsSize > 2){
-            numBlocks = Utility::StringToU16(commandArgs[2], &didError);
+        if(commandArgsSize > 3){
+            numBlocks = Utility::StringToU16(commandArgs[3], &didError);
             if (didError)
             {
                 return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
@@ -882,7 +884,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
         DYNAMIC_ARRAY(buffer, bufferSize);
         DYNAMIC_ARRAY(charBuffer, bufferSize * 3 + 1);
         for(int j=0; j<numBlocks; j++){
-            u32 block = Utility::StringToU32(commandArgs[1], &didError) + j;
+            u32 block = Utility::StringToU32(commandArgs[2], &didError) + j;
             if (didError)
             {
                 return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;

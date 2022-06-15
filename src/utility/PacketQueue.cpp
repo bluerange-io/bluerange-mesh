@@ -55,7 +55,7 @@ PacketQueue::PacketQueue(u32* buffer, u16 bufferLength)
 
 //IF READ AND WRITE ARE EQUAL, THE QUEUE IS EMPTY
 //Put does only allow data sizes up to 250 byte per element
-bool PacketQueue::Put(u8* data, u16 dataLength)
+bool PacketQueue::Put(const u8* data, u16 dataLength)
 {
     u8* dest = Reserve(dataLength);
 

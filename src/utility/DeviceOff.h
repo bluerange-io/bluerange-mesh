@@ -37,11 +37,24 @@
  */
 class DeviceOff
 {
-    private:
-        u32 buttonPressedTimeDs = 0;
-
     public:
+        //Can be set to a time in Ds to automatically power off the device
+        u32 autoPowerOffTimeDs = 0;
+
+        //Can be set to a time in Ds to automatically power off the device
+        //but only if it is unenrolled
+        u32 autoPowerOffIfUnenrolledTimeDs = 0;
+
         DeviceOff();
         void HandleReset();
         void TimerHandler(u16 passedTimeDs);
+
+
+    private:
+        u32 powerButtonPressedTimeDs = 0;
+
+        bool IsPowerButtonPressed();
+        bool CheckPowerButtonLongPress(u32 delayMs);
+        void PrepareSystemOff();
+        void GotoSystemOff();
 };

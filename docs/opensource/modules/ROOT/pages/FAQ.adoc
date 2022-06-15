@@ -17,3 +17,7 @@ FruityMesh is based on BLE connections instead of broadcasting and advertising. 
 - This makes it possible to run on batteries and still have a high throughput and low latency.
 
 One of the drawbacks is, that setting up connections takes time and a node failure can lead to a temporary loss of connectivity for parts of the mesh.
+
+== Which Vendor-Module IDs are known for FruityMesh?
+
+- #1: The example `AppUartModule` which allows sending terminal output and input to and from a smartphone.

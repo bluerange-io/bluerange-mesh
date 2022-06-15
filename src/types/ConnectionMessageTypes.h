@@ -740,26 +740,46 @@ typedef struct
 }ConnPacketUpdateConnectionInterval;
 STATIC_ASSERT_SIZE(ConnPacketUpdateConnectionInterval, SIZEOF_CONN_PACKET_UPDATE_CONNECTION_INTERVAL);
 
-enum class TrackedAssetMessageType : u8
+enum class TrackedAssetMessageEntryType : u8
 {
     BLE    = 0x00,
     INS    = 0x01
 };
-struct TrackedAssetMessage
+struct PeriodicAssetMessageEntry
 {
     u8 moving : 1;
     u8 hasFreeInConnection : 1;
     u8 interestedInConnection : 1;
-    u8 reservedBits : 5;
+    u8 moveMod : 1;
+    u8 reservedBits : 4;
 
     NodeId nodeId;
-    i8 rssi;
+    u8 lastRssi;
 
-    TrackedAssetMessageType messageType;
+    TrackedAssetMessageEntryType entryType;
     u8 payload[SIZEOF_ADV_STRUCTURE_ASSET_SERVICE_DATA_PAYLOAD];
 };
-constexpr size_t SIZEOF_TRACKED_ASSET_MESSAGE = 12;
-constexpr size_t SIZEOF_TRACKED_ASSET_MESSAGE_WITH_CONN_PACKET_HEADER = SIZEOF_TRACKED_ASSET_MESSAGE + SIZEOF_CONN_PACKET_HEADER;
+constexpr size_t SIZEOF_TRACKED_ASSET_MESSAGE_ENTRY = 12;
+constexpr size_t SIZEOF_TRACKED_ASSET_MESSAGE_WITH_CONN_PACKET_HEADER = SIZEOF_TRACKED_ASSET_MESSAGE_ENTRY + SIZEOF_CONN_PACKET_HEADER;
+
+//Size must never change! Old nodes will process the message exactly like this as multiple entries are concatenated
+STATIC_ASSERT_SIZE(PeriodicAssetMessageEntry, SIZEOF_TRACKED_ASSET_MESSAGE_ENTRY);
+
+struct StandstillAssetMessageEntry
+{
+    u8 hasFreeInConnection : 1;
+    u8 interestedInConnection : 1;
+    u8 reservedBits : 1;
+    u8 positionCounter : 5;
+    NodeId nodeId;
+    u8 avgRssi;
+    u8 rssiCount;
+};
+constexpr size_t SIZEOF_STANDSTILL_ASSET_MESSAGE_ENTRY = 5;
+constexpr size_t SIZEOF_STANDSTILL_ASSET_MESSAGE_WITH_CONN_PACKET_HEADER = SIZEOF_STANDSTILL_ASSET_MESSAGE_ENTRY + SIZEOF_CONN_PACKET_HEADER;
+
+//Size must never change! Old nodes will process the message exactly like this as multiple entries are concatenated
+STATIC_ASSERT_SIZE(StandstillAssetMessageEntry, SIZEOF_STANDSTILL_ASSET_MESSAGE_ENTRY);
 
 //End Packing
 #pragma pack(pop)

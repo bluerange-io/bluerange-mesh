@@ -69,7 +69,7 @@ class ScanController
 private:
     FruityHal::BleGapScanParams currentScanParams;
     bool scanStateOk = true;
-    std::array<ScanJob, 4> jobs{};
+    std::array<ScanJob, 5> jobs{};
 
     void TryConfiguringScanState();
 

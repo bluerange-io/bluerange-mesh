@@ -117,6 +117,9 @@ void EnrollmentModule::TimerEventHandler(u16 passedTimeDs)
             if (GS->cm.pendingConnection != nullptr) {
                 GS->cm.DeleteConnection(GS->cm.pendingConnection, AppDisconnectReason::ENROLLMENT_TIMEOUT);
             }
+            if (conn) {
+                conn.DisconnectAndRemove(AppDisconnectReason::ENROLLMENT_TIMEOUT);
+            }
         }
         else if(ted.state >= EnrollmentStates::CONNECTED)
         {

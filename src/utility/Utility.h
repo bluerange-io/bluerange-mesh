@@ -89,7 +89,7 @@ namespace Utility
 
     //Serial number and version utilities
     u32 GetIndexForSerial(const char* serialNumber, bool *didError = nullptr);
-    void GenerateBeaconSerialForIndex(u32 index, char* serialBuffer); //Attention: Serial buffer must be NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH big
+    u32 GenerateBeaconSerialForIndex(u32 index, char* serialBuffer); //Attention: Serial buffer must be NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH big
     void GetVersionStringFromInt(const u32 version, char* outputBuffer);
 
     //ModuleId stuff
@@ -128,6 +128,11 @@ namespace Utility
     void ToUpperCase(char* str);
 
     u32 MessageLengthToAmountOfSplitPackets(u32 messageLength, u32 mtu);
+    
+    // ECDSA
+    ErrorType ECDSASecp256r1Sign(const u8 * privateKey, const u8 * hash, u16 hashLen, u8 * signature);
+    ErrorType ECDSASecp256r1Verify(const u8 * publicKey, const u8 * hash, u16 hashLen, const u8 * signature);
+    void SHA256HashCalculate(const u8* data, u32 len, u8* hash);
 
     //Other
     u16 ByteToAsciiHex(u8 b);

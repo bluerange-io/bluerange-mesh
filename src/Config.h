@@ -55,10 +55,10 @@ class RecordStorageEventListener;
 
 // major (0-400), minor (0-999), patch (0-9999)
 #define FM_VERSION_MAJOR 1
-#define FM_VERSION_MINOR 0
+#define FM_VERSION_MINOR 1
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 1940
+#define FM_VERSION_PATCH 230
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -77,6 +77,8 @@ static_assert(FM_VERSION_PATCH >= 0 && FM_VERSION_PATCH <= 9999, "Malformed Patc
 #endif
 
 #ifdef FEATURESET
+// Subtract to for ".h" as that won't be part of the license array
+static_assert(strlen(FEATURESET_NAME) - 2 <= 32, "Featureset name too long to fit in license!");
 struct ModuleConfiguration;
 #define SET_BOARD_CONFIGURATION XCONCAT(SetBoardConfiguration_,FEATURESET)
 extern void SET_BOARD_CONFIGURATION(BoardConfiguration* config);
@@ -96,6 +98,8 @@ extern FeatureSetGroup GET_FEATURE_SET_GROUP();
 extern u32 GET_WATCHDOG_TIMEOUT();
 #define GET_WATCHDOG_TIMEOUT_SAFE_BOOT XCONCAT(GetWatchdogTimeoutSafeBoot_,FEATURESET)
 extern u32 GET_WATCHDOG_TIMEOUT_SAFE_BOOT();
+#define GET_LICENSE_STATE XCONCAT(GetLicenseState_,FEATURESET)
+extern LicenseState GET_LICENSE_STATE();
 #elif defined(SIM_ENABLED)
 #define SET_BOARD_CONFIGURATION(configuration) SetBoardConfiguration_CherrySim(configuration);
 
@@ -115,6 +119,8 @@ extern u32 GetWatchdogTimeout_CherrySim();
 #define GET_WATCHDOG_TIMEOUT() GetWatchdogTimeout_CherrySim()
 extern u32 GetWatchdogTimeoutSafeBoot_CherrySim();
 #define GET_WATCHDOG_TIMEOUT_SAFE_BOOT() GetWatchdogTimeoutSafeBoot_CherrySim()
+extern LicenseState GetLicenseState_CherrySim();
+#define GET_LICENSE_STATE() GetLicenseState_CherrySim()
 extern const char* GetFeaturesetName_CherrySim();
 #define FEATURESET_NAME GetFeaturesetName_CherrySim()
 #else
@@ -268,6 +274,7 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 #define ACTIVATE_SEGGER_RTT 0
 #endif
 
+//An exemplary implementation to send and receive terminal commands with a smartphone
 #ifndef ACTIVATE_APP_UART
 #define ACTIVATE_APP_UART 0
 #endif
@@ -328,6 +335,7 @@ class Conf
         RecordStorageResultCode SaveConfigToFlash(RecordStorageEventListener* listener, u32 userType, u8* userData, u16 userDataLength);
 
         u32 GetSerialNumberIndex() const;
+        u32 GetFactorySerialNumberIndex() const;
         const char* GetSerialNumber() const;
         void SetSerialNumberIndex(u32 serialNumber);
 
@@ -392,6 +400,9 @@ class Conf
         //(0-...) Slave latency in number of connection events
         static constexpr u16 meshPeripheralSlaveLatency = 0;
 
+        //we add slave latency for the serial connect to the asset in order to save power
+        static constexpr u16 serialConnectSlaveLatency = 15; 
+
         //(20-1024) (100-1024 for non connectable advertising!) Determines advertising interval in units of 0.625 millisecond.
         static constexpr u16 meshAdvertisingIntervalLow = (u16)MSEC_TO_UNITS(200, CONFIG_UNIT_0_625_MS);
 
@@ -402,6 +413,15 @@ class Conf
         static constexpr u16 meshConnectingScanWindow = 60; //FIXME_HAL: 60 units = 37.5ms (0.625ms steps)
         //(0-...) in seconds
         static constexpr u16 meshConnectingScanTimeout = 2;
+
+        static_assert(meshConnectingScanWindow <= meshConnectingScanInterval, "scan window must be smaller or equal than the scan interval");
+
+        /// Scan interval used when the max. allowed scan duty cycle for connecting is requested (in 0.625ms steps)
+        static constexpr u16 maxScanDutyCycleConnectingScanInterval = meshConnectingScanInterval;
+        /// Scan window used when the max. allowed scan duty cycle for connecting is requested (in 0.625ms steps)
+        static constexpr u16 maxScanDutyCycleConnectingScanWindow = 90; // FIXME_HAL: 90 units = 56.25ms (0.625ms steps)
+
+        static_assert(maxScanDutyCycleConnectingScanWindow <= maxScanDutyCycleConnectingScanInterval, "scan window must be smaller or equal than the scan interval");
 
         //HANDSHAKE
         //If the handshake has not finished after this time, the connection will be disconnected
@@ -546,12 +566,14 @@ class Conf
     extern u32 __application_ram_start_address;
     extern u32 __start_conn_type_resolvers;
     extern u32 __stop_conn_type_resolvers;
+    extern u32 __license_data_start_address;
 #else
     extern u32 __application_start_address[]; //Variable is set in the linker script
     extern u32 __application_end_address[]; //Variable is set in the linker script
     extern u32 __application_ram_start_address[]; //Variable is set in the linker script
     extern u32 __start_conn_type_resolvers[];
     extern u32 __stop_conn_type_resolvers[];
+    extern u32 __license_data_start_address[];
 #endif
 
 //Alright, I know this is bad, but it's for readability....

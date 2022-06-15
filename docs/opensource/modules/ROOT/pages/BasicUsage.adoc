@@ -15,17 +15,13 @@ Keep in mind that image:led_long_red.png[role=led-symbol] is used to indicate lo
 
 | `powered_up_but_not_connected`: When a node is powered up but is not connected to any other node
 | image:led_long_red.png[role=led-symbol]
-
 | `while_performing_handshake`: When two nodes are connected to each other and performing handshake
 | image:led_long_blue.png[role=led-symbol]
-
 | `handshake_is_complete`: When handshake is complete. The number of LED blinks corresponds to number of active connections to other nodes
 | image:led_short_green.png[role=led-symbol]image:led_short_green.png[role=led-symbol]
-
 | `deviceoff_mode`:  When device is switched to DeviceOff mode
 | image:led_short_red.png[role=led-symbol]image:led_short_red.png[role=led-symbol]
-
-|==
+|===
 
 [#TerminalCommands]
 == Terminal Commands
@@ -65,12 +61,11 @@ user input.
 * *get_modules [nodeId]*: Displays a list of modules from the node and
 whether they are active or not.
 
+== More Commands
+
 FruityMesh is structured in Modules. Each module provides its own set of commands. A detailed listing of all available modules and their commands can be found on the xref:Modules.adoc[Modules] page.
 
 ____
 Have a look at the xref:Specification.adoc#NodeIds[NodeIDs section] for
 some insights on how to address nodes individually or in groups.
 ____
-
-== More Commands
-

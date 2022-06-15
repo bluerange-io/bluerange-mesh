@@ -34,6 +34,7 @@ also inspect packets before sending them to the other device and will
 translate the virtual id back into the id of the device before
 transmitting the packet over the MeshAccessConnection.
 
+[#TunnelTypes]
 === Tunnel Types
 A node that connects to another mesh will need to
 specify the tunnelType, it can be on of the following:
@@ -47,6 +48,8 @@ remote mesh to the local mesh.
 * `MESH_ACCESS_TUNNEL_TYPE_LOCAL_MESH = 2`: All nodes from the local mesh can
 send and receive data to/from the node but can't send data to the
 remote mesh.
+
+NOTE: The tunnel type `PEER_TO_PEER` is always used when fmKeyId `NODE_KEY` is specified while establishing a MeshAccessConnection. It will _silently_ override any other tunnel type (such as `REMOTE_MESH` or `LOCAL_MESH`) when establishing the connection.
 
 === Authorization
 Depending on the key type, certain messages are not
@@ -79,7 +82,7 @@ service version, the messageType can be changed.
 |1 bit|isEnrolled|1 if the node is enrolled, 0 otherwise
 |1 bit|isSink|1 if the node is communicating with a MeshGateway, 0 otherwise
 |1 bit|isZeroKeyConnectable|1 if the node is connectable using the zero key, 0 otherwise
-|1 bit|isConnectable|1 if the node currently has unused incoming connections, 0 otherwise
+|1 bit|hasFreeInConnection|1 if the node currently has unused incoming connections, 0 otherwise
 |1 bit|interestedInConnection |1 if asset wants to send a component_sense message, 0 otherwise
 |3 bit|reserved|Must be 0
 |4|serialNumberIndex|cf. xref:Specification.adoc[Specification]
@@ -168,18 +171,23 @@ Instructs a node to build a _MeshAccessConneciton_ to another node. The connecti
 [source,C++]
 ----
 //Establish a connection to another device using a MeshAccessConnection
-action [nodeId] ma serial_connect [serial number] [keyId] [key] [nodeId_of_partner_after_connect] [initial_keep_alive] {requestHandle=0} {bleAddress=""}
+action [nodeId] ma serial_connect [serial number] [keyId] [key] [nodeId_of_partner_after_connect] [initial_keep_alive] {requestHandle=0} {bleAddress=""} {forceMode=0}
 
 //E.g. Connect to device BBBBQ with node key 00:11:22:...
 action 6 ma serial_connect BBBBQ 1 00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF 33012 20 13
 
 //Same as above but with the BLE address given as well
 action 6 ma serial_connect BBBBQ 1 00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF 33012 20 13 AA:BB:CC:DD:EE:FF
+
+//Same as above but with a hint to the node that the connection should be established faster and more reliably (forceMode)
+action 6 ma serial_connect BBBBQ 1 00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF 33012 20 13 AA:BB:CC:DD:EE:FF 1
 ----
 
-`nodeId_of_partner_after_connect` must be inside the range of organization wide unique nodeIds [33000, 39999].
+`nodeId_of_partner_after_connect` must be inside the range of organization wide unique nodeIds [33000, 57999].
 
 `initial_keep_alive` is merely a suggestion to the node. There are a lot of cases where a connection can also be prematurely disconnected.
+
+`forceMode` is merely a suggestion to the node. The node is supposed to use parameters for the connection which lead to faster connections and connect more reliably.
 
 Once the connection was established or cancelled, it is answered with the following JSON:
 
@@ -230,6 +238,7 @@ action this ma disconnect 00:11:22:33:44:55
 #define MESSAGE_TYPE_ENCRYPT_CUSTOM_DONE 28
 ----
 
+[#StartHandshake]
 === Start Handshake
 The central starts the encryption process by sending
 the following unencrypted packet:

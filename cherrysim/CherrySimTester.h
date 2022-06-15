@@ -210,4 +210,27 @@ public:
     //Inherited via CherrySimEventListener
     void CherrySimEventHandler(const char* eventType) override;
     void CherrySimBleEventHandler(NodeEntry* currentNode, simBleEvent* simBleEvent, u16 eventSize) override;
+
+private:
+    static bool verboseTestsByDefault;
+
+public:
+    /// Sets the default value of the verbose flag in the `CherrySimTesterConfig` created by
+    /// `CherrySimTester::CreateDefaultTesterConfiguration` to true, which causes all tests
+    /// that are executed and don't explicitly override the flag to be verbose (i.e. have
+    /// the terminal output from the simulated nodes printed).
+    static void EnableVerboseTestsByDefault();
+
+    //Returns true if the tester has terminal output enabled.
+    bool IsVerbose() const;
+
+    //Use this to disable/ enable terminal output during a test
+    void SetVerbose(bool verbose);
+
+    //### Helpers for Simulating updates
+    static void DfuStartFromTerminalCommandFile(CherrySimTester& tester, std::string file, TerminalId targetTerminalId);
+    static void DfuDataFromTerminalCommandFile(CherrySimTester& tester, std::string file, TerminalId targetTerminalId);
+    static void DfuAllTransmittedFromTerminalCommandFile(CherrySimTester& tester, std::string file, TerminalId targetTerminalId);
+    static void DfuApplyFromTerminalCommandFile(CherrySimTester& tester, std::string file, TerminalId targetTerminalId);
+
 };

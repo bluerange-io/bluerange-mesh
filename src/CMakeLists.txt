@@ -11,6 +11,9 @@ add_subdirectory(hal)
 if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/vendor")
   add_subdirectory(vendor)
 endif(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/vendor")
+if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/external")
+  add_subdirectory(external)
+endif(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/external")
 
 file(GLOB   LOCAL_SRC CONFIGURE_DEPENDS "./Boardconfig.cpp"
                                         "./Config.cpp")

@@ -1,0 +1,156 @@
+= CherrySim Json File
+
+== General
+CherrySim uses several json files for configuration and debugging purposes. It depends on the command line arguments and the contents of the files, which of them are used.
+* meshGwCommunication
+* devices
+* site
+* replaylog
+
+
+=== meshGwCommunication
+This file includes all the cherrysim configurations e.g. number of nodes, number of assets, featureset etc. By default cherrsim only uses this file if the `MeshGwCommunication` argument is passed to `cherrySim_runner`. Below is an example meshGwCommunication.json file.
+[source,json]
+----
+{
+    "asyncFlashCommitTimeProbability": 0.9,
+    "connectionTimeoutProbabilityPerSec": 0.0,
+    "defaultBleStackType": 200,
+    "defaultNetworkId": 0,
+    "devicesJsonPath": "testdevices.json",
+    "enableClusteringValidityCheck": false,
+    "enableSimStatistics": true,
+    "importFromJson": true,
+    "interruptProbability": 0.10000000149011612,
+    "logReplayCommands": true,
+    "mapElevationInMeters": 1,
+    "mapHeightInMeters": 40,
+    "mapWidthInMeters": 60,
+    "nodeConfigName":{"prod_sink_nrf52":1,"prod_mesh_nrf52":7,"prod_vs_nrf52":1,"prod_clc_mesh_nrf52":1, "prod_asset_nrf52":2},
+    "playDelay": 10,
+    "preDefinedPositions": [],
+    "replayPath": "",
+    "realTime": false,
+    "rssiNoise": true,
+    "sdBleGapAdvDataSetFailProbability": 0.0,
+    "sdBusyProbability": 0.01,
+    "seed": 117,
+    "simOtherDelay": 1,
+    "simTickDurationMs": 50,
+    "simulateAsyncFlash": true,
+    "simulateJittering": false,
+    "simulateWatchdog": false,
+    "siteJsonPath": "testsite.json",
+    "storeFlashToFile": "CherrySimFlashState.bin",
+    "terminalId": 1,
+    "verbose": false,
+    "verboseCommands": true,
+    "floorBiasInMeters": 0.9,
+    "ceilingHeightInMeters": 3,
+    "ceilingAttenuationDb": 0,
+    "simulateAdvertisingIndexStep": 1
+}
+----
+Most of the fields are self explanatory but some noteworthy fields are 
+
+* `importFromJson` can be set to true if  xref:#devices[device] and  xref:#sites[sites] configuration needs to be extracted from devices.json and sites.json files. 
+** There file locations can be provided in the properties `devicesJsonPath` and `siteJsonPath` in this file. 
+* One can also set `verbose` to true in order to enable cherrysim logs.
+* Field 'verboseCommands' is deprecated and only retained for compatibility reasons.
+* `realTime` if set to true, the simulator will only tick when the real time clock passed the necessary time otherwise as fast as possible.  It can be a bit of a pitfall if you want to test something with a long replay log.
+* `enableClusteringValidityCheck`, enable automatic checking of the clustering after each step. It is a heuristic and can have false positives as well, so that needs to be verified.
+* `simTickDurationMs` simulation time per tick. It should not be changed unless one is really sure what he is doing.
+* `nodeConfigName` is a key pair value in a map (map<std::string, int>) where key defines the featureset and value defines number of nodes with that featureset e.g
+{"prod_sink_nrf52":1,"prod_mesh_nrf52":7} will have one node with prod_sink_nrf52 featureset and 7 nodes with prod_mesh_nrf52 featureset. In case we have `importFromJson` field set to true, these values will be ignored and the input will be directly taken from xref:#devices[device].
+* `interruptProbability` is the probability with which a queued interrupt is simulated. if it has a value 0 means that interrupt wont be simulated.
+* `preDefinedPositions` is the defined position in the space where beacon will be simulated. By default, if its not provided, the position will be defined randomly.
+* 'simOtherDelay' is deprecated and retained only for compatibility reasons.
+*  'playDelay' allows us to view the simulation slower than simulated, delay is added after each step.
+* `mapElevationInMeters` is the elevations in the area depicted on a map.
+* `floorBiasInMeters` defines the base height of floor number zero, it is subtracted from the `z` coordinate of a node before it's floor number is computed
+* `ceilingHeightInMeters` defines the height of a floor for the purpose of the computation of the floor number (used to determine if a simulated signal has to penetrate one or more ceilings)
+* `ceilingAttenuationDb` defines how the simulated signal strength is attenuated between nodes with different floor numbers (i.e. nodes where the signal would penetrate one or more ceilings)
+* `simulateAdvertisingIndexStep` defines the fraction of nodes considered for advertisement delivery in each simulation step.
+  It is not required to be changed from it's default value of 1 (all nodes) under normal circumstances.
+  The parameter was introduced to make real-time simulations with many nodes feasible (hundreds, depends on the hardware).
+  See the xref:CherrySim.adoc#ImplementationRSSI[simulator documentation] for some more information.
+
+NOTE:  Adding and removing fields in the file wont work out the box, cherrysim code needs to be adjusted accordingly.
+
+=== devices
+This json file includes the configuration of each node i.e. deviceId, platform etc. Below is one of the example device.json file.
+
+[source,json]
+----
+  {
+  	"results": [{
+  			"deviceId": "ZZZZZ",
+  			"platform": "EDGEROUTER",
+  			"properties": {
+  				"x": "0.1",
+  				"y": "0.1",
+  				"zNorm": "0.15",
+  				"onMap": "true",
+  				"cherrySimFeatureSet": "prod_sink_nrf52",
+  				"IOT_NODE_ID": "1",
+  				"IOT_NODE_KEY": "01000000010000000100000001000000",
+  				"IOT_NETWORK_ID": "42416",
+  				"IOT_NETWORK_KEY": "297f414271bb6733f31e0c9ee457dbaf",
+  				"IOT_ORGANIZATION_KEY": "5319a92f686e61154cb081c4043a61fd"
+  			}
+  		},
+  		{
+  			"deviceId": "BBBBC",
+  			"platform": "BLENODE",
+  			"properties": {
+  				"x": "0.3",
+  				"y": "0.1",
+  				"zNorm": "0.2",
+  				"onMap": "true",
+  				"cherrySimFeatureSet": "prod_mesh_nrf52",
+  				"IOT_NODE_ID": "2",
+  				"IOT_NODE_KEY": "02000000020000000200000002000000",
+  				"IOT_NETWORK_ID": "42417",
+  				"IOT_NETWORK_KEY": "884b3d711234a117f3e078361383762a",
+  				"IOT_ORGANIZATION_KEY": "5319a92f686e61154cb081c4043a61fd",
+  			}
+  		}
+  	]
+  }
+----
+Some of the fields that should be noted is that
+
+* `deviceId` field assigns serialId to the node and is recommended to be provided if device json files is to be used. In case, the field is not present a default serialId will be assigned but that is not a recommended practice.
+
+* `platform` field can have `BLENODE`, `ASSET` and `EDGEROUTER` depending on the type of platform one need and this field is mandatory.
+
+* In the properties, the mandatory fields that must be present are the `x`, `y` and `onMap` must be true. While others will get default values if not present i.e 
+** `zNorm`: `0`,  
+** `cherrySimFeatureSet` if not present will get 
+*** `cherrySimFeatureSet`: `prod_mesh_nrf52` in case of `platform`: `BLENODE`.
+*** `cherrySimFeatureSet`: `prod_sink_nrf52` in case of `platform`: `EDGEROUTER`.
+*** `cherrySimFeatureSet`: `prod_asset_nrf52` in case of `platform`: `ASSET`.
+** `IOT_NODE_KEY`, `IOT_NETWORK_KEY`, `IOT_ORGANIZATION_KEY`, `IOT_NODE_ID` and `IOT_NETWORK_ID` will also get default values if not present.
+
+=== sites
+This file configures the site where all nodes would be present. Below is one of the example of site.json file.
+[source,json]
+----
+{
+	"results": [
+		{
+			"lengthInMeter": 100.0,
+			"heightInMeter": 57,
+
+			"pixelPerMeter": 24.57,
+			"elevationInMeter": 60
+		}
+	]
+}
+----
+
+=== replaylog
+
+CherrySim is deterministic and reproducible and therefore it is possible to reply a log file which can be used for diagnostics purposes. To enable this feature the CherrySim that produced the log file should have been ran with `logReplayCommands = true`, this could have been set from xref:#meshGwCommunication[meshGwCommunication] in case cherrysim was configured to extract configuration from xref:#meshGwCommunication[meshGwCommunication] or if xref:#meshGwCommunication[meshGwCommunication] is not used, then it should be set to true in cherrysim implementation. The path of the log file can be set in the configuration field `replayPath` either in xref:#meshGwCommunication[meshGwCommunication] or in the cherrysim implementation. A designated line was created to help you with this, look for the String "@ReplayFeature@" inside `CherrySimRunner.cpp` for more information
+
+NOTE: This feature should be used in CherrySimRunner configuration unless for some known purposes.

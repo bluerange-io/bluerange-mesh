@@ -66,7 +66,7 @@ namespace
 
 TEST(TestRuuviWeatherModule, TestSensorDataIsBroadcast) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    testerConfig.verbose = false;
+    //testerConfig.verbose = false;
 
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     SetupRuuviTagSimConfiguration(simConfig, 4);
@@ -107,7 +107,7 @@ TEST(TestRuuviWeatherModule, TestSensorDataIsBroadcast) {
 
 TEST(TestRuuviWeatherModule, TestActionConfigureAdvertiser) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    testerConfig.verbose = false;
+    //testerConfig.verbose = false;
 
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     SetupRuuviTagSimConfiguration(simConfig, 2);
@@ -139,7 +139,7 @@ TEST(TestRuuviWeatherModule, TestActionConfigureAdvertiser) {
 
 TEST(TestRuuviWeatherModule, TestDataIsAdvertisedUsingTimeslots) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    testerConfig.verbose = false;
+    //testerConfig.verbose = false;
 
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     SetupRuuviTagSimConfiguration(simConfig, 3);

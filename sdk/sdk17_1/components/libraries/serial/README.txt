@@ -1,0 +1,1 @@
+This folder has been taken from nRF5 SDK 16.0.0 98a08e2 to not require porting to a new library as per https://devzone.nordicsemi.com/f/nordic-q-a/66848/where-did-nrf_serial-go-in-sdk-v17

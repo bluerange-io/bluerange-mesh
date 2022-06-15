@@ -28,6 +28,8 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
+
+#include <HelperFunctions.h>
 #include <CherrySimTester.h>
 #include <CherrySimUtils.h>
 #include <Node.h>
@@ -157,24 +159,52 @@ TEST(TestRawData, TestSimpleTransmissionsViaMeshAccess) {
 
     tester.Start();
 
-    //Wait for establishing mesh access connection
-    tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 2");
-    tester.SimulateForGivenTime(300000);
+    RetryOrFail<TimeoutException>(
+        32,
+        [&] {
+            //Wait for establishing mesh access connection
+            tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 2");
+        },
+        [&] {
+            tester.SimulateUntilRegexMessageReceived(20 * 1000, 1, R"("nodeId":1,"type":"ma_conn_state","module":10,"requestHandle":0,"partnerId":[0-9]+,"state":4)");
+        });
 
-    tester.SendTerminalCommand(1, "raw_data_start 2001 0 128 2 12");
-    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":2002,\"type\":\"raw_data_start\",\"module\":0,\"numChunks\":128,\"protocol\":2,\"fmKeyId\":0,\"requestHandle\":12}");
+    const NodeId virtualPartnerIdInitiator = [&] {
+        NodeIndexSetter nodeIndexSetter{1};
+        MeshAccessConnections connections = cherrySimInstance->currentNode->gs.cm.GetMeshAccessConnections(ConnectionDirection::INVALID);
+        if (connections.count != 1)
+        {
+            SIMEXCEPTIONFORCE(IllegalStateException);
+        }
 
-    tester.SendTerminalCommand(1, "raw_data_start_received 2001 0 12");
-    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":2002,\"type\":\"raw_data_start_received\",\"module\":0,\"requestHandle\":12}");
+        return connections.handles[0].GetVirtualPartnerId();
+    }();
 
-    tester.SendTerminalCommand(1, "raw_data_chunk 2001 0 42 abcdeQ== 12");
-    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":2002,\"type\":\"raw_data_chunk\",\"module\":0,\"chunkId\":42,\"payload\":\"abcdeQ==\",\"requestHandle\":12}");
+    const NodeId virtualPartnerIdGoldenDevice = [&] {
+        NodeIndexSetter nodeIndexSetter{0};
+        MeshAccessConnections connections = cherrySimInstance->currentNode->gs.cm.GetMeshAccessConnections(ConnectionDirection::INVALID);
+        if (connections.count != 1)
+        {
+            SIMEXCEPTIONFORCE(IllegalStateException);
+        }
 
-    tester.SendTerminalCommand(1, "raw_data_report 2001 0 -");
-    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":2002,\"type\":\"raw_data_report\",\"module\":0,\"missing\":[],\"requestHandle\":0}");
+        return connections.handles[0].GetVirtualPartnerId();
+    }();
 
-    tester.SendTerminalCommand(1, "raw_data_error 2001 0 1 3 12");
-    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":2002,\"type\":\"raw_data_error\",\"module\":0,\"error\":1,\"destination\":3,\"requestHandle\":12}");
+    tester.SendTerminalCommand(1, "raw_data_start %d 0 128 2 12", virtualPartnerIdGoldenDevice);
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":%d,\"type\":\"raw_data_start\",\"module\":0,\"numChunks\":128,\"protocol\":2,\"fmKeyId\":0,\"requestHandle\":12}", virtualPartnerIdInitiator);
+
+    tester.SendTerminalCommand(1, "raw_data_start_received %d 0 12", virtualPartnerIdGoldenDevice);
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":%d,\"type\":\"raw_data_start_received\",\"module\":0,\"requestHandle\":12}", virtualPartnerIdInitiator);
+
+    tester.SendTerminalCommand(1, "raw_data_chunk %d 0 42 abcdeQ== 12", virtualPartnerIdGoldenDevice);
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":%d,\"type\":\"raw_data_chunk\",\"module\":0,\"chunkId\":42,\"payload\":\"abcdeQ==\",\"requestHandle\":12}", virtualPartnerIdInitiator);
+
+    tester.SendTerminalCommand(1, "raw_data_report %d 0 -", virtualPartnerIdGoldenDevice);
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":%d,\"type\":\"raw_data_report\",\"module\":0,\"missing\":[],\"requestHandle\":0}", virtualPartnerIdInitiator);
+
+    tester.SendTerminalCommand(1, "raw_data_error %d 0 1 3 12", virtualPartnerIdGoldenDevice);
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":%d,\"type\":\"raw_data_error\",\"module\":0,\"error\":1,\"destination\":3,\"requestHandle\":12}", virtualPartnerIdInitiator);
 }
 
 TEST(TestRawData, TestSimpleTransmissionsViaMeshAccessFail) {
@@ -193,24 +223,60 @@ TEST(TestRawData, TestSimpleTransmissionsViaMeshAccessFail) {
 
     tester.Start();
 
-    //Wait for establishing mesh access connection
-    tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 3");
-    tester.SimulateForGivenTime(300000);
+    RetryOrFail<TimeoutException>(
+        32,
+        [&] {
+            //Wait for establishing mesh access connection
+            tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 4");
+        },
+        [&] {
+            tester.SimulateUntilRegexMessageReceived(20 * 1000, 1, R"("nodeId":1,"type":"ma_conn_state","module":10,"requestHandle":0,"partnerId":[0-9]+,"state":4)");
+        });
 
-    tester.SendTerminalCommand(1, "raw_data_start 2001 0 128 2 12");
-    ASSERT_THROW(tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":2002,\"type\":\"raw_data_start\",\"module\":0,\"numChunks\":128,\"protocol\":2,\"fmKeyId\":0,\"requestHandle\":12}"), TimeoutException);
 
-    tester.SendTerminalCommand(1, "raw_data_start_received 2001 0 12");
-    ASSERT_THROW(tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":2002,\"type\":\"raw_data_start_received\",\"module\":0,\"requestHandle\":12}"), TimeoutException);
+    const NodeId virtualPartnerIdInitiator = [&] {
+        NodeIndexSetter nodeIndexSetter{1};
+        MeshAccessConnections connections = cherrySimInstance->currentNode->gs.cm.GetMeshAccessConnections(ConnectionDirection::INVALID);
+        if (connections.count != 1)
+        {
+            SIMEXCEPTIONFORCE(IllegalStateException);
+        }
 
-    tester.SendTerminalCommand(1, "raw_data_chunk 2001 0 42 abcdeQ== 12");
-    ASSERT_THROW(tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":2002,\"type\":\"raw_data_chunk\",\"module\":0,\"chunkId\":42,\"payload\":\"abcdeQ==\",\"requestHandle\":12}"), TimeoutException);
+        return connections.handles[0].GetVirtualPartnerId();
+    }();
 
-    tester.SendTerminalCommand(1, "raw_data_report 2001 0 -");
-    ASSERT_THROW(tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":2002,\"type\":\"raw_data_report\",\"module\":0,\"missing\":[],\"requestHandle\":0}"), TimeoutException);
+    const NodeId virtualPartnerIdGoldenDevice = [&] {
+        NodeIndexSetter nodeIndexSetter{0};
+        MeshAccessConnections connections = cherrySimInstance->currentNode->gs.cm.GetMeshAccessConnections(ConnectionDirection::INVALID);
+        if (connections.count != 1)
+        {
+            SIMEXCEPTIONFORCE(IllegalStateException);
+        }
 
-    tester.SendTerminalCommand(1, "raw_data_error 2001 0 1 3 12");
-    ASSERT_THROW(tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":2002,\"type\":\"raw_data_error\",\"module\":0,\"error\":1,\"destination\":3,\"requestHandle\":12}"), TimeoutException);
+        return connections.handles[0].GetVirtualPartnerId();
+    }();
+    {
+        Exceptions::ExceptionDisabler<TimeoutException>te;
+        tester.SendTerminalCommand(1, "raw_data_start %d 0 128 2 12", virtualPartnerIdGoldenDevice);
+        tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":%d,\"type\":\"raw_data_start\",\"module\":0,\"numChunks\":128,\"protocol\":2,\"fmKeyId\":0,\"requestHandle\":12}", virtualPartnerIdInitiator);
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
+
+        tester.SendTerminalCommand(1, "raw_data_start_received %d 0 12", virtualPartnerIdGoldenDevice);
+        tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":%d,\"type\":\"raw_data_start_received\",\"module\":0,\"requestHandle\":12}", virtualPartnerIdInitiator);
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
+
+        tester.SendTerminalCommand(1, "raw_data_chunk %d 0 42 abcdeQ== 12", virtualPartnerIdGoldenDevice);
+        tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":%d,\"type\":\"raw_data_chunk\",\"module\":0,\"chunkId\":42,\"payload\":\"abcdeQ==\",\"requestHandle\":12}", virtualPartnerIdInitiator);
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
+
+        tester.SendTerminalCommand(1, "raw_data_report %d 0 -", virtualPartnerIdGoldenDevice);
+        tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":%d,\"type\":\"raw_data_report\",\"module\":0,\"missing\":[],\"requestHandle\":0}");
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
+
+        tester.SendTerminalCommand(1, "raw_data_error %d 0 1 3 12", virtualPartnerIdGoldenDevice);
+        tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":%d,\"type\":\"raw_data_error\",\"module\":0,\"error\":1,\"destination\":3,\"requestHandle\":12}");
+        ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
+    }
 }
 
 TEST(TestRawData, TestTransmissionsOfAllPossibleSizes) {

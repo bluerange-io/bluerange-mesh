@@ -149,7 +149,7 @@ BaseConnection* MeshAccessConnection::ConnTypeResolver(BaseConnection* oldConnec
 
 #define ________________________CONNECTION_________________________
 
-u32 MeshAccessConnection::ConnectAsMaster(FruityHal::BleGapAddr const * address, u16 connIntervalMs, u16 connectionTimeoutSec, FmKeyId fmKeyId, u8 const * customKey, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualId)
+u32 MeshAccessConnection::ConnectAsMaster(FruityHal::BleGapAddr const * address, u16 connIntervalMs, u16 connectionTimeoutSec, FmKeyId fmKeyId, u8 const * customKey, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualId, u16 overwriteSlaveLatency, bool maxScanDutyCycle)
 {
     //Only connect when not currently in another connection and when there are free connections
     if (GS->cm.pendingConnection != nullptr) return 0;
@@ -193,7 +193,7 @@ u32 MeshAccessConnection::ConnectAsMaster(FruityHal::BleGapAddr const * address,
     }
 
     //Tell the GAP Layer to connect, it will return if it is trying or if there was an error
-    ErrorType err = GS->gapController.ConnectToPeripheral(*address, MSEC_TO_UNITS(connIntervalMs, CONFIG_UNIT_1_25_MS), connectionTimeoutSec);
+    ErrorType err = GS->gapController.ConnectToPeripheral(*address, MSEC_TO_UNITS(connIntervalMs, CONFIG_UNIT_1_25_MS), connectionTimeoutSec, overwriteSlaveLatency, maxScanDutyCycle);
 
     if (err == ErrorType::SUCCESS)
     {

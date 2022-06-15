@@ -70,7 +70,15 @@ void IoModule::ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableCo
     currentLedMode = configuration.ledMode;
 
     //Start the Module...
+    
+    //Configure vibration motor and buzzer pin output pins
+    vibrationPins.pinsetIdentifier = PinsetIdentifier::VIBRATION;
+    GS->boardconf.getCustomPinset(&vibrationPins);
+    if(vibrationPins.vibrationPin != -1) FruityHal::GpioConfigureOutput(vibrationPins.vibrationPin);
 
+    buzzerPins.pinsetIdentifier = PinsetIdentifier::BUZZER;
+    GS->boardconf.getCustomPinset(&buzzerPins);
+    if(buzzerPins.buzzerPin != -1) FruityHal::GpioConfigureOutput(buzzerPins.buzzerPin);
 }
 
 void IoModule::TimerEventHandler(u16 passedTimeDs)
@@ -83,7 +91,7 @@ void IoModule::TimerEventHandler(u16 passedTimeDs)
         if (remainingIdentificationTimeDs <= passedTimeDs)
         {
             // Make really sure that identification is inactive.
-            remainingIdentificationTimeDs = 0;
+            StopIdentification();
         }
         else
         {
@@ -92,6 +100,24 @@ void IoModule::TimerEventHandler(u16 passedTimeDs)
             GS->ledRed.Toggle();
             GS->ledGreen.Toggle();
             GS->ledBlue.Toggle();
+
+            //Vibrate until next Timer event
+            if(vibrationPins.vibrationPin != -1)
+            {
+                FruityHal::GpioPinToggle(vibrationPins.vibrationPin);
+            }
+
+            //Buzz for a short time
+            if(buzzerPins.buzzerPin != -1)
+            {
+                for(int i=0; i<200; i++)
+                {
+                    FruityHal::GpioPinToggle(buzzerPins.buzzerPin);
+                    FruityHal::DelayUs(500);
+                }
+                FruityHal::GpioPinClear(buzzerPins.buzzerPin);
+            }
+
             // Adjust the remaining identification time.
             remainingIdentificationTimeDs -= passedTimeDs;
         }
@@ -358,7 +384,7 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
                         logt("IOMOD", "identification started by SET_IDENTIFICATION message");
                         // Set the remaining identification time, which
                         // activates identification.
-                        remainingIdentificationTimeDs = 300;
+                        remainingIdentificationTimeDs = defaultIdentificationTimeDs;
                         // Make sure all leds are in the same state.
                         GS->ledRed.Off();
                         GS->ledGreen.Off();
@@ -367,9 +393,9 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
 
                     case IdentificationMode::IDENTIFICATION_STOP:
                         logt("IOMOD", "identification stopped by SET_IDENTIFICATION message");
-                        // Set the remaining identification time to zero,
-                        // which deactivates the identification.
-                        remainingIdentificationTimeDs = 0;
+
+                        StopIdentification();
+
                         break;
 
                     default:
@@ -469,4 +495,18 @@ bool IoModule::IsIdentificationActive() const
     // The remaining time is non-zero if and only if identification is
     // currently active.
     return remainingIdentificationTimeDs > 0;
+}
+
+void IoModule::StopIdentification()
+{
+    //Clear the remaining time
+    remainingIdentificationTimeDs = 0;
+
+    //Stop all kinds of notification
+    GS->ledRed.Off();
+    GS->ledGreen.Off();
+    GS->ledBlue.Off();
+
+    if(vibrationPins.vibrationPin >= 0) FruityHal::GpioPinClear(vibrationPins.vibrationPin);
+    if(buzzerPins.buzzerPin >= 0) FruityHal::GpioPinClear(buzzerPins.buzzerPin);
 }

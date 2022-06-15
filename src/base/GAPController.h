@@ -45,7 +45,7 @@ public:
     void BleConfigureGAP() const;
 
     //Connects to a peripheral with the specified address and calls the corresponding callbacks
-    ErrorType ConnectToPeripheral(const FruityHal::BleGapAddr &address, u16 connectionInterval, u16 timeout) const;
+    ErrorType ConnectToPeripheral(const FruityHal::BleGapAddr &address, u16 connectionInterval, u16 timeout, u16 overwriteSlaveLatency = GAP_CONTROLLER_USE_CONFIGURED_SLAVE_LATENCY, bool maxScanDutyCycle = false) const;
 
     //Encryption
     void StartEncryptingConnection(u16 connectionHandle) const;

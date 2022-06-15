@@ -28,12 +28,14 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
+
+#include <HelperFunctions.h>
 #include <CherrySimTester.h>
 
 TEST(TestIoModule, TestCommands) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-    testerConfig.verbose = false;
+    //testerConfig.verbose = false;
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9 });
     simConfig.SetToPerfectConditions();
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
@@ -53,7 +55,7 @@ TEST(TestIoModule, TestCommands) {
 TEST(TestIoModule, TestIdentifyCommands)
 {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    testerConfig.verbose = false;
+    //testerConfig.verbose = false;
 
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
@@ -87,7 +89,7 @@ TEST(TestIoModule, TestIdentifyCommands)
 TEST(TestIoModule, TestLedOnAssetOverMeshAccessSerialConnectWithOrgaKey)
 {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    // testerConfig.verbose               = true;
+    //testerConfig.verbose               = true;
     SimConfiguration simConfig    = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId          = 0;
     simConfig.defaultNetworkId    = 0;
@@ -115,12 +117,16 @@ TEST(TestIoModule, TestLedOnAssetOverMeshAccessSerialConnectWithOrgaKey)
 
     tester.SimulateUntilMessageReceived(100 * 1000, 1, "clusterSize\":2"); // Wait until the nodes have clustered.
 
-    // Initiate a connection from the sink on the mesh node to the asset tag using the organization key.
-    tester.SendTerminalCommand(
-        1, "action 2 ma serial_connect BBBBD 4 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 33000 20 13");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1,
-                                        R"({"type":"serial_connect_response","module":10,"nodeId":2,)"
-                                        R"("requestHandle":13,"code":0,"partnerId":33000})");
+    RetryOrFail<TimeoutException>(
+        32, [&] {
+            // Initiate a connection from the sink on the mesh node to the asset tag using the organization key.
+            tester.SendTerminalCommand(
+                1, "action 2 ma serial_connect BBBBD 4 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 33000 20 13");
+        }, [&] {
+            tester.SimulateUntilMessageReceived(10 * 1000, 1,
+                                                R"({"type":"serial_connect_response","module":10,"nodeId":2,)"
+                                                R"("requestHandle":13,"code":0,"partnerId":33000})");
+        });
 
     // Send a 'led on' from the sink to the asset tag using it's partner id.
     tester.SendTerminalCommand(1, "action 33000 io led on 55");

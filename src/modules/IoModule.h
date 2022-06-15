@@ -48,6 +48,11 @@ STATIC_ASSERT_SIZE(IoModuleConfiguration, 5);
 class IoModule: public Module
 {
     public:
+
+        //The default time the identification is active before being automatically stopped
+        //Can be configured through the featureset
+        u8 defaultIdentificationTimeDs = SEC_TO_DS(10);
+
         enum class IoModuleTriggerActionMessages : u8{
             SET_PIN_CONFIG = 0,
             GET_PIN_CONFIG = 1,
@@ -109,6 +114,9 @@ class IoModule: public Module
         /// is active if this variable holds a non-zero value.
         u32 remainingIdentificationTimeDs = 0;
 
+        VibrationPins vibrationPins = {};
+        BuzzerPins buzzerPins = {};
+
     public:
 
         DECLARE_CONFIG_AND_PACKED_STRUCT(IoModuleConfiguration);
@@ -134,4 +142,6 @@ class IoModule: public Module
     private:
         /// Returns true if identification is currently active.
         bool IsIdentificationActive() const;
+
+        void StopIdentification();
 };

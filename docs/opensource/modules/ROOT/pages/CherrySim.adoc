@@ -275,9 +275,29 @@ A response of type `sim_term_changed` will inform you if the simulator was able 
 
 You are now connected to the terminal of the specified node and you are free to open more clients to interact with other nodes at the same time. Only a single client can be connected to the terminal of a single node.
 
+
 [#CherrySimTester]
 == CherrySimTester
 CherrySimTester is used to write automated tests against the mesh. Typically a test will first set up a mesh network with a few nodes, possibly with different featuresets. Afterwards, it might wait until they are clustered and then send some terminal commands. Next, the simulation might wait for some message to be received so that the test is considered passing. Have a look at the available tests under `<fruitymesh>/cherrysim/test` to get a better understanding.
+
+Command line arguments of the `cherrySim_tester` executable:
+
+* `SeedStart=...`: lets the tester start _each test_ with this particular PRNG seed set in the `CherrySim` instance
+* `SeedIncrement=...`: the seed will be incremented by this number between each test run
+* `numRuns=...`: all tests will be repeatedly run this number of times (this is used together with `SeedIncrmenet`)
+* `verboseTestsByDefault`: if this flag is given, the `verbose` member of the `CherrySimTesterConfig` will be `true` by default - useful to re-run tests as verbose without needing to recompile
+
+Additionally the usual `gtest` flags can be used:
+
+* `--gtest_filter=...` applies a filter on the tests being run (see https://google.github.io/googletest/advanced.html#running-a-subset-of-the-tests)
+
+=== Terminal ID
+
+Each node is assigned a `terminalId`, defined as the `nodeIndex + 1`.
+The `terminalId` should be used when matching nodes in test code, e.g. to send commands to a node or waiting for particular terminal output.
+
+Because the `nodeId` might be changed due to enrollment, it is particularly important not to search for nodes using the `nodeId` _if it was not explicitly set in the test code_.
+
 
 == SimulateUntilRegexMessageReceived
 
@@ -286,6 +306,28 @@ Prior to the implementation of SimulateUntilRegexMessageReceived we had to simul
 Two very nice online resources to test if a given regex matches with a message are the following: https://regex101.com/ and https://regexr.com/
 
 Noteworthy: Both "{" and "}" (occurring in JSONs) have to be escaped because they are special regex chars. The regex escape character itself has to be escaped as it is placed in a C-String-Literal, thus a "{" becomes "\\{".
+
+== CheckExceptionWasThrown
+
+In some cases, we want to write a test where we want to check if a certain exception has occurred or not even though we have disabled it, e.g for writing a test to check if our code throws an IllegalArgumentException, if we provide a malformed string buffer to our Logger::ParseEncodedStringToBuffer(..) method. Example implementation could be
+
+[source,C++]
+----
+{
+   Exceptions::ExceptionDisabler<IllegalArgumentException> iae;
+   base64 = "Malformed";
+   Logger::ParseEncodedStringToBuffer(base64.c_str(), buffer, sizeof(buffer));
+   ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(IllegalArgumentException)));
+}
+----
+
+In our example above, we first disabled the IllegalArgumentException. The simulator will then start to accumulated the exceptions for one simulation step and we can later check if an
+IllegalArgumentException was thrown in that simulation step by calling CheckExceptionWasThrown(..).
+
+This should be used instead of `ASSERT_THROW` as a simulator exception will leave the firmware code and simulation step exceptionally, thereby leaving the simulation in an undefined state. If we disable the exception, we can however safely continue the simulation.
+
+WARNING: An exceptions is only accumulated once it is disabled and is kept only for a single simulation step. You will not be able to simulate for a given time and then check for all exceptions that have happened in the meantime.
+
 
 == StepCallbacks
 
@@ -335,6 +377,25 @@ The simulator supports the use of special simulator commands. These commands all
 
 == Working Directory
 If CherrySim has trouble loading some files (mostly with the integrated webserver) you can try to specify the working directory in an environment variable `CHERRYSIM_WORKDIR` without a trailing `/` like this: `/path/to/cherrysim`.
+
+
+== Implementation Detail
+
+[#ImplementationRSSI]
+=== RSSI Computation and Reception Probability
+
+The Received Signal Strength Indicator of a simulated signal between nodes is computed from paramters of both nodes.
+Most importantly it considers the distance between the nodes and uses the Path-Loss-Model (see `cherrysim/PathLossModel.h`).
+Signal noise is modeled using zero-mean Gaussian noise.
+
+Computing the probability of receiving an advertisement (important for the simulated BLE connection establishment) must also take into account how much time is spent by the central device on listenting for an advertisement of the peripheral device.
+These parameters are found in form of the relation of the `scan window` and `scan interval`, where the `window` is the (absolute) duration used for listening of the full `interval` in which the BLE channel is kept constant.
+
+In order to balance the effect of the `simulateAdvertisingIndexStep` setting in the xref:JsonFilesIncludedInCherrySim.adoc#meshGwCommunication[configuration file], which causes advertising simulation only being executed every other simulation step, the probability is multiplied by the simulation step.
+Without this multiplication, the reception probability would be invalid when the advertising steps are skipped.
+
+The `floorBiasInMeters`, together with the `ceilingHeightInMeters` and `ceilingAttenuationDb` settings can also potentially affect the RSSI computation, as they add a dampening effect (worsening the reception) based on the number of ceilings the simulated signal passes through.
+
 
 == Legal Disclaimer
 Nordic allowed us in their forums to use their headers in our simulator as long as it

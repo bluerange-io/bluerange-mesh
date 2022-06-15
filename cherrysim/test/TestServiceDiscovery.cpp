@@ -28,6 +28,8 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
+
+#include <HelperFunctions.h>
 #include <CherrySimTester.h>
 #include <CherrySimUtils.h>
 #include <Node.h>
@@ -47,12 +49,16 @@ TEST(TestServiceDiscovery, TestIfMeshAccessConnectionIsSetUp) {
 
     tester.Start();
 
-    //Wait for establishing mesh access connection
-    tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 2");
-    tester.SimulateForGivenTime(3000);
+    RetryOrFail<TimeoutException>(
+        32,
+        [&] {
+            // Wait for establishing mesh access connection
+            tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 2");
+            tester.SimulateForGivenTime(3000);
 
-    //Ask for device info from second node and check if this serial number is received
-    tester.SendTerminalCommand(1, "action 0 status get_device_info");
-    tester.SimulateUntilRegexMessageReceived(1000, 1, "BBBBC");
+            // Ask for device info from second node and check if this serial number is received
+            tester.SendTerminalCommand(1, "action 0 status get_device_info");
+        },
+        [&] { tester.SimulateUntilRegexMessageReceived(1000, 1, "BBBBC"); });
 }
 #endif //GITHUB_RELEASE

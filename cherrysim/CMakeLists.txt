@@ -28,8 +28,9 @@ file(GLOB   CHERRYSIM_SRC   CONFIGURE_DEPENDS   "./*.c"
                                                 "./stdfax.cpp"
                                                 "./SystemTest.cpp"
                                                 "./MersenneTwister.cpp"
+                                                "./PathLossModel.cpp"
                                                 "./StackWatcher.cpp"
-                                                )												
+                                                )
 SET(visual_studio_source_list ${visual_studio_source_list} ${CHERRYSIM_SRC} ${TESTERCPP} ${RUNNERCPP} CACHE INTERNAL "")
 
 list(APPEND LOCAL_INC             ${gtest_include_dir}

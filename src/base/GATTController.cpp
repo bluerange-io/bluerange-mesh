@@ -83,8 +83,7 @@ ErrorType GATTController::BleWriteCharacteristic(u16 connectionHandle, u16 chara
 
 
     //Configure the write parameters with reliable/unreliable, writehandle, etc...
-    FruityHal::BleGattWriteParams writeParameters;
-    CheckedMemset(&writeParameters, 0, sizeof(writeParameters));
+    FruityHal::BleGattWriteParams writeParameters = {};
     writeParameters.handle = characteristicHandle;
     writeParameters.offset = 0;
     writeParameters.len = dataLength;
@@ -114,8 +113,7 @@ ErrorType GATTController::BleSendNotification(u16 connectionHandle, u16 characte
     logt("CONN_DATA", "%s", stringBuffer);
 
 
-    FruityHal::BleGattWriteParams notificationParams;
-    CheckedMemset(&notificationParams, 0, sizeof(notificationParams));
+    FruityHal::BleGattWriteParams notificationParams = {};
     notificationParams.handle = characteristicHandle;
     notificationParams.offset = 0;
     notificationParams.p_data = data;

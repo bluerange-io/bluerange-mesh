@@ -37,6 +37,8 @@
 #include <limits>
 #include "GlobalState.h"
 #include <FruityHal.h>
+#include <sha256_external.h>
+#include <uECC.h>
 
 u32 Utility::GetSettingsPageBaseAddress()
 {
@@ -64,8 +66,7 @@ constexpr u32 STACK_WATCHER_MAGIC_NUMBER = 0xED505505; //Mnemonic: Ed screams SO
 constexpr u32 UNUSED_STACK_INDICATOR = 0xA9B8C7D6;
 SizedData Utility::GetStackWatcherAddress()
 {
-    SizedData retVal;
-    CheckedMemset(&retVal, 0, sizeof(retVal));
+    SizedData retVal = {};
     constexpr u32 STACK_WATCHER_LENGTH = 32;
     retVal.length = STACK_WATCHER_LENGTH * sizeof(u32);
     retVal.data = (u8*)(((u32*)((u32)__FruityStackLimit - ((u32)__FruityStackLimit % alignof(u32)))) - STACK_WATCHER_LENGTH);
@@ -81,9 +82,15 @@ void Utility::FillStackWatcher()
         addr[i] = STACK_WATCHER_MAGIC_NUMBER;
     }
 }
+// NOTE: This function *must* be simple enough to be *inlined* via LTO, as it is used in the HardFaultErrorHandler.
 bool Utility::IsStackOverflowDetected()
 {
-    SizedData stackWatcherStart = GetStackWatcherAddress();
+    SizedData stackWatcherStart = {};
+
+    constexpr u32 STACK_WATCHER_LENGTH = 32;
+    stackWatcherStart.length = STACK_WATCHER_LENGTH * sizeof(u32);
+    stackWatcherStart.data = (u8*)(((u32*)((u32)__FruityStackLimit - ((u32)__FruityStackLimit % alignof(u32)))) - STACK_WATCHER_LENGTH);
+
     volatile u32 const * const addr = (u32*)stackWatcherStart.data; // volatile because the stack guard is no valid C++ data object
                                                                     // see: https://en.cppreference.com/w/cpp/language/object
     for (u32 i = 0; i < stackWatcherStart.length.GetRaw() / sizeof(u32); i++)
@@ -278,6 +285,36 @@ u32 Utility::MessageLengthToAmountOfSplitPackets(const u32 messageLength, const 
     return retVal;
 }
 
+ErrorType Utility::ECDSASecp256r1Sign(const u8 * privateKey, const u8 * hash, u16 hashLen, u8 * signature)
+{
+    int ret = uECC_sign(privateKey, hash, hashLen, signature, uECC_secp256r1());
+    if (ret == 0)
+    {
+        return ErrorType::INTERNAL;
+    }
+
+    return ErrorType::SUCCESS;    
+}
+
+ErrorType Utility::ECDSASecp256r1Verify(const u8 * publicKey, const u8 * hash, u16 hashLen, const u8 * signature)
+{
+    int ret = uECC_verify(publicKey, hash, hashLen, signature, uECC_secp256r1());
+    if (ret == 0)
+    {
+        return ErrorType::INTERNAL;
+    }
+
+    return ErrorType::SUCCESS;  
+}
+
+void Utility::SHA256HashCalculate(const u8 * data, u32 len, u8 * hash)
+{
+    SHA256_CTX context;
+    sha256_external_init(&context);
+    sha256_external_update(&context, data, len);
+    sha256_external_final(&context, hash);
+}
+
 u32 Utility::GetIndexForSerial(const char* serialNumber, bool *didError){
     u32 index = 0;
     u32 serialLength = strlen(serialNumber);
@@ -299,7 +336,7 @@ u32 Utility::GetIndexForSerial(const char* serialNumber, bool *didError){
     return index;
 }
 
-void Utility::GenerateBeaconSerialForIndex(u32 index, char* serialBuffer)
+u32 Utility::GenerateBeaconSerialForIndex(u32 index, char* serialBuffer)
 {
     CheckedMemset(serialBuffer, 0x00, NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH);
     u32 numChars = index < SHORT_SERIAL_NUMBER_INDEX_MAX ? 5 : 7; //Small serial numbers use 5 characters, the extended range uses 7 characters
@@ -308,6 +345,7 @@ void Utility::GenerateBeaconSerialForIndex(u32 index, char* serialBuffer)
         serialBuffer[numChars - i - 1] = serialAlphabet[rest];
         index /= strlen(serialAlphabet);
     }
+    return numChars;
 }
 
 u16 Utility::ByteToAsciiHex(u8 b) {
@@ -351,14 +389,18 @@ u32 Utility::ByteFromAsciiHex(const char* asciiHex, u8 numChars){
 
 void Utility::LogRebootJson(bool rebootReasonCleared)
 {
+    //We are logging a message of type init first to make sure the reboot message is properly
+    //picked up by a gateway even if there is garbage on the line and the begin cannot be determined
     if (rebootReasonCleared)
     {
         // We already cleared ramRetainStruct and we should use copy of that struct.
-        logjson("MAIN", "{\"type\":\"reboot\",\"reason\":%u,\"code1\":%u,\"stack\":%u,\"version\":%u,\"blversion\":%u}" SEP, (u32)GS->ramRetainStructPreviousBootPtr->rebootReason, GS->ramRetainStructPreviousBootPtr->code1, GS->ramRetainStructPreviousBootPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion());
+        logjson("MAIN", R"({"type":"init"})" SEP);
+        logjson("MAIN", R"({"type":"reboot","reason":%u,"code1":%u,"stack":%u,"version":%u,"blversion":%u})" SEP, (u32)GS->ramRetainStructPreviousBootPtr->rebootReason, GS->ramRetainStructPreviousBootPtr->code1, GS->ramRetainStructPreviousBootPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion());
     }
     else
     {
-        logjson("MAIN", "{\"type\":\"reboot\",\"reason\":%u,\"code1\":%u,\"stack\":%u,\"version\":%u,\"blversion\":%u}" SEP, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1, GS->ramRetainStructPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion());
+        logjson("MAIN", R"({"type":"init"})" SEP);
+        logjson("MAIN", R"({"type":"reboot","reason":%u,"code1":%u,"stack":%u,"version":%u,"blversion":%u})" SEP, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1, GS->ramRetainStructPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion());
     }
 }
 

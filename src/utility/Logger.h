@@ -154,8 +154,8 @@ public:
     void BlePrettyPrintAdvData(SizedData advData) const;
     static void ConvertBufferToBase64String(const u8* srcBuffer, u32 srcLength,           char* dstBuffer, u16 bufferLength);
     static void ConvertBufferToBase64String(const u8* srcBuffer, MessageLength srcLength, char* dstBuffer, u16 bufferLength);
-    static void ConvertBufferToHexString(const u8* srcBuffer, u32 srcLength,           char* dstBuffer, u16 bufferLength);
-    static void ConvertBufferToHexString(const u8* srcBuffer, MessageLength srcLength, char* dstBuffer, u16 bufferLength);
+    static u32 ConvertBufferToHexString(const u8* srcBuffer, u32 srcLength,           char* dstBuffer, u16 bufferLength);
+    static u32 ConvertBufferToHexString(const u8* srcBuffer, MessageLength srcLength, char* dstBuffer, u16 bufferLength);
 public:
     static u32 ParseEncodedStringToBuffer(const char* encodedString, u8* dstBuffer, u16 dstBufferSize, bool *didError = nullptr);
 private:

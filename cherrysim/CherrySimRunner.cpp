@@ -30,13 +30,17 @@
 #include "CherrySimRunner.h"
 #include "CherrySim.h"
 #include "CherrySimUtils.h"
+
 #include <string>
 #include <iostream>
 #include <fstream>
 #include <chrono>
 #include <cmath>
 #include <regex>
+#include <cinttypes>
+
 #include "json.hpp"
+
 #ifdef _MSC_VER
 #include <filesystem>
 #endif
@@ -77,6 +81,27 @@ int main(int argc, char** argv) {
             i >> configJson;
             simConfig = configJson;
             printf("Launching with MeshGwCommunication!" EOL);
+        }
+        else if (s == "--config")
+        {
+            std::string configPath = argv[i+1];
+            std::ifstream inputFile(configPath);
+            if (!inputFile)
+            {
+                printf("Could not properly open %s", configPath.c_str());
+                SIMEXCEPTION(FileException);
+            }
+
+            simConfig = CherrySimRunner::CreateDefaultRunConfiguration();
+
+            nlohmann::json configJson;
+            inputFile >> configJson;
+
+            from_json(configJson, simConfig);
+
+            printf("Launching with %s!" EOL, configPath.c_str());
+
+            i++;
         }
         else if (s == "shortLived")
         {
@@ -163,10 +188,38 @@ void CherrySimRunner::TerminalReaderMain() {
         }
 
         sim->receivedDataFromMeshGw = true;
-        sim->FindUniqueNodeById(MESH_GW_NODE)->gs.terminal.PutIntoTerminalCommandQueue(input, false);
+        NodeEntry* meshGwNode = GetSinkNodeForTerminalMainReader();
+        if (meshGwNode == nullptr)
+        {
+            SIMEXCEPTIONFORCE(NoSinkConfiguredForMeshGatewayConfigurationException);
+        }
+        meshGwNode->gs.terminal.PutIntoTerminalCommandQueue(input, false);
     }
 }
 
+NodeEntry* CherrySimRunner::GetSinkNodeForTerminalMainReader()
+{
+    if (sim->simConfig.terminalId > 0)
+    {
+        return sim->FindUniqueNodeByTerminalId(sim->simConfig.terminalId);
+    }
+    else
+    {
+        // If simConfig.terminalId <= 0, we return the first actual sink node 
+        for (u32 index = 0; index < sim->GetTotalNodes(); index++)
+        {
+            auto currentNodeEntry = &(sim->nodes[index]);
+            if (currentNodeEntry->featuresetPointers != nullptr)
+            {
+                if (currentNodeEntry->featuresetPointers->getDeviceTypePtr() == DeviceType::SINK)
+                {
+                    return currentNodeEntry;
+                }
+            }
+        }
+        return nullptr;
+    }
+}
 CherrySimRunnerConfig CherrySimRunner::CreateDefaultTesterConfiguration()
 {
     CherrySimRunnerConfig config;
@@ -204,9 +257,6 @@ SimConfiguration CherrySimRunner::CreateDefaultRunConfiguration()
     simConfig.importFromJson = false; //Set to true in order to not generate nodes
     simConfig.siteJsonPath = "testsite.json";
     simConfig.devicesJsonPath = "testdevices.json";
-
-
-    simConfig.defaultBleStackType = BleStackType::NRF_SD_132_ANY;
 
     simConfig.defaultNetworkId = 10;
 
@@ -280,6 +330,8 @@ bool CherrySimRunner::Simulate()
 {
     //Simulate all nodes
     while (running) {
+        const auto frameStartTimePoint = std::chrono::steady_clock::now();
+
         if (sim->simConfig.playDelay > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(sim->simConfig.playDelay));
         }
@@ -330,6 +382,31 @@ bool CherrySimRunner::Simulate()
         }
         catch (CherrySimQuitException& e) {
             return false;
+        }
+
+        const auto frameEndTimePoint = std::chrono::steady_clock::now();
+
+        // If realTime is enabled and the tick duration is positive, verify that the real time a single time
+        // step took to compute is not vastly different from the simulated step.
+        if (simConfig.realTime && simConfig.simTickDurationMs > 0)
+        {
+            // Rate-limit the check to only every-so-often such that the output isn't flooded with messages
+            if ((frameEndTimePoint - lastRealTimeViolation) > std::chrono::seconds{10})
+            {
+                using fmilliseconds = std::chrono::duration<float, std::chrono::milliseconds::period>;
+                using std::chrono::duration_cast;
+
+                const auto frameDuration = duration_cast<fmilliseconds>(frameEndTimePoint - frameStartTimePoint);
+                const auto frameRatio = frameDuration.count() / static_cast<float>(simConfig.simTickDurationMs);
+
+                // Vastly different is 50% off in each direction (i.e. too short or too long)
+                if (std::abs(frameRatio - 1.0f) > 0.5f)
+                {
+                    std::fprintf(
+                        stderr, "## WARNING: real frame time (%.3f ms) differs significantly from simulated frame time (%" PRIu32 " ms)" EOL, frameDuration.count(), simConfig.simTickDurationMs);
+                    lastRealTimeViolation = std::chrono::steady_clock::now();
+                }
+            }
         }
     }
     return true;

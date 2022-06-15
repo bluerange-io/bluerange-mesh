@@ -1,0 +1,51 @@
+ifndef::imagesdir[:imagesdir: ../assets/images]
+= The Timeslot API
+
+The nRF52 SDK and SoftDevice allows an application to have full control over the `RADIO` peripheral using the _Timeslot API_.
+Usage of this API in FruityMesh is handled via the `Timeslot` class, declared in `Timeslot.hpp` and the HAL.
+
+In order to be used, the featureset must define `#define ACTIVATE_TIMESLOT 1` which makes the API available.
+
+*Important:* Any code which has direct `RADIO` access will run with the highest interrupt priority (0) and can therefore *not* call _any_ SoftDevice functions, as these are implemented using software interrupts.
+Additionally, the code running in this context must not run for longer than scheduled with the SoftDevice.
+If it does, the device *will* Hardfault.
+This in particular makes it hard to work with the Timeslot API, as it severely limits the programmers ability to debug.
+
+During the `RADIO` callback, the application has also full control over the high-resolution timer, which should be used to get a notification right before the end of the scheduled timeslot in order to request an extension (if necessary).
+
+If the Timeslot API is activated, the `NrfHalMemory` stores two additional values, the callback return parameter and the radio request.
+
+Opening and closing a timeslot session, as well as registering callbacks are implemented in the `Timeslot` class (singleton) and the configuration of the `RADIO` peripheral and configuration of the request data structure are available in the `FruityHal::Radio...(...)` functions.
+An example implementation which utilizes this API is available in the `RuuviWeatherModule`.
+
+== Nordic Documentation
+
+For more information on the usage of the Timeslot API, have a look at the following documents:
+
+* The SoftDevice documentation for the S132 and S140 SoftDevice document the `sd_radio_...` functions in the _SoC Library API_ section.
+  These functions control the Timeslot API and register the handlers for the `RADIO` events.
+** `sd_radio_notification_cfg_set`
+** `sd_radio_request`
+** `sd_radio_session_close`
+** `sd_radio_session_open`
+
+* A fully fledged example for the nRF51 chips, for which the Timeslot API is also available can be found under
+  https://github.com/NordicPlayground/nRF51-multi-role-conn-observer-advertiser
+** https://github.com/NordicPlayground/nRF51-multi-role-conn-observer-advertiser/blob/master/btle_hci/advertiser/nrf_advertiser.c
+** https://github.com/NordicPlayground/nRF51-multi-role-conn-observer-advertiser/blob/master/btle_hci/advertiser/ts_controller.c
+** https://github.com/NordicPlayground/nRF51-multi-role-conn-observer-advertiser/blob/master/btle_hci/advertiser/ts_peripheral.c
+
+== Debugging Code in the Radio Signal Handler
+
+The time allocated for execution of the code in the `RADIO` signal handler (i.e. running with the highest interrupt level) is limited by whatever was requested and subsequently granted by the SoftDevice.
+
+It is *not* possible to print debugging output except by directly using the `SEGGER` API, as it only copies data to a memory buffer.
+Keep in mind that this is also not necessarily safe, as the `RADIO` signal handler can interrupt almost any other code, including other code currently printing using the `SEGGER` API.
+This is also hampered by the time-constraints, as string formatting is generally not particularly fast and one can easily trigger hardfaults.
+
+One way to achieve this anyhow, is to copy values to some memory buffer and format and print them in a `TimerEventHandler`.
+It is the programmers responsibility to make sure that the `RADIO` signal handler - which may interrupt the `TimerEventHandler` - does not write to the buffer while it is read.
+Use atomic variables to guard against this - e.g. by setting a flag in the `TimerEventHandler` which signals that the buffer is currently being read and the `RADIO` signal handler should not write to it.
+
+Another way to debug is to set or unset or toggle a GPIO pin, which might drive a LED or can be visualized with a Logic Analyzer.
+This is usually pretty fast and will generally not significantly increase the wasted time in the `RADIO` signal handler, but only very limited information can be transmitted.

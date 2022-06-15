@@ -71,6 +71,7 @@ struct FeaturesetPointers
     Chipset(*getChipsetPtr)(void) = nullptr;
     u32(*getWatchdogTimeout)(void) = nullptr;
     u32(*getWatchdogTimeoutSafeBoot)(void) = nullptr;
+    LicenseState(*getLicenseState)(void) = nullptr;
     u32 featuresetOrder = 0;
     const char* featuresetName = nullptr;
 };
@@ -80,10 +81,10 @@ class SocketTerm;
 class CherrySim
 {
     friend class NodeIndexSetter;
-private:
+
     std::vector<char> nodeEntryBuffer; // As std::vector calls the copy constructor of it's type and NodeEntry has no copy constructor we have to provide the memory like this.
+
 public:
-    constexpr static float N = 2.5; //Our calibration value for distance calculation
     int globalBreakCounter = 0; //Can be used to increment globally everywhere in sim and break on a specific count
     bool shouldRestartSim = false;
     bool blockConnections = false; //Can be set to true to stop packets from being sent
@@ -93,6 +94,13 @@ public:
     NodeEntry* currentNode = nullptr; //A pointer to the current node under simulation
     NodeEntry* nodes = nullptr; //A pointer that points to the memory that holds the complete state of all nodes
     std::string logAccumulator;
+
+    /// The propagation constant or path loss exponent is a dimensionless quantity
+    float propagationConstant = 2.0;
+    /// Mean of the RSSI noise
+    float rssiNoiseMean = 0.0f;
+    /// Standard deviation of the RSSI noise, over 99% of generated values lie within 3-times this value.
+    float rssiNoiseStddev = 5.0f;
 
     bool renderLess = false;
 
@@ -118,9 +126,17 @@ public:
     static std::string ExtractAndCleanReplayToken(const std::string& fileContents, const std::string& startToken, const std::string& endToken);
     static SimConfiguration ExtractSimConfigurationFromReplayRecord(const std::string &fileContents);
     static void CheckVersionFromReplayRecord(const std::string &fileContents);
+    // Exception can be checked for occurrence. Keep in mind that exception are stored:
+    // * only for one simulation step and cleared at the start of the next simulation step
+    // * only stored when the exception type is disabled
+    bool CheckExceptionWasThrown(std::type_index index);
+    //Method called to store exceptions when exception type
+    //is disabled
+    void LogThrownException(std::type_index index);
 
 private:
-
+    //set to store exception when exception type is disabled
+    std::set<std::type_index>loggedExceptions;
 TESTER_PUBLIC:
     void SetNode(u32 i); //Should not be called publicly. Use the NodeIndexSetter instead.
     u32 totalNodes = 0;
@@ -163,6 +179,8 @@ TESTER_PUBLIC:
     void PrepareSimulatedFeatureSets();
     void QueueInterrupts();
 
+    i8 FindFloorNumber(float zNorm);
+
 #ifdef GITHUB_RELEASE
     //Used to redirect featuresets on github releases
     bool IsRedirectedFeatureset(const std::string& featureset);
@@ -193,6 +211,10 @@ public:
     u32 GetTotalNodes(bool countAgain = false) const; // returns number of all nodes i.e our nodes, vendor nodes and asset nodes
     u32 GetAssetNodes(bool countAgain = false) const; //iterates over all the nodes and calculate the node with device type Asset
     void InitNode(u32 i); // Creates a node with default settings (like manufacturing the hardware)
+    void WriteSerialNumberToUicr(const char * serialNumber, u32 i); // Updates serial number and serial index in flash
+    void WriteSerialNumberToUicr(u32 serialNumberIndex, u32 i); // Updates serial number and serial index in flash
+    void EraseLicense(u32 i); // Removes license from flash
+    void GenerateLicense(u32 i); // Generates license using Serial stored in UICR
     void FlashNode(u32 i); // Flashes a node with uicr and settings
     void BootCurrentNode(); // Starts the node. ShutdownCurrentNode() must be called to clean up
     void ResetCurrentNode(RebootReason rebootReason, bool throwException = true, bool powerLoss = false); //Resets a node and boots it again (Only call this after node was booted already)
@@ -225,13 +247,16 @@ public:
     void PositionNodesRandomly();
     void LoadPresetNodePositions();
 
+    //Bootloader Simulation
+    void SimulateFruityLoader();
+
     //Flash simulation
     void SimulateFlashCommit();
     void SimCommitFlashOperations();
     void SimCommitSomeFlashOperations(const uint8_t* failData, uint16_t numMaxEvents);
 
     //GAP Simulation
-    void SimulateBroadcast();
+    void SimulateAdvertising();
     static ble_gap_addr_t Convert(const FruityHal::BleGapAddr* address);
     static FruityHal::BleGapAddr Convert(const ble_gap_addr_t* p_addr);
     void ConnectMasterToSlave(NodeEntry * master, NodeEntry* slave);
@@ -291,13 +316,16 @@ public:
 
     void ChooseSimulatorTerminal();
 
-    float RssiToDistance(int rssi, int calibratedRssi);
     float GetDistanceBetween(const NodeEntry * nodeA, const NodeEntry * nodeB);
     float GetReceptionRssi(const NodeEntry* sender, const NodeEntry* receiver);
-    float GetReceptionRssi(const NodeEntry* sender, const NodeEntry* receiver, int8_t senderDbmTx, int8_t senderCalibratedTx);
     float GetReceptionRssiNoNoise(const NodeEntry* sender, const NodeEntry* receiver);
-    float GetReceptionRssiNoNoise(const NodeEntry* sender, const NodeEntry* receiver, int8_t senderDbmTx, int8_t senderCalibratedTx);
-    uint32_t CalculateReceptionProbability(const NodeEntry* sendingNode, const NodeEntry* receivingNode);
+
+private:
+    uint32_t CalculateReceptionProbabilityFromRssi(float rssi);
+
+public:
+    uint32_t CalculateReceptionProbabilityForConnection(const NodeEntry* sendingNode, const NodeEntry* receivingNode);
+    uint32_t CalculateReceptionProbabilityForAdvertisement(const NodeEntry* sendingNode, const NodeEntry* receivingNode);
 
     bool ShouldSimIvTrigger(u32 ivMs);
     bool ShouldSimConnectionIvTrigger(u32 ivMs, SoftdeviceConnection* connection);

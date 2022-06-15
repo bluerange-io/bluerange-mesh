@@ -49,10 +49,13 @@ AppUartModule::AppUartModule()
     // sizeof configuration must be a multiple of 4 bytes
     vendorConfigurationPointer = &configuration;
     configurationLength = sizeof(AppUartModuleConfiguration);
-    // init member
-    for (u8 ii = 0; ii < PARTNER_NUM; ++ii) {
+
+    // Initialize the array of partners to all-invalid
+    for (u8 ii = 0; ii < APP_UART_MAX_NUM_PARTNERS; ++ii)
+    {
         partners[ii].partnerId = NODE_ID_INVALID;
     }
+
     // Set defaults
     ResetToDefaultConfiguration();
 }
@@ -85,8 +88,10 @@ void AppUartModule::ConfigurationLoadedHandler(u8* migratableConfig, u16 migrata
 
 void AppUartModule::TimerEventHandler(u16 passedTimeDs)
 {
-    if (SHOULD_IV_TRIGGER(GS->appTimerDs, passedTimeDs, LOG_SENT_INTERVAL_DS)) {
-        if (HasPartner()) {
+    if (SHOULD_IV_TRIGGER(GS->appTimerDs, passedTimeDs, APP_UART_LOG_SEND_INTERVAL_DS))
+    {
+        if (HasPartner())
+        {
             DoSendAppLogQueue();
         }
     }
@@ -94,22 +99,30 @@ void AppUartModule::TimerEventHandler(u16 passedTimeDs)
 
 void AppUartModule::GapDisconnectedEventHandler(const FruityHal::GapDisconnectedEvent& disconnectedEvent)
 {
-    removePartner(disconnectedEvent.GetConnectionHandle());
+    RemovePartner(disconnectedEvent.GetConnectionHandle());
 }
 
 #ifdef TERMINAL_ENABLED
 TerminalCommandHandlerReturnType AppUartModule::TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize)
 {
-    if (commandArgsSize >= 3 && TERMARGS(2, moduleName)) {
-        if (TERMARGS(0, "action")) {
+    if (commandArgsSize >= 3 && TERMARGS(2, moduleName))
+    {
+        if (TERMARGS(0, "action"))
+        {
             if (!TERMARGS(2, moduleName))
+            {
                 return TerminalCommandHandlerReturnType::UNKNOWN;
-            if (TERMARGS(3, "log")) {
-                if (commandArgsSize <= 4) {
+            }
+
+            if (TERMARGS(3, "log"))
+            {
+                if (commandArgsSize <= 4)
+                {
                     logt("APPUART", "sample log from terminal command");
                     return TerminalCommandHandlerReturnType::SUCCESS;
                 }
-                if (commandArgsSize == 5) {
+                if (commandArgsSize == 5)
+                {
                     logt("APPUART", commandArgs[4]);
                     return TerminalCommandHandlerReturnType::SUCCESS;
                 }
@@ -117,6 +130,7 @@ TerminalCommandHandlerReturnType AppUartModule::TerminalCommandHandler(const cha
             }
         }
     }
+
     // Must be called to allow the module to get and set the config
     return Module::TerminalCommandHandler(commandArgs, commandArgsSize);
 }
@@ -129,25 +143,32 @@ void AppUartModule::MeshMessageReceivedHandler(
     Module::MeshMessageReceivedHandler(connection, sendData, packetHeader);
 
     if (packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION
-        && sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE_VENDOR) {
-        ConnPacketModuleVendor const* packet = (ConnPacketModuleVendor const*)packetHeader;
+        && sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE_VENDOR)
+    {
+        const auto* packet = (ConnPacketModuleVendor const*)packetHeader;
 
         // Check if our module is meant and we should trigger an action
         if (packet->moduleId != vendorModuleId)
+        {
             return;
+        }
 
-        if (packet->actionType == AppUartModuleTriggerActionMessages::HANDSHAKE) {
-            const AppUartModuleHandshakeMessage* data = (const AppUartModuleHandshakeMessage*)packet->data;
-            pushPartner(data->partnerId);
+        if (packet->actionType == AppUartModuleTriggerActionMessages::HANDSHAKE)
+        {
+            const auto* data = (const AppUartModuleHandshakeMessage*)packet->data;
+            PushPartner(data->partnerId);
             SendModuleActionMessage(MessageType::MODULE_ACTION_RESPONSE, packet->header.sender,
                 AppUartModuleActionResponseMessages::HANDSHAKE_DONE, 0, nullptr, 0, false);
             logt("APPUART", "HANDSHAKE DONE");
         }
 
-        if (packet->actionType == AppUartModuleTriggerActionMessages::TERMINAL_COMMAND) {
-            const AppUartModuleTerminalCommandMessage* data = (const AppUartModuleTerminalCommandMessage*)packet->data;
+        if (packet->actionType == AppUartModuleTriggerActionMessages::TERMINAL_COMMAND)
+        {
+            const auto* data = (const AppUartModuleTerminalCommandMessage*)packet->data;
+
             // invalid buffer state
-            if (readBufferOffset == 0 && data->splitCount > 0) {
+            if (readBufferOffset == 0 && data->splitCount > 0)
+            {
                 readBufferOffset = 0;
                 AppUartModuleTerminalResponseMessage message = { .commandSuccess = 0 };
                 SendModuleActionMessage(MessageType::MODULE_ACTION_RESPONSE, packet->header.sender,
@@ -155,8 +176,10 @@ void AppUartModule::MeshMessageReceivedHandler(
                     SIZEOF_APP_UART_MODULE_TERMINAL_RESPONSE_MESSAGE, false);
                 return;
             }
+
             // If there is not enough buffer, clear it
-            if (TERMINAL_READ_BUFFER_LENGTH - readBufferOffset - 1 < data->partLen) {
+            if (TERMINAL_READ_BUFFER_LENGTH - readBufferOffset - 1 < data->partLen)
+            {
                 logt("APPUART", "Too large command.");
                 readBufferOffset = 0;
                 AppUartModuleTerminalResponseMessage message = { .commandSuccess = 0 };
@@ -165,7 +188,9 @@ void AppUartModule::MeshMessageReceivedHandler(
                     SIZEOF_APP_UART_MODULE_TERMINAL_RESPONSE_MESSAGE, false);
                 return;
             }
-            if ((readBufferOffset == 0 && data->splitCount == 0) || (readBufferOffset > 0 && data->splitCount > 0)) {
+
+            if ((readBufferOffset == 0 && data->splitCount == 0) || (readBufferOffset > 0 && data->splitCount > 0))
+            {
                 CheckedMemcpy(&(readBuffer[readBufferOffset]), data->data, data->partLen);
                 readBufferOffset += data->partLen;
                 if (data->splitHeader != MessageType::SPLIT_WRITE_CMD_END)
@@ -198,29 +223,51 @@ MeshAccessConnectionHandle AppUartModule::GetMeshAccessConnectionHandleByPartner
     return maHandle;
 }
 
-void AppUartModule::pushPartner(const NodeId nodeId)
+void AppUartModule::PushPartner(const NodeId nodeId)
 {
     MeshAccessConnectionHandle connHandle = GetMeshAccessConnectionHandleByPartnerId(nodeId);
+
     if (!connHandle.IsValid())
+    {
         return;
-    for (u8 ii = 0; ii < PARTNER_NUM; ++ii) {
+    }
+
+    AppUartPartner *selectedPartner = nullptr;
+
+    for (u8 ii = 0; ii < APP_UART_MAX_NUM_PARTNERS; ++ii)
+    {
         const NodeId partnerId = partners[ii].partnerId;
-        if (partnerId == NODE_ID_INVALID) {
-            partners[ii].partnerId = nodeId;
-            partners[ii].connectionHandle = connHandle.GetConnectionHandle();
+
+        // If we still need a slot and found an empty one, save it for later. We need to continue
+        // searching all slots however, since the partners nodeId might already be known
+        if (selectedPartner == nullptr && partnerId == NODE_ID_INVALID)
+        {
+            selectedPartner = &partners[ii];
+        }
+
+        // If the partner is already known, skip any modification and just return
+        if (partnerId == nodeId)
+        {
             return;
         }
-        // duplicate
-        if (partnerId == nodeId)
-            return;
+    }
+
+    // If we selected a slot, assign the specified nodeId and connection
+    if (selectedPartner != nullptr)
+    {
+        selectedPartner->partnerId = nodeId;
+        selectedPartner->connectionHandle = connHandle.GetConnectionHandle();
     }
 }
 
-void AppUartModule::removePartner(const u16 connectionHandle)
+void AppUartModule::RemovePartner(const u16 connectionHandle)
 {
-    for (u8 ii = 0; ii < PARTNER_NUM; ++ii) {
+    for (u8 ii = 0; ii < APP_UART_MAX_NUM_PARTNERS; ++ii)
+    {
         if (partners[ii].partnerId == NODE_ID_INVALID || partners[ii].connectionHandle != connectionHandle)
+        {
             continue;
+        }
 
         partners[ii].partnerId = NODE_ID_INVALID;
     }
@@ -229,8 +276,10 @@ void AppUartModule::removePartner(const u16 connectionHandle)
 bool AppUartModule::HasPartner()
 {
     bool isConnect = false;
-    for (u8 ii = 0; ii < PARTNER_NUM; ++ii) {
-        if (partners[ii].partnerId != NODE_ID_INVALID) {
+    for (u8 ii = 0; ii < APP_UART_MAX_NUM_PARTNERS; ++ii)
+    {
+        if (partners[ii].partnerId != NODE_ID_INVALID)
+        {
             isConnect = true;
             break;
         }
@@ -241,19 +290,26 @@ bool AppUartModule::HasPartner()
 bool AppUartModule::CanQueueLog()
 {
     // Queuing is not possible while module is sending logs
-    if (GetIsSendingLog()) {
+    if (GetIsSendingLog())
+    {
         return false;
     }
+
     // Queuing is not possible while the partner's queue waiting to be sent is not empty.
-    for (u8 ii = 0; ii < PARTNER_NUM; ++ii) {
+    for (u8 ii = 0; ii < APP_UART_MAX_NUM_PARTNERS; ++ii) {
         const NodeId partnerId = partners[ii].partnerId;
         if (partnerId == NODE_ID_INVALID)
+        {
             continue;
+        }
 
         const MeshAccessConnectionHandle connHandle = GetMeshAccessConnectionHandleByPartnerId(partnerId);
         if (!connHandle.IsValid())
+        {
             continue;
-        if (connHandle.GetConnection()->GetPendingPackets() > 0) {
+        }
+        if (connHandle.GetConnection()->GetPendingPackets() > 0)
+        {
             return false;
         }
     }
@@ -263,20 +319,26 @@ bool AppUartModule::CanQueueLog()
 ErrorTypeUnchecked AppUartModule::SendAppLogQueue()
 {
     if (logQueue._numElements < 2 || !HasPartner())
+    {
         return ErrorTypeUnchecked::INTERNAL;
+    }
 
     AppUartLogRemain* logRemain = reinterpret_cast<AppUartLogRemain*>(logQueue.PeekNext().data);
     char* log = reinterpret_cast<char*>(logQueue.PeekNext(1).data);
     const u16 logLen = logRemain->logLen;
+
     AppUartModuleTerminalLogMessage message;
-    if (logLen <= DATA_MAX_LEN) {
+    if (logLen <= DATA_MAX_LEN)
+    {
         message.splitHeader = MessageType::SPLIT_WRITE_CMD_END;
         message.splitCount = 0;
         message.partLen = logLen;
         CheckedMemcpy(message.data, log, logLen);
     }
+
     const u16 remainLogLen = logLen - logRemain->sentLength;
-    if (logLen > DATA_MAX_LEN) {
+    if (logLen > DATA_MAX_LEN)
+    {
         message.splitHeader
             = remainLogLen > DATA_MAX_LEN ? MessageType::SPLIT_WRITE_CMD : MessageType::SPLIT_WRITE_CMD_END;
         message.splitCount = (u8)(logRemain->sentLength / DATA_MAX_LEN);
@@ -285,22 +347,33 @@ ErrorTypeUnchecked AppUartModule::SendAppLogQueue()
     }
 
     ErrorTypeUnchecked error = ErrorTypeUnchecked::SUCCESS;
-    for (u8 ii = 0; ii < PARTNER_NUM; ++ii) {
+    for (u8 ii = 0; ii < APP_UART_MAX_NUM_PARTNERS; ++ii)
+    {
         const NodeId partnerId = partners[ii].partnerId;
         if (partnerId == NODE_ID_INVALID)
+        {
             continue;
+        }
+
         error = SendModuleActionMessage(MessageType::MODULE_ACTION_RESPONSE, partnerId,
             AppUartModuleActionResponseMessages::RECEIVE_LOG, 0, reinterpret_cast<u8*>(&message),
             SIZEOF_APP_UART_MODULE_TERMINAL_COMMAND_MESSAGE_STATIC + message.partLen, false);
+
         if (error != ErrorTypeUnchecked::SUCCESS)
+        {
             return error;
+        }
     }
-    if (remainLogLen > DATA_MAX_LEN) {
+
+    if (remainLogLen > DATA_MAX_LEN)
+    {
         logRemain->sentLength += DATA_MAX_LEN;
         return error;
     }
-    // queued log completely
+
+    // Remove the queue entries that were just sent to the partners
     DiscardLogQueue();
+
     return error;
 }
 
@@ -316,15 +389,24 @@ bool AppUartModule::PutAppLogQueue(const char* log, u16 length)
 {
     // Logs should be dropped while the module is sending logs to prevent infinite loops
     if (log == NULL || length == 0 || !HasPartner() || !CanQueueLog())
+    {
         return false;
+    }
 
+    // Try to put the header into the queue
     AppUartLogRemain remain = { .sentLength = 0, .logLen = length };
-    if (!logQueue.Put(reinterpret_cast<u8*>(&remain), sizeof(AppUartLogRemain)))
+    if (!logQueue.Put(reinterpret_cast<const u8*>(&remain), sizeof(AppUartLogRemain)))
+    {
         return false;
-    if (!logQueue.Put(reinterpret_cast<u8*>(const_cast<char*>(log)), length)) {
+    }
+
+    // Try to put the actual log message into the queue. If this fails, the header must be removed as well.
+    if (!logQueue.Put(reinterpret_cast<const u8*>(log), length))
+    {
         logQueue.DiscardLast();
         return false;
     }
+
     return true;
 }
 

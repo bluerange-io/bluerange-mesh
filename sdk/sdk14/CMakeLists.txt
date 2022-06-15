@@ -1,10 +1,22 @@
+# This CMakeLists file is used to build the following combination
+# NRF52832_XXAA, SDK14, S132 v5
+
+set_property_multi("${SDK_14_TARGETS}" "FM_MAX_APP_SIZE" 167936) # Max app size 4096 * 41 (for S132 v5)
+
 target_compile_definitions_multi("${SDK_14_TARGETS}" "S132")
 target_compile_definitions_multi("${SDK_14_TARGETS}" "NRF52")
 target_compile_definitions_multi("${SDK_14_TARGETS}" "NRF52832_XXAA")
 target_compile_definitions_multi("${SDK_14_TARGETS}" "NRF52832")
 target_compile_definitions_multi("${SDK_14_TARGETS}" "SDK=14")
+
+target_compile_definitions_multi("${SDK_14_TARGETS}" "SOFTDEVICE_PRESENT")
+target_compile_definitions_multi("${SDK_14_TARGETS}" "BLE_STACK_SUPPORT_REQD")
+
+target_compile_options_multi("${SDK_14_TARGETS}"  "-mcpu=cortex-m4")
 target_compile_options_multi("${SDK_14_TARGETS}" "-mfloat-abi=hard")
 target_compile_options_multi("${SDK_14_TARGETS}" "-mfpu=fpv4-sp-d16")
+
+target_link_options_multi("${SDK_14_TARGETS}" "-mcpu=cortex-m4")
 target_link_options_multi("${SDK_14_TARGETS}" "-mfloat-abi=hard")
 target_link_options_multi("${SDK_14_TARGETS}" "-mfpu=fpv4-sp-d16")
 target_link_options_multi("${SDK_14_TARGETS}" "-T${PROJECT_SOURCE_DIR}/linker/gcc_nrf52832_s132v5_64kb.ld")

@@ -227,7 +227,7 @@ void StatusReporterModule::SendNearbyNodes(NodeId toNode, u8 requestHandle, Mess
     }
 
     u8 packetSize = (u8)(numMeasurements * 3);
-    DYNAMIC_ARRAY(buffer, packetSize);
+    DYNAMIC_ARRAY(buffer, packetSize == 0 ? 1 : packetSize);
 
     u16 j = 0;
     for(int i=0; i<NUM_NODE_MEASUREMENTS; i++)
@@ -366,8 +366,14 @@ void StatusReporterModule::SendErrors(NodeId toNode, u8 requestHandle)
     auto &logger = Logger::GetInstance();
 
     //If our time is synced we report the absolute uptime, otherwhise the relative uptime is all we know
-    CustomErrorTypes timeSyncType = GS->timeManager.IsTimeSynced() ? CustomErrorTypes::INFO_UPTIME_ABSOLUTE : CustomErrorTypes::INFO_UPTIME_RELATIVE;
-    logger.LogCustomError(timeSyncType, GS->timeManager.GetUtcTime());
+    if(GS->timeManager.IsTimeSynced()){
+        //Reports the absolute UTC boot timestamp
+        u32 startTimeUtcSec = GS->timeManager.GetUtcTime() - DS_TO_SEC(GS->appTimerDs);
+        logger.LogCustomError(CustomErrorTypes::INFO_UPTIME_ABSOLUTE, startTimeUtcSec);
+    } else {
+        //Reports the time in seconds since boot
+        logger.LogCustomError(CustomErrorTypes::INFO_UPTIME_RELATIVE, GS->timeManager.GetUtcTime());
+    }
 
 #ifndef SIM_ENABLED
     //Also report how big the stack grew.
@@ -470,40 +476,47 @@ void StatusReporterModule::StartConnectionRSSIMeasurement(MeshConnection& connec
 void StatusReporterModule::GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent & advertisementReportEvent)
 {
     const u8* data = advertisementReportEvent.GetData();
-    u16 dataLength = advertisementReportEvent.GetDataLength();
+    const u16 dataLength = advertisementReportEvent.GetDataLength();
 
-    const AdvPacketHeader* packetHeader = (const AdvPacketHeader*)data;
+    const auto packetHeader = (const AdvPacketHeader*)data;
 
     if (packetHeader->messageType == ManufacturerSpecificMessageType::JOIN_ME_V0)
     {
-        if (dataLength == SIZEOF_ADV_PACKET_JOIN_ME)
+        if (packetHeader->networkId == GS->node.configuration.networkId)
         {
-            const AdvPacketJoinMeV0* packet = (const AdvPacketJoinMeV0*)data;
-
-            bool found = false;
-
-            for (int i = 0; i < NUM_NODE_MEASUREMENTS; i++) {
-                if (nodeMeasurements[i].nodeId == packet->payload.sender) {
-                    if (nodeMeasurements[i].packetCount == UINT16_MAX) {
-                        nodeMeasurements[i].packetCount = 0;
-                        nodeMeasurements[i].rssiSum = 0;
-                    }
-                    nodeMeasurements[i].packetCount++;
-                    nodeMeasurements[i].rssiSum += advertisementReportEvent.GetRssi();
-                    found = true;
-                    break;
-                }
+            if (dataLength == SIZEOF_ADV_PACKET_JOIN_ME)
+            {
+                const auto packet = (const AdvPacketJoinMeV0*)data;
+                HandleJoinMeAdvertisement(advertisementReportEvent.GetRssi(), *packet);
             }
-            if (!found) {
-                for (int i = 0; i < NUM_NODE_MEASUREMENTS; i++) {
-                    if (nodeMeasurements[i].nodeId == 0) {
-                        nodeMeasurements[i].nodeId = packet->payload.sender;
-                        nodeMeasurements[i].packetCount = 1;
-                        nodeMeasurements[i].rssiSum = advertisementReportEvent.GetRssi();
+        }
+    }
+}
 
-                        break;
-                    }
-                }
+void StatusReporterModule::HandleJoinMeAdvertisement(const i8 rssi, const AdvPacketJoinMeV0 & packet)
+{
+    bool found = false;
+
+    for (int i = 0; i < NUM_NODE_MEASUREMENTS; i++) {
+        if (nodeMeasurements[i].nodeId == packet.payload.sender) {
+            if (nodeMeasurements[i].packetCount == UINT16_MAX) {
+                nodeMeasurements[i].packetCount = 0;
+                nodeMeasurements[i].rssiSum = 0;
+            }
+            nodeMeasurements[i].packetCount++;
+            nodeMeasurements[i].rssiSum += rssi;
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        for (int i = 0; i < NUM_NODE_MEASUREMENTS; i++) {
+            if (nodeMeasurements[i].nodeId == 0) {
+                nodeMeasurements[i].nodeId = packet.payload.sender;
+                nodeMeasurements[i].packetCount = 1;
+                nodeMeasurements[i].rssiSum = rssi;
+
+                break;
             }
         }
     }
