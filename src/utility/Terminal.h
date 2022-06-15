@@ -192,6 +192,13 @@ public:
 
 #endif
 
+    //###### App UART ######
+#if IS_ACTIVE(APP_UART)
+private:
+    void AppUartCheckAndProcessLine();
+    void AppUartPutString(const char* message);
+#endif
+
     //###### Stdio ######
 #if IS_ACTIVE(STDIO)
 public:

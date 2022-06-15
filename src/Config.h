@@ -268,6 +268,10 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 #define ACTIVATE_SEGGER_RTT 0
 #endif
 
+#ifndef ACTIVATE_APP_UART
+#define ACTIVATE_APP_UART 0
+#endif
+
 // In case stdout should be used, enable this (wont't work on nrf hardware)
 #ifndef ACTIVATE_STDIO
 #define ACTIVATE_STDIO 0
