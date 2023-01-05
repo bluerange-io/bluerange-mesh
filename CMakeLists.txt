@@ -20,9 +20,14 @@ cmake_policy(SET CMP0079 NEW)
 # that contains all the header and source files nicely structured according to the directories
 SET(visual_studio_source_list "${visual_studio_source_list}" CACHE INTERNAL "")
 
-# If ON, this will build firmware for the target, otherwise, it builds the simulator
-# TODO: Should be renamed to BUILD_TYPE (IOT-4859)
-option(BUILD_FEATURESETS "Compiles the featuresets for native ARM targets if ON, otherwise compiles the x86 simulator (that contains all featuresets in one binary)." OFF)
+# The user can set BUILD_TYPE to either SIMULATOR or FIRMWARE, for other values an error is thrown, default is SIMULATOR
+set(BUILD_TYPES "SIMULATOR" "FIRMWARE")
+set(BUILD_TYPE "FIRMWARE" CACHE STRING "Compiles the featuresets for native ARM targets if ON, otherwise compiles the x86 simulator (that contains all featuresets in one binary).")
+set_property(CACHE BUILD_TYPE PROPERTY STRINGS ${BUILD_TYPES})
+message("Build type is ${BUILD_TYPE}")
+if(NOT BUILD_TYPE IN_LIST BUILD_TYPES)
+    message(FATAL_ERROR "BUILD_TYPE must be one of ${BUILD_TYPES}")
+endif()
 
 option(CI_PIPELINE "Meant to be set by the CI Pipeline to do some code manipulation." OFF)
 
@@ -33,6 +38,11 @@ option(FM_NATIVE_RENDERER_ENABLED "If set and the simulator is built, a native r
 # Sanitizers are used to do a number of runtime checks that help us to spot issues.
 # However the compile time increases by a lot and the executable will also execute slower.
 option(ENABLE_SANITIZERS "If ON and GCC is used and the simulator is built, sanitizer flags are used during compilation." ON) # ON by default is intentional
+
+# In order to calculate test coverage with LCOV and GCOV, the executable needs to be built with
+# (e.g. -fprofile-arcs -ftest-coverage)
+option(ENABLE_COVERAGE "If ON and the simulator is built, coverage and arc profiling are active." OFF)
+
 
 if(WIN32)
   set(exe_suffix ".exe")
@@ -56,7 +66,7 @@ endmacro()
 # Adds our function definitions to apply CMake functions on multiple targets
 include(CMake/MultiTargetCommands.cmake)
 
-if(BUILD_FEATURESETS)
+if(BUILD_TYPE STREQUAL "FIRMWARE")
   # Okay, this here is >really< ugly, but I couldn't find a better solution.
   # The underlying problem is that on windows, where Visual Studio is set as
   # the default generator, CMake always tries to call MSBuild.exe, even if the
@@ -67,6 +77,7 @@ if(BUILD_FEATURESETS)
   # Generator is specified on the CLI. This of course is dirty. If anybody can
   # find a better solution, please let me know.
   if(NOT CMAKE_GENERATOR STREQUAL "Unix Makefiles" AND NOT CMAKE_GENERATOR STREQUAL "Ninja")
+    message("Did you want to build the Simulator? Then you need to generate the project using -DBUILD_TYPE=SIMULATOR or modify your CMakeCache.txt file in your build directory to set BUILD_TYPE:STRING=SIMULATOR")
     message(FATAL_ERROR "Wrong Generator selected: ${CMAKE_GENERATOR} but \"Unix Makefiles\" or \"Ninja\" was expected. Remove all files that were just created and call cmake again with -G \"Unix Makefiles\".")
   endif()
   
@@ -308,7 +319,7 @@ foreach(f ${FEATURE_SET_MAKE_FILES})
 endforeach()
 
 # Next, here are the steps for building our simulator
-else(BUILD_FEATURESETS)
+else(BUILD_TYPE STREQUAL "FIRMWARE")
   project(CherrySim C CXX)
   if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     message(FATAL_ERROR "Compiler ${CMAKE_CXX_COMPILER_ID} is not supported!")
@@ -412,4 +423,4 @@ endif()
   endif()
   
   source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX fruitymesh FILES ${visual_studio_source_list})
-endif(BUILD_FEATURESETS)
+endif()

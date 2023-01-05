@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -529,13 +529,13 @@ void CherrySim::Init()
     }
 
     //Opens a Webserver to serve the FruityMap for visualization
-    webserver = new FruitySimServer();
+    webserver = new FruitySimServer(simConfig.webServerPort);
 
     //Opens the socket based Terminal
     //This is currently only enabled for the runner
 #ifdef CHERRYSIM_RUNNER_ENABLED
     socketTerm = new SocketTerm();
-    socketTerm->CreateServerSocket();
+    socketTerm->CreateServerSocket(simConfig.socketServerPort);
 #endif
 }
 
@@ -641,13 +641,13 @@ void CherrySim::ImportDataFromJson()
         std::ifstream siteJsonStream(simConfig.siteJsonPath);
         //Throw an exception if file does not exist or cannot be opened, etc,...
         if (siteJsonStream.fail()) SIMEXCEPTION(FileException);
-        siteJsonStream >> siteJson;
+        siteJson = nlohmann::json::parse(siteJsonStream, nullptr, false, true);
 
         //Load the devices json
         std::ifstream devicesJsonStream(simConfig.devicesJsonPath);
         //Throw an exception if file does not exist or cannot be opened, etc,...
         if (devicesJsonStream.fail()) SIMEXCEPTION(FileException);
-        devicesJsonStream >> devicesJson;
+        devicesJson = nlohmann::json::parse(devicesJsonStream, nullptr, false, true);
     }
 
     if (simConfig.logReplayCommands)
@@ -699,7 +699,8 @@ void CherrySim::ImportPositionsAndDataFromJson()
     {
         //Load the devices json
         std::ifstream devicesJsonStream(simConfig.devicesJsonPath);
-        devicesJsonStream >> devicesJson;
+
+        devicesJson = nlohmann::json::parse(devicesJsonStream, nullptr, false, true);
     }
 
     //Get other data from our devices
@@ -732,11 +733,6 @@ void CherrySim::ImportPositionsAndDataFromJson()
                 WriteSerialNumberToUicr(configuredSerialNumberIndex, nodeIndex);
             }
 
-            //Import Default NodeId
-            if (device["properties"].contains("IOT_NODE_ID")) {
-                nodes[nodeIndex].uicr.CUSTOMER[10] = (u32)std::stol(devicesJson["results"][i]["properties"]["IOT_NODE_ID"].get<std::string>());
-            }
-
             //Import Node Key
             if (device["properties"].contains("IOT_NODE_KEY")) {
                 std::string key = device["properties"]["IOT_NODE_KEY"].get<std::string>();
@@ -747,19 +743,27 @@ void CherrySim::ImportPositionsAndDataFromJson()
                 nodes[nodeIndex].uicr.CUSTOMER[7] = Utility::ByteFromAsciiHex(chars + 24, 8);
             }
 
-            //Import NetworkId as defaultNetworkId
-            if (device["properties"].contains("IOT_NETWORK_ID")) {
-                nodes[nodeIndex].uicr.CUSTOMER[9] = (u32)std::stol(device["properties"]["IOT_NETWORK_ID"].get<std::string>());
-            }
+            if (!simConfig.ignoreDeviceJsonEnrollments)
+            {
+                //Import Default NodeId
+                if (device["properties"].contains("IOT_NODE_ID")) {
+                    nodes[nodeIndex].uicr.CUSTOMER[10] = (u32)std::stol(devicesJson["results"][i]["properties"]["IOT_NODE_ID"].get<std::string>());
+                }
 
-            //Import Network Key
-            if (device["properties"].contains("IOT_NETWORK_KEY")) {
-                std::string key = device["properties"]["IOT_NETWORK_KEY"].get<std::string>();
-                const char* chars = key.c_str();
-                nodes[nodeIndex].uicr.CUSTOMER[13] = Utility::ByteFromAsciiHex(chars, 8);
-                nodes[nodeIndex].uicr.CUSTOMER[14] = Utility::ByteFromAsciiHex(chars + 8, 8);
-                nodes[nodeIndex].uicr.CUSTOMER[15] = Utility::ByteFromAsciiHex(chars + 16, 8);
-                nodes[nodeIndex].uicr.CUSTOMER[16] = Utility::ByteFromAsciiHex(chars + 24, 8);
+                //Import NetworkId as defaultNetworkId
+                if (device["properties"].contains("IOT_NETWORK_ID")) {
+                    nodes[nodeIndex].uicr.CUSTOMER[9] = (u32)std::stol(device["properties"]["IOT_NETWORK_ID"].get<std::string>());
+                }
+
+                //Import Network Key
+                if (device["properties"].contains("IOT_NETWORK_KEY")) {
+                    std::string key = device["properties"]["IOT_NETWORK_KEY"].get<std::string>();
+                    const char* chars = key.c_str();
+                    nodes[nodeIndex].uicr.CUSTOMER[13] = Utility::ByteFromAsciiHex(chars, 8);
+                    nodes[nodeIndex].uicr.CUSTOMER[14] = Utility::ByteFromAsciiHex(chars + 8, 8);
+                    nodes[nodeIndex].uicr.CUSTOMER[15] = Utility::ByteFromAsciiHex(chars + 16, 8);
+                    nodes[nodeIndex].uicr.CUSTOMER[16] = Utility::ByteFromAsciiHex(chars + 24, 8);
+                }
             }
 
             nodes[nodeIndex].jsonDataImported = true;
@@ -1014,7 +1018,7 @@ void CherrySim::SimulateStepForAllNodes()
     if (simConfig.realTime)
     {
         const auto tickDuration = std::chrono::milliseconds{simConfig.simTickDurationMs};
-
+        const auto busyLoopTime = std::chrono::milliseconds(15);
         while (true)
         {
             const auto passedTime = std::chrono::steady_clock::now() - lastTick;
@@ -1022,6 +1026,10 @@ void CherrySim::SimulateStepForAllNodes()
             {
                 lastTick += passedTime;
                 break;
+            }
+            else if (tickDuration - passedTime - busyLoopTime > std::chrono::milliseconds(0))
+            {
+                std::this_thread::sleep_for(tickDuration-passedTime-busyLoopTime);
             }
         }
     }
@@ -1214,7 +1222,7 @@ TerminalCommandHandlerReturnType CherrySim::TerminalCommandHandler(const std::ve
 {
     if (commandArgs.size() >= 2 && commandArgs[0] == "sim")
     {
-        if (commandArgs[1] == "stat") {
+        if (commandArgs[1] == "stat" || commandArgs[1] == "help") {
             printf("---- Configurable via terminal ----\n");
             printf("Terminal (sim term): %d\n", simConfig.terminalId);
             printf("Number of non-asset Nodes (sim nodes): %u\n", GetTotalNodes() - GetAssetNodes());
@@ -1230,6 +1238,7 @@ TerminalCommandHandlerReturnType CherrySim::TerminalCommandHandler(const std::ve
             printf("Devices json (sim devices): %s\n", simConfig.devicesJsonPath.c_str());
             printf("---- Other ----\n");
             printf("Simtime %u\n", simState.simTimeMs);
+            printf("To print available terminals use sim print terms");
 
             sim_print_statistics();
 
@@ -1252,6 +1261,42 @@ TerminalCommandHandlerReturnType CherrySim::TerminalCommandHandler(const std::ve
             printf("Switched Terminal to %d\n", simConfig.terminalId);
 
             return TerminalCommandHandlerReturnType::SUCCESS;
+        }
+        else if (commandArgs.size() >= 3 && commandArgs[1] == "print") {
+            if (commandArgs[2] == "terms")
+            {
+                for (u32 i = 0; i < GetTotalNodes(); i++)
+                {
+                    NodeEntry* node = &nodes[i];
+                    const std::string serialNumberOfNode = node->gs.config.GetSerialNumber();
+
+                    printf("Terminal %u: Node %s, NodeId %u, Featureset %s, x %.2f, y %.2f" EOL,
+                        node->GetTerminalId(),
+                        node->gs.config.GetSerialNumber(),
+                        node->GetNodeId(),
+                        node->featuresetPointers->featuresetName,
+                        node->x,
+                        node->y
+                        );
+
+                    char nodeKeyHex[128];
+                    Logger::ConvertBufferToHexString(node->gs.config.configuration.nodeKey, 16, nodeKeyHex, sizeof(nodeKeyHex));
+                    
+
+                    printf("       Addr %02X:%02X:%02X:%02X:%02X:%02X, NetworkId %u, NodeKey %s" EOL EOL,
+                        node->address.addr[5],
+                        node->address.addr[4],
+                        node->address.addr[3],
+                        node->address.addr[2],
+                        node->address.addr[1],
+                        node->address.addr[0],
+                        node->GetNetworkId(),
+                        nodeKeyHex
+                    );
+                }
+
+                return TerminalCommandHandlerReturnType::SUCCESS;
+            }
         }
         else if (commandArgs[1] == "nodes") {
             if (commandArgs.size() < 4) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;

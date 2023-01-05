@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -40,6 +40,7 @@ void to_json(nlohmann::json& j, const SimConfiguration & config)
         { "mapWidthInMeters"                         , config.mapWidthInMeters                          },
         { "mapHeightInMeters"                        , config.mapHeightInMeters                         },
         { "mapElevationInMeters"                     , config.mapElevationInMeters                      },
+        { "floorplanImage"                           , config.floorplanImage                            },
         { "simTickDurationMs"                        , config.simTickDurationMs                         },
         { "terminalId"                               , config.terminalId                                },
         { "simOtherDelay"                            , config.simOtherDelay                             },
@@ -63,6 +64,7 @@ void to_json(nlohmann::json& j, const SimConfiguration & config)
         { "logReplayCommands"                        , config.logReplayCommands                         },
         { "useLogAccumulator"                        , config.useLogAccumulator                         },
         { "defaultNetworkId"                         , config.defaultNetworkId                          },
+        { "ignoreDeviceJsonEnrollments"              , config.ignoreDeviceJsonEnrollments               },
         { "preDefinedPositions"                      , config.preDefinedPositions                       },
         { "rssiNoise"                                , config.rssiNoise                                 },
         { "simulateWatchdog"                         , config.simulateWatchdog                          },
@@ -79,6 +81,9 @@ void to_json(nlohmann::json& j, const SimConfiguration & config)
         { "perfectReceptionProbabilityForConnection" , config.perfectReceptionProbabilityForConnection  },
         { "verboseCommands"                          , config.verboseCommands                           },
         { "simulateAdvertisingIndexStep"             , config.simulateAdvertisingIndexStep              },
+        { "disableNonCriticalExceptions"             , config.disableNonCriticalExceptions              },
+        { "webServerPort"                            , config.webServerPort                             },
+        { "socketServerPort"                         , config.socketServerPort                          },
     };
 }
 
@@ -92,6 +97,7 @@ void from_json(const nlohmann::json & j, SimConfiguration & config)
         else if(it.key() == "mapWidthInMeters"                          ) config.mapWidthInMeters                          = *it;
         else if(it.key() == "mapHeightInMeters"                         ) config.mapHeightInMeters                         = *it;
         else if(it.key() == "mapElevationInMeters"                      ) config.mapElevationInMeters                      = *it;
+        else if(it.key() == "floorplanImage"                            ) config.floorplanImage                            = *it;
         else if(it.key() == "simTickDurationMs"                         ) config.simTickDurationMs                         = *it;
         else if(it.key() == "terminalId"                                ) config.terminalId                                = *it;
         else if(it.key() == "simOtherDelay"                             ) config.simOtherDelay                             = *it;
@@ -115,6 +121,7 @@ void from_json(const nlohmann::json & j, SimConfiguration & config)
         else if(it.key() == "logReplayCommands"                         ) config.logReplayCommands                         = *it;
         else if(it.key() == "useLogAccumulator"                         ) config.useLogAccumulator                         = *it;
         else if(it.key() == "defaultNetworkId"                          ) config.defaultNetworkId                          = *it;
+        else if(it.key() == "ignoreDeviceJsonEnrollments"               ) config.ignoreDeviceJsonEnrollments               = *it;
         else if(it.key() == "preDefinedPositions"                       ) j.at("preDefinedPositions").get_to(config.preDefinedPositions);
         else if(it.key() == "rssiNoise"                                 ) config.rssiNoise                                 = *it;
         else if(it.key() == "simulateWatchdog"                          ) config.simulateWatchdog                          = *it;
@@ -131,6 +138,9 @@ void from_json(const nlohmann::json & j, SimConfiguration & config)
         else if(it.key() == "perfectReceptionProbabilityForConnection"  ) config.perfectReceptionProbabilityForConnection  = *it;
         else if(it.key() == "verboseCommands"                           ) config.verboseCommands                           = *it;
         else if(it.key() == "simulateAdvertisingIndexStep"              ) config.simulateAdvertisingIndexStep              = *it;
+        else if(it.key() == "disableNonCriticalExceptions"              ) config.disableNonCriticalExceptions              = *it;
+        else if(it.key() == "webServerPort"                             ) config.webServerPort                             = *it;
+        else if(it.key() == "socketServerPort"                          ) config.socketServerPort                          = *it;
         else printf("WARNING: Unknown json entry %s in CherrySimConfig", it.key().c_str());
     }
 }

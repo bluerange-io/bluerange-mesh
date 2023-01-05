@@ -183,6 +183,10 @@ action 6 ma serial_connect BBBBQ 1 00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:
 action 6 ma serial_connect BBBBQ 1 00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF 33012 20 13 AA:BB:CC:DD:EE:FF 1
 ----
 
+`serial number` is the serial number of the other device that the connection will be established to.
+
+`keyId` should start at 1.
+
 `nodeId_of_partner_after_connect` must be inside the range of organization wide unique nodeIds [33000, 57999].
 
 `initial_keep_alive` is merely a suggestion to the node. There are a lot of cases where a connection can also be prematurely disconnected.

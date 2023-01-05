@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -83,6 +83,80 @@ TEST(TestStatusReporterModule, TestCommands) {
     tester.SendTerminalCommand(1, "action 2 status get_rebootreason");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"reboot_reason\",\"nodeId\":2,\"module\":3,");
 }
+
+#if defined(PROD_SINK_NRF52) && defined(PROD_MESH_NRF52)
+#ifndef GITHUB_RELEASE
+TEST(TestStatusReporterModule, TestLiveReportMacAddressPart) {
+    // Tests whether the mac addresse part is successfully transmitted when a node disconnects
+
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2 });
+    simConfig.preDefinedPositions = { {0, 0.5,0.1}, {0.55, 0.5}, {1.1, 0.51} };
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+    tester.sim->FindNodeById(3)->gs.logger.EnableTag("STATUSMOD");
+    tester.sim->FindNodeById(1)->gs.logger.EnableTag("STATUSMOD");
+    tester.sim->FindNodeById(2)->gs.logger.EnableTag("STATUSMOD");
+    
+
+    NodeEntry* disconnectingNode = &tester.sim->nodes[1];
+    u32 disconnectingNodeAddress;
+    CheckedMemcpy(&disconnectingNodeAddress, disconnectingNode->address.addr.data(), 4);
+
+    u32 otherNodeAddress;
+    CheckedMemcpy(&otherNodeAddress, (tester.sim->nodes + 2)->address.addr.data(), 4);
+
+    
+
+    char msg1[100];
+    snprintf(msg1, 100, "{\"type\":\"live_report\",\"nodeId\":2,\"module\":3,\"code\":52,\"extra\":%u,", otherNodeAddress);
+
+    char msg2[100];
+    snprintf(msg2, 100, "{\"type\":\"live_report\",\"nodeId\":3,\"module\":3,\"code\":52,\"extra\":%u,", disconnectingNodeAddress);
+
+    std::vector<SimulationMessage> messages = {
+        SimulationMessage(1,msg1),
+        SimulationMessage(3,msg2)
+    };
+
+
+    // does not always work, so we might need to retry
+    int maxRetry = 5;
+
+    RetryOrFail<TimeoutException>(
+        maxRetry, [&] {
+            tester.SimulateUntilClusteringDone(100 * 1000, nullptr);
+            tester.SendTerminalCommand(1, "sep");
+            int connHandleToDisconnect = -1;
+            {
+                bool foundThirdNode = false, foundGW = false;
+                BaseConnection** conns = disconnectingNode->gs.cm.allConnections;
+                for (size_t i = 0; i < TOTAL_NUM_CONNECTIONS; i++) {
+                    if (conns[i] != nullptr && conns[i]->partnerId == 3) {
+                        connHandleToDisconnect = conns[i]->connectionHandle;
+                        foundThirdNode = true;
+                    }
+                    if (conns[i] != nullptr && conns[i]->partnerId == 1) {
+                        foundGW = true;
+                    }
+                }
+                ASSERT_TRUE(foundThirdNode && foundGW);
+            }
+            ASSERT_TRUE(connHandleToDisconnect != -1);
+            tester.SendTerminalCommand(2, "disconnect %u", connHandleToDisconnect);
+        },
+        [&] {
+            tester.SimulateUntilMessagesReceived(1000 * 1000, messages);
+        });
+    
+}
+#endif //GITHUB_RELEASE
+#endif
 
 TEST(TestStatusReporterModule, TestMediumPrioCommandWorksWithQueuesFull) {
     // Tests if medium prio commands (e.g. action 2 status get_status) works, even if other priorities
@@ -224,7 +298,7 @@ TEST(TestStatusReporterModule, TestHopsToSinkFixing) {
     // We expect that incorrect hops error wont be received as hopsToSink should have been fixed together with first keep_alive message.
     {
         Exceptions::ExceptionDisabler<TimeoutException> te;
-        tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":%u,\"code\":%u", LoggingError::CUSTOM, CustomErrorTypes::FATAL_INCORRECT_HOPS_TO_SINK);
+        tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":%u,\"code\":%u", (u32)LoggingError::CUSTOM, (u32)CustomErrorTypes::FATAL_INCORRECT_HOPS_TO_SINK);
         ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
     }
 }

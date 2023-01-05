@@ -21,12 +21,16 @@ private:
     bool paused = false;
     bbe::List<RenderPacket> renderPackets;
 
+    bbe::Image backgroundImage;
+
     void resetCamera();
 
     bool showConnections = true;
     bool showNodes       = true;
     bool showPackets = true;
     int zPos             = 0;
+
+    int draggedNodeIndex = -1;
 
 public:
     explicit BBERenderer(CherrySim* sim);
@@ -51,6 +55,10 @@ public:
     //This will pay attention to the currently selected z position and will only
     //mark displayed nodes
     i32 getClosestIndexToMouse() const;
+
+    //Similar to the above method but will only return nodes that are directly
+    //below the mouse cursor
+    i32 getNodeIndexUnderMouse() const;
 
     bool isPaused() const;
     void reset();

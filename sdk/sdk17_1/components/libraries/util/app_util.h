@@ -54,7 +54,7 @@
 #include <stddef.h>
 #include "compiler_abstraction.h"
 #include "nordic_common.h"
-#include "nrf.h"
+#include <nrf.h>
 
 #ifdef __cplusplus
 extern "C" {

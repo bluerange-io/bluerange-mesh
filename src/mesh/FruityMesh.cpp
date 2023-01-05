@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -160,7 +160,6 @@ void BootFruityMesh()
     cherrySimInstance->ChooseSimulatorTerminal(); //TODO: Maybe remove
 #endif
 
-#if IS_INACTIVE(GW_SAVE_SPACE)
     //Enable logging for some interesting log tags
     Logger::GetInstance().EnableTag("MAIN");
     Logger::GetInstance().EnableTag("INS");
@@ -214,15 +213,12 @@ void BootFruityMesh()
 //    Logger::GetInstance().EnableTag("BME");
 //    Logger::GetInstance().EnableTag("ADVS");
       Logger::GetInstance().EnableTag("OFF");
-#endif
     
     //Log the reboot reason to our ram log so that it is automatically queried by the sink
     Logger::GetInstance().LogError(LoggingError::REBOOT, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1);
     
     //If the nordic secure dfu bootloader is enabled, disable it as soon as fruitymesh boots the first time
-#if IS_INACTIVE(GW_SAVE_SPACE)
     FruityHal::DisableHardwareDfuBootloader();
-#endif
 
     if (GS->ramRetainStructPtr->rebootReason == RebootReason::FACTORY_RESET_SUCCEEDED_FAILSAFE)
     {

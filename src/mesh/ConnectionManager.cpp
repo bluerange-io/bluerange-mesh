@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -140,6 +140,10 @@ void ConnectionManager::DeleteConnection(BaseConnection* connection, AppDisconne
     if(connection == nullptr) return;
 
     logt("CM", "Cleaning up conn %u", connection->connectionId);
+
+    // store parts of the addresse so it can be sent as a live_report when the gatt disconnect event fires as the Connection instance could be already deleted at that time
+    CheckedMemcpy(&recentlyDisconnectedMACAddressPart, connection->partnerAddress.addr.data(), sizeof(recentlyDisconnectedMACAddressPart));
+    recentlyDisconnectedConnectionHandle = connection->connectionHandle;
 
     for(u32 i=0; i<TOTAL_NUM_CONNECTIONS; i++){
         if(connection == allConnections[i]){
@@ -1173,10 +1177,23 @@ void ConnectionManager::GapConnectionDisconnectedHandler(const FruityHal::GapDis
 
     StatusReporterModule* statusMod = (StatusReporterModule*)GS->node.GetModuleById(ModuleId::STATUS_REPORTER_MODULE);
     if (statusMod != nullptr) {
-        statusMod->SendLiveReport(LiveReportTypes::WARN_GAP_DISCONNECTED, 0, connection == nullptr ? 0 : connection->partnerId, (u32)disconnectedEvent.GetReason());
+        u32 extra1;
+        if (connection == nullptr) {
+            extra1 = recentlyDisconnectedConnectionHandle == disconnectedEvent.GetConnectionHandle() ? recentlyDisconnectedMACAddressPart : 0;
+        }
+        else {
+            CheckedMemcpy(&extra1, connection->partnerAddress.addr.data(), 4);
+        }
+        statusMod->SendLiveReport(LiveReportTypes::WARN_GAP_DISCONNECTED, 0, extra1, (u32)disconnectedEvent.GetReason());
     }
 
-    if(connection == nullptr) return;
+    // clear the stored handle as it might be reused for a different connection in the future
+    if (recentlyDisconnectedConnectionHandle == disconnectedEvent.GetConnectionHandle())
+    {
+        recentlyDisconnectedConnectionHandle = FruityHal::FH_BLE_INVALID_HANDLE;
+    }
+
+    if (connection == nullptr) return;
 
 
     logt("CM", "Gap Connection handle %u disconnected", disconnectedEvent.GetConnectionHandle());
@@ -1187,7 +1204,7 @@ void ConnectionManager::GapConnectionDisconnectedHandler(const FruityHal::GapDis
     bool result = connection->GapDisconnectionHandler(disconnectedEvent.GetReason());
 
     //The connection can be disconnected
-    if(result){
+    if (result) {
         logt("WARNING", "Final Disconnect");
         connection->DisconnectAndRemove(AppDisconnectReason::GAP_DISCONNECT_NO_REESTABLISH_REQUESTED);
     }
@@ -1197,6 +1214,7 @@ void ConnectionManager::GapConnectionDisconnectedHandler(const FruityHal::GapDis
 
     }
 }
+
 
 void ConnectionManager::GattcTimeoutEventHandler(const FruityHal::GattcTimeoutEvent & gattcTimeoutEvent)
 {

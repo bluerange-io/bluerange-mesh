@@ -84,7 +84,7 @@ action 1 debug counter 0 0 0
 ----
 
 === Reading the Memory of a Node
-It is possible to read any part of memory of a node that is available over the mesh network. It goes without saying, that this command is very powerful and a big security issue. It is therefore not (and must not be) included in release builds. The length is limited to 32 bytes and multiple reads should be done if more memory is to be requested. By defining ACTIVATE_UNSECURE_MEMORY_READBACK, it can be activated in any featureset for testing, e.g. by sending a modified version of the same firmware as an update.
+It is possible to read any part of memory of a node that is available over the mesh network. It goes without saying, that this command is very powerful and a big security issue. It is therefore not (and must not be) included in release builds. The length is limited to 32 bytes and multiple reads should be done if more memory is to be requested. By defining ACTIVATE_UNSECURE_DEBUG_FUNCTIONALITY, it can be activated in any featureset for testing, e.g. by sending a modified version of the same firmware as an update.
 
 [source, C++]
 ----

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -113,6 +113,7 @@ private:
             GENERATE_LOAD_CHUNK       = 5,
             EMERGENCY_DISCONNECT      = 6,
             SET_ENROLLED_NODES        = 7,
+            GET_TIME                 = 8,
         };
 
         enum class NodeModuleActionResponseMessages : u8
@@ -123,6 +124,7 @@ private:
             START_GENERATE_LOAD_RESULT       = 4,
             EMERGENCY_DISCONNECT_RESULT      = 5,
             SET_ENROLLED_NODES_RESULT        = 6,
+            GET_TIME_RESULT                 = 8,
         };
 
         #pragma pack(push, 1)
@@ -132,6 +134,24 @@ private:
             NOT_ALL_CONNECTIONS_USED_UP = 1,
             CANT_DISCONNECT_ANYBODY     = 2,
         };
+        
+        enum class TimeSyncState : u8
+        {
+            UNSYNCED = 0,
+            SYNCED = 1,
+            CORRECTED = 2,
+        };
+
+        static constexpr size_t SIZEOF_GET_TIME_RESPONSE_MESSAGE = 8;
+        struct GetTimeResponseMessage
+        {
+            u32 unixTimeStamp;
+            i16 offset;
+            TimeSyncState timeSyncState;
+            u8 isTimeMaster : 1;
+            u8 reserved : 7;
+        };
+        STATIC_ASSERT_SIZE(GetTimeResponseMessage, SIZEOF_GET_TIME_RESPONSE_MESSAGE);
 
         struct EmergencyDisconnectResponseMessage
         {

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -206,7 +206,6 @@ TerminalCommandHandlerReturnType IoModule::TerminalCommandHandler(const char* co
             NodeId destinationNode = Utility::TerminalArgumentToNodeId(commandArgs[1]);
 
             //Example:
-#if IS_INACTIVE(GW_SAVE_SPACE)
             if(TERMARGS(3,"pinset"))
             {
                 if (commandArgsSize < 6) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
@@ -238,9 +237,7 @@ TerminalCommandHandlerReturnType IoModule::TerminalCommandHandler(const char* co
                 return TerminalCommandHandlerReturnType::SUCCESS;
             }
             //E.g. action 635 io led on
-            else
-#endif
-            if(TERMARGS(3,"led"))
+            else if(TERMARGS(3,"led"))
             {
                 if (commandArgsSize < 5) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
                 IoModuleSetLedMessage data;

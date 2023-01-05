@@ -8,6 +8,7 @@ CherrySim uses several json files for configuration and debugging purposes. It d
 * replaylog
 
 
+[#meshGwCommunication]
 === meshGwCommunication
 This file includes all the cherrysim configurations e.g. number of nodes, number of assets, featureset etc. By default cherrsim only uses this file if the `MeshGwCommunication` argument is passed to `cherrySim_runner`. Below is an example meshGwCommunication.json file.
 [source,json]
@@ -77,6 +78,7 @@ Most of the fields are self explanatory but some noteworthy fields are
 
 NOTE:  Adding and removing fields in the file wont work out the box, cherrysim code needs to be adjusted accordingly.
 
+[#devices]
 === devices
 This json file includes the configuration of each node i.e. deviceId, platform etc. Below is one of the example device.json file.
 
@@ -132,6 +134,7 @@ Some of the fields that should be noted is that
 *** `cherrySimFeatureSet`: `prod_asset_nrf52` in case of `platform`: `ASSET`.
 ** `IOT_NODE_KEY`, `IOT_NETWORK_KEY`, `IOT_ORGANIZATION_KEY`, `IOT_NODE_ID` and `IOT_NETWORK_ID` will also get default values if not present.
 
+[#sites]
 === sites
 This file configures the site where all nodes would be present. Below is one of the example of site.json file.
 [source,json]

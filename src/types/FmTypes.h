@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -141,47 +141,51 @@ constexpr u32 REBOOT_MAGIC_NUMBER = 0xE0F7213C;
 // air with a given firmware. For an update, the firmware group ids must match.
 enum class FeatureSetGroup : NodeId
 {
-    INVALID                                               = 0,
+    INVALID                                                     = 0,
     //These comments are used to parse values with FruityDeploy (do not remove)
-    //                              CHIP_NRF51            = 20000,
-    //                              CHIP_NRF52            = 20001,
-    //                              NRF51_SINK            = 20002, //Deprecated as of 09.04.2020
-    /*FruityDeploy-FeatureSetGroup*/NRF51_MESH            = 20003,
-    /*FruityDeploy-FeatureSetGroup*/NRF52_MESH            = 20004,
-    //                              NRF51_ASSET           = 20005, //Deprecated as of 09.04.2020
-    /*FruityDeploy-FeatureSetGroup*/NRF52_ASSET           = 20006,
-    /*FruityDeploy-FeatureSetGroup*/NRF52_CLC_MESH        = 20007,
-    //                              NRF51_CLC_SINK        = 20008, //Deprecated as of 09.04.2020
-    /*FruityDeploy-FeatureSetGroup*/NRF52_VS_MESH         = 20009,
-    /*FruityDeploy-FeatureSetGroup*/NRF52_VS_SINK         = 20010,
-    /*FruityDeploy-FeatureSetGroup*/NRF52_SINK            = 20011,
-    //                              NRF51_EINK            = 20012, //Deprecated as of 09.04.2020
-    /*FruityDeploy-FeatureSetGroup*/NRF52840_WM_MESH      = 20013,
-    /*FruityDeploy-FeatureSetGroup*/NRF52_PC_BRIDGE       = 20014,
-    //                              CHIP_NRF52840         = 20015,
-    /*FruityDeploy-FeatureSetGroup*/NRF52840_MESH         = 20016,
-    /*FruityDeploy-FeatureSetGroup*/NRF52840_SINK_USB     = 20017,
-    /*FruityDeploy-FeatureSetGroup*/NRF52840_MESH_USB     = 20018,
-    /*FruityDeploy-FeatureSetGroup*/NRF52840_BP_MESH      = 20019,
-    /*FruityDeploy-FeatureSetGroup*/NRF52_EINK            = 20020,
-    // Reserved for Cypress (currently on a seperate branch) = 20021,
-    /*FruityDeploy-FeatureSetGroup*/NRF52_ET_MESH         = 20022,
-    /*FruityDeploy-FeatureSetGroup*/NRF52_ET_ASSET        = 20023,
-    /*FruityDeploy-FeatureSetGroup*/NRF52_ET_ASSET2       = 20024,
-    /*FruityDeploy-FeatureSetGroup*/NRF52_ET_ASSET3       = 20025,
-    /*FruityDeploy-FeatureSetGroup*/NRF52_VS_CONVERTER    = 20026,
-    /*FruityDeploy-FeatureSetGroup*/NRF52840_ASSET_INS    = 20027,
-    /*FruityDeploy-FeatureSetGroup*/NRF52840_EINK         = 20028,
-    /*FruityDeploy-FeatureSetGroup*/NRF52_SINK_GITHUB     = 20029,
-    /*FruityDeploy-FeatureSetGroup*/NRF52_MESH_GITHUB     = 20030,
-    /*FruityDeploy-FeatureSetGroup*/NRF52_DEV_GITHUB      = 20031,
-    /*FruityDeploy-FeatureSetGroup*/NRF52840_DEV_GITHUB   = 20032,
-    /*FruityDeploy-FeatureSetGroup*/NRF52_RV_WEATHER_MESH = 20033,
-    /*FruityDeploy-FeatureSetGroup*/NRF52840_LVE_NBT      = 20034,
-    /*FruityDeploy-FeatureSetGroup*/NRF52_MULTI_ASSET     = 20035,
-    /*FruityDeploy-FeatureSetGroup*/NRF52840_ASSET        = 20036,
-    /*FruityDeploy-FeatureSetGroup*/DEV_NRF52832_SDK_17   = 20037,
-    /*FruityDeploy-FeatureSetGroup*/DEV_NRF52840_SDK_17   = 20038,
+    //                              CHIP_NRF51                  = 20000,
+    //                              CHIP_NRF52                  = 20001,
+    //                              NRF51_SINK                  = 20002, //Deprecated as of 09.04.2020
+    /*FruityDeploy-FeatureSetGroup*/NRF51_MESH                  = 20003,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_MESH                  = 20004,
+    //                              NRF51_ASSET                 = 20005, //Deprecated as of 09.04.2020
+    /*FruityDeploy-FeatureSetGroup*/NRF52_ASSET                 = 20006,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_CLC_MESH              = 20007,
+    //                              NRF51_CLC_SINK              = 20008, //Deprecated as of 09.04.2020
+    /*FruityDeploy-FeatureSetGroup*/NRF52_VS_MESH               = 20009,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_VS_SINK               = 20010,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_SINK                  = 20011,
+    //                              NRF51_EINK                  = 20012, //Deprecated as of 09.04.2020
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_WM_MESH            = 20013,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_PC_BRIDGE             = 20014,
+    //                              CHIP_NRF52840               = 20015,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_MESH               = 20016,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_SINK_USB           = 20017,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_MESH_USB           = 20018,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_BP_MESH            = 20019,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_EINK                  = 20020,
+    // Reserved for Cypress (currently on a seperate branch)    = 20021,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_ET_MESH               = 20022,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_ET_ASSET              = 20023,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_ET_ASSET2             = 20024,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_ET_ASSET3             = 20025,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_VS_CONVERTER          = 20026,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_ASSET_INS          = 20027,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_EINK               = 20028,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_SINK_GITHUB           = 20029,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_MESH_GITHUB           = 20030,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_DEV_GITHUB            = 20031,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_DEV_GITHUB         = 20032,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_RV_WEATHER_MESH       = 20033,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_LVE_NBT            = 20034,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_MULTI_ASSET           = 20035,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_ASSET              = 20036,
+    /*FruityDeploy-FeatureSetGroup*/NRF52832_MESH_SDK17         = 20037,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_MESH_SDK17         = 20038,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_MESH_GITHUB_SDK17     = 20039,
+    /*FruityDeploy-FeatureSetGroup*/NRF52_MOD                   = 20040,
+    //                              CHIP_NRF52833               = 20041,
+    /*FruityDeploy-FeatureSetGroup*/NRF52833_MESH               = 20042,
 };
 
 //Sets the maximum number of firmware group ids that can be compiled into the firmware

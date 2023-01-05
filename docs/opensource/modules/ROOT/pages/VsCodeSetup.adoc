@@ -9,6 +9,9 @@ This page includes some additional information for setting up Visual Studio Code
 If you need debugging support, you will need to install the Cortex-Debug Extension from here:
 
 * Cortex Debug: https://marketplace.visualstudio.com/items?itemName=marus25.cortex-debug
+* Newer versions than 1.4.4 only support GDB v9 and higher. However, this project uses version 7.
+Thus, it is neccessary to roll back to version 1.4.4 of the plugin.
+One way to roll back is to open the extension's page in VSCode, click the arrow next to _Uninstall_, click on _Install Another Version..._ and select version _1.4.4_.
 
 
 You should then create the file `<fruitymesh>/.vscode/launch.json` with the content below. This is the configuration for the Cortex-Debug Extension. Make sure to insert the correct paths for armToolchainPath and serverPath. Also, depending on the featureset you are debugging, you must change the executable path to the correct binary. The device should also be changed if debugging a different chipset. The SVD file is optionally used, if you want to see the registers of the chips peripherals. Make sure to point it to the correct chipset if you need it.
@@ -58,7 +61,7 @@ In order to get better Intellisense results (E.g. for conditional code compilati
 ----
 "cmake.configureSettings":{
     "GCC_PATH":"C:/mway/tools/gcc-arm-embedded-4.9-2015q3",
-    "BUILD_FEATURESETS":"ON",
+    "BUILD_TYPE":"FIRMWARE",
     "ONLY_FEATURESET":"your_featureset_name"
 },
 ----

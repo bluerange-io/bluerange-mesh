@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -97,11 +97,9 @@ void ScanningModule::ConfigurationLoadedHandler(u8* migratableConfig, u16 migrat
     totalMessages = 0;
     totalRSSI = 0;
 
-#if IS_INACTIVE(GW_SAVE_SPACE)
     if (configuration.moduleActive && assetReportingIntervalDs != 0) {
         GS->scanController.UpdateJobPointer(&p_scanJob, ScanState::HIGH, ScanJobState::ACTIVE);
     }
-#endif
     //Start the Module...
 }
 
@@ -174,15 +172,12 @@ void ScanningModule::GapAdvertisementReportEventHandler(const FruityHal::GapAdve
 {
     if (!configuration.moduleActive) return;
 
-#if IS_INACTIVE(GW_SAVE_SPACE)
     HandleAssetLegacyPackets(advertisementReportEvent);
     HandleAssetPackets(advertisementReportEvent);
-#endif
 }
 
 #define _______________________ASSET_LEGACY______________________
 
-#if IS_INACTIVE(GW_SAVE_SPACE)
 //This function checks whether we received an assetLegacy packet
 void ScanningModule::HandleAssetLegacyPackets(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent)
 {
@@ -319,7 +314,6 @@ bool ScanningModule::AddTrackedAsset(const AdvPacketLegacyV2AssetServiceData * p
     }
     return false;
 }
-#endif
 
 /**
  * Sends out all tracked assets from our buffer and resets the buffer
@@ -329,7 +323,6 @@ bool ScanningModule::AddTrackedAsset(const AdvPacketLegacyV2AssetServiceData * p
 //FIXME: do we average packets or do we just take the best rssi
 void ScanningModule::SendTrackedAssets()
 {
-#if IS_INACTIVE(GW_SAVE_SPACE)
     //Find out how many assets were tracked
     u8 count = 0;
     for (int i = 0; i < ASSET_PACKET_BUFFER_SIZE; i++) {
@@ -377,7 +370,6 @@ void ScanningModule::SendTrackedAssets()
 
     //Clear the buffer
     assetPackets = {};
-#endif
 }
 
 void ScanningModule::ReceiveTrackedAssetsLegacy(BaseConnectionSendData* sendData, ScanModuleTrackedAssetsLegacyMessage const * packet) const

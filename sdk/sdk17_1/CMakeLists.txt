@@ -37,6 +37,12 @@ foreach(target ${FEATURE_SETS})
 
     target_sources_multi("${target}" "./modules/nrfx/mdk/gcc_startup_nrf52.S")
     target_sources_multi("${target}" "./modules/nrfx/mdk/system_nrf52.c")
+  elseif("${TARGET_CHIPSET}" STREQUAL "NRF52833_XXAA")
+    target_compile_definitions_multi("${target}" "NRF52833_XXAA")
+    target_compile_definitions_multi("${target}" "NRF52833")
+
+    target_sources_multi("${target}" "./modules/nrfx/mdk/gcc_startup_nrf52833.S")
+    target_sources_multi("${target}" "./modules/nrfx/mdk/system_nrf52833.c")
   elseif("${TARGET_CHIPSET}" STREQUAL "NRF52840_XXAA")
     target_compile_definitions_multi("${target}" "NRF52840_XXAA")
     target_compile_definitions_multi("${target}" "NRF52840")
@@ -51,6 +57,9 @@ foreach(target ${FEATURE_SETS})
   if("${TARGET_CHIPSET}" STREQUAL "NRF52832_XXAA" AND ${TARGET_STACK} STREQUAL "NRF_S132_V7_3_0")
     target_link_options_multi("${target}" "-T${PROJECT_SOURCE_DIR}/linker/gcc_nrf52832_xxaa_s132_v7.ld")
     set_property(TARGET "${target}" PROPERTY FM_MAX_APP_SIZE 163840) # 80 pages in total for App + Free Space, 40 * 4096
+  elseif("${TARGET_CHIPSET}" STREQUAL "NRF52833_XXAA" AND ${TARGET_STACK} STREQUAL "NRF_S140_V7_3_0")
+    target_link_options_multi("${target}" "-T${PROJECT_SOURCE_DIR}/linker/gcc_nrf52833_xxaa_s140_v7.ld")
+    set_property(TARGET "${target}" PROPERTY FM_MAX_APP_SIZE 159744) # 80 pages in total for App + Free Space, 39 * 4096
   elseif("${TARGET_CHIPSET}" STREQUAL "NRF52840_XXAA" AND ${TARGET_STACK} STREQUAL "NRF_S140_V7_3_0")
     target_link_options_multi("${target}" "-T${PROJECT_SOURCE_DIR}/linker/gcc_nrf52840_xxaa_s140_v7.ld")
     set_property(TARGET "${target}" PROPERTY FM_MAX_APP_SIZE 245000) # Calculated with an update chunk size of 128

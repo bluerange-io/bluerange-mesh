@@ -14,6 +14,18 @@
 	<script src="require.js"></script>
 	<script src="fruitymap.js"></script>
 	<script>
+		require.config({
+		    baseUrl: ".",
+		    paths: {
+		        "pixijs": "pixi",
+		    },
+		    shim: {
+		        'pixijs': {
+		            exports: 'PIXI'
+		        }
+		    }
+		});
+
 		window.onload = function () {
 			requirejs(["test/tests/mesh/testSimulatorMap"], function (test) {
 				test.default();

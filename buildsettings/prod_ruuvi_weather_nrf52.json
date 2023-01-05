@@ -1,14 +1,23 @@
 {
+	"settingsVersion":2,
 	"additionalArgs":{
 		"settings":"prod_ruuvi_weather_nrf52",
 		"make":"prod_ruuvi_weather_nrf52",
-		"platform":"nrf52",
 		"flash":"",
 		"devicetype":1
 	},
+	"genericSettings":{
+		"family":"NRF52",
+		"platform":"NRF52832",
+		"chipset":"NRF52832_XXAA"
+	},
 	"buildSettings":{
+		"toolchain":"gcc-arm-embedded-4.9-2015q3",
 		"environmentVariables":{
 			"FEATURESET":"prod_ruuvi_weather_nrf52"
 		}
+	},
+	"flashSettings":{
+		"stack":"s132_nrf52_5.1.0_softdevice.hex"
 	}
 }

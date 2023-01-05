@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -49,14 +49,24 @@ public:
     {
         //We have to boot up a simulator for this test because the PacketQueue uses the Logger
         CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+        //testerConfig.verbose = true;
         SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-        simConfig.nodeConfigName.insert( { "prod_sink_nrf52", 1 } );
+        simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
         tester = new CherrySimTester(testerConfig, simConfig);
         tester->sim->nodes[0].nodeConfiguration = "prod_sink_nrf52";
         tester->Start();
         NodeIndexSetter setter(0);
 
         startPage = (u8*)Utility::GetSettingsPageBaseAddress();
+    }
+
+    u8* GetFreeSpace(u8 dataLength) {
+        u8 padding = (4 - dataLength % 4) % 4;
+
+        u16 recordLength = dataLength + SIZEOF_RECORD_STORAGE_RECORD_HEADER + padding;
+
+        //Afterwards, there must be enough free space, otherwise it is not possible to save this record
+        return GS->recordStorage.GetFreeRecordSpace(recordLength);
     }
 
     void TearDown() override
@@ -75,7 +85,11 @@ public:
         return GS->recordStorage.IsRecordValid(*page, record);
     }
     void DefragmentPage(RecordStoragePage* pageToDefragment, bool force) {
-        GS->recordStorage.DefragmentPage(*pageToDefragment, false);
+        GS->recordStorage.DefragmentPage(*pageToDefragment, force);
+    }
+
+    u8 AddressToRecordStoragePageIdx(u8* address) {
+        return (u8)((address - startPage) / FruityHal::GetCodePageSize());
     }
 
     void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override
@@ -94,6 +108,178 @@ public:
         }
     }
 };
+
+TEST_F(TestRecordStorage, TestImmortalLockdownWithErrors) {
+    NodeIndexSetter setter(0);
+    constexpr size_t nTestRecords = 2 * 8;
+
+    //Setup
+    CheckedMemset(startPage, 0xff, numPages * FruityHal::GetCodePageSize());
+    RepairPages();
+    cherrySimInstance->SimCommitFlashOperations();
+
+    u8 data[] = { 1,2,3,4,5,6,7,8 };
+
+    // store immortal and mortal records
+    for (size_t i = 1; i <= nTestRecords; i++) {
+        GS->recordStorage.SaveRecord(i, data, 8, nullptr, 0, INVALID_WRAPPED_MODULE_ID);
+        cherrySimInstance->SimCommitFlashOperations();
+        if (i % 2 != 0) {
+            GS->recordStorage.ImmortalizeRecord(i, nullptr, 0);
+            cherrySimInstance->SimCommitFlashOperations();
+        }
+    }
+
+    GS->recordStorage.LockDownAndClearAllSettings(0, nullptr, 0);    // do a factory reset
+
+
+    // let some operations fail
+    DYNAMIC_ARRAY(failData1, 500);
+    for (size_t i = 0; i < 500; i++) {
+        if (i > 2 && i < 20) failData1[i] = 1;
+        else failData1[i] = i % 3 == 0 ? 1 : 0;
+    }
+    CheckedMemset(failData1, 1, 500);
+    cherrySimInstance->SimCommitSomeFlashOperations(failData1, 500);
+
+    // check that all and only the immortals survived
+    for (size_t i = 1; i <= nTestRecords; i++) {
+        RecordStorageRecord* record = (RecordStorageRecord*)GS->recordStorage.GetRecord(i);
+        if (record == nullptr && i % 2 != 0) FAIL() << "immortal " << i << " killed during reset!";
+        else if (record != nullptr && i % 2 == 0) FAIL() << "mortal " << i << " survived reset!";
+        if (record != nullptr) {
+            for (size_t j = 0; j < 8; j++) {
+                if (record->data[j] != data[j]) FAIL() << "record " << i << " was corrupted!";
+            }
+        }
+    }
+}
+
+TEST_F(TestRecordStorage, TestImmortalLockdownPowerLoss) {
+    NodeIndexSetter setter(0);
+    constexpr size_t nTestImmortals = 15;
+
+    //Setup
+    CheckedMemset(startPage, 0xff, numPages * FruityHal::GetCodePageSize());
+    RepairPages();
+    cherrySimInstance->SimCommitFlashOperations();
+
+    u8 immortalData[] = { 1,2,3,4,5,6,7,8 };
+
+    // store some immortals
+    for (size_t i = 1; i <= nTestImmortals; i++) {
+        GS->recordStorage.SaveRecord(i, immortalData, 8, nullptr, 0, INVALID_WRAPPED_MODULE_ID);
+        cherrySimInstance->SimCommitFlashOperations();
+        GS->recordStorage.ImmortalizeRecord(i, nullptr, 0);
+        cherrySimInstance->SimCommitFlashOperations();
+    }
+
+    GS->recordStorage.LockDownAndClearAllSettings(0, nullptr, 0);    // do a factory reset
+
+
+    // commit less flash operations than immortals
+    DYNAMIC_ARRAY(failData, nTestImmortals);
+    CheckedMemset(failData, 0, nTestImmortals);
+    cherrySimInstance->SimCommitSomeFlashOperations(failData, nTestImmortals - 12);
+
+    cherrySimInstance->ResetCurrentNode(RebootReason::HARDFAULT, false, true);
+
+    cherrySimInstance->SimCommitFlashOperations();
+
+    // check that the immortals survived
+    for (size_t i = 1; i <= nTestImmortals; i++) {
+        RecordStorageRecord* record = (RecordStorageRecord*)GS->recordStorage.GetRecord(i);
+        if (record == nullptr) FAIL() << "immortal " << i << " killed in reset!";
+        else {
+            for (size_t j = 0; j < 8; j++) {
+                if (record->data[j] != immortalData[j]) FAIL() << "immortal " << i << " was corrupted!";
+            }
+        }
+    }
+}
+
+TEST_F(TestRecordStorage, TestImmortalLockdownWhileDefragmenting) {
+    NodeIndexSetter setter(0);
+
+    //Setup
+    CheckedMemset(startPage, 0xff, numPages * FruityHal::GetCodePageSize());
+    RepairPages();
+    cherrySimInstance->SimCommitFlashOperations();
+
+    u8 mortalData[] = { 8,7,6,5,4,3,2,1 };
+    u8 immortalData[] = { 1,2,3,4,5,6,7,8 };
+
+
+    GS->recordStorage.SaveRecord(1, mortalData, 8, nullptr, 0); // will be saved on page 1 since page 0 was promoted to swap page by repair
+    cherrySimInstance->SimCommitFlashOperations();
+
+    RecordStoragePage* page = (RecordStoragePage*)(startPage + FruityHal::GetCodePageSize());
+    DefragmentPage(page, true); // defragment page 1 so page 0 is not the swap page anymore
+    cherrySimInstance->SimCommitFlashOperations();
+
+    logt("WARNING", "---- TEST SAVE ----");
+
+    RecordStorageRecord* freeSpace = (RecordStorageRecord*)GetFreeSpace(8);
+    // store some mortals and an immortal
+    for (size_t i = 2; i < 10; i++) {
+        GS->recordStorage.SaveRecord(i, mortalData, 8, nullptr, 0);
+        cherrySimInstance->SimCommitFlashOperations();
+    }
+    GS->recordStorage.SaveRecord(10, immortalData, 8, nullptr, 0);
+    cherrySimInstance->SimCommitFlashOperations();
+    GS->recordStorage.ImmortalizeRecord(10, nullptr, 0, nullptr, 0);
+    cherrySimInstance->SimCommitFlashOperations();
+
+    // store some mortals and an immortal
+    for (size_t i = 11; i < 20; i++) {
+        GS->recordStorage.SaveRecord(i, mortalData, 8, nullptr, 0);
+        cherrySimInstance->SimCommitFlashOperations();
+    }
+
+    // create an immortal
+    GS->recordStorage.SaveRecord(20, immortalData, 8, nullptr, 0, INVALID_WRAPPED_MODULE_ID);
+    cherrySimInstance->SimCommitFlashOperations();
+    GS->recordStorage.ImmortalizeRecord(20, nullptr, 0);
+    cherrySimInstance->SimCommitFlashOperations();
+
+    u8 record2IsOnPage = AddressToRecordStoragePageIdx((u8*)freeSpace);
+    if (record2IsOnPage != 0) FAIL() << "page 0 is no swap page and has space, should have been saved there";
+
+    // defrag page 0 and immediately start a lockdown/factory reset
+    page = (RecordStoragePage*)(startPage);
+    DefragmentPage(page, true);
+    GS->recordStorage.LockDownAndClearAllSettings(0, nullptr, 0);    // do a factory reset
+    cherrySimInstance->SimCommitFlashOperations();
+
+
+    // check that only the immortals survived
+    u8* data = GS->recordStorage.GetRecordData(10).data;
+    RecordStorageRecord* record = GS->recordStorage.GetRecord(10);
+    if (data == nullptr || record == nullptr) {
+        FAIL() << "immortals shouldn't die!10";
+    }
+    //Check that the data is correct
+    for (size_t i = 0; i < 8; i++) {
+        if (data[i] != i + 1)
+            FAIL() << "Data changed!";
+    }
+
+    data = GS->recordStorage.GetRecordData(20).data;
+    record = GS->recordStorage.GetRecord(20);
+    if (data == nullptr || record == nullptr) {
+        FAIL() << "immortals shouldn't die!20";
+    }
+    for (size_t i = 0; i < 8; i++) {
+        if (data[i] != i + 1)
+            FAIL() << "Data changed!";
+    }
+
+    // this shouldn't fail even in a situation (that we created above) where a defrag was in progress when the reset was started
+    for (size_t i = 1; i < 10; i++)
+        if (GS->recordStorage.GetRecord(i) != nullptr) FAIL() << "mortal " << i << " shouldnt survive a lockdown!";
+    for (size_t i = 11; i < 20; i++)
+        if (GS->recordStorage.GetRecord(i) != nullptr) FAIL() << "mortal " << i << " shouldnt survive a lockdown!";
+}
 
 
 TEST_F(TestRecordStorage, TestCleanup) {

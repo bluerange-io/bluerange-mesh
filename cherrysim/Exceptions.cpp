@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -28,6 +28,7 @@
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "Exceptions.h"
+#include "CherrySim.h"
 #include <map>
 
 static std::map<std::type_index, int> ignoredExceptions;
@@ -64,6 +65,9 @@ void Exceptions::EnableExceptionByIndex(std::type_index index)
 
 bool Exceptions::IsExceptionEnabledByIndex(std::type_index index)
 {
+    //Check if all non-critical exceptions should be ignored
+    if (cherrySimInstance != nullptr && cherrySimInstance->simConfig.disableNonCriticalExceptions) return false;
+
     if (ignoredExceptions.find(index) == ignoredExceptions.end()) {
         return true;
     }

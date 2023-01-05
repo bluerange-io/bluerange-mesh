@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -87,6 +87,10 @@ private:
     u16 timeSinceLastEnrolledNodesSyncDs = 0;
 
     u32 uniqueConnectionIdCounter = 0; //Counts all created connections to assign "unique" ids
+
+    // store these so that the mac addresse can be sent as a livereport in the gatt disconnect event handler
+    u32 recentlyDisconnectedMACAddressPart = 0;
+    u16 recentlyDisconnectedConnectionHandle = FruityHal::FH_BLE_INVALID_HANDLE;
 
     BaseConnection* GetRawConnectionByUniqueId(u32 uniqueConnectionId) const;
     BaseConnection* GetRawConnectionFromHandle(u16 connectionHandle) const;

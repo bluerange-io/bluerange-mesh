@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -145,7 +145,7 @@ extern "C" {
 
 #define ACTIVATE_RUUVI_WEATHER_MODULE 1
 
-#define ACTIVATE_UNSECURE_MEMORY_READBACK 1
+#define ACTIVATE_UNSECURE_DEBUG_FUNCTIONALITY 1
 
 #define ACTIVATE_CONN_PARAM_UPDATE         1
 #define ACTIVATE_CONN_PARAM_UPDATE_LOGGING 1
@@ -340,6 +340,7 @@ typedef struct
 typedef enum
 {
     NRF_UART_PARITY_EXCLUDED = 1,//Not the original value!
+    NRF_UART_PARITY_INCLUDED = 2,//Not the original value!
 } nrf_uart_parity_t;
 
 #define NRF_UART_INT_MASK_RXTO 0 //Not the original value!

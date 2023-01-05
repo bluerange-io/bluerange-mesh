@@ -29,6 +29,6 @@ Do not hesitate to ask questions, submit issues and add comments. Mail us throug
 == Who Are We?
 image:mway.png[mway_logo]
 
-This project is under active development at xref:http://www.mwaysolutions.com/[M-Way Solutions GmbH], Germany.
+This project is under active development at link:http://www.mwaysolutions.com/[M-Way Solutions GmbH], Germany.
 
 We use FruityMesh ourselves in conjunction with our custom MeshGateway to build services such as connected lights, asset tracking and much more for our customers.

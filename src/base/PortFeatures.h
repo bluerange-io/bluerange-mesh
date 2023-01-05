@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -40,7 +40,7 @@
 #define FEATURE_AVAILABLE(FEATURE) (FEATURE ## _AVAILABLE)
 
 // Chipset string name (Only used for logging)
-#if defined(NRF52832) || defined(NRF52840)
+#if defined(NRF52832) || defined(NRF52840) || defined(NRF52833)
     #define CHIPSET_NAME "NRF52"
 #elif defined(SIM_ENABLED)
     #define CHIPSET_NAME "SIMULATOR"
@@ -50,23 +50,10 @@
     #error "No defined chipset"
 #endif
 
-// Default chipset board ID if not given (e.g. the development board)
-#if defined(NRF52832)
-    #define BOARD_TYPE 4
-#elif defined(NRF52840)
-    #define BOARD_TYPE 18
-#elif defined(SIM_ENABLED)
-    #define BOARD_TYPE 19
-#elif defined(ARM_TEMPLATE)
-    #define BOARD_TYPE 1 // just for now
-#else
-    #error "No defined chipset"
-#endif
-
 // INS
 #if defined(NRF52840)
     #define INS_AVAILABLE 1
-#elif defined(NRF52832)
+#elif defined(NRF52832) || defined(NRF52833)
     #define INS_AVAILABLE 0
 #elif defined(SIM_ENABLED)
     #define INS_AVAILABLE 1
@@ -77,7 +64,7 @@
 #endif
 
 // adc internal measurement
-#if defined(NRF52832) || defined(NRF52840)
+#if defined(NRF52832) || defined(NRF52840) || defined(NRF52833)
     #define ADC_INTERNAL_MEASUREMENT_AVAILABLE 1
 #elif defined(SIM_ENABLED)
     #define ADC_INTERNAL_MEASUREMENT_AVAILABLE 0

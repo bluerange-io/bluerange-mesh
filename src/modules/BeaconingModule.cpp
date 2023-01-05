@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -76,7 +76,6 @@ void BeaconingModule::ResetToDefaultConfiguration()
 
 void BeaconingModule::ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableConfigLength)
 {
-#if IS_INACTIVE(GW_SAVE_SPACE)
     //Start the Module...
     //Delete previous jobs if they exist
     for(u32 i=0; i<advJobHandles.size(); i++){
@@ -107,7 +106,6 @@ void BeaconingModule::ConfigurationLoadedHandler(u8* migratableConfig, u16 migra
 
         advJobHandles[i] = GS->advertisingController.AddJob(job);
     }
-#endif
 }
 
 void BeaconingModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const* packetHeader)

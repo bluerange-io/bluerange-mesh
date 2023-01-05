@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -97,17 +97,21 @@ private:
     std::string        messagePart;
     std::string        messageComplete = "";
     bool               found           = false;
+    // if false e.g. SimulateUntilMessagesReceived will throw an Exception should the message be received
+    bool               shouldOccur = true;
 
     bool Matches(const std::string &message);
     void MakeFound(const std::string &messageComplete);
     bool MatchesRegex(const std::string &message);
 
 public:
-    SimulationMessage(TerminalId, const std::string& messagePart);
-    SimulationMessage(NodeEntryPredicate predicate, const std::string& messagePart);
+    SimulationMessage(TerminalId, const std::string& messagePart, bool shouldOccur=true);
+    SimulationMessage(NodeEntryPredicate predicate, const std::string& messagePart, bool shouldOccur=true);
     bool CheckAndSet(const std::string &message, bool useRegex);
     bool IsFound() const;
+    bool ShouldOccur() const { return shouldOccur; }
     const std::string& GetCompleteMessage() const;
+    void PrintState() const;
 
     bool AppliesToNodeEntry(const NodeEntry * nodeEntry) const
     {
@@ -141,6 +145,7 @@ private:
     SimConfiguration simConfig = {};
     void _SimulateUntilMessageReceived(int timeoutMs, std::function<void()> executePerStep = std::function<void()>());
     bool started = false;
+    bool unwantedMessageOccured = false;
 
 public:
     CherrySimTester(CherrySimTesterConfig testerConfig, SimConfiguration simConfig);

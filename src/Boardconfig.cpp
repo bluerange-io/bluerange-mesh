@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -34,9 +34,29 @@
 #include <GlobalState.h>
 #include <RecordStorage.h>
 
+//At compile time, we choose a default boardId depending on the chipset
+//This is usually the boardId of the development kit for this chipset
+//If no boardId is specified in the UICR, this id will be used
+#ifdef BOARD_TYPE
+// The board type can also be defined through the featureset.h at compile time
+#elif defined(NRF52832)
+    #define BOARD_TYPE 4
+#elif defined(NRF52833)
+    #define BOARD_TYPE 39
+#elif defined(NRF52840)
+    #define BOARD_TYPE 18
+#elif defined(SIM_ENABLED)
+    #define BOARD_TYPE 19
+#elif defined(ARM_TEMPLATE)
+    #define BOARD_TYPE 1 // just for now
+#else
+    #error "No defined BOARD_TYPE"
+#endif
+
 extern void SetBoard_4(BoardConfiguration* c);
 extern void SetBoard_18(BoardConfiguration* c);
 extern void SetBoard_19(BoardConfiguration* c);
+extern void SetBoard_39(BoardConfiguration* c);
 
 void* fmBoardConfigPtr;
 
@@ -93,6 +113,7 @@ void Boardconf::ResetToDefaultConfiguration()
     //Now, we load all Default boards (nRf Development kits)
     SetBoard_4(&configuration);
     SetBoard_18(&configuration);
+    SetBoard_39(&configuration);
 
 #ifdef SIM_ENABLED
 #ifndef GITHUB_RELEASE

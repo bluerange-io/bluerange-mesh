@@ -66,7 +66,7 @@ Live reports are a way to send information about errors, connections, disconnect
 * Info (150)
 * Debug (200)
 
-Live reports can be generated in the firmware using the `SendLiveReport` method. Two extra parameters can be given that can contain additional information for the specific report/error. These will of course only be received if the node is currently part of the mesh. If this is not the case, than it might be better to use the xref:#ErrorLog[error log].
+Live reports can be generated in the firmware using the `SendLiveReport` method. Two extra parameters can be given that can contain additional information for the specific report/error. The meaning of the extras is documented at the LiveReportType definition. LiveReports will of course only be received if the node is currently part of the mesh. If this is not the case, than it might be better to use the xref:#ErrorLog[error log].
 
 [source,C++]
 ----

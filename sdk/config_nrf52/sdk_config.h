@@ -1610,6 +1610,15 @@
 #define APP_USBD_DEVICE_VER_MINOR 0
 #endif
 
+// <o> APP_USBD_DEVICE_VER_SUB - Sub-minor device version  <0-9> 
+
+
+// <i> Sub-minor device version, will be converted automatically to BCD notation. Use just decimal values.
+
+#ifndef APP_USBD_DEVICE_VER_SUB
+#define APP_USBD_DEVICE_VER_SUB 0
+#endif
+
 // <e> APP_USBD_EVENT_QUEUE_ENABLE - Enable event queue
 
 // <i> This is the default configuration when all the events are placed into internal queue.

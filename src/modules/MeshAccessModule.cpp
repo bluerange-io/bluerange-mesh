@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -733,7 +733,6 @@ void MeshAccessModule::MeshConnectionChangedHandler(MeshConnection& connection)
 #ifdef TERMINAL_ENABLED
 TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize)
 {
-#if IS_INACTIVE(SAVE_SPACE)
     if(TERMARGS(0, "maconn"))
     {
         if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
@@ -778,7 +777,6 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-#endif
 
     //React on commands, return true if handled, false otherwise
     if (commandArgsSize >= 4 && TERMARGS(0, "action") && TERMARGS(2, moduleName))
@@ -902,7 +900,6 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
 void MeshAccessModule::GapAdvertisementReportEventHandler(const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent)
 {
     const AdvPacketServiceAndDataHeader* packet = (const AdvPacketServiceAndDataHeader*)advertisementReportEvent.GetData();
-#if IS_INACTIVE(GW_SAVE_SPACE)
     if(logNearby){
         //Check if the advertising packet is an mesh access packet
         if (
@@ -938,7 +935,7 @@ void MeshAccessModule::GapAdvertisementReportEventHandler(const FruityHal::GapAd
             }
         }
     }
-#endif
+    
     FruityHal::BleGapAddr addr;
     addr.addr_type = advertisementReportEvent.GetPeerAddrType();
     addr.addr = advertisementReportEvent.GetPeerAddr();

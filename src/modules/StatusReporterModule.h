@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -333,6 +333,7 @@ private:
 
         void MeshConnectionChangedHandler(MeshConnection& connection) override final;
 
+        // You can read about the meaning of extra and extra2 at the definition of LiveReportTypes
         void SendLiveReport(LiveReportTypes type, u16 requestHandle, u32 extra, u32 extra2) const;
 
         u8 GetBatteryVoltage() const;

@@ -1,5 +1,6 @@
 = DeviceOff
 
+[#DeviceOff]
 == Purpose
 The _DeviceOff_ functionality allows turning device off by pressing a power button. It can be used to drastically reduce the battery consumption (to less than 1 µA) so that an unused device can be shipped to a customer and can be stored in stock for a long time with the battery inserted.
 

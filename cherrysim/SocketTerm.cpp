@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -46,9 +46,6 @@
 #include <arpa/inet.h>
 #endif
 
-
-#define SERVER_PORT 5556
-
 constexpr size_t TRACE_BUFFER_SIZE = 500;
 static constexpr int INPUT_CHUNK_SIZE = 1 * 1024;
 static constexpr int MAX_INPUT_BUFFER_SIZE = 100 * 1024;
@@ -66,7 +63,7 @@ SocketTerm::~SocketTerm()
 {
 }
 
-void SocketTerm::CreateServerSocket()
+void SocketTerm::CreateServerSocket(uint16_t port)
 {
     int listen_fd;
     struct sockaddr_in listen_addr;
@@ -84,7 +81,7 @@ void SocketTerm::CreateServerSocket()
     CheckedMemset(&listen_addr, 0, sizeof(listen_addr));
     listen_addr.sin_family = AF_INET;
     listen_addr.sin_addr.s_addr = INADDR_ANY;
-    listen_addr.sin_port = htons(SERVER_PORT);
+    listen_addr.sin_port = htons(port);
     if (bind(listen_fd, (struct sockaddr*) & listen_addr, sizeof(listen_addr)) < 0) {
         printf("SocketTerm: Could not bind to Socket" EOL);
         SIMEXCEPTION(IllegalStateException);
@@ -109,7 +106,7 @@ void SocketTerm::CreateServerSocket()
     event_assign(&ev_accept, eventBase, listen_fd, EV_READ | EV_PERSIST, SocketTerm::ClientConnectedHandler, nullptr);
     event_add(&ev_accept, nullptr);
 
-    printf("SocketTerm: Listening on port %u" EOL, (u32)SERVER_PORT);
+    printf("SocketTerm: Listening on port %u" EOL, (u32)port);
 }
 
 void SocketTerm::ClientConnectedHandler(int fd, short ev, void *arg)

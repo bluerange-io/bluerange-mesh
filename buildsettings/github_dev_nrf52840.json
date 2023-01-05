@@ -1,15 +1,22 @@
 {	
+	"settingsVersion":2,
 	"additionalArgs":{
 		"settings":"github_dev_nrf52840",
 		"make":"github_dev_nrf52840",
 		"flash":""
 	},
+	"genericSettings":{
+		"family":"NRF52",
+		"platform":"NRF52840",
+		"chipset":"NRF52840_XXAA"
+	},
 	"buildSettings":{
+		"toolchain":"gcc-arm-embedded-4.9-2015q3",
 		"environmentVariables":{
 			"FEATURESET":"github_dev_nrf52840"
 		}
 	},
-	"moduleConfigs":[
-		
-	]
+	"flashSettings":{
+		"stack":"s140_nrf52840_6.1.0_softdevice.hex"
+	}
 }

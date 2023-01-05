@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -701,7 +701,6 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 
             }
             break;
-#if IS_INACTIVE(SAVE_SPACE)
         case MessageType::UPDATE_CONNECTION_INTERVAL:
             {
                 ConnPacketUpdateConnectionInterval const * packet = (ConnPacketUpdateConnectionInterval const *) packetHeader;
@@ -709,7 +708,6 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
                 GS->cm.SetMeshConnectionInterval(packet->newInterval);
             }
             break;
-#endif
         default:    //Surpress GCC warning of unhandled MessageTypes
             break;
     }
@@ -724,7 +722,6 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
             SendModuleList(packet->header.sender, packet->requestHandle);
 
         }
-#if IS_INACTIVE(SAVE_SPACE)
         else if(packet->actionType == (u8)Module::ModuleConfigMessages::MODULE_LIST_V2)
         {
             logjson_partial("MODULE", "{\"nodeId\":%u,\"type\":\"module_list\",\"modules\":[", packet->header.sender);
@@ -739,7 +736,6 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
             }
             logjson("MODULE", "]}" SEP);
         }
-#endif
     }
 
 
@@ -748,7 +744,36 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
 
         //Check if our module is meant and we should trigger an action
         if(packet->moduleId == ModuleId::NODE){
+            if (packet->actionType == (u8)NodeModuleTriggerActionMessages::GET_TIME) {
+                u32 unixTimeStamp = GS->timeManager.GetUtcTime();
+                TimeSyncState state;
+                if (GS->timeManager.IsTimeCorrected()) {
+                    state = TimeSyncState::CORRECTED;
+                }
+                else if (GS->timeManager.IsTimeSynced()) {
+                    state = TimeSyncState::SYNCED;
+                }
+                else {
+                    state = TimeSyncState::UNSYNCED;
+                }
+                GetTimeResponseMessage data{
+                    unixTimeStamp,
+                    (i16)GS->timeManager.GetOffset(),
+                    state,
+                    GS->timeManager.IsTimeMaster(),
+                    0
+                };
 
+                SendModuleActionMessage(
+                    MessageType::MODULE_ACTION_RESPONSE,
+                    packetHeader->sender,
+                    (u8)NodeModuleActionResponseMessages::GET_TIME_RESULT,
+                    0,
+                    (u8*)&data,
+                    SIZEOF_GET_TIME_RESPONSE_MESSAGE,
+                    false
+                );
+            }
 
             if(packet->actionType == (u8)NodeModuleTriggerActionMessages::SET_DISCOVERY){
 
@@ -980,8 +1005,23 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
         ConnPacketModule const * packet = (ConnPacketModule const *)packetHeader;
         //Check if our module is meant and we should trigger an action
         if(packet->moduleId == ModuleId::NODE){
+            if (packet->actionType == (u8)NodeModuleActionResponseMessages::GET_TIME_RESULT) {
+                GetTimeResponseMessage const * message = (GetTimeResponseMessage const *)(packet->data);
 
-            if (packet->actionType == (u8)NodeModuleActionResponseMessages::SET_DISCOVERY_RESULT)
+                logjson("NODE", "{\"type\":\"get_time_result\",\"nodeId\":%d,\"module\":%u,\"syncState\":%u,\"time\":%u,\"offset\":%u,\"master\":%u}" SEP,
+                    packetHeader->sender,
+                    (u32)ModuleId::NODE,
+                    (u32)message->timeSyncState,
+                    message->unixTimeStamp,
+                    message->offset,
+                    message->isTimeMaster);
+
+                //Now, for convenience, we also log the time in a more human readable format
+                char timestring[100];
+                TimeManager::ConvertTimeToString(message->unixTimeStamp, message->offset, 0, timestring, sizeof(timestring));
+                logt("NODE", R"(Node %u reported: %s, timeSyncState: %u, isTimeMaster: %s)", packetHeader->sender, timestring, (u32)message->timeSyncState, message->isTimeMaster ? "true" : "false");
+            }
+            else if (packet->actionType == (u8)NodeModuleActionResponseMessages::SET_DISCOVERY_RESULT)
             {
                 logjson("NODE", "{\"type\":\"set_discovery_result\",\"nodeId\":%d,\"module\":%u}" SEP, packetHeader->sender, (u32)ModuleId::NODE);
             }
@@ -2570,6 +2610,21 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
             //But reroute it to our own node
             const NodeId destinationNode = Utility::TerminalArgumentToNodeId(commandArgs[1]);
 
+            if (TERMARGS(3, "gettime") && commandArgsSize >= 4)
+            {
+                SendModuleActionMessage(
+                    MessageType::MODULE_TRIGGER_ACTION,
+                    destinationNode,
+                    (u8)NodeModuleTriggerActionMessages::GET_TIME,
+                    0,
+                    nullptr,
+                    0,
+                    false
+                );
+
+                return TerminalCommandHandlerReturnType::SUCCESS;
+            }
+
             if(commandArgsSize >= 5 && TERMARGS(3 ,"discovery"))
             {
                 u8 discoveryState = (TERMARGS(4 , "idle")) ? 0 : 1;
@@ -2719,17 +2774,14 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         }
     }
 
-#if IS_INACTIVE(CLC_GW_SAVE_SPACE)    //If you require a reset, use action reset instead
     /************* SYSTEM ***************/
     if (TERMARGS(0 ,"reset"))
     {
         Reboot(1, RebootReason::LOCAL_RESET);
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-#endif //IS_INACTIVE(CLC_GW_SAVE_SPACE)
     /************* NODE ***************/
     //Get a full status of the node
-#if IS_INACTIVE(GW_SAVE_SPACE)
     else if (TERMARGS(0, "status"))
     {
         PrintStatus();
@@ -2775,7 +2827,6 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
     }
 
 #endif //SIM_ENABLED
-#endif //IS_INACTIVE(GW_SAVE_SPACE)
 
     // ################# Raw Data Protocol #######################
     //Sends a small packet that can have different protocol types
@@ -3032,24 +3083,23 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
     else if (TERMARGS(0, "settime") && commandArgsSize >= 3)
     {
         //Set the time for our node
-        GS->timeManager.SetTime(strtoul(commandArgs[1], nullptr, 10), 0, (i16)strtoul(commandArgs[2], nullptr, 10));
+        GS->timeManager.SetMasterTime(strtoul(commandArgs[1], nullptr, 10), 0, (i16)strtol(commandArgs[2], nullptr, 10));
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-#if IS_INACTIVE(CLC_GW_SAVE_SPACE)
     //Display the time of this node
-    else if(TERMARGS(0, "gettime"))
+    else if (TERMARGS(0, "gettime"))
     {
-        char timestring[80];
-        GS->timeManager.convertLocalTimeToString(timestring);
+        char timestring[100];
+        GS->timeManager.ConvertTimeToString(timestring, sizeof(timestring));
 
         if (GS->timeManager.IsTimeSynced())
         {
-            trace("Time is currently %s" EOL, timestring);        
+            trace("Time is currently %s" EOL, timestring);
         }
         else
         {
-            trace("Time is currently not set: %s" EOL, timestring);    
+            trace("Time is currently not set: %s" EOL, timestring);
         }
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
@@ -3058,7 +3108,6 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         Conf::GetInstance().terminalMode = TerminalMode::PROMPT;
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-#endif
     else if (TERMARGS(0, "stopterm"))
     {
         Conf::GetInstance().terminalMode = TerminalMode::JSON;
@@ -3125,7 +3174,6 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-#if IS_INACTIVE(SAVE_SPACE)
     //Print the JOIN_ME buffer
     else if (TERMARGS(0, "bufferstat"))
     {
@@ -3152,7 +3200,6 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         if (err == ErrorType::SUCCESS) return TerminalCommandHandlerReturnType::SUCCESS;
         else return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
     }
-#if IS_INACTIVE(GW_SAVE_SPACE)
     //Stop the state machine
     else if (TERMARGS(0, "stop"))
     {
@@ -3168,10 +3215,6 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-#endif
-#endif
-
-#if IS_INACTIVE(SAVE_SPACE)
     //Disconnect a connection by its handle or all
     else if (TERMARGS(0, "disconnect"))
     {
@@ -3242,7 +3285,6 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         if (err == ErrorType::SUCCESS) return TerminalCommandHandlerReturnType::SUCCESS;
         else return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
     }
-#endif
     /************* UART COMMANDS ***************/
     //Get the status information of this node
     else if(TERMARGS(0, "get_plugged_in"))
@@ -3250,7 +3292,6 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         logjson("NODE", "{\"type\":\"plugged_in\",\"nodeId\":%u,\"serialNumber\":\"%s\",\"fmVersion\":%u}" SEP, configuration.nodeId, RamConfig->GetSerialNumber(), GS->config.GetFruityMeshVersion());
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-#if IS_INACTIVE(SAVE_SPACE)
     //Query all modules from any node
     else if((TERMARGS(0, "get_modules")))
     {
@@ -3271,8 +3312,6 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-#endif
-#if IS_INACTIVE(GW_SAVE_SPACE)
     else if(TERMARGS(0, "sep")){
         trace(EOL);
         for(u32 i=0; i<80*5; i++){
@@ -3283,7 +3322,6 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         trace(EOL);
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-#endif
     else if (TERMARGS(0, "enable_corruption_check"))
     {
         logjson("NODE", "{\"type\":\"enable_corruption_check_response\",\"err\":0,\"check\":\"crc32\"}" SEP);

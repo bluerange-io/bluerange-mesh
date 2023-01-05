@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -374,6 +374,188 @@ void RecordStorage::ImmortalizeRecordInternal(ImmortalizeRecordOperation& op)
     }
 }
 
+bool RecordStorage::HasImmortalRecords() {
+    //Go through all pages
+    for (u32 i = 0; i < RECORD_STORAGE_NUM_PAGES; i++)
+    {
+        //Check if this page is active
+        RecordStoragePage& page = getPage(i);
+        if (GetPageState(page) != RecordStoragePageState::ACTIVE) continue;
+
+        //Get first record
+        RecordStorageRecord* record = (RecordStorageRecord*)page.data;
+
+        //Iterate through all valid records
+        while (IsRecordValid(page, record))
+        {
+            if (!record->mortal) {
+                return true;
+            }
+            record = (RecordStorageRecord*)((u8*)record + record->recordLength);
+        }
+    }
+    return false;
+}
+
+
+// Very similar to DefragmentPage but will only copy immortal records to the swap page,
+// mortals are left to be erased. Used in a lockdown if there are immortals
+void RecordStorage::ClearPageAndSaveImmortals(RecordStoragePage& page, bool force) {
+    logt("WARNING", "defr");
+
+    if (repairStage != RepairStage::NO_REPAIR) {
+        SIMEXCEPTION(IllegalStateException);
+    }
+
+    if (defragmentationStage == DefragmentationStage::NO_DEFRAGMENTATION) {
+        defragmentPage = &page;
+        defragmentSwapPage = GetSwapPage();
+        defragmentationStage = DefragmentationStage::MOVE_TO_SWAP_PAGE;
+
+        if (!force && GetFreeSpaceOnPage(*defragmentPage) == GetFreeSpaceWhenDefragmented(*defragmentPage)) {
+            logt("RS", "No defrag possible");
+            defragmentationStage = DefragmentationStage::NO_DEFRAGMENTATION;
+            return;
+        }
+        if (defragmentSwapPage == nullptr)
+        {
+            GS->logger.LogCustomError(CustomErrorTypes::FATAL_RECORD_STORAGE_COULD_NOT_FIND_SWAP_PAGE, 0);
+            defragmentationStage = DefragmentationStage::NO_DEFRAGMENTATION;
+            SIMEXCEPTION(IllegalStateException);
+            return;
+        }
+
+        logt("RS", "Defragmenting Page %u (free %u, after %u)", ((u32)defragmentPage - (u32)FLASH_REGION_START_ADDRESS) / (u32)FruityHal::GetCodePageSize(), GetFreeSpaceOnPage(*defragmentPage), GetFreeSpaceWhenDefragmented(*defragmentPage));
+    }
+
+    //If there are items in the flashStorage queue, we wait until we get called after the queue is empty
+    if (GS->flashStorage.GetNumberOfActiveTasks() != 0) {
+        logt("WARNING", "tasks %u", GS->flashStorage.GetNumberOfActiveTasks());
+        return;
+    }
+
+
+    if (defragmentationStage == DefragmentationStage::MOVE_TO_SWAP_PAGE)
+    {
+        //Move records one by one to the swap page
+        RecordStorageRecord* record = (RecordStorageRecord*)defragmentPage->data;
+        RecordStorageRecord* swapRecord = (RecordStorageRecord*)defragmentSwapPage->data;
+        RecordStorageRecord* freeSpacePtr = (RecordStorageRecord*)defragmentSwapPage->data;
+
+        //This loop goes through all records, if it finds a record that needs to be moved (and wasn't already), it will move it
+        while (IsRecordValid(*defragmentPage, record))
+        {
+            //Only copy record if it is not outdated (e.g. newer version on a different page)
+            if (GetRecord(record->recordId) == record && record->recordActive && !record->mortal)
+            {
+                //Check if record was already moved to swap page
+                bool found = false;
+                while (IsRecordValid(*defragmentSwapPage, swapRecord)) {
+                    if (record->recordId == swapRecord->recordId) {
+                        freeSpacePtr = (RecordStorageRecord*)((u8*)swapRecord + swapRecord->recordLength);
+                        found = true;
+                        break;
+                    }
+                    swapRecord = (RecordStorageRecord*)((u8*)swapRecord + swapRecord->recordLength);
+                }
+                //If the record was not found on the swap page, we must move it
+                if (!found) {
+                    logt("RS", "Moving record %u", (u32)record);
+                    GS->flashStorage.CacheAndWriteData((u32*)record, (u32*)freeSpacePtr, record->recordLength, nullptr, (u32)FlashUserTypes::DEFAULT);
+                    return;
+                }
+            }
+            //Update reference to record
+            record = (RecordStorageRecord*)((u8*)record + record->recordLength);
+        }
+
+        defragmentationStage = DefragmentationStage::WRITE_PAGE_HEADER;
+    }
+
+    if (defragmentationStage == DefragmentationStage::WRITE_PAGE_HEADER)
+    {
+
+        //Check the current versionCounter of all pages
+        u16 maxVersionCounter = 0;
+        for (u32 i = 0; i < RECORD_STORAGE_NUM_PAGES; i++) {
+            RecordStoragePage& page = getPage(i);
+            if (GetPageState(page) != RecordStoragePageState::ACTIVE) continue;
+            if (page.versionCounter > maxVersionCounter) {
+                maxVersionCounter = page.versionCounter;
+            }
+        }
+
+        //Currently, we do not support more than 65000 erase cycles
+        if (maxVersionCounter == UINT16_MAX) {
+            GS->logger.LogCustomError(CustomErrorTypes::FATAL_RECORD_STORAGE_ERASE_CYCLES_HIGH, (u32)maxVersionCounter);
+            SIMEXCEPTION(IllegalStateException);
+            return;
+        }
+        else if (maxVersionCounter >= UINT16_MAX) {
+            GS->logger.LogCustomError(CustomErrorTypes::WARN_RECORD_STORAGE_ERASE_CYCLES_HIGH, (u32)maxVersionCounter);
+            SIMEXCEPTION(IllegalStateException);
+        }
+
+        //Next, write Active to this page with a version that is newer than all other pages
+        RecordStoragePage pageHeader;
+        CheckedMemset(&pageHeader, 0, sizeof(pageHeader));
+        pageHeader.magicNumber = RECORD_STORAGE_ACTIVE_PAGE_MAGIC_NUMBER;
+        pageHeader.versionCounter = maxVersionCounter + 1;
+
+        GS->flashStorage.CacheAndWriteData((u32*)&pageHeader, (u32*)defragmentSwapPage, SIZEOF_RECORD_STORAGE_PAGE_HEADER, this, (u32)FlashUserTypes::DEFAULT);
+
+        defragmentationStage = DefragmentationStage::ERASE_OLD_PAGE;
+    }
+    else if (defragmentationStage == DefragmentationStage::ERASE_OLD_PAGE)
+    {
+        //Finally, erase the page that we just swapped
+        GS->flashStorage.ErasePage(((u32)defragmentPage - FLASH_REGION_START_ADDRESS) / FruityHal::GetCodePageSize(), this, (u32)FlashUserTypes::DEFAULT);
+
+        defragmentationStage = DefragmentationStage::FINALIZE;
+    }
+    else if (defragmentationStage == DefragmentationStage::FINALIZE)
+    {
+        defragmentationStage = DefragmentationStage::NO_DEFRAGMENTATION;
+        //Call the listener manually because we did not queue another task
+        ProcessQueue(true);
+
+    }
+}
+
+// This function is continuously called from the itemExecuted handler when a page has been cleared.
+// It is only necessary in a lockdown if there are immortal records
+void RecordStorage::LockDownAndClearAllSettingsImmortalRecords()
+{
+    if (repairStage != RepairStage::NO_REPAIR || defragmentationStage != DefragmentationStage::NO_DEFRAGMENTATION) {
+        SIMEXCEPTION(IllegalStateException);
+    }
+    if (lockDownPageToEraseIdxImmortals >= RECORD_STORAGE_NUM_PAGES) {
+        logt("RS", "record Storage was cleaned");
+        lockDownPageToEraseIdxImmortals = 0;
+        lockDownStageImmortalRecords = LockDownStageImmortalRecords::LOCKED_DOWN;
+        RepairPages();
+        return;
+    }
+    else if (lockDownPageToEraseIdxImmortals == 0) {
+        logt("RS", "starting record storage lockdown");
+        recordStorageLockDown = true;
+    }
+
+    // Find a non empty page
+    while (GetPageState(getPage(lockDownPageToEraseIdxImmortals)) == RecordStoragePageState::EMPTY && lockDownPageToEraseIdxImmortals < RECORD_STORAGE_NUM_PAGES)
+    {
+        logt("RS", "page %u was empty.", lockDownPageToEraseIdxImmortals);
+        lockDownPageToEraseIdxImmortals++;
+    }
+
+    // Use the ClearPageAndSaveImmortals method to relocate only immortal records to the swap page and erase the page afterwards
+    if (lockDownPageToEraseIdxImmortals < RECORD_STORAGE_NUM_PAGES) {
+        logt("RS", "page %u will be erased.", lockDownPageToEraseIdxImmortals);
+        ClearPageAndSaveImmortals(getPage(lockDownPageToEraseIdxImmortals), true);
+    }
+    lockDownPageToEraseIdxImmortals++;
+}
+
 RecordStorageResultCode RecordStorage::LockDownAndClearAllSettings(ModuleIdWrapper responsibleModuleForShutDown, RecordStorageEventListener * callback, u32 userType)
 {
     //Check if we already have locked down
@@ -392,15 +574,30 @@ RecordStorageResultCode RecordStorage::LockDownAndClearAllSettings(ModuleIdWrapp
     lockDownCallback = callback;
     lockDownUserType = userType;
     lockDownModuleId = responsibleModuleForShutDown;
-    FlashStorageError flashRetVal = GS->flashStorage.ErasePages(TO_PAGE(startPage), RECORD_STORAGE_NUM_PAGES, this, (u32)FlashUserTypes::LOCK_DOWN);
-    if (flashRetVal == FlashStorageError::SUCCESS)
-    {
-        recordStorageLockDown = true;
+
+    if (HasImmortalRecords()) {
+        if (defragmentationStage == DefragmentationStage::NO_DEFRAGMENTATION && repairStage == RepairStage::NO_REPAIR) {
+            lockDownStageImmortalRecords = LockDownStageImmortalRecords::LOCKING_DOWN;
+            LockDownAndClearAllSettingsImmortalRecords();
+        }
+        else {
+            // finish the ongoing operation, once it is done LockDownAndClearAllSettingsImmortalRecords will be called from the itemExecutedHandler
+            lockDownStageImmortalRecords = LockDownStageImmortalRecords::LOCKDOWN_SCHEDULED;
+        }
+            
         return RecordStorageResultCode::SUCCESS;
     }
-    else
-    {
-        return RecordStorageResultCode::BUSY;
+    else {
+        FlashStorageError flashRetVal = GS->flashStorage.ErasePages(TO_PAGE(startPage), RECORD_STORAGE_NUM_PAGES, this, (u32)FlashUserTypes::LOCK_DOWN);
+        if (flashRetVal == FlashStorageError::SUCCESS)
+        {
+            recordStorageLockDown = true;
+            return RecordStorageResultCode::SUCCESS;
+        }
+        else
+        {
+            return RecordStorageResultCode::BUSY;
+        }
     }
 }
 
@@ -586,7 +783,7 @@ void RecordStorage::DefragmentPage(RecordStoragePage& pageToDefragment, bool for
 
     //If there are items in the flashStorage queue, we wait until we get called after the queue is empty
     if (GS->flashStorage.GetNumberOfActiveTasks() != 0){
-        logt("ERROR", "tasks %u", GS->flashStorage.GetNumberOfActiveTasks());
+        //logt("ERROR", "tasks %u", GS->flashStorage.GetNumberOfActiveTasks());
         return;
     }
 
@@ -968,74 +1165,152 @@ void RecordStorage::ProcessQueue(bool force)
 //This is the handler that is notified once a FlashStorage task has executed
 void RecordStorage::FlashStorageItemExecuted(FlashStorageTaskItem* task, FlashStorageError errorCode)
 {
-    if (task == nullptr || task->header.userType == (u32)FlashUserTypes::DEFAULT)
+    //####### 
+    //This is the logic for processing the records if no immortal records are present or once
+    //the storage was successfully erased and locked down after processing all records and immortal records
+    if (
+        lockDownStageImmortalRecords == LockDownStageImmortalRecords::NO_LOCKDOWN
+        || lockDownStageImmortalRecords == LockDownStageImmortalRecords::LOCKED_DOWN
+        )
     {
-        processQueueInProgress = true;
-
-        //TODO: Use errorCode
-
-        //If either a repair or defrag is in Progress, do nothing, these are called from the QueueEmptyHandler
-        if (repairStage != RepairStage::NO_REPAIR || defragmentationStage != DefragmentationStage::NO_DEFRAGMENTATION) {
-            processQueueInProgress = false;
-            return;
-        }
-        //Check if we have other high level operations to be executed
-        else if (opQueue._numElements > 0)
+        if (task == nullptr || task->header.userType == (u32)FlashUserTypes::DEFAULT)
         {
-            SizedData data = opQueue.PeekNext();
-            RecordStorageOperation* op = (RecordStorageOperation*)data.data;
+            processQueueInProgress = true;
 
-            if (op->type == (u8)RecordStorageOperationType::SAVE_RECORD)
-            {
-                op->flashStorageErrorCode = errorCode;
-                SaveRecordInternal(*(SaveRecordOperation*)op);
+            //TODO: Use errorCode
+
+            //If either a repair or defrag is in Progress, do nothing, these are called from the QueueEmptyHandler
+            if (repairStage != RepairStage::NO_REPAIR || defragmentationStage != DefragmentationStage::NO_DEFRAGMENTATION) {
+                processQueueInProgress = false;
+                return;
             }
-            else if (op->type == (u8)RecordStorageOperationType::DEACTIVATE_RECORD)
+            //Check if we have other high level operations to be executed
+            else if (opQueue._numElements > 0)
             {
-                op->flashStorageErrorCode = errorCode;
-                DeactivateRecordInternal(*(DeactivateRecordOperation*)op);
+                SizedData data = opQueue.PeekNext();
+                RecordStorageOperation* op = (RecordStorageOperation*)data.data;
+
+                if (op->type == (u8)RecordStorageOperationType::SAVE_RECORD)
+                {
+                    op->flashStorageErrorCode = errorCode;
+                    SaveRecordInternal(*(SaveRecordOperation*)op);
+                }
+                else if (op->type == (u8)RecordStorageOperationType::DEACTIVATE_RECORD)
+                {
+                    op->flashStorageErrorCode = errorCode;
+                    DeactivateRecordInternal(*(DeactivateRecordOperation*)op);
+                }
+                else if (op->type == (u8)RecordStorageOperationType::IMMORTALIZE_RECORD)
+                {
+                    op->flashStorageErrorCode = errorCode;
+                    ImmortalizeRecordInternal(*(ImmortalizeRecordOperation*)op);
+                }
             }
-            else if (op->type == (u8)RecordStorageOperationType::IMMORTALIZE_RECORD)
-            {
-                op->flashStorageErrorCode = errorCode;
-                ImmortalizeRecordInternal(*(ImmortalizeRecordOperation*)op);
+
+            if (opQueue._numElements == 0) {
+                processQueueInProgress = false;
             }
         }
-
-        if (opQueue._numElements == 0) {
-            processQueueInProgress = false;
-        }
-    }
-    else if (task != nullptr && task->header.userType == (u32)FlashUserTypes::LOCK_DOWN)
-    {
-        //If we were not successful and havn't exceeded our retry counter, we try again. 
-        if (errorCode != FlashStorageError::SUCCESS && lockDownRetryCounter < LOCK_DOWN_RETRY_MAX)
+        else if (task != nullptr && task->header.userType == (u32)FlashUserTypes::LOCK_DOWN)
         {
-            lockDownRetryCounter++;
-            recordStorageLockDown = false; //Will be set to true in LockDownAndClearAllSettings again.
-            if (LockDownAndClearAllSettings(lockDownModuleId, lockDownCallback, lockDownUserType) != RecordStorageResultCode::SUCCESS)
+            //If we were not successful and havn't exceeded our retry counter, we try again. 
+            if (errorCode != FlashStorageError::SUCCESS && lockDownRetryCounter < LOCK_DOWN_RETRY_MAX)
             {
+                lockDownRetryCounter++;
+                recordStorageLockDown = false; //Will be set to true in LockDownAndClearAllSettings again.
+                if (LockDownAndClearAllSettings(lockDownModuleId, lockDownCallback, lockDownUserType) != RecordStorageResultCode::SUCCESS)
+                {
+                    GS->node.Reboot(SEC_TO_DS(4), RebootReason::FACTORY_RESET_FAILED);
+                }
+            }
+            //If we were not successful and have exceeded our retry counter, we inform the callback about the failure.
+            else if (errorCode != FlashStorageError::SUCCESS)
+            {
+                if (lockDownCallback != nullptr)
+                {
+                    lockDownCallback->RecordStorageEventHandler(0, RecordStorageResultCode::BUSY, lockDownUserType, nullptr, 0);
+                }
                 GS->node.Reboot(SEC_TO_DS(4), RebootReason::FACTORY_RESET_FAILED);
             }
-        }
-        //If we were not successful and have exceeded our retry counter, we inform the callback about the failure.
-        else if (errorCode != FlashStorageError::SUCCESS)
-        {
-            if (lockDownCallback != nullptr)
+            //If we were successful we inform the callback about success.
+            else
             {
-                lockDownCallback->RecordStorageEventHandler(0, RecordStorageResultCode::BUSY, lockDownUserType, nullptr, 0);
+                RepairPages();
             }
-            GS->node.Reboot(SEC_TO_DS(4), RebootReason::FACTORY_RESET_FAILED);
         }
-        //If we were successful we inform the callback about success.
         else
         {
-            RepairPages();
+            SIMEXCEPTION(IllegalArgumentException);
         }
     }
-    else
-    {
-        SIMEXCEPTION(IllegalArgumentException);
+    //#######
+    //This is the logic that is used to process the records once immortal records are present
+    else {
+        if (lockDownStageImmortalRecords == LockDownStageImmortalRecords::LOCKDOWN_SCHEDULED) {
+            processQueueInProgress = true;
+
+            //TODO: Use errorCode
+
+            //If either a repair or defrag is in Progress, do nothing, these are called from the QueueEmptyHandler
+            if (repairStage != RepairStage::NO_REPAIR || defragmentationStage != DefragmentationStage::NO_DEFRAGMENTATION) {
+                processQueueInProgress = false;
+                return;
+            }
+            else {
+                lockDownStageImmortalRecords = LockDownStageImmortalRecords::LOCKING_DOWN;
+                LockDownAndClearAllSettingsImmortalRecords();
+                processQueueInProgress = false;
+            }
+
+            if (opQueue._numElements == 0) {
+                processQueueInProgress = false;
+            }
+        }
+        else if (lockDownStageImmortalRecords == LockDownStageImmortalRecords::LOCKING_DOWN) {
+            if (task == nullptr) // One Defrag operation finished
+            {
+                LockDownAndClearAllSettingsImmortalRecords();
+                processQueueInProgress = false;
+            }
+            else {
+                if (defragmentationStage == DefragmentationStage::NO_DEFRAGMENTATION) {
+                    SIMEXCEPTION(IllegalStateException);
+                }
+                if (errorCode == FlashStorageError::SUCCESS) {
+                    processQueueInProgress = false;
+                    return; // the defrag method will continue working from the queue empty handler so we do nothing here
+                }
+                else if (lockDownRetryCounter < LOCK_DOWN_RETRY_MAX) { // the error must have happened in the defragmentation method used during a factory reset
+                    lockDownRetryCounter++;
+                    switch (defragmentationStage) {
+                    case DefragmentationStage::FINALIZE:
+                        defragmentationStage = DefragmentationStage::ERASE_OLD_PAGE;
+                        break;
+                    case DefragmentationStage::ERASE_OLD_PAGE:
+                        defragmentationStage = DefragmentationStage::WRITE_PAGE_HEADER;
+                        break;
+                    case DefragmentationStage::MOVE_TO_SWAP_PAGE: // dont go back, just stay in the stage and try relocating the immortal again
+                        break;
+                    default: // this shouldn't happen
+                        defragmentationStage = DefragmentationStage::ERASE_OLD_PAGE;
+                        SIMEXCEPTION(IllegalStateException);
+                        break;
+                    }
+                }
+                else {
+                    lockDownPageToEraseIdxImmortals = 0; // if before the reboot another factory reset is triggered we want to start fresh
+                    if (lockDownCallback != nullptr)
+                    {
+                        lockDownCallback->RecordStorageEventHandler(0, RecordStorageResultCode::BUSY, lockDownUserType, nullptr, 0);
+                    }
+                    GS->node.Reboot(SEC_TO_DS(1), RebootReason::FACTORY_RESET_FAILED);
+                }
+            }
+        }
+        else {
+            //This stage should was not implemented, maybe sth. was added to the enum
+            SIMEXCEPTION(IllegalArgumentException);
+        }
     }
 }
 
@@ -1051,6 +1326,12 @@ void RecordStorage::FlashStorageQueueEmptyHandler()
     }
     else if (defragmentationStage != DefragmentationStage::NO_DEFRAGMENTATION)
     {
-        DefragmentPage(*defragmentPage, false);
+        // This means that there are immortal records present because lock down is progressing in stages 
+        if (lockDownStageImmortalRecords == LockDownStageImmortalRecords::LOCKING_DOWN) {
+            ClearPageAndSaveImmortals(*defragmentPage, false);
+        }
+        else {
+            DefragmentPage(*defragmentPage, false);
+        }
     }
 }

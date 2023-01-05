@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -49,6 +49,11 @@
 #define USBD_POWER_DETECTION true
 #define USBD_CONFIG_DMASCHEDULER_MODE 0
 #define USBD_CONFIG_DMASCHEDULER_ISO_BOOST 1
+
+//For SDK17, we need to configure the translation layer
+#define NRFX_USBD_ENABLED 1
+#define NRFX_USBD_CONFIG_DMASCHEDULER_ISO_BOOST 1
+#define NRFX_USBD_CONFIG_IRQ_PRIORITY 6
 
 //Enable the App USB Device Library
 #define APP_USBD_ENABLED 1

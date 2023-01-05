@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -62,8 +62,8 @@ TEST(TestEnrollmentModule, TestCommands) {
     ASSERT_TRUE(tester.sim->nodes[1].gs.node.configuration.enrollmentState == EnrollmentState::ENROLLED);
     ASSERT_TRUE(tester.sim->nodes[1].gs.node.configuration.nodeId == 123);
 
-    //Next, press the button for two seconds and check if the node entered to unenrolled state
-    tester.SendButtonPress(2, 1, 23);
+    //Next, press the button for about 12 seconds and check if the node entered to unenrolled state
+    tester.SendButtonPress(2, 1, 123);
 
     tester.SimulateUntilMessageReceived(100 * 1000, 2, "Unenrollment successful");
 
@@ -71,6 +71,7 @@ TEST(TestEnrollmentModule, TestCommands) {
     ASSERT_TRUE(tester.sim->nodes[1].gs.node.configuration.networkId == 0);
 }
 #endif //ACTIVATE_CLC_MODULE
+
 
 TEST(TestEnrollmentModule, TestFactoryReset) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
@@ -105,6 +106,102 @@ TEST(TestEnrollmentModule, TestFactoryReset) {
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "Record not found");
 }
 
+
+TEST(TestEnrollmentModule, TestFactoryResetWithImmortalRecords) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    testerConfig.verbose = true;
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.asyncFlashCommitTimeProbability = UINT32_MAX;
+    simConfig.SetToPerfectConditions();
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    //Store some dummy values
+    tester.SendTerminalCommand(1, "saverec 2001 11:BB:CC:DD:EE:FF");
+    tester.SimulateGivenNumberOfSteps(1);
+    tester.SendTerminalCommand(1, "saverec 2002 22:BB:CC:DD:EE:FF");
+    tester.SimulateGivenNumberOfSteps(1);
+    tester.SendTerminalCommand(1, "saverec 2003 33:BB:CC:DD:EE:FF");
+    tester.SimulateGivenNumberOfSteps(1);
+    tester.SendTerminalCommand(1, "saverec 2004 44:BB:CC:DD:EE:FF");
+    tester.SimulateGivenNumberOfSteps(1);
+    tester.SendTerminalCommand(1, "saverec 2005 55");
+    tester.SimulateGivenNumberOfSteps(1);
+
+    //Make two records immortal
+    {
+        NodeIndexSetter setter(0);
+
+        GS->recordStorage.ImmortalizeRecord(2002, nullptr, 0);
+        cherrySimInstance->SimCommitFlashOperations();
+        GS->recordStorage.ImmortalizeRecord(2005, nullptr, 0);
+        cherrySimInstance->SimCommitFlashOperations();
+
+    }
+
+    //Next, unenroll the beacon which triggers a factory reset
+    tester.SendTerminalCommand(1, "action this enroll remove BBBBB");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, "Unenrollment successful");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, R"("type":"reboot","reason":16,)");
+
+    //Check that all records are gone but immortals are still present
+    tester.SendTerminalCommand(1, "getrec 2001");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Record not found");
+    tester.SendTerminalCommand(1, "getrec 2002");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "22:BB:CC:DD:EE:FF: (6)");
+    tester.SendTerminalCommand(1, "getrec 2003");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Record not found");
+    tester.SendTerminalCommand(1, "getrec 2004");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Record not found");
+    tester.SendTerminalCommand(1, "getrec 2005");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "55: (1)");
+
+    //Now, deactivate one immortal record
+    tester.SendTerminalCommand(1, "delrec 2005");
+    tester.SimulateGivenNumberOfSteps(1);
+
+    //Enroll and unenroll to do a factory reset
+    tester.SendTerminalCommand(1, "action this enroll basic BBBBB 123 456 AA:BB:CC:DD:AA:BB:CC:DD:AA:BB:CC:DD:AA:BB:CC:DD");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, R"("type":"reboot","reason":9,)");
+    tester.SendTerminalCommand(1, "action this enroll remove BBBBB");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, "Unenrollment successful");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, R"("type":"reboot","reason":16,)");
+
+    //Make sure only one immortal is present
+    tester.SendTerminalCommand(1, "getrec 2002");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "22:BB:CC:DD:EE:FF: (6)");
+    tester.SendTerminalCommand(1, "getrec 2005");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Record not found");
+
+    //Make sure the record is not available, also not in deactivated form
+    {
+        NodeIndexSetter setter(0);
+        RecordStorageRecord* record = GS->recordStorage.GetRecord(2005);
+        ASSERT_TRUE(record == nullptr);
+    }
+
+    //Deactivate the other one as well
+    tester.SendTerminalCommand(1, "delrec 2002");
+    tester.SimulateGivenNumberOfSteps(1);
+
+    //Enroll and unenroll to do a factory reset again
+    tester.SendTerminalCommand(1, "action this enroll basic BBBBB 123 456 AA:BB:CC:DD:AA:BB:CC:DD:AA:BB:CC:DD:AA:BB:CC:DD");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, R"("type":"reboot","reason":9,)");
+    tester.SendTerminalCommand(1, "action this enroll remove BBBBB");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, "Unenrollment successful");
+
+    //Should be gone as well
+    tester.SendTerminalCommand(1, "getrec 2002");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Record not found");
+
+    //Make sure page is empty
+    {
+        NodeIndexSetter setter(0);
+        bool hasImmortal = GS->recordStorage.HasImmortalRecords();
+        ASSERT_TRUE(hasImmortal == false);
+    }
+}
 TEST(TestEnrollmentModule, TestEnrollmentBasicNewMesh) {
     //Configure a clc sink and a mesh clc beacon
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -70,8 +70,7 @@ typedef struct BoardConfiguration
     int8_t uartTXPin;
     int8_t uartCTSPin;
     int8_t uartRTSPin;
-    //Default, can be overridden by boards
-    uint32_t uartBaudRate : 32;
+    uint32_t uartBaudRate;
 
     //Display Dimensions
     uint16_t displayWidth;
@@ -96,7 +95,7 @@ typedef struct BoardConfiguration
     uint8_t powerOptimizationEnabled;
 
     int8_t powerButton;
-    uint8_t powerButtonActiveHigh : 8;
+    uint8_t powerButtonActiveHigh;
 } BoardConfiguration;
 #pragma pack(pop)
 

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -87,9 +87,9 @@ private:
 
 public:
     //This should create a server socket to that a number of clients can connect to this process
-    //It will listen on port 5556 to accept connections
+    //It will listen on the given port to accept connections
     //This will crash with an IllegalStateException if the port is not available
-    static void CreateServerSocket();
+    static void CreateServerSocket(uint16_t port);
 
     //Called by libevent as soon as a new client is connected
     static void ClientConnectedHandler(int fd, short ev, void* arg);

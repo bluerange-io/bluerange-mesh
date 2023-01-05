@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -93,6 +93,9 @@ int main(int argc, char **argv)
     // ###########################
     // Manual testing
     // ###########################
+    
+    // Set to true to run all tests even if some fail
+    bool runAllTestsWithoutBreaks = false;
     if (!runByVisualStudioTestExplorer)
     {
         ::testing::GTEST_FLAG(break_on_failure) = true;
@@ -102,7 +105,7 @@ int main(int argc, char **argv)
 
         //Do not catch exceptions is useful for debugging (Automatically set to 1 if running on Gitlab)
         ::testing::GTEST_FLAG(catch_exceptions) = 0;
-
+        
         bool quiet = false;
         if (quiet)
         {
@@ -110,6 +113,10 @@ int main(int argc, char **argv)
             listeners.Release(listeners.default_result_printer());
         }
     }
+
+    
+    
+
     // ###########################
     // Automated testing
     // ###########################
@@ -182,6 +189,12 @@ int main(int argc, char **argv)
         MersenneTwister::seedOffset = seedOffset;
 
         if (GitLab) {
+            Exceptions::DisableDebugBreakOnException disabler;
+            exitCode = RUN_ALL_TESTS();
+        }
+        else if (runAllTestsWithoutBreaks) {
+            ::testing::GTEST_FLAG(catch_exceptions) = 1;
+            ::testing::GTEST_FLAG(break_on_failure) = false;
             Exceptions::DisableDebugBreakOnException disabler;
             exitCode = RUN_ALL_TESTS();
         }
@@ -538,7 +551,7 @@ void CherrySimTester::_SimulateUntilMessageReceived(int timeoutMs, std::function
     if (timeoutMs == 0) SIMEXCEPTION(ZeroTimeoutNotSupportedException);
     int startTimeMs = sim->simState.simTimeMs;
     awaitedMessagesFound = false;
-
+    unwantedMessageOccured = false;
     while (!awaitedMessagesFound) {
         if (executePerStep)
         {
@@ -547,10 +560,24 @@ void CherrySimTester::_SimulateUntilMessageReceived(int timeoutMs, std::function
 
         sim->SimulateStepForAllNodes();
 
+        if (unwantedMessageOccured) {
+            SIMEXCEPTION(MessageShouldNotOccurException);
+            break;
+        }
+
         //Watch if a timeout occurs
         if (startTimeMs + timeoutMs < (i32)sim->simState.simTimeMs) {
-            awaitedTerminalOutputs = nullptr;
-            SIMEXCEPTION(TimeoutException); //Timeout waiting for message
+            awaitedMessagesFound = std::all_of(awaitedTerminalOutputs->begin(), awaitedTerminalOutputs->end(), [](const SimulationMessage& sm) {return sm.IsFound() || !sm.ShouldOccur(); });
+
+            if (!awaitedMessagesFound) {
+                printf("Could not find all awaited messages:" EOL);
+                for (const auto& v : *awaitedTerminalOutputs) {
+                    v.PrintState();
+                }
+                awaitedTerminalOutputs = nullptr;
+                SIMEXCEPTION(TimeoutException); //Timeout waiting for message
+            }
+            else awaitedTerminalOutputs = nullptr;
             break;
         }
     }
@@ -744,9 +771,15 @@ void CherrySimTester::TerminalPrintHandler(NodeEntry* currentNode, const char* m
             if (!awaited[i].IsFound()) {
                 if (awaited[i].AppliesToNodeEntry(sim->currentNode))
                 {
+
                     if (awaited[i].CheckAndSet(awaitedMessageResult.data(), useRegex))
                     {
-                        break; //A received message should validate only one awaited message.
+                        if (awaited[i].ShouldOccur())
+                            break; //A received message should validate only one awaited message.
+                        else {
+                            unwantedMessageOccured = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -807,13 +840,13 @@ void CherrySimTester::SetVerbose(bool verbose)
     config.verbose = verbose;
 }
 
-SimulationMessage::SimulationMessage(TerminalId terminalId, const std::string &messagePart)
-    : SimulationMessage(NodeEntryPredicate::AllowTerminalId(terminalId), messagePart)
+SimulationMessage::SimulationMessage(TerminalId terminalId, const std::string &messagePart, bool shouldOccur)
+    : SimulationMessage(NodeEntryPredicate::AllowTerminalId(terminalId), messagePart, shouldOccur)
 {
 }
 
-SimulationMessage::SimulationMessage(NodeEntryPredicate predicate, const std::string &messagePart)
-    : predicate{std::move(predicate)}, messagePart(messagePart)
+SimulationMessage::SimulationMessage(NodeEntryPredicate predicate, const std::string &messagePart, bool shouldOccur)
+    : predicate{std::move(predicate)}, messagePart(messagePart), shouldOccur(shouldOccur)
 {
 }
 
@@ -869,7 +902,10 @@ bool SimulationMessage::MatchesRegex(const std::string & message)
     return std::regex_search(message, reg);
 }
 
-
+void SimulationMessage::PrintState() const
+{
+    printf("Found %u, should occur %u: %s" EOL, found, shouldOccur, messagePart.c_str());
+}
 
 void CherrySimTester::DfuStartFromTerminalCommandFile(CherrySimTester& tester, std::string file, TerminalId targetTerminalId)
 {

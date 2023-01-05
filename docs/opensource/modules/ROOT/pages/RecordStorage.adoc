@@ -9,6 +9,7 @@ The most important features of _RecordStorage_ are:
 * creating new records in memory
 * updating existing records
 * deleting existing records
+* immortalizing records so that they survive factory resets
 * protection against power loss
 * defragmentation
 
@@ -21,6 +22,23 @@ The _versionCounter_ is used determine the version of the record. When a record 
 NOTE: The _versionCounter_ and _pageVersion_ have a maximum value of 65535. This is the maximum number of times a record can be updated and the maximum number of times that pages can be swapped.
 
 Record storage needs to be assigned a number of pages in flash memory that are not used by the application. The minimium number of pages is 2 (one data and one swap page). The swap page is the page that currently doesn't contain any data. When all other pages are full, the page which can be defragmented the most is defragmented and copied to the swap page. After validation of the records, the old page is erased and becomes the swap page. During defragmentation, all active records will be moved but inactive records will be omitted.
+
+== Immortal Records
+
+WARNING: Using immortal records must only be used if you really know what you are doing. Keep in mind that these records will not be eliminated by a factory reset and could therefore make a device unusable if anything goes wrong, e.g. after an update. If your record is not parsed properly or an unforseen parameter breaks your implementation, the device might not boot up again.
+
+There are two ways to create an immortal, either pass isMortal=0 to the SaveRecord method or grant immortality to an existing record using the ImmortalizeRecord Method. 
+
+Immortal records are just like regular/mortal records but they have the mortal bit set to zero. This makes it possible for them to survive a factory reset, an event that typically whipes out all records. During factory reset, the devices enters a lockdown mode to clear the settings before a reboot. Internally there are different lockdown stages. _NO_LOCKDOWN_ is the default operation mode.
+
+After the _LockDownAndClearAllSettings_ method is called (during factory reset) the lockdown stage changes to _LOCKDOWN_SCHEDULED_ if a repair or defragmentation is currently in progress. Otherwise, or if the ongoing progress finishes the lockdown stage is set to _LOCKING_DOWN_. In this stage a defragmentation is triggered on every page, one after the other.
+
+The defragmentation method will usually relocate every active record from its current page to the swap page and clear the target page afterwards. During a factory reset however, only active immortal records are relocated, all mortals are not relocated and therefore cleared.
+
+Once every page has been defragmented, the stage is set to _LOCKED_DOWN_ and all mortals have been erased. New records can only be saved in the _NO_LOCKDOWN_ stage (after a reboot) or by the module that initiated the lockdown. A reboot is necessary to unlock the storage . If a flash operation such as a page erase fails in the _LOCKDOWN_SCHEDULED_ stage, it is retried a couple of times by setting the defragmentation stage. If it still does not work the device reboots.
+
+
+NOTE: Immortals are powerless in the face of the DeactivateRecord method. Its power can be used to remove them from their realm.
 
 == Usage
 Saving or updating records and deleting them are all non-blocking operations which are cached and executed asynchronously. Users can register a listener when scheduling an operation to get notified once the operation was executed. In the handler, the user receives information about the result of the operation. A _userType_ and user context data can be given to identify the operation.

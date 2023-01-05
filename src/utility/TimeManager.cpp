@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -34,6 +34,12 @@
 #include "Node.h"
 #include "Utility.h"
 
+/*
+Known Limitation: Starting a timesync on multiple nodes around the same time with different times will
+not sync the same time to all nodes. Doing another sync on one node will however correct this.
+The reason is that both nodes will generate the same counter value and therefore, there will be no winner.
+*/
+
 TimeManager::TimeManager()
 {
     syncTime = 0;
@@ -64,13 +70,23 @@ u32 TimeManager::GetLocalTime()
     }
 }
 
+i16 TimeManager::GetOffset()
+{
+    return offset;
+}
+
+bool TimeManager::IsTimeMaster()
+{
+    return isTimeMaster;
+}
+
 TimePoint TimeManager::GetLocalTimePoint()
 {
     ProcessTicks();
     return TimePoint(GetLocalTime(), additionalTicks);
 }
 
-void TimeManager::SetTime(u32 syncTimeDs, u32 timeSinceSyncTimeDs, i16 offset, u32 additionalTicks)
+void TimeManager::SetMasterTime(u32 syncTimeDs, u32 timeSinceSyncTimeDs, i16 offset, u32 additionalTicks)
 {
     this->syncTime = syncTimeDs;
     this->timeSinceSyncTime = timeSinceSyncTimeDs;
@@ -79,6 +95,8 @@ void TimeManager::SetTime(u32 syncTimeDs, u32 timeSinceSyncTimeDs, i16 offset, u
     this->counter++;
     this->waitingForCorrection = false;
     this->timeCorrectionReceived = true;
+
+    this->isTimeMaster = true;
 
     //We inform the connection manager so that it resends the time sync messages.
     logt("TSYNC", "Received time by command! NodeId: %u", (u32)GS->node.configuration.nodeId);
@@ -97,6 +115,8 @@ void TimeManager::SetTime(const TimeSyncInitial & timeSyncIntitialMessage)
         this->waitingForCorrection = true;
         this->timeCorrectionReceived = false;
 
+        this->isTimeMaster = false;
+
         //We inform the connection manager so that it resends the time sync messages.
         logt("TSYNC", "Received time by mesh! NodeId: %u, Partner: %u", (u32)GS->node.configuration.nodeId, (u32)timeSyncIntitialMessage.header.header.sender);
         GS->cm.ResetTimeSync();
@@ -114,6 +134,8 @@ void TimeManager::SetTime(const TimeSyncInterNetwork& timeSyncInterNetwork)
         this->counter++;
         this->waitingForCorrection = false;
         this->timeCorrectionReceived = false;
+
+        this->isTimeMaster = false;
 
         //We inform the connection manager so that it resends the time sync messages.
         logt("TSYNC", "Received time by inter mesh! NodeId: %u, Partner: %u", (u32)GS->node.configuration.nodeId, (u32)timeSyncInterNetwork.header.header.sender);
@@ -164,26 +186,44 @@ void TimeManager::HandleUpdateTimestampMessages(ConnPacketHeader const * packetH
         connPacketUpdateTimestamp const * packet = (connPacketUpdateTimestamp const *)packetHeader;
         if (dataLength >= offsetof(connPacketUpdateTimestamp, offset) + sizeof(packet->offset))
         {
-            SetTime(packet->timestampSec, 0, packet->offset);
+            SetMasterTime(packet->timestampSec, 0, packet->offset);
         }
         else
         {
-            SetTime(packet->timestampSec, 0, 0);
+            SetMasterTime(packet->timestampSec, 0, 0);
         }
     }
 }
 
-void TimeManager::convertLocalTimeToString(char * buffer)
+void TimeManager::ConvertTimeToString(char* buffer, u16 bufferSize)
 {
     ProcessTicks();
-    u32 gapDays;
-    u32 remainingSeconds = GetLocalTime();
+    TimeManager::ConvertTimeToString(GetUtcTime(), GetOffset(), additionalTicks, buffer, bufferSize);
+}
+
+void TimeManager::ConvertTimeToString(u32 unixTimestamp, i16 offset, u32 ticks, char* buffer, u16 bufferSize)
+{
+    u32 localTime = unixTimestamp;
+    i32 offsetSeconds = offset * 60;
+    if (offsetSeconds < 0 && localTime < static_cast<u32>(-offsetSeconds))
+    {
+        //Edge case.
+        snprintf(buffer, bufferSize, "Negative Offset (%d) smaller than timestamp (%u)", offset, unixTimestamp);
+        return;
+    }
+    else
+    {
+        localTime = unixTimestamp + offsetSeconds;
+    }
+
+
+    u32 remainingSeconds = localTime;
 
     u32 yearDivider = 60 * 60 * 24 * 365;
     u16 years = remainingSeconds / yearDivider + 1970;
     remainingSeconds = remainingSeconds % yearDivider;
 
-    gapDays = (years - 1970) / 4 - 1;
+    u32 gapDays = (years - 1970) / 4 - 1;
     u32 dayDivider = 60 * 60 * 24;
     u16 days = remainingSeconds / dayDivider;
     days -= gapDays;
@@ -199,7 +239,7 @@ void TimeManager::convertLocalTimeToString(char * buffer)
 
     u32 seconds = remainingSeconds;
 
-    snprintf(buffer, 80, "approx. %u years, %u days, %02uh:%02um:%02us,%u ticks", years, days, hours, minutes, seconds, this->additionalTicks);
+    snprintf(buffer, bufferSize, "approx. %u years, %u days, %02uh:%02um:%02us,%u ticks (offset %d)", years, days, hours, minutes, seconds, ticks, offset);
 }
 
 TimeSyncInitial TimeManager::GetTimeSyncIntialMessage(NodeId receiver) const

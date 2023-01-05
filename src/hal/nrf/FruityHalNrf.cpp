@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -197,6 +197,8 @@ static constexpr u16 SIZE_OF_EVENT_BUFFER = GlobalState::SIZE_OF_EVENT_BUFFER;
 #define REGION_BOOTLOADER_SETTINGS_START (FLASH_REGION_START_ADDRESS + 0x0003FC00) //Last page of flash
 #elif defined(NRF52840)
 #define REGION_BOOTLOADER_SETTINGS_START (FLASH_REGION_START_ADDRESS + 0x000FF000) //Last page of flash
+#elif defined(NRF52833)
+#define REGION_BOOTLOADER_SETTINGS_START (FLASH_REGION_START_ADDRESS + 0x0007F000) //Last page of flash
 #elif defined(NRF52832)
 #define REGION_BOOTLOADER_SETTINGS_START (FLASH_REGION_START_ADDRESS + 0x0007F000) //Last page of flash
 #endif
@@ -3174,7 +3176,7 @@ void FruityHal::GetDeviceIdLong(u32 * p_data)
 
 #define __________________UART____________________
 
-static nrf_uart_baudrate_t UartBaudRateToNordic(FruityHal::UartBaudrate baudRate)
+nrf_uart_baudrate_t UartBaudRateToNordic(FruityHal::UartBaudrate baudRate)
 {
 #ifndef SIM_ENABLED
     switch (baudRate)
@@ -3185,6 +3187,8 @@ static nrf_uart_baudrate_t UartBaudRateToNordic(FruityHal::UartBaudrate baudRate
             return (nrf_uart_baudrate_t)NRF_UART_BAUDRATE_115200;
         case FruityHal::UartBaudrate::BAUDRATE_38400:
             return (nrf_uart_baudrate_t)NRF_UART_BAUDRATE_38400;
+        case FruityHal::UartBaudrate::BAUDRATE_19200:
+            return (nrf_uart_baudrate_t)NRF_UART_BAUDRATE_19200;
         case FruityHal::UartBaudrate::BAUDRATE_57600:
         default:
             return (nrf_uart_baudrate_t)NRF_UART_BAUDRATE_57600;
@@ -3192,6 +3196,32 @@ static nrf_uart_baudrate_t UartBaudRateToNordic(FruityHal::UartBaudrate baudRate
 #else
     return (nrf_uart_baudrate_t)0;
 #endif
+}
+
+nrf_uart_hwfc_t UartFlowControlToNrf(FruityHal::UartFlowControl flowControl)
+{
+    switch (flowControl)
+    {
+        case FruityHal::UartFlowControl::NONE:
+            return (nrf_uart_hwfc_t)NRF_UART_HWFC_DISABLED;
+        case FruityHal::UartFlowControl::RTS_CTS:
+            return (nrf_uart_hwfc_t)NRF_UART_HWFC_ENABLED;
+        default:
+            return (nrf_uart_hwfc_t)NRF_UART_HWFC_DISABLED;
+    }
+}
+
+nrf_uart_parity_t UartParityToNrf(FruityHal::UartParity parity)
+{
+    switch (parity)
+    {
+        case FruityHal::UartParity::NONE:
+            return (nrf_uart_parity_t)NRF_UART_PARITY_EXCLUDED;
+        case FruityHal::UartParity::EVEN:
+            return (nrf_uart_parity_t)NRF_UART_PARITY_INCLUDED;
+        default:
+            return (nrf_uart_parity_t)NRF_UART_PARITY_EXCLUDED;
+    }
 }
 
 /*

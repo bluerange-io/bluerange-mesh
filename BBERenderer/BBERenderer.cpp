@@ -4,6 +4,8 @@
 #endif
 #include <cmath>
 
+constexpr u32 NODE_DIAMETER = 10;
+
 void BBERenderer::resetCamera()
 {
     zoomLevel = 10;
@@ -23,6 +25,18 @@ void BBERenderer::setSim(CherrySim* sim)
 void BBERenderer::onStart()
 {
     resetCamera();
+
+    //Create an image from the given floorplan if available
+    if (!sim->simConfig.floorplanImage.empty()) {
+        std::ifstream imageFile(sim->simConfig.floorplanImage);
+        if (!imageFile) {
+            printf("Could not load floorplan image %s" EOL, sim->simConfig.floorplanImage.c_str());
+            SIMEXCEPTIONFORCE(IllegalArgumentException);
+        }
+
+        backgroundImage = bbe::Image(sim->simConfig.floorplanImage.c_str());
+    }
+
 }
 
 void BBERenderer::update(float timeSinceLastFrame)
@@ -34,14 +48,46 @@ void BBERenderer::update(float timeSinceLastFrame)
     const bbe::Vector2 error = worldPosToScreenPos(mouseToWorld - mouseToWorldAfterTransform) - renderOffset;
     renderOffset -= error;
 
-    if (isMouseDown(bbe::MouseButton::LEFT))
-    {
-        renderOffset += getMouseDelta();
+    //Stop dragging a node once the mouse button is up
+    if (isMouseUp(bbe::MouseButton::LEFT)) {
+        draggedNodeIndex = -1;
     }
 
-    if (isKeyDown(bbe::Key::SPACE))
-    {
-        resetCamera();
+    if (isKeyDown(bbe::Key::LEFT_CONTROL)) {
+        //Move nodes around
+        if (isMouseDown(bbe::MouseButton::LEFT))
+        {
+            //Check if we should start dragging a node
+            if (draggedNodeIndex < 0) {
+                draggedNodeIndex = getNodeIndexUnderMouse();
+            }
+            //Drag the node that was selected for dragging
+            if (draggedNodeIndex >= 0) {
+                const bbe::Vector2 delta = getMouseDelta();
+                {
+                    //Use Add Position so that the node can realize it was moved (e.g. accelerometer simulation)
+                    sim->AddPosition(
+                        draggedNodeIndex,
+                        delta.x / zoomLevel / sim->simConfig.mapWidthInMeters,
+                        delta.y / zoomLevel / sim->simConfig.mapHeightInMeters,
+                        0
+                    );
+                }
+            }
+        }
+    }
+    else {
+        //Move the camera with the mouse
+        if (isMouseDown(bbe::MouseButton::LEFT))
+        {
+            renderOffset += getMouseDelta();
+        }
+
+        //Reset the camera to 0,0
+        if (isKeyDown(bbe::Key::SPACE))
+        {
+            resetCamera();
+        }
     }
 
     if (!paused)
@@ -125,6 +171,24 @@ i32 BBERenderer::getClosestIndexToMouse() const
     return closestIndex;
 }
 
+i32 BBERenderer::getNodeIndexUnderMouse() const
+{
+    const bbe::Vector2 mouse = getMouse();
+
+    for (u32 i = 0; i < sim->GetTotalNodes(); i++)
+    {
+        if (!checkNodeVisible(&sim->nodes[i])) continue;
+
+        const float dist = mouse.getDistanceTo(getPosOfIndex(i));
+        if (dist < NODE_DIAMETER)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 bool BBERenderer::isPaused() const
 {
     return paused;
@@ -153,9 +217,20 @@ void BBERenderer::addPacket(const NodeEntry* sender, const NodeEntry* receiver)
 
 void BBERenderer::draw2D(bbe::PrimitiveBrush2D& brush)
 {
+    bbe::Vector2 rectStart = worldPosToScreenPos({ 0, 0 });
+    bbe::Vector2 rectDimensions = bbe::Vector2({ sim->simConfig.mapWidthInMeters * zoomLevel, sim->simConfig.mapHeightInMeters * zoomLevel });
+
+    if (backgroundImage.isLoaded()) {
+        brush.drawImage(
+            rectStart,
+            rectDimensions,
+            backgroundImage
+        );
+    }
+
     //Draw the map dimensions
-    brush.setColorRGB(0.1f, 0.1f, 0.1f);
-    brush.fillRect(worldPosToScreenPos({ 0, 0 }), bbe::Vector2({ sim->simConfig.mapWidthInMeters * zoomLevel, sim->simConfig.mapHeightInMeters * zoomLevel }));
+    brush.setColorRGB(0.2f, 0.2f, 0.2f, 0.4f);
+    brush.fillRect(rectStart, rectDimensions);
 
     if (showConnections)
     {
@@ -227,9 +302,40 @@ void BBERenderer::draw2D(bbe::PrimitiveBrush2D& brush)
                 brush.fillCircle(getPosOfIndex(i) - bbe::Vector2{ 8, 8 }, 16, 16);
             }
 
+            //Hardcoded value to set the drawing mode for the nodes
+            u8 drawMode = 0;
+
+            //Draw each node with a color of its cluster
+            if (drawMode == 0) {
+                brush.setColorRGB(clusterIdToColor(sim->nodes[i].gs.node.clusterId), getAlpha(&sim->nodes[i]));
+            }
             //Draw each node with the color of its cluster
-            brush.setColorRGB(clusterIdToColor(sim->nodes[i].gs.node.clusterId), getAlpha(&sim->nodes[i]));
-            brush.fillCircle(getPosOfIndex(i) - bbe::Vector2{ 5, 5 }, 10, 10);
+            else if(drawMode == 1) 
+            {
+                NodeIndexSetter setter(i);
+
+                if (sim->nodes[i].gs.timeManager.IsTimeCorrected())
+                {
+                    brush.setColorRGB(0, 255, 0);
+                }
+                else if (sim->nodes[i].gs.timeManager.IsTimeSynced())
+                {
+                    brush.setColorRGB(0, 255, 255);
+                }
+                else {
+                    brush.setColorRGB(255, 0, 0);
+                }
+                char timestr[20];
+                sprintf(timestr, "%s%u,%d", GS->timeManager.IsTimeMaster() ? "M " : "", GS->timeManager.GetUtcTime(), GS->timeManager.GetOffset());
+
+                ImGui::GetForegroundDrawList()->AddText(ImVec2(getPosOfIndex(i).x, getPosOfIndex(i).y), 0xFFFFFFFF, timestr);
+            }
+            else
+            {
+                SIMEXCEPTION(IllegalArgumentException);
+            }
+
+            brush.fillCircle(getPosOfIndex(i) - bbe::Vector2{ 5, 5 }, NODE_DIAMETER, NODE_DIAMETER);
         }
     }
 

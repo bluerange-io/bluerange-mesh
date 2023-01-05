@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -218,11 +218,9 @@ static const char* GetUartErrorString(Logger::UartErrorType uartError)
         case Logger::UartErrorType::TOO_FEW_ARGUMENTS:
             return "Too few arguments";
             break;
-#if IS_INACTIVE(SAVE_SPACE)
         case Logger::UartErrorType::WARN_DEPRECATED:
             return "Warning: Command is marked deprecated!";
             break;
-#endif
         case Logger::UartErrorType::CRC_INVALID:
             return "crc invalid";
             break;

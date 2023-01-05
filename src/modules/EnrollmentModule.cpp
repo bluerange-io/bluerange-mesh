@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -800,7 +800,6 @@ void EnrollmentModule::DispatchPreEnrollment(Module* lastModuleCalled, PreEnroll
 {
     u8 moduleIndex = 0;
 
-#if IS_INACTIVE(GW_SAVE_SPACE)
     //If the PreEnrollment was already done for some modules, we continue with the next module in line
     if(lastModuleCalled != nullptr)
     {
@@ -832,7 +831,6 @@ void EnrollmentModule::DispatchPreEnrollment(Module* lastModuleCalled, PreEnroll
             return;
         }
     }
-#endif
 
     //The PreEnrollment might already have timed out
     if(ted.state != EnrollmentStates::PREENROLLMENT_RUNNING) return;
@@ -1046,9 +1044,20 @@ void EnrollmentModule::SendEnrollmentResponse(EnrollmentModuleActionResponseMess
 #if IS_ACTIVE(BUTTONS)
 void EnrollmentModule::ButtonHandler(u8 buttonId, u32 holdTimeDs)
 {
-    //Remove beacon enrollment and set to default
-    if(SHOULD_BUTTON_EVT_EXEC(configuration.buttonRemoveEnrollmentDs)){
+    //Remove device enrollment and set to default if press time is in a time window of 4 seconds
+    if((configuration.buttonRemoveEnrollmentDs != 0 && holdTimeDs > configuration.buttonRemoveEnrollmentDs && holdTimeDs < (u32)(configuration.buttonRemoveEnrollmentDs + SEC_TO_DS(4)))){
         logt("WARNING", "Resetting to unenrolled mode");
+
+        for (size_t i = 0; i < buttonRemoveEnrollmentLedToggleCount; i++) {
+            GS->ledBlue.Toggle();
+            GS->ledRed.Toggle();
+            GS->ledGreen.Toggle();
+            FruityHal::DelayMs(100);
+        }
+
+        GS->ledBlue.Off();
+        GS->ledRed.Off();
+        GS->ledGreen.Off();
 
         //Prepare a packet with the unenrollment
         const u8 len = SIZEOF_CONN_PACKET_MODULE + SIZEOF_ENROLLMENT_MODULE_REMOVE_ENROLLMENT;

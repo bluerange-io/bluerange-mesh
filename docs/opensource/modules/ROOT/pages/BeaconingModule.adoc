@@ -19,7 +19,7 @@ Example (adding an iBeacon message)
 
 [source,C++]
 ----
-action 123 adv add 02:01:06:1A:FF:4C:00:02:15:F0:01:8B:9B:75:09:4C:31:A9:05:1A:27:D3:9C:00:3C:EA:60:00:32:81:00:00 13
+action 123 adv add 02:01:06:1A:FF:4C:00:02:15:F0:01:8B:9B:75:09:4C:31:A9:05:1A:27:D3:9C:00:3C:EA:60:00:32:81:00 13
 ----
 
 The response acknowledges the receipt with this command:
@@ -56,7 +56,7 @@ Example (setting an iBeacon message)
 
 [source,C++]
 ----
-action 123 adv set 0 02:01:06:1A:FF:4C:00:02:15:F0:01:8B:9B:75:09:4C:31:A9:05:1A:27:D3:9C:00:3C:EA:60:00:32:81:00:00 13
+action 123 adv set 0 02:01:06:1A:FF:4C:00:02:15:F0:01:8B:9B:75:09:4C:31:A9:05:1A:27:D3:9C:00:3C:EA:60:00:32:81:00 13
 ----
 
 The response acknowledges the receipt with this command:

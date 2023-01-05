@@ -65,4 +65,13 @@ namespace bbe
         virtual void draw2D(bbe::PrimitiveBrush2D &brush) = 0;
         virtual void onEnd()                              = 0;
     };
+
+    class Image
+    {
+    public:
+        Image(){};
+        explicit Image(const char* path){};
+
+        bool isLoaded() const { return false; };
+    };
 }

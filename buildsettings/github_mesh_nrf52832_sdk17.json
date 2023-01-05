@@ -1,0 +1,22 @@
+{	
+	"settingsVersion":2,
+	"additionalArgs":{
+		"settings":"github_mesh_nrf52832_sdk17",
+		"make":"github_mesh_nrf52832_sdk17",
+		"flash":""
+	},
+	"genericSettings":{
+		"family":"NRF52",
+		"platform":"NRF52832",
+		"chipset":"NRF52832_XXAA"
+	},
+	"buildSettings":{
+		"toolchain":"gcc-arm-none-eabi-9-2020-q2-update",
+		"environmentVariables":{
+			"FEATURESET":"github_mesh_nrf52832_sdk17"
+		}
+	},
+	"flashSettings":{
+		"stack":"s132_nrf52_7.3.0_softdevice.hex"
+	}
+}

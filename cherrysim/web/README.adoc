@@ -1,0 +1,5 @@
+= FruityMap for CherrySim
+
+This folder includes the dev build of fruitymap. This build includes the testSimulatorMap functionality which is configured to periodically poll the GET /devices endpoint that is provided by the FruitySimServer of CherrySim. The /devices endpoint can also be used with a POST request to set the x and y position of a device.
+
+Devices are colored according to their cluster id. There is basic support for displaying the LED state.

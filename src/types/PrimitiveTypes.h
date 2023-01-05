@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -148,6 +148,7 @@ enum class Chipset : NodeId
     //CHIP_NRF51 = 20000, //Deprecated as of 09.04.2020
     CHIP_NRF52 = 20001,
     CHIP_NRF52840 = 20015,
+    CHIP_NRF52833 = 20041,
 };
 
 /*## Key Types #############################################################*/
@@ -306,7 +307,7 @@ enum class LiveReportTypes : u8
 
     //##### Warning Level (Below 100) #####
     HANDSHAKED_MESH_DISCONNECTED = 51, //extra is partnerid, extra2 is appDisconnectReason
-    WARN_GAP_DISCONNECTED = 52, //extra is partnerid, extra2 is hci code
+    WARN_GAP_DISCONNECTED = 52, //extra is the first 4 bytes of the mac address, extra2 is hci code
     LEVEL_WARN = 100,
 
     //##### Info Level (below 150) #####
@@ -323,6 +324,7 @@ enum class LiveReportTypes : u8
     DECISION_RESULT = 151, //extra is decision type, extra2 is preferredPartner
     LEVEL_DEBUG
 };
+
 
 enum class LiveReportHandshakeFailCode : u8
 {

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -128,7 +128,6 @@ void Terminal::Init()
 
     terminalIsInitialized = true;
 
-#if IS_INACTIVE(GW_SAVE_SPACE)
     char versionString[15];
     Utility::GetVersionStringFromInt(GS->config.GetFruityMeshVersion(), versionString);
 
@@ -165,7 +164,6 @@ void Terminal::Init()
     } else {
         
     }
-#endif
 #endif //IS_ACTIVE(UART)
 }
 
@@ -247,7 +245,6 @@ void Terminal::ProcessTerminalCommandHandlerReturnType(TerminalCommandHandlerRet
 #endif
     }
 
-#if IS_INACTIVE(SAVE_SPACE)
     else if (handled == TerminalCommandHandlerReturnType::WARN_DEPRECATED)
     {
         if (Conf::GetInstance().terminalMode == TerminalMode::PROMPT)
@@ -259,7 +256,6 @@ void Terminal::ProcessTerminalCommandHandlerReturnType(TerminalCommandHandlerRet
             logjson_error(Logger::UartErrorType::WARN_DEPRECATED);
         }
     }
-#endif
 }
 
 Terminal & Terminal::GetInstance()
@@ -461,9 +457,7 @@ void Terminal::ProcessLine(char* line)
         }
     }
 
-#if IS_ACTIVE(SAVE_SPACE)
     if (handled == TerminalCommandHandlerReturnType::WARN_DEPRECATED) handled = TerminalCommandHandlerReturnType::SUCCESS;
-#endif
 
     ProcessTerminalCommandHandlerReturnType(handled, commandArgsSize);
 #endif
@@ -556,13 +550,11 @@ void Terminal::UartCheckAndProcessLine(){
         UartPutCharBlockingWithTimeout(27); //ESC
         UartPutStringBlockingWithTimeout("[H"); //Cursor to Home
     }
-#if IS_INACTIVE(GW_SAVE_SPACE)
     else if(strcmp(readBuffer, "startterm") == 0){
         Conf::GetInstance().terminalMode = TerminalMode::PROMPT;
         UartEnable(true);
         return;
     }
-#endif
     else if(strcmp(readBuffer, "stopterm") == 0){
         Conf::GetInstance().terminalMode = TerminalMode::JSON;
         UartEnable(false);
@@ -592,7 +584,6 @@ void Terminal::UartCheckAndProcessLine(){
 // a non-interrupt driven UART will not generate an event
 void Terminal::UartReadLineBlocking()
 {
-#if IS_INACTIVE(GW_SAVE_SPACE)
     if (!uartActive)
         return;
 
@@ -648,7 +639,6 @@ void Terminal::UartReadLineBlocking()
             readBufferOffset++;
         }
     }
-#endif
 }
 
 //############################ UART_BLOCKING_WRITE

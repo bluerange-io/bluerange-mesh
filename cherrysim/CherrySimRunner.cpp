@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -59,12 +59,10 @@ int main(int argc, char** argv) {
     printf("#################################################" EOL
            "#                  CherrySim                    #" EOL
            "#################################################" EOL
-           "#  Open your browser at http://localhost:5555/  #" EOL
-           "#  to view the visualization of the simulation  #" EOL
-           "#################################################" EOL);
+        );
 
-    CherrySimRunnerConfig runnerConfig = CherrySimRunner::CreateDefaultTesterConfiguration();
-    SimConfiguration simConfig = CherrySimRunner::CreateDefaultRunConfiguration();
+    CherrySimRunnerConfig runnerConfig = CherrySimRunner::CreateDefaultRunnerConfiguration();
+    SimConfiguration simConfig = CherrySimRunner::CreateDefaultSimConfiguration();
 
     for (int i = 0; i < argc; i++)
     {
@@ -84,7 +82,7 @@ int main(int argc, char** argv) {
         }
         else if (s == "--config")
         {
-            std::string configPath = argv[i+1];
+            std::string configPath = argv[i + 1];
             std::ifstream inputFile(configPath);
             if (!inputFile)
             {
@@ -92,7 +90,7 @@ int main(int argc, char** argv) {
                 SIMEXCEPTION(FileException);
             }
 
-            simConfig = CherrySimRunner::CreateDefaultRunConfiguration();
+            simConfig = CherrySimRunner::CreateDefaultSimConfiguration();
 
             nlohmann::json configJson;
             inputFile >> configJson;
@@ -100,6 +98,61 @@ int main(int argc, char** argv) {
             from_json(configJson, simConfig);
 
             printf("Launching with %s!" EOL, configPath.c_str());
+
+            i++;
+        }
+        else if (s == "--configdir")
+        {
+            //Create the default runner config
+            simConfig = CherrySimRunner::CreateDefaultSimConfiguration();
+
+            std::string configDir = argv[i + 1];
+            if (configDir.at(configDir.length()-1) != '/') configDir += "/";
+
+            std::string simConfigPath = configDir + "sim_config.json";
+            std::string runnerConfigPath = configDir + "runner_config.json";
+
+            //Load the sim config from the config directory
+            std::ifstream simConfigFile(simConfigPath);
+            if (!simConfigFile) {
+                printf("Could not open sim config %s" EOL, simConfigPath.c_str());
+                SIMEXCEPTIONFORCE(FileException);
+            }
+            
+            nlohmann::json simConfigJson = nlohmann::json::parse(simConfigFile, nullptr, false, true);
+            from_json(simConfigJson, simConfig);
+
+            //Make sure that all configuration files are loaded from the config directory
+            if (!simConfig.siteJsonPath.empty()) simConfig.siteJsonPath = configDir + simConfig.siteJsonPath;
+            if (!simConfig.devicesJsonPath.empty()) simConfig.devicesJsonPath = configDir + simConfig.devicesJsonPath;
+            if (!simConfig.storeFlashToFile.empty()) simConfig.storeFlashToFile = configDir + simConfig.storeFlashToFile;
+            if(!simConfig.floorplanImage.empty()) simConfig.floorplanImage = configDir + simConfig.floorplanImage;
+
+            //TODO: maybe remove
+            //Test that the other files exist as well
+            std::ifstream siteConfig(simConfig.siteJsonPath);
+            if (!siteConfig) printf("Could not open site config %s" EOL, simConfig.siteJsonPath.c_str());
+            std::ifstream devicesConfig(simConfig.devicesJsonPath);
+            if (!devicesConfig) printf("Could not open devices config %s" EOL, simConfig.devicesJsonPath.c_str());
+
+            //Load the runner config from the config directory
+            std::ifstream runnerConfigFile(runnerConfigPath);
+            if (!runnerConfigFile) {
+                printf("Could not open runner config %s" EOL, runnerConfigPath.c_str());
+                SIMEXCEPTIONFORCE(FileException);
+            }
+
+            nlohmann::json runnerConfigJson = nlohmann::json::parse(runnerConfigFile, nullptr, false, true);
+
+            //FIXME: Put somewhere else
+            for (nlohmann::json::const_iterator it = runnerConfigJson.begin(); it != runnerConfigJson.end(); ++it)
+            {
+                if (it.key() == "verbose") runnerConfigJson.at("verbose").get_to(runnerConfig.verbose);
+                else if (it.key() == "enableClusteringTest") runnerConfigJson.at("enableClusteringTest").get_to(runnerConfig.enableClusteringTest);
+                else SIMEXCEPTIONFORCE(IllegalArgumentException);
+
+                //FIXME: Add disabling of exceptions and disable most exceptions through the config
+            }
 
             i++;
         }
@@ -116,6 +169,17 @@ int main(int argc, char** argv) {
             if (i != 0) std::cerr << "WARNING: unknown parameter " << s << "\n";
         }
     }
+
+    printf(
+        "#  Open your browser at http://localhost:%u/  #" EOL
+        "#  to view the visualization of the simulation  #" EOL
+        "#################################################" EOL
+        "#   Use socat or e.g. Putty to connect to the   #" EOL
+        "#             SocketTerm on Port %u           #" EOL
+        "#################################################" EOL,
+        simConfig.webServerPort,
+        simConfig.socketServerPort
+    );
 
 #ifdef _MSC_VER
     std::filesystem::path currentWorkingDir = std::filesystem::current_path();
@@ -220,7 +284,7 @@ NodeEntry* CherrySimRunner::GetSinkNodeForTerminalMainReader()
         return nullptr;
     }
 }
-CherrySimRunnerConfig CherrySimRunner::CreateDefaultTesterConfiguration()
+CherrySimRunnerConfig CherrySimRunner::CreateDefaultRunnerConfiguration()
 {
     CherrySimRunnerConfig config;
     config.enableClusteringTest = false; //If enabled, the simulator be reset after all nodes have clustered
@@ -229,7 +293,7 @@ CherrySimRunnerConfig CherrySimRunner::CreateDefaultTesterConfiguration()
     return config;
 }
 
-SimConfiguration CherrySimRunner::CreateDefaultRunConfiguration()
+SimConfiguration CherrySimRunner::CreateDefaultSimConfiguration()
 {
     SimConfiguration simConfig;
 

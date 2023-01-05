@@ -3,7 +3,7 @@ ifndef::imagesdir[:imagesdir: ../assets/images]
 :page-partial:
 image:cpp.png[cplusplus]
 
-FruityMesh can be built using GCC and is mainly written in C++, with some small C++11 bits. Setting up the development environment has become pretty straightforward.
+FruityMesh can be built using GCC and is mainly written in {cpp}, with some small {cpp}11 bits. Setting up the development environment has become pretty straightforward.
 
 You have three possibilities:
 
@@ -55,11 +55,12 @@ Download Version 4.9 of the GNU ARM Embedded Toolchain. This includes the compil
 You can choose any location for the setup of fruitymesh. In this example we will create a folder in our `home/user` folder by checking out the fruitymesh GitHub repository:
 
 ==== Windows
-`cd %HOMEPATH%`
+With CMD: `cd %HOMEPATH%`,
+with PowerShell: `cd $HOME`
 and 
 `git clone https://github.com/mwaylabs/fruitymesh.git`
 
-Download the compiler from https://launchpad.net/gcc-arm-embedded/4.9/4.9-2015-q3-update/ and unzip the files to the cloned fruitymesh folder.
+Download the compiler from https://launchpad.net/gcc-arm-embedded/4.9/4.9-2015-q3-update/ and unzip the files to a directory of your choice.
 
 WARNING: Do not choose a newer version, as this might fail to compile.
 
@@ -68,7 +69,7 @@ WARNING: Do not choose a newer version, as this might fail to compile.
 and 
 `git clone https://github.com/mwaylabs/fruitymesh.git`
 
-Download the compiler from https://launchpad.net/gcc-arm-embedded/4.9/4.9-2015-q3-update/ and unzip the files to the cloned fruitymesh folder.
+Download the compiler from https://launchpad.net/gcc-arm-embedded/4.9/4.9-2015-q3-update/ and unzip the files to a directory of your choice.
 
 WARNING: Do not choose a newer version, as this might fail to compile.
 
@@ -131,7 +132,7 @@ In order to configure the project, you should create the file `<fruitymesh-folde
 {
     "cmake.configureSettings":{
         "GCC_PATH":"C:/<your_path>/gcc-arm-embedded-4.9-2015q3",
-        "BUILD_FEATURESETS":"ON"
+        "BUILD_TYPE":"FIRMWARE"
     },
     "cmake.buildDirectory": "${workspaceFolder}/_build/vscode/",
     "cmake.configureOnOpen": true,
@@ -170,7 +171,7 @@ If you want to build FruityMesh on the command line, use the following instructi
 
 Open a command line in `<fruitymesh-folder>/_build/commandline` and execute the following command within that directory. Make sure to replace the path to GCC to fit your installation (use forward slashes "*/*"):
 
-`cmake "../../" -DBUILD_FEATURESETS=ON -DGCC_PATH="C:/<yourpath>/gcc-arm-none-eabi-4_9" -G "Unix Makefiles"`
+`cmake "../../" -DBUILD_TYPE=FIRMWARE -DGCC_PATH="C:/<yourpath>/gcc-arm-none-eabi-4_9" -G "Unix Makefiles"`
 
 WARNING: The GCC_PATH must be specified using forward slashes "*/*", not backward slashes "*\*", otherwhise cmake will complain about `Invalid character escape '\m'`. You have to delete all files in your build directory before executing the command again to solve the issue! In case of other errors, make sure to have a look at xref:BuildingWithCMake.adoc#Troubleshooting[Building With CMake]
 
@@ -199,7 +200,7 @@ Eclipse is a good development IDE but its CMake integration is a bit outdated. T
 
 To generate the project settings, open a commandline in the `fruitymesh_eclipse` folder and execute: 
 
-`cmake ../fruitymesh -DBUILD_FEATURESETS=ON -DGCC_PATH="C:/<yourpath>/gcc-arm-none-eabi-4_9" -G "Eclipse CDT4 - Unix Makefiles"`
+`cmake ../fruitymesh -DBUILD_TYPE=FIRMWARE -DGCC_PATH="C:/<yourpath>/gcc-arm-none-eabi-4_9" -G "Eclipse CDT4 - Unix Makefiles"`
 
 After starting Eclipse, all you have to do is to import the generated FruityMesh project. You can then develop, flash and debug in a comfortable way.
 

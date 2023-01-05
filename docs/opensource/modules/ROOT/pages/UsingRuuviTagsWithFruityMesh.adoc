@@ -68,7 +68,7 @@ Then we configure the build directory for building the firmware and specify the 
 
 ```
 ┏━ 2021-02-24 16:49:42 user@host:~/doc/code/fruitymesh
-$ cmake -S. -B../fruitymesh_build -DBUILD_FEATURESETS=ON -DGCC_PATH=$HOME/var/local/gcc-arm-none-eabi/v4.9-2015q3/
+$ cmake -S. -B../fruitymesh_build -DBUILD_TYPE=FIRMWARE -DGCC_PATH=$HOME/var/local/gcc-arm-none-eabi/v4.9-2015q3/
 -- The C compiler identification is GNU 4.9.3
 -- The CXX compiler identification is GNU 4.9.3
 -- The ASM compiler identification is GNU

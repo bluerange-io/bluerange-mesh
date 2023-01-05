@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -86,6 +86,9 @@ TEST(TestNode, TestCommands) {
     tester.SendTerminalCommand(1, "datal r");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "RX Data size is:");
 
+    tester.SendTerminalCommand(1, "action 2 node gettime");
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"(\{"type":"get_time_result","nodeId":2,"module":0,"syncState":0,"time":\d*,"offset":\d*,"master":0)");
+
     tester.SendTerminalCommand(1, "settime 1337 0");
     tester.SimulateGivenNumberOfSteps(1);
     ASSERT_EQ(tester.sim->FindNodeById(1)->gs.timeManager.GetLocalTime(), 1337);
@@ -93,6 +96,11 @@ TEST(TestNode, TestCommands) {
     tester.SendTerminalCommand(1, "gettime");
     tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "Time is currently approx. 1970 years, 1 days, 00h:22m:17s,\\d+ ticks");
     
+    //We must wait for some time until the time was properly synced and corrected
+    tester.SimulateForGivenTime(10 * 1000);
+    tester.SendTerminalCommand(1, "action 2 node gettime");
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"(\{"type":"get_time_result","nodeId":2,"module":0,"syncState":2,"time":\d*,"offset":\d*,"master":0)");
+
     tester.SendTerminalCommand(1, "stop");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "Stopping state machine.");
     tester.SendTerminalCommand(1, "start");
@@ -206,6 +214,7 @@ TEST(TestNode, TestCommands) {
     ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[5]), 106);
     ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[6]), 107);
     ASSERT_EQ(Utility::ToAlignedU16(&tester.sim->nodes[1].gs.config.configuration.preferredPartnerIds[7]), 108);
+
 }
 #endif
 

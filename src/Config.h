@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -58,7 +58,7 @@ class RecordStorageEventListener;
 #define FM_VERSION_MINOR 1
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 230
+#define FM_VERSION_PATCH 590
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -425,7 +425,7 @@ class Conf
 
         //HANDSHAKE
         //If the handshake has not finished after this time, the connection will be disconnected
-        static constexpr u16 meshHandshakeTimeoutDs = SEC_TO_DS(4);
+        static constexpr u16 meshHandshakeTimeoutDs = SEC_TO_DS(5);
 
         /*
          * If both conn_sup_timeout and max_conn_interval are specified, then the following constraint applies:

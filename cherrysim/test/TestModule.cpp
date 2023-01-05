@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -291,7 +291,7 @@ TEST(TestModule, TestConfigRemovalDuringUnenrollment) {
 
     //Disable StatusReporterModule
     tester.SendTerminalCommand(1, "set_active 2 status off");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"set_active_result\",\"module\":%u,\"requestHandle\":0,\"code\":0}", ModuleId::STATUS_REPORTER_MODULE);
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"set_active_result\",\"module\":%u,\"requestHandle\":0,\"code\":0}", (u32)ModuleId::STATUS_REPORTER_MODULE);
 
     //Reset the node
     tester.SendTerminalCommand(2, "reset");

@@ -308,6 +308,16 @@ Afterwards, the local time of the local node can be queried on the terminal usin
 
 The output gives the local time and date of the node in a human-readable format. This is only an approximate calculation. It is just to verify if the time was set correctly. Internally, the nodes work with Unix time stamps.
 
+To query the local time of a node in the network with e.g nodeId 1234, the following command can be used:
+
+`action 1234 node gettime`
+
+Sample response: 
+
+`{"type":"get_time_result","nodeId":1234,"module":0,"syncState":2,"time":1654247506,"offset":120,"master":0}`
+
+You can see if the requested node is currently regarded as the time master, which means that it was used to sync the time to the network. If logging is enabled, the timestamp will also be logged out in a human readable format.
+
 [#queryingActiveModules]
 == Querying Active Modules
 

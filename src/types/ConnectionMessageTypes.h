@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -83,7 +83,7 @@ enum class MessageType : u8
     ENCRYPT_CUSTOM_DONE = 28,
 
     //Others
-    UPDATE_TIMESTAMP = 30, //Used to enable timestamp distribution over the mesh
+    UPDATE_TIMESTAMP = 30, //This is used to set the time of a node directly, e.g. from a Smartphone and will trigger time synchronization
     UPDATE_CONNECTION_INTERVAL = 31, //Instructs a node to use a different connection interval
     ASSET_LEGACY = 32,
     CAPABILITY = 33,

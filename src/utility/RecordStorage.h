@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -142,6 +142,14 @@ enum class DefragmentationStage : u8
     NO_DEFRAGMENTATION = 255,
 };
 
+enum class LockDownStageImmortalRecords : u8   // only used if there is at least one immortal record, otherwise everything is just erased in one step
+{
+    NO_LOCKDOWN = 0,
+    LOCKDOWN_SCHEDULED = 1, // lockdown method was called but there is a defragmentation process that has to finish first
+    LOCKING_DOWN = 2,       // lockdown is in progress, meaning that all pages are defragmented one after the other
+    LOCKED_DOWN = 3         // the process of locking down has finished in the past
+};
+
 #pragma pack(push)
 #pragma pack(1)
 constexpr int SIZEOF_RECORD_STORAGE_RECORD_HEADER = 8;
@@ -249,7 +257,7 @@ class RecordStorage : public FlashStorageEventListener
 {
     friend class TestRecordStorage;
 
-    private:
+    TESTER_PUBLIC:
         enum class FlashUserTypes : u32
         {
             DEFAULT   = 0, //TODO: All usages of this value should be refactored to use a distinct user type instead.
@@ -270,6 +278,9 @@ class RecordStorage : public FlashStorageEventListener
         RecordStoragePage* defragmentSwapPage = nullptr;
         DefragmentationStage defragmentationStage = DefragmentationStage::NO_DEFRAGMENTATION;
 
+        u32 lockDownPageToEraseIdxImmortals = 0;
+        LockDownStageImmortalRecords lockDownStageImmortalRecords = LockDownStageImmortalRecords::NO_LOCKDOWN;
+
         bool processQueueInProgress = false;
 
         //Stores a record
@@ -281,6 +292,13 @@ class RecordStorage : public FlashStorageEventListener
                 
         void DefragmentPage(RecordStoragePage& pageToDefragment, bool force);
         void RepairPages();
+
+        // used for record storage lockdown in the presence of immortals
+        void LockDownAndClearAllSettingsImmortalRecords();
+        void ClearPageAndSaveImmortals(RecordStoragePage& pageToDefragment, bool force);
+
+        //Returns true if any immortal record is currently present, even if it is deactivated
+        bool HasImmortalRecords();
 
         void ProcessQueue(bool force);
 

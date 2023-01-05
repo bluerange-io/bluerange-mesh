@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -336,6 +336,17 @@ namespace FruityHal
         BAUDRATE_115200,
         BAUDRATE_57600,
         BAUDRATE_38400,
+        BAUDRATE_19200,
+    };
+
+    enum class UartParity : u8 {
+        NONE,
+        EVEN
+    };
+
+    enum class UartFlowControl : u8 {
+        NONE,
+        RTS_CTS
     };
 
     // ######################### Ble Stack and Event Handling ############################

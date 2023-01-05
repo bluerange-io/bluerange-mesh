@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -196,7 +196,11 @@ void StatusReporterModule::SendDeviceInfoV2(NodeId toNode, u8 requestHandle, Mes
 
     data.manufacturerId = RamConfig->manufacturerId;
     data.deviceType = GET_DEVICE_TYPE();
-    FruityHal::GetDeviceAddress(data.chipId);
+    u32 deviceId[2] = {};
+    FruityHal::GetDeviceIdLong(deviceId);
+    deviceId[0] = Utility::SwapU32(deviceId[0]);
+    deviceId[1] = Utility::SwapU32(deviceId[1]);
+    CheckedMemcpy(data.chipId, deviceId, sizeof(data.chipId));
     data.serialNumberIndex = RamConfig->GetSerialNumberIndex();
     data.accessAddress = FruityHal::GetBleGapAddress();
     data.nodeVersion = GS->config.GetFruityMeshVersion();
@@ -950,9 +954,9 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
 
                 //As the time is currently only 3 byte, use this formula to get the current unix timestamp in UTC: now()  - (now() % (2^24)) + timestamp
                 logjson_partial("STATUSMOD", "\"errType\":%u,\"code\":%u,\"extra\":%u,\"time\":%u", (u32)data->errorType, data->errorCode, data->extraInfo, data->timestamp);
-#if IS_INACTIVE(GW_SAVE_SPACE)
+
                 logjson_partial("STATUSMOD", ",\"typeStr\":\"%s\",\"codeStr\":\"%s\"", Logger::GetErrorLogErrorType((LoggingError)data->errorType), Logger::GetErrorLogError((LoggingError)data->errorType, data->errorCode));
-#endif
+
                 logjson("STATUSMOD", "}" SEP);
             }
             else if(actionType == StatusModuleActionResponseMessages::REBOOT_REASON)

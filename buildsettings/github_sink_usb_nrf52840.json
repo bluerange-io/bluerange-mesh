@@ -1,14 +1,23 @@
 {
+	"settingsVersion":2,
 	"additionalArgs":{
 		"settings":"github_sink_usb_nrf52840",
 		"make":"github_sink_usb_nrf52840",
-		"platform":"nrf52840",
 		"flash":"",
 		"devicetype":3
 	},
+	"genericSettings":{
+		"family":"NRF52",
+		"platform":"NRF52840",
+		"chipset":"NRF52840_XXAA"
+	},
 	"buildSettings":{
+		"toolchain":"gcc-arm-embedded-4.9-2015q3",
 		"environmentVariables":{
 			"FEATURESET":"github_sink_usb_nrf52840"
 		}
+	},
+	"flashSettings":{
+		"stack":"s140_nrf52840_6.1.0_softdevice.hex"
 	}
 }

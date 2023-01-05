@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -47,7 +47,7 @@ private:
     std::thread terminalReader;
 public:
     CherrySim* sim;
-    static CherrySimRunnerConfig CreateDefaultTesterConfiguration();
+    static CherrySimRunnerConfig CreateDefaultRunnerConfiguration();
 
     bool meshGwCommunication;
 
@@ -70,7 +70,7 @@ public:
 
     NodeEntry* GetSinkNodeForTerminalMainReader();
 
-    static SimConfiguration CreateDefaultRunConfiguration();
+    static SimConfiguration CreateDefaultSimConfiguration();
 
 private:
     bool shouldRestartSim;

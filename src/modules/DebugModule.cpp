@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -125,7 +125,7 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
 
     /*When time is synced, this will switch on green led after every 10 sec for 2 sec from the start of the minute*/
     u32 seconds = GS->timeManager.GetLocalTime();
-    char timestring[80];
+    char timestring[100];
     if (seconds % 60 == 0 && !syncTest && GS->timeManager.IsTimeSynced()) {
         //Enable LED
         IoModule* ioMod = (IoModule*)GS->node.GetModuleById(ModuleId::IO_MODULE);
@@ -139,7 +139,7 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
     if (syncTest)
     {
         if (seconds % 10 == 0) {
-            GS->timeManager.convertLocalTimeToString(timestring);
+            GS->timeManager.ConvertTimeToString(timestring, sizeof(timestring));
 
             trace("Time is currently %s" EOL, timestring);
 
@@ -149,8 +149,6 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
     }
 #endif
 
-
-#if IS_INACTIVE(GW_SAVE_SPACE)
     //Counter message generation
     if(currentCounter <= counterMaxCount){
         if (counterMessagesPer10Sec != 0)
@@ -251,7 +249,6 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
         logt("DEBUGMOD", "flood mode timeout");
         floodMode = FloodMode::OFF;
     }
-#endif
 }
 
 void DebugModule::PrintAdvMessageHeader(const char* type, const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent)
@@ -596,14 +593,13 @@ void DebugModule::ButtonHandler(u8 buttonId, u32 holdTimeDs)
 TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize)
 {
     //React on commands, return true if handled, false otherwise
-    if(commandArgsSize >= 3 && (TERMARGS(2 ,moduleName) || TERMARGS(2 ,"eink")))
+    if(commandArgsSize >= 3 && TERMARGS(2 ,moduleName))
     {
         NodeId destinationNode = Utility::TerminalArgumentToNodeId(commandArgs[1]);
 
 
         if(commandArgsSize >= 4 && TERMARGS(0 ,"action"))
         {
-#if IS_INACTIVE(CLC_GW_SAVE_SPACE)
             if(commandArgsSize >= 4 && TERMARGS(3 ,"get_buffer")){
                 SendModuleActionMessage(
                     MessageType::MODULE_TRIGGER_ACTION,
@@ -617,8 +613,6 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
                 return TerminalCommandHandlerReturnType::SUCCESS;
             }
-#endif
-#if IS_INACTIVE(SAVE_SPACE)
             //Reset the connection loss counter of any node
             else if(TERMARGS(3, "reset_connection_loss_counter"))
             {
@@ -662,7 +656,8 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
                 return TerminalCommandHandlerReturnType::SUCCESS;
             }
-            //Tell any node to generate a hardfault
+            //Tell any node to generate a hardfault            
+#if IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
             else if(TERMARGS(3, "hardfault"))
             {
                 logt("DEBUGMOD", "send hardfault");
@@ -678,6 +673,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
                 return TerminalCommandHandlerReturnType::SUCCESS;
             }
+#endif //IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
             //Queries a nodes to read back parts of its memory and send it back over the mesh
             //This is helpful if a remote node has some issues and cannot be accessed
             else if (TERMARGS(3, "readmem"))
@@ -807,12 +803,9 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
                 return TerminalCommandHandlerReturnType::SUCCESS;
             }
-#endif
         }
 
     }
-
-#if IS_INACTIVE(SAVE_SPACE)
     else if (TERMARGS(0, "data"))
     {
         NodeId receiverId = 0;
@@ -856,7 +849,8 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
     }
     //Reads a page of the memory (0-256) and prints it
-    if(TERMARGS(0, "readblock"))
+#if IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
+    else if(TERMARGS(0, "readblock"))
     {
         if(commandArgsSize < 3) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
@@ -900,8 +894,9 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
+#endif //IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
     //Prints a map of empty (0) and used (1) memory pages
-    if(TERMARGS(0 ,"memorymap"))
+    else if(TERMARGS(0 ,"memorymap"))
     {
         u32 offset = FLASH_REGION_START_ADDRESS;
         u16 blockSize = 1024; //Size of a memory block to check
@@ -920,7 +915,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-    if (TERMARGS(0,"log_error"))
+    else if (TERMARGS(0,"log_error"))
     {
         if(commandArgsSize <= 2) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
@@ -931,6 +926,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
+#if IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
     else if (TERMARGS(0,"saverec"))
     {
         if(commandArgsSize <= 2) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
@@ -974,6 +970,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
+#endif //IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
     else if (TERMARGS(0, "send"))
     {
         if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
@@ -1107,7 +1104,8 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
         }
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-    if (TERMARGS(0, "nswrite")  && commandArgsSize >= 3)    //jstodo rename nswrite to flashwrite? Might also be unused because we already have saverec
+#if IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
+    else if (TERMARGS(0, "nswrite")  && commandArgsSize >= 3)    //jstodo rename nswrite to flashwrite? Might also be unused because we already have saverec
     {
         u32 addr = strtoul(commandArgs[1], nullptr, 10) + FLASH_REGION_START_ADDRESS;
         u8 buffer[200];
@@ -1118,7 +1116,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-    if (TERMARGS(0, "erasepage"))
+    else if (TERMARGS(0, "erasepage"))
     {
         if(commandArgsSize <= 1) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
@@ -1128,7 +1126,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-    if (TERMARGS(0, "erasepages") && commandArgsSize >= 3)
+    else if (TERMARGS(0, "erasepages") && commandArgsSize >= 3)
     {
 
         u16 page = Utility::StringToU16(commandArgs[1]);
@@ -1138,13 +1136,14 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-    if (TERMARGS(0, "filltx"))
+#endif //IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
+    else if (TERMARGS(0, "filltx"))
     {
         GS->cm.FillTransmitBuffers();
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-    if (TERMARGS(0, "getpending"))
+    else if (TERMARGS(0, "getpending"))
     {
         logt("DEBUGMOD", "cm pending %u", GS->cm.GetPendingPackets());
 
@@ -1156,8 +1155,8 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-
-    if (TERMARGS(0, "writedata"))
+#if IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
+    else if (TERMARGS(0, "writedata"))
     {
         if(commandArgsSize < 3) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
@@ -1171,8 +1170,9 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-
-    if(TERMARGS(0, "printqueue") )
+#endif //IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
+#if IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
+    else if(TERMARGS(0, "printqueue") )
     {
         BaseConnectionHandle conn;
 
@@ -1206,13 +1206,14 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-
-    if (TERMARGS(0, "stack_overflow"))
+#endif //IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
+#if IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
+    else if (TERMARGS(0, "stack_overflow"))
     {
         CauseStackOverflow();
     }
-
-    if (TERMARGS(0, "scanlog"))
+#endif //IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
+    else if (TERMARGS(0, "scanlog"))
     {
         if(commandArgsSize == 1)
         {
@@ -1261,8 +1262,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-
-    if (TERMARGS(0, "scanboost"))
+    else if (TERMARGS(0, "scanboost"))
     {
         u16 timeLeftDs = commandArgsSize > 1 ? SEC_TO_DS(Utility::StringToU16(commandArgs[1])) : SEC_TO_DS(60);
 
@@ -1280,8 +1280,6 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-
-#endif
 
     //Must be called to allow the module to get and set the config
     return Module::TerminalCommandHandler(commandArgs, commandArgsSize);
@@ -1303,7 +1301,6 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 
             if (actionType == DebugModuleTriggerActionMessages::SET_FLOOD_MODE)
             {
-#if IS_INACTIVE(SAVE_SPACE)
                 DebugModuleSetFloodModeMessage const * data = (DebugModuleSetFloodModeMessage const *)packet->data;
                 floodMode = (FloodMode)data->floodMode;
                 floodFrameSkip = true;
@@ -1379,9 +1376,8 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
                     //Keep track of all flood messages received
                     packetsIn++;
                 }
-#endif
             }
-#if IS_ACTIVE(UNSECURE_MEMORY_READBACK)
+#if IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
             //This part should not be used in release builds, otherwise, the whole memory
             //contents can be read back. This is only for analyzing bugs
             else if (actionType == DebugModuleTriggerActionMessages::READ_MEMORY)
@@ -1407,15 +1403,12 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
                     false);
             }
 #endif
-#if IS_INACTIVE(CLC_GW_SAVE_SPACE)
             else if (packet->actionType == (u8)DebugModuleTriggerActionMessages::RESET_FLOOD_COUNTER)
             {
                 logt("DEBUGMOD", "Resetting flood counter.");
                 packetsOut = 0;
                 packetsIn = 0;
             }
-#endif
-#if IS_INACTIVE(CLC_GW_SAVE_SPACE)
             else if (actionType == DebugModuleTriggerActionMessages::GET_JOIN_ME_BUFFER)
             {
                 //Send a special packet that contains my own information
@@ -1456,8 +1449,6 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
                 }
 
             }
-#endif
-#if IS_INACTIVE(SAVE_SPACE)
             else if (actionType == DebugModuleTriggerActionMessages::RESET_CONNECTION_LOSS_COUNTER) {
 
                 logt("DEBUGMOD", "Resetting connection loss counter");
@@ -1485,10 +1476,12 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
                 SendStatistics(packet->header.sender);
 
             }
+#if IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
             else if (actionType == DebugModuleTriggerActionMessages::CAUSE_HARDFAULT_MESSAGE) {
                 logt("DEBUGMOD", "receive hardfault");
                 CauseHardfault();
             }
+#endif //IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
             else if (actionType == DebugModuleTriggerActionMessages::PING) {
                 //We respond to the ping
                 SendModuleActionMessage(
@@ -1555,7 +1548,6 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 
                 }
             }
-#endif
         }
     }
     else if (packetHeader->messageType == MessageType::DATA_1
@@ -1574,7 +1566,6 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
 
         //Check if our module is meant
         if(packet->moduleId == moduleId){
-#if IS_INACTIVE(SAVE_SPACE)
             if (actionType == DebugModuleActionResponseMessages::STATS_MESSAGE){
                 DebugModuleInfoMessage const * infoMessage = (DebugModuleInfoMessage const *) packet->data;
 
@@ -1651,9 +1642,6 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
                 queueFloodCounterHigh++;
             }
 #endif
-
-#endif
-#if IS_INACTIVE(CLC_GW_SAVE_SPACE)
             if(actionType == DebugModuleActionResponseMessages::JOIN_ME_BUFFER_ITEM){
                 //Must copy the data to not produce a hardfault because of unaligned access
                 joinMeBufferPacket data;
@@ -1666,7 +1654,6 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
                         (u32)data.payload.deviceType, data.payload.ackField
                 );
             }
-#endif
         }
     }
 }

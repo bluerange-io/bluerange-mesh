@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
 // **
-// ** Copyright (C) 2015-2021 M-Way Solutions GmbH
+// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
 // ** Contact: https://www.blureange.io/licensing
 // **
 // ** This file is part of the Bluerange/FruityMesh implementation
@@ -377,6 +377,7 @@ struct SimConfiguration {
     uint32_t    mapWidthInMeters                   = 0;
     uint32_t    mapHeightInMeters                  = 0;
     uint32_t    mapElevationInMeters               = 0;
+    std::string floorplanImage                     = "";
     uint32_t    simTickDurationMs                  = 0;
     int32_t     terminalId                         = 0; //Enter -1 to disable, 0 for all nodes, or a specific id
     int32_t     simOtherDelay                      = 0; // deprecated and retained only for compatibility reasons
@@ -400,6 +401,7 @@ struct SimConfiguration {
     bool        logReplayCommands                  = false; //If set, lines are logged out that can be used as input for the replay feature.
     bool        useLogAccumulator                  = false; //If set, all logs are written to CherrySim::logAccumulator
     u32         defaultNetworkId                   = 0;
+    bool        ignoreDeviceJsonEnrollments        = false; //Set to true to not use the enrollment info from the devices json
     std::vector<DevicePosition> preDefinedPositions;
     bool        rssiNoise                          = false;
     bool        simulateWatchdog                   = false;
@@ -422,6 +424,13 @@ struct SimConfiguration {
     bool        perfectReceptionProbabilityForConnection  = false;
 
     bool        verboseCommands                    = false; // deprecated but retained only for compatability reasons. Should be removed in ticket BR-2321
+
+    //Set this to true to disable all non-critical exceptions, e.g. useful for CherrySimRunner
+    bool        disableNonCriticalExceptions       = false;
+
+    //The ports where web server and SocketTerm listen for connections
+    u16         webServerPort                      = 5555;
+    u16         socketServerPort                   = 5556;
 
     /// To speed up the simulator when running with many advertising nodes, this parameter changes
     /// the index step in the loop iterating over all potential delivery partners.

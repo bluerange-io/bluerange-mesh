@@ -17,9 +17,9 @@ As is always the case with CMake, an "out-of-source build" should be preferred. 
 
 1. Create a sibling directory next to the repository
 2. Open the Command Line / Terminal in this directory
-3. Execute the following: `cmake ../fruitymesh` (assuming the repository has the default "fruitymesh" name).
+3. Execute the following: `cmake ../fruitymesh -DBUILD_TYPE=SIMULATOR` (assuming the repository has the default "fruitymesh" name).
 
-TIP: On Windows, we do recommend that you download the free link:https://visualstudio.microsoft.com/de/downloads/[Visual Studio Community Edition]. In order to create the build files, you should use `cmake ../fruitymesh -A Win32` which will generate the whole Visual Studio Solution for you that you only need to open and hit `Play`.
+TIP: On Windows, we do recommend that you download the free link:https://visualstudio.microsoft.com/de/downloads/[Visual Studio Community Edition]. The Windows 10 SDK as well as C++ Build Tools need to be installed. In order to create the build files, you should use `cmake ../fruitymesh -A Win32 -DBUILD_TYPE=SIMULATOR` which will generate the whole Visual Studio Solution for you that you only need to open and hit `Play`.
 
 The necessary build files are created inside the sibling directory. To make sure that everything worked as intended try to compile and run the cherrySim_runner and cherrySim_tester projects. In case you are using visual studio, open the Solution file (.sln), right click the projects on the left side and select "start up project".
 
@@ -29,7 +29,7 @@ The necessary build files are created inside the sibling directory. To make sure
 
 Building the native featuresets for your development board is mostly the same as with the simulator. The only difference is that some extra parameters need to be passed to cmake:
 
-`cmake ../fruitymesh -DBUILD_FEATURESETS=ON -DGCC_PATH="C:/path/to/gcc-arm-none-eabi-4_9" -G "Unix Makefiles"`
+`cmake ../fruitymesh -DBUILD_TYPE=FIRMWARE -DGCC_PATH="C:/path/to/gcc-arm-none-eabi-4_9" -G "Unix Makefiles"`
 
 WARNING: The GCC_PATH must be specified using forward slashes ("/"), not backward slashes ("\"). If you accidentally used backward slashes you have to remove all the files that CMake just created in the current working directory and execute the command again with forward slashes.
 
@@ -83,6 +83,9 @@ Each featureset has its own cmake file which is located in fruitymesh/config/fea
 
 == ONLY_FEATURESET
 When generating the project files with CMake for building a featureset, it is possible to set the "ONLY_FEATURESET" parameter. If set, only the given featureset (the one that is stored in this parameter) will be generated. There are some advantages to this, for example the generated Makefile shows the done percentage more clearly. If all featuresets are generated, the shown percentage jump in steps of 20, while if only one featureset it generated, the percentage is smoothly rising from one percentage to the next. Another advantage is better intellisense code hints in visual studio code. For example, it indicates better which areas are currently disabled by an `#ifdef`.
+
+== BUILD_TYPE
+The "BUILD_TYPE" parameter can be set to either SIMULATOR or FIRMWARE with the later one being the default. Depending on it either the GNU ARM Embedded Toolchain is used to produce binaries for e.g. the nrf52 boards or the cherrySim_runner and cherrySim_tester executables are built.
 
 == SDK, Chipset, BLE Stack Compatibility
 

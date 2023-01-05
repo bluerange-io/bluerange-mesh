@@ -1,15 +1,22 @@
 {	
+	"settingsVersion":2,
 	"additionalArgs":{
 		"settings":"github_sink_nrf52",
 		"make":"github_sink_nrf52",
 		"flash":""
 	},
+	"genericSettings":{
+		"family":"NRF52",
+		"platform":"NRF52832",
+		"chipset":"NRF52832_XXAA"
+	},
 	"buildSettings":{
+		"toolchain":"gcc-arm-embedded-4.9-2015q3",
 		"environmentVariables":{
 			"FEATURESET":"github_sink_nrf52"
 		}
 	},
-	"moduleConfigs":[
-		
-	]
+	"flashSettings":{
+		"stack":"s132_nrf52_5.1.0_softdevice.hex"
+	}
 }
