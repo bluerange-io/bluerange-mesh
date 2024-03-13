@@ -197,7 +197,7 @@ TEST(TestStatusReporterModule, TestPeriodicTimeSend) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
-    //testerConfig.verbose = true;
+    // testerConfig.verbose = true;
 
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
@@ -210,10 +210,33 @@ TEST(TestStatusReporterModule, TestPeriodicTimeSend) {
     //Send a write command
     tester.SendTerminalCommand(1, "component_act 2 3 1 0xABCD 0x1234 01 13");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "Periodic Time Send is now: 1");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"component_sense\",\"module\":3,\"requestHandle\":13,\"actionType\":2,\"component\":\"0xABCD\",\"register\":\"0x1234\",\"payload\":");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"component_sense\",\"module\":3,\"requestHandle\":13,\"actionType\":0,\"component\":\"0xABCD\",\"register\":\"0x1234\",\"payload\":");
 
     //Make sure that the status module automatically disables the periodic time send after 10 minutes.
     tester.SimulateUntilMessageReceived(10 * 60 * 1000, 2, "Periodic Time Send is now: 0");
+}
+
+TEST(TestStatusReporterModule, TestPersistentPeriodicTimeSend) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    //testerConfig.verbose = true;
+
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateUntilClusteringDone(100 * 1000);
+    tester.sim->FindNodeById(2)->gs.logger.EnableTag("STATUSMOD");
+
+    //Send a write command
+    tester.SendTerminalCommand(1, "action 2 status set_time_reporting 10");
+    tester.SimulateUntilMessageReceived(1 * 1000, 1, "{\"type\":\"time_reporting_state\",\"intervalDs\":10,\"nodeId\":2,\"module\":3,\"code\":0}");
+    tester.SimulateUntilMessageReceived(2 * 1000, 1, "{\"nodeId\":2,\"type\":\"component_sense\",\"module\":3,\"requestHandle\":0,\"actionType\":0,\"component\":\"0xABCD\",\"register\":\"0x1234\",\"payload\":");
+
+    tester.SendTerminalCommand(1, "reset");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"component_sense\",\"module\":3,\"requestHandle\":0,\"actionType\":0,\"component\":\"0xABCD\",\"register\":\"0x1234\",\"payload\":");
 }
 
 TEST(TestStatusReporterModule, TestGetConnectionsVerbose) {
@@ -498,6 +521,12 @@ TEST(TestStatusReporterModule, TestCapabilitySending) {
     tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":\\d+,\"capabilityType\":2,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"BlueRange Node\",\"revision\":\"\\d+.\\d+.\\d+\"\\}");
     // metadata capability of Status module
     tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":\\d+,\"capabilityType\":3,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"BlueRange Node Status\",\"revision\":\"0\"\\}");
+    // Mesh Firmware version > 1.1.0
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":\\d+,\"capabilityType\":2,\"manufacturer\":\"BlueRange GmbH\",\"model\":\"Mesh Firmware\",\"revision\":\"[1-9]\\d*\\.[1-9]\\d*\\.\\d+\"\\}");
+    // Softdevice version >= 5.0.0 and < 10
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":\\d+,\"capabilityType\":2,\"manufacturer\":\"BlueRange GmbH\",\"model\":\"BLE Stack\",\"revision\":\"[5-9]\\.\\d+\\.\\d+\"\\}");
+    // bootloader version should be > 0
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":\\d+,\"capabilityType\":2,\"manufacturer\":\"BlueRange GmbH\",\"model\":\"Bootloader\",\"revision\":\"[1-9]\\d*\"\\}");
 
     // end of capabilities
     tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"nodeId\":2,\"type\":\"capability_end\",\"amount\":\\d+\\}");
@@ -608,16 +637,16 @@ TEST(TestStatusReporterModule, TestNearbyNodesReportsOnlyWithSameNetworkId)
 
     tester.SendTerminalCommand(
         1, "action this enroll basic BBBBB 1 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 "
-           "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 "
-           "01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00 10 0 0");
+        "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 "
+        "01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00 10 0 0");
     tester.SendTerminalCommand(
         2, "action this enroll basic BBBBC 2 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 "
-           "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 "
-           "02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 10 0 0");
+        "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 "
+        "02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 10 0 0");
     tester.SendTerminalCommand(
         3, "action this enroll basic BBBBD 3 20000 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 "
-           "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 "
-           "03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0 0");
+        "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 "
+        "03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0 0");
 
     tester.SimulateUntilMessageReceived(100 * 1000, 1, "clusterSize\":2"); // Wait until the nodes have clustered.
 
@@ -641,4 +670,103 @@ TEST(TestStatusReporterModule, TestNearbyNodesReportsOnlyWithSameNetworkId)
             ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
         }
     }
+}
+
+#if defined(PROD_SINK_NRF52) && defined(PROD_ASSET_NRF52)
+//This test makes sure that the error logs can be queried from mesh nodes and asset tags
+TEST(TestStatusReporterModule, TestErrorLogQuerying) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    simConfig.mapWidthInMeters = 10;
+    simConfig.mapHeightInMeters = 10;
+    simConfig.SetToPerfectConditions();
+    //testerConfig.verbose = true;
+
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_asset_nrf52", 2 });
+
+
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    //action [nodeId] enroll basic [serialNumber] [newNodeId] [newNetworkId] {newNetworkKey} {newUserBaseKey} {newOrganizationKey} {nodeKey} {timeoutSec} {enrollOnlyIfUnenrolled} {requestHandle}
+    tester.SendTerminalCommand(1, "action 0 enroll basic BBBBB 1 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00 10 0 0");
+    tester.SendTerminalCommand(2, "action 0 enroll basic BBBBC 2 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 10 0 0");
+    tester.SendTerminalCommand(3, "action 0 enroll basic BBBBD 33000 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0 0");
+
+    // second asset gets a different network but same orga
+    tester.SendTerminalCommand(4, "action 0 enroll basic BBBBF 33001 20000 99:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 04:00:00:00:04:00:00:00:04:00:00:00:04:00:00:00 10 0 0");
+
+
+    tester.SimulateUntilClusteringDone(50 * 1000);
+
+    //////// Node 2 (same network)
+    //Request the error log from node 2
+    tester.SendTerminalCommand(1, "action 2 status get_errors");
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"("type":"error_log_entry","nodeId":2,"module":3,"errType":2,.*"typeStr":"CUSTOM","codeStr":"INFO_ERRORS_REQUESTED")");
+
+
+
+    //////// Node 3 (same network)
+    //Establish a mesh access connection as nodeId=3 is an asset using the network key 
+    RetryOrFail<TimeoutException>(
+        2, [&] {
+            // action [nodeId] ma serial_connect [serial number] [keyId] [key] [nodeId_of_partner_after_connect] [initial_keep_alive] {requestHandle=0} {bleAddress=""} {forceMode=0}
+            tester.SendTerminalCommand(1, "action 2 ma serial_connect BBBBD 2 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 33010 60 12");
+        },
+        [&] {
+            tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"type\":\"serial_connect_response\",\"module\":10,\"nodeId\":2,\"requestHandle\":12,\"code\":0,\"partnerId\":33010}");
+        });
+
+    //Request the error log from node 3 using the partnerId
+    tester.SendTerminalCommand(1, "action 33010 status get_errors");
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"("type":"error_log_entry","nodeId":33010,"module":3,"errType":2,.*"typeStr":"CUSTOM","codeStr":"INFO_ERRORS_REQUESTED")");
+
+
+
+    //////// Node 4 (different network)
+    //Establish a mesh access connection as nodeId=4 is an asset using the orga key 
+    RetryOrFail<TimeoutException>(
+        2, [&] {
+            // action [nodeId] ma serial_connect [serial number] [keyId] [key] [nodeId_of_partner_after_connect] [initial_keep_alive] {requestHandle=0} {bleAddress=""} {forceMode=0}
+            tester.SendTerminalCommand(1, "action 2 ma serial_connect BBBBF 4 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 33011 60 12");
+        },
+        [&] {
+            tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"type\":\"serial_connect_response\",\"module\":10,\"nodeId\":2,\"requestHandle\":12,\"code\":0,\"partnerId\":33011}");
+        });
+
+    //Request the error log from node 3 using the partnerId
+    tester.SendTerminalCommand(1, "action 33011 status get_errors");
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"("type":"error_log_entry","nodeId":33011,"module":3,"errType":2,.*"typeStr":"CUSTOM","codeStr":"INFO_ERRORS_REQUESTED")");
+}
+#endif
+
+TEST(TestStatusReporterModule, TestGatewayStatus) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    // testerConfig.verbose = true;
+
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateUntilClusteringDone(100 * 1000);
+
+    // Should be unknown since we compile without the virtual comport enabled flag
+    // should be NO_SERIAL_CONNECTION (1) if virtual comport is enabled (e.g. in real life)
+    tester.SendTerminalCommand(1, "action 1 status get_gw_status");
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"("type":"gw_status","nodeId":\d+,"module":\d+,"status":0)");
+
+    tester.SendTerminalCommand(1, "action 1 status set_gw_status 11");
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"("type":"gw_status","nodeId":\d+,"module":\d+,"status":11)");
+    tester.SendTerminalCommand(1, "action 1 status get_gw_status");
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"("type":"gw_status","nodeId":\d+,"module":\d+,"status":11)");
+
+    //Non-enum values are allowed
+    tester.SendTerminalCommand(1, "action 1 status set_gw_status 22");
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"("type":"gw_status","nodeId":\d+,"module":\d+,"status":22)");
 }

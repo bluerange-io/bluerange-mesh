@@ -140,6 +140,13 @@ enum class CustomErrorTypes : u8 {
     WATCHDOG_REBOOT = 88,
     INFO_LICENSE_CHECK = 89,
     FATAL_LICENSE_MIGRATION_FAILED = 90,
+    COUNT_VENDOR_FRAMES_SENT = 91,
+    COUNT_VENDOR_FRAMES_RECEIVED = 92,
+    COUNT_VENDOR_FRAMES_DROPPED = 93,
+    COUNT_VENDOR_RX_ERRORS = 94,
+    COUNT_VENDOR_CONN_LOSS = 95,
+    WARN_AUTO_SENSE_REPORT_WITHOUT_DATA = 96,
+    COUNT_VENDOR_BYTES_SENT = 97,
     // When adding new error type please also add in frutyapi in BeaconErrorMessage.java
 };
 

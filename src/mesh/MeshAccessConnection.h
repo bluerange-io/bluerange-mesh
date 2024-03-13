@@ -76,7 +76,7 @@ private:
 
     bool useCustomKey = false;
     u8 key[16] = {};
-
+    
     FmKeyId fmKeyId = FmKeyId::ZERO;
 
     static constexpr u32 MAX_CORRUPTED_MESSAGES = 32;
@@ -107,6 +107,10 @@ public:
     //We cannot support a mesh on both sides without additional routing data, therefore
     //we have to decide whether we route data through the remote mesh or through the local mesh
     MeshAccessTunnelType tunnelType;
+
+    //Type of connection has to be checkable for closing by EnOcean module
+    FmKeyId getFmKeyId();
+
 
     u16 partnerRxCharacteristicHandle = 0;
     u16 partnerTxCharacteristicHandle = 0;

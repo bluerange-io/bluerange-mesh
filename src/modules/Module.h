@@ -91,8 +91,7 @@ class Node;
  * ModuleIds must also be the same within a mesh network to guarantee the correct
  * delivery of actions and responses.
  */
-class Module:
-        public RecordStorageEventListener
+class Module
 {
     friend class FruityMesh;
 
@@ -148,8 +147,7 @@ public:
 
     enum class ModuleSaveAction : u8{
         SAVE_MODULE_CONFIG_ACTION,
-        SET_ACTIVE_CONFIG_ACTION,
-        PRE_ENROLLMENT_RECORD_DELETE
+        SET_ACTIVE_CONFIG_ACTION
     };
 
     struct SaveModuleConfigAction {
@@ -203,14 +201,15 @@ public:
     //is used.
     virtual DeliveryPriority GetPriorityOfMessage(const u8* data, MessageLength size) { return DeliveryPriority::INVALID; };
 
-    //This handler receives all connection packets addressed to this node
+    //This handler receives all connection packets addressed to this node.
+    //CAREFUL: In some situations, the message may not actually have come through a connection, but
+    //         from the node itself. One example is when the terminal command handler is able to
+    //         dispatch the message to the node itself. In such a case, connection is nullptr.
     virtual void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader);
 
     //This handler is called before the node is enrolled, it can return PRE_ENROLLMENT_ codes
     //The enrollment packet that was received with the enrollment data is passed to the handler and can be checked
     virtual PreEnrollmentReturnCode PreEnrollmentHandler(ConnPacketModule* enrollmentPacket, MessageLength packetLength);
-
-    virtual void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
 
     //Queries a single capability of a module. If no capability with the given index is available the value INVALID must be returned.
     //After the first invalid index, no valid indices must follow. To limit the amount of virtual methods, this method is called once
@@ -276,5 +275,20 @@ private:
     #pragma pack(pop)
 
     void SendModuleConfigResult(NodeId senderId, ModuleIdWrapper moduleId, ModuleConfigMessages actionType, SetConfigResultCodes result, u8 requestHandle);
+
+    // If any subclass of the Module wants to be a RecordStorageEventListener, then this Proxy implementation
+    // avoids an ambiguity which RecordStorageEventHandler should be called. In addition, it avoids that clashes
+    // between userTypes cause any issues.
+    class RecordStorageEventListenerProxy : public RecordStorageEventListener
+    {
+    private:
+        Module& mod;
+    public:
+        explicit  RecordStorageEventListenerProxy(Module& mod);
+
+        virtual void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
+    };
+    RecordStorageEventListenerProxy proxy;
+    void ProxyRecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength);
 
 };

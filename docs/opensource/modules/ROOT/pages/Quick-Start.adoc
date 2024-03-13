@@ -48,30 +48,29 @@ You're now ready to test FruityMesh. Continue by reading the <<Get Started,Get S
 == Compile FruityMesh
 FruityMesh is built using the GCC compiler toolchain together with CMake and GNU make. The installation process varies a little for each operating system.
 
+=== Clone the FruityMesh Repository
+
+Clone the FruityMesh Repository in a folder of your choice, e.g. using the command line:
+
+`git clone https://github.com/mwaylabs/fruitymesh.git`
+
 === Installing the Toolchain
 ==== GNU ARM Embedded Toolchain
-Download Version 4.9 of the GNU ARM Embedded Toolchain. This includes the compiler gcc, linker, and multiple utilities like objcopy, addr2line and gdb - the GNU debugger:
+Download the zipped version 4.9 of the GNU ARM Embedded Toolchain from link:https://launchpad.net/gcc-arm-embedded/4.9/4.9-2015-q3-update/[]. This includes the compiler gcc, linker, and multiple utilities like objcopy, addr2line and gdb - the GNU debugger.
 
-You can choose any location for the setup of fruitymesh. In this example we will create a folder in our `home/user` folder by checking out the fruitymesh GitHub repository:
+WARNING: Do not choose a newer version for this quick start, as this might fail to compile.
 
-==== Windows
-With CMD: `cd %HOMEPATH%`,
-with PowerShell: `cd $HOME`
-and 
-`git clone https://github.com/mwaylabs/fruitymesh.git`
+TIP: This version of GCC is used to compile the featuresets for SDK 14 and SDK 15 which we have documented as an example in this quick start. To compile the SDK17 featuresets, you should download and install the link:https://developer.arm.com/downloads/-/gnu-rm/9-2020-q2-update[gcc-arm-none-eabi-9-2020-q2-update].
 
-Download the compiler from https://launchpad.net/gcc-arm-embedded/4.9/4.9-2015-q3-update/ and unzip the files to a directory of your choice.
+Unzip the contents in a directory of your choice.
 
-WARNING: Do not choose a newer version, as this might fail to compile.
+Now, you must add the compiler to your PATH variable.
 
-==== Mac/Linux
-`cd ~`
-and 
-`git clone https://github.com/mwaylabs/fruitymesh.git`
+*For Windows:*
 
-Download the compiler from https://launchpad.net/gcc-arm-embedded/4.9/4.9-2015-q3-update/ and unzip the files to a directory of your choice.
+Use the environment variable editor and add a new entry to the PATH variable of your user, e.g. `C:\tools\gcc-arm-none-eabi-4_9-2015q3\bin`.
 
-WARNING: Do not choose a newer version, as this might fail to compile.
+*For Mac/Linux:*
 
 Open your default shell PATH file:
 
@@ -82,9 +81,9 @@ For Bash shell
 `nano ~/.bash_profile`
 
 And add the following line to to the file. Do not forget to change the path according to your GNU ARM Embedded Toolchain location.
-`export PATH="$PATH:<fruitymesh-folder>/gcc-arm-none-eabi-4_9-2015q3/bin"`
+`export PATH="$PATH:/opt/gcc-arm-none-eabi-4_9-2015q3/bin"`
 
-For macOS user with Apple silicons the installation of rosetta is required to make gcc work: `softwareupdate --install-rosetta`
+For macOS user with Apple silicons, the installation of rosetta is required to make gcc work: `softwareupdate --install-rosetta`
 
 ==== Installing CMake
 
@@ -92,7 +91,16 @@ Download and install the latest Version of CMake:
 
 https://cmake.org/download/
 
-==== Tools Installation (Windows Only)
+==== Installing Python
+
+You also have to download and install Python 3.x if not already installed from here:
+
+link:https://www.python.org/downloads/[]
+
+=== Install the nRF Command Line Tools
+If you haven't already installed the nRF5 Command Line Tools, you can see how do so xref:#NrfTools[here]. It is important that the tools are installed and available in the PATH of your operating system as the build will otherwhise fail with an error such as: `mergehex` could not be found.
+
+==== Unix Tools Installation (Windows Only)
 Next, if you are working on windows, you have to download and install some unix utilities, the GNU ARM Eclipse Build Tools. This includes _make_, _sh_, _rm_ and some others. Version 2.4 has been tested successfully and the executable installer can be downloaded from here:
 
 https://github.com/gnu-mcu-eclipse/windows-build-tools/releases/tag/v2.4b
@@ -107,7 +115,7 @@ Dependencies:
 
 http://gnuwin32.sourceforge.net/downlinks/coreutils-dep-zip.php
 
-Finally, you should add the bin folders of the gnu buildtools and the `bin` folder of `gcc-arm-embedded` to your PATH variable under System Environment. This will make sure that you can access these tools from anywhere.
+Finally, you should add the bin folders of the gnu buildtools to your PATH variable as well, e.g.  under System Environment. This will make sure that you can access these tools from anywhere.
 
 === Building FruityMesh
 Now, you have a few options on how to build FruityMesh. We recommend using VsCode for building and coding with FruityMesh as it has a really nice CMake integration and can be set up in a short time.
@@ -140,6 +148,8 @@ In order to configure the project, you should create the file `<fruitymesh-folde
 }
 ----
 
+TIP: If you want to compile an SDK17 featureset, you need to change both the GCC_PATH to point to the `gcc-arm-none-eabi-9-2020-q2-update` version and your build directory should also be changed to e.g. `vscode_sdk17` as you will run into issues when using the same build directory for different toolchain versions.
+
 Now, if not already opened, you should open VsCode and use `File => Open Folder` to open the FruityMesh project folder. This should look similar to the following screenshot, with the `.vscode` folder as part of the repository.
 
 image:vscode_project.png[vscode project]
@@ -157,8 +167,6 @@ image:vscode_cmake.png[cmake panel]
 This should automatically trigger the CMake configuration and load all available featuresets
 
 image:vscode_featuresets.png[featuresets]
-
-If you haven't already installed the nRF5 Command Line Tools, you can do so xref:#NrfTools[here].
 
 You are now able to build the binary targets by clicking on the build button next to the featureset. There are also a number of Utility targets. If you right click a Utility target and choose "Run Utility", it will first build the target and then flash the application and SoftDevice on any attached development board.
 

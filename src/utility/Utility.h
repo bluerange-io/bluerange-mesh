@@ -65,6 +65,12 @@ class RecordStorageEventListener;
                 || std::is_union             <std::remove_pointer<decltype(&((dst)[0]))>::type>::value, "Tried to call memcpy on non trivial copyable type!"); /*CODE_ANALYZER_IGNORE Just a string.*/ \
     memcpy((dst), (src), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemcpy*/ \
 }
+#define CheckedMemmove(dst, src, size) \
+{\
+    static_assert(HAS_TRIVIAL_COPY(std::remove_pointer<decltype(&((dst)[0]))>::type) \
+                || std::is_union             <std::remove_pointer<decltype(&((dst)[0]))>::type>::value, "Tried to call memmove on non trivial copyable type!"); /*CODE_ANALYZER_IGNORE Just a string.*/ \
+    memmove((dst), (src), (size)); /*CODE_ANALYZER_IGNORE Implementation of CheckedMemmove*/ \
+}
 
 /*
  * The Utility class holds a number of auxiliary functions
@@ -95,6 +101,10 @@ namespace Utility
     //ModuleId stuff
     bool IsVendorModuleId(ModuleId moduleId);
     bool IsVendorModuleId(ModuleIdWrapper moduleId);
+    bool IsSameModuleId(ModuleIdWrapper a, ModuleIdWrapper b);
+    // Checks if the Format of the moduleId is valid. Note that it does not check if the module actually exists, only that it doesn't
+    // have generally impossible values. That's why it's called IsValidModuleId>>>FORMAT<<<.
+    bool IsValidModuleIdFormat(ModuleIdWrapper moduleId);
 
     ModuleIdWrapper GetWrappedModuleId(u16 vendorId, u8 subId);
     ModuleIdWrapper GetWrappedModuleId(ModuleId moduleId);
@@ -142,7 +152,19 @@ namespace Utility
     bool Contains(const u8* data, const u32 length, const u8 searchValue);
 
     bool IsPowerOfTwo(u32 val);
-    u32 NextMultipleOf(u32 val, u32 multiple);
+    constexpr u32 NextMultipleOf(u32 val, u32 multiple)
+    {
+        // Prior to C++14, constexpr functions can only have a return statement, nothing more.
+        // This forces us to this "beauty"...
+        return 
+            multiple <= 1 ? 
+                val
+                :
+                ((val % multiple) == 0 ?
+                    val
+                    :
+                    (val + multiple - (val % multiple)));
+    }
 
     NodeId TerminalArgumentToNodeId(const char* arg, bool* didError = nullptr);
 
@@ -157,6 +179,7 @@ namespace Utility
     i16 ToAlignedI16(const void* ptr);
     u32 ToAlignedU32(const void* ptr);
     i32 ToAlignedI32(const void* ptr);
+    float ToAlignedFloat(const void* ptr);
 
     //The outDidError varaible can be nullptr, in which case it is ignored.
     //If it's not set to nullptr, the underlying value must be initialized
@@ -179,6 +202,13 @@ namespace Utility
         return val;
     }
 
+    template<typename T>
+    T flipEndianness(T value)
+    {
+        SwapBytes((u8*)&value, sizeof(value));
+        return value;
+    }
+
     /// Write an integer byte-by-byte in little endian (least significant byte
     /// first) order to a byte-buffer.
     template<typename T>
@@ -190,7 +220,7 @@ namespace Utility
         );
 
         // cast to an unsigned value (two's complement signed ints don't
-        // change bit patterns - see C++17 standard draft 7.8 ยง2 integral
+        // change bit patterns - see C++17 standard draft 7.8 ง2 integral
         // conversions[conv.integral])
         const typename std::make_unsigned<T>::type unsignedValue = value;
 
@@ -213,7 +243,7 @@ namespace Utility
         );
 
         // cast to an unsigned value (two's complement signed ints don't
-        // change bit patterns - see C++17 standard draft 7.8 ยง2 integral
+        // change bit patterns - see C++17 standard draft 7.8 ง2 integral
         // conversions[conv.integral])
         const typename std::make_unsigned<T>::type unsignedValue = value;
 
@@ -224,5 +254,8 @@ namespace Utility
             dst[sizeof(value) - byteIndex - 1] = byteValue;
         }
     }
+
+    Endianness GetEndianness(DataTypeDescriptor dataType);
+    DataTypeDescriptor ToLittleEndianDescriptor(DataTypeDescriptor dataType);
 }
 

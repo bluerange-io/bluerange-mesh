@@ -706,28 +706,7 @@ void CherrySimTester::SendTerminalCommandToAllNodes(const char *message, ...)
 
 void CherrySimTester::DoSendTerminalCommand(const NodeEntry &nodeEntry, const std::string &originalCommand) const
 {
-    const u32 crc                = Utility::CalculateCrc32String(originalCommand.c_str());
-    const std::string crcCommand = originalCommand + std::string(" CRC: ") + std::to_string(crc);
-
-    NodeIndexSetter setter(nodeEntry.index);
-
-    if (!GS->terminal.terminalIsInitialized)
-    {
-        // The terminal of the node is not active, cannot send the message. It must either be activated before
-        // sending a message to it.
-        SIMEXCEPTION(IllegalStateException);
-    }
-
-    std::string commandToSend = originalCommand;
-    if (GS->terminal.IsCrcChecksEnabled() && originalCommand.find(" CRC: ") == std::string::npos && appendCrcToMessages)
-    {
-        commandToSend = crcCommand;
-    }
-    if (config.verbose)
-    {
-        printf("NODE %d TERM_IN: %s" EOL, sim->currentNode->GetNodeId(), commandToSend.c_str());
-    }
-    GS->terminal.PutIntoTerminalCommandQueue(commandToSend, false);
+    sim->DoSendTerminalCommand(nodeEntry, originalCommand, config.verbose, appendCrcToMessages);
 }
 
 void CherrySimTester::SendButtonPress(TerminalId terminalId, u8 buttonId, u32 holdTimeDs)

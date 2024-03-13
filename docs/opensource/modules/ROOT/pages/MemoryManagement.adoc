@@ -102,3 +102,46 @@ The memory for all logical connections (BaseConnection, MeshConnection, MeshAcce
 Before the introduction of the ConnectionQueueMemoryAllocator the largest part of a connection was the memory for its send queues. This turned out to be a huge waste as normally not all possible connections are allocated. As such the memory of these unused connections could be utilized. The same applies for connections that don't send a lot. They still had a big queue buffer without using it. Part of this buffer could be utilized by other connections as well.
 
 To fix this issue, a PoolAllocator, the ConnectionQueueMemoryAllocator was introduced. The memory for the send queues is no longer part of the connections but is handled completely separately. Each send queue of each connection holds a linked list of chunks that originate from the ConnectionQueueMemoryAllocator. The implementation guarantees that each send queue has at least one chunk so that it is guaranteed that each send queue is able to send something all of the time. In addition, a distinction is made while allocating between a new connection that needs chunks during construction and allocating chunks for an already existing connection. The latter has less chunks available so that new connections are guaranteed to always have chunks available.
+
+
+== Function Stack Usage Analysis at Compile Time
+
+Sometimes stack usage is too high and needs to be optimized. To help with that, it is possible to analyze the stack usage for each function. The compiler can generate a `.su` for for each source file with a list of static and dynamic stack usage for each function.
+
+The general procedure is to generate `.su` files, merge them all in one file, sort them by stack size (descending) and finally have a look into the result.
+
+WARNING: This only analyses the stack size used by isolated functions. This means that a function A that calls B will not include the stack size of B. Same for recursive functions: C calling C will only include the stack size of one C without a function call. This compiler flag computes worst-case scenarios.
+
+=== Generate Stack Usage
+
+To use this, activate the `-fstack-usage` GCC flag in CMake. This can be done e.g. in a featureset `.cmake` file by adding the line 
+```cmake
+set(GCC_FSTACK_USAGE_FLAGS "-fstack-usage")
+add_definitions(${GCC_FSTACK_USAGE_FLAGS})
+```
+
+This flag conflicts with `-flto`, which stands for link time optimization. Thus, it must be disabled during analysis:
+[source,diff]
+----
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -257,7 +257,7 @@ if(BUILD_TYPE STREQUAL "FIRMWARE")
+-  target_compile_options_multi("${NATIVE_TARGETS}" "-flto")
++  # target_compile_options_multi("${NATIVE_TARGETS}" "-flto")
+----
+
+The `.su` files are generated alongide object files in the `src` directory of the build.
+
+=== Merge .su Files
+NOTE: The following script is only available for PowerShell.
+
+Place the script `merge_and_sort_stack_usage.ps1` inside the desired folder and execute it. For a featureset built with FruityDeploy, this might be `_build\vscode\CMakeFiles\prod_sink_nrf52.dir`
+
+The result might look like this:
+```shell
+
+Files Merged Functions Largest Stack Size
+------------ --------- ------------------
+         152      1749               1048
+
+```

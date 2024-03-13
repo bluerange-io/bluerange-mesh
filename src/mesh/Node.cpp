@@ -43,7 +43,9 @@
 #include <StatusReporterModule.h>
 #include <MeshConnection.h>
 #include <MeshAccessConnection.h>
+#include "ConnectionMessageTypes.h"
 #include "MeshAccessModule.h"
+#include "PrimitiveTypes.h"
 #include "mini-printf.h"
 
 #if IS_ACTIVE(SIG_MESH)
@@ -104,6 +106,8 @@ void Node::ResetToDefaultConfiguration()
 
     CheckedMemcpy(&configuration.bleAddress, &RamConfig->staticAccessAddress, sizeof(FruityHal::BleGapAddr));
     configuration.numberOfEnrolledDevices = 0;
+
+    CheckedMemset(configuration.dynamicGroupIds, 0, sizeof(configuration.dynamicGroupIds));
 
     SET_FEATURESET_CONFIGURATION(&configuration, this);
 }
@@ -998,6 +1002,99 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
                     false
                 );
             }
+            else if (packet->actionType == (u8)NodeModuleTriggerActionMessages::ADD_DYNAMIC_GROUP)
+            {
+                MessageLength messageBytes = (sendData->dataLength - SIZEOF_CONN_PACKET_MODULE).GetRaw();
+                if (messageBytes < sizeof(NodeId))
+                {
+                    SIMEXCEPTION(IllegalStateException);
+                    return;
+                }
+                const NodeId group = ((AddOrRemoveDynamicGroupMessage const*)&packet->data)->id;
+                if (group < NODE_ID_DYNAMIC_GROUP_BASE || group >= NODE_ID_DYNAMIC_GROUP_BASE + NODE_ID_DYNAMIC_GROUP_BASE_SIZE)
+                {
+                    SendGroupResponse(packetHeader->sender, NodeModuleActionResponseMessages::ADD_DYNAMIC_GROUP, packet->requestHandle, group, AddDynamicGroupResponseMessageCode::OUT_OF_RANGE);
+                    return;
+                }
+                else
+                {
+                    // Check if we are already in that group.
+                    for (u32 i = 0; i < MAX_AMOUNT_OF_DYNAMIC_GROUP_IDS; i++)
+                    {
+                        if (configuration.dynamicGroupIds[i] == group)
+                        {
+                            // Immediately return success.
+                            SendGroupResponse(packetHeader->sender, NodeModuleActionResponseMessages::ADD_DYNAMIC_GROUP, packet->requestHandle, group, AddDynamicGroupResponseMessageCode::SUCCESS);
+                            return;
+                        }
+                    }
+
+                    // Search for the first free spot
+                    for (u32 i = 0; i < MAX_AMOUNT_OF_DYNAMIC_GROUP_IDS; i++)
+                    {
+                        if (!configuration.dynamicGroupIds[i])
+                        {
+                            configuration.dynamicGroupIds[i] = group;
+                            SaveRecordStorageDynamicGroup(packetHeader->sender, NodeModuleActionResponseMessages::ADD_DYNAMIC_GROUP, packet->requestHandle, group);
+                            return;
+                        }
+                    }
+
+                    SendGroupResponse(packetHeader->sender, NodeModuleActionResponseMessages::ADD_DYNAMIC_GROUP, packet->requestHandle, group, AddDynamicGroupResponseMessageCode::NO_GROUPS_LEFT);
+                }
+            }
+            else if (packet->actionType == (u8)NodeModuleTriggerActionMessages::REMOVE_DYNAMIC_GROUP)
+            {
+                const NodeId group = ((AddOrRemoveDynamicGroupMessage const*)&packet->data)->id;
+
+                bool changed = false;
+                for (u32 i = 0; i < MAX_AMOUNT_OF_DYNAMIC_GROUP_IDS; i++)
+                {
+                    if (configuration.dynamicGroupIds[i] == group)
+                    {
+                        configuration.dynamicGroupIds[i] = 0;
+                        changed = true;
+                    }
+                }
+                if (changed)
+                {
+                    SaveRecordStorageDynamicGroup(packetHeader->sender, NodeModuleActionResponseMessages::REMOVE_DYNAMIC_GROUP, packet->requestHandle, group);
+                }
+                else
+                {
+                    SendGroupResponse(packetHeader->sender, NodeModuleActionResponseMessages::REMOVE_DYNAMIC_GROUP, packet->requestHandle, group, AddDynamicGroupResponseMessageCode::SUCCESS);
+                }
+            }
+            else if (packet->actionType == (u8)NodeModuleTriggerActionMessages::CLEAR_DYNAMIC_GROUPS)
+            {
+                CheckedMemset(configuration.dynamicGroupIds, 0x00, sizeof(configuration.dynamicGroupIds));
+                SaveRecordStorageDynamicGroup(packetHeader->sender, NodeModuleActionResponseMessages::CLEAR_DYNAMIC_GROUPS, packet->requestHandle, 0);
+            }
+            else if (packet->actionType == (u8)NodeModuleTriggerActionMessages::GET_DYNAMIC_GROUPS)
+            {
+                // See: GetDynamicGroupsResponseMessage
+                NodeId ids[MAX_AMOUNT_OF_DYNAMIC_GROUP_IDS];
+                CheckedMemset(ids, 0, sizeof(ids));
+                u32 writeHead = 0;
+                for (u32 i = 0; i < MAX_AMOUNT_OF_DYNAMIC_GROUP_IDS; i++)
+                {
+                    if (configuration.dynamicGroupIds[i] != 0)
+                    {
+                        ids[writeHead] = configuration.dynamicGroupIds[i];
+                        writeHead++;
+                    }
+                }
+
+                SendModuleActionMessage(
+                    MessageType::MODULE_ACTION_RESPONSE,
+                    packetHeader->sender,
+                    (u8)NodeModuleActionResponseMessages::GET_DYNAMIC_GROUPS,
+                    packet->requestHandle,
+                    (u8*)ids,
+                    writeHead * sizeof(NodeId),
+                    false
+                );
+            }
         }
     }
 
@@ -1055,6 +1152,50 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
                 const u16 enrolledNodes = (u16)(((SetEnrolledNodesResponseMessage const *)&packet->data)->enrolledNodes);
                 logjson("NODE", "{\"type\":\"set_enrolled_nodes\",\"nodeId\":%d,\"module\":%d,\"enrolled_nodes\":%u}" SEP, packetHeader->sender, (u32)ModuleId::NODE, enrolledNodes);
                 GS->cm.SetEnrolledNodesReplyReceived(packet->header.sender, enrolledNodes);
+            }
+            else if (packet->actionType == (u8)NodeModuleActionResponseMessages::ADD_DYNAMIC_GROUP)
+            {
+                DynamicGroupResponseMessage const* message = (DynamicGroupResponseMessage const*)(packet->data);
+                logjson("NODE", "{\"type\":\"add_group_result\",\"nodeId\":%d,\"module\":%u,\"group\":%u,\"code\":%u}" SEP,
+                    packetHeader->sender,
+                    (u32)ModuleId::NODE,
+                    (u32)message->id,
+                    (u32)message->code);
+            }
+            else if (packet->actionType == (u8)NodeModuleActionResponseMessages::REMOVE_DYNAMIC_GROUP)
+            {
+                DynamicGroupResponseMessage const* message = (DynamicGroupResponseMessage const*)(packet->data);
+                logjson("NODE", "{\"type\":\"remove_group_result\",\"nodeId\":%d,\"module\":%u,\"group\":%u,\"code\":%u}" SEP,
+                    packetHeader->sender,
+                    (u32)ModuleId::NODE,
+                    (u32)message->id,
+                    (u32)message->code);
+            }
+            else if (packet->actionType == (u8)NodeModuleActionResponseMessages::CLEAR_DYNAMIC_GROUPS)
+            {
+                DynamicGroupResponseMessage const* message = (DynamicGroupResponseMessage const*)(packet->data);
+                logjson("NODE", "{\"type\":\"clear_groups_result\",\"nodeId\":%d,\"module\":%u,\"group\":%u,\"code\":%u}" SEP,
+                    packetHeader->sender,
+                    (u32)ModuleId::NODE,
+                    (u32)message->id,
+                    (u32)message->code);
+            }
+            else if (packet->actionType == (u8)NodeModuleActionResponseMessages::GET_DYNAMIC_GROUPS)
+            {
+                GetDynamicGroupsResponseMessage const* message = (GetDynamicGroupsResponseMessage const*)(packet->data);
+                logjson_partial("NODE", "{\"type\":\"get_groups_result\",\"nodeId\":%d,\"module\":%u,\"groups\":[",
+                    packetHeader->sender,
+                    (u32)ModuleId::NODE);
+                u16 groupCount = (sendData->dataLength - SIZEOF_CONN_PACKET_MODULE).GetRaw() / sizeof(NodeId);
+                for (u32 i = 0; i < groupCount; i++)
+                {
+                    logjson_partial("NODE", "%d", message->ids[i]);
+                    if (i < (u32)(groupCount - 1))
+                    {
+                        logjson_partial("NODE", ",");
+                    }
+                }
+                logjson("NODE", "]}" SEP);
             }
         }
     }
@@ -1150,37 +1291,82 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
         {
             const RawDataStartPayload* packet = (const RawDataStartPayload*)payloadPtr;
 
-            logjson("NODE",
-                "{"
-                    "\"nodeId\":%u,"
-                    "\"type\":\"raw_data_start\","
-                    "\"module\":%s,"
-                    "\"numChunks\":%u,"
-                    "\"protocol\":%u,"
-                    "\"fmKeyId\":%u,"
-                    "\"requestHandle\":%u"
-                "}" SEP,
-                senderId,
-                Utility::GetModuleIdString(moduleId).data(),
-                packet->numChunks,
-                packet->protocolId,
-                packet->fmKeyId,
-                requestHandle
-            );
+            char metadataString[250] = {};
+            Logger::ConvertBufferToBase64String(packet->metadata, payloadLength - SIZEOF_RAW_DATA_START_PAYLOAD, metadataString, sizeof(metadataString));
+
+            if (strlen(metadataString) > 0) {
+                logjson("NODE",
+                    "{"
+                        "\"nodeId\":%u,"
+                        "\"type\":\"raw_data_start\","
+                        "\"module\":%s,"
+                        "\"numChunks\":%u,"
+                        "\"protocol\":%u,"
+                        "\"fmKeyId\":%u,"
+                        "\"requestHandle\":%u,"
+                        "\"metadata\":\"%s\""
+                    "}" SEP,
+                    senderId,
+                    Utility::GetModuleIdString(moduleId).data(),
+                    packet->numChunks,
+                    packet->protocolId,
+                    packet->fmKeyId,
+                    requestHandle,
+                    metadataString
+                );
+            } else {
+                logjson("NODE",
+                    "{"
+                        "\"nodeId\":%u,"
+                        "\"type\":\"raw_data_start\","
+                        "\"module\":%s,"
+                        "\"numChunks\":%u,"
+                        "\"protocol\":%u,"
+                        "\"fmKeyId\":%u,"
+                        "\"requestHandle\":%u"
+                    "}" SEP,
+                    senderId,
+                    Utility::GetModuleIdString(moduleId).data(),
+                    packet->numChunks,
+                    packet->protocolId,
+                    packet->fmKeyId,
+                    requestHandle
+                );
+            }
+
         }
         else if (actionType == RawDataActionType::START_RECEIVED)
         {
-            logjson("NODE",
-                "{"
-                    "\"nodeId\":%u,"
-                    "\"type\":\"raw_data_start_received\","
-                    "\"module\":%s,"
-                    "\"requestHandle\":%u"
-                "}" SEP,
-                senderId,
-                Utility::GetModuleIdString(moduleId).data(),
-                requestHandle
-            );
+            char metadataString[250];
+            Logger::ConvertBufferToBase64String(payloadPtr, payloadLength, metadataString, sizeof(metadataString));
+
+            if (strlen(metadataString) > 0) {
+                logjson("NODE",
+                    "{"
+                        "\"nodeId\":%u,"
+                        "\"type\":\"raw_data_start_received\","
+                        "\"module\":%s,"
+                        "\"requestHandle\":%u,"
+                        "\"metadata\":\"%s\""
+                    "}" SEP,
+                    senderId,
+                    Utility::GetModuleIdString(moduleId).data(),
+                    requestHandle,
+                    metadataString
+                );
+            } else {
+                logjson("NODE",
+                    "{"
+                        "\"nodeId\":%u,"
+                        "\"type\":\"raw_data_start_received\","
+                        "\"module\":%s,"
+                        "\"requestHandle\":%u"
+                    "}" SEP,
+                    senderId,
+                    Utility::GetModuleIdString(moduleId).data(),
+                    requestHandle
+                );
+            }
         }
         else if (actionType == RawDataActionType::ERROR_T && payloadLength >= sizeof(RawDataErrorPayload))
         {
@@ -1523,7 +1709,7 @@ DeliveryPriority Node::GetPriorityOfMessage(const u8* data, MessageLength size)
 #define ________________ADVERTISING___________________
                                                                                     
 //Start to broadcast our own clusterInfo, set ackID if we want to have an ack or an ack response
-void Node::UpdateJoinMePacket() const
+void Node::UpdateJoinMePacket()
 {
     if (configuration.networkId == 0) return;
     if (meshAdvJobHandle == nullptr) return;
@@ -1556,7 +1742,9 @@ void Node::UpdateJoinMePacket() const
 
     //A leaf only has one free in connection
     if(GET_DEVICE_TYPE() == DeviceType::LEAF){
-        if(GS->cm.freeMeshInConnections > 0) packet->freeMeshInConnections = 1;
+        if(GS->cm.freeMeshInConnections > 0) {
+            packet->freeMeshInConnections = 1;
+        }
         packet->freeMeshOutConnections = 0;
     }
 
@@ -1591,12 +1779,14 @@ void Node::UpdateJoinMePacket() const
 
     logjson("SIM", "{\"type\":\"update_joinme\",\"clusterId\":%u,\"clusterSize\":%d}" SEP, clusterId, clusterSize);
 
+    
     //Stop advertising if we are already connected as a leaf. Necessary for EoModule
     if(GET_DEVICE_TYPE() == DeviceType::LEAF && GS->cm.freeMeshInConnections == 0){
         meshAdvJobHandle->slots = 0;
     } else if(GET_DEVICE_TYPE() == DeviceType::LEAF){
         meshAdvJobHandle->slots = 5;
     }
+
 
     GS->advertisingController.RefreshJob(meshAdvJobHandle);
 }
@@ -1863,6 +2053,56 @@ void Node::ResetEmergencyDisconnect()
         emergencyDisconnectValidationConnectionUniqueId.DisconnectAndRemove(AppDisconnectReason::EMERGENCY_DISCONNECT_RESET);
         emergencyDisconnectValidationConnectionUniqueId = MeshAccessConnectionHandle();
     }
+}
+
+void Node::SendGroupResponse(NodeId receiver, NodeModuleActionResponseMessages actionType, u8 requestHandle, NodeId group, AddDynamicGroupResponseMessageCode code)
+{
+    DynamicGroupResponseMessage responseMessage;
+    CheckedMemset(&responseMessage, 0, sizeof(responseMessage));
+    responseMessage.code = code;
+    responseMessage.id = group;
+    SendModuleActionMessage(
+        MessageType::MODULE_ACTION_RESPONSE,
+        receiver,
+        (u8)actionType,
+        0,
+        (u8*)(&responseMessage),
+        sizeof(responseMessage),
+        false
+    );
+}
+
+void Node::SendGroupResponse(NodeId receiver, NodeModuleActionResponseMessages actionType, u8 requestHandle, NodeId group, RecordStorageResultCode code)
+{
+    AddDynamicGroupResponseMessageCode transformedCode = AddDynamicGroupResponseMessageCode::SUCCESS;
+    if (code != RecordStorageResultCode::SUCCESS)
+    {
+        static_assert((u32)RecordStorageResultCode::LAST_ENTRY < 255 - (u32)AddDynamicGroupResponseMessageCode::RECORD_STORAGE_ERROR_OFFSET, "Not enough room to embed error codes!");
+        transformedCode = (AddDynamicGroupResponseMessageCode)((u32)code + (u32)AddDynamicGroupResponseMessageCode::RECORD_STORAGE_ERROR_OFFSET);
+    }
+    SendGroupResponse(receiver, actionType, requestHandle, group, transformedCode);
+}
+
+void Node::SaveRecordStorageDynamicGroup(NodeId receiver, NodeModuleActionResponseMessages actionType, u8 requestHandle, NodeId group)
+{
+    DynamicGroupSaveData saveData;
+    CheckedMemset(&saveData, 0, sizeof(saveData));
+    saveData.group = group;
+    saveData.receiver = receiver;
+    saveData.requestHandle = requestHandle;
+    RecordStorageResultCode result = GS->recordStorage.SaveRecord(
+        (u16)ModuleId::NODE,
+        (u8*)&(configuration),
+        sizeof(configuration),
+        this,
+        (u32)actionType,
+        (u8*)&saveData,
+        sizeof(saveData));
+    if (result != RecordStorageResultCode::SUCCESS)
+    {
+        SendGroupResponse(receiver, actionType, requestHandle, group, result);
+    }
+    // => continues in RecordStorageEventHandler
 }
 
 //All advertisement packets are received here if they are valid
@@ -2420,7 +2660,7 @@ Module* Node::GetModuleById(ModuleId id) const
 Module* Node::GetModuleById(VendorModuleId id) const
 {
     for(u32 i=0; i<GS->amountOfModules; i++){
-        if(GS->activeModules[i]->vendorModuleId == id){
+        if(Utility::IsSameModuleId(GS->activeModules[i]->vendorModuleId, id)){
             return GS->activeModules[i];
         }
     }
@@ -2435,7 +2675,7 @@ void Node::PrintStatus(void) const
     trace("Node %s (nodeId: %u) vers: %u, NodeKey: %02X:%02X:....:%02X:%02X" EOL EOL, RamConfig->GetSerialNumber(), configuration.nodeId, GS->config.GetFruityMeshVersion(),
             RamConfig->GetNodeKey()[0], RamConfig->GetNodeKey()[1], RamConfig->GetNodeKey()[14], RamConfig->GetNodeKey()[15]);
     SetTerminalTitle();
-    trace("Mesh clusterSize:%u, clusterId:%u, featureset: %s" EOL, clusterSize, clusterId, FEATURESET_NAME);
+    trace("Mesh clusterSize:%u, clusterId:%u, featureset: %s, boardid: %u" EOL, clusterSize, clusterId, FEATURESET_NAME, Boardconfig->boardType);
     trace("Enrolled %u: networkId:%u, deviceType:%u, NetKey %02X:%02X:....:%02X:%02X, UserBaseKey %02X:%02X:....:%02X:%02X" EOL,
             (u32)configuration.enrollmentState, configuration.networkId, (u32)GET_DEVICE_TYPE(),
             configuration.networkKey[0], configuration.networkKey[1], configuration.networkKey[14], configuration.networkKey[15],
@@ -2589,6 +2829,13 @@ void Node::RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resul
     if (userType == (u32)NodeSaveActions::FACTORY_RESET)
     {
         Reboot(SEC_TO_DS(1), RebootReason::FACTORY_RESET);
+    }
+    else if (userType == (u32)NodeSaveActions::ADD_DYNAMIC_GROUP
+        || userType == (u32)NodeSaveActions::REMOVE_DYNAMIC_GROUP
+        || userType == (u32)NodeSaveActions::CLEAR_DYNAMIC_GROUPS)
+    {
+        DynamicGroupSaveData* dgsd = (DynamicGroupSaveData*)userData;
+        SendGroupResponse(dgsd->receiver, (NodeModuleActionResponseMessages)userType, dgsd->requestHandle, dgsd->group, resultCode);
     }
 }
 
@@ -2771,6 +3018,86 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
 
                 return TerminalCommandHandlerReturnType::SUCCESS;
             }
+
+            if (TERMARGS(3, "add_group") || TERMARGS(3, "remove_group"))
+            {
+                if (commandArgsSize < 5) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+                bool didError = false;
+                const NodeId dynamicGroup = Utility::TerminalArgumentToNodeId(commandArgs[4], &didError);
+                const u8 requestHandle = commandArgsSize > 5 ? Utility::StringToU8(commandArgs[5], &didError) : 0;
+                if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+
+                u8 actionType = 0;
+                if (TERMARGS(3, "add_group"))
+                {
+                    actionType = (u8)NodeModuleTriggerActionMessages::ADD_DYNAMIC_GROUP;
+                }
+                else if (TERMARGS(3, "remove_group"))
+                {
+                    actionType = (u8)NodeModuleTriggerActionMessages::REMOVE_DYNAMIC_GROUP;
+                }
+                else
+                {
+                    // Implementation bug!
+                    SIMEXCEPTION(IllegalStateException);
+                    return TerminalCommandHandlerReturnType::INTERNAL_ERROR;
+                }
+
+                AddOrRemoveDynamicGroupMessage message;
+                message.id = dynamicGroup;
+
+                SendModuleActionMessage(
+                    MessageType::MODULE_TRIGGER_ACTION,
+                    destinationNode,
+                    actionType,
+                    requestHandle,
+                    (u8*)(&message),
+                    sizeof(message),
+                    false
+                );
+
+                return TerminalCommandHandlerReturnType::SUCCESS;
+            }
+
+            if (TERMARGS(3, "clear_groups"))
+            {
+                bool didError = false;
+                const u8 requestHandle = commandArgsSize > 4 ? Utility::StringToU8(commandArgs[4], &didError) : 0;
+                if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+
+                SendModuleActionMessage(
+                    MessageType::MODULE_TRIGGER_ACTION,
+                    destinationNode,
+                    (u8)NodeModuleTriggerActionMessages::CLEAR_DYNAMIC_GROUPS,
+                    requestHandle,
+                    nullptr,
+                    0,
+                    false
+                );
+
+                return TerminalCommandHandlerReturnType::SUCCESS;
+            }
+
+            if (TERMARGS(3, "get_groups"))
+            {
+                bool didError = false;
+                const u8 requestHandle = commandArgsSize > 4 ? Utility::StringToU8(commandArgs[4], &didError) : 0;
+                if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+
+                SendModuleActionMessage(
+                    MessageType::MODULE_TRIGGER_ACTION,
+                    destinationNode,
+                    (u8)NodeModuleTriggerActionMessages::GET_DYNAMIC_GROUPS,
+                    requestHandle,
+                    nullptr,
+                    0,
+                    false
+                );
+
+                return TerminalCommandHandlerReturnType::SUCCESS;
+            }
+
+
         }
     }
 
@@ -2862,21 +3189,28 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
     //Send some large data that is split over a few messages
-    //raw_data_start [receiverId] [destinationModule] [numChunks] [protocolId] {requestHandle = 0}
+    //raw_data_start [receiverId] [destinationModule] [numChunks] [protocolId] {requestHandle = 0} {metadataHex = ""}
     else if(commandArgsSize >= 5 && TERMARGS(0, "raw_data_start"))
     {
+        u8 buffer[SIZEOF_RAW_DATA_START_PAYLOAD + MAX_RAW_DATA_METADATA_SIZE];
+        CheckedMemset(buffer, 0, sizeof(buffer));
+
         bool didError = false;
-        RawDataStartPayload data;
-        CheckedMemset(&data, 0x00, sizeof(data));
 
         NodeId receiverId = Utility::TerminalArgumentToNodeId(commandArgs[1], &didError);
         ModuleIdWrapper moduleId = Utility::GetWrappedModuleIdFromTerminal(commandArgs[2], &didError);
 
-        data.numChunks = Utility::StringToU32(commandArgs[3], &didError);
-        data.protocolId = (u32)static_cast<RawDataProtocol>(Utility::StringToU8(commandArgs[4], &didError));
-        data.fmKeyId = 0; //TODO: IOT-1465
+        RawDataStartPayload* data = (RawDataStartPayload*)buffer;
+        data->numChunks = Utility::StringToU32(commandArgs[3], &didError);
+        data->protocolId = (u32)static_cast<RawDataProtocol>(Utility::StringToU8(commandArgs[4], &didError));
+        data->fmKeyId = 0; //TODO: IOT-1465
 
         u8 requestHandle = commandArgsSize >= 6 ? Utility::StringToU8(commandArgs[5], &didError) : 0;
+
+        u16 metadataLen = 0;
+        if (commandArgsSize >= 7) {
+            metadataLen = Logger::ParseEncodedStringToBuffer(commandArgs[6], data->metadata, MAX_RAW_DATA_METADATA_SIZE, &didError);
+        }
 
         if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
 
@@ -2886,8 +3220,8 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
             receiverId,
             (u8)RawDataActionType::START,
             requestHandle,
-            (u8*)&data,
-            sizeof(data),
+            (u8*)data,
+            sizeof(RawDataStartPayload) + metadataLen,
             false,
             true
         );
@@ -2926,7 +3260,7 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         return TerminalCommandHandlerReturnType::SUCCESS;
 
     }
-    //raw_data_start_received [receiverId] [destinationModule] {requestHandle = 0}
+    //raw_data_start_received [receiverId] [destinationModule] {requestHandle = 0} {metadataHex = ""}
     else if (commandArgsSize >= 3 && TERMARGS(0, "raw_data_start_received"))
     {
         bool didError = false;
@@ -2935,6 +3269,13 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
         ModuleIdWrapper moduleId = Utility::GetWrappedModuleIdFromTerminal(commandArgs[2], &didError);
 
         u8 requestHandle = commandArgsSize >= 4 ? Utility::StringToU8(commandArgs[3], &didError) : 0;
+        
+        u8 metadata[MAX_RAW_DATA_METADATA_SIZE];
+        CheckedMemset(metadata, 0x00, sizeof(metadata));
+        u16 metadataLen = 0;
+        if (commandArgsSize >= 5) {
+            metadataLen = Logger::ParseEncodedStringToBuffer(commandArgs[4], metadata, MAX_RAW_DATA_METADATA_SIZE, &didError);
+        }
 
         if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
 
@@ -2944,8 +3285,8 @@ TerminalCommandHandlerReturnType Node::TerminalCommandHandler(const char* comman
             receiverId,
             (u8)RawDataActionType::START_RECEIVED,
             requestHandle,
-            nullptr,
-            0,
+            metadata,
+            metadataLen,
             false,
             true
             );

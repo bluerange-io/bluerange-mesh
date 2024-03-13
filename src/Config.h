@@ -58,7 +58,7 @@ class RecordStorageEventListener;
 #define FM_VERSION_MINOR 1
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 590
+#define FM_VERSION_PATCH 1640
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -224,6 +224,7 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 // is woken up without receiving events. 6554 is a good value (32768 times a second)
 #ifndef MAIN_TIMER_TICK
 #define MAIN_TIMER_TICK 6554 //roughly 2 ds
+#define MAIN_TIMER_DS_PER_TICK 2 //MUST MATCH the above setting
 #endif
 
 // Define this to automatically set the putty terminal title if in terminal mode
@@ -398,13 +399,14 @@ class Conf
         static constexpr u16 meshExtendedConnectionTimeoutSec = 10;
 
         //(0-...) Slave latency in number of connection events
-        static constexpr u16 meshPeripheralSlaveLatency = 0;
+        u16 meshPeripheralSlaveLatency = 0;
 
         //we add slave latency for the serial connect to the asset in order to save power
         static constexpr u16 serialConnectSlaveLatency = 15; 
 
         //(20-1024) (100-1024 for non connectable advertising!) Determines advertising interval in units of 0.625 millisecond.
         static constexpr u16 meshAdvertisingIntervalLow = (u16)MSEC_TO_UNITS(200, CONFIG_UNIT_0_625_MS);
+        static constexpr u16 emergencyMeshAdvertisingInterval = (u16)MSEC_TO_UNITS(2000, CONFIG_UNIT_0_625_MS);
 
         //INITIATING
         //(20-1024) in 0.625ms units

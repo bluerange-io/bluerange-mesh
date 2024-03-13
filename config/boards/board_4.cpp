@@ -48,7 +48,7 @@ void SetBoard_4(BoardConfiguration* c)
         c->uartTXPin =  6;
         c->uartCTSPin =  7;
         c->uartRTSPin =  5;
-        c->uartBaudRate = (u32)FruityHal::UartBaudrate::BAUDRATE_1M;
+        c->uartBaudRate = (u32)FruityHal::UartBaudRate::BAUDRATE_1M;
         c->dBmRX = -96;
         c->calibratedTX =  -60;
         c->lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_XTAL;

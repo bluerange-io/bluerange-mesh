@@ -50,6 +50,10 @@ uint32_t virtualComCheckAndProcessLine(uint8_t* buffer, uint16_t bufferLength);
 
 uint32_t virtualComWriteData(const uint8_t* buffer, uint16_t bufferLength);
 
+bool isVirtualComPortOpen();
+bool isVirtualComPortInitialized();
+uint32_t getVirtualComPortInitializedCounter();
+
 #if __cplusplus
 };
 #endif

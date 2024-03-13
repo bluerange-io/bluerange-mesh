@@ -95,7 +95,9 @@ extern "C"
     void nrf_uart_txrx_pins_set(NRF_UART_Type *p_reg, uint32_t pseltxd, uint32_t pselrxd) {}
     void nrf_uart_hwfc_pins_set(NRF_UART_Type *p_reg, uint32_t pselrts, uint32_t pselcts) {}
     void nrf_uart_event_clear(NRF_UART_Type *p_reg, nrf_uart_event_t event) {}
-    void nrf_uart_enable(NRF_UART_Type *p_reg) {}
+    void nrf_uart_enable(NRF_UART_Type *p_reg) {
+        cherrySimInstance->currentNode->state.uartEnabled = true;
+    }
     void nrf_uart_task_trigger(NRF_UART_Type *p_reg, nrf_uart_task_t task) {}
 
 
@@ -1123,7 +1125,7 @@ extern "C"
                 auto & connParams = bleEvent.evt.gap_evt.params.conn_param_update.conn_params;
                 connParams.min_conn_interval = peripheralConnection->connectionInterval;
                 connParams.max_conn_interval = peripheralConnection->connectionInterval;
-                connParams.slave_latency = Conf::meshPeripheralSlaveLatency;
+                connParams.slave_latency = Conf::GetInstance().meshPeripheralSlaveLatency;
                 connParams.conn_sup_timeout = Conf::meshConnectionSupervisionTimeout;
 
                 peripheralConnection->owningNode->eventQueue.push_back(simEvent);

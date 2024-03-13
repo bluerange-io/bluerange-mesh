@@ -47,6 +47,15 @@ public:
     u32 GetAdditionalTicks() const;
 };
 
+class TimeSyncedListener
+{
+public:
+    TimeSyncedListener() {};
+    virtual ~TimeSyncedListener() {};
+
+    virtual void TimeSyncedHandler() = 0;
+};
+
 
 /*
  * The TimeManager is responsible for synchronizing times beetween different
@@ -67,6 +76,8 @@ private:
     bool waitingForCorrection = false;
     bool timeCorrectionReceived = false;
     bool isTimeMaster = false; //This will be set to true if the time was given directly to this node (e.g. via UPDATE_TIMESTAMP or locally)
+
+    TimeSyncedListener* timeSyncedListener = nullptr;
 
 public:
     TimeManager();
@@ -117,4 +128,6 @@ public:
 
     TimeSyncInitial GetTimeSyncIntialMessage(NodeId receiver) const;
     TimeSyncInterNetwork GetTimeSyncInterNetworkMessage(NodeId receiver) const;
+
+    void AddTimeSyncedListener(TimeSyncedListener* listener);
 };

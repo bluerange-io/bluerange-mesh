@@ -167,6 +167,9 @@ class GlobalState
                     if (Utility::IsVendorModuleId(activeModules[amountOfModules]->moduleId)) {
                         if (recordId < RECORD_STORAGE_RECORD_ID_VENDOR_MODULE_CONFIG_BASE || recordId > RECORD_STORAGE_RECORD_ID_VENDOR_MODULE_CONFIG_MAX) {
                             recordId = RECORD_STORAGE_RECORD_ID_INVALID;
+                            // If this error occured then you probably forgot to pass the record id to the InitializeModule function in your featureset cpp file.
+                            // It should look like this: GS->InitializeModule<RuuviWeatherModule>(createModule, RECORD_STORAGE_RECORD_ID_VENDOR_MODULE_CONFIG_BASE + 0);
+                            // The second argument is neccessary for vendor modules with vendor module ids.
                             logt("ERROR", "Invalid recordId");
                         }
                         activeModules[amountOfModules]->recordStorageId = recordId;

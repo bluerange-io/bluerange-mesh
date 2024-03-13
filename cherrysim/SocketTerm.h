@@ -29,6 +29,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#ifndef __EMSCRIPTEN__
 #include <vector>
 #include <CherrySimTypes.h>
 #include <CircularBuffer.h>
@@ -137,3 +138,4 @@ private:
     //Disconnects a client and frees its resources
     static void DisconnectClient(SocketClient* client);
 };
+#endif

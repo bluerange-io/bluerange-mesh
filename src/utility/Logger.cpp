@@ -621,6 +621,20 @@ const char* Logger::GetErrorLogCustomError(CustomErrorTypes type)
         return "WATCHDOG_REBOOT";
     case CustomErrorTypes::INFO_LICENSE_CHECK:
         return "INFO_LICENSE_CHECK";
+    case CustomErrorTypes::COUNT_VENDOR_FRAMES_SENT:
+        return "COUNT_VENDOR_FRAMES_SENT";
+    case CustomErrorTypes::COUNT_VENDOR_FRAMES_RECEIVED:
+        return "COUNT_VENDOR_FRAMES_RECEIVED";
+    case CustomErrorTypes::COUNT_VENDOR_FRAMES_DROPPED:
+        return "COUNT_VENDOR_FRAMES_DROPPED";
+    case CustomErrorTypes::COUNT_VENDOR_RX_ERRORS:
+        return "COUNT_VENDOR_RX_ERRORS";
+    case CustomErrorTypes::COUNT_VENDOR_CONN_LOSS:
+        return "COUNT_VENDOR_CONN_LOSS";
+    case CustomErrorTypes::WARN_AUTO_SENSE_REPORT_WITHOUT_DATA:
+        return "WARN_AUTO_SENSE_REPORT_WITHOUT_DATA";
+    case CustomErrorTypes::COUNT_VENDOR_BYTES_SENT:
+        return "COUNT_VENDOR_BYTES_SENT";
     default:
         SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
         return "UNKNOWN_ERROR";

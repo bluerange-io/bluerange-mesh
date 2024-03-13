@@ -166,6 +166,11 @@ void TimeManager::AddCorrection(u32 ticks)
         this->waitingForCorrection = false;
         this->timeCorrectionReceived = true;
 
+        if(timeSyncedListener)
+        {
+            timeSyncedListener->TimeSyncedHandler();
+        }
+
         logt("TSYNC", "Time synced and corrected");
     }
 }
@@ -277,6 +282,17 @@ TimeSyncInterNetwork TimeManager::GetTimeSyncInterNetworkMessage(NodeId receiver
     retVal.offset = offset;
 
     return retVal;
+}
+
+void TimeManager::AddTimeSyncedListener(TimeSyncedListener* listener)
+{
+    if (timeSyncedListener)
+    {
+        // The current implementation only allows a single Listener. If more
+        // is needed, change timeSyncedListener to be an array instead.
+        SIMEXCEPTION(IllegalStateException);
+    }
+    timeSyncedListener = listener;
 }
 
 TimePoint::TimePoint(u32 unixTime, u32 additionalTicks)

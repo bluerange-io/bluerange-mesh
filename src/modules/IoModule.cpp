@@ -29,6 +29,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 
+#include "FmTypes.h"
+#include "FruityHal.h"
 #include <IoModule.h>
 
 
@@ -236,6 +238,31 @@ TerminalCommandHandlerReturnType IoModule::TerminalCommandHandler(const char* co
                 );
                 return TerminalCommandHandlerReturnType::SUCCESS;
             }
+            else if (TERMARGS(3,"pinread"))
+            {
+                if (commandArgsSize < 5) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+                if (commandArgsSize >= 5 + MAX_NUM_GPIO_READ_PINS) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT; // too many arguments
+                //Check how many GPIO pins we want to get
+                u8 numPins = (u8)(commandArgsSize - 4);
+
+                DYNAMIC_ARRAY(pinNumbers, numPins);
+
+                for (u8 i = 0; i < numPins; ++i) {
+                    u8 pinNumber = Utility::StringToU8(commandArgs[4 + i]);
+                    pinNumbers[i] = pinNumber;
+                }
+
+                SendModuleActionMessage(
+                    MessageType::MODULE_TRIGGER_ACTION,
+                    destinationNode,
+                    (u8)IoModuleTriggerActionMessages::GET_PIN_LEVEL,
+                    0,
+                    pinNumbers,
+                    numPins,
+                    false
+                );
+                return TerminalCommandHandlerReturnType::SUCCESS;
+            }
             //E.g. action 635 io led on
             else if(TERMARGS(3,"led"))
             {
@@ -337,8 +364,12 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
                     if (pinConfig->direction == 0) FruityHal::GpioConfigureInput(pinConfig->pinNumber, (FruityHal::GpioPullMode)pinConfig->pull);
                     else FruityHal::GpioConfigureOutput(pinConfig->pinNumber);
 
-                    if(pinConfig->set) FruityHal::GpioPinSet(pinConfig->pinNumber);
-                    else FruityHal::GpioPinClear(pinConfig->pinNumber);
+                    if (pinConfig->set) {
+                        FruityHal::GpioPinSet(pinConfig->pinNumber);
+                    }
+                    else {
+                        FruityHal::GpioPinClear(pinConfig->pinNumber);
+                    }
                 }
 
                 //Confirmation
@@ -410,6 +441,33 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
                     false
                 );
             }
+            else if (actionType == IoModuleTriggerActionMessages::GET_PIN_LEVEL) {
+                // + 1 because the receiver reads it until there's a 0xff
+                constexpr u8 bufSize = MAX_NUM_GPIO_READ_PINS * SIZEOF_IO_MODULE_GET_PIN_MESSAGE + 1;
+                DYNAMIC_ARRAY(buf, bufSize);
+                IoModuleGetPinMessage* message = (IoModuleGetPinMessage*) buf;
+
+                u8 i;
+                for (i = 0; i < dataFieldLength.GetRaw(); ++i) {
+                    u8 pinNumber = packet->data[i];
+                    FruityHal::GpioConfigureInput(pinNumber, FruityHal::GpioPullMode::GPIO_PIN_NOPULL);
+                    bool pinLevel = FruityHal::GpioPinRead(pinNumber);
+                    FruityHal::GpioConfigureOutput(pinNumber); // change it to output so save energy
+                    message[i].pinNumber = pinNumber;
+                    message[i].pinLevel = (u8)pinLevel;
+                }
+                buf[i * SIZEOF_IO_MODULE_GET_PIN_MESSAGE] = 0xff;
+
+                SendModuleActionMessage(
+                    MessageType::MODULE_ACTION_RESPONSE,
+                    packet->header.sender,
+                    (u8)IoModuleActionResponseMessages::PIN_LEVEL,
+                    packet->requestHandle,
+                    buf,
+                    bufSize,
+                    false
+                );
+            }
         }
     }
 
@@ -435,6 +493,22 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
             {
                 logjson_partial("MODULE", "{\"nodeId\":%u,\"type\":\"identify_response\",\"module\":%u,", packet->header.sender, (u8)ModuleId::IO_MODULE);
                 logjson("MODULE",  "\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, 0);
+            }
+            else if(actionType == IoModuleActionResponseMessages::PIN_LEVEL)
+            {
+
+                logjson_partial("MODULE", "{\"nodeId\":%u,\"type\":\"pin_level_result\",\"module\":%u,\"pins\":[", packet->header.sender, (u8)ModuleId::IO_MODULE);
+
+                const IoModuleGetPinMessage* msgs = (const IoModuleGetPinMessage*)(packet->data);
+                for(u8 i = 0; i < MAX_NUM_GPIO_READ_PINS; ++i)
+                {
+                    u8 pinNumber = msgs[i].pinNumber;
+                    if (pinNumber == END_OF_PIN_ARRAY_SYMBOL) break;
+                    u8 pinLevel = msgs[i].pinLevel;
+                    if(i > 0){ logjson_partial("MODULE", ","); }
+                    logjson_partial("MODULE", "{\"pin_number\":%u,\"pin_level\":%u}", pinNumber, pinLevel);
+                }
+                logjson("MODULE", "],\"requestHandle\":%u,\"code\":%u}" SEP, packet->requestHandle, 0);
             }
         }
     }

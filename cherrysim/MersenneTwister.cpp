@@ -703,6 +703,7 @@ void MersenneTwister::SetSeed(uint32_t seed)
 
 uint32_t MersenneTwister::NextU32(uint32_t min, uint32_t max)
 {
+    // min and max are inclusive
     if (min > max)
     {
         SIMEXCEPTION(IllegalArgumentException);

@@ -230,7 +230,7 @@ void FruityHal::GpioPinSet(u32 pin){ }
 void FruityHal::GpioPinClear(u32 pin){ }
 void FruityHal::GpioPinToggle(u32 pin){ }
 u32 FruityHal::GpioPinRead(u32 pin){ return 0; }
-ErrorType FruityHal::GpioConfigureInterrupt(u32 pin, GpioPullMode mode, GpioTransistion trigger, GpioInterruptHandler handler){ return ErrorType::SUCCESS; }
+ErrorType FruityHal::GpioConfigureInterrupt(u32 pin, GpioPullMode mode, GpioTransition trigger, GpioInterruptHandler handler){ return ErrorType::SUCCESS; }
 
 // ######################### ADC ############################
 
@@ -259,6 +259,13 @@ void FruityHal::UartEnableReadInterrupt(){ }
 bool FruityHal::IsUartErroredAndClear(){ return false; }
 bool FruityHal::IsUartTimedOutAndClear(){ return false; }
 FruityHal::UartReadCharResult FruityHal::UartReadChar(){ UartReadCharResult ret; ret.hasNewChar = false; return ret; }
+u32 FruityHal::UartBaudRateToNumber(FruityHal::UartBaudRate baudrate) { return 0; }
+FruityHal::UartBaudRate FruityHal::UartBaudRateFromNumber(u32 number) { return FruityHal::UartBaudRate::BAUDRATE_INVALID; }
+FruityHal::UartParity FruityHal::UartParityFromNumber(u8 number) { return FruityHal::UartParity::INVALID; }
+u8 FruityHal::UartParityToNumber(FruityHal::UartParity parity) { return 0xff; }
+FruityHal::UartFlowControl FruityHal::UartFlowControlFromNumber(u8 number) { return FruityHal::UartFlowControl::INVALID; }
+FruityHal::UartStopBits FruityHal::UartStopBitsFromNumber(u8 number) { return FruityHal::UartStopBits::INVALID; }
+FruityHal::UartDataBits FruityHal::UartDataBitsFromNumber(u8 number) { return FruityHal::UartDataBits::INVALID; }
 
 u32 FruityHal::GetMasterBootRecordSize(){ return 0; }
 u32 FruityHal::GetLicenseSectionAdress(u32 sdBaseAddr) { return 0; }

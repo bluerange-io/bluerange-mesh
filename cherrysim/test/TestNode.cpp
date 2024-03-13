@@ -218,6 +218,214 @@ TEST(TestNode, TestCommands) {
 }
 #endif
 
+TEST(TestNode, TestDynamicGroups)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    //testerConfig.verbose = true;
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    simConfig.SetToPerfectConditions();
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+    tester.SimulateUntilClusteringDone(100 * 1000);
+
+    // First check that we never get an answer for an unregistered group ID
+    tester.SendTerminalCommand(1, "action 21001 status get_status");
+    {
+        Exceptions::DisableDebugBreakOnException disabler;
+        ASSERT_THROW(tester.SimulateUntilMessageReceived(20 * 1000, 1,
+           "\"type\":\"status\",\""), TimeoutException);
+    }
+
+    // In the beginning the reported groups are empty.
+    tester.SendTerminalCommand(1, "action this node get_groups");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"get_groups_result\",\"nodeId\":1,\"module\":0,\"groups\":[]}");
+
+    // Add the group.
+    tester.SendTerminalCommand(1, "action this node add_group 21001");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"add_group_result\",\"nodeId\":1,\"module\":0,\"group\":21001,\"code\":0}");
+
+    // The added group is not visible in get_groups
+    tester.SendTerminalCommand(1, "action this node get_groups");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"get_groups_result\",\"nodeId\":1,\"module\":0,\"groups\":[21001]}");
+
+    // The same command from above should now return a result.
+    tester.SendTerminalCommand(1, "action 21001 status get_status"); 
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "\"type\":\"status\",\"");
+
+    // Even after a restart
+    ASSERT_EQ(tester.sim->nodes[0].restartCounter, 1);
+    tester.SendTerminalCommand(1, "reset");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, "reboot");
+    ASSERT_EQ(tester.sim->nodes[0].restartCounter, 2);
+    tester.SimulateUntilClusteringDone(100 * 1000);
+    tester.SendTerminalCommand(1, "action 21001 status get_status");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "\"type\":\"status\",\"");
+    tester.SendTerminalCommand(1, "action this node get_groups");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"get_groups_result\",\"nodeId\":1,\"module\":0,\"groups\":[21001]}");
+
+    // Remove the group
+    tester.SendTerminalCommand(1, "action this node remove_group 21001");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"remove_group_result\",\"nodeId\":1,\"module\":0,\"group\":21001,\"code\":0}");
+
+    // Get Groups is empty again.
+    tester.SendTerminalCommand(1, "action this node get_groups");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"get_groups_result\",\"nodeId\":1,\"module\":0,\"groups\":[]}");
+
+    // Now it isn't reported anymore
+    tester.SendTerminalCommand(1, "action 21001 status get_status");
+    {
+        Exceptions::DisableDebugBreakOnException disabler;
+        ASSERT_THROW(tester.SimulateUntilMessageReceived(20 * 1000, 1,
+            "\"type\":\"status\",\""), TimeoutException);
+    }
+
+    // Until we add it back.
+    tester.SendTerminalCommand(1, "action this node add_group 21001");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"add_group_result\",\"nodeId\":1,\"module\":0,\"group\":21001,\"code\":0}");
+    tester.SendTerminalCommand(1, "action 21001 status get_status");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "\"type\":\"status\",\"");
+    tester.SendTerminalCommand(1, "action this node get_groups");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"get_groups_result\",\"nodeId\":1,\"module\":0,\"groups\":[21001]}");
+
+    // Clear the group and make sure it's once again not responded.
+    tester.SendTerminalCommand(1, "action this node clear_groups");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"clear_groups_result\",\"nodeId\":1,\"module\":0,\"group\":0,\"code\":0}");
+    tester.SendTerminalCommand(1, "action 21001 status get_status");
+    {
+        Exceptions::DisableDebugBreakOnException disabler;
+        ASSERT_THROW(tester.SimulateUntilMessageReceived(20 * 1000, 1,
+            "\"type\":\"status\",\""), TimeoutException);
+    }
+    tester.SendTerminalCommand(1, "action this node get_groups");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"get_groups_result\",\"nodeId\":1,\"module\":0,\"groups\":[]}");
+
+    // Adding the same group over and over must simply "work" and always be returned with a success.
+    for (int i = 0; i < 100; i++)
+    {
+        tester.SendTerminalCommand(1, "action this node add_group 21001");
+        tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"add_group_result\",\"nodeId\":1,\"module\":0,\"group\":21001,\"code\":0}");
+    }
+    tester.SendTerminalCommand(1, "action this node get_groups");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"get_groups_result\",\"nodeId\":1,\"module\":0,\"groups\":[21001]}");
+
+    // We can add up to 20 groups.
+    for (int i = 0; i < 20; i++)
+    {
+        int id = 21001 + i;
+        tester.SendTerminalCommand(1, "action this node add_group %d", id);
+        tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"add_group_result\",\"nodeId\":1,\"module\":0,\"group\":%d,\"code\":0}", id);
+    }
+    tester.SendTerminalCommand(1, "action this node get_groups");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"get_groups_result\",\"nodeId\":1,\"module\":0,\"groups\":[21001,21002,21003,21004,21005,21006,21007,21008,21009,21010,21011,21012,21013,21014,21015,21016,21017,21018,21019,21020]}");
+
+    // But the 21st group will result in an error code NO_GROUPS_LEFT(2)
+    tester.SendTerminalCommand(1, "action this node add_group 21022");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"add_group_result\",\"nodeId\":1,\"module\":0,\"group\":21022,\"code\":2}");
+    tester.SendTerminalCommand(1, "action this node get_groups");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"get_groups_result\",\"nodeId\":1,\"module\":0,\"groups\":[21001,21002,21003,21004,21005,21006,21007,21008,21009,21010,21011,21012,21013,21014,21015,21016,21017,21018,21019,21020]}");
+
+    // The node reacts on all 20 given dynamic groups
+    for (int i = 0; i < 20; i++)
+    {
+        int id = 21001 + i;
+        tester.SendTerminalCommand(1, "action %d status get_status", id);
+        tester.SimulateUntilMessageReceived(20 * 1000, 1, "\"type\":\"status\",\"");
+    }
+
+    // But not on the 21st group.
+    tester.SendTerminalCommand(1, "action 21022 status get_status");
+    {
+        Exceptions::DisableDebugBreakOnException disabler;
+        ASSERT_THROW(tester.SimulateUntilMessageReceived(20 * 1000, 1,
+            "\"type\":\"status\",\""), TimeoutException);
+    }
+
+    // Deleting one group in the middle.
+    tester.SendTerminalCommand(1, "action this node remove_group 21008");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"remove_group_result\",\"nodeId\":1,\"module\":0,\"group\":21008,\"code\":0}");
+    tester.SendTerminalCommand(1, "action this node get_groups");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"get_groups_result\",\"nodeId\":1,\"module\":0,\"groups\":[21001,21002,21003,21004,21005,21006,21007,21009,21010,21011,21012,21013,21014,21015,21016,21017,21018,21019,21020]}");
+    // The node must still react to all the groups except the one that was just removed.
+    for (int i = 0; i < 20; i++)
+    {
+        int id = 21001 + i;
+        tester.SendTerminalCommand(1, "action %d status get_status", id);
+        if (id != 21008)
+        {
+            tester.SimulateUntilMessageReceived(20 * 1000, 1, "\"type\":\"status\",\"");
+        }
+        else
+        {
+            Exceptions::DisableDebugBreakOnException disabler;
+            ASSERT_THROW(tester.SimulateUntilMessageReceived(20 * 1000, 1,
+                "\"type\":\"status\",\""), TimeoutException);
+        }
+    }
+
+    // After clearing the groups...
+    tester.SendTerminalCommand(1, "action this node clear_groups");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"clear_groups_result\",\"nodeId\":1,\"module\":0,\"group\":0,\"code\":0}");
+    // ...the node no longer responds to any of the ids anymore.
+    for (int i = 0; i < 20; i++)
+    {
+        int id = 21001 + i;
+        tester.SendTerminalCommand(1, "action %d status get_status", id);
+        {
+            Exceptions::DisableDebugBreakOnException disabler;
+            ASSERT_THROW(tester.SimulateUntilMessageReceived(20 * 1000, 1,
+                "\"type\":\"status\",\""), TimeoutException);
+        }
+    }
+    tester.SendTerminalCommand(1, "action this node get_groups");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"get_groups_result\",\"nodeId\":1,\"module\":0,\"groups\":[]}");
+
+    // Trying to add a group id that is out of range gives us the error code OUT_OF_RANGE(1)
+    tester.SendTerminalCommand(1, "action this node add_group 22000");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"add_group_result\",\"nodeId\":1,\"module\":0,\"group\":22000,\"code\":1}");
+    tester.SendTerminalCommand(1, "action this node get_groups");
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"get_groups_result\",\"nodeId\":1,\"module\":0,\"groups\":[]}");
+}
+
+TEST(TestNode, TestMissingDynamicGroupsInConfig)
+{
+    // Tests if a node config without dynamic group configs still works.
+    // NOTE: Mostly a copy of TestEnrollmentModule::TestFactoryResetForTemporaryEnrollment
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.SetToPerfectConditions();
+    //testerConfig.verbose = true;
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    //Set the default network id to 0
+    tester.sim->nodes[0].uicr.CUSTOMER[9] = 0;
+
+    //Write an enrollment in the flash config, but not the dynamic group ids
+    NodeConfiguration config;
+    CheckedMemset(&config, 0x00, sizeof(config));
+    config.moduleId = ModuleId::NODE;
+    config.moduleVersion = NODE_MODULE_CONFIG_VERSION;
+    config.moduleActive = 1;
+    config.enrollmentState = EnrollmentState::ENROLLED;
+    config.nodeId = 1;
+    config.networkId = 123;
+    config.bleAddress.addr_type = FruityHal::BleGapAddrType::INVALID;
+    NodeIndexSetter setter(0);
+    tester.sim->WriteRecordToFlash((u16)ModuleId::NODE, (u8*)&config, offsetof(NodeConfiguration, dynamicGroupIds));
+
+
+    tester.Start();
+
+    //First, make sure our stored enrollment was available
+    tester.SendTerminalCommand(1, "status");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Enrolled 1: networkId:123");
+}
+
 TEST(TestNode, TestCRCValidation)
 {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();

@@ -354,7 +354,7 @@ TEST(TestMeshAccessModule, TestSerialConnect) {
         [&] { tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"type\":\"serial_connect_response\",\"module\":10,\"nodeId\":5,\"requestHandle\":13,\"code\":0,\"partnerId\":33011}"); });
     // Component act must be sendable through MA with orga key.
     tester.SendTerminalCommand(1, "component_act 33011 3 1 0xABCD 0x1234 01 13");
-    tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"nodeId\":33011,\"type\":\"component_sense\",\"module\":3,\"requestHandle\":13,\"actionType\":2,\"component\":\"0xABCD\",\"register\":\"0x1234\",\"payload\":");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"nodeId\":33011,\"type\":\"component_sense\",\"module\":3,\"requestHandle\":13,\"actionType\":0,\"component\":\"0xABCD\",\"register\":\"0x1234\",\"payload\":");
     // The same applies to capabilities
     tester.SendTerminalCommand(1, "request_capability 33011");
     tester.SimulateUntilMessageReceived(100 * 1000, 1, "\"type\":\"capability_entry\"");
@@ -999,6 +999,39 @@ TEST(TestMeshAccessModule, TestMeshAccessConnectionUsingInvalidKeyData)
     // Make sure the mesh access connection is not established (i.e. state is
     // DISCONNECTED).
     tester.SimulateUntilRegexMessageReceived(5000, 1, R"("nodeId":1,"type":"ma_conn_state","module":10,"requestHandle":0,"partnerId":[^,]*,"state":0)");
+}
+
+TEST(TestMeshAccessModule, TestConnectionAttemptWithAlreadyOpenConnection)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    testerConfig.verbose = false;
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2 });
+    simConfig.SetToPerfectConditions();
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateGivenNumberOfSteps(100);
+    
+    //open Mesh Access connection serial
+    tester.SendTerminalCommand(1, "action this ma serial_connect BBBBC 1 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 33012 60");
+    //Wait for serial_connection_reponse code 0
+    tester.SimulateUntilMessageReceived(10 * 10000, 1, R"({"type":"serial_connect_response","module":10,"nodeId":1,"requestHandle":0,"code":0,"partnerId":33012})");
+    //open Mesh Access connection again with the same parameters
+    tester.SendTerminalCommand(1, "action this ma serial_connect BBBBC 1 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 33012 60");
+    //Wait for serial_connection_response code 0
+    tester.SimulateUntilMessageReceived(10 * 10000, 1, R"({"type":"serial_connect_response","module":10,"nodeId":1,"requestHandle":0,"code":0,"partnerId":33012})");
+    //Wait for disconnect
+    tester.SimulateUntilMessageReceived(60*10 * 1000, 1, R"({"nodeId":1,"type":"ma_conn_state","module":10,"requestHandle":0,"partnerId":33012,"state":0})");
+    
+    //Open Mesh Access connection with BLE address
+    tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 1 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00");
+    //Wait for ma_conn_state response state 4
+    tester.SimulateUntilRegexMessageReceived(20 * 1000, 1, "\\{\"nodeId\":1,\"type\":\"ma_conn_state\",\"module\":10,\"requestHandle\":0,\"partnerId\":\\d+,\"state\":4\\}");
+    //Open Mesh Access connection with BLE address again
+    tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 1 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00");
+    //Check if same message comes back if we try again
+    tester.SimulateUntilRegexMessageReceived(20 * 1000, 1, "\\{\"nodeId\":1,\"type\":\"ma_conn_state\",\"module\":10,\"requestHandle\":0,\"partnerId\":\\d+,\"state\":4\\}");
 }
 
 #if defined(PROD_SINK_NRF52) && defined(PROD_SINK_USB_NRF52840)

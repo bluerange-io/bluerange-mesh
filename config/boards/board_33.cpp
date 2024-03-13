@@ -46,7 +46,7 @@ void SetBoard_33(BoardConfiguration* c)
         c->uartTXPin = -1;
         c->uartCTSPin = -1;
         c->uartRTSPin = -1;
-        c->uartBaudRate = (u32)FruityHal::UartBaudrate::BAUDRATE_1M;
+        c->uartBaudRate = (u32)FruityHal::UartBaudRate::BAUDRATE_1M;
         c->dBmRX = -96;
         c->calibratedTX = -55;
         //Accuracy from Datasheet: https://aconno.de/download/acn52832-data-sheet-v1-2/

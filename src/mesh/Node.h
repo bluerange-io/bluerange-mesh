@@ -73,6 +73,7 @@ typedef struct meshServiceStruct_temporary
 
 #pragma pack(push)
 #pragma pack(1)
+    constexpr u32 MAX_AMOUNT_OF_DYNAMIC_GROUP_IDS = 20;
     //Persistently saved configuration (should be multiple of 4 bytes long)
     //Serves to store settings that are changeable, e.g. by enrolling the node
     struct NodeConfiguration : ModuleConfiguration {
@@ -86,11 +87,17 @@ typedef struct meshServiceStruct_temporary
         u8 userBaseKey[16];
         u8 organizationKey[16];
         u16 numberOfEnrolledDevices;
+        NodeId dynamicGroupIds[MAX_AMOUNT_OF_DYNAMIC_GROUP_IDS];
     };
 #pragma pack(pop)
 
 enum class NodeSaveActions : u8 {
-    FACTORY_RESET,
+    FACTORY_RESET             = 0,
+
+    // Correspond to the message ids.
+    ADD_DYNAMIC_GROUP         = 9,
+    REMOVE_DYNAMIC_GROUP      = 10,
+    CLEAR_DYNAMIC_GROUPS      = 11,
 };
 
 /*
@@ -99,7 +106,7 @@ enum class NodeSaveActions : u8 {
  * and the MeshConnection. It also implements some core functionality that
  * other layers can use.
  */
-class Node: public Module
+class Node: public Module, public RecordStorageEventListener
 {
 
 private:
@@ -113,7 +120,11 @@ private:
             GENERATE_LOAD_CHUNK       = 5,
             EMERGENCY_DISCONNECT      = 6,
             SET_ENROLLED_NODES        = 7,
-            GET_TIME                 = 8,
+            GET_TIME                  = 8,
+            ADD_DYNAMIC_GROUP         = 9,
+            REMOVE_DYNAMIC_GROUP      = 10,
+            CLEAR_DYNAMIC_GROUPS      = 11,
+            GET_DYNAMIC_GROUPS        = 12,
         };
 
         enum class NodeModuleActionResponseMessages : u8
@@ -124,7 +135,11 @@ private:
             START_GENERATE_LOAD_RESULT       = 4,
             EMERGENCY_DISCONNECT_RESULT      = 5,
             SET_ENROLLED_NODES_RESULT        = 6,
-            GET_TIME_RESULT                 = 8,
+            GET_TIME_RESULT                  = 8,
+            ADD_DYNAMIC_GROUP                = 9,
+            REMOVE_DYNAMIC_GROUP             = 10,
+            CLEAR_DYNAMIC_GROUPS             = 11,
+            GET_DYNAMIC_GROUPS               = 12,
         };
 
         #pragma pack(push, 1)
@@ -170,6 +185,41 @@ private:
             u16 enrolledNodes;
         };
         STATIC_ASSERT_SIZE(SetEnrolledNodesResponseMessage, 2);
+
+        struct AddOrRemoveDynamicGroupMessage
+        {
+            NodeId id;
+        };
+        STATIC_ASSERT_SIZE(AddOrRemoveDynamicGroupMessage, 2);
+
+        enum class AddDynamicGroupResponseMessageCode : u8
+        {
+            SUCCESS = 0,
+            OUT_OF_RANGE = 1,
+            NO_GROUPS_LEFT = 2,
+            RECORD_STORAGE_ERROR_OFFSET = 100,
+        };
+        struct DynamicGroupResponseMessage
+        {
+            NodeId id;
+            AddDynamicGroupResponseMessageCode code;
+        };
+        STATIC_ASSERT_SIZE(DynamicGroupResponseMessage, 3);
+
+        //struct GetDynamicGroupsMessage
+        //{
+        //    EMPTY MESSSAGE
+        //};
+
+        struct GetDynamicGroupsResponseMessage
+        {
+            NodeId ids[1]; // Varying size
+        };
+
+        //struct ClearDynamicGroupMessage
+        //{
+        //    EMPTY MESSAGE
+        //};
         #pragma pack(pop)
 
         bool stateMachineDisabled = false;
@@ -226,6 +276,16 @@ private:
         constexpr static u32 emergencyDisconnectTimerTriggerDs = SEC_TO_DS(/*Two minutes*/ 2 * 60);
         MeshAccessConnectionHandle emergencyDisconnectValidationConnectionUniqueId;
         void ResetEmergencyDisconnect(); //Resets all the emergency disconnect variables and closes the validation connection.
+
+        struct DynamicGroupSaveData
+        {
+            NodeId receiver;
+            NodeId group;
+            u8 requestHandle;
+        };
+        void SendGroupResponse(NodeId receiver, NodeModuleActionResponseMessages actionType, u8 requestHandle, NodeId group, AddDynamicGroupResponseMessageCode code);
+        void SendGroupResponse(NodeId receiver, NodeModuleActionResponseMessages actionType, u8 requestHandle, NodeId group, RecordStorageResultCode code);
+        void SaveRecordStorageDynamicGroup(NodeId receiver, NodeModuleActionResponseMessages actionType, u8 requestHandle, NodeId group);
 
     public:    
         DECLARE_CONFIG_AND_PACKED_STRUCT(NodeConfiguration);
@@ -317,7 +377,7 @@ private:
 
         //Stuff
         Node::DecisionStruct DetermineBestClusterAvailable(void);
-        void UpdateJoinMePacket() const;
+        void UpdateJoinMePacket();
         void StartFastJoinMeAdvertising();
 
         //States

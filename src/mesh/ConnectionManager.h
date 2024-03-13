@@ -128,6 +128,8 @@ public:
     MeshAccessConnections GetMeshAccessConnections(ConnectionDirection direction) const;
     BaseConnections GetConnectionsOfType(ConnectionType connectionType, ConnectionDirection direction) const;
 
+    bool HasMeshConnection() const;
+
     u16 GetSmallestMtuOfAllConnections() const;
 
     i8 GetFreeConnectionSpot() const;
@@ -185,6 +187,7 @@ public:
 
     MeshConnectionHandle GetMeshConnectionToShortestSink(const BaseConnection* excludeConnection) const;
     ClusterSize GetMeshHopsToShortestSink(const BaseConnection* excludeConnection) const;
+    bool IsSinkAvailable(const BaseConnection* excludeConnection) const;
 
     u16 GetPendingPackets() const;
 

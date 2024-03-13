@@ -106,13 +106,69 @@ TEST(TestEnrollmentModule, TestFactoryReset) {
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "Record not found");
 }
 
+TEST(TestEnrollmentModule, TestFactoryResetDuringReenrollment) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    //testerConfig.verbose = true;
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    simConfig.asyncFlashCommitTimeProbability = UINT32_MAX;
+    simConfig.SetToPerfectConditions();
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    //Store some dummy values
+    tester.SendTerminalCommand(1, "saverec 1337 AA:BB:CC:DD:EE:FF");
+    tester.SimulateGivenNumberOfSteps(1);
+
+    //Check that the data is present...
+    tester.SendTerminalCommand(1, "getrec 1337");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "AA:BB:CC:DD:EE:FF");
+
+    //Enroll node in new mesh
+    tester.SendTerminalCommand(1, "action this enroll basic BBBBB 11 100 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22");
+
+    //Check for successful factory reset and enrollment
+    std::vector<SimulationMessage> messages = {
+        SimulationMessage(1, "{\"nodeId\":11,\"type\":\"enroll_response_serial\",\"module\":5,\"requestId\":0,\"serialNumber\":\"BBBBB\",\"code\":0}"),
+        SimulationMessage(1, "Factory reset done"),
+    };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messages);
+
+    //... and make sure that the data is no longer there (factory reset)
+    tester.SendTerminalCommand(1, "getrec 1337");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Record not found");
+
+    //Do it again with another network
+    tester.SimulateGivenNumberOfSteps(1000);
+
+    //Store some dummy values
+    tester.SendTerminalCommand(1, "saverec 1337 AA:BB:CC:DD:EE:FF");
+    tester.SimulateGivenNumberOfSteps(1);
+
+    //Check that the data is present...
+    tester.SendTerminalCommand(1, "getrec 1337");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "AA:BB:CC:DD:EE:FF");
+
+    //Enroll node in new mesh
+    tester.SendTerminalCommand(1, "action this enroll basic BBBBB 12 200 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:12 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22");
+
+    //Check for successful factory reset and enrollment
+    messages = {
+        SimulationMessage(1, "{\"nodeId\":12,\"type\":\"enroll_response_serial\",\"module\":5,\"requestId\":0,\"serialNumber\":\"BBBBB\",\"code\":0}"),
+        SimulationMessage(1, "Factory reset done"),
+    };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messages);
+
+    //... and make sure that the data is no longer there (factory reset)
+    tester.SendTerminalCommand(1, "getrec 1337");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "Record not found");
+}
 
 TEST(TestEnrollmentModule, TestFactoryResetWithImmortalRecords) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-    testerConfig.verbose = true;
+    testerConfig.verbose = false;
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
-    simConfig.asyncFlashCommitTimeProbability = UINT32_MAX;
     simConfig.SetToPerfectConditions();
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
@@ -706,7 +762,8 @@ TEST(TestEnrollmentModule, TestFactoryResetForTemporaryEnrollment)
     config.nodeId = 1;
     config.networkId = 123;
     config.bleAddress.addr_type = FruityHal::BleGapAddrType::INVALID;
-    STATIC_ASSERT_SIZE(config, 68); //Must be changed once the configuration changes
+    // config.dynamicGroupIds can be ignored for this test.
+    STATIC_ASSERT_SIZE(config, 108); //Must be changed once the configuration changes
     NodeIndexSetter setter(0);
     tester.sim->WriteRecordToFlash((u16)ModuleId::NODE, (u8*)&config, sizeof(config));
 

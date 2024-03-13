@@ -27,6 +27,7 @@ Hover over any node and the details will be displayed in the panel on the right.
 
 You can close the renderer at any time to significantly speed up the simulation as the rendering is done for each frame and slows down the simulation. Make sure to take a look at the fastLane option in our xref:CherrySim.adoc[CherrySim documentation] which is very useful for debugging.
 
+[#Setup]
 == Setup
 
 1. Download & install the [Vulkan SDK](https://vulkan.lunarg.com/).

@@ -1,3 +1,4 @@
+ifndef::imagesdir[:imagesdir: ../assets/images]
 = DeviceOff
 
 [#DeviceOff]
@@ -9,6 +10,12 @@ See also our documentation on xref:bluerange-manual::AssetTracking/AssetTracking
 == Functionality
 To turn use the power off functionality, the `powerButton` needs to be configured in the `BoardConfiguration` for the board. When the power button is pressed for over 1 second the device resets and enters a system off mode. If the device has LEDs, the power off will be signalled by *blinking the red led 5 times*.
 
+The current time periods are the following (x-axis in seconds):
+
+image:powerOffPattern.png[Power Off, width=500]
+
+//link:https://www.plantuml.com/plantuml/uml/ROuz2iCm34RtxnJ69-Z_B3e4kjXTUe0GoM3goX2dzFgr8DaoFVIU1AAsZFFo_HHCLQVSnFbGMLnkBWRlHiDE6WPhHe0EYC7ilMHzepiR7bm4eEFQ_BF-P7On9RzjR4ezG2VG6NG1wBfUl9GbPHNkxWOIvVxb7m00[Image source]
+
 The only way to wake the device from system off mode is to press power button for over 1 second, to execute a pin reset or to replace the battery. If the power button is pressed for less than 1 second, while in off mode, device will start booting, but will immediately go to system off mode again. When waking up, FruityMesh will by default signal this by shortly *flashing the green and blue LEDs* (or the red one if it is the only one available).
 
 == Implementation details
@@ -17,3 +24,11 @@ During runtime, we detect the duration that the power button was pressed and onl
 Once the device is running, it might have initialized functionality that consumes additional power, we therefore do a soft reset of the chip and on the next boot, we check the reason for the reboot. If the reason is `PREPARE_DEVICE_OFF`, we then immediately go to system off mode before executing any other code.
 
 WARNING: Switching off the device will not disable external sensors. We have not yet implemented callbacks to perform actions before the device is being powered off.
+
+=== Special behaviour for intentional reboots
+By default, the node will boot into safe mode to recover from unexpected faults.
+
+In cases where a reboot is on purpose, like a Watchdog reboot or after the `"reset"` action, the _reboot magic number_ has to be set. This is a `u32` variable that is stored inside a persisted RAM region next to the `ramRetainStruct`, so it is available after a reboot.
+The magic number must be set to the defined value of `REBOOT_MAGIC_NUMBER` before a reboot. If not, the node will boot into safe mode.
+
+Booting into safe mode is not generally bad, but the watchdog will trigger a reboot after 20s, replacing the original reboot reason with `WATCHDOG_REBOOT`.

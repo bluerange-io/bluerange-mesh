@@ -101,7 +101,10 @@ The queried nodes will respond with their complete error log that they have stor
 ----
 
 === Component periodic timestamp sending
-The StatusReporterModule includes functionality for periodically sending the nodes current timestamp. Can be enabled and disabled via component_act. When enabled, it is automatically disabled after a few minutes to avoid unnecessary battery usage.
+The StatusReporterModule includes functionality for periodically sending the nodes current timestamp. 
+It has temporary and persistent time reporting functionality.
+
+Temporary time reporting can be enabled and disabled via component_act. When enabled, it is automatically disabled after a few minutes to avoid unnecessary battery usage.
 
 [source,C++]
 ----
@@ -112,14 +115,94 @@ component_act [nodeId] 3 2 0xABCD 0x1234 01 [requestHandle]
 component_act [nodeId] 3 2 0xABCD 0x1234 00 [requestHandle]
 ----
 
-Upon activation, the component_act message is answered with multiple component_sense messages that roughly look like this example:
+Persistent time reporting is enabled with the terminal command:
+
+```Terminal
+action [nodeId] status set_time_reporting [intervalDs]
+```
+
+_intervalDs_ .. Time reporting interval in deci seconds.
+An interval of `0` means no time reporting.
+
+The immediate confirmation message should look like this:
+```json
+{"type":"time_reporting_state","intervalDs":10,"nodeId":2,"module":3,"code":0}
+```
+
+Upon activation, the time is reported with multiple component_sense messages that roughly look like this example:
 
 [source,Javascript]
 ----
-{"nodeId":33011,"type":"component_sense","module":3,"requestHandle":13,"actionType":2,"component":43981,"register":4660,"payload":"AgAAAA=="}
+{"nodeId":33011,"type":"component_sense","module":3,"requestHandle":13,"actionType":0,"component":43981,"register":4660,"payload":"AgAAAA=="}
 ----
 
 The payload of the answer is the base 64 timestamp of the target node.
+
+[#UsbGwStatus]
+=== Gateway status for Sink Nodes with USB support
+For nodes that use the `ACTIVATE_ONLY_SINK_FUNCTIONALITY` and the `ACTIVATE_VIRTUAL_COM_PORT` defines, the current USB serial Terminal and Gateway status can be retreived and updated.
+
+This value is stored as a `u8` in RAM only. It is updated
+
+* always when calling `set_gw_status`
+* when calling `get_gw_status` to ensure that an up to date serial status is provided
+** When USB is not initialized, it is set to `USB_PORT_NOT_CONNECTED(2)`
+** When USB is initialized and wasn't before, it is set to `USB_PORT_CONNECTED(1)`
+
+==== Set Gateway status
+The gateway status can be set to any number from 10 to 255. However, only the following values are defined as an enum:
+
+[#SetGatewayStatusEnum]
+===== Enum
+```cpp
+enum class GatewayStatus : u8 {
+    // 0..9 from firmware side
+    UNKNOWN = 0,
+    USB_PORT_CONNECTED = 1,
+    USB_PORT_NOT_CONNECTED = 2, // overwrites the other states
+    // 10.. set from outside, overwrites USB_PORT_CONNECTED
+    READY = 10, //Serial communication handshake done
+    USB_PORT_CONNECTED_BUT_UNKNOWN_STATUS = 11, // when the gateway failed to determine current state
+    READY_BUT_NO_BLUERANGE_CONNECTION = 12, // no server connection
+    READY_BUT_NOT_ENROLLED = 13,
+    READY_BUT_NO_MESH_CONNECTION = 14, // enrolled but no other node is enrolled
+};
+```
+
+The response is the current Gateway status:
+
+```Terminal
+action [nodeId] status set_gw_status [status]
+
+// Example
+action this status set_gw_status 10
+// Example response
+{"type":"gw_status","nodeId":2,"module":3,"status":10}
+```
+
+==== Get Gateway status
+As noted xref:#UsbGwStatus[in the introduction], the Gateway status can be updated by the node when calling `get_gw_status`.
+
+```Terminal
+action [nodeId] status get_gw_status
+
+// Example
+action this status get_gw_status
+// Example response: node just started -> UNKNOWN
+{"type":"gw_status","nodeId":2,"module":3,"status":0}
+
+// ... USB plugged in
+action this status get_gw_status
+{"type":"gw_status","nodeId":2,"module":3,"status":1}
+
+// ... Gateway sets the status
+action this status set_gw_status
+{"type":"gw_status","nodeId":2,"module":3,"status":10}
+
+// ... USB unplugged
+action this status get_gw_status
+{"type":"gw_status","nodeId":2,"module":3,"status":2}
+```
 
 == Messages
 
@@ -305,3 +388,22 @@ This feature is part of xref:SinkRouting.adoc[sink routing].
 |7 bits|reserved|Reserved
 |===
 
+=== Get Gateway status
+==== Request
+
+[cols="1,2,2,5"]
+|===
+|Bytes |Type |Name  |Description
+
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule] |header|*messageType:* MODULE_TRIGGER_ACTION(51), *actionType:* GET_GATEWAY_STATUS(14)
+|===
+
+==== Response
+
+[cols="1,2,2,5"]
+|===
+|Bytes |Type |Name |Description
+
+|8 |xref:Specification.adoc#connPacketModule[connPacketModule] |header|*messageType:* MODULE_ACTION_RESPONSE(52), *actionType:* GATEWAY_STATUS(14)
+|1 |u8 |gatewayStatus |see xref:#SetGatewayStatusEnum[enum above]
+|===

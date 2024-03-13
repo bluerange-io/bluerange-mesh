@@ -300,7 +300,7 @@ namespace FruityHal
         GPIO_PIN_HIGHSENSE            = 2
     };
 
-    enum class GpioTransistion {
+    enum class GpioTransition {
         GPIO_TRANSITION_TOGGLE      = 0,
         GPIO_TRANSITION_LOW_TO_HIGH = 1,
         GPIO_TRANSITION_HIGH_TO_LOW = 2
@@ -331,22 +331,52 @@ namespace FruityHal
         ADC_REFERENCE_1_4_POWER_SUPPLY  = 4,
     };
 
-    enum class UartBaudrate {
-        BAUDRATE_1M,
-        BAUDRATE_115200,
-        BAUDRATE_57600,
-        BAUDRATE_38400,
-        BAUDRATE_19200,
+    // Don't change values for compatibility
+    // and when adding adjust function to convert from / to number
+    enum class UartBaudRate : u8 {
+        BAUDRATE_1M                     = 0,
+        BAUDRATE_115200                 = 1,
+        BAUDRATE_57600                  = 2,
+        BAUDRATE_38400                  = 3,
+        BAUDRATE_19200                  = 4,
+        BAUDRATE_9600                   = 5,
+        BAUDRATE_4800                   = 6,
+        BAUDRATE_2400                   = 7,
+        BAUDRATE_INVALID                = 0xff,
     };
 
+    // Don't change values for compatibility
+    // and when adding adjust function to convert from / to number
     enum class UartParity : u8 {
-        NONE,
-        EVEN
+        NONE    = 0,
+        ODD     = 1,
+        EVEN    = 2,
+        INVALID = 0xff,
     };
 
+    // Don't change values for compatibility
+    // and when adding adjust function to convert from / to number
     enum class UartFlowControl : u8 {
-        NONE,
-        RTS_CTS
+        NONE     = 0,
+        RTS_CTS  = 1,
+        INVALID  = 0xff,
+    };
+
+    // Don't change values for compatibility
+    // and when adding adjust function to convert from / to number
+    enum class UartStopBits : u8 {
+        ONE     = 1,
+        TWO     = 2,
+        INVALID = 0xff,
+    };
+
+    // Don't change values for compatibility
+    // and when adding adjust function to convert from / to number
+    //
+    // When changing, make sure ModbusModule::ConfigurationLoadedHandler still works
+    enum class UartDataBits : u8 {
+        EIGHT   = 8,
+        INVALID = 0xff,
     };
 
     // ######################### Ble Stack and Event Handling ############################
@@ -488,8 +518,8 @@ namespace FruityHal
     void GpioPinClear(u32 pin);
     u32 GpioPinRead(u32 pin);
     void GpioPinToggle(u32 pin);
-    typedef void (*GpioInterruptHandler)(u32 pin, GpioTransistion transistion);
-    ErrorType GpioConfigureInterrupt(u32 pin, GpioPullMode mode, GpioTransistion trigger, GpioInterruptHandler handler);
+    typedef void (*GpioInterruptHandler)(u32 pin, GpioTransition transition);
+    ErrorType GpioConfigureInterrupt(u32 pin, GpioPullMode mode, GpioTransition trigger, GpioInterruptHandler handler);
 
     // ######################### ADC ############################
 
@@ -522,6 +552,13 @@ namespace FruityHal
     bool IsUartErroredAndClear();
     bool IsUartTimedOutAndClear();
     UartReadCharResult UartReadChar();
+    u32 UartBaudRateToNumber(FruityHal::UartBaudRate baudrate);
+    UartBaudRate UartBaudRateFromNumber(u32 number);
+    UartParity UartParityFromNumber(u8 number);
+    u8 UartParityToNumber(FruityHal::UartParity parity);
+    UartFlowControl UartFlowControlFromNumber(u8 number);
+    UartStopBits UartStopBitsFromNumber(u8 number);
+    UartDataBits UartDataBitsFromNumber(u8 number);
 
     u32 GetMasterBootRecordSize();
     //By default this is called with the Master Boot Record size

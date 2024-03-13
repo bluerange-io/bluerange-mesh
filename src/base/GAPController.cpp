@@ -76,7 +76,7 @@ void GAPController::BleConfigureGAP() const{
 
     gapConnectionParams.minConnInterval = Conf::GetInstance().meshMinConnectionInterval;
     gapConnectionParams.maxConnInterval = Conf::GetInstance().meshMaxConnectionInterval;
-    gapConnectionParams.slaveLatency = Conf::meshPeripheralSlaveLatency;
+    gapConnectionParams.slaveLatency = Conf::GetInstance().meshPeripheralSlaveLatency;
     gapConnectionParams.connSupTimeout = Conf::meshConnectionSupervisionTimeout;
     err = FruityHal::BleGapConnectionPreferredParamsSet(gapConnectionParams);
     FRUITYMESH_ERROR_CHECK(err); //OK

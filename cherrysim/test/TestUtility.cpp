@@ -31,6 +31,9 @@
 #include "Utility.h"
 #include "CherrySimTester.h"
 #include "CherrySimUtils.h"
+#include "MultiScheduler.h"
+#include "BitMask.h"
+#include "SlotStorage.h"
 #include <set>
 
 TEST(TestUtility, TestGetIndexForSerial) {
@@ -522,5 +525,388 @@ TEST(TestUtility, TestECDSAVerify)
     {
         ErrorType ret = Utility::ECDSASecp256r1Verify(ecdsa_public_key[i], ecdsa_hash, sizeof(ecdsa_hash), ecdsa_signature[i]);
         ASSERT_EQ(ret, ErrorType::SUCCESS);
+    }
+}
+
+TEST(TestUtility, TestMultischeduler)
+{
+    MultiScheduler<u8, 10> ms;
+    ASSERT_FALSE(ms.isEventReady());
+    ms.addEvent(17, 4, 0, EventTimeType::RELATIVE);
+    ms.addEvent(18, 5, 0, EventTimeType::RELATIVE);
+    ms.addEvent(19, 7, 0, EventTimeType::RELATIVE);
+    ms.addEvent(20, 7, 0, EventTimeType::RELATIVE);
+    ms.addEvent(21, 3, 0, EventTimeType::RELATIVE);
+
+    // The internal state should now be:
+    // 21 3
+    // 17 4
+    // 18 5
+    // 19 7
+    // 20 7
+
+    ms.advanceTime(1);
+    ASSERT_FALSE(ms.isEventReady());
+    ms.advanceTime(1);
+    ASSERT_FALSE(ms.isEventReady());
+    ms.advanceTime(1);
+    ASSERT_TRUE(ms.isEventReady());
+    ASSERT_EQ(ms.getAndReenter(), 21);
+    ASSERT_FALSE(ms.isEventReady());
+    ms.advanceTime(1);
+    ASSERT_TRUE(ms.isEventReady());
+    ASSERT_EQ(ms.getAndReenter(), 17);
+    ASSERT_FALSE(ms.isEventReady());
+    ms.advanceTime(1);
+    ASSERT_TRUE(ms.isEventReady());
+    ASSERT_EQ(ms.getAndReenter(), 18);
+    ASSERT_FALSE(ms.isEventReady());
+    ms.advanceTime(1);
+    ASSERT_TRUE(ms.isEventReady());
+    ASSERT_EQ(ms.getAndReenter(), 21);
+    ASSERT_FALSE(ms.isEventReady());
+    ms.advanceTime(1);
+    ASSERT_TRUE(ms.isEventReady());
+    ASSERT_EQ(ms.getAndReenter(), 19);
+    ASSERT_TRUE(ms.isEventReady());
+    ASSERT_EQ(ms.getAndReenter(), 20);
+    ASSERT_FALSE(ms.isEventReady());
+    ms.advanceTime(1);
+    ASSERT_TRUE(ms.isEventReady());
+    ASSERT_EQ(ms.getAndReenter(), 17);
+    ASSERT_FALSE(ms.isEventReady());
+
+    // Let the scheduler run a bit...
+    for (u32 i = 0; i < 1000; i++)
+    {
+        ms.advanceTime(1);
+        while (ms.isEventReady())
+        {
+            ms.getAndReenter();
+        }
+    }
+    // ... and then make sure that we still get all 5 numbers from time to time.
+    std::set<u32> set;
+    for (u32 i = 0; i < 8; i++)
+    {
+        ms.advanceTime(1);
+        while (ms.isEventReady())
+        {
+            set.insert(ms.getAndReenter());
+        }
+    }
+    ASSERT_EQ(set.count(17), 1);
+    ASSERT_EQ(set.count(18), 1);
+    ASSERT_EQ(set.count(19), 1);
+    ASSERT_EQ(set.count(20), 1);
+    ASSERT_EQ(set.count(21), 1);
+
+    // Remove two events...
+    ms.removeEvent(18);
+    ms.removeEvent(21);
+    // ... and make sure they don't occure anymore.
+    set.clear();
+    for (u32 i = 0; i < 8; i++)
+    {
+        ms.advanceTime(1);
+        while (ms.isEventReady())
+        {
+            set.insert(ms.getAndReenter());
+        }
+    }
+    ASSERT_EQ(set.count(17), 1);
+    ASSERT_EQ(set.count(18), 0);
+    ASSERT_EQ(set.count(19), 1);
+    ASSERT_EQ(set.count(20), 1);
+    ASSERT_EQ(set.count(21), 0);
+
+    {
+        MultiScheduler<u8, 3> ms;
+        Exceptions::DisableDebugBreakOnException disabler;
+        ASSERT_THROW(ms.addEvent(9, 0, 0, EventTimeType::RELATIVE), IllegalArgumentException);
+        ms.addEvent(0, 1, 0, EventTimeType::RELATIVE);
+        ms.addEvent(1, 1, 0, EventTimeType::RELATIVE);
+        ms.addEvent(2, 1, 0, EventTimeType::RELATIVE);
+        ASSERT_THROW(ms.addEvent(10, 17, 0, EventTimeType::RELATIVE), BufferTooSmallException);
+    }
+    {
+        
+        MultiScheduler<u8, 3> ms;
+        Exceptions::DisableDebugBreakOnException disabler;
+        Exceptions::ExceptionDisabler<BufferTooSmallException> btse;
+        Exceptions::ExceptionDisabler<IllegalArgumentException> iae;
+        // Make sure it doesn't crash.
+        ms.addEvent( 9,  0, 0, EventTimeType::RELATIVE);
+        ms.addEvent( 0,  1, 0, EventTimeType::RELATIVE);
+        ms.addEvent( 1,  1, 0, EventTimeType::RELATIVE);
+        ms.addEvent( 2,  1, 0, EventTimeType::RELATIVE);
+        ms.addEvent(10, 17, 0, EventTimeType::RELATIVE);
+    }
+}
+
+constexpr u32 numBits = 20;
+void checkEquality(const BitMask<numBits>& bm, const bool* checkArr)
+{
+    for (u32 i = 0; i < numBits; i++)
+    {
+        ASSERT_EQ(bm.get(i), checkArr[i]);
+    }
+}
+
+TEST(TestUtility, TestBitMask)
+{
+    BitMask<numBits> bm;
+    bool checkArr[numBits] = {};
+#define setBit(n, val) { bm.set((n), (val)); checkArr[(n)] = (val); }
+    checkEquality(bm, checkArr);
+    setBit(8, true);
+    checkEquality(bm, checkArr);
+    setBit(17, true);
+    checkEquality(bm, checkArr);
+    setBit(4, true);
+    checkEquality(bm, checkArr);
+
+    MersenneTwister rnd(1);
+    for (u32 i = 0; i < 1000; i++)
+    {
+        u32 index = rnd.NextU32(0, numBits - 1);
+        setBit(index, !checkArr[index]);
+        checkEquality(bm, checkArr);
+    }
+
+    {
+        Exceptions::DisableDebugBreakOnException disabler;
+        ASSERT_THROW(bm.get(20), IllegalArgumentException);
+        ASSERT_THROW(bm.set(20, true), IllegalArgumentException);
+    }
+
+    {
+        Exceptions::DisableDebugBreakOnException disabler;
+        Exceptions::ExceptionDisabler<IllegalArgumentException> iae;
+        ASSERT_FALSE(bm.get(20));
+        bm.set(20, true); // Make sure it doesn't crash.
+    }
+
+    for (u32 i = 0; i < numBits; i++)
+    {
+        bm.set(i, false);
+    }
+    bm.set(0, true);
+    bm.set(9, true);
+    bm.set(18, true);
+    ASSERT_EQ(bm.getNumberBytes(), 3);
+    ASSERT_EQ(bm.getRaw()[0], 1);
+    ASSERT_EQ(bm.getRaw()[1], 2);
+    ASSERT_EQ(bm.getRaw()[2], 4);
+#undef setBit
+}
+
+void fillSlot(SlotStorage<20, 512>& slotStorage, u32 slot, u32 size, u32 offset)
+{
+    u8* s = slotStorage.get(slot);
+    for (u32 i = 0; i < size; i++)
+    {
+        s[i] = u8((i + offset) % 256);
+    }
+}
+
+void checkSlotIntegrity(SlotStorage<20, 512>& slotStorage, u32 slot, u32 size, u32 offset)
+{
+    u8* s = slotStorage.get(slot);
+    for (u32 i = 0; i < size; i++)
+    {
+        const u8 expectedValue = u8((i + offset) % 256);
+        const u8 actualValue = s[i];
+        ASSERT_EQ(actualValue, expectedValue);
+    }
+}
+
+TEST(TestUtility, TestSlotStorage)
+{
+    SlotStorage<20, 512> slotStorage;
+    ASSERT_FALSE(slotStorage.isSlotRegistered(0));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(1));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(2));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(3));
+    ASSERT_EQ(slotStorage.spaceLeft(), 512);
+    ASSERT_EQ(slotStorage.spaceUsed(), 0);
+
+    ASSERT_TRUE(slotStorage.isEnoughSpaceLeftForSlotWithSize(512));
+    ASSERT_FALSE(slotStorage.isEnoughSpaceLeftForSlotWithSize(513));
+
+    slotStorage.registerSlot(0, 64);
+    ASSERT_TRUE(slotStorage.isSlotRegistered(0));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(1));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(2));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(3));
+    ASSERT_EQ(slotStorage.spaceLeft(), 448);
+    ASSERT_EQ(slotStorage.spaceUsed(), 64);
+    fillSlot(slotStorage, 0, 64, 10);
+
+    slotStorage.registerSlot(1, 32);
+    ASSERT_TRUE(slotStorage.isSlotRegistered(0));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(1));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(2));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(3));
+    ASSERT_EQ(slotStorage.spaceLeft(), 416);
+    ASSERT_EQ(slotStorage.spaceUsed(), 96);
+    fillSlot(slotStorage, 1, 32, 17);
+
+    slotStorage.registerSlot(2, 128);
+    ASSERT_TRUE(slotStorage.isSlotRegistered(0));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(1));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(2));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(3));
+    ASSERT_EQ(slotStorage.spaceLeft(), 288);
+    ASSERT_EQ(slotStorage.spaceUsed(), 224);
+    fillSlot(slotStorage, 2, 128, 5);
+
+    checkSlotIntegrity(slotStorage, 0,  64, 10);
+    checkSlotIntegrity(slotStorage, 1,  32, 17);
+    checkSlotIntegrity(slotStorage, 2, 128,  5);
+
+    slotStorage.unregisterSlot(1);
+    ASSERT_TRUE(slotStorage.isSlotRegistered(0));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(1));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(2));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(3));
+    ASSERT_EQ(slotStorage.spaceLeft(), 320);
+    ASSERT_EQ(slotStorage.spaceUsed(), 192);
+    checkSlotIntegrity(slotStorage, 0,  64, 10);
+    checkSlotIntegrity(slotStorage, 2, 128,  5);
+
+    slotStorage.registerSlot(1, 17);
+    checkSlotIntegrity(slotStorage, 0, 64, 10);
+    checkSlotIntegrity(slotStorage, 2, 128, 5);
+    fillSlot(slotStorage, 1, 17, 133);
+    ASSERT_TRUE(slotStorage.isSlotRegistered(0));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(1));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(2));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(3));
+    ASSERT_EQ(slotStorage.spaceLeft(), 303);
+    ASSERT_EQ(slotStorage.spaceUsed(), 209);
+    checkSlotIntegrity(slotStorage, 0, 64, 10);
+    checkSlotIntegrity(slotStorage, 1, 17, 133);
+    checkSlotIntegrity(slotStorage, 2, 128, 5);
+
+    {
+        Exceptions::DisableDebugBreakOnException disabler;
+        ASSERT_THROW(slotStorage.registerSlot(5, 304), BufferTooSmallException);
+        ASSERT_TRUE(slotStorage.isSlotRegistered(0));
+        ASSERT_TRUE(slotStorage.isSlotRegistered(1));
+        ASSERT_TRUE(slotStorage.isSlotRegistered(2));
+        ASSERT_FALSE(slotStorage.isSlotRegistered(3));
+        ASSERT_FALSE(slotStorage.isSlotRegistered(5));
+        ASSERT_EQ(slotStorage.spaceLeft(), 303);
+        ASSERT_EQ(slotStorage.spaceUsed(), 209);
+        checkSlotIntegrity(slotStorage, 0, 64, 10);
+        checkSlotIntegrity(slotStorage, 1, 17, 133);
+        checkSlotIntegrity(slotStorage, 2, 128, 5);
+    }
+
+    slotStorage.registerSlot(5, 303);
+    ASSERT_TRUE(slotStorage.isSlotRegistered(0));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(1));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(2));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(3));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(5));
+    ASSERT_EQ(slotStorage.spaceLeft(), 0);
+    ASSERT_EQ(slotStorage.spaceUsed(), 512);
+    checkSlotIntegrity(slotStorage, 0, 64, 10);
+    checkSlotIntegrity(slotStorage, 1, 17, 133);
+    checkSlotIntegrity(slotStorage, 2, 128, 5);
+    fillSlot(slotStorage, 5, 303, 29);
+    checkSlotIntegrity(slotStorage, 0, 64, 10);
+    checkSlotIntegrity(slotStorage, 1, 17, 133);
+    checkSlotIntegrity(slotStorage, 2, 128, 5);
+    checkSlotIntegrity(slotStorage, 5, 303, 29);
+
+    slotStorage.unregisterSlot(0);
+    ASSERT_FALSE(slotStorage.isSlotRegistered(0));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(1));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(2));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(3));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(5));
+    ASSERT_EQ(slotStorage.spaceLeft(), 64);
+    ASSERT_EQ(slotStorage.spaceUsed(), 448);
+    checkSlotIntegrity(slotStorage, 1, 17, 133);
+    checkSlotIntegrity(slotStorage, 2, 128, 5);
+    checkSlotIntegrity(slotStorage, 5, 303, 29);
+
+    // Registering slot 1 again, with same size. The contents should be cleared
+    slotStorage.registerSlot(1, 17);
+    ASSERT_FALSE(slotStorage.isSlotRegistered(0));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(1));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(2));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(3));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(5));
+    ASSERT_EQ(slotStorage.spaceLeft(), 64);
+    ASSERT_EQ(slotStorage.spaceUsed(), 448);
+    checkSlotIntegrity(slotStorage, 2, 128, 5);
+    checkSlotIntegrity(slotStorage, 5, 303, 29);
+    fillSlot(slotStorage, 1, 17, 63);
+    checkSlotIntegrity(slotStorage, 1, 17, 63);
+    checkSlotIntegrity(slotStorage, 2, 128, 5);
+    checkSlotIntegrity(slotStorage, 5, 303, 29);
+
+    // Registering slot 1 again, with smaller size. The contents should be cleared
+    slotStorage.registerSlot(1, 15);
+    ASSERT_FALSE(slotStorage.isSlotRegistered(0));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(1));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(2));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(3));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(5));
+    ASSERT_EQ(slotStorage.spaceLeft(), 66);
+    ASSERT_EQ(slotStorage.spaceUsed(), 446);
+    checkSlotIntegrity(slotStorage, 2, 128, 5);
+    checkSlotIntegrity(slotStorage, 5, 303, 29);
+    fillSlot(slotStorage, 1, 15, 52);
+    checkSlotIntegrity(slotStorage, 1, 15, 52);
+    checkSlotIntegrity(slotStorage, 2, 128, 5);
+    checkSlotIntegrity(slotStorage, 5, 303, 29);
+
+    // Registering slot 1 again, with smaller size. The contents should be cleared
+    slotStorage.registerSlot(1, 81);
+    ASSERT_FALSE(slotStorage.isSlotRegistered(0));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(1));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(2));
+    ASSERT_FALSE(slotStorage.isSlotRegistered(3));
+    ASSERT_TRUE(slotStorage.isSlotRegistered(5));
+    ASSERT_EQ(slotStorage.spaceLeft(), 0);
+    ASSERT_EQ(slotStorage.spaceUsed(), 512);
+    checkSlotIntegrity(slotStorage, 2, 128, 5);
+    checkSlotIntegrity(slotStorage, 5, 303, 29);
+    fillSlot(slotStorage, 1, 81, 93);
+    checkSlotIntegrity(slotStorage, 1, 81, 93);
+    checkSlotIntegrity(slotStorage, 2, 128, 5);
+    checkSlotIntegrity(slotStorage, 5, 303, 29);
+}
+
+TEST(TestUtility, TestSlotStorageErrorCases)
+{
+    {
+        SlotStorage<20, 512> slotStorage;
+        Exceptions::DisableDebugBreakOnException disabler;
+        ASSERT_THROW(slotStorage.get(0), IllegalArgumentException); // Slot is empty.
+        ASSERT_THROW(slotStorage.get(20), IllegalArgumentException); // Slot doesn't exist.
+        ASSERT_THROW(slotStorage.isSlotRegistered(20), IllegalArgumentException); // Slot doesn't exist.
+        ASSERT_THROW(slotStorage.getSizeOfSlot(0), IllegalArgumentException); // Slot is empty.
+        slotStorage.registerSlot(0, 512);
+        ASSERT_THROW(slotStorage.registerSlot(0, 513), BufferTooSmallException);
+        ASSERT_THROW(slotStorage.registerSlot(1, 1), BufferTooSmallException);
+    }
+    {
+        SlotStorage<20, 512> slotStorage;
+        Exceptions::DisableDebugBreakOnException disabler;
+        Exceptions::ExceptionDisabler<IllegalArgumentException> iae;
+        ASSERT_EQ(slotStorage.get(0), nullptr); // Slot is empty.
+        ASSERT_EQ(slotStorage.get(20), nullptr); // Slot doesn't exist.
+        ASSERT_EQ(slotStorage.isSlotRegistered(20), false); // Slot doesn't exist.
+        ASSERT_EQ(slotStorage.getSizeOfSlot(0), 0xFFFF); // Slot is empty.
+        slotStorage.registerSlot(0, 512);
+        Exceptions::ExceptionDisabler<BufferTooSmallException> btse;
+        ASSERT_EQ(slotStorage.registerSlot(0, 513), nullptr);
+        ASSERT_EQ(slotStorage.getSizeOfSlot(0), 512);
+        ASSERT_EQ(slotStorage.registerSlot(1, 1), nullptr);
     }
 }

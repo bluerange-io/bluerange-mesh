@@ -145,7 +145,6 @@ enum class MeshAccessSerialConnectMode : u8 {
         std::array<u8, 16> key;
         u8 tunnelType : 2;
         u8 reserved;
-
     }MeshAccessModuleConnectMessage;
     STATIC_ASSERT_SIZE(MeshAccessModuleConnectMessage, 29);
 
@@ -217,6 +216,9 @@ class MeshAccessModule: public Module
 
         static constexpr u32 meshAccessDfuSurvivalTimeDs = SEC_TO_DS(60);
         static constexpr u32 meshAccessInterestedInConnectionInitialKeepAliveDs = SEC_TO_DS(10);
+        static constexpr u16 meshAccessBroadcastIvInBulkModeMs = 1000;
+        u16 defaultMeshAccessBroadcastIvMs = 100;
+
     private:
 
         std::array<ModuleId, 3> moduleIdsToAdvertise{};

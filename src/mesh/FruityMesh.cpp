@@ -107,6 +107,8 @@ void BootFruityMesh()
         if (Utility::IsUnknownRebootReason(GS->ramRetainStructPtr->rebootReason)
             || *GS->rebootMagicNumberPtr == REBOOT_MAGIC_NUMBER) {
             safeBootEnabled = false;
+            // Each implementation of a reset has to set magic number on purpose so that it knows that the next reboot was intended.
+            // If this line wasn't there, the node wouldn't be able to get into safe boot anymore.
             *GS->rebootMagicNumberPtr = 0;
         }
         else {

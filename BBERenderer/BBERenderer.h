@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BBE/BrotboxEngine.h"
+#include "BBE/BrotBoxEngine.h"
 #include "CherrySim.h"
 
 class RenderPacket
@@ -31,6 +31,7 @@ private:
     int zPos             = 0;
 
     int draggedNodeIndex = -1;
+    float fps = 60.f;
 
 public:
     explicit BBERenderer(CherrySim* sim);
@@ -48,7 +49,7 @@ public:
     bbe::Vector2 worldPosToScreenPos(const bbe::Vector2& pos) const;
     bbe::Vector2 screenPosToWorldPos(const bbe::Vector2& pos) const;
 
-    bbe::Vector3 clusterIdToColor(ClusterId id) const;
+    bbe::Color clusterIdToColor(ClusterId id) const;
 
     //Returns the node index that has the closest position to the mouse cursor
     //Will return -1 if no node was found
@@ -67,4 +68,6 @@ public:
 
     bool checkNodeVisible(const NodeEntry* node) const;
     float getAlpha(const NodeEntry* node, bool veryFaint = false) const;
+
+    float getFps() const;
 };

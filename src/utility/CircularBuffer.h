@@ -36,11 +36,10 @@
 #include <cstring>
 #include "FmTypes.h"
 
-template<typename T, int N>
-
 /**
  * A simple circular buffer implementation.
  */
+template<typename T, int N>
 class CircularBuffer
 {
 private:

@@ -3,3 +3,57 @@ ifndef::imagesdir[:imagesdir: ../assets/images]
 
 == Purpose
 In order to compile and run FruityMesh on different chipsets and architectures, we decided to abstract chip specific behaviour in our FruityHal. This is an ongoing process and the documentation for this will continously be expanded. Our Hal is more than a standard Hal, it abstracts the functionality at a higher level to allow it to run on top of different BLE stacks. For the interface of the Hal, take a look at `FruityHal.h` and for the implementation for the nRF chipsets, take a look at `FruityHalNrf.cpp`
+
+== Data
+The following lists data and enums being used. These associated values are those that are used e.g. for internal logic or for storing in flash memory.
+
+[#UartBaudRate]
+```C++
+enum class UartBaudRate : u8 {
+    BAUDRATE_1M                     = 0,
+    BAUDRATE_115200                 = 1,
+    BAUDRATE_57600                  = 2,
+    BAUDRATE_38400                  = 3,
+    BAUDRATE_19200                  = 4,
+    BAUDRATE_9600                   = 5,
+    BAUDRATE_4800                   = 6,
+    BAUDRATE_2400                   = 7,
+    BAUDRATE_INVALID                = 0xff,
+};
+```
+
+[#UartParity]
+```C++
+enum class UartParity : u8 {
+    NONE    = 0,
+    EVEN    = 1,
+    ODD     = 2,
+    INVALID = 0xff,
+};
+```
+
+[#UartFlowControl]
+```C++
+enum class UartFlowControl : u8 {
+    NONE     = 0,
+    RTS_CTS  = 1,
+    INVALID  = 0xff,
+};
+```
+
+[#UartStopBits]
+```C++
+enum class UartStopBits : u8 {
+    ONE     = 1,
+    TWO     = 2,
+    INVALID = 0xff,
+};
+```
+
+[#UartDataBits]
+```C++
+enum class UartDataBits : u8 {
+    EIGHT   = 8,
+    INVALID = 0xff,
+};
+```

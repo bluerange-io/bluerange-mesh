@@ -45,6 +45,8 @@ class CherrySimRunner : public TerminalPrintListener, public CherrySimEventListe
 private:
     volatile bool terminalReaderLaunched = false;
     std::thread terminalReader;
+
+    void Init();
 public:
     CherrySim* sim;
     static CherrySimRunnerConfig CreateDefaultRunnerConfiguration();

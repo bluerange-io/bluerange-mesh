@@ -93,7 +93,7 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     
     #define GET_SP()                __get_SP()
 
-#elif defined   ( __GNUC__ )
+#elif defined   ( __GNUC__ ) && !defined(__EMSCRIPTEN__)
 
     #ifndef __ASM
         #define __ASM               __asm

@@ -58,7 +58,11 @@
 
 //std::is_trivially_copyable seems to be unavailable in GCC 4.9, although it is specified to be available in C++11.
 #if defined(__GNUG__) && __GNUC__ < 5
+#ifdef __EMSCRIPTEN__
+#define HAS_TRIVIAL_COPY(T) __is_trivially_copyable(T)
+#else
 #define HAS_TRIVIAL_COPY(T) __has_trivial_copy(T)
+#endif
 #else
 #define HAS_TRIVIAL_COPY(T) std::is_trivially_copyable<T>::value
 #endif
@@ -115,6 +119,13 @@ constexpr NodeId NODE_ID_DEVICE_BASE_SIZE = 1999;
 constexpr NodeId NODE_ID_VIRTUAL_BASE = 2000; //Used to assign sub-addresses to connections that do not belong to the mesh but want to perform mesh activity. Used as a multiplier.
 constexpr NodeId NODE_ID_GROUP_BASE = 20000; //Used to assign group ids to nodes. A node can take part in many groups at once
 constexpr NodeId NODE_ID_GROUP_BASE_SIZE = 10000;
+constexpr NodeId NODE_ID_STATIC_GROUP_BASE = 20000; // Range is embedded in the Group range.
+constexpr NodeId NODE_ID_STATIC_GROUP_BASE_SIZE = 1000;
+constexpr NodeId NODE_ID_DYNAMIC_GROUP_BROADCAST_RESERVED = 21000; // Currently unused, but reserved for future use. See BR-12337
+constexpr NodeId NODE_ID_DYNAMIC_GROUP_BASE = 21001; // Range is embedded in the Group range.
+constexpr NodeId NODE_ID_DYNAMIC_GROUP_BASE_SIZE = 999;
+constexpr NodeId NODE_ID_RESERVED_GROUP_BASE = 22000; // Unused range, embedded in the Group range.
+constexpr NodeId NODE_ID_RESERVED_GROUP_BASE_SIZE = 8000;
 
 constexpr NodeId NODE_ID_LOCAL_LOOPBACK = 30000; //30000 is like a local loopback address that will only send to the current node,
 constexpr NodeId NODE_ID_HOPS_BASE = 30000; //30001 sends to the local node and one hop further, 30002 two hops
@@ -189,6 +200,11 @@ enum class ModuleId : u8 {
     TESTING_MODULE = 12,
     BULK_MODULE = 13,
     ENVIRONMENT_SENSING_MODULE = 14, //Placeholder for environmental sensing module
+    AUTO_SENSE_MODULE = 15,
+    // Not an actual Module, but a placeholder dummy in google tests. Its only purpose
+    // is to make sure that we don't accidentally clash with other moduleIds in the future.
+    G_TEST_MODULE = 16,
+    AUTO_ACT_MODULE = 17,
 
     //M-Way Modules
     CLC_MODULE = 150,
@@ -204,8 +220,12 @@ enum class ModuleId : u8 {
     MULTI_ASSET_MODULE = 160,
     LICENSE_MODULE = 161,
     BEACON_SCANNING_MODULE = 162,
+    LIGHT_CONTROL_MODULE = 163,
+    ST_NET_MODULE = 164,
+    EL_MO_MODULE = 165,
+    EURO_MODULE = 166,
 
-    //Other Modules, this range can be used for experimenting but must not be used if FruityMesh
+    //Other Modules, this range (200 - 239) can be used for experimenting but must not be used if FruityMesh
     //nodes are to be used in a network with nodes of different vendors as their moduleIds will clash
     MY_CUSTOM_MODULE = 200,
     //PING_MODULE = 201, Deprecated as of 26.08.2020, now uses a VendorModuleId
@@ -238,8 +258,8 @@ constexpr u32 INVALID_WRAPPED_MODULE_ID = 0xFFFFFFFFUL;
 typedef union {
     struct {
         ModuleId prefix; //For a VendorModuleId, the prefix must be set to VENDOR_MODULE_ID_PREFIX; for a ModuleId it must be lower than this value
-        u8 subId; // For a VendorModuleId, the subId is used to create a number of different modules for each vendor; for a ModuleId, this must be set to 0xFF
-        u16 vendorId; // For a VendorModuleId, the vendor id must be set to the company identifier given by the BLE SIG (see https://www.bluetooth.com/de/specifications/assigned-numbers/company-identifiers/); for a ModuleId, this must be 0xFFFF
+        u8 subId; // For a VendorModuleId, the subId is used to create a number of different modules for each vendor; for a ModuleId, this must be set to 0x00 or 0xFF
+        u16 vendorId; // For a VendorModuleId, the vendor id must be set to the company identifier given by the BLE SIG (see https://www.bluetooth.com/de/specifications/assigned-numbers/company-identifiers/); for a ModuleId, this must be 0x0000 or 0xFFFF
     };
     ModuleIdWrapper wrappedModuleId; //This is used to access the full 4 byte VendorModuleId
 } ModuleIdWrapperUnion;
@@ -811,3 +831,31 @@ struct stacked_regs_t
     uint32_t psr;
 };
 #pragma pack(pop)
+
+enum class DataTypeDescriptor : u8
+{
+    U8_LE = 0,
+    U16_LE = 1,
+    U32_LE = 2,
+    I8_LE = 10,
+    I16_LE = 11,
+    I32_LE = 12,
+    FLOAT32_LE = 20,
+
+    RAW = 30,
+
+    U8_BE = 128,
+    U16_BE = 129,
+    U32_BE = 130,
+    I8_BE = 138,
+    I16_BE = 139,
+    I32_BE = 140,
+    FLOAT32_BE = 148,
+};
+
+enum class Endianness : u8
+{
+    UNKNOWN = 0,
+    LITTLE = 1,
+    BIG = 2,
+};

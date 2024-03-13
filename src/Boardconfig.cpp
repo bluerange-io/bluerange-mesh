@@ -94,7 +94,7 @@ void Boardconf::ResetToDefaultConfiguration()
     configuration.uartTXPin = -1;
     configuration.uartCTSPin = -1;
     configuration.uartRTSPin = -1;
-    configuration.uartBaudRate = (u32)FruityHal::UartBaudrate::BAUDRATE_1M;
+    configuration.uartBaudRate = (u32)FruityHal::UartBaudRate::BAUDRATE_1M;
     configuration.dBmRX = -90;
     configuration.calibratedTX = -60;
     configuration.lfClockSource = (u8)FruityHal::ClockSource::CLOCK_SOURCE_RC;

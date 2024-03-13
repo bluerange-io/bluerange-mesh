@@ -76,7 +76,7 @@ TEST(TestRawData, TestSimpleTransmissions) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
-    //testerConfig.verbose = true;
+    // testerConfig.verbose = true;
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
     simConfig.SetToPerfectConditions();
@@ -343,4 +343,41 @@ TEST(TestRawData, TestRandomTransmissions) {
             tester.SimulateUntilMessageReceived(10 * 1000, receiver, base64Buffer);
         }
     }
+}
+
+TEST(TestRawData, TestMetadata) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.terminalId = 0;
+    // testerConfig.verbose = true;
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1});
+    simConfig.SetToPerfectConditions();
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    tester.Start();
+    tester.SimulateUntilClusteringDone(100 * 1000);
+
+    // metadata = 0x12345678 (b64 encoded)
+    tester.SendTerminalCommand(1, "raw_data_start 2 0 128 2 1 EjRWeA==");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_start\",\"module\":0,\"numChunks\":128,\"protocol\":2,\"fmKeyId\":0,\"requestHandle\":1,\"metadata\":\"EjRWeA==\"}");
+
+    // test with hex string encoding
+    tester.SendTerminalCommand(1, "raw_data_start 2 0 128 2 1 12:34:56:78");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_start\",\"module\":0,\"numChunks\":128,\"protocol\":2,\"fmKeyId\":0,\"requestHandle\":1,\"metadata\":\"EjRWeA==\"}");
+
+    // test .._received
+    tester.SendTerminalCommand(1, "raw_data_start_received 2 0 12 12:34:56:78");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_start_received\",\"module\":0,\"requestHandle\":12,\"metadata\":\"EjRWeA==\"}");
+
+    // test 40 bytes (0x1111...)
+    tester.SendTerminalCommand(1, "raw_data_start 2 0 128 2 1 EREREREREREREREREREREREREREREREREREREREREREREREREREREQ==");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":1,\"type\":\"raw_data_start\",\"module\":0,\"numChunks\":128,\"protocol\":2,\"fmKeyId\":0,\"requestHandle\":1,\"metadata\":\"EREREREREREREREREREREREREREREREREREREREREREREREREREREQ==\"}");
+
+    // test 41 bytes 0x111111...22 (should lead to error)
+    Exceptions::ExceptionDisabler<BufferTooSmallException> btse;
+    tester.SendTerminalCommand(1, "raw_data_start 2 0 128 2 1 ERERERERERERERERERERERERERERERERERERERERERERERERERERESI=");
+    Exceptions::ExceptionDisabler<WrongCommandParameterException> wcpe;
+    tester.SimulateGivenNumberOfSteps(1);
+    ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(WrongCommandParameterException)));
 }

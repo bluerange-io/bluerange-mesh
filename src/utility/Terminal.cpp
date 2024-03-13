@@ -69,7 +69,9 @@ extern "C"
 #include <conio.h>
 #else
 #undef trace
+#ifndef __EMSCRIPTEN__
 #include <ncurses.h>
+#endif
 #define trace(message, ...) 
 #endif
 #endif
@@ -826,7 +828,7 @@ void Terminal::AppUartPutString(const char* message)
 //it can get deactivated to improve performance
 bool Terminal::stdioActive = true;
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 static int _kbhit(void)
 {
     int ch = getch();
@@ -848,7 +850,7 @@ void Terminal::StdioInit()
 std::string Terminal::ReadStdioLine() {
     size_t i;
     std::string retVal = "";
-#ifdef __unix
+#if defined(__unix) && !defined(__EMSCRIPTEN__)
     nodelay(stdscr, FALSE);
 #endif
     for (i = 0; i < TERMINAL_READ_BUFFER_LENGTH - 1; i++) {
@@ -858,7 +860,7 @@ std::string Terminal::ReadStdioLine() {
 
         retVal += (char)c;
     }
-#ifdef __unix
+#if defined(__unix) && !defined(__EMSCRIPTEN__)
     nodelay(stdscr, TRUE);
 #endif
     return retVal;
@@ -982,7 +984,7 @@ void Terminal::StdioCheckAndProcessLine()
 {
     if (!cherrySimInstance->IsSimTermOfCurrentNodeActive()) return;
 
-#if ((defined(__unix) || defined(_WIN32)))
+#if ((defined(__unix) || defined(_WIN32))) && !defined(__EMSCRIPTEN__)
     if(!meshGwCommunication && _kbhit() != 0){ //FIXME: Not supported by eclipse console
         printf("mhTerm: ");
         std::string line = ReadStdioLine();

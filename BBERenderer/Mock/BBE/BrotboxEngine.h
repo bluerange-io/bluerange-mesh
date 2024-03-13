@@ -25,6 +25,12 @@ namespace bbe
         float x, y, z;
     };
 
+    class Color
+    {
+    public:
+        float r, g, b, a;
+    };
+
     class PrimitiveBrush3D
     {
     public:
@@ -58,6 +64,8 @@ namespace bbe
         void start(int x, int y, const char* title){}
         bool keepAlive(){ return true; }
         void frame(){}
+        void frameUpdate(){}
+        void frameDraw(){}
         void shutdown(){}
         virtual void onStart()                            = 0;
         virtual void update(float timeSinceLastFrame)     = 0;
@@ -73,5 +81,11 @@ namespace bbe
         explicit Image(const char* path){};
 
         bool isLoaded() const { return false; };
+    };
+    
+    class GameTime
+    {
+    public:
+        float tick() { return 0.0f; }
     };
 }

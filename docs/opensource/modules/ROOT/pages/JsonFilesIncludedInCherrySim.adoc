@@ -157,3 +157,9 @@ This file configures the site where all nodes would be present. Below is one of 
 CherrySim is deterministic and reproducible and therefore it is possible to reply a log file which can be used for diagnostics purposes. To enable this feature the CherrySim that produced the log file should have been ran with `logReplayCommands = true`, this could have been set from xref:#meshGwCommunication[meshGwCommunication] in case cherrysim was configured to extract configuration from xref:#meshGwCommunication[meshGwCommunication] or if xref:#meshGwCommunication[meshGwCommunication] is not used, then it should be set to true in cherrysim implementation. The path of the log file can be set in the configuration field `replayPath` either in xref:#meshGwCommunication[meshGwCommunication] or in the cherrysim implementation. A designated line was created to help you with this, look for the String "@ReplayFeature@" inside `CherrySimRunner.cpp` for more information
 
 NOTE: This feature should be used in CherrySimRunner configuration unless for some known purposes.
+
+== Generate device JSON files
+
+If you need many devices inside a network, you can generate the `devices_config.json` and `enrollments.json` for an arbitrary amount of nodes.
+
+This is done by a Python script that can be found in `fruitymesh/cherrysim/runnerconfigs/generated/generate_configs.py`. Execute the script from within the `generated` directory to get additional help.

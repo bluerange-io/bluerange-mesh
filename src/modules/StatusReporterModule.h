@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "FlashStorage.h"
 #include <Module.h>
 #include <Logger.h>
 
@@ -41,10 +42,10 @@ constexpr u16 STATUS_REPORTER_MODULE_MAX_HOPS = NODE_ID_HOPS_BASE + NODE_ID_HOPS
 constexpr size_t BATTERY_SAMPLES_IN_BUFFER = 1; //Number of SAADC samples in RAM before returning a SAADC event. For low power SAADC set this constant to 1. Otherwise the EasyDMA will be enabled for an extended time which consumes high current.
 
 enum class StatusReporterModuleComponent :u16 {
-    TIME = 0xABCD,
+    DEBUG_TIME_SENSOR = 0xABCD,
 };
 
-enum class StatusReporterModuleRegister : u16 {
+enum class StatusReporterModuleTimeRegister : u16 {
     TIME = 0x1234,
 };
 
@@ -64,6 +65,7 @@ struct StatusReporterModuleConfiguration: ModuleConfiguration
         u16 nearbyReportingIntervalDs;
         u16 deviceInfoReportingIntervalDs;
         LiveReportTypes liveReportingState;
+        u16 timeReportingIntervalDs;
         //Insert more persistent config values here
 };
 #pragma pack(pop)
@@ -167,6 +169,11 @@ public:
             GET_DEVICE_INFO_V2 = 10,
             SET_LIVEREPORTING = 11,
             GET_ALL_CONNECTIONS_VERBOSE = 12,
+            // Time reporting will periodically send the local time into the mesh.
+            // The interval can be configured with the u16 payload.
+            // It's stored inside the private variable "u16 timeReportingIntervalDs"
+            SET_TIME_REPORTING = 13,
+            GET_GATEWAY_STATUS = 14,
         };
 
         enum class StatusModuleActionResponseMessages : u8
@@ -182,11 +189,26 @@ public:
             REBOOT_REASON = 8,
             DEVICE_INFO_V2 = 10,
             ALL_CONNECTIONS_VERBOSE = 12,
+            SET_TIME_REPORTING_RESULT = 13,
+            GATEWAY_STATUS = 14,
         };
 
         enum class StatusModuleGeneralMessages : u8
         {
             LIVE_REPORT = 1
+        };
+
+        enum class GatewayStatus : u8 {
+            // 0..9 from firmware side
+            UNKNOWN = 0,
+            USB_PORT_CONNECTED = 1,
+            USB_PORT_NOT_CONNECTED = 2, // overwrites the other states
+            // 10.. set from outside, overwrites USB_PORT_CONNECTED
+            READY = 10,
+            USB_PORT_CONNECTED_BUT_UNKNOWN_STATUS = 11,
+            READY_BUT_NO_BLUERANGE_CONNECTION = 12,
+            READY_BUT_NOT_ENROLLED = 13,
+            READY_BUT_NO_MESH_CONNECTION = 14,
         };
 
 private:
@@ -260,6 +282,29 @@ private:
             } StatusReporterModuleLiveReportMessage;
             STATIC_ASSERT_SIZE(StatusReporterModuleLiveReportMessage, 9);
 
+            // for setting the time reporting interval
+            static constexpr int SIZEOF_STATUS_REPORTER_MODULE_SET_TIME_REPORTING_MESSAGE = 2;
+            struct SetTimeReportingMessage
+            {
+                u16 newTimeReportingIntervalDs;
+            };
+            STATIC_ASSERT_SIZE(SetTimeReportingMessage, SIZEOF_STATUS_REPORTER_MODULE_SET_TIME_REPORTING_MESSAGE);
+
+            static constexpr int SIZEOF_STATUS_REPORTER_MODULE_SET_TIME_REPORTING_MESSAGE_RESPONSE = 3;
+            struct SetTimeReportingMessageResponse
+            {
+                RecordStorageResultCode recordStorageResultCode;
+                u16                     timeReportingIntervalDs;
+            };
+            STATIC_ASSERT_SIZE(SetTimeReportingMessageResponse, SIZEOF_STATUS_REPORTER_MODULE_SET_TIME_REPORTING_MESSAGE_RESPONSE);
+
+            static constexpr int SIZEOF_STATUS_REPORTER_MODULE_GATEWAY_STATUS_MESSAGE = 1;
+            struct GatewayStatusMessage
+            {
+                GatewayStatus gatewayStatus;
+            };
+            STATIC_ASSERT_SIZE(GatewayStatusMessage, SIZEOF_STATUS_REPORTER_MODULE_GATEWAY_STATUS_MESSAGE);
+
         #pragma pack(pop)
 
         //####### Module messages end
@@ -275,6 +320,11 @@ private:
         NodeId getErrorsCurrentDestination = NODE_ID_INVALID;
         u8 getErrorsCurrentRequestHandle = 0;
         u32 getErrorsRemainingPops = 0;
+
+#if IS_ACTIVE(ONLY_SINK_FUNCTIONALITY) || SIM_ENABLED
+        GatewayStatus gatewayStatus = GatewayStatus::UNKNOWN;
+        uint32_t lastComPortInitializedCounter = 0;
+#endif //IS_ACTIVE(ONLY_SINK_FUNCTIONALITY) || SIM_ENABLED
 
         void SendStatus(NodeId toNode, u8 requestHandle, MessageType messageType) const;
         void SendDeviceInfoV2(NodeId toNode, u8 requestHandle, MessageType messageType) const;
@@ -335,6 +385,11 @@ private:
 
         // You can read about the meaning of extra and extra2 at the definition of LiveReportTypes
         void SendLiveReport(LiveReportTypes type, u16 requestHandle, u32 extra, u32 extra2) const;
+
+#if IS_ACTIVE(ONLY_SINK_FUNCTIONALITY) || SIM_ENABLED
+        void SendGatewayStatusResponse(u16 sender, u8 requestHandle, GatewayStatus status) const;
+        void UpdateGatewayStatus();
+#endif //IS_ACTIVE(ONLY_SINK_FUNCTIONALITY) || SIM_ENABLED
 
         u8 GetBatteryVoltage() const;
 

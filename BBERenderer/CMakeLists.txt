@@ -7,22 +7,24 @@ if(FM_NATIVE_RENDERER_MOCK_ENABLED)
   target_include_directories(cherrySim_runner PUBLIC .
                                               PUBLIC ./Mock)
 else()
-  set(BBE_ADD_TEST_PROJECTS    OFF CACHE BOOL "" FORCE)
-  set(BBE_ADD_EXAMPLE_PROJECTS OFF CACHE BOOL "" FORCE)
-  set(BBE_ADD_AUDIO            OFF CACHE BOOL "" FORCE) # The current Audio System from BBE does not really like the Build Directory structure of CherrySim.
+  set(BBE_ADD_TEST_PROJECTS    OFF      CACHE BOOL   "" FORCE)
+  set(BBE_ADD_EXAMPLE_PROJECTS OFF      CACHE BOOL   "" FORCE)
+  set(BBE_ADD_AUDIO            OFF      CACHE BOOL   "" FORCE) # The current Audio System from BBE does not really like the Build Directory structure of CherrySim.
+  set(BBE_ADD_CURL             OFF      CACHE BOOL   "" FORCE) # We don't need CURL
+  set(BBE_RENDER_MODE          "OpenGL" CACHE STRING "" FORCE)
   include(FetchContent)
   FetchContent_Declare(
     bbe
     GIT_REPOSITORY https://github.com/Brotcrunsher/BrotboxEngine
-    GIT_TAG        v0.1.7
+    GIT_TAG        v0.2.8
   )
   FetchContent_GetProperties(bbe)
   if(NOT bbe_POPULATED)
     FetchContent_Populate(bbe)
   endif()
-
+  
   add_subdirectory(${bbe_SOURCE_DIR} ${bbe_BINARY_DIR})
-
+  
   add_compile_definitions(BBE_APPLICATION_ASSET_PATH="${CMAKE_CURRENT_SOURCE_DIR}")
   target_link_libraries(cherrySim_tester PRIVATE BrotBoxEngine)
   target_link_libraries(cherrySim_runner PRIVATE BrotBoxEngine)

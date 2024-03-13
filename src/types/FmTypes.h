@@ -186,6 +186,12 @@ enum class FeatureSetGroup : NodeId
     /*FruityDeploy-FeatureSetGroup*/NRF52_MOD                   = 20040,
     //                              CHIP_NRF52833               = 20041,
     /*FruityDeploy-FeatureSetGroup*/NRF52833_MESH               = 20042,
+    /*FruityDeploy-FeatureSetGroup*/NRF52832_BR_PIR_ZERO        = 20043,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_MOD                = 20044,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_EURO_UART          = 20045,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_ST_NET             = 20046,
+    /*FruityDeploy-FeatureSetGroup*/NRF52832_EL_MO              = 20047,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_CS_CORESENSING     = 20048,
 };
 
 //Sets the maximum number of firmware group ids that can be compiled into the firmware

@@ -31,7 +31,11 @@
 
 #elif defined(__clang__)
 
+#ifdef __EMSCRIPTEN__
+#define debug_break()
+#else
 #define debug_break() asm("int $3");
+#endif
 
 #elif defined(__GNUC__) && defined(_WIN32)
 

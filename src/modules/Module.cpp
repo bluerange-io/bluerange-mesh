@@ -46,7 +46,7 @@ Module::Module(ModuleId moduleId, const char* name)
 }
 
 Module::Module(VendorModuleId _vendorModuleId, const char* name)
-    :vendorModuleId(_vendorModuleId), moduleName(name)
+    :vendorModuleId(_vendorModuleId), moduleName(name), proxy(*this)
 {
     //Overwritten by Modules
     this->configurationPointer = nullptr;
@@ -283,7 +283,7 @@ void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnecti
                     this,
                     this->configurationPointer,
                     this->configurationLength,
-                    this,
+                    &proxy,
                     (u8)ModuleSaveAction::SAVE_MODULE_CONFIG_ACTION,
                     (u8*)&userData,
                     sizeof(SaveModuleConfigAction));
@@ -376,7 +376,7 @@ void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnecti
                         this,
                         this->configurationPointer,
                         this->configurationLength,
-                        this,
+                        &proxy,
                         (u8)ModuleSaveAction::SET_ACTIVE_CONFIG_ACTION,
                         (u8*)&userData,
                         sizeof(SaveModuleConfigAction));
@@ -429,9 +429,14 @@ PreEnrollmentReturnCode Module::PreEnrollmentHandler(ConnPacketModule* enrollmen
 }
 
 
-void Module::RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength)
+Module::RecordStorageEventListenerProxy::RecordStorageEventListenerProxy(Module& mod)
+    : mod(mod)
 {
-    if(userDataLength > 0){
+}
+
+void Module::ProxyRecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength)
+{
+    if (userDataLength > 0) {
         DYNAMIC_ARRAY(buffer, userDataLength);
         CheckedMemcpy(buffer, userData, userDataLength);
 
@@ -458,20 +463,11 @@ void Module::RecordStorageEventHandler(u16 recordId, RecordStorageResultCode res
                 requestData->requestHandle);
         }
     }
-    
-    if(userType == (u8)ModuleSaveAction::PRE_ENROLLMENT_RECORD_DELETE)
-    {
-        logt("MODULE", "Remove config during preEnrollment status %u", (u32)resultCode);
+}
 
-        EnrollmentModule* enrollMod = (EnrollmentModule*)GS->node.GetModuleById(ModuleId::ENROLLMENT_MODULE);
-        if(enrollMod != nullptr){
-            if(resultCode == RecordStorageResultCode::SUCCESS){
-                enrollMod->DispatchPreEnrollment(this, PreEnrollmentReturnCode::DONE);
-            } else {
-                enrollMod->DispatchPreEnrollment(this, PreEnrollmentReturnCode::FAILED);
-            }
-        }
-    }
+void Module::RecordStorageEventListenerProxy::RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength)
+{
+    mod.ProxyRecordStorageEventHandler(recordId, resultCode, userType, userData, userDataLength);
 }
 
 void Module::SendModuleConfigResult(NodeId senderId, ModuleIdWrapper moduleId, ModuleConfigMessages actionType, SetConfigResultCodes result, u8 requestHandle)

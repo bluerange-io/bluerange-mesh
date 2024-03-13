@@ -1,7 +1,7 @@
 = AdvertisingController
 
 == Purpose
-The AdvertisingController should be used for registering custom advertising messages. Advertising jobs can be added and removed and have a number of slots according to their importance. The AdvertisingController then schedules all registered advertising messages so that they can't interfere with the messages from other modules.
+The AdvertisingController should be used for registering custom advertising messages. Advertising jobs can be added and removed and have a number of slots according to their importance. The AdvertisingController then schedules all registered advertising messages so that they won't interfere with the messages from other modules.
 
 == Functionality
 Advertising messages can either be scheduled or immediate. A scheduled message is sent randomly according to the number of slots, interleaved with all other registered advertising messages. An immediate message stops all other advertising and sends the message for the given number of slots. The job is then removed automatically.

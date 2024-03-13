@@ -47,9 +47,28 @@ TEST(TestIoModule, TestCommands) {
     tester.SimulateUntilMessageReceived(500, 2, "set_led_result");
 
 
-    tester.SendTerminalCommand(1, "action 2 io pinset 1 2");
+    tester.SendTerminalCommand(1, "action 2 io pinset 1 high 2 high");
     tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"nodeId\":2,\"type\":\"set_pin_config_result\",\"module\":6");
 
+    // This only works because the virtual pins dont save their state and will always return 0.
+    // If tested for pinset low it will not work.
+    // However, it's enough to test the command with response format.
+    tester.SendTerminalCommand(1, "action 2 io pinread 1 2");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"nodeId\":2,\"type\":\"pin_level_result\",\"module\":6,\"pins\":[{\"pin_number\":1,\"pin_level\":1},{\"pin_number\":2,\"pin_level\":1}]");
+
+    // Test min. number of arguments
+    tester.SendTerminalCommand(1, "action 2 io pinread 1");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"nodeId\":2,\"type\":\"pin_level_result\",\"module\":6,\"pins\":[{\"pin_number\":1,\"pin_level\":1}]");
+
+    // Test max. number of arguments
+    tester.SendTerminalCommand(1, "action 2 io pinread 1 2 3 4 5");
+    tester.SimulateUntilMessageReceived(
+        100 * 1000, 1, 
+        "{\"nodeId\":2,\"type\":\"pin_level_result\",\"module\":6,\"pins\":"
+        "[{\"pin_number\":1,\"pin_level\":1},{\"pin_number\":2,\"pin_level\":1},"
+        "{\"pin_number\":3,\"pin_level\":1},{\"pin_number\":4,\"pin_level\":1},"
+        "{\"pin_number\":5,\"pin_level\":1}]"
+    );
 }
 
 TEST(TestIoModule, TestIdentifyCommands)

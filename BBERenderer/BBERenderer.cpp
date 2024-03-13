@@ -142,7 +142,7 @@ bbe::Vector2 BBERenderer::screenPosToWorldPos(const bbe::Vector2& pos) const
     return bbe::Vector2{partial.x / sim->simConfig.mapWidthInMeters, partial.y / sim->simConfig.mapHeightInMeters};
 }
 
-bbe::Vector3 BBERenderer::clusterIdToColor(ClusterId id) const
+bbe::Color BBERenderer::clusterIdToColor(ClusterId id) const
 {
     const float hue = (id % 360) * 17.5f;
     const float s = 0.5f + ((id % 100) / 100.f) / 2.0f;
@@ -307,7 +307,9 @@ void BBERenderer::draw2D(bbe::PrimitiveBrush2D& brush)
 
             //Draw each node with a color of its cluster
             if (drawMode == 0) {
-                brush.setColorRGB(clusterIdToColor(sim->nodes[i].gs.node.clusterId), getAlpha(&sim->nodes[i]));
+                bbe::Color c = clusterIdToColor(sim->nodes[i].gs.node.clusterId);
+                c.a = getAlpha(&sim->nodes[i]);
+                brush.setColorRGB(c);
             }
             //Draw each node with the color of its cluster
             else if(drawMode == 1) 
@@ -339,28 +341,31 @@ void BBERenderer::draw2D(bbe::PrimitiveBrush2D& brush)
         }
     }
 
+    ImGui::GetIO().ConfigWindowsResizeFromEdges = false;
 
-    ImGui::SetNextWindowSize({ (float)getScaledWindowWidth() / 5.f, (float)getScaledWindowHeight() / 2 });
+    ImGui::SetNextWindowSize({ (float)getScaledWindowWidth() / 5.f, (float)getScaledWindowHeight() / 3 });
     ImGui::SetNextWindowPos({ (float)getScaledWindowWidth() * 4.f / 5.f, 0 });
-    ImGui::Begin("Sim Stats");
-    ImGui::Text("Num Nodes:   %d", sim->GetTotalNodes());
-    ImGui::Text("Asset Nodes: %d", sim->GetAssetNodes());
+    ImGui::Begin("Sim Stats", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+    {
+        ImGui::Text("Num Nodes:   %d", sim->GetTotalNodes());
+        ImGui::Text("Asset Nodes: %d", sim->GetAssetNodes());
 #ifdef CHERRYSIM_TESTER_ENABLED
-    const char* testName = "NULL";
-    const ::testing::TestInfo* testInfo = ::testing::UnitTest::GetInstance()->current_test_info();
-    if (testInfo) testName = testInfo->name();
-    ImGui::Text("Test Name:   %s", testName);
+        const char* testName = "NULL";
+        const ::testing::TestInfo* testInfo = ::testing::UnitTest::GetInstance()->current_test_info();
+        if (testInfo) testName = testInfo->name();
+        ImGui::Text("Test Name:   %s", testName);
 #endif
-    ImGui::Text("Cl. Done:      %s", sim->IsClusteringDone() ? "True" : "False");
-    ImGui::Text("Map Width:     %d m", sim->simConfig.mapWidthInMeters);
-    ImGui::Text("Map Height:    %d m", sim->simConfig.mapHeightInMeters);
-    ImGui::Text("Map Elevation: %d m", sim->simConfig.mapElevationInMeters);
-    ImGui::Text("Time:          %.3f s", sim->simState.simTimeMs / 1000.f);
+        ImGui::Text("Cl. Done:      %s", sim->IsClusteringDone() ? "True" : "False");
+        ImGui::Text("Map Width:     %d m", sim->simConfig.mapWidthInMeters);
+        ImGui::Text("Map Height:    %d m", sim->simConfig.mapHeightInMeters);
+        ImGui::Text("Map Elevation: %d m", sim->simConfig.mapElevationInMeters);
+        ImGui::Text("Time:          %.3f s", sim->simState.simTimeMs / 1000.f);
+    }
     ImGui::End();
 
-    ImGui::SetNextWindowSize({(float)getScaledWindowWidth() / 5.f, (float)getScaledWindowHeight() / 2});
-    ImGui::SetNextWindowPos({ (float)getScaledWindowWidth() * 4.f / 5.f, (float)getScaledWindowHeight() / 2 });
-    ImGui::Begin("Mouse Node Stats");
+    ImGui::SetNextWindowSize({(float)getScaledWindowWidth() / 5.f, (float)getScaledWindowHeight() / 3});
+    ImGui::SetNextWindowPos({ (float)getScaledWindowWidth() * 4.f / 5.f, (float)getScaledWindowHeight() / 3 });
+    ImGui::Begin("Mouse Node Stats", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
     {
         if (closestMouseIndex >= 0) {
             NodeIndexSetter setter(closestMouseIndex);
@@ -381,9 +386,35 @@ void BBERenderer::draw2D(bbe::PrimitiveBrush2D& brush)
     }
     ImGui::End();
 
+    ImGui::SetNextWindowSize({(float)getScaledWindowWidth() / 5.f, (float)getScaledWindowHeight() / 3});
+    ImGui::SetNextWindowPos({ (float)getScaledWindowWidth() * 4.f / 5.f, (float)getScaledWindowHeight() * 2 / 3 });
+    ImGui::Begin("Terminal", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+    {
+        static char terminalBuffer[1024];
+        ImGui::PushItemWidth(-1);
+        const bool enterPressed = ImGui::InputText("##Input", terminalBuffer, sizeof(terminalBuffer), ImGuiInputTextFlags_EnterReturnsTrue);
+        ImGui::PopItemWidth();
+        if (enterPressed)
+        {
+            std::string inputString = terminalBuffer;
+            NodeIndexSetter setter(0);
+
+            if (NodeEntry* nodeEntry = sim->FindUniqueNodeByTerminalId(1))
+            {
+                sim->DoSendTerminalCommand(*nodeEntry, inputString, false, true);
+            }
+            else
+            {
+                SIMEXCEPTION(TerminalIdNotFoundException);
+            }
+            memset(terminalBuffer, 0, sizeof(terminalBuffer));
+        }
+    }
+    ImGui::End();
+
     ImGui::SetNextWindowSize({ (float)getScaledWindowWidth() * 4.f / 5.f, (float)getScaledWindowHeight() / 13.f });
     ImGui::SetNextWindowPos({ 0, (float)getScaledWindowHeight() * 12.f / 13.f});
-    ImGui::Begin("Control");
+    ImGui::Begin("Control", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
     if (ImGui::Button("Reset View"))
     {
         resetCamera();
@@ -397,10 +428,21 @@ void BBERenderer::draw2D(bbe::PrimitiveBrush2D& brush)
     ImGui::SameLine(0, 20);
     ImGui::Checkbox("Show Packets", &showPackets);
     ImGui::SameLine(0, 20);
-    ImGui::Checkbox("FastForward", &sim->renderLess);
-    ImGui::SameLine(0, 20);
     ImGui::SetNextItemWidth(100);
     ImGui::SliderInt("Z-pos", &zPos, 0, sim->simConfig.mapElevationInMeters, "%d m");
+    ImGui::SameLine(0, 20);
+    ImGui::SetNextItemWidth(100);
+    static int item = 2;
+    const char* const items[] = { "15", "30", "60", "120" };
+    ImGui::Combo("FPS", &item, items, 4);
+    switch (item)
+    {
+    case 0: fps =  15.f; break;
+    case 1: fps =  30.f; break;
+    case 2: fps =  60.f; break;
+    case 3: fps = 120.f; break;
+    default: SIMEXCEPTION(IllegalStateException); break;
+    }
     ImGui::End();
 
 }
@@ -426,4 +468,9 @@ float BBERenderer::getAlpha(const NodeEntry* node, bool veryFaint) const
     }
     //Everything that is more far is not displayed at all
     else return 0.0;
+}
+
+float BBERenderer::getFps() const
+{
+    return fps;
 }

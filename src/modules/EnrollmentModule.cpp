@@ -837,17 +837,12 @@ void EnrollmentModule::DispatchPreEnrollment(Module* lastModuleCalled, PreEnroll
 
     logt("ENROLLMOD", "PreEnrollment succeeded");
 
-    if (ted.requestHeader.actionType == (u8)EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_SERIAL) {
-        SaveEnrollment(&ted.requestHeader, ted.GetPacketLength());
-    }
-    else {
-        //First, clear all settings that are stored on the chip
-        RecordStorageResultCode errorCode = GS->recordStorage.LockDownAndClearAllSettings(Utility::GetWrappedModuleId(moduleId), this, (u32)EnrollmentModuleSaveActions::ERASE_RECORD_STORAGE);
-        if (errorCode != RecordStorageResultCode::SUCCESS)
-        {
-            logt("WARN", "Could not save because %u", (u32)errorCode);
-            GS->logger.LogCustomError(CustomErrorTypes::WARN_ENROLLMENT_LOCK_DOWN_FAILED, (u16)errorCode);
-        }
+    //First, clear all settings that are stored on the chip
+    RecordStorageResultCode errorCode = GS->recordStorage.LockDownAndClearAllSettings(Utility::GetWrappedModuleId(moduleId), this, (u32)EnrollmentModuleSaveActions::ERASE_RECORD_STORAGE);
+    if (errorCode != RecordStorageResultCode::SUCCESS)
+    {
+        logt("WARN", "Could not save because %u", (u32)errorCode);
+        GS->logger.LogCustomError(CustomErrorTypes::WARN_ENROLLMENT_LOCK_DOWN_FAILED, (u16)errorCode);
     }
 }
 
@@ -1101,7 +1096,8 @@ void EnrollmentModule::GapAdvertisementReportEventHandler(const FruityHal::GapAd
         && dataLength >= SIZEOF_MESH_ACCESS_SERVICE_DATA_ADV_MESSAGE_LEGACY
         && message->flags.type == (u8)BleGapAdType::TYPE_FLAGS
         && message->serviceUuids.uuid == MESH_SERVICE_DATA_SERVICE_UUID16
-        && message->serviceData.data.messageType == ServiceDataMessageType::MESH_ACCESS
+        && (message->serviceData.data.messageType == ServiceDataMessageType::MESH_ACCESS ||
+        message->serviceData.data.messageType == ServiceDataMessageType::EMERGENCY_MESH_ACCESS)
     ){
         if(advertisementReportEvent.GetRssi() > STABLE_CONNECTION_RSSI_THRESHOLD){
             NotifyNewStableSerialIndexScanned(message->serviceData.serialIndex);
@@ -1178,7 +1174,10 @@ void EnrollmentModule::RecordStorageEventHandler(u16 recordId, RecordStorageResu
     {
         if (resultCode == RecordStorageResultCode::SUCCESS)
         {
-            if (ted.requestHeader.actionType == (u8)EnrollmentModuleTriggerActionMessages::REMOVE_ENROLLMENT)
+            if (ted.requestHeader.actionType == (u8)EnrollmentModuleTriggerActionMessages::SET_ENROLLMENT_BY_SERIAL) {
+                SaveEnrollment(&ted.requestHeader, ted.GetPacketLength());
+            }
+            else if (ted.requestHeader.actionType == (u8)EnrollmentModuleTriggerActionMessages::REMOVE_ENROLLMENT)
             {
                 SaveUnenrollment(&ted.requestHeader, ted.GetPacketLength());
             }

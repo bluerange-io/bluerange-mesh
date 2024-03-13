@@ -148,6 +148,7 @@ void DeviceOff::GotoSystemOff()
     CheckedMemset(GS->ramRetainStructPtr, 0, sizeof(RamRetainStruct));
     GS->ramRetainStructPtr->rebootReason = RebootReason::FROM_OFF_STATE;
     GS->ramRetainStructPtr->crc32 = Utility::CalculateCrc32((u8*)GS->ramRetainStructPtr, sizeof(RamRetainStruct) - 4);
+    *GS->rebootMagicNumberPtr = REBOOT_MAGIC_NUMBER; // the magic number might have been set to 0 (FruityMesh.cpp ~L100), resulting in a safe boot next time
     
     // Make sure power button is configured in sense mode and will wake the device up
     if (Boardconfig->powerButtonActiveHigh)

@@ -168,6 +168,35 @@ bool Utility::IsVendorModuleId(ModuleIdWrapper moduleId)
     else return false;
 }
 
+bool Utility::IsSameModuleId(ModuleIdWrapper a, ModuleIdWrapper b)
+{
+    if (a == b) return true;
+
+    if (!IsVendorModuleId(a) && !IsVendorModuleId(b)) return GetModuleId(a) == GetModuleId(b);
+
+    return false;
+}
+
+bool Utility::IsValidModuleIdFormat(ModuleIdWrapper moduleId)
+{
+    ModuleIdWrapperUnion wrapper;
+    wrapper.wrappedModuleId = moduleId;
+
+    if (wrapper.prefix == ModuleId::INVALID_MODULE) return false;
+
+    if (IsVendorModuleId(moduleId))
+    {
+        // Note: vendorId 0x0000 is valid! 0xFFFF isn't given to anyone yet but could become valid one day.
+        //       subIds 0x00 and 0xFF are totally okay for vendor modules.
+        return true;
+    }
+    else
+    {
+        return (wrapper.subId    ==   0xFF || wrapper.subId    ==   0x00) 
+            && (wrapper.vendorId == 0xFFFF || wrapper.vendorId == 0x0000);
+    }
+}
+
 ModuleIdWrapper Utility::GetWrappedModuleId(u16 vendorId, u8 subId)
 {
     ModuleIdWrapperUnion wrappedModuleId;
@@ -415,14 +444,6 @@ bool Utility::IsPowerOfTwo(u32 val)
     else return ((val & (val - 1ul)) == 0ul);
 }
 
-u32 Utility::NextMultipleOf(const u32 val, const u32 multiple)
-{
-    if (multiple <= 1) return val;
-    const u32 remainder = val % multiple;
-    if (remainder == 0) return val;
-    return val + multiple - remainder;
-}
-
 NodeId Utility::TerminalArgumentToNodeId(const char * arg, bool* didErrorArg)
 {
     if (arg == nullptr)
@@ -568,6 +589,22 @@ i16 Utility::StringToI16(const char * str, bool *outDidError)
 i32 Utility::StringToI32(const char * str, bool *outDidError)
 {
     return StringToI<i32>(str, outDidError);
+}
+
+Endianness Utility::GetEndianness(DataTypeDescriptor dataType)
+{
+    if (dataType == DataTypeDescriptor::RAW) return Endianness::UNKNOWN;
+
+    if ((u8)dataType < 128) return Endianness::LITTLE;
+
+    return Endianness::BIG;
+}
+
+DataTypeDescriptor Utility::ToLittleEndianDescriptor(DataTypeDescriptor dataType)
+{
+    u8 val = (u8)dataType;
+    if (val > 128) val -= 128;
+    return (DataTypeDescriptor)val;
 }
 
 /*
@@ -727,6 +764,13 @@ u32 Utility::ToAlignedU32(const void* ptr)
 i32 Utility::ToAlignedI32(const void* ptr)
 {
     i32 retVal = 0;
+    CheckedMemcpy(&retVal, ptr, sizeof(retVal));
+    return retVal;
+}
+
+float Utility::ToAlignedFloat(const void* ptr)
+{
+    float retVal = 0;
     CheckedMemcpy(&retVal, ptr, sizeof(retVal));
     return retVal;
 }

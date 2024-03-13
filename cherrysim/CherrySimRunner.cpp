@@ -45,6 +45,10 @@
 #include <filesystem>
 #endif
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 /**
 The CherrySimRunner is used to start the simulator in a forever running loop.
 Terminal input into all nodes is possible and visualization works using FruityMap.
@@ -185,17 +189,6 @@ int main(int argc, char** argv) {
     std::filesystem::path currentWorkingDir = std::filesystem::current_path();
     printf("Current Working Directory: %s" EOL, currentWorkingDir.string().c_str());
 #endif
-
-    //The following exceptions are correctly handled by FruityMesh, they don't require us to terminate the simulator.
-    Exceptions::ExceptionDisabler<ErrorCodeUnknownException> ecue;
-    Exceptions::ExceptionDisabler<CRCMissingException> crcme;
-    Exceptions::ExceptionDisabler<CRCInvalidException> crcie;
-    Exceptions::ExceptionDisabler<CommandNotFoundException> cnfe;
-    Exceptions::ExceptionDisabler<TooManyArgumentsException> tmae;
-
-    //Failing a SystemTest just because one Error Message was logged somewhere is
-    //probably too harsh and will lead to more issues than it solves in the future.
-    Exceptions::ExceptionDisabler<ErrorLoggedException> ele;
 
     //@ReplayFeature@ <- Don't change this, it's a label used in the documentation.
     //You may use the following line to enable the replay feature. As this change
@@ -345,39 +338,56 @@ CherrySimRunner::CherrySimRunner(const CherrySimRunnerConfig &runnerConfig, cons
     this->sim = nullptr;
 }
 
+void CherrySimRunner::Init()
+{
+    printf("## SIM Starting ##" EOL);
+    sim = new CherrySim(simConfig);
+    sim->SetCherrySimEventListener(this);
+    sim->RegisterTerminalPrintListener(this);
+    sim->Init();
+
+    //We can now modify the nodes to use a different configuration
+    //Set the first node to deviceType sink
+    sim->nodes[0].uicr.CUSTOMER[11] = (u32)DeviceType::SINK; //deviceType
+
+
+    //Boot up all nodes
+    for (u32 i = 0; i < sim->GetTotalNodes(); i++) {
+        NodeIndexSetter setter(i);
+        sim->BootCurrentNode();
+    }
+
+    if (shortLived)
+    {
+        //ShortLived mode is only used for dry runs on the pipeline.
+        //As we don't have a communication partner in that scenario,
+        //we immediately tell that we received some data so that the
+        //simulation starts properly.
+        sim->receivedDataFromMeshGw = true;
+    }
+    if (meshGwCommunication && !terminalReaderLaunched)
+    {
+        terminalReaderLaunched = true;
+        terminalReader = std::thread(&CherrySimRunner::TerminalReaderMain, this);
+    }
+}
+
+#ifdef __EMSCRIPTEN__
+static void SimulateCaller(void* instance)
+{
+    CherrySimRunner* runner = (CherrySimRunner*)instance;
+    runner->Simulate();
+}
+#endif
+
 void CherrySimRunner::Start()
 {
+#ifdef __EMSCRIPTEN__
+    Init();
+    emscripten_set_main_loop_arg(SimulateCaller, this, 0, true);
+#else
     while (running) {
-        printf("## SIM Starting ##" EOL);
-        sim = new CherrySim(simConfig);
-        sim->SetCherrySimEventListener(this);
-        sim->RegisterTerminalPrintListener(this);
-        sim->Init();
-
-        //We can now modify the nodes to use a different configuration
-        //Set the first node to deviceType sink
-        sim->nodes[0].uicr.CUSTOMER[11] = (u32)DeviceType::SINK; //deviceType
-
-
-        //Boot up all nodes
-        for (u32 i = 0; i < sim->GetTotalNodes(); i++) {
-            NodeIndexSetter setter(i);
-            sim->BootCurrentNode();
-        }
-
-        if (shortLived)
-        {
-            //ShortLived mode is only used for dry runs on the pipeline.
-            //As we don't have a communication partner in that scenario,
-            //we immediately tell that we received some data so that the
-            //simulation starts properly.
-            sim->receivedDataFromMeshGw = true;
-        }
-        if (meshGwCommunication && !terminalReaderLaunched)
-        {
-            terminalReaderLaunched = true;
-            terminalReader = std::thread(&CherrySimRunner::TerminalReaderMain, this);
-        }
+        Init();
 
         if (Simulate()) {
             break;
@@ -388,12 +398,27 @@ void CherrySimRunner::Start()
 
         delete sim;
     }
+#endif
 }
 
 bool CherrySimRunner::Simulate()
 {
+    //The following exceptions are correctly handled by FruityMesh, they don't require us to terminate the simulator.
+    Exceptions::ExceptionDisabler<ErrorCodeUnknownException> ecue;
+    Exceptions::ExceptionDisabler<CRCMissingException> crcme;
+    Exceptions::ExceptionDisabler<CRCInvalidException> crcie;
+    Exceptions::ExceptionDisabler<CommandNotFoundException> cnfe;
+    Exceptions::ExceptionDisabler<TooManyArgumentsException> tmae;
+
+    //Failing a SystemTest just because one Error Message was logged somewhere is
+    //probably too harsh and will lead to more issues than it solves in the future.
+    Exceptions::ExceptionDisabler<ErrorLoggedException> ele;
+
     //Simulate all nodes
-    while (running) {
+#ifndef __EMSCRIPTEN__
+    while (running)
+#endif
+    {
         const auto frameStartTimePoint = std::chrono::steady_clock::now();
 
         if (sim->simConfig.playDelay > 0) {

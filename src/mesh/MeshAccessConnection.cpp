@@ -68,6 +68,11 @@
 uint32_t meshAccessConnTypeResolver __attribute__((section(".ConnTypeResolvers"), used)) = (u32)MeshAccessConnection::ConnTypeResolver;
 #endif
 
+FmKeyId MeshAccessConnection::getFmKeyId()
+{
+    return this->fmKeyId;
+}
+
 MeshAccessConnection::MeshAccessConnection(u8 id, ConnectionDirection direction, FruityHal::BleGapAddr const * partnerAddress, FmKeyId fmKeyId, MeshAccessTunnelType tunnelType, NodeId overwriteVirtualPartnerId)
     : BaseConnection(id, direction, partnerAddress)
 {
@@ -163,9 +168,6 @@ u32 MeshAccessConnection::ConnectAsMaster(FruityHal::BleGapAddr const * address,
             FruityHal::BleGapAddr partnerAddress = conn.GetPartnerAddress();
             u32 result = memcmp(&partnerAddress, address, FH_BLE_SIZEOF_GAP_ADDR);
             if (result == 0) {
-                //TODO wouldn't it be better to return conn->uniqueConnectionId instead?
-                //Probably the callee does not care if a real new connection was established,
-                //he just wants to have a connection to the specified partner.
                 return 0;
             }
         }

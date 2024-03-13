@@ -61,6 +61,7 @@ enum class ServiceDataMessageType : u16
     SENSOR_MESSAGE         = 0x05,
     ASSET_BLE              = 0x06,
     ASSET_INS              = 0x07,
+    EMERGENCY_MESH_ACCESS  = 0x08,
     // Note: When adding a new type, think about using using something bigger than e.g. 200
     // so that we can have a contiguous space with ManufacturerSpecificMessageType and we have u16 here
 };

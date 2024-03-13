@@ -164,6 +164,42 @@ The response acknowledges the receipt of these commands.
 {"type":"ping","nodeId":123,"module":0,"requestHandle":100}
 ----
 
+=== Dynamic Group Ids
+A node can be added to and removed from one or more dynamic groups. The assignment is stored persistently until a factory reset is performed. These IDs - a subset of the NodeId range - can be used to broadcast messages to a selected group of nodes simultaniously. All nodes that are part of the group will respond to a message that is adressed to it. See the xref:Specification.adoc#NodeIds[specification] for the range of NodeIds belonging to the dynamic group range. Trying to set groupIDs outside of this range will result in an error. A node can belong to up to 20 groups, although this limitation is potentially subject to change in the future.
+[source, C++]
+----
+//Add the node to a group
+action [nodeId] node add_group [groupId] {requestHandle}
+//Remove the node from a group
+action [nodeId] node remove_group [groupId] {requestHandle}
+//Remove the node from all groups
+action [nodeId] node clear_groups {requestHandle}
+//Get all groups
+action [nodeId] node get_groups {requestHandle}
+----
+
+The response acknowledges the receipt of these commands.
+
+[source,Javascript]
+----
+{"type":"add_group_result","nodeId":1,"module":0,"group":21001,"code":0}
+{"type":"remove_group_result","nodeId":1,"module":0,"group":21001,"code":0}
+{"type":"clear_groups_result","nodeId":1,"module":0,"group":0,"code":0}
+{"type":"get_groups_result","nodeId":1,"module":0,"groups":[21001, 21007]}
+----
+
+The codes are defined as:
+
+[cols="1,2,5"]
+|===
+|Code|Name|Description
+
+|0|SUCCESS|The operation was successful. This is also returned if adding a node to a group that it already belongs to or removing it from a group that it didn't belong to.
+|1|OUT_OF_RANGE|The given group ID was not inside the valid range.
+|2|NO_GROUPS_LEFT|The node already belongs to too many groups.
+|100...|RECORD_STORAGE_ERROR_OFFSET|The Record Storage reported some error. These error codes are embedded here, with an offset of 100.
+|===
+
 === Generating Load
 
 `action [nodeId] node generate_load [target] [size] [amountOfMessages] [timeBetweenMessagesDs] \{requestHandle}`

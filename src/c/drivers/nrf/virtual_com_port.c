@@ -124,6 +124,7 @@ static void (*portEventHandlerPtr)(bool) = NULL;
 
 static bool virtualComInitialized = false;
 static bool virtualComOpened = false;
+static uint32_t virtualComInitializedCounter = 0;
 
 //Set to true once data is being sent out, we must wait for the completion event
 static volatile bool currentlySendingData = false;
@@ -269,6 +270,7 @@ static void usbd_user_ev_handler(app_usbd_event_type_t event)
         case APP_USBD_EVT_DRV_RESUME:
             FRUITYMESH_VCOM_LOG_DEBUG("USB resume\n");
             virtualComInitialized = true;
+            ++virtualComInitializedCounter;
             break;
         case APP_USBD_EVT_STOPPED:
             FRUITYMESH_VCOM_LOG_DEBUG("USB stopped\n");
@@ -279,6 +281,7 @@ static void usbd_user_ev_handler(app_usbd_event_type_t event)
         case APP_USBD_EVT_STARTED:
             FRUITYMESH_VCOM_LOG_DEBUG("USB started\n");
             virtualComInitialized = true;
+            ++virtualComInitializedCounter;
             break;
         case APP_USBD_EVT_POWER_DETECTED:
             FRUITYMESH_VCOM_LOG_DEBUG("USB power detected\n");
@@ -455,6 +458,18 @@ uint32_t virtualComWriteData(const uint8_t* buffer, uint16_t bufferLength)
     }
 
     return err;
+}
+
+bool isVirtualComPortOpen() {
+    return virtualComOpened;
+}
+
+bool isVirtualComPortInitialized() {
+    return virtualComInitialized;
+}
+
+uint32_t getVirtualComPortInitializedCounter() {
+    return virtualComInitializedCounter;
 }
 
 #endif //IS_ACTIVE(VIRTUAL_COM_PORT)

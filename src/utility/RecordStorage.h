@@ -74,7 +74,18 @@ constexpr u16 RECORD_STORAGE_RECORD_ID_SIG_STATES_LAST = RECORD_STORAGE_RECORD_I
 static_assert(SIG_MAX_NUM_ELEMENTS <= RECORD_STORAGE_RECORD_ID_SIG_AMOUNT, "Not enough record ids for all elements!");
 #endif //IS_ACTIVE(SIG_MESH)
 
-// ############ RECORD IDS 3000 - 49999 #############
+// ############ RECORD IDS 3000 - 3999 #############
+// Building Automation
+constexpr u16 RECORD_STORAGE_RECORD_ID_AUTO_SENSE_ENTRIES_BASE = 3000;
+constexpr u16 RECORD_STORAGE_RECORD_ID_AUTO_SENSE_ENTRIES_AMOUNT = 256;
+constexpr u16 RECORD_STORAGE_RECORD_ID_AUTO_SENSE_ENTRIES_LAST = RECORD_STORAGE_RECORD_ID_AUTO_SENSE_ENTRIES_BASE + RECORD_STORAGE_RECORD_ID_AUTO_SENSE_ENTRIES_AMOUNT - 1;
+
+constexpr u16 RECORD_STORAGE_RECORD_ID_AUTO_ACT_ENTRIES_BASE = 3256;
+constexpr u16 RECORD_STORAGE_RECORD_ID_AUTO_ACT_ENTRIES_AMOUNT = 256;
+constexpr u16 RECORD_STORAGE_RECORD_ID_AUTO_ACT_ENTRIES_LAST = RECORD_STORAGE_RECORD_ID_AUTO_ACT_ENTRIES_BASE + RECORD_STORAGE_RECORD_ID_AUTO_ACT_ENTRIES_AMOUNT - 1;
+// Records 3512 - 3999 are reserved for other building automation records.
+
+// ############ RECORD IDS 4000 - 49999 #############
 // This range is reserved for other core functionality
 
 // ############ RECORD IDS 50000 - 65534 #############
@@ -222,7 +233,7 @@ typedef struct
     u16 reserved;
 
 }ImmortalizeRecordOperation;
-STATIC_ASSERT_SIZE(DeactivateRecordOperation, SIZEOF_RECORD_STORAGE_IMMORTALIZE_RECORD_OP);
+STATIC_ASSERT_SIZE(ImmortalizeRecordOperation, SIZEOF_RECORD_STORAGE_IMMORTALIZE_RECORD_OP);
 #pragma pack(pop)
 
 enum class RecordStorageResultCode : u8
@@ -337,11 +348,13 @@ class RecordStorage : public FlashStorageEventListener
         static RecordStorage& GetInstance();
 
         //Stores a record (Operation is queued)
-        RecordStorageResultCode SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, ModuleIdWrapper lockDownModule = INVALID_WRAPPED_MODULE_ID);
+        RecordStorageResultCode SaveRecord(u16 recordId, const u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, ModuleIdWrapper lockDownModule = INVALID_WRAPPED_MODULE_ID);
         //Allows to cache some information until store completes
-        RecordStorageResultCode SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength, ModuleIdWrapper lockDownModule = INVALID_WRAPPED_MODULE_ID, bool alwaysPersist = false);
+        RecordStorageResultCode SaveRecord(u16 recordId, const u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength, ModuleIdWrapper lockDownModule = INVALID_WRAPPED_MODULE_ID, bool alwaysPersist = false);
         //Removes a record (Operation is queued)
         RecordStorageResultCode DeactivateRecord(u16 recordId, RecordStorageEventListener * callback, u32 userType, ModuleIdWrapper lockDownModule = INVALID_WRAPPED_MODULE_ID, bool alwaysPersist = false);
+        //Allows to cache some information until remove completes
+        RecordStorageResultCode DeactivateRecord(u16 recordId, RecordStorageEventListener * callback, u32 userType, u8* userData, u16 userDataLength, ModuleIdWrapper lockDownModule = INVALID_WRAPPED_MODULE_ID, bool alwaysPersist = false);
         //Retrieves a record
         RecordStorageRecord* GetRecord(u16 recordId) const;
         //Retrieves the data of a record

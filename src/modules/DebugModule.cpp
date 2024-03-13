@@ -253,10 +253,12 @@ void DebugModule::TimerEventHandler(u16 passedTimeDs){
 
 void DebugModule::PrintAdvMessageHeader(const char* type, const FruityHal::GapAdvertisementReportEvent& advertisementReportEvent)
 {
-#if IS_ACTIVE(LOGGING)
+#ifdef TERMINAL_ENABLED
     u16 dataLength = advertisementReportEvent.GetDataLength();
     const u8* data = advertisementReportEvent.GetData();
-    TO_HEX(data, dataLength);
+
+    DYNAMIC_ARRAY(dataHex, (dataLength)*3+1);
+    Logger::ConvertBufferToHexString(data, dataLength, (char*)dataHex, dataLength*3+1);
 
     //Convert the BLE address (Bytes must be swapped for correct display)
     char addrHex[FH_BLE_GAP_ADDR_LEN * 3 + 1];
@@ -327,7 +329,7 @@ void DebugModule::PrintAdvMessage(const FruityHal::GapAdvertisementReportEvent& 
         //MeshAccess Broadcast Message
         else if(
             dataLength > SIZEOF_ADV_STRUCTURE_FLAGS + SIZEOF_ADV_STRUCTURE_UUID16 + SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA_LEGACY
-            && messageType == (u16)ServiceDataMessageType::MESH_ACCESS
+            && (messageType == (u16)ServiceDataMessageType::MESH_ACCESS || messageType == (u16)ServiceDataMessageType::EMERGENCY_MESH_ACCESS)
             && (scanLogIdentifier.advMessageTypeFilter == 0 || scanLogIdentifier.advMessageTypeFilter == (u16)ServiceDataMessageType::MESH_ACCESS)
         ){
             knownFormat = true;
@@ -340,7 +342,13 @@ void DebugModule::PrintAdvMessage(const FruityHal::GapAdvertisementReportEvent& 
             char serialString[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
             Utility::GenerateBeaconSerialForIndex(payload->serialIndex, serialString);
 
-            PrintAdvMessageHeader("MESH_ACCESS(3)", advertisementReportEvent);
+            if(messageType == (u16)ServiceDataMessageType::MESH_ACCESS){
+                PrintAdvMessageHeader("MESH_ACCESS(3)", advertisementReportEvent);
+            } else if(messageType == (u16)ServiceDataMessageType::EMERGENCY_MESH_ACCESS){
+                PrintAdvMessageHeader("EMERGENCY_MESH_ACCESS(8)", advertisementReportEvent);
+            } else {
+                PrintAdvMessageHeader("MESH_ACCESS_*(?)", advertisementReportEvent);
+            }
 
             trace("    > networkId:%u, hasFreeInConn:%u, enrolled:%u, sink:%u, zeroKey:%u, wantsConn:%u, serial:%s" EOL,
                 payload->networkId,

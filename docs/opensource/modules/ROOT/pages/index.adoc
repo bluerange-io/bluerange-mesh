@@ -1,7 +1,7 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
 = FruityMesh
 
-FruityMesh is the reference implementation of the **BlueRange** initiative. It was the first open source implementation of a mesh network that is based on standard *Bluetooth Low Energy 4.1 connections*. In contrast to meshes that use advertising and scanning, this allows for a network run with *battery powered* devices. FruityMesh works with the Nordic nRF52 chipset in combination with the *S132/S140 SoftDevices* and enables tons of devices to connect to each other with its auto-meshing capabilities. It is *always connected* with configurable connection intervals of *7.5 ms to 4 seconds* while still being able to run on batteries.
+FruityMesh is the reference implementation of the **BlueRange** initiative. It was the first open source implementation of a mesh network that is based on standard *Bluetooth Low Energy 4.1/5.x connections*. In contrast to mesh networks that use advertising and scanning, this allows for a network run with *battery powered* devices. FruityMesh works with the Nordic nRF52 chipset in combination with the *S132/S140 SoftDevices* and enables tons of devices to connect to each other with its auto-meshing capabilities. It is *always connected* with configurable connection intervals of *7.5 ms to 4 seconds* while still being able to run on batteries.
 
 == BlueRange
 BlueRange is our commercial product that includes our Mesh, MeshGateway, Platform, Asset Tracking and much more. Have a look at our website:
@@ -27,8 +27,8 @@ We’re interested in contributions of every kind, otherwise we wouldn’t be he
 Do not hesitate to ask questions, submit issues and add comments. Mail us through our website for business inquiries or open an issue and label it as _question_ for developer questions.
 
 == Who Are We?
-image:mway.png[mway_logo]
+image:bluerange.png[bluerange_logo]
 
-This project is under active development at link:http://www.mwaysolutions.com/[M-Way Solutions GmbH], Germany.
+This project is under active development at link:https://bluerange.io[BlueRange GmbH], Germany.
 
-We use FruityMesh ourselves in conjunction with our custom MeshGateway to build services such as connected lights, asset tracking and much more for our customers.
+We use FruityMesh ourselves in conjunction with our BlueRange Gateway to build services such as connected lights, sensors, building control devices, asset tracking and much more for our customers.

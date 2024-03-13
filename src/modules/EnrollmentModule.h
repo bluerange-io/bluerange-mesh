@@ -145,7 +145,7 @@ struct EnrollmentModuleConfiguration : ModuleConfiguration {
  * functionality using MeshAccess connections. This is sometimes also called
  * provisioning.
  */
-class EnrollmentModule: public Module
+class EnrollmentModule: public Module, public RecordStorageEventListener
 {
     public:
         enum class EnrollmentModuleTriggerActionMessages : u8{

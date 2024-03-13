@@ -43,6 +43,38 @@ action [nodeId] io pinset [pinNumber] [mode] ...
 action 0 io pinset 21 high 22 low
 ----
 
+=== Read Pins
+Reads the digital level of one or up to 5 pins (0 = low and 1 = high).
+
+WARNING: This changes the pin's GPIO configuration output (after it has changed it to input and read the pin).
+
+[source,C++]
+----
+//Pass the pin numbers to read
+action [nodeId] io pinread [pinNumber] {pinNumber} ...
+
+//Read pin 21
+action 0 io pinread 21
+
+//Read pins 2, 1 and 19
+action 0 io pinread 2 1 19
+----
+
+Example response:
+[source,JSON]
+----
+{
+    "nodeId": 2,
+    "type": "pin_level_result",
+    "module": 6,
+    "pins": [
+        {"pin_number":  2, "pin_level": 1},
+        {"pin_number":  1, "pin_level": 1},
+        {"pin_number": 19, "pin_level": 0}
+    ]
+}
+----
+
 [#Identify]
 === Start identification
 Starts identification procedure which will blink all board LEDs with a 200ms period for a total of 30 seconds. Can also be handled by other modules to start custom identification. This mode overrules curent led mode.

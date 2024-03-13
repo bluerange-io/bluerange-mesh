@@ -231,6 +231,12 @@ FruityMesh keeps track of how much stack RAM was used. To do so, at boot time, t
 == RebootReason::UNKNOWN_BUT_BOOTED
 There are two reboot reasons that indicate that we don't know the exact reason of the reboot: `UNKNOWN` and `UNKNOWN_BUT_BOOTED`. The first one indicates that we were unable to read the reboot reason from the RAM retain struct. This most likely indicates that some kind of power shortage happened. The second reason indicates that although we don't know why the node is rebooting, we know that it was successfully booted previously within the current power cycle, so know that power was not lost. One possible explanation for this is when we flash a node. This resets the node, without removing power from it. If this was not the cause, then this reboot reason indicates something more sinister. Something rebooted the node without even calling any fault handler or the fault handler was for some reason unable to correctly store the RebootReason.
 
+== MultiScheduler
+Using the MultiScheduler class allows you to manage multiple arbitrary, repeating events in both relative and absolute time. Simply instantiate an object with the type of the events and how many events should be handles `MultiScheduler<u32, 10> scheduler;`, add events `scheduler.addEvent(1, 10, 0, EventTimeType::RELATIVE);`, advance time `scheduler.advanceTime(5);`, check if events are ready `scheduler.isEventReady()`, and retriev them `u32 event = scheduler.getAndReenter();`.
+
+== BitMask
+The `BitMask` template offers a simple way to work with Bit Masks of arbitrary length. Instantiate the Bit Mask with the desired length `BitMask<10> bitMask;`, set some values `bitMask.set(2, true);`, and retriev values `bitMask.get(7);`.
+
 == HAL memory
 TODO: Move to memory management
 The HAL has its own memory location to store any arbitrary data. A void pointer to this memory is stored in the GlobalState as `halMemory`. The HAL has to cast this pointer to some structure to interpret its state. The node allocates enough RAM for the HAL on boot, using the `GetHalMemorySize` function to determine how much is needed.

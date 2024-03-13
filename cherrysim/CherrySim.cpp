@@ -86,7 +86,7 @@ extern "C"{
 
 #include <regex>
 
-#ifdef CI_PIPELINE
+#if defined(CI_PIPELINE) && !defined(__EMSCRIPTEN__)
 //Stacktrace handling on segfault
 #include <execinfo.h>
 #include <signal.h>
@@ -326,6 +326,25 @@ void CherrySim::PrepareSimulatedFeatureSets()
 #ifdef PROD_EINK_NRF52840 //PROD_EINK_NRF52840
     AddSimulatedFeatureSet(prod_eink_nrf52840);
 #endif //PROD_EINK_NRF52840
+#ifdef PROD_MOD_NRF52832 //PROD_MOD_NRF52832
+    AddSimulatedFeatureSet(prod_mod_nrf52832);
+#endif //PROD_MOD_NRF52832
+#ifdef DEV_MOD_NRF52840 //DEV_MOD_NRF52840
+    AddSimulatedFeatureSet(dev_mod_nrf52840);
+#endif //PROD_MOD_NRF52840
+#ifdef PROD_MOD_NRF52840 //PROD_MOD_NRF52840
+    AddSimulatedFeatureSet(prod_mod_nrf52840);
+#endif //PROD_MOD_NRF52840
+#ifdef PROD_ST_NET_NRF52840 //PROD_ST_NET_NRF52840
+    AddSimulatedFeatureSet(prod_st_net_nrf52840);
+#endif //PROD_ST_NET_NRF52840
+#ifdef PROD_EL_MO_NRF52832 //PROD_EL_MO_NRF52832
+    AddSimulatedFeatureSet(prod_el_mo_nrf52832);
+#endif //PROD_EL_MO_NRF52832
+#ifdef PROD_EURO_UART_NRF52840 //PROD_EURO_UART_NRF52840
+    AddSimulatedFeatureSet(prod_euro_uart_nrf52840);
+#endif //PROD_EURO_UART_NRF52840
+
 
 //AssetNodes will be assigned the last nodeIds
 
@@ -335,7 +354,9 @@ void CherrySim::PrepareSimulatedFeatureSets()
 #ifdef PROD_ASSET_NRF52 //PROD_ASSET_NRF52
     AddSimulatedFeatureSet(prod_asset_nrf52);
 #endif //PROD_ASSET_NRF52
-
+#ifdef PROD_MESH_BR_PIR_ZERO
+    AddSimulatedFeatureSet(prod_mesh_br_pir_zero);
+#endif //PROD_MESH_BR_PIR_ZERO
 }
 #undef AddSimulatedFeatureSet
 
@@ -459,11 +480,13 @@ CherrySim::~CherrySim()
     currentNode = nullptr;
     nodeEntryBuffer.clear();
 
+#ifndef __EMSCRIPTEN__
     if(webserver != nullptr) delete webserver;
     webserver = nullptr;
 
     if(socketTerm != nullptr) delete socketTerm;
     socketTerm = nullptr;
+#endif
 
     if (cherrySimInstance == this) cherrySimInstance = nullptr;
 }
@@ -528,12 +551,14 @@ void CherrySim::Init()
         LoadPresetNodePositions();
     }
 
+#ifndef __EMSCRIPTEN__
     //Opens a Webserver to serve the FruityMap for visualization
     webserver = new FruitySimServer(simConfig.webServerPort);
+#endif
 
     //Opens the socket based Terminal
     //This is currently only enabled for the runner
-#ifdef CHERRYSIM_RUNNER_ENABLED
+#if defined(CHERRYSIM_RUNNER_ENABLED) && !defined(__EMSCRIPTEN__)
     socketTerm = new SocketTerm();
     socketTerm->CreateServerSocket(simConfig.socketServerPort);
 #endif
@@ -1007,6 +1032,7 @@ void CherrySim::SimulateStepForAllNodes()
     //wait until we received something. This has the advantage that the replay
     //log is not filled with unnecessary wait time at the beginning which
     //makes debugging a little bit more easy.
+#ifndef __EMSCRIPTEN__
     while (meshGwCommunication && !receivedDataFromMeshGw)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -1014,6 +1040,7 @@ void CherrySim::SimulateStepForAllNodes()
         // receivedDataFromMeshGw will never be set to true.
         socketTerm->ProcessSockets();
     }
+#endif
 
     if (simConfig.realTime)
     {
@@ -1036,11 +1063,13 @@ void CherrySim::SimulateStepForAllNodes()
 
     CheckForMultiTensorflowUsage();
 
+#ifndef __EMSCRIPTEN__
     //Check if the webserver has some open requests to process
     webserver->ProcessServerRequests();
 
     //Check if there is Terminal input / ouput waiting to be processed over TCP sockets
     socketTerm->ProcessSockets();
+#endif
 
     int64_t sumOfAllSimulatedFrames = 0;
     for (u32 i = 0; i < GetTotalNodes(); i++) {
@@ -1121,16 +1150,17 @@ void CherrySim::SimulateStepForAllNodes()
 #ifdef FM_NATIVE_RENDERER_ENABLED
     if (bbeRenderer && bbeRenderer->keepAlive())
     {
-        //Only draw a frame from time to time if fastLane is active, otherwhise always draw
-        if (
-            (simConfig.fastLaneToSimTimeMs > simState.simTimeMs && (simState.simTimeMs % (simConfig.simTickDurationMs * 500) == 0))
-            || simConfig.fastLaneToSimTimeMs < simState.simTimeMs
-            || simState.simTimeMs == simConfig.simTickDurationMs //Draw the first frame
-        ) {
-            //If render less is active, only draw from time to time
-            if (!renderLess || simState.simTimeMs % (simConfig.simTickDurationMs * 500) == 0) {
-                bbeRenderer->frame();
-            }
+        static bbe::GameTime gt;
+        static float timeSinceLastFrameDraw = 0;
+        bbeRenderer->frameUpdate();
+        timeSinceLastFrameDraw += gt.tick();
+        const float targetFrameTime = 1.f / bbeRenderer->getFps();
+        if (timeSinceLastFrameDraw > targetFrameTime)
+        {
+            timeSinceLastFrameDraw -= targetFrameTime;
+            // Limit the time dept.
+            if (timeSinceLastFrameDraw > targetFrameTime) timeSinceLastFrameDraw = targetFrameTime;
+            bbeRenderer->frameDraw();
         }
     }
     else if(bbeRenderer)
@@ -1161,6 +1191,32 @@ void LogThrownCherrySimException(std::type_index index)
 void CherrySim::LogThrownException(std::type_index index)
 {
     this->loggedExceptions.emplace(index);
+}
+
+void CherrySim::DoSendTerminalCommand(const NodeEntry& nodeEntry, const std::string& originalCommand, bool verbose, bool appendCrcToMessages) const
+{
+    const u32 crc = Utility::CalculateCrc32String(originalCommand.c_str());
+    const std::string crcCommand = originalCommand + std::string(" CRC: ") + std::to_string(crc);
+
+    NodeIndexSetter setter(nodeEntry.index);
+
+    if (!GS->terminal.terminalIsInitialized)
+    {
+        // The terminal of the node is not active, cannot send the message. It must either be activated before
+        // sending a message to it.
+        SIMEXCEPTION(IllegalStateException);
+    }
+
+    std::string commandToSend = originalCommand;
+    if (GS->terminal.IsCrcChecksEnabled() && originalCommand.find(" CRC: ") == std::string::npos && appendCrcToMessages)
+    {
+        commandToSend = crcCommand;
+    }
+    if (verbose)
+    {
+        printf("NODE %d TERM_IN: %s" EOL, currentNode->GetNodeId(), commandToSend.c_str());
+    }
+    GS->terminal.PutIntoTerminalCommandQueue(commandToSend, false);
 }
 
 bool CherrySim::CheckExceptionWasThrown(std::type_index index)
@@ -2025,7 +2081,7 @@ void CherrySim::SetFeaturesets()
             }
             else 
             {
-                SIMEXCEPTIONFORCE(IllegalStateException); //Featureset is not defined yet
+                SIMEXCEPTIONFORCE(IllegalStateException); //Featureset is not defined yet, add it to CherrySim::PrepareSimulatedFeatureSets
             }
         }
         if (it->second <= 0)
@@ -2084,6 +2140,8 @@ void CherrySim::WriteSerialNumberToUicr(u32 serialNumberIndex, u32 nodeIndex)
 #ifdef GITHUB_RELEASE
 void CherrySim::EraseLicense(u32 nodeIndex) {};
 void CherrySim::GenerateLicense(u32 nodeIndex) {};
+void CherrySim::SetMasterPublicKey(const u8* key) {};
+const u8* CherrySim::GetMasterPublicKey() { return nullptr; };
 #endif
 
 //This will configure UICR / FICR and flash (settings,...) of a node
@@ -2737,11 +2795,13 @@ void CherrySim::SendUartCommand(NodeId nodeId, const u8* message, u32 messageLen
 {
     SoftdeviceState* state = &(cherrySimInstance->FindUniqueNodeById(nodeId)->state);
     u32 oldBufferLength = state->uartBufferLength;
-    state->uartBufferLength += messageLength;
 
-    if (state->uartBufferLength > state->uartBuffer.size()) {
+    if (state->uartBufferLength + messageLength > state->uartBuffer.size()) {
         SIMEXCEPTION(MessageTooLongException);
+        return; //Must return as the exception might be ignored by a testcase
     }
+
+    state->uartBufferLength += messageLength;
     CheckedMemcpy(state->uartBuffer.data() + oldBufferLength, message, messageLength);
 }
 
@@ -3343,7 +3403,7 @@ void CherrySim::SimulateConnectionParameterUpdateRequestTimeout()
         auto & connParams = bleEvent.evt.gap_evt.params.conn_param_update.conn_params;
         connParams.min_conn_interval = peripheralConnection.connectionInterval;
         connParams.max_conn_interval = peripheralConnection.connectionInterval;
-        connParams.slave_latency = Conf::meshPeripheralSlaveLatency;
+        connParams.slave_latency = Conf::GetInstance().meshPeripheralSlaveLatency;
         connParams.conn_sup_timeout = Conf::meshConnectionSupervisionTimeout;
 
         peripheral.eventQueue.push_back(simEvent);

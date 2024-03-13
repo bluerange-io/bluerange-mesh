@@ -266,7 +266,7 @@ void ConnectionManager::UpdateConnectionIntervalForLongTermMeshConnections() con
                     handle.GetConnectionHandle(),
                     Conf::GetInstance().meshMinLongTermConnectionInterval,
                     Conf::GetInstance().meshMaxLongTermConnectionInterval,
-                    Conf::meshPeripheralSlaveLatency,
+                    Conf::GetInstance().meshPeripheralSlaveLatency,
                     Conf::meshConnectionSupervisionTimeout
                 );
                 // If the connection parameter update was handled by the
@@ -861,6 +861,19 @@ bool ConnectionManager::IsReceiverOfNodeId(NodeId nodeId) const
     if (nodeId >= NODE_ID_HOPS_BASE && nodeId < NODE_ID_HOPS_BASE + NODE_ID_HOPS_BASE_SIZE) return true;
     if (nodeId == NODE_ID_SHORTEST_SINK && GET_DEVICE_TYPE() == DeviceType::SINK)           return true;
 
+    if (nodeId >= NODE_ID_DYNAMIC_GROUP_BASE && nodeId < NODE_ID_DYNAMIC_GROUP_BASE + NODE_ID_DYNAMIC_GROUP_BASE_SIZE)
+    {
+        // It's a dynamic group id, let's check if we are part of it.
+        // TODO: Can be optimized if we sort the list before saving
+        for (u32 i = 0; i < MAX_AMOUNT_OF_DYNAMIC_GROUP_IDS; i++)
+        {
+            if (GS->node.configuration.dynamicGroupIds[i] == nodeId)
+            {
+                return true;
+            }
+        }
+    }
+
     return false;
 }
 
@@ -1366,6 +1379,17 @@ BaseConnections ConnectionManager::GetConnectionsOfType(ConnectionType connectio
     return fc;
 }
 
+bool ConnectionManager::HasMeshConnection() const{
+    for (u32 i = 0; i < TOTAL_NUM_CONNECTIONS; i++) {
+        if (allConnections[i] != nullptr) {
+            if (allConnections[i]->connectionType == ConnectionType::FRUITYMESH) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 u16 ConnectionManager::GetSmallestMtuOfAllConnections() const
 {
     u16 retVal = 0xFFFF;
@@ -1496,6 +1520,11 @@ ClusterSize ConnectionManager::GetMeshHopsToShortestSink(const BaseConnection* e
         logt("SINK", "HOPS %d, clID:%x, clSize:%d", hopsToSink, GS->node.clusterId, GS->node.GetClusterSize());
         return hopsToSink;
     }
+}
+
+bool ConnectionManager::IsSinkAvailable(const BaseConnection* excludeConnection) const
+{
+    return GetMeshHopsToShortestSink(excludeConnection) != -1;
 }
 
 #define _________________EVENTS____________

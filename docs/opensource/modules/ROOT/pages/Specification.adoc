@@ -205,6 +205,8 @@ There are different node ID ranges that are used for different purposes:
 |NODE_ID_DEVICE_BASE|1...1999| Uniquely address devices (nodes, sinks, ...) given by enrollment
 |NODE_ID_VIRTUAL_BASE|2000...19999| Virtual addresses to address smartphones connected to the mesh (dynamically assigned, aka. virtual partner id)
 |NODE_ID_GROUP_BASE|20000...20999| Address groups of devices (statically assigned at compile time)
+|NODE_ID_DYNAMIC_GROUP_BROADCAST_RESERVED|21000| Currently unused
+|NODE_ID_DYNAMIC_GROUP_BASE|21001...21999| Address a group of devices, the groups are dynamically assigned at run time and saved persistently
 |NODE_ID_LOCAL_LOOPBACK|30000| Address for the current node itself (similar to localhost)
 |NODE_ID_HOPS_BASE|30001...30999| Specify the number of hops that a packet can travel. Used for xref:SinkRouting.adoc[sink routing]. (30 001 e.g. specifies that the packet must only reach the direct neighbours)
 |NODE_ID_SHORTEST_SINK|31000| Used to send a packet to sink nodes (the closest one if xref:SinkRouting.adoc[sink routing] is enabled or all if disabled) (see xref:#deviceTypes[Device Types])

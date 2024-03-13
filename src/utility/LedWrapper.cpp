@@ -30,6 +30,7 @@
 
 #include <Config.h>
 #include <LedWrapper.h>
+#include <GlobalState.h>
 
 
 LedWrapper::LedWrapper(i8 io_num, bool active_high)
@@ -75,6 +76,27 @@ void LedWrapper::Toggle(void)
 {
     if(!active) return;
         FruityHal::GpioPinToggle(m_io_pin);
+}
+
+void LedWrapper::Pulse(u32 amountOfPulses, u32 repeatTimeDs)
+{
+    //The time for a full cycle of LED pulses until they repeat
+    const u32 animationTimeDs = GS->appTimerDs % repeatTimeDs;
+
+    //Even Steps
+    if((animationTimeDs / MAIN_TIMER_DS_PER_TICK) % 2 == 0){
+        //Calculate the current step (on+off) and check if we are still lower than the
+        //given amount of pulses
+        if(animationTimeDs / MAIN_TIMER_DS_PER_TICK / 2 < amountOfPulses){
+            On();
+        } else {
+            Off();
+        }
+    }
+    //Uneven Steps
+    else {
+        Off();
+    }
 }
 
 /* EOF */

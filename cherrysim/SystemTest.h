@@ -101,7 +101,9 @@
 //Some config stuff
 //#define ACTIVATE_LOGGING
 #define ACTIVATE_STDIO 1
+#ifndef __EMSCRIPTEN__
 #define ACTIVATE_SOCKET_TERM 1
+#endif
 
 
 #include <stdint.h>
@@ -131,7 +133,7 @@ extern "C" {
 
 //################ Enable compilation of all modules for Simulator ###########################
 
-#if defined PROD_EINK_NRF52840 || defined(PROD_EINK_NRF52) //PROD_EINK_NRF52840 || PROD_EINK_NRF52
+#if (defined PROD_EINK_NRF52840 || defined(PROD_EINK_NRF52)) && !defined(__EMSCRIPTEN__) //PROD_EINK_NRF52840 || PROD_EINK_NRF52
 #define ACTIVATE_EINK_MODULE 1
 #endif //PROD_EINK_NRF52840 || PROD_EINK_NRF52
 
@@ -158,6 +160,10 @@ extern "C" {
 
 #define ACTIVATE_MULTI_ASSET_MODULE 1
 
+#define ACTIVATE_BR_PIR_MODULE 1
+#define ACTIVATE_SOFTWARE_RS485_RESET 1
+
+//#define ACTIVATE_ONLY_SINK_FUNCTIONALITY 1
 
 #define NRF_GPIOTE_POLARITY_TOGGLE 1
 #define NRF_GPIOTE_POLARITY_HITOLO 2

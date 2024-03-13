@@ -32,13 +32,23 @@
 #include <cstdlib>
 
 
+#include "ConnectionMessageTypes.h"
+#include "FmTypes.h"
+#include "RecordStorage.h"
 #include "StatusReporterModule.h"
 #include "Logger.h"
+#include "Terminal.h"
 #include "Utility.h"
 #include "Node.h"
 #include "Config.h"
 #include "GlobalState.h"
 #include "MeshAccessModule.h"
+
+#include "mini-printf.h"
+
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+#include <virtual_com_port.h>
+#endif //IS_ACTIVE(VIRTUAL_COM_PORT)
 
 StatusReporterModule::StatusReporterModule()
     : Module(ModuleId::STATUS_REPORTER_MODULE, "status")
@@ -124,7 +134,9 @@ void StatusReporterModule::TimerEventHandler(u16 passedTimeDs)
     if (IsPeriodicTimeSendActive())
     {
         timeSinceLastPeriodicTimeSendDs += passedTimeDs;
-        if(timeSinceLastPeriodicTimeSendDs > TIME_BETWEEN_PERIODIC_TIME_SENDS_DS){
+        if(IsPeriodicTimeSendActive() && 
+            (timeSinceLastPeriodicTimeSendDs > TIME_BETWEEN_PERIODIC_TIME_SENDS_DS || timeSinceLastPeriodicTimeSendDs > configuration.timeReportingIntervalDs)
+            ){
             timeSinceLastPeriodicTimeSendDs = 0;
 
             constexpr size_t bufferSize = sizeof(ComponentMessageHeader) + sizeof(GS->timeManager.GetLocalTime());
@@ -139,9 +151,9 @@ void StatusReporterModule::TimerEventHandler(u16 passedTimeDs)
 
             outPacket->componentHeader.moduleId = ModuleId::STATUS_REPORTER_MODULE;
             outPacket->componentHeader.requestHandle = periodicTimeSendRequestHandle;
-            outPacket->componentHeader.actionType = (u8)SensorMessageActionType::READ_RSP;
-            outPacket->componentHeader.component = (u16)StatusReporterModuleComponent::TIME;
-            outPacket->componentHeader.registerAddress = (u16)StatusReporterModuleRegister::TIME;
+            outPacket->componentHeader.actionType = (u8)SensorMessageActionType::UNSPECIFIED;
+            outPacket->componentHeader.component = (u16)StatusReporterModuleComponent::DEBUG_TIME_SENSOR;
+            outPacket->componentHeader.registerAddress = (u16)StatusReporterModuleTimeRegister::TIME;
 
             *(decltype(GS->timeManager.GetLocalTime())*)outPacket->payload = GS->timeManager.GetLocalTime();
 
@@ -458,6 +470,40 @@ void StatusReporterModule::SendLiveReport(LiveReportTypes type, u16 requestHandl
     );
 }
 
+#if IS_ACTIVE(ONLY_SINK_FUNCTIONALITY) || SIM_ENABLED
+void StatusReporterModule::SendGatewayStatusResponse(u16 sender, u8 requestHandle, GatewayStatus status) const
+{
+    SendModuleActionMessage(
+        MessageType::MODULE_ACTION_RESPONSE,
+        sender,
+        (u8)StatusModuleActionResponseMessages::GATEWAY_STATUS,
+        requestHandle,
+        (u8*)&status,
+        sizeof(status),
+        false
+    );
+}
+
+void StatusReporterModule::UpdateGatewayStatus()
+{
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+    const bool inited = isVirtualComPortInitialized();
+    if (!inited) {
+        gatewayStatus = GatewayStatus::USB_PORT_NOT_CONNECTED;
+        return;
+    }
+
+    // When the usb port is reinitialized, the GW state is probably outdated.
+    // Hence, we reset it.
+    const uint32_t currentInitCounter = getVirtualComPortInitializedCounter();
+    if (lastComPortInitializedCounter != currentInitCounter) {
+        lastComPortInitializedCounter = currentInitCounter;
+        gatewayStatus = GatewayStatus::USB_PORT_CONNECTED;
+    }
+#endif //IS_ACTIVE(VIRTUAL_COM_PORT)
+}
+#endif //IS_ACTIVE(ONLY_SINK_FUNCTIONALITY) || SIM_ENABLED
+
 void StatusReporterModule::StartConnectionRSSIMeasurement(MeshConnection& connection) const{
     if (connection.IsConnected())
     {
@@ -691,6 +737,57 @@ TerminalCommandHandlerReturnType StatusReporterModule::TerminalCommandHandler(co
 
                 return TerminalCommandHandlerReturnType::SUCCESS;
             }
+            else if (TERMARGS(3, "set_time_reporting"))
+            {
+                if (commandArgsSize != 5) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+                SetTimeReportingMessage msg = {
+                    Utility::StringToU16(commandArgs[4])
+                };
+
+                SendModuleActionMessage(
+                    MessageType::MODULE_TRIGGER_ACTION,
+                    destinationNode,
+                    (u8)StatusModuleTriggerActionMessages::SET_TIME_REPORTING,
+                    0,
+                    (u8*)&msg,
+                    SIZEOF_STATUS_REPORTER_MODULE_SET_TIME_REPORTING_MESSAGE,
+                    false
+                );
+
+                return TerminalCommandHandlerReturnType::SUCCESS;
+            }
+#if IS_ACTIVE(ONLY_SINK_FUNCTIONALITY) || SIM_ENABLED
+            else if (TERMARGS(3, "set_gw_status"))
+            {
+                if (commandArgsSize != 5) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
+
+                bool didError = false;
+
+                GatewayStatus newGatewayStatus = (GatewayStatus)Utility::StringToU8(commandArgs[4], &didError);
+                if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
+                gatewayStatus = newGatewayStatus;
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+                lastComPortInitializedCounter = getVirtualComPortInitializedCounter();
+#endif //IS_ACTIVE(VIRTUAL_COM_PORT)
+                SendGatewayStatusResponse(destinationNode, 0, gatewayStatus);
+
+                return TerminalCommandHandlerReturnType::SUCCESS;
+            }
+            else if (TERMARGS(3, "get_gw_status"))
+            {
+                SendModuleActionMessage(
+                    MessageType::MODULE_TRIGGER_ACTION,
+                    destinationNode,
+                    (u8)StatusModuleTriggerActionMessages::GET_GATEWAY_STATUS,
+                    0,
+                    nullptr,
+                    0,
+                    false
+                );
+
+                return TerminalCommandHandlerReturnType::SUCCESS;
+            }
+#endif //IS_ACTIVE(ONLY_SINK_FUNCTIONALITY) || SIM_ENABLED
         }
     }
 
@@ -811,6 +908,43 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
             {
                 SendRebootReason(packet->header.sender, packet->requestHandle);
             }
+            else if (actionType == StatusModuleTriggerActionMessages::SET_TIME_REPORTING)
+            {
+                DYNAMIC_ARRAY(buffer, SIZEOF_STATUS_REPORTER_MODULE_SET_TIME_REPORTING_MESSAGE_RESPONSE);
+                SetTimeReportingMessageResponse* response = (SetTimeReportingMessageResponse*) buffer;
+
+                const SetTimeReportingMessage* timeRepMsg = (const SetTimeReportingMessage*)packet->data;
+                u16 newTimeReportingIntervalDs = timeRepMsg->newTimeReportingIntervalDs;
+                configuration.timeReportingIntervalDs = newTimeReportingIntervalDs;
+                response->recordStorageResultCode = Utility::SaveModuleSettingsToFlash(
+                    this,
+                    this->configurationPointer,
+                    this->configurationLength,
+                    nullptr,
+                    0,
+                    nullptr,
+                    0);
+
+                response->timeReportingIntervalDs = newTimeReportingIntervalDs;
+
+                SendModuleActionMessage(
+                    MessageType::MODULE_ACTION_RESPONSE,
+                    packet->header.sender,
+                    (u8)StatusModuleActionResponseMessages::SET_TIME_REPORTING_RESULT,
+                    packet->requestHandle,
+                    (const u8*) response,
+                    SIZEOF_STATUS_REPORTER_MODULE_SET_TIME_REPORTING_MESSAGE_RESPONSE,
+                    false
+                );
+            }
+#if IS_ACTIVE(ONLY_SINK_FUNCTIONALITY) || SIM_ENABLED
+            else if (actionType == StatusModuleTriggerActionMessages::GET_GATEWAY_STATUS)
+            {
+                UpdateGatewayStatus();
+                SendGatewayStatusResponse(packet->header.sender, packet->requestHandle, gatewayStatus);
+            }
+#endif //IS_ACTIVE(ONLY_SINK_FUNCTIONALITY) || SIM_ENABLED
+
         }
     }
 
@@ -829,7 +963,7 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
                 StatusReporterModuleConnectionsMessage const * packetData = (StatusReporterModuleConnectionsMessage const *) (packet->data);
                 logjson("STATUSMOD", "{\"type\":\"connections\",\"nodeId\":%d,\"module\":%u,\"partners\":[%d,%d,%d,%d],\"rssiValues\":[%d,%d,%d,%d]}" SEP, packet->header.sender, (u8)ModuleId::STATUS_REPORTER_MODULE, packetData->partner1, packetData->partner2, packetData->partner3, packetData->partner4, packetData->rssi1, packetData->rssi2, packetData->rssi3, packetData->rssi4);
             }
-            if (actionType == StatusModuleActionResponseMessages::ALL_CONNECTIONS_VERBOSE)
+            else if (actionType == StatusModuleActionResponseMessages::ALL_CONNECTIONS_VERBOSE)
             {
                 StatusReporterModuleConnectionsVerboseMessage const* packetData = (StatusReporterModuleConnectionsVerboseMessage const*)(packet->data);
                 bool unknownButFittingVersion = false;
@@ -970,6 +1104,29 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
                 }
                 logjson("STATUSMOD", "]}" SEP);
             }
+            else if (actionType == StatusModuleActionResponseMessages::SET_TIME_REPORTING_RESULT)
+            {
+                const SetTimeReportingMessageResponse* data = (const SetTimeReportingMessageResponse*)packet->data;
+                logjson(
+                    "STATUSMOD", "{\"type\":\"time_reporting_state\",\"intervalDs\":%u,\"nodeId\":%u,\"module\":%u,\"code\":%u}" SEP, 
+                    data->timeReportingIntervalDs, 
+                    packet->header.sender, 
+                    (u8)ModuleId::STATUS_REPORTER_MODULE,
+                    (u8)data->recordStorageResultCode
+                );
+            }
+#if IS_ACTIVE(ONLY_SINK_FUNCTIONALITY) || SIM_ENABLED
+            else if (actionType == StatusModuleActionResponseMessages::GATEWAY_STATUS)
+            {
+                const GatewayStatusMessage* data = (const GatewayStatusMessage*)packet->data;
+                logjson(
+                    "STATUSMOD", "{\"type\":\"gw_status\",\"nodeId\":%u,\"module\":%u,\"status\":%u}" SEP, 
+                    packet->header.sender, 
+                    (u8)ModuleId::STATUS_REPORTER_MODULE,
+                    (u8)data->gatewayStatus
+                );
+            }
+#endif //IS_ACTIVE(ONLY_SINK_FUNCTIONALITY) || SIM_ENABLED
         }
     }
 
@@ -998,9 +1155,9 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
         {
             if (packet->componentHeader.actionType == (u8)ActorMessageActionType::WRITE)
             {
-                if (packet->componentHeader.component == (u16)StatusReporterModuleComponent::TIME)
+                if (packet->componentHeader.component == (u16)StatusReporterModuleComponent::DEBUG_TIME_SENSOR)
                 {
-                    if (packet->componentHeader.registerAddress == (u16)StatusReporterModuleRegister::TIME)
+                    if (packet->componentHeader.registerAddress == (u16)StatusReporterModuleTimeRegister::TIME)
                     {
                         if (packet->payload[0] != 0)
                         {
@@ -1131,7 +1288,7 @@ void StatusReporterModule::ConvertADCtoVoltage()
 
 bool StatusReporterModule::IsPeriodicTimeSendActive()
 {
-    return periodicTimeSendStartTimestampDs != 0 && GS->appTimerDs < periodicTimeSendStartTimestampDs + PERIODIC_TIME_SEND_AUTOMATIC_DEACTIVATION;
+    return (periodicTimeSendStartTimestampDs != 0 && GS->appTimerDs < periodicTimeSendStartTimestampDs + PERIODIC_TIME_SEND_AUTOMATIC_DEACTIVATION) || configuration.timeReportingIntervalDs > 0;
 }
 
 u8 StatusReporterModule::GetBatteryVoltage() const
@@ -1159,9 +1316,16 @@ MeshAccessAuthorization StatusReporterModule::CheckMeshAccessPacketAuthorization
             {
                 switch (mod->actionType)
                 {
+                case (u8)StatusModuleTriggerActionMessages::GET_ERRORS:
+                case (u8)StatusModuleTriggerActionMessages::GET_REBOOT_REASON:
+                case (u8)StatusModuleTriggerActionMessages::SET_KEEP_ALIVE:
+                case (u8)StatusModuleTriggerActionMessages::SET_TIME_REPORTING:
                 case (u8)StatusModuleTriggerActionMessages::GET_STATUS:
                 case (u8)StatusModuleTriggerActionMessages::GET_DEVICE_INFO_V2:
                 case (u8)StatusModuleTriggerActionMessages::SET_INITIALIZED:
+#if IS_ACTIVE(ONLY_SINK_FUNCTIONALITY) || SIM_ENABLED
+                case (u8)StatusModuleTriggerActionMessages::GET_GATEWAY_STATUS:
+#endif //IS_ACTIVE(ONLY_SINK_FUNCTIONALITY) || SIM_ENABLED
                     return MeshAccessAuthorization::WHITELIST;
 
                 default:
@@ -1172,9 +1336,15 @@ MeshAccessAuthorization StatusReporterModule::CheckMeshAccessPacketAuthorization
             {
                 switch (mod->actionType)
                 {
+                case (u8)StatusModuleActionResponseMessages::ERROR_LOG_ENTRY:
+                case (u8)StatusModuleActionResponseMessages::REBOOT_REASON:
+                case (u8)StatusModuleActionResponseMessages::SET_TIME_REPORTING_RESULT:
                 case (u8)StatusModuleActionResponseMessages::STATUS:
                 case (u8)StatusModuleActionResponseMessages::DEVICE_INFO_V2:
                 case (u8)StatusModuleActionResponseMessages::SET_INITIALIZED_RESULT:
+#if IS_ACTIVE(ONLY_SINK_FUNCTIONALITY) || SIM_ENABLED
+                case (u8)StatusModuleActionResponseMessages::GATEWAY_STATUS:
+#endif //IS_ACTIVE(ONLY_SINK_FUNCTIONALITY) || SIM_ENABLED
                     return MeshAccessAuthorization::WHITELIST;
 
                 default:
@@ -1199,7 +1369,8 @@ MeshAccessAuthorization StatusReporterModule::CheckMeshAccessPacketAuthorization
 
 bool StatusReporterModule::IsInterestedInMeshAccessConnection()
 {
-    return IsPeriodicTimeSendActive();
+    // Only interested in MA connection if time reporting is not persistently enabled
+    return periodicTimeSendStartTimestampDs != 0 && GS->appTimerDs < periodicTimeSendStartTimestampDs + PERIODIC_TIME_SEND_AUTOMATIC_DEACTIVATION;
 }
 
 CapabilityEntry StatusReporterModule::GetCapability(u32 index, bool firstCall)
@@ -1214,6 +1385,64 @@ CapabilityEntry StatusReporterModule::GetCapability(u32 index, bool firstCall)
         strcpy(retVal.manufacturer, "M-Way Solutions GmbH");
         strcpy(retVal.modelName, "BlueRange Node Status");
         strcpy(retVal.revision, "0");
+        return retVal;
+    }
+
+    // FruityMesh version. We call it Mesh Firmware as we have two flavours: FruityMesh and BlueRange
+    if (index == 1) {
+        CapabilityEntry retVal;
+        CheckedMemset(&retVal, 0, sizeof(retVal));
+        retVal.type = CapabilityEntryType::SOFTWARE;
+        strcpy(retVal.manufacturer, "BlueRange GmbH");
+        strcpy(retVal.modelName, "Mesh Firmware");
+        snprintf(
+            retVal.revision,
+            sizeof(retVal.revision),
+            "%u.%u.%u",
+            FM_VERSION_MAJOR,
+            FM_VERSION_MINOR,
+            FM_VERSION_PATCH
+        );
+        return retVal;
+    }
+
+    // Softdevice version in human readable form
+    if (index == 2) {
+        const u32 softDeviceVersion = FruityHal::GetSoftDeviceVersion();
+        const u32 softDevicePatch = softDeviceVersion % 1000;
+        const u32 softDeviceMinor = ((softDeviceVersion % 1000000) - softDevicePatch) / 1000;
+        const u32 softDeviceMajor = softDeviceVersion / 1000000;
+
+        CapabilityEntry retVal;
+        CheckedMemset(&retVal, 0, sizeof(retVal));
+        retVal.type = CapabilityEntryType::SOFTWARE;
+        strcpy(retVal.manufacturer, "BlueRange GmbH");
+        strcpy(retVal.modelName, "BLE Stack");
+        snprintf(
+            retVal.revision,
+            sizeof(retVal.revision),
+            "%u.%u.%u",
+            softDeviceMajor,
+            softDeviceMinor,
+            softDevicePatch
+        );
+        return retVal;
+            
+    }
+
+    // Our custom Bootloader called FruityLoader internally
+    if (index == 3) {
+        CapabilityEntry retVal;
+        CheckedMemset(&retVal, 0, sizeof(retVal));
+        retVal.type = CapabilityEntryType::SOFTWARE;
+        strcpy(retVal.manufacturer, "BlueRange GmbH");
+        strcpy(retVal.modelName, "Bootloader");
+        snprintf(
+            retVal.revision,
+            sizeof(retVal.revision),
+            "%u",
+            FruityHal::GetBootloaderVersion()
+        );
         return retVal;
     }
 

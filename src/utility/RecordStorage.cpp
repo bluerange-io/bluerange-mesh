@@ -101,7 +101,7 @@ RecordStorage & RecordStorage::GetInstance()
 # A call will be queued first, and will then be executed
 ######################### */
 
-RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, ModuleIdWrapper lockDownModule)
+RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, const u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, ModuleIdWrapper lockDownModule)
 {
     if (!GS->config.enableRecordStorage) return RecordStorageResultCode::PERSISTENCE_DISABLED;
 
@@ -113,7 +113,7 @@ RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 da
     return RecordStorage::SaveRecord(recordId, data, dataLength, callback, userType, nullptr, 0, lockDownModule);
 }
 
-RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength, ModuleIdWrapper lockDownModule, bool alwaysPersist)
+RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, const u8* data, u16 dataLength, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength, ModuleIdWrapper lockDownModule, bool alwaysPersist)
 {
     //If persistence is disabled we do not store the entry
     //This can however be overwritten if alwaysPersist is true
@@ -149,6 +149,11 @@ RecordStorageResultCode RecordStorage::SaveRecord(u16 recordId, u8* data, u16 da
 
 RecordStorageResultCode RecordStorage::DeactivateRecord(u16 recordId, RecordStorageEventListener* callback, u32 userType, ModuleIdWrapper lockDownModule, bool alwaysPersist)
 {
+    return DeactivateRecord(recordId, callback, userType, nullptr, 0, lockDownModule, alwaysPersist);
+}
+
+RecordStorageResultCode RecordStorage::DeactivateRecord(u16 recordId, RecordStorageEventListener* callback, u32 userType, u8* userData, u16 userDataLength, ModuleIdWrapper lockDownModule, bool alwaysPersist)
+{
     if (!GS->config.enableRecordStorage && !alwaysPersist) return RecordStorageResultCode::PERSISTENCE_DISABLED;
 
     if (recordStorageLockDown && lockDownModule != lockDownModuleId)
@@ -157,15 +162,17 @@ RecordStorageResultCode RecordStorage::DeactivateRecord(u16 recordId, RecordStor
         return RecordStorageResultCode::RECORD_STORAGE_LOCK_DOWN;
     }
     //Cache the operation to be processed later
-    u8* buffer = opQueue.Reserve(SIZEOF_RECORD_STORAGE_DEACTIVATE_RECORD_OP);
+    u8* buffer = opQueue.Reserve(SIZEOF_RECORD_STORAGE_DEACTIVATE_RECORD_OP + userDataLength);
 
     if (buffer != nullptr) {
         DeactivateRecordOperation* op = (DeactivateRecordOperation*)buffer;
         op->op.type = (u8)RecordStorageOperationType::DEACTIVATE_RECORD;
         op->op.callback = callback;
         op->op.userType = userType;
+        op->op.userDataLength = userDataLength;
         op->recordId = recordId;
         op->stage = RecordStorageDeactivateStage::FIRST_STAGE;
+        if (userData != nullptr) CheckedMemcpy(buffer + (SIZEOF_RECORD_STORAGE_DEACTIVATE_RECORD_OP), userData, userDataLength);
 
         ProcessQueue(false);
         return RecordStorageResultCode::SUCCESS;
@@ -737,6 +744,7 @@ void RecordStorage::RepairPages()
         {
             if (lockDownCallback != nullptr)
             {
+                logt("RS", "Factory reset done");
                 lockDownCallback->RecordStorageEventHandler(0, RecordStorageResultCode::SUCCESS, lockDownUserType, nullptr, 0);
             }
 
@@ -903,7 +911,7 @@ void RecordStorage::ExecuteCallback(RecordStorageOperation & op, RecordStorageRe
                 // Make sure the user data is 4 byte aligned. That way the user can give
                 // us any struct of alignment <= 4 without problems.
                 DYNAMIC_ARRAY(buffer, op.userDataLength);
-                CheckedMemcpy(buffer, ((u8*)&op) + SIZEOF_RECORD_STORAGE_SAVE_RECORD_OP + sop->dataLength, op.userDataLength)
+                CheckedMemcpy(buffer, ((u8*)&op) + SIZEOF_RECORD_STORAGE_SAVE_RECORD_OP + sop->dataLength, op.userDataLength);
                 op.callback->RecordStorageEventHandler(sop->recordId, code, op.userType, buffer, op.userDataLength);
             }
             else
@@ -914,7 +922,18 @@ void RecordStorage::ExecuteCallback(RecordStorageOperation & op, RecordStorageRe
         else if (op.type == (u8)RecordStorageOperationType::DEACTIVATE_RECORD)
         {
             DeactivateRecordOperation* dop = (DeactivateRecordOperation*)&op;
-            op.callback->RecordStorageEventHandler(dop->recordId, code, op.userType, ((u8*)&op) + SIZEOF_RECORD_STORAGE_DEACTIVATE_RECORD_OP, op.userDataLength);
+            if (op.userDataLength > 0)
+            {
+                // Make sure the user data is 4 byte aligned. That way the user can give
+                // us any struct of alignment <= 4 without problems.
+                DYNAMIC_ARRAY(buffer, op.userDataLength);
+                CheckedMemcpy(buffer, ((u8*)&op) + SIZEOF_RECORD_STORAGE_DEACTIVATE_RECORD_OP, op.userDataLength);
+                op.callback->RecordStorageEventHandler(dop->recordId, code, op.userType, buffer, op.userDataLength);
+            }
+            else
+            {
+                op.callback->RecordStorageEventHandler(dop->recordId, code, op.userType, nullptr, 0);
+            }
         }
     }
 }

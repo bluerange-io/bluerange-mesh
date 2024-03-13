@@ -232,6 +232,9 @@ void MeshAccessModule::RegisterGattService()
 
 void MeshAccessModule::UpdateMeshAccessBroadcastPacket(u16 advIntervalMs)
 {
+    // EmergencyAccess so that a node can still be contacted from time to time using the Node Key for tasks such as enrollmen / unenrollment
+    bool emergencyAccess = false;
+
     if(    !enableAdvertising
         || !allowInboundConnections
         || !configuration.moduleActive)
@@ -252,7 +255,8 @@ void MeshAccessModule::UpdateMeshAccessBroadcastPacket(u16 advIntervalMs)
             if (conns.handles[i].IsHandshakeDone()) {
                 logt("MAMOD", "In Mesh, disabling MA broadcast");
                 DisableBroadcast();
-                return;
+                emergencyAccess = true;
+                advIntervalMs = GS->config.emergencyMeshAdvertisingInterval;
             }
         }
     }
@@ -267,7 +271,7 @@ void MeshAccessModule::UpdateMeshAccessBroadcastPacket(u16 advIntervalMs)
         AdvJobTypes::SCHEDULED, //JobType
         5, //Slots
         0, //Delay
-        (u16)MSEC_TO_UNITS((GS->node.isInBulkMode ? 1000 : 100), CONFIG_UNIT_0_625_MS), //AdvInterval
+        (u16)MSEC_TO_UNITS((GS->node.isInBulkMode ? meshAccessBroadcastIvInBulkModeMs : defaultMeshAccessBroadcastIvMs), CONFIG_UNIT_0_625_MS), //AdvInterval
         0, //AdvChannel
         0, //CurrentSlots
         0, //CurrentDelay
@@ -291,7 +295,7 @@ void MeshAccessModule::UpdateMeshAccessBroadcastPacket(u16 advIntervalMs)
 
     if (advIntervalMs != 0)
     {
-        currentJob->advertisingInterval = MSEC_TO_UNITS((GS->node.isInBulkMode ? 1000 : advIntervalMs), CONFIG_UNIT_0_625_MS);
+        currentJob->advertisingInterval = MSEC_TO_UNITS((GS->node.isInBulkMode ? meshAccessBroadcastIvInBulkModeMs : advIntervalMs), CONFIG_UNIT_0_625_MS);
     }
 
     AdvStructureFlags* flags = (AdvStructureFlags*)buffer;
@@ -309,7 +313,7 @@ void MeshAccessModule::UpdateMeshAccessBroadcastPacket(u16 advIntervalMs)
     serviceData->data.uuid.len = SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA - 1;
     serviceData->data.uuid.type = (u8)BleGapAdType::TYPE_SERVICE_DATA;
     serviceData->data.uuid.uuid = MESH_SERVICE_DATA_SERVICE_UUID16;
-    serviceData->data.messageType = ServiceDataMessageType::MESH_ACCESS;
+    serviceData->data.messageType = (!emergencyAccess ? ServiceDataMessageType::MESH_ACCESS  : ServiceDataMessageType::EMERGENCY_MESH_ACCESS);
     serviceData->networkId = GS->node.configuration.networkId;
     serviceData->isEnrolled = GS->node.configuration.enrollmentState == EnrollmentState::ENROLLED;
     serviceData->isSink = GET_DEVICE_TYPE() == DeviceType::SINK ? 1 : 0;
@@ -496,10 +500,35 @@ void MeshAccessModule::ReceivedMeshAccessConnectMessage(ConnPacketModule const *
 
     u32 uniqueConnId = MeshAccessConnection::ConnectAsMaster(&message->targetAddress, 10, 5, message->fmKeyId, message->key.data(), tunnelType);
 
-    MeshAccessConnection* conn = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(uniqueConnId).GetConnection();
-    if(conn != nullptr){
-        //Register for changes in the connection state
-        conn->connectionStateSubscriberId = packet->header.sender;
+    //Check if we have an existing connection with the same parameters so that we can notify
+    //the sender that the connection is already open
+    if (uniqueConnId == 0) {
+        //Get already open connection
+        MeshAccessConnections conns = GS->cm.GetMeshAccessConnections(ConnectionDirection::DIRECTION_OUT);
+        for(u32 i=0; i<conns.count; i++)
+        {
+            MeshAccessConnectionHandle connHandle = conns.handles[i];
+            if (connHandle) {
+                FruityHal::BleGapAddr partnerAddress = connHandle.GetPartnerAddress();
+                u32 result = memcmp(&partnerAddress, &message->targetAddress, FH_BLE_SIZEOF_GAP_ADDR);
+                if (result == 0) {
+                    MeshAccessConnection* conn = (MeshAccessConnection*)connHandle.GetConnection();
+                    //Check all parameters of this connection
+                    ConnPacketHeader const header = (ConnPacketHeader const) packet->header;
+                    if(message->fmKeyId == conn->fmKeyId && memcmp(&message->key, &conn->key,16) == 0 && tunnelType == conn->tunnelType && conn->connectionStateSubscriberId == header.sender) {
+                        conn->NotifyConnectionStateSubscriber(conn->connectionState);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    else {
+        MeshAccessConnection* conn = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(uniqueConnId).GetConnection();
+        if (conn != nullptr) {
+            //Register for changes in the connection state
+            conn->connectionStateSubscriberId = packet->header.sender;
+        }
     }
 }
 
@@ -623,12 +652,35 @@ void MeshAccessModule::OnFoundSerialIndexWithAddr(const FruityHal::BleGapAddr& a
 
             meshAccessSerialConnectConnectionId = MeshAccessConnection::ConnectAsMaster(&addr, 10, timeout, latestMeshAccessSerialConnectMessage.fmKeyId, latestMeshAccessSerialConnectMessage.key, MeshAccessTunnelType::LOCAL_MESH, latestMeshAccessSerialConnectMessage.nodeIdAfterConnect, Conf::serialConnectSlaveLatency, maxScanDutyCycle);
 
-            MeshAccessConnection* maconn = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(meshAccessSerialConnectConnectionId).GetConnection();
-            if (maconn != nullptr)
-            {
-                maconn->connectionStateSubscriberId = meshAccessSerialConnectSender;
+            if (meshAccessSerialConnectConnectionId == 0) {
+                //Get already open connections
+                MeshAccessConnections conns = GS->cm.GetMeshAccessConnections(ConnectionDirection::DIRECTION_OUT);
+                for (u32 i = 0; i < conns.count; i++)
+                {
+                    MeshAccessConnectionHandle connHandle = conns.handles[i];
+                    if (connHandle) {
+                        FruityHal::BleGapAddr partnerAddress = connHandle.GetPartnerAddress();
+                        u32 result = memcmp(&partnerAddress, &addr, FH_BLE_SIZEOF_GAP_ADDR);
+                        if (result == 0) {
+                            MeshAccessConnection* conn = (MeshAccessConnection*)connHandle.GetConnection();
+                            //Check all parameters of this connection (The tunnel type is always LOCAL_MESH for serial_connect connections)
+                            if (conn != nullptr && latestMeshAccessSerialConnectMessage.fmKeyId == conn->fmKeyId && memcmp(latestMeshAccessSerialConnectMessage.key, &conn->key, 16) == 0 && MeshAccessTunnelType::LOCAL_MESH == conn->tunnelType) {
+                                SendMeshAccessSerialConnectResponse(MeshAccessSerialConnectError::SUCCESS, conn->virtualPartnerId);
+                                ResetSerialConnectAttempt(false);
+                                break;
+                            }
+                        }
+                    }
+                }
             }
-            //Register for changes in the connection state
+            else {
+                //Register for changes in the connection state
+                MeshAccessConnection* maconn = (MeshAccessConnection*)GS->cm.GetConnectionByUniqueId(meshAccessSerialConnectConnectionId).GetConnection();
+                if (maconn != nullptr)
+                {
+                    maconn->connectionStateSubscriberId = meshAccessSerialConnectSender;
+                }
+            }
         }
 }
 

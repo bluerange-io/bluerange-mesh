@@ -27,6 +27,7 @@
 // **
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
+#ifndef __EMSCRIPTEN__
 #include "SocketTerm.h"
 #include "Exceptions.h"
 #include "CherrySim.h"
@@ -405,3 +406,4 @@ bool SocketTerm::IsTermActive(const NodeEntry *nodeEntry)
     SocketClient *client = FindUniqueClientByNodeEntry(nodeEntry);
     return client != nullptr;
 }
+#endif

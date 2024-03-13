@@ -81,7 +81,7 @@ class IoModule: public Module
             u8 sense : 2; // if configured as input sense either high or low level
             u8 set : 1; // set pin or unset it
         };
-        STATIC_ASSERT_SIZE(gpioPinConfig, 2);
+        STATIC_ASSERT_SIZE(gpioPinConfig, SIZEOF_GPIO_PIN_CONFIG);
 
 
     public:
@@ -95,7 +95,15 @@ class IoModule: public Module
                 LedMode ledMode;
 
             }IoModuleSetLedMessage;
-            STATIC_ASSERT_SIZE(IoModuleSetLedMessage, 1);
+            STATIC_ASSERT_SIZE(IoModuleSetLedMessage, SIZEOF_IO_MODULE_SET_LED_MESSAGE);
+
+            static constexpr int SIZEOF_IO_MODULE_GET_PIN_MESSAGE = 2;
+            typedef struct
+            {
+                u8 pinNumber;
+                u8 pinLevel;
+            }IoModuleGetPinMessage;
+            STATIC_ASSERT_SIZE(IoModuleGetPinMessage, SIZEOF_IO_MODULE_GET_PIN_MESSAGE);
             
             static constexpr int SIZEOF_IO_MODULE_SET_IDENTIFICATION_MESSAGE = 1;
             typedef struct
@@ -103,7 +111,7 @@ class IoModule: public Module
                 IdentificationMode identificationMode;
 
             }IoModuleSetIdentificationMessage;
-            STATIC_ASSERT_SIZE(IoModuleSetIdentificationMessage, 1);
+            STATIC_ASSERT_SIZE(IoModuleSetIdentificationMessage, SIZEOF_IO_MODULE_SET_IDENTIFICATION_MESSAGE);
 
         #pragma pack(pop)
         //####### Module messages end
@@ -116,6 +124,12 @@ class IoModule: public Module
 
         VibrationPins vibrationPins = {};
         BuzzerPins buzzerPins = {};
+
+        // Limit the number of readable pins with action pinread
+        static constexpr u8 MAX_NUM_GPIO_READ_PINS = 5;
+        // This symbol is used to indicate that there are no more pins to be read.
+        // It is placed after the last pin in the array.
+        static constexpr u8 END_OF_PIN_ARRAY_SYMBOL = 0xff;
 
     public:
 
@@ -145,3 +159,4 @@ class IoModule: public Module
 
         void StopIdentification();
 };
+

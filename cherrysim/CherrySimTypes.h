@@ -206,10 +206,13 @@ struct SoftdeviceState {
 
     //UART
     NRF_UART_Type uartType;
-    std::array<char, 1024> uartBuffer;
+    // only used in simulator, increase if the buffer reaches its limit
+    std::array<char, 4096> uartBuffer;
     u32 uartReadIndex = 0;
     u32 uartBufferLength = 0;
 
+    u32 currentUartBaudrateNumber = 0;
+    bool uartEnabled = false;
     uint32_t currentlyEnabledUartInterrupts = 0;
 
     //Memory configuration
@@ -407,7 +410,7 @@ struct SimConfiguration {
     bool        simulateWatchdog                   = false;
     bool        simulateJittering                  = false;
     bool        verbose                            = false;
-    uint32_t    fastLaneToSimTimeMs                = 0; //Set to a value bigger than 0 to speed up the simulation until this simulation time was reached (disables native rendering & terminal in the meantime)
+    uint32_t    fastLaneToSimTimeMs                = 0; //Set to a value bigger than 0 to speed up the simulation until this simulation time was reached (disables terminal in the meantime)
 
     bool        enableClusteringValidityCheck      = false; //Enable automatic checking of the clustering after each step
     bool        enableSimStatistics                = false;

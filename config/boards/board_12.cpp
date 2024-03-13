@@ -47,7 +47,7 @@ void SetBoard_12(BoardConfiguration* c)
         c->uartTXPin =  -1;
         c->uartCTSPin =  -1;
         c->uartRTSPin =  -1;
-        c->uartBaudRate = (u32)FruityHal::UartBaudrate::BAUDRATE_1M;
+        c->uartBaudRate = (u32)FruityHal::UartBaudRate::BAUDRATE_1M;
         c->dBmRX = -96;
         c->calibratedTX =  -60;
         //According to https://github.com/ruuvi/ruuvitag_fw/blob/master/bsp/ruuvitag_b.h

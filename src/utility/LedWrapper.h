@@ -52,5 +52,12 @@ public:
     void On(void);
     void Off(void);
     void Toggle(void);
+
+
+    // Non-blocking! Must be called repeatedly.
+    // Will pulse the LED on/off each time it is called
+    // until the given amount of pulses in the given cycle time
+    // is reached.
+    void Pulse(u32 amountOfPulses, u32 repeatTimeDs);
 };
 

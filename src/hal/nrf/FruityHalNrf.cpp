@@ -295,18 +295,18 @@ static inline nrf_gpio_pin_sense_t GenericSenseModeToNrf(FruityHal::GpioSenseMod
     else return NRF_GPIO_PIN_NOSENSE;
 }
 
-static inline nrf_gpiote_polarity_t GenericPolarityToNrf(FruityHal::GpioTransistion transition)
+static inline nrf_gpiote_polarity_t GenericPolarityToNrf(FruityHal::GpioTransition transition)
 {
-    if (transition == FruityHal::GpioTransistion::GPIO_TRANSITION_TOGGLE) return NRF_GPIOTE_POLARITY_TOGGLE;
-    else if (transition == FruityHal::GpioTransistion::GPIO_TRANSITION_LOW_TO_HIGH) return NRF_GPIOTE_POLARITY_LOTOHI;
+    if (transition == FruityHal::GpioTransition::GPIO_TRANSITION_TOGGLE) return NRF_GPIOTE_POLARITY_TOGGLE;
+    else if (transition == FruityHal::GpioTransition::GPIO_TRANSITION_LOW_TO_HIGH) return NRF_GPIOTE_POLARITY_LOTOHI;
     else return NRF_GPIOTE_POLARITY_HITOLO;
 }
 
-static inline FruityHal::GpioTransistion NrfPolarityToGeneric(nrf_gpiote_polarity_t polarity)
+static inline FruityHal::GpioTransition NrfPolarityToGeneric(nrf_gpiote_polarity_t polarity)
 {
-    if (polarity == NRF_GPIOTE_POLARITY_TOGGLE) return FruityHal::GpioTransistion::GPIO_TRANSITION_TOGGLE;
-    else if (polarity == NRF_GPIOTE_POLARITY_LOTOHI) return FruityHal::GpioTransistion::GPIO_TRANSITION_LOW_TO_HIGH;
-    else return FruityHal::GpioTransistion::GPIO_TRANSITION_HIGH_TO_LOW;
+    if (polarity == NRF_GPIOTE_POLARITY_TOGGLE) return FruityHal::GpioTransition::GPIO_TRANSITION_TOGGLE;
+    else if (polarity == NRF_GPIOTE_POLARITY_LOTOHI) return FruityHal::GpioTransition::GPIO_TRANSITION_LOW_TO_HIGH;
+    else return FruityHal::GpioTransition::GPIO_TRANSITION_HIGH_TO_LOW;
 }
 
 #ifdef NRF52_SERIES
@@ -333,7 +333,20 @@ ErrorType FruityHal::BleStackInit()
     }
 #endif
 
-    logt("NODE", "Init Softdevice version 0x%x, Boardid %d", 3, Boardconfig->boardType);
+    {
+        const u32 softDeviceVersion = FruityHal::GetSoftDeviceVersion();
+        const u32 softDevicePatch = softDeviceVersion % 1000;
+        const u32 softDeviceMinor = ((softDeviceVersion % 1000000) - softDevicePatch) / 1000;
+        const u32 softDeviceMajor = softDeviceVersion / 1000000;
+
+        logt("NODE", "Init Softdevice version %u.%u.%u, Boardid %d", 
+            softDeviceMajor,
+            softDeviceMinor,
+            softDevicePatch,
+            Boardconfig->boardType
+        );
+    }
+
     //######### Enables the Softdevice
     u32 finalErr = 0;
 
@@ -2607,7 +2620,7 @@ static void GpioteHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action
     }
 }
 
-ErrorType FruityHal::GpioConfigureInterrupt(u32 pin, FruityHal::GpioPullMode mode, FruityHal::GpioTransistion trigger, FruityHal::GpioInterruptHandler handler)
+ErrorType FruityHal::GpioConfigureInterrupt(u32 pin, FruityHal::GpioPullMode mode, FruityHal::GpioTransition trigger, FruityHal::GpioInterruptHandler handler)
 {
     NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
     if ((handler == nullptr) || (halMemory->gpioteHandlersCreated == MAX_GPIOTE_HANDLERS)) return ErrorType::INVALID_PARAM;
@@ -2907,19 +2920,19 @@ u32 FruityHal::GetSoftDeviceSize(u32 sdBaseAddress)
 
 u32 FruityHal::GetSoftDeviceVersion()
 {
-    //TODO: Should use the stored SoftDevice in the node's flash
 #ifdef SIM_ENABLED
     switch (GetBleStackType())
     {
     case BleStackType::NRF_SD_132_ANY:
-        return SD_FWID_GET(GetMasterBootRecordSize());
     case BleStackType::NRF_SD_140_ANY:
+        // Sim flash region does not start at 0x0, therefore the offset
+        return SD_VERSION_GET(FLASH_REGION_START_ADDRESS + GetMasterBootRecordSize());
     default:
         SIMEXCEPTION(IllegalStateException);
     }
     return 0;
 #else
-    return SD_FWID_GET(MBR_SIZE);
+    return SD_VERSION_GET(GetMasterBootRecordSize());
 #endif
 }
 
@@ -3176,26 +3189,122 @@ void FruityHal::GetDeviceIdLong(u32 * p_data)
 
 #define __________________UART____________________
 
-nrf_uart_baudrate_t UartBaudRateToNordic(FruityHal::UartBaudrate baudRate)
+nrf_uart_baudrate_t UartBaudRateToNordic(FruityHal::UartBaudRate baudRate)
 {
 #ifndef SIM_ENABLED
     switch (baudRate)
     {
-        case FruityHal::UartBaudrate::BAUDRATE_1M:
+        case FruityHal::UartBaudRate::BAUDRATE_1M:
             return (nrf_uart_baudrate_t)NRF_UART_BAUDRATE_1000000;
-        case FruityHal::UartBaudrate::BAUDRATE_115200:
+        case FruityHal::UartBaudRate::BAUDRATE_115200:
             return (nrf_uart_baudrate_t)NRF_UART_BAUDRATE_115200;
-        case FruityHal::UartBaudrate::BAUDRATE_38400:
+        case FruityHal::UartBaudRate::BAUDRATE_57600:
+            return (nrf_uart_baudrate_t)NRF_UART_BAUDRATE_57600;
+        case FruityHal::UartBaudRate::BAUDRATE_38400:
             return (nrf_uart_baudrate_t)NRF_UART_BAUDRATE_38400;
-        case FruityHal::UartBaudrate::BAUDRATE_19200:
+        case FruityHal::UartBaudRate::BAUDRATE_19200:
             return (nrf_uart_baudrate_t)NRF_UART_BAUDRATE_19200;
-        case FruityHal::UartBaudrate::BAUDRATE_57600:
+        case FruityHal::UartBaudRate::BAUDRATE_9600:
+            return (nrf_uart_baudrate_t)NRF_UART_BAUDRATE_9600;
+        case FruityHal::UartBaudRate::BAUDRATE_4800:
+            return (nrf_uart_baudrate_t)NRF_UART_BAUDRATE_4800;
+        case FruityHal::UartBaudRate::BAUDRATE_2400:
+            return (nrf_uart_baudrate_t)NRF_UART_BAUDRATE_2400;
         default:
             return (nrf_uart_baudrate_t)NRF_UART_BAUDRATE_57600;
     }
 #else
     return (nrf_uart_baudrate_t)0;
 #endif
+}
+
+u32 FruityHal::UartBaudRateToNumber(FruityHal::UartBaudRate baudrate)
+{
+    switch (baudrate)
+    {
+        case FruityHal::UartBaudRate::BAUDRATE_1M:
+            return 1000000;
+        case FruityHal::UartBaudRate::BAUDRATE_115200:
+            return 115200;
+        case FruityHal::UartBaudRate::BAUDRATE_57600:
+            return 57600;
+        case FruityHal::UartBaudRate::BAUDRATE_38400:
+            return 38400;
+        case FruityHal::UartBaudRate::BAUDRATE_19200:
+            return 19200;
+        case FruityHal::UartBaudRate::BAUDRATE_9600:
+            return 9600;
+        case FruityHal::UartBaudRate::BAUDRATE_4800:
+            return 4800;
+        case FruityHal::UartBaudRate::BAUDRATE_2400:
+            return 2400;
+        default:
+            return 0;
+    }
+}
+
+FruityHal::UartBaudRate FruityHal::UartBaudRateFromNumber(u32 number) {
+    switch (number) {
+        case 1000000: return FruityHal::UartBaudRate::BAUDRATE_1M;
+        case 115200: return FruityHal::UartBaudRate::BAUDRATE_115200;
+        case 57600: return FruityHal::UartBaudRate::BAUDRATE_57600;
+        case 38400: return FruityHal::UartBaudRate::BAUDRATE_38400;
+        case 19200: return FruityHal::UartBaudRate::BAUDRATE_19200;
+        case 9600: return FruityHal::UartBaudRate::BAUDRATE_9600;
+        case 4800: return FruityHal::UartBaudRate::BAUDRATE_4800;
+        case 2400: return FruityHal::UartBaudRate::BAUDRATE_2400;
+        default: return FruityHal::UartBaudRate::BAUDRATE_INVALID;
+    }
+}
+
+FruityHal::UartParity FruityHal::UartParityFromNumber(u8 number) {
+    switch (number) {
+        case 0: return FruityHal::UartParity::NONE;
+        case 1: 
+            if (GET_CHIPSET() == Chipset::CHIP_NRF52833 && SDK >= 17) {
+                return FruityHal::UartParity::ODD;
+            }
+            return FruityHal::UartParity::INVALID;
+        case 2: return FruityHal::UartParity::EVEN;
+        default: return FruityHal::UartParity::INVALID;
+    }
+}
+
+u8 FruityHal::UartParityToNumber(FruityHal::UartParity parity) {
+    switch (parity) {
+        case FruityHal::UartParity::NONE: return 0;
+        case FruityHal::UartParity::ODD: return 1;
+        case FruityHal::UartParity::EVEN: return 2;
+        default: return 0xff;
+    }
+}
+
+FruityHal::UartFlowControl FruityHal::UartFlowControlFromNumber(u8 number) {
+    switch (number) {
+        case 0: return FruityHal::UartFlowControl::NONE;
+        case 1: return FruityHal::UartFlowControl::RTS_CTS;
+        default: return FruityHal::UartFlowControl::INVALID;
+    }
+}
+
+FruityHal::UartStopBits FruityHal::UartStopBitsFromNumber(u8 number) {
+    switch (number) {
+        case 1: return FruityHal::UartStopBits::ONE;
+        case 2: {
+            if (GET_CHIPSET() == Chipset::CHIP_NRF52) {
+                return FruityHal::UartStopBits::INVALID;
+            }
+            return FruityHal::UartStopBits::TWO;
+        }
+        default: return FruityHal::UartStopBits::INVALID;
+    }
+}
+
+FruityHal::UartDataBits FruityHal::UartDataBitsFromNumber(u8 number) {
+    switch (number) {
+        case 8: return FruityHal::UartDataBits::EIGHT;
+        default: return FruityHal::UartDataBits::INVALID;
+    }
 }
 
 nrf_uart_hwfc_t UartFlowControlToNrf(FruityHal::UartFlowControl flowControl)
@@ -3351,7 +3460,7 @@ void FruityHal::EnableUart(bool promptAndEchoMode)
     config.pselcts                  = Boardconfig->uartCTSPin == -1 ? NRF_UART_PSEL_DISCONNECTED : Boardconfig->uartCTSPin;
     config.hwfc                     = Boardconfig->uartRTSPin == -1 ? NRF_UART_HWFC_DISABLED : NRF_UART_HWFC_ENABLED;
     config.parity                   = FH_EASYDMA_UART_PARITY;
-    config.baudrate                 = UartBaudRateToNordic((FruityHal::UartBaudrate)Boardconfig->uartBaudRate);
+    config.baudrate                 = UartBaudRateToNordic((FruityHal::UartBaudRate)Boardconfig->uartBaudRate);
     config.interrupt_priority       = HIGHER_THAN_APP_PRIO; //We must be fast enough to not cause a bottleneck
 
     u32 err = nrf_serial_init(&serial_uart, &config, &serial_config);
@@ -3374,7 +3483,9 @@ void FruityHal::EnableUart(bool promptAndEchoMode)
     nrf_gpio_cfg_output(Boardconfig->uartTXPin);
     nrf_gpio_cfg_input(Boardconfig->uartRXPin, NRF_GPIO_PIN_NOPULL);
 
-    nrf_uart_baudrate_set(NRF_UART0, UartBaudRateToNordic((FruityHal::UartBaudrate)Boardconfig->uartBaudRate));
+    logt("FH", "Enable UART %u", (u32)Boardconfig->uartBaudRate);
+
+    nrf_uart_baudrate_set(NRF_UART0, UartBaudRateToNordic((FruityHal::UartBaudRate)Boardconfig->uartBaudRate));
     nrf_uart_configure(NRF_UART0, NRF_UART_PARITY_EXCLUDED, Boardconfig->uartRTSPin != -1 ? NRF_UART_HWFC_ENABLED : NRF_UART_HWFC_DISABLED);
     nrf_uart_txrx_pins_set(NRF_UART0, Boardconfig->uartTXPin, Boardconfig->uartRXPin);
 
@@ -3415,6 +3526,10 @@ void FruityHal::EnableUart(bool promptAndEchoMode)
         FruityHal::UartEnableReadInterrupt();
     }
 #endif //FH_NRF_ENABLE_EASYDMA_TERMINAL
+
+#ifdef SIM_ENABLED
+    cherrySimInstance->currentNode->state.currentUartBaudrateNumber = FruityHal::UartBaudRateToNumber((FruityHal::UartBaudRate)Boardconfig->uartBaudRate);
+#endif
 }
 
 void FruityHal::DisableUart()
@@ -3430,6 +3545,9 @@ void FruityHal::DisableUart()
         halMemory->nrfSerialErrorDetected = false;
     }
 #else 
+
+    logt("FH", "Disable UART");
+
     //Disable UART interrupt
     sd_nvic_DisableIRQ(UART0_IRQn);
 
@@ -3461,6 +3579,8 @@ void FruityHal::DisableUart()
         if (NRF_UART0->PSELCTS != NRF_UART_PSEL_DISCONNECTED) nrf_gpio_cfg_default(Boardconfig->uartCTSPin);
     }
 #endif //FH_NRF_ENABLE_EASYDMA_TERMINAL
+#else //SIM_ENABLED
+    cherrySimInstance->currentNode->state.uartEnabled = false;
 #endif //SIM_ENABLED
 }
 

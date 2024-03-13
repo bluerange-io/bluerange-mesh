@@ -102,8 +102,6 @@ public:
     /// Standard deviation of the RSSI noise, over 99% of generated values lie within 3-times this value.
     float rssiNoiseStddev = 5.0f;
 
-    bool renderLess = false;
-
     CherrySimEventListener* simEventListener = nullptr;
 
     int flashToFileWriteCycle = 0;
@@ -134,6 +132,8 @@ public:
     //is disabled
     void LogThrownException(std::type_index index);
 
+    void DoSendTerminalCommand(const NodeEntry& nodeEntry, const std::string& originalCommand, bool verbose, bool appendCrcToMessages) const;
+
 private:
     //set to store exception when exception type is disabled
     std::set<std::type_index>loggedExceptions;
@@ -142,8 +142,12 @@ TESTER_PUBLIC:
     u32 totalNodes = 0;
     u32 assetNodes = 0;
     TerminalPrintListener* terminalPrintListener = nullptr;
+#ifndef __EMSCRIPTEN__
     FruitySimServer* webserver = nullptr;
     SocketTerm* socketTerm = nullptr;
+#endif
+
+    u8 masterPublicKeyReplacement[64] = { 0 };
 
     std::chrono::time_point<std::chrono::steady_clock> lastTick;
 
@@ -215,6 +219,8 @@ public:
     void WriteSerialNumberToUicr(u32 serialNumberIndex, u32 i); // Updates serial number and serial index in flash
     void EraseLicense(u32 i); // Removes license from flash
     void GenerateLicense(u32 i); // Generates license using Serial stored in UICR
+    void SetMasterPublicKey(const u8* key); //Used to set the key for testing against different keys
+    const u8* GetMasterPublicKey(); //Returns the Master Public Key
     void FlashNode(u32 i); // Flashes a node with uicr and settings
     void BootCurrentNode(); // Starts the node. ShutdownCurrentNode() must be called to clean up
     void ResetCurrentNode(RebootReason rebootReason, bool throwException = true, bool powerLoss = false); //Resets a node and boots it again (Only call this after node was booted already)

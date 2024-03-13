@@ -485,13 +485,19 @@ STATIC_ASSERT_SIZE(RawDataLightVendor, SIZEOF_RAW_DATA_LIGHT_VENDOR_PACKET + 1);
 
 // ##### Raw Data Payload #####
 
+#ifndef MAX_RAW_DATA_METADATA_SIZE
+#define MAX_RAW_DATA_METADATA_SIZE 40
+#endif
+constexpr size_t SIZEOF_RAW_DATA_START_PAYLOAD = 8;
 struct RawDataStartPayload
 {
     u32 numChunks : 24;
     u32 protocolId : 8; //RawDataProtocol
     u32 fmKeyId;
+
+    u8 metadata[];
 };
-STATIC_ASSERT_SIZE(RawDataStartPayload, 8);
+STATIC_ASSERT_SIZE(RawDataStartPayload, SIZEOF_RAW_DATA_START_PAYLOAD);
 
 enum class RawDataErrorType : u8
 {

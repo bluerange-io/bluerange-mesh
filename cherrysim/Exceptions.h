@@ -90,6 +90,10 @@ CREATEEXCEPTIONINHERITING(NoSinkConfiguredForMeshGatewayConfigurationException, 
 CREATEEXCEPTIONINHERITING(ImageNotLicenseCompatibleException           , IllegalStateException);
 CREATEEXCEPTIONINHERITING(LicenseMigrationFailedException              , IllegalStateException);
 CREATEEXCEPTIONINHERITING(DfuImageCrcException                         , IllegalStateException);
+CREATEEXCEPTIONINHERITING(TransformationFailedException                , IllegalStateException);
+CREATEEXCEPTIONINHERITING(PreambleNotAtStartException                  , IllegalStateException);
+CREATEEXCEPTIONINHERITING(DoubleDataOffsetException                    , IllegalStateException);
+
 
 CREATEEXCEPTION(BufferException);
 CREATEEXCEPTIONINHERITING(TriedToReadEmptyBufferException         , BufferException);
@@ -125,6 +129,7 @@ CREATEEXCEPTION(MessageTypeInvalidException);
 CREATEEXCEPTION(IllegalAdvertismentStateException);
 CREATEEXCEPTION(MalformedPacketException);
 CREATEEXCEPTION(NotImplementedException);
+CREATEEXCEPTION(NotUsedException); //Not a typical use-case but can happen
 CREATEEXCEPTION(CorruptOrOutdatedSavefile);
 CREATEEXCEPTION(ZeroTimeoutNotSupportedException);
 CREATEEXCEPTION(ErrorLoggedException);

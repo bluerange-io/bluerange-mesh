@@ -2,6 +2,8 @@
 /Release/
 _build/
 build/
+buildEm/
+buildMock/
 /Makefile.local
 /logs/
 /Debug52/
@@ -84,3 +86,6 @@ sourceDistributions/*
 
 /sdk/wiced_btsdk/dev-kit/baselib/20819A1/build
 /sdk/wiced_btsdk/dev-kit/bsp/TARGET_CYW920819EVB-02/build
+
+.cache/clangd/index
+compile_commands.json

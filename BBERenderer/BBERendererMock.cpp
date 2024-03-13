@@ -54,9 +54,9 @@ bbe::Vector2 BBERenderer::screenPosToWorldPos(const bbe::Vector2& pos) const
     return bbe::Vector2{0, 0};
 }
 
-bbe::Vector3 BBERenderer::clusterIdToColor(ClusterId id) const
+bbe::Color BBERenderer::clusterIdToColor(ClusterId id) const
 {
-    return bbe::Vector3{0, 0, 0};
+    return bbe::Color();
 }
 
 i32 BBERenderer::getClosestIndexToMouse() const
@@ -84,4 +84,9 @@ void BBERenderer::draw2D(bbe::PrimitiveBrush2D& brush)
 
 void BBERenderer::onEnd()
 {
+}
+
+float BBERenderer::getFps() const
+{
+    return 0.0f;
 }

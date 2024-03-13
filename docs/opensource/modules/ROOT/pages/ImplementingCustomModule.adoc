@@ -15,7 +15,7 @@ Here is an overview over some of the handlers that a Module can use:
 
 * *ConfigurationLoadedHandler*: Is called when a new Module configuration is loaded.
 * *TimerEventHandler*: Is called at a fixed interval to do periodic tasks.
-* Differene *Ble Event Handlers*: Several handlers that are called when low level ble events occur.
+* Different *Ble Event Handlers*: Several handlers that are called when low level ble events occur.
 * *MeshMessageReceivedEventHandler*: Delivers data that has been sent over the mesh.
 * *TerminalCommandHandler*: Gets called when data is received over UART.
 

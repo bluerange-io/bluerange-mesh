@@ -33,7 +33,7 @@ raw_data_start_received | The sender must send the _raw_data_start_ again after 
 |===
 
 ==== Transmission Start
-`raw_data_start [receiverId] [destinationModuleId] [numChunks] [protocolId] \{requestHandle = 0}`
+`raw_data_start [receiverId] [destinationModuleId] [numChunks] [protocolId] {requestHandle = 0} {metadataHex}`
 
 This command starts a raw data transmission. The payload shall be sent using _raw_data_chunk_ messages.
 
@@ -46,6 +46,7 @@ This command starts a raw data transmission. The payload shall be sent using _ra
 |numChunks | u24 | Number of Chunks for the total message. Must not be 0.
 |protocolId | u8 | One of the protocol IDs mentioned in the table below
 |requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions (Default: 0)
+|metadataHex | HexString or Base64 | Optional binary metadata to send, e.g. 11:22:33:44 or ESIzRA==. The maximum length is 40 bytes of binary data (hex/base64 encoded string will be longer). It can be used to store request specific data like a UUID of a transmission.
 |===
 
 [#RawDataProtocolId]
@@ -64,6 +65,7 @@ This command starts a raw data transmission. The payload shall be sent using _ra
 If received by a device with a terminal, _raw_data_start_ is printed out like this:
 [source,javascript]
 ----
+// without metadata
 {
 	"nodeId":5,
 	"type":"raw_data_start",
@@ -73,10 +75,22 @@ If received by a device with a terminal, _raw_data_start_ is printed out like th
 	"fmKeyId":2,
 	"requestHandle":0
 }
+
+// with metadata
+{
+	"nodeId":5,
+	"type":"raw_data_start",
+	"module":4,
+	"numChunks":3,
+	"protocol":1,
+	"fmKeyId":2,
+	"requestHandle":0,
+	"metadata":"ESIzRA=="
+}
 ----
 
 ==== Accept Transmission
-`raw_data_start_received [receiverId] [destinationModuleId] \{requestHandle = 0}`
+`raw_data_start_received [receiverId] [destinationModuleId] {requestHandle = 0} {metadataHex = ""}`
 
 Once a _raw_data_start_ is received, the receiver shall send the sender a _raw_data_start_received_ message.
 
@@ -87,22 +101,33 @@ Once a _raw_data_start_ is received, the receiver shall send the sender a _raw_d
 |receiverId | u16 | The node ID that this message should be sent to
 |destinationModuleId | u8 | The module ID is used for giving context to this message. If the transmission should only be printed on the receiver and otherwise be ignored by the firmware, it must be set to 0.
 |requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions (Default: 0)
+|metadataHex | HexString or Base64 | Optional binary metadata to send, e.g. 11:22:33:44 or ESIzRA==. The maximum length is 40 bytes of binary data (hex/base64 encoded string will be longer). It can be used to store request specific data like a UUID of a transmission.
 |===
 
 
-If received by a JSON-capable device, the _raw_data_start_ is printed out like this:
+If received by a JSON-capable device, the _raw_data_start_received_ is printed out like this:
 [source,javascript]
 ----
+// without metadata
 {
 	"nodeId":5,
 	"type":"raw_data_start_received",
 	"module":4,
 	"requestHandle":0
 }
+
+// with metadata
+{
+	"nodeId":5,
+	"type":"raw_data_start_received",
+	"module":4,
+	"requestHandle":0,
+	"metadata":"ESIzRA=="
+}
 ----
 
 ==== Subsequent Chunk Messages
-`raw_data_chunk [receiverId] [destinationModuleId] [chunkId] [payloadHex] \{requestHandle = 0}`
+`raw_data_chunk [receiverId] [destinationModuleId] [chunkId] [payloadHex] {requestHandle = 0}`
 
 Once a raw transmission has been started, the appropriate number of chunks should follow in the correct order. Once the last chunk is received by the receiver, it is possible to reassemble and parse the whole message. The _moduleId_ is present in all chunks so that they can be assigned to the correct stream and to avoid clashes between different modules. A module can send intermittent data streams if is uses different request handles.
 
@@ -112,12 +137,12 @@ Once a raw transmission has been started, the appropriate number of chunks shoul
 
 |receiverId | u16 | The NodeID that this message should be sent to
 |destinationModuleId | u8 | The ModuleId is used for giving context to this message. If the transmission should only be printed on the receiver and otherwise be ignored by the firmware, it must be set to 0.
-|chunkId | u24 | ID of this data chunk starting from 0.
+|chunkId | u24 | ID of this data chunk starting from 1.
 |payloadHex | HexString or Base64String | The binary data to send. E.g. AA:BB:CC. The maximum length is 60 bytes for HexStrings, 120 bytes for Base64Strings.
 |requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions (Default: 0)
 |===
 
-If received by a JSON-capable device, the _raw_data_start_ is printed out like this:
+If received by a JSON-capable device, the _raw_data_chunk_ is printed out like this:
 [source,javascript]
 ----
 {
@@ -131,7 +156,7 @@ If received by a JSON-capable device, the _raw_data_start_ is printed out like t
 ----
 
 ==== Send Report
-`raw_data_report [receiverId] [destinationModuleId] [MissingChunkIds] \{requestHandle = 0}`
+`raw_data_report [receiverId] [destinationModuleId] [MissingChunkIds] {requestHandle = 0}`
 
 Once the last chunk is received, the receiver sends this message to the sender, indicating either a successful transmission (empty missing chunk IDs) or informs the sender about missing chunk IDs.
 
@@ -145,7 +170,7 @@ Once the last chunk is received, the receiver sends this message to the sender, 
 |requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions (Default: 0)
 |===
 
-If received by a JSON-capable device, the _raw_data_start_ is printed out like this:
+If received by a JSON-capable device, the _raw_data_report_ is printed out like this:
 [source,javascript]
 ----
 {
@@ -169,7 +194,7 @@ Or in cases where the transmission was successful:
 ----
 
 ==== Send Report Desired
-`raw_data_report_desired [receiverId] [destinationModuleId] \{requestHandle = 0}`
+`raw_data_report_desired [receiverId] [destinationModuleId] {requestHandle = 0}`
 
 The "Report Desired" message is an optional message that can speed up transmissions in cases where the current last chunk was dropped. It is send from the sender to the receiver, indicating that the sender wishes to get a raw_data_report from the receiver. The receiver however may completely ignore this message, completely relying on the timeouts. The sender may also never send it, also completely relying on the timeouts.
 
@@ -195,7 +220,7 @@ If received by a JSON-capable device, the _raw_data_report_desired_ is printed o
 
 
 ==== Send Error
-`raw_data_error [receiverId] [destinationModuleId] [errorCode] [destination] \{requestHandle = 0}`
+`raw_data_error [receiverId] [destinationModuleId] [errorCode] [destination] {requestHandle = 0}`
 
 This command indicates that some error occurred and the transmission must be closed. The packet will be sent to the receiver as well as the sender.
 
@@ -242,7 +267,7 @@ If received by a JSON-capable device, the _raw_data_error_ is printed out like t
 Sending messages that fit into a single mesh packet can be done by using raw_data_light with minimal overhead and almost no implementation effort.
 
 === Terminal Command
-`raw_data_light [receiverId] [destinationModuleId] [protocolId] [payload] \{requestHandle = 0}`
+`raw_data_light [receiverId] [destinationModuleId] [protocolId] [payload] {requestHandle = 0}`
 
 Sends a single chunk of arbitrary data to the receiver. There is no guarantee that the message is transmitted if the mesh is in the process of restructuring or busy. The sender should provide some resending logic if desired.
 
@@ -258,7 +283,7 @@ Sends a single chunk of arbitrary data to the receiver. There is no guarantee th
 |===
 
 === Terminal Response
-If received by a JSON-capable device, then _raw_data_start_ is printed out like this:
+If received by a JSON-capable device, then _raw_data_light_ is printed out like this:
 [source,javascript]
 ----
 {
@@ -281,10 +306,11 @@ The mesh message is documented xref:#RawDataLightMessage[here].
 |===
 |Bytes |Type| Name| Description
 
-|8 |xref:Specification.adoc#connPacketModule[connPacketModule]| Conn Packet Module | Message Type = 54, Action Type = 0.
-|3 |u24                                     | Number of Chunks   | The total amount of raw_data_chunk messages for this transmission.
-|1 |u8                                      | Protocol ID        | See above for a list of valid protocol IDs.
-|4 |u32                                     | fmKeyId            | <<Specification.adoc#,See EncryptionKeys Heading.>>
+|8    |xref:Specification.adoc#connPacketModule[connPacketModule]| Conn Packet Module | Message Type = 54, Action Type = 0.
+|3    |u24                                     | Number of Chunks   | The total amount of raw_data_chunk messages for this transmission.
+|1    |u8                                      | Protocol ID        | See above for a list of valid protocol IDs.
+|4    |u32                                     | fmKeyId            | <<Specification.adoc#,See EncryptionKeys Heading.>>
+|0-40 |u8                                      | metadataHex        | Optional metadata
 |===
 
 === Raw Data Start Received Message
@@ -294,6 +320,7 @@ The mesh message is documented xref:#RawDataLightMessage[here].
 |Bytes |Type| Name| Description
 
 |8 |xref:Specification.adoc#connPacketModule[connPacketModule]| Conn Packet Module | Message Type = 54, Action Type = 1.
+|0-40 |u8                                      | metadataHex        | Same metadata as included in the raw data start message
 |===
 
 === Raw Data Error Message

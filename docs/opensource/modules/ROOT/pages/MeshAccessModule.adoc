@@ -94,6 +94,9 @@ service version, the messageType can be changed.
 |**7**||**Reserved**|
 |===
 
+==== Mesh access emergency connect mode
+It is possible to disable the normal advertising of a node if it has an active mesh connection. This can be necessary for increasing energy efficiency or free radio time. In this case the node advertises with an interval of 2 seconds and the meshAccessBroadcastMessage type is EMERGENCY_MESH_ACCESS. Through this it is possible to connect to the node and enroll it without access to the connected network.
+
 === GATT Service
 The Mesh Access Service is offered under a different UUID (a 128-bit UUID) in order to seperate different services from each other.
 
