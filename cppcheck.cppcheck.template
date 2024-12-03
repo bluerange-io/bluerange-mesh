@@ -8,10 +8,10 @@
     <check-unused-templates>false</check-unused-templates>
     <max-ctu-depth>10</max-ctu-depth>
     <suppressions>
-        <suppression fileName="PATH_TO_FRUITYMESH_REPOSITORY/cherrysim/json.hpp">*</suppression>
-        <suppression fileName="PATH_TO_FRUITYMESH_REPOSITORY/cherrysim/ccm_soft.c">*</suppression>
-        <suppression fileName="PATH_TO_FRUITYMESH_REPOSITORY/src/vendor/ins/*">*</suppression>
-        <suppression fileName="PATH_TO_FRUITYMESH_REPOSITORY/sdk/*">*</suppression>
+        <suppression fileName="PATH_TO_BLUERANGE_MESH_REPOSITORY/cherrysim/json.hpp">*</suppression>
+        <suppression fileName="PATH_TO_BLUERANGE_MESH_REPOSITORY/cherrysim/ccm_soft.c">*</suppression>
+        <suppression fileName="PATH_TO_BLUERANGE_MESH_REPOSITORY/src/vendor/ins/*">*</suppression>
+        <suppression fileName="PATH_TO_BLUERANGE_MESH_REPOSITORY/sdk/*">*</suppression>
         <suppression fileName="PATH_TO_CMAKE_DIRECTORY/_deps/*">*</suppression>
         <suppression fileName="PATH_TO_CMAKE_DIRECTORY/cherrysim/googletest-src/*">*</suppression>
         <suppression>missingInclude</suppression>

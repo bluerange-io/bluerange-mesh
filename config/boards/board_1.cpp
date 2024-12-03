@@ -60,6 +60,6 @@ void SetBoard_1(BoardConfiguration* c)
         c->powerOptimizationEnabled = false;
         c->powerButton =  -1;
         c->powerButtonActiveHigh = false;
-        GS->boardconf.getCustomPinset = nullptr;
+        c->getCustomPinset = nullptr;
     }
 }

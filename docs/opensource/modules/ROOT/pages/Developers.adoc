@@ -31,14 +31,14 @@ Have a look at xref:Class-Structure.adoc[Class Structure] for some more detailed
 
 There are some utilities in the `/util` folder, for example a python script that opens a putty terminal for all connected serial devices and a Wireshark dissector that can be used together with the nRF Sniffer to inspect the advertising packets.
 
-== Configuring FruityMesh
+== Configuring BlueRange Mesh
 Most settings are found in the `fruitymesh/src/` folder in `Config.h` but should be configured in the Featuresets. Module specific settings are kept within the module's header and cpp file.
 
 [#Featuresets]
 == Feature Sets
-FruityMesh uses so called featuresets for creating different distributions for different use-cases. A featureset defines the compile time and run time configuration for a node. The cmake build process can be configured differently for a featureset, a number of different defines or macros can be used during compile time and different code is used during runtime. This allows us to tailor the firmware functionality and size to each use-case and also allows FruityMesh to compile for different chipsets from the same source. You can specify the featureset by calling cmake with `cmake --build . --target featureset_name`. A featureset consists of a file triplet, including a `.h`, `.cpp`, and `.cmake` file. It is typically located inside `fruitymesh/config/featuresets`. To create your own featureset, copy an existing featureset and modify these three files accordingly (see below for an explanation of each file).
+BlueRange Mesh uses so called featuresets for creating different distributions for different use-cases. A featureset defines the compile time and run time configuration for a node. The cmake build process can be configured differently for a featureset, a number of different defines or macros can be used during compile time and different code is used during runtime. This allows us to tailor the firmware functionality and size to each use-case and also allows BlueRange Mesh to compile for different chipsets from the same source. You can specify the featureset by calling cmake with `cmake --build . --target featureset_name`. A featureset consists of a file triplet, including a `.h`, `.cpp`, and `.cmake` file. It is typically located inside `fruitymesh/config/featuresets`. To create your own featureset, copy an existing featureset and modify these three files accordingly (see below for an explanation of each file).
 
-A featureset can contain a number of xref:BoardConfig.adoc[Board Configurations] which allows you to flash and run the binary of the featureset on a number of different boards. The correct board configuration such as the pin configuration is then loaded by FruityMesh at runtime depending on the boardId stored in the xref:Specification.adoc#UICR[UICR]. If no boardId is stored in the UICR, the default boards will be loaded from `Boardconfig.cpp`.
+A featureset can contain a number of xref:BoardConfig.adoc[Board Configurations] which allows you to flash and run the binary of the featureset on a number of different boards. The correct board configuration such as the pin configuration is then loaded by BlueRange Mesh at runtime depending on the boardId stored in the xref:Specification.adoc#UICR[UICR]. If no boardId is stored in the UICR, the default boards will be loaded from `Boardconfig.cpp`.
 
 === Feature Set Header File (.h)
 The header file of a featureset is meant to change `#define` values located in `fruitymesh/src/Config.h`. In addition to this, any other value can be defined here which is then usable for any compilation unit that includes the `Config.h` file.
@@ -126,7 +126,7 @@ nrfjprog --chiperase --program github_dev_nrf52_merged_node_FMBBB.hex --reset
 ----
 
 == Memory Requirements
-FruityMesh doesn't run on devices with only 16kb of RAM. It may be possible to optimize the build and resize some buffers, but this is currently not supported. The binary of FruityMesh is around 50kb depending on the configuration and will easily fit on devices with 256kb flash together with the softdevice and still be updatable using dual bank updates.
+BlueRange Mesh doesn't run on devices with only 16kb of RAM. It may be possible to optimize the build and resize some buffers, but this is currently not supported. The binary of BlueRange Mesh is around 50kb depending on the configuration and will easily fit on devices with 256kb flash together with the softdevice and still be updatable using dual bank updates.
 
 == Want To Contribute?
 All kinds of contributions are welcome. Before you start coding, please contact us to align the development process.
@@ -135,7 +135,7 @@ All kinds of contributions are welcome. Before you start coding, please contact 
 If you have a general question, the best way is to open a new issue and label it with "question". This way, a knowledge base of questions and answers is maintained for easy access in the future. If it is a commit-specific comment or question, you can just comment under the commit.
 
 == About Forking
-We'd love to develop the FruityMesh protocol as an interoperable protocol that works across devices from different developers. If you want to make any changes to the protocol itself, please contact us first so that we can work out a mutual agreement. Every implementation that is compatible with the current official release of FruityMesh is welcome to use the M-Way Solutions Company identifier (0x024D) in the manufacturer specific data along with the current mesh identifier. Be sure to read the xref:Specification.adoc[Specification] for some basics. This is only very basic documentation, we try to continually improve the specification and add more details. In the meantime, do not hesitate to contact us or have a look in the implementation.
+We'd love to develop the BlueRange Mesh protocol as an interoperable protocol that works across devices from different developers. If you want to make any changes to the protocol itself, please contact us first so that we can work out a mutual agreement. Every implementation that is compatible with the current official release of BlueRange Mesh is welcome to use the M-Way Solutions Company identifier (0x024D) in the manufacturer specific data along with the current mesh identifier. Be sure to read the xref:Specification.adoc[Specification] for some basics. This is only very basic documentation, we try to continually improve the specification and add more details. In the meantime, do not hesitate to contact us or have a look in the implementation.
 
 == About Documentation
 When adding documentation for a module, make sure to check the xref:ModuleDocumentationTemplate.adoc[Module Documentation Template].
@@ -226,7 +226,7 @@ NOTE: There is a very slight possibility that the stack overflow detection repor
 NOTE: When analyzing manually, have a look for the value `0xED505505` (Mnemonic: Ed screams SOS SOS).
 
 == Determining how much stack was used during runtime
-FruityMesh keeps track of how much stack RAM was used. To do so, at boot time, the whole stack is filled with a special value (see: UNUSED_STACK_INDICATOR). When errors are queried (action this status get_errors), the stack is iterated and it is counted how many bytes still have this special value at the end of the stack. This amount is reported as INFO_UNUSED_STACK_BYTES and can be used to find potential stack overflow risks or if way too much stack is unused which could be used for other things.
+BlueRange Mesh keeps track of how much stack RAM was used. To do so, at boot time, the whole stack is filled with a special value (see: UNUSED_STACK_INDICATOR). When errors are queried (action this status get_errors), the stack is iterated and it is counted how many bytes still have this special value at the end of the stack. This amount is reported as INFO_UNUSED_STACK_BYTES and can be used to find potential stack overflow risks or if way too much stack is unused which could be used for other things.
 
 == RebootReason::UNKNOWN_BUT_BOOTED
 There are two reboot reasons that indicate that we don't know the exact reason of the reboot: `UNKNOWN` and `UNKNOWN_BUT_BOOTED`. The first one indicates that we were unable to read the reboot reason from the RAM retain struct. This most likely indicates that some kind of power shortage happened. The second reason indicates that although we don't know why the node is rebooting, we know that it was successfully booted previously within the current power cycle, so know that power was not lost. One possible explanation for this is when we flash a node. This resets the node, without removing power from it. If this was not the cause, then this reboot reason indicates something more sinister. Something rebooted the node without even calling any fault handler or the fault handler was for some reason unable to correctly store the RebootReason.
@@ -246,10 +246,10 @@ NOTE: The hal memory is initialized to 0. Avoid using con- and destructors as th
 The advantage of the hal memory versus some global storage variables is that the hal memory can be fully simulated, giving each simulated node its own separate HAL state.
 
 == STL usage
-In general, STL/STD usage is prohibited in FruityMesh. There are several reasons for this:
+In general, STL/STD usage is prohibited in BlueRange Mesh. There are several reasons for this:
 
-. They tend to use heap memory, which is prohibited in FruityMesh.
-. They also tend to use exceptions, which is also prohibited in FruityMesh.
+. They tend to use heap memory, which is prohibited in BlueRange Mesh.
+. They also tend to use exceptions, which is also prohibited in BlueRange Mesh.
 . Often the exact behavior is implementation dependent, meaning that the behavior changes across compilers. This is bad for reproducibility.
 . We don't have control over the implementation. Often they tend to be bigger than is really required for an embedded environment.
 
@@ -261,7 +261,7 @@ There are a few exceptions to this:
 The simulator additionally allows the usage of container classes like std::vector and std::map, as heap allocations are no problem in the simulator.
 
 == Licence
-FruityMesh is published under the GPLv3 version, which is available in the repository.
+BlueRange Mesh is published under the GPLv3 version, which is available in the repository.
 
 == Watchdog timeout handler
 For better analysis, the watchdog timeout handler was implemented. This interrupt handler triggers shortly before a watchdog reboot. The result is reported upon next boot by using the custom error type `WATCHDOG_REBOOT`. This error log entry is reported after the reboot reason WATCHDOG and contains a bitmask with extra information. This represents a number of collected runtime information and will be gradually extended. It is helpful to analyse why a device was rebooted by the watchdog.

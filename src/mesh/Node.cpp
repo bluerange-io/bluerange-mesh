@@ -1592,7 +1592,9 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
         }
     }
 
-    else if (packetHeader->messageType == MessageType::COMPONENT_SENSE && sendData->dataLength >= SIZEOF_COMPONENT_MESSAGE_HEADER)
+    else if (
+        (packetHeader->messageType == MessageType::COMPONENT_SENSE || packetHeader->messageType == MessageType::COMPONENT_ACT)
+        && sendData->dataLength >= SIZEOF_COMPONENT_MESSAGE_HEADER)
     {
         ModuleIdWrapper moduleId = INVALID_WRAPPED_MODULE_ID;
 
@@ -1662,16 +1664,6 @@ void Node::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnection
             registerAddress,
             payloadString);
 
-    }
-
-    else if (packetHeader->messageType == MessageType::COMPONENT_ACT)
-    {
-        ConnPacketComponentMessage const* packet = (ConnPacketComponentMessage const*)packetHeader;
-
-        char payload[50];
-        MessageLength payloadLength = sendData->dataLength - sizeof(packet->componentHeader);
-        Logger::ConvertBufferToHexString(packet->payload, payloadLength, payload, sizeof(payload));
-        logt("NODE", "component_act payload = %s", payload);
     }
 #if IS_ACTIVE(SIG_MESH)
     //Forwards tunneled SIG mesh messages to the implementation
@@ -1755,7 +1747,7 @@ void Node::UpdateJoinMePacket()
         packet->batteryRuntime = 0;
     }
 
-    packet->txPower = Conf::defaultDBmTX;
+    packet->txPower = Conf::GetInstance().defaultDBmTX;
     packet->deviceType = GET_DEVICE_TYPE();
     packet->hopsToSink = GS->cm.GetMeshHopsToShortestSink(nullptr);
     packet->meshWriteHandle = meshService.sendMessageCharacteristicHandle.valueHandle;
@@ -3687,6 +3679,23 @@ ErrorTypeUnchecked Node::SendComponentMessageFromTerminal(MessageType componentM
     u16 payloadLength = 0;
     u16 totalLength;
 
+    //Allow for a more verbose command entry
+    u8 actionType = 0xFF;
+    if(componentMessageType == MessageType::COMPONENT_ACT){
+        if(strcmp("write", commandArgs[3]) == 0) actionType = (u8)ActorMessageActionType::WRITE;
+        else if(strcmp("read", commandArgs[3]) == 0) actionType = (u8)ActorMessageActionType::READ;
+        else if(strcmp("writeack", commandArgs[3]) == 0) actionType = (u8)ActorMessageActionType::WRITE_ACK;
+    } else if(componentMessageType == MessageType::COMPONENT_SENSE){
+        if(strcmp("event", commandArgs[3]) == 0) actionType = (u8)SensorMessageActionType::UNSPECIFIED;
+        else if(strcmp("error", commandArgs[3]) == 0) actionType = (u8)SensorMessageActionType::ERROR_RSP;
+        else if(strcmp("read", commandArgs[3]) == 0) actionType = (u8)SensorMessageActionType::READ_RSP;
+        else if(strcmp("write", commandArgs[3]) == 0) actionType = (u8)SensorMessageActionType::WRITE_RSP;
+        else if(strcmp("result", commandArgs[3]) == 0) actionType = (u8)SensorMessageActionType::RESULT_RSP;
+    }
+    if(actionType == 0xFF){
+        actionType = (u8)strtoul(commandArgs[3], nullptr, 0);
+    }
+
     //We use a different packet format with an additional 3 bytes in case of a vendor module id
     if(Utility::IsVendorModuleId(moduleId))
     {
@@ -3695,7 +3704,7 @@ ErrorTypeUnchecked Node::SendComponentMessageFromTerminal(MessageType componentM
         message->componentHeader.header.sender = configuration.nodeId;
         message->componentHeader.header.receiver = Utility::TerminalArgumentToNodeId(commandArgs[1]);
         message->componentHeader.moduleId = (VendorModuleId)moduleId;
-        message->componentHeader.actionType = (u8)strtoul(commandArgs[3], nullptr, 0);
+        message->componentHeader.actionType = actionType;
         message->componentHeader.component = (u16)strtoul(commandArgs[4], nullptr, 0);
         message->componentHeader.registerAddress = (u16)strtoul(commandArgs[5], nullptr, 0);
         message->componentHeader.requestHandle = (u8)((commandArgsSize > 7) ? strtoul(commandArgs[7], nullptr, 0) : 0);
@@ -3709,7 +3718,7 @@ ErrorTypeUnchecked Node::SendComponentMessageFromTerminal(MessageType componentM
         message->componentHeader.header.sender = configuration.nodeId;
         message->componentHeader.header.receiver = Utility::TerminalArgumentToNodeId(commandArgs[1]);
         message->componentHeader.moduleId = Utility::GetModuleId(moduleId);
-        message->componentHeader.actionType = (u8)strtoul(commandArgs[3], nullptr, 0);
+        message->componentHeader.actionType = actionType;
         message->componentHeader.component = (u16)strtoul(commandArgs[4], nullptr, 0);
         message->componentHeader.registerAddress = (u16)strtoul(commandArgs[5], nullptr, 0);
         message->componentHeader.requestHandle = (u8)((commandArgsSize > 7) ? strtoul(commandArgs[7], nullptr, 0) : 0);

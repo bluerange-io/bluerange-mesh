@@ -424,12 +424,12 @@ void Utility::LogRebootJson(bool rebootReasonCleared)
     {
         // We already cleared ramRetainStruct and we should use copy of that struct.
         logjson("MAIN", R"({"type":"init"})" SEP);
-        logjson("MAIN", R"({"type":"reboot","reason":%u,"code1":%u,"stack":%u,"version":%u,"blversion":%u})" SEP, (u32)GS->ramRetainStructPreviousBootPtr->rebootReason, GS->ramRetainStructPreviousBootPtr->code1, GS->ramRetainStructPreviousBootPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion());
+        logjson("MAIN", R"({"type":"reboot","reason":%u,"code1":%u,"stack":%u,"version":%u,"blversion":%u,"uptime":%u})" SEP, (u32)GS->ramRetainStructPreviousBootPtr->rebootReason, GS->ramRetainStructPreviousBootPtr->code1, GS->ramRetainStructPreviousBootPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion(), GS->appTimerDs);
     }
     else
     {
         logjson("MAIN", R"({"type":"init"})" SEP);
-        logjson("MAIN", R"({"type":"reboot","reason":%u,"code1":%u,"stack":%u,"version":%u,"blversion":%u})" SEP, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1, GS->ramRetainStructPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion());
+        logjson("MAIN", R"({"type":"reboot","reason":%u,"code1":%u,"stack":%u,"version":%u,"blversion":%u,"uptime":%u})" SEP, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1, GS->ramRetainStructPtr->stacktrace[0], FM_VERSION, FruityHal::GetBootloaderVersion(), GS->appTimerDs);
     }
 }
 
@@ -527,7 +527,6 @@ unsigned long Utility::StringToUnsignedLong(const char * str, bool *outDidError)
     {
         if (outDidError == nullptr) { SIMEXCEPTION(NotANumberStringException); }
         else { *outDidError = true; }
-        logt("WARN", "Tried to interpret the none number string \"%s\" as a number", str);
         return 0;
     }
 
@@ -605,6 +604,45 @@ DataTypeDescriptor Utility::ToLittleEndianDescriptor(DataTypeDescriptor dataType
     u8 val = (u8)dataType;
     if (val > 128) val -= 128;
     return (DataTypeDescriptor)val;
+}
+
+bool Utility::ToConnPacketModuleContents(ConnPacketModuleContents* destinationContents, BaseConnectionSendData* sendData, ConnPacketHeader const* packetHeader)
+{
+    if (sendData->dataLength < SIZEOF_CONN_PACKET_MODULE) return false;
+    *destinationContents = {};
+
+    ConnPacketModule const* packet = (ConnPacketModule const*)packetHeader;
+
+    if (!Utility::IsVendorModuleId(packet->moduleId))
+    {
+        destinationContents->messageType   = packet->header.messageType;
+        destinationContents->sender        = packet->header.sender;
+        destinationContents->receiver      = packet->header.receiver;
+        destinationContents->moduleId      = Utility::GetWrappedModuleId(packet->moduleId);
+        destinationContents->requestHandle = packet->requestHandle;
+        destinationContents->actionType    = packet->actionType;
+        destinationContents->data          = packet->data;
+        destinationContents->dataSize      = sendData->dataLength.GetRaw() - SIZEOF_CONN_PACKET_MODULE;
+        return true;
+    }
+    else if (sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE_VENDOR)
+    {
+        ConnPacketModuleVendor const* packetVendor = (ConnPacketModuleVendor const*)packetHeader;
+        
+        destinationContents->messageType   = packetVendor->header.messageType;
+        destinationContents->sender        = packetVendor->header.sender;
+        destinationContents->receiver      = packetVendor->header.receiver;
+        destinationContents->moduleId      = packetVendor->moduleId;
+        destinationContents->requestHandle = packetVendor->requestHandle;
+        destinationContents->actionType    = packetVendor->actionType;
+        destinationContents->data          = packetVendor->data;
+        destinationContents->dataSize      = sendData->dataLength.GetRaw() - SIZEOF_CONN_PACKET_MODULE_VENDOR;
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
 /*

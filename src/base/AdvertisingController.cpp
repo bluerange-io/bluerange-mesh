@@ -467,7 +467,7 @@ void AdvertisingController::SetAdvertisingState(AdvJob* job)
                 logt("WARNING", "Error restarting advertisement %u", (u32)err);
                 return;
             }
-            err = FruityHal::RadioSetTxPower(Conf::defaultDBmTX, FruityHal::TxRole::ADVERTISING, handle);
+            err = FruityHal::RadioSetTxPower(Conf::GetInstance().defaultDBmTX, FruityHal::TxRole::ADVERTISING, handle);
             if (err != ErrorType::SUCCESS) {
                 logt("ERROR","error code = %u", (u32)err);
             }

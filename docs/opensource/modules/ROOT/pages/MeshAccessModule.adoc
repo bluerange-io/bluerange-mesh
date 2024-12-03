@@ -89,7 +89,7 @@ service version, the messageType can be changed.
 |1|moduleId0|ID of a module that is available over the mesh access connection (0 for invalid module)
 |1|moduleId1|ID of a module that is available over the mesh access connection (0 for invalid module)
 |1|moduleId2|ID of a module that is available over the mesh access connection (0 for invalid module)
-|||**Everything below is optional! Older versions of FruityMesh (< 0.8.5000) may not support it.**
+|||**Everything below is optional! Older versions of BlueRange Mesh (< 0.8.5000) may not support it.**
 |1|xref:Specification.adoc#deviceTypes[DeviceType]|The device type of the sender. 
 |**7**||**Reserved**|
 |===

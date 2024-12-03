@@ -307,4 +307,87 @@ CapabilityEntry VendorTemplateModule::GetCapability(u32 index, bool firstCall)
     }
 }
 
+#if IS_ACTIVE(REGISTER_HANDLER)
+RegisterGeneralChecks VendorTemplateModule::GetGeneralChecks(u16 component, u16 reg, u16 length) const
+{
+    //It is possible to enable the register handler only for specific locations
+    if (component != 0) return RGC_LOCATION_DISABLED;
+
+    GENERAL_CHECK_STRING(DEMO_REGISTER_SOME_STRING_BASE, demoVarSomeString);
+
+    return RGC_SUCCESS;
+}
+
+//The CheckValues method will be called for a read or write with the first register id and the full data and length
+//This can be used to do complex checks over the complete operation to keep it atomic and check dependencies between
+//multiple registers
+RegisterHandlerCode VendorTemplateModule::CheckValues(u16 component, u16 reg, const u8* values, u16 length) const
+{
+    if (component == 0)
+    {
+        if (reg == DEMO_REGISTER_SOME_STRING_BASE)
+        {
+            // Lets check that the string starts with '@'!
+            // Just a toy example for CheckValues.
+            if (length == 0) return RegisterHandlerCode::ILLEGAL_VALUE;
+            if (*values != '@') return RegisterHandlerCode::ILLEGAL_VALUE;
+        }
+    }
+    return RegisterHandlerCode::SUCCESS;
+}
+
+//The MapRegister method specifies the available registers and their region
+//This is the only necessary method that must be implemented to use generic register access
+//It will handle all read/write register access and generic error handling (e.g. out of range, wrong size, ....)
+//However, if you want to act on a new value that is written, implement at least ChangeValue()
+void VendorTemplateModule::MapRegister(u16 component, u16 reg, SupervisedValue& out, u32& persistedId)
+{
+    if (component == 0)
+    {
+        //Control Registers
+        if (reg == DEMO_REGISTER_WRITABLE) out.SetWritable(&demoVarWritable);
+        if (reg == DEMO_REGISTER_SOME_STRING_BASE) out.SetWritableRange(demoVarSomeString, sizeof(demoVarSomeString));
+        if (reg == DEMO_REGISTER_CLAMPED_VALUE) out.SetWritable(&demoVarClampedValue);
+
+        //Data Registers
+        if (reg == DEMO_REGISTER_READ_ONLY) out.SetReadable(demoVarReadOnly);
+    }
+}
+
+//The ChangeValue method will be called individually for each of the available registers once data is written.
+//It's most common use-cases are:
+//  - perform functionality such as toggling pins, sending messages to 3rd party controllers, ....
+//  - modifying the data, before it is being written
+void VendorTemplateModule::ChangeValue(u16 component, u16 reg, u8* values, u16 length)
+{
+    if (component == 0)
+    {
+        if (reg == DEMO_REGISTER_WRITABLE)
+        {
+            logt("DEBUGMOD", "New value will be %u", values[0]);
+        }
+        if (reg == DEMO_REGISTER_CLAMPED_VALUE)
+        {
+            u32 val = Utility::ToAlignedU32(values);
+            //Perform some symbolic clamping as it is a common use-cases that a register has a fixed range for its values
+            val = Utility::Clamp<u32>(val, 100, 424242);
+            CheckedMemcpy(values, &val, sizeof(val));
+        }
+    }
+}
+
+//OnRegisterRead is called before the register is being accessed for a read
+// This can be used to e.g. update the register content in time with an up to date sensor reading
+void VendorTemplateModule::OnRegisterRead(u16 component, u16 reg)
+{
+    if (component == 0)
+    {
+        if (reg == DEMO_REGISTER_READ_ONLY)
+        {
+            logt("STATUSMOD", "Demo Register was read");
+        }
+    }
+}
+#endif //IS_ACTIVE(REGISTER_HANDLER)
+
 #endif //IS_ACTIVE(VENDOR_TEMPLATE_MODULE)

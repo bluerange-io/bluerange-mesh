@@ -31,6 +31,19 @@
 #pragma once
 
 #include <Module.h>
+#include <RegisterHandler.h>
+#include <AutoSenseModule.h>
+
+//Set these maximums in your featureset
+#ifndef REGISTER_DIGITAL_OUT_NUM_MAX
+#define REGISTER_DIGITAL_OUT_NUM_MAX 10
+#endif
+#ifndef REGISTER_DIGITAL_IN_NUM_MAX
+#define REGISTER_DIGITAL_IN_NUM_MAX 10
+#endif
+#ifndef REGISTER_DIGITAL_IN_TOGGLE_PARIS_NUM_MAX
+#define REGISTER_DIGITAL_IN_TOGGLE_PARIS_NUM_MAX 10
+#endif
 
 #pragma pack(push, 1)
 //Module configuration that is saved persistently
@@ -41,11 +54,17 @@ struct IoModuleConfiguration : ModuleConfiguration {
 STATIC_ASSERT_SIZE(IoModuleConfiguration, 5);
 #pragma pack(pop)
 
+enum class IoModuleComponent :u16 {
+    BASIC_REGISTER_HANDLER_FUNCTIONALITY = 0
+};
+
 /**
  * The IoModule can be used for controlling different LED behavior and
  * some very basic pin settings.
  */
-class IoModule: public Module
+class IoModule:
+    public Module,
+    public AutoSenseModuleDataProvider
 {
     public:
 
@@ -83,6 +102,24 @@ class IoModule: public Module
         };
         STATIC_ASSERT_SIZE(gpioPinConfig, SIZEOF_GPIO_PIN_CONFIG);
 
+        VibrationPins vibrationPins = {};
+        BuzzerPins buzzerPins = {};
+
+        // Limit the number of readable pins with action pinread
+        static constexpr u8 MAX_NUM_GPIO_READ_PINS = 5;
+        // This symbol is used to indicate that there are no more pins to be read.
+        // It is placed after the last pin in the array.
+        static constexpr u8 END_OF_PIN_ARRAY_SYMBOL = 0xff;
+
+        u8 ledBlinkPosition = 0;
+        /// The remaining identification time in deci-seconds. Identification
+        /// is active if this variable holds a non-zero value.
+        u32 remainingIdentificationTimeDs = 0;
+
+        /// Returns true if identification is currently active.
+        bool IsIdentificationActive() const;
+        void StopIdentification();
+
 
     public:
         //####### Module messages (these need to be packed)
@@ -116,23 +153,6 @@ class IoModule: public Module
         #pragma pack(pop)
         //####### Module messages end
 
-    private:
-        u8 ledBlinkPosition = 0;
-        /// The remaining identification time in deci-seconds. Identification
-        /// is active if this variable holds a non-zero value.
-        u32 remainingIdentificationTimeDs = 0;
-
-        VibrationPins vibrationPins = {};
-        BuzzerPins buzzerPins = {};
-
-        // Limit the number of readable pins with action pinread
-        static constexpr u8 MAX_NUM_GPIO_READ_PINS = 5;
-        // This symbol is used to indicate that there are no more pins to be read.
-        // It is placed after the last pin in the array.
-        static constexpr u8 END_OF_PIN_ARRAY_SYMBOL = 0xff;
-
-    public:
-
         DECLARE_CONFIG_AND_PACKED_STRUCT(IoModuleConfiguration);
 
         LedMode currentLedMode;
@@ -153,10 +173,112 @@ class IoModule: public Module
         TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
         #endif
 
-    private:
-        /// Returns true if identification is currently active.
-        bool IsIdentificationActive() const;
+        enum class DigitalInReadMode : u8 {
+            ON_DEMAND = 0, // Default
+            INTERRUPT = 1
+        };
 
-        void StopIdentification();
+        //Information Registers
+        constexpr static u16 REGISTER_DIO_OUTPUT_NUM                     = 100;
+        constexpr static u16 REGISTER_DIO_INPUT_NUM                      = 101;
+        constexpr static u16 REGISTER_DIO_INPUT_TOGGLE_PAIR_NUM          = 102;
+
+        //Control Registers
+        constexpr static u32 REGISTER_DIO_OUTPUT_STATE_START             = 20000;
+        
+        //Data Registers
+        constexpr static u32 REGISTER_DIO_INPUT_STATE_START              = 30000;
+        constexpr static u32 REGISTER_DIO_TOGGLE_PAIR_START              = 30100;
+        constexpr static u32 REGISTER_DIO_INPUT_LAST_ACTIVE_TIME_START   = 31000;
+        constexpr static u32 REGISTER_DIO_INPUT_LAST_HOLD_TIME_START     = 31400;
+
+        // AutoSenseModuleDataProvider
+        void RequestData(u16 component, u16 register_, u8 length, AutoSenseModuleDataConsumer* provideTo) override;
+
+        static void GpioHandler(u32 pin, FruityHal::GpioTransition transition);
+
+        //#### Configuration for Generic Register Access
+    TESTER_PUBLIC:
+        // Digital Outputs that are accessible via Registers
+        typedef struct {
+            u8 pin;
+            u8 activeHigh;
+            u8 state;
+        } DigitalOutPinSetting;
+        u8 numDigitalOutPinSettings = 0;
+        std::array<DigitalOutPinSetting, REGISTER_DIGITAL_OUT_NUM_MAX> digitalOutPinSettings = {};
+
+        // Digital Inputs that are accessible via Registers
+        typedef struct {
+            u8 pin;
+            u8 activeHigh;
+            DigitalInReadMode readMode;
+            u32 lastActiveTimeDs;
+            u32 lastHoldTimeDs;
+        } DigitalInPinSetting;
+        u8 numDigitalInPinSettings = 0;
+        std::array<DigitalInPinSetting, REGISTER_DIGITAL_IN_NUM_MAX> digitalInPinSettings = {};
+
+        //Toggle Pairs contain two indices referencing interrupt based digital inputs
+        typedef struct {
+            u8 pinIndexA;
+            u8 pinIndexB;
+        } DigitalInTogglePair;
+        u8 numDigitalInTogglePairSettings = 0;
+        std::array<DigitalInTogglePair, REGISTER_DIGITAL_IN_TOGGLE_PARIS_NUM_MAX> digitalInTogglePairSettings = {};
+
+    public:
+        //Should be called through setCustomModuleSettings in the boardconfig
+        void AddDigitalOutForBoard(u8 pin, bool activeHigh) {
+            if (!moduleStarted && numDigitalOutPinSettings < REGISTER_DIGITAL_OUT_NUM_MAX) {
+                digitalOutPinSettings[numDigitalOutPinSettings].pin = pin;
+                digitalOutPinSettings[numDigitalOutPinSettings].activeHigh = activeHigh ? 1 : 0;
+                numDigitalOutPinSettings++;
+            } else {
+                logt("ERROR", "AddDigitalOutForBoard failed");
+            }
+        }
+
+        //Add a digital input pin
+        void AddDigitalInForBoard(u8 pin, bool activeHigh, DigitalInReadMode readMode) {
+            if (!moduleStarted && numDigitalInPinSettings < REGISTER_DIGITAL_IN_NUM_MAX) {
+                digitalInPinSettings[numDigitalInPinSettings].pin = pin;
+                digitalInPinSettings[numDigitalInPinSettings].activeHigh = activeHigh ? 1 : 0;
+                digitalInPinSettings[numDigitalInPinSettings].readMode = readMode;
+                numDigitalInPinSettings++;
+            }
+            else {
+                logt("ERROR", "AddDigitalInForBoard failed");
+            }
+        }
+
+        //Specify the pin indices (indices are assigned in the order that the digital inputs were created)
+        //pin A switches the toggle to OFF, pin B switches to ON
+        void AddTogglePairForBoard(i8 pinIndexA, u8 pinIndexB) {
+            if (
+                !moduleStarted
+                && numDigitalInTogglePairSettings < REGISTER_DIGITAL_IN_TOGGLE_PARIS_NUM_MAX
+                && pinIndexA != pinIndexB
+                && pinIndexA < numDigitalInPinSettings // PinIndexA and B must be configured as digital inputs before
+                && pinIndexB < numDigitalInPinSettings
+                && digitalInPinSettings[pinIndexA].readMode == DigitalInReadMode::INTERRUPT // PinIndexA and B must be configured interrupt based
+                && digitalInPinSettings[pinIndexB].readMode == DigitalInReadMode::INTERRUPT
+            ) {
+
+                digitalInTogglePairSettings[numDigitalInTogglePairSettings].pinIndexA = pinIndexA;
+                digitalInTogglePairSettings[numDigitalInTogglePairSettings].pinIndexB = pinIndexB;
+                numDigitalInTogglePairSettings++;
+            }
+            else {
+                logt("ERROR", "AddTogglePairForBoard failed");
+            }
+        }
+
+#if IS_ACTIVE(REGISTER_HANDLER)
+    protected:
+        virtual RegisterGeneralChecks GetGeneralChecks(u16 component, u16 reg, u16 length) const override final;
+        virtual void MapRegister(u16 component, u16 register_, SupervisedValue& out, u32& persistedId) override final;
+        virtual void ChangeValue(u16 component, u16 register_, u8* values, u16 length) override final;
+#endif //IS_ACTIVE(REGISTER_HANDLER)
 };
 

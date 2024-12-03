@@ -24,6 +24,6 @@ With less central connections, the throughput will increase. For example, having
 
 == Conclusion
 
-The throughput of FruityMesh is around *20 times higher* than other solutions that rely on a flooding mesh. FruityMesh has a measured throughput of around 8 kbyte/s. The theoretical throughput of flooding mesh implementations is usually stated as 3.5 kbit/s, which means around 0.4 kbyte/s. Also, FruityMesh uses all 37 connection channels of BLE while most flooding mesh implementations only use one channel and cannot use more than 3. This does further reduce the throughput of these implementations in real world use-cases.
+The throughput of BlueRange Mesh is around *20 times higher* than other solutions that rely on a flooding mesh. BlueRange Mesh has a measured throughput of around 8 kbyte/s. The theoretical throughput of flooding mesh implementations is usually stated as 3.5 kbit/s, which means around 0.4 kbyte/s. Also, BlueRange Mesh uses all 37 connection channels of BLE while most flooding mesh implementations only use one channel and cannot use more than 3. This does further reduce the throughput of these implementations in real world use-cases.
 
 Also, there is more room for improvement: Increasing the MTU will increase the throughput drastically if messages are grouped together or if bigger messages are sent through the mesh.

@@ -147,6 +147,8 @@ enum class CustomErrorTypes : u8 {
     COUNT_VENDOR_CONN_LOSS = 95,
     WARN_AUTO_SENSE_REPORT_WITHOUT_DATA = 96,
     COUNT_VENDOR_BYTES_SENT = 97,
+    ERROR_TOO_MANY_REGISTER_HANDLERS = 98,
+    ERROR_RECORD_STORAGE_REGISTER_HANDLER = 99,
     // When adding new error type please also add in frutyapi in BeaconErrorMessage.java
 };
 

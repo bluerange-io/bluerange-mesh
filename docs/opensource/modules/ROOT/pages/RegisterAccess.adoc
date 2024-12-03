@@ -1,0 +1,26 @@
+= Register Access
+
+== Overview
+In addition to our message based approach, we have added functionality to offer a generic implementation for register based access. While this has been possible for a long time in BlueRange Mesh by implementing handlers for component_act and component_sense messages, this drastically reduces the implementation effort. If you have knowledge of the modbus protocol, you will be already be familiar with the basic concept.
+
+Registers can be read or written by specyfing the moduleId, a component and the register number. Each module can make use of a full range of ~65k registers for each of the ~65k components. While the module id defines the functionality, the component is typically used to specify a device instance. For example, imagine you have a set of luminaires connected to your controller and each luminaire offers the exact same functionality.
+
+NOTE: The register handler does not yet offer automatic persistance of configuration registers. This will be added in the future.
+
+In contrast to Modbus, we have decided to offer a simplified and more up-to-date implementation. The main differences are:
+
+* A register has a minimum size of 1 byte and can have an arbitrary length depending on the data type. Typical sizes are 1 byte for an 8 bit integer, 2 bytes for u16, 4 bytes for u32.
+* The data alignment is little endian by default as this is the default for the BlueRange Mesh implementation.
+* The register range always starts with index 0 and the register should be numbered register 0 to avoid off-by-one issues.
+* Readable and writable registers are available in a single adress range, unlike Modbus where this can very between implementations.
+
+== Implementation Guide
+
+=== Register Ranges
+ The implementation should adhere to the following convention:
+
+* Register 0 ... 9999: Information Registers provide read-only data to offer capabilities such as device serial, number of lightheads, etc, ....
+* Register 10000 ... 19999: Configuration Registers are readable/writable registers to modify the functionality of the device. They can be persisted by the device.
+* Register 20000 ... 29999: Control Registers are readable/writable register, used to actuate the device. For example, turn on a light, set a motor position, etc,....
+* Register 30000 ... 39999: Data Registers are read-only registers used to provide data such as sensor measurements, e.g. the ambient light level, state of the implementation, etc,...
+

@@ -358,13 +358,13 @@ void ConnectionManager::NotifyDeleteConnection()
 
 #define _________________SENDING____________
 
-void ConnectionManager::SendMeshMessage(u8* data, u16 dataLength) const
+void ConnectionManager::SendMeshMessage(u8* data, u16 dataLength)
 {
     ErrorType err = SendMeshMessageInternal(data, dataLength, false, true, true);
     if (err != ErrorType::SUCCESS) logt("ERROR", "Failed to send mesh message error code: %u", (u32)err);
 }
 
-ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, bool reliable, bool loopback, bool toMeshAccess) const
+ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, bool reliable, bool loopback, bool toMeshAccess)
 {
     ErrorType err = ErrorType::SUCCESS;
 
@@ -394,7 +394,13 @@ ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, b
         //       Both these cases can be ignored in the vast majority of the cases.
         const u32 smallestMtu = GetSmallestMtuOfAllConnections();
         const u32 amountOfSplitPackets = Utility::MessageLengthToAmountOfSplitPackets(dataLength, smallestMtu);
-        GS->logger.LogCustomCount(CustomErrorTypes::COUNT_GENERATED_SPLIT_PACKETS, amountOfSplitPackets);
+
+        //We at least do some filtering. While still not correct, this should provide a better metric
+        //as e.g. AutoSense might generate quite a few local messages
+        if (packetHeader->receiver != NODE_ID_LOCAL_LOOPBACK && packetHeader->receiver != GS->node.configuration.nodeId) {
+            GS->logger.LogCustomCount(CustomErrorTypes::COUNT_GENERATED_SPLIT_PACKETS, amountOfSplitPackets);
+            generatedPackets += amountOfSplitPackets;
+        }
     }
 
     // ########################## Local Loopback
@@ -514,7 +520,7 @@ ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, b
     return err;
 }
 
-void ConnectionManager::DispatchMeshMessage(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packet, bool checkReceiver) const
+void ConnectionManager::DispatchMeshMessage(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packet, bool checkReceiver)
 {
     if(
         !checkReceiver

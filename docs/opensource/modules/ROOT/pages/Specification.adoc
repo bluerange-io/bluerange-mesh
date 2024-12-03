@@ -6,9 +6,9 @@ this page and ongoing discussions will show whether some of these
 specifications should be changed.
 
 == Advertising Packets
-FruityMesh uses a number of advertising packets, the most important one being the _JOIN_ME_ packet that is used for discovery of nearby nodes that also run FruityMesh.
+BlueRange Mesh uses a number of advertising packets, the most important one being the _JOIN_ME_ packet that is used for discovery of nearby nodes that also run BlueRange Mesh.
 
-There are two types of advertising packets used by FruityMesh. One uses the manufacturer specific advertisement structure, the other uses the serviceData advertisement structure. Some devices such as iOS devices have a better reception rate when using the serviceData structure.
+There are two types of advertising packets used by BlueRange Mesh. One uses the manufacturer specific advertisement structure, the other uses the serviceData advertisement structure. Some devices such as iOS devices have a better reception rate when using the serviceData structure.
 
 === Advertising Packet with Manufacturer Specific Data
 
@@ -24,7 +24,7 @@ There are two types of advertising packets used by FruityMesh. One uses the manu
 |===
 
 ==== Manufacturer ID
-The company ID 0x024D (M-Way Solutions GmbH) is registered with the Bluetooth SIG and may be used by any implementation that conforms to the latest specifications of the FruityMesh protocol.
+The company ID 0x024D (M-Way Solutions GmbH) is registered with the Bluetooth SIG and may be used by any implementation that conforms to the latest specifications of the BlueRange Mesh protocol.
 
 ==== Mesh Identifier
 The mesh identifier is 0xF0. No other identifier shall be used. Future versions might change this identifier. The purpose of the mesh identifier is to enable different protocols under the same manufacturer ID.
@@ -58,7 +58,7 @@ The _JOIN_ME_ packet contains all the information that other nodes can use to de
 
 [#ServiceDataBroadcastHeader]
 === Advertising Packet With Service Data
-Another type of advertising packet used by FruityMesh uses the Service Data Adv Structure. This is important when dealing with mobile devices since some have hardware filtering with no support for manufacturer specific data.
+Another type of advertising packet used by BlueRange Mesh uses the Service Data Adv Structure. This is important when dealing with mobile devices since some have hardware filtering with no support for manufacturer specific data.
 
 |===
 |Bytes|Type|Name|Description
@@ -88,7 +88,7 @@ Below is a list of all messages that we have currently openly specified. These a
 |===
 
 === Other Advertising Packets
-FruityMesh can be used to distribute all advertising packets that conform to the BLE specification. These can be Eddystone, iBeacon or any other kind of advertising messages. These are however not essential for FruityMesh itself and are therefore not documented here. Have a look at the xref:BeaconingModule.adoc[BeaconingModule] for more information.
+BlueRange Mesh can be used to distribute all advertising packets that conform to the BLE specification. These can be Eddystone, iBeacon or any other kind of advertising messages. These are however not essential for BlueRange Mesh itself and are therefore not documented here. Have a look at the xref:BeaconingModule.adoc[BeaconingModule] for more information.
 
 == Connection Packets
 The mesh uses a number of packets that are sent over connections. Most packets that are sent over connections must have this header. There are some exceptions to this (e.g. split packets use a two byte message header for less overhead. The _messageType_ is used to identify if the _connPacketHeader_ is used or not.
@@ -105,13 +105,13 @@ The mesh uses a number of packets that are sent over connections. Most packets t
 |===
 
 == Modules
-FruityMesh uses a concept of modules to group functionality into different parts. This works together nicely with the featuresets. A user is able to write his own modules that extend the basic functionality of FruityMesh. Each module is identified using a module id. 
+BlueRange Mesh uses a concept of modules to group functionality into different parts. This works together nicely with the featuresets. A user is able to write his own modules that extend the basic functionality of BlueRange Mesh. Each module is identified using a module id. 
 
 [#ModuleIds]
 === ModuleIds
 There are two types of module ids: the standard *ModuleId* has a size of one byte and is solely used by standardized modules. The *VendorModuleId* on the other hand uses 4 bytes to allow different vendors to develop modules that can run together in a single network without clashing with other modules that were written by different vendors on different nodes in the same mesh network. This is done by including a vendor id as part of the VendorModuleId. This vendor id must be set to the company identifier that can be acquired from the BLE SIG. See https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers/[this page] for instructions on how to get this company identifier and for a complete list of known company identifiers.
 
-VendorModuleIds were not part of FruityMesh prior to version 1.x.x. FruityMesh tries to keep the usage of VendorModuleIds as easy as possible and does most of the work when using VendorModuleIds. Some parts will e.g. use different message types for messages with ModuleId and VendorModuleId and other parts use the ModuleIdWrapper to be able to work with both module id types in the same data structure. As a convention, whenever a ModuleId is printed out as a string, it is printed as a decimal number, e.g. `123`. VendorModuleIds on the other hand are printed as a string like this `"0xABCD01F0"` to make the individual parts easier to read.
+VendorModuleIds were not part of BlueRange Mesh prior to version 1.x.x. BlueRange Mesh tries to keep the usage of VendorModuleIds as easy as possible and does most of the work when using VendorModuleIds. Some parts will e.g. use different message types for messages with ModuleId and VendorModuleId and other parts use the ModuleIdWrapper to be able to work with both module id types in the same data structure. As a convention, whenever a ModuleId is printed out as a string, it is printed as a decimal number, e.g. `123`. VendorModuleIds on the other hand are printed as a string like this `"0xABCD01F0"` to make the individual parts easier to read.
 
 To get started, see xref:ImplementingCustomModule.adoc[Implementing a Custom Module].
 
@@ -158,7 +158,7 @@ The most common usage of the connPacketModule header is to provide the possibili
 |===
 
 ==== Actuator and Sensor Messages
-Often, FruityMesh must tunnel a different protocol such as Modbus because it is installed on a controller that is attached to a 3rd party controller. In this case, it is necessary to have a tunneling protocol that is generic enough to provide access to all functionality while still allowing a platform or MeshGateway to interpret the received data in a useful manner. This is why we have introduced the `component_sense` and `component_act` message types. You should use them whenever you report sensor data or when you want to write data to the node that should be written to a specific "address".
+Often, BlueRange Mesh must tunnel a different protocol such as Modbus because it is installed on a controller that is attached to a 3rd party controller. In this case, it is necessary to have a tunneling protocol that is generic enough to provide access to all functionality while still allowing a platform or MeshGateway to interpret the received data in a useful manner. This is why we have introduced the `component_sense` and `component_act` message types. You should use them whenever you report sensor data or when you want to write data to the node that should be written to a specific "address".
 
 .Module MessageTypes for Actuators and Sensors
 |===
@@ -171,7 +171,7 @@ Often, FruityMesh must tunnel a different protocol such as Modbus because it is 
 Take a look at the detailed documentation for xref:SensorsAndActuators.adoc[Sensors and Actuators].
 
 ==== Raw Data
-Another use-case is to tunnel any kind of data through FruityMesh where the nodes do not need to parse or process the data at all, e.g. a smartphone might want to send data to a MeshGateway or Backend.  This could also be data of an entirely different protocol such as HTTP, etc... This could be a small data packet or a rather large file that needs to be split into several parts. To do this, we have introduced `raw_data` and `raw_data_light` which are documented in a lot of detail at the xref:RawData.adoc[Raw Data] page.
+Another use-case is to tunnel any kind of data through BlueRange Mesh where the nodes do not need to parse or process the data at all, e.g. a smartphone might want to send data to a MeshGateway or Backend.  This could also be data of an entirely different protocol such as HTTP, etc... This could be a small data packet or a rather large file that needs to be split into several parts. To do this, we have introduced `raw_data` and `raw_data_light` which are documented in a lot of detail at the xref:RawData.adoc[Raw Data] page.
 
 .Module MessageTypes for Raw Data
 |===
@@ -220,14 +220,14 @@ There are different node ID ranges that are used for different purposes:
 == Serial Numbers / SerialNumberIndex
 The serial numbers use a special alphabet of ASCII characters that is easily readable (`BCDFGHJKLMNPQRSTVWXYZ123456789`) and will not result in funny words because it does not contain vocals. Serial numbers are either 5 or 7 characters long. Each serial number can be converted to a serialNumberIndex which is represented as an unsigned 32 bit integer. If a serial number is human readable, it can be printed in its ASCII representation, but if sending a serialNumber over the network or using it in code, the serialNumberIndex should be used. Check out the appropriate methods (_GenerateBeaconSerialForIndex_ and _GetIndexForSerial_) in the _Utility_ class on how to convert the serial number. Also see the appropriate tests in the _TestUtility_ class.
 
-There are two types of serial number ranges. There is a range of two billion serial numbers that is exclusively managed by M-Way Solutions. This range contains serial numbers with 5 characters and also serial numbers with 7 characters. Parts of this range are licensed to partners. The second range can be used for projects working with the open source version of FruityMesh completely free of charge. This is always a 7 character serial number.
+There are two types of serial number ranges. There is a range of two billion serial numbers that is exclusively managed by M-Way Solutions. This range contains serial numbers with 5 characters and also serial numbers with 7 characters. Parts of this range are licensed to partners. The second range can be used for projects working with the open source version of BlueRange Mesh completely free of charge. This is always a 7 character serial number.
 
 [#MwaySerialRange]
 === M-Way Solutions Proprietary Serial Number Range
 The serialNumberIndex of this range starts with 0 for the serial number `BBBBB` and increments up to `0x7FFFFFFF` for the serial number `D8PJQ8K`. This range should not be used without consulting us beforehand because serial numbers will clash otherwise. We assign sub-ranges to our partners which allows them to use serial numbers with 5 characters.
 
 === Open Source Testing Range
-To provide beginners with an easy method for testing FruityMesh, we decided to open source a part of our proprietary range that contains nicely readable serial numbers. This range starts from `2673000` (`FMBBB`) and ranges until `2699999` (`FM999`).By default, the serial number is generated randomly (from the unique deviceId stored in the chipset) within this testing range if there is no UICR data available (see _generateRandomSerialAndNodeId_ in the Config class). This makes it easier to start testing FruityMesh. You should not distribute products that use a serial number from this range as it will clash with others.
+To provide beginners with an easy method for testing BlueRange Mesh, we decided to open source a part of our proprietary range that contains nicely readable serial numbers. This range starts from `2673000` (`FMBBB`) and ranges until `2699999` (`FM999`).By default, the serial number is generated randomly (from the unique deviceId stored in the chipset) within this testing range if there is no UICR data available (see _generateRandomSerialAndNodeId_ in the Config class). This makes it easier to start testing BlueRange Mesh. You should not distribute products that use a serial number from this range as it will clash with others.
 
 [#OpenSourceProductSerialRange]
 === Open Source Serial Number Range for Products
@@ -238,7 +238,7 @@ If you do not have a Bluetooth SIG company identifier yet, you can use the manuf
 [#EncryptionKeys]
 == Encryption Keys
 There are a number of different keys used throughout
-FruityMesh. These are all 128-bit keys and are used for AES encryption
+BlueRange Mesh. These are all 128-bit keys and are used for AES encryption
 between the nodes, as well as for communication with smartphones or other
 devices.
 
@@ -299,7 +299,7 @@ TIP: A key that is filled with 0xFF is considered invalid and cannot be
 used.
 
 == QR Codes
-One convenient method to transmit a node key out of band is by using QR codes. Please see our dedicated xref:QRCodeGeneration.adoc[specification on QR codes] for more information on how to generate QR codes that are compatible with the FruityMesh / BlueRange ecosystem.
+One convenient method to transmit a node key out of band is by using QR codes. Please see our dedicated xref:QRCodeGeneration.adoc[specification on QR codes] for more information on how to generate QR codes that are compatible with the BlueRange Mesh / BlueRange ecosystem.
 
 [#deviceTypes]
 == Device Types
@@ -330,14 +330,14 @@ The UICR is a special persistant storage that is used to store factory defaults 
 
 If you want to store a serial number, _nodeKey_, etc. for a node, you must write the UICR during flashing. The NRF_UICR->CUSTOMER area is used for that purpose and starts at 0x10001080. You can use http://srecord.sourceforge.net/[srec_cat] to produce a .hex file containing the desired UICR data. This can then be merged with the SoftDevice and Application or you can flash each one separately. For detailed instructions, see our xref:Developers.adoc#UICR[Developers chapter].
 
-FruityMesh will boot with random data (random _nodeId_ / _serialNumber_ / ...) if no data is present in the UICR. The data will however be persistent across reboots as it is generated according to the internal chip id from the FICR. Layout of UICR memory:
+BlueRange Mesh will boot with random data (random _nodeId_ / _serialNumber_ / ...) if no data is present in the UICR. The data will however be persistent across reboots as it is generated according to the internal chip id from the FICR. Layout of UICR memory:
 
 .Layout of UICR memory
 |===
 |Offset|Size (Bytes)|Name|Description
 
 |0|4|MAGIC_NUMBER|Must be set to 0x00F07700 when UICR data is available
-|4|4|BOARD_TYPE|Accepts an integer that defines the hardware board that FruityMesh should be running on (_boardId_, a.k.a. _boardType_)
+|4|4|BOARD_TYPE|Accepts an integer that defines the hardware board that BlueRange Mesh should be running on (_boardId_, a.k.a. _boardType_)
 |8|8|SERIAL_NUMBER|Deprecated: This contained the given serial number as ASCII (zero terminated) but is not used anymore (since 12.05.2020). Must now be set to FFFF....FFFF. The serial number is instead calculated from the SERIAL_NUMBER_INDEX
 |16|16|NODE_KEY|Should be securely and randomly generated
 |32|4|MANUFACTURER_ID|Set to manufacturer ID according to the
@@ -351,7 +351,7 @@ company identifiers]
 |===
 
 == Heap usage
-Heap usage (malloc / new) is prohibited in the FruityMesh codebase. To ensure that this rule is followed, a linker flag for ld is used that generates a linker error if malloc is used. The error looks something like this:
+Heap usage (malloc / new) is prohibited in the BlueRange Mesh codebase. To ensure that this rule is followed, a linker flag for ld is used that generates a linker error if malloc is used. The error looks something like this:
 
 `Make: new_op.cc:(.text._Znwj+0xe): undefined reference to `__wrap_malloc'`
 

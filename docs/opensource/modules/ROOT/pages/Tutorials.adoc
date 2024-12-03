@@ -1,11 +1,11 @@
 = Tutorials
 
 This page strives to be a collection of tutorials around
-FruityMesh. If you want to write your own and submit it, you are very
+BlueRange Mesh. If you want to write your own and submit it, you are very
 welcome.
 
 == Modules
-FruityMesh consists of Modules, if you want to know more
+BlueRange Mesh consists of Modules, if you want to know more
 about modules and about how you can write your own, have a look at this
 tutorial that will guide you through the necessary steps on how to
 create a Module that can send and receive ping requests.
@@ -13,8 +13,8 @@ create a Module that can send and receive ping requests.
 Tutorial: xref:ImplementingCustomModule.adoc[Implementing a Custom Module]
 
 == Hardware
-FruityMesh can not just be used with Nordics nRF52-DK and nRF52840-DK.
-If you want to know how to use other hardware together with FruityMesh,
+BlueRange Mesh can not just be used with Nordics nRF52-DK and nRF52840-DK.
+If you want to know how to use other hardware together with BlueRange Mesh,
 have a look at the following examples.
 
-Tutorial: xref:fruitymesh::UsingRuuviTagsWithFruityMesh.adoc[Using RuuviTags with FruityMesh]
+Tutorial: xref:fruitymesh::UsingRuuviTagsWithBlueRangeMesh.adoc[Using RuuviTags with BlueRange Mesh]

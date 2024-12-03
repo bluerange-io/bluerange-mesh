@@ -172,7 +172,7 @@ TEST(TestNode, TestCommands) {
             "}");
 
     tester.SendTerminalCommand(1, "component_act 0 123 0 7 77 qrs=");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "component_act payload = AA:BB");
+    tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, R"(component_act.*"payload":"qrs=")"); //AA:BB
 
     tester.SendTerminalCommand(1, "get_plugged_in");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "plugged_in");
@@ -890,12 +890,8 @@ TEST(TestNode, TestMeshAccessConnectionPacketQueuing) {
 
     RetryOrFail<TimeoutException>(
         32, [&] {
-//Connect to node 2 using a mesh access connection and the network key. Network key is different for github release (and source dist tester)!
-#ifdef GITHUB_RELEASE
-            tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 2 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22");
-#else
+            //Connect to node 2 using a mesh access connection and the network key.
             tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 2 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
-#endif //GITHUB_RELEASE
         },
         [&] {
             //Wait until connection was set up
@@ -971,11 +967,10 @@ TEST(TestNode, TestCapabilitySending) {
         SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":0,\"capabilityType\":2,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"BlueRange Node\",\"revision\":\"\\d+.\\d+.\\d+\"\\}"),
 #ifndef GITHUB_RELEASE
         SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":1,\"capabilityType\":4,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Featureset\",\"revision\":\"prod_mesh_nrf52\"\\}"),
-        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":2,\"capabilityType\":4,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Board Id\",\"revision\":\"Simulator Board \\(19\\)\"\\}"),
 #else
         SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":1,\"capabilityType\":4,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Featureset\",\"revision\":\"github_dev_nrf52\"\\}"),
-        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":2,\"capabilityType\":4,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Board Id\",\"revision\":\"UNKNOWN \\(19\\)\"\\}"),
 #endif
+        SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_entry\",\"index\":2,\"capabilityType\":4,\"manufacturer\":\"M-Way Solutions GmbH\",\"model\":\"Board Id\",\"revision\":\"Simulator Board \\(19\\)\"\\}"),
         SimulationMessage(1, "\\{\"nodeId\":2,\"type\":\"capability_end\",\"amount\":\\d+\\}"),
     };
     tester.SimulateUntilRegexMessagesReceived(100 * 1000, msgs);

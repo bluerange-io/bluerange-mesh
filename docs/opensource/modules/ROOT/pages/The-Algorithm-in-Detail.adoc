@@ -1,5 +1,5 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
-= FruityMesh Algorithm in Detail
+= BlueRange Mesh Algorithm in Detail
 
 ____
 Some parts of this documentation are outdated. Changes
@@ -331,7 +331,7 @@ Specific Data header is set to 0x024D, which is the registered
 company identifier of M-Way Solutions GmbH.
 
 A *Mesh Identifier* has been selected with a length of two bytes that
-is used to check if the packet is intended for FruityMesh (0xF0).
+is used to check if the packet is intended for BlueRange Mesh (0xF0).
 This allows for multiple protocols with the same Company Identifier.
 
 The *Network Identifier* allows to have multiple networks in the same
@@ -388,7 +388,7 @@ inconsistent data.
 The algorithm uses a state machine to manage its tasks, which is
 represented in a simplified form here:
 
-.Figure: Simplified FruityMesh state flow chart
+.Figure: Simplified BlueRange Mesh state flow chart
 image:node-states.png[states]
 
 After a node is initialized, it enters the DISCOVERY_HIGH state in which

@@ -225,9 +225,17 @@ struct SoftdeviceState {
 
 };
 
-struct InterruptSettings
+enum class GpioConfig : u8 {
+    INVALID,
+    DIGITAL_INPUT,
+    DIGITAL_OUTPUT
+};
+
+struct PinSettings
 {
-    bool isEnabled                       = false;
+    GpioConfig gpioConfig = GpioConfig::INVALID;
+    bool interruptEnabled = false;
+    bool currentState = false; // If the pin is currently low or high
     nrf_drv_gpiote_evt_handler_t handler = nullptr;
 };
 
@@ -272,7 +280,7 @@ struct NodeEntry {
 
     std::vector<int> impossibleConnection; //The rssi to these nodes is artificially increased to an unconnectable level.
 
-    std::map<u32, InterruptSettings> gpioInitializedPins; // Map from pin to settings
+    std::map<u32, PinSettings> gpioInitializedPins; // Map from pin to settings
     std::queue<u32> interruptQueue;
 
     bool bmgWasInit          = false;

@@ -53,6 +53,7 @@
 #include <FlashStorage.h>
 #include <Timeslot.h>
 #include <DeviceOff.h>
+#include <RegisterHandler.h>
 
 #ifndef GITHUB_RELEASE
 #if IS_ACTIVE(ASSET_MODULE)
@@ -301,7 +302,17 @@ void BootModules()
 
     //Start all Modules
     for (u32 i = 0; i < GS->amountOfModules; i++) {
+        //Every board has the ability to overwrite the module configuration before
+        //the module is started
+        if (Boardconfig->setCustomModuleSettings) {
+            Boardconfig->setCustomModuleSettings(GS->activeModules[i]->configurationPointer, GS->activeModules[i]);
+        }
+
+        //Loading the module configuraton will call the ConfigurationLoadedHandler
+        //after which the module will be initialized
         GS->activeModules[i]->LoadModuleConfigurationAndStart();
+
+        GS->activeModules[i]->moduleStarted = true;
     }
 
 #if IS_ACTIVE(SIG_MESH)
@@ -352,6 +363,14 @@ void BootModules()
     {
         // Here we boot in bulk mode. We don't check license in this mode.
     }
+
+    // Load the RegisterHandlers after everything else booted up.
+#ifdef JSTODO_PERSISTENCE
+    for (u32 i = 0; i < GS->amountOfRegisterHandlers; i++)
+    {
+        GS->registerHandlers[i]->LoadFromFlash();
+    }
+#endif
 }
 
 void StartFruityMesh()            //LCOV_EXCL_LINE Simulated in a different way
@@ -380,13 +399,13 @@ void DispatchSystemEvents(FruityHal::SystemEvents sys_evt)
 }
 
 //This function dispatches once a Button was pressed for some time
-void DispatchButtonEvents(u8 buttonId, u32 buttonHoldTime)
+void DispatchButtonEvents(u8 buttonId, u32 buttonHoldTimeDs)
 {
 #if IS_ACTIVE(BUTTONS)
-    logt("WARN", "Button %u pressed %u", buttonId, buttonHoldTime);
+    logt("MAIN", "Button %u pressed %u ds", buttonId, buttonHoldTimeDs);
     for(u32 i=0; i<GS->amountOfModules; i++){
         if(GS->activeModules[i]->configurationPointer->moduleActive){
-            GS->activeModules[i]->ButtonHandler(buttonId, buttonHoldTime);
+            GS->activeModules[i]->ButtonHandler(buttonId, buttonHoldTimeDs);
         }
     }
 #endif

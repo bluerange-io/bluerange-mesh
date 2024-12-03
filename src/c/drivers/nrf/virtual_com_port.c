@@ -163,6 +163,19 @@ ProcessSingleReceivedByteResult;
 /// read (in which case it should be processed as soon as possible) or if more bytes are required.
 static ProcessSingleReceivedByteResult ProcessSingleReceivedByte(uint8_t byte)
 {
+    if (lineToReadAvailable) {
+        // Ignore received byte, if the line is complete and has not been processed, yet.
+        return FRUITYMESH_VCOM_WHOLE_LINE_BUFFERED;
+    }
+
+    // Check if buffer is full to avoid potential buffer overflow.
+    if (lineBufferOffset >= VIRTUAL_COM_LINE_BUFFER_SIZE - 1) {
+        // Terminate the line to avoid buffer overflow
+        lineBuffer[VIRTUAL_COM_LINE_BUFFER_SIZE-1] = '\0'; 
+        lineToReadAvailable = true;
+        return FRUITYMESH_VCOM_WHOLE_LINE_BUFFERED;
+    }
+
     lineBuffer[lineBufferOffset] = byte;
     lineBufferOffset++;
 

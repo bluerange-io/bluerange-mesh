@@ -359,6 +359,8 @@ enum class ActorMessageActionType : u8
     READ = 2, // Read a value
     WRITE_ACK = 3, // Write with acknowledgement
     //CMD = 4, //deprecated as of 09.09.2021, use WRITE_ACK or WRITE instead
+    
+    INVALID = 0xFF
 };
 
 enum class SensorMessageActionType : u8
@@ -368,6 +370,8 @@ enum class SensorMessageActionType : u8
     READ_RSP = 2, // Response following a READ
     WRITE_RSP = 3, // Response following a WRITE_ACK that contains the data actually written
     RESULT_RSP = 4, //Response following a WRITE_ACK that contains a result code
+
+    INVALID = 0xFF
 };
 
 //COMPONENT_MESSAGE_HEADER is used for component_act and component_sense messages
@@ -406,6 +410,14 @@ typedef struct
     u16 registerAddress;
 }ComponentMessageHeaderVendor;
 STATIC_ASSERT_SIZE(ComponentMessageHeaderVendor, SIZEOF_COMPONENT_MESSAGE_HEADER_VENDOR);
+
+struct ConnPacketComponentMessageContents
+{
+    u16 component;
+    u16 registerAddress;
+    u8 payload[1];
+};
+STATIC_ASSERT_SIZE(ConnPacketComponentMessageContents, 5);
 
 //CONN_PACKET_COMPONENT_MESSAGE_VENDOR is used as a wrapper with a pointer to the payload for component messages
 //This packet generates a sensor event or instruct device to write data into register and send it through mesh
@@ -501,9 +513,21 @@ STATIC_ASSERT_SIZE(RawDataStartPayload, SIZEOF_RAW_DATA_START_PAYLOAD);
 
 enum class RawDataErrorType : u8
 {
-    UNEXPECTED_END_OF_TRANSMISSION = 0,
-    NOT_IN_A_TRANSMISSION = 1,
-    MALFORMED_MESSAGE = 2,
+    RESERVED = 0,
+    UNEXPECTED_END_OF_TRANSMISSION = 1,
+    NOT_IN_A_TRANSMISSION = 2,
+    MALFORMED_MESSAGE = 3,
+    UNSUPPORTED_PROTOCOL = 4,
+    MALFORMED_GZIP = 5,
+    MALFORMED_TYPE = 6,
+    INVALID_CHUNK_ID = 7,
+    TRANSMISSION_ABORTED = 8,
+    METADATA_UNPARSABLE = 9,
+    NOT_INTERESTED = 10,
+    OUT_OF_MEMORY = 11,
+    TERMINAL_NOT_REACHABLE = 12,
+    IMPLEMENTATION_NOT_REACHABLE = 13,
+
     START_OF_USER_DEFINED_ERRORS = 200,
     LAST_ID = 255
 };

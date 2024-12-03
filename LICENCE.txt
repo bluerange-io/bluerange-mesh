@@ -1,18 +1,18 @@
-                COMMERCIAL LICENSE FRUITYMESH/BLUERANGE
-                       VERSION 1.0, 01 Jan 2017
+                COMMERCIAL LICENSE BLUERANGE MESH
+                    VERSION 1.1, 19 Jun 2024
 
-FruityMesh Firmware is dual-licensed under commercial and open source 
-licenses. The commercial license of FruityMesh (termed “Bluerange”)  
+BlueRange Mesh Firmware is dual-licensed under commercial and open source 
+licenses. The commercial license of BlueRange Mesh
 gives you the full rights to create and distribute software on your 
 own terms without any open source license obligations. With the 
 commercial license you also have access to the official Bluerange 
 Support and close strategic relationship with M-Way Solutions GmbH 
 to make sure your development goals are met. 
 
-FruityMesh Firmware is also available under a *modified* GPL v3 open 
+BlueRange Mesh Firmware is also available under a *modified* GPL v3 open 
 source licenses. The modification is provided in the form of an exception.
 
-The FruityMesh open source licensing is ideal for use cases such as 
+The BlueRange Mesh Community Edition licensing is ideal for use cases such as 
 open source projects with open source distribution, student/academic 
 purposes, hobby projects, internal research projects without external 
 distribution, or other projects where the GPLv3 obligations with the 
@@ -20,7 +20,18 @@ exception can be met.
 
 NOTE: The modification to the GPL is included to allow you to distribute a
 combined work that includes Nordic SDK without being obliged to provide the
-source code for proprietary components outside of FruityMesh. 
+source code for proprietary components outside of BlueRange Mesh. 
+
+----------------------------------------------------------------------------
+
+Changelog of this license:
+
+Version 1.1 (19 Jun 2024):
+- Renamed FruityMesh (open source) to BlueRange Mesh Community Edition
+- Renamed FruityMesh (commercial) to BlueRange Mesh
+
+Version 1.0 (01 Jan 2017):
+- initial license release
 
 ----------------------------------------------------------------------------
 

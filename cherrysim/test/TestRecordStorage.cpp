@@ -37,7 +37,7 @@
 #include <Logger.h>
 #include <CherrySimTester.h>
 
-class TestRecordStorage : public ::testing::Test, public RecordStorageEventListener
+class TestRecordStorageFixture : public ::testing::Test, public RecordStorageEventListener
 {
 private:
     CherrySimTester* tester = nullptr;
@@ -109,7 +109,7 @@ public:
     }
 };
 
-TEST_F(TestRecordStorage, TestImmortalLockdownWithErrors) {
+TEST_F(TestRecordStorageFixture, TestImmortalLockdownWithErrors) {
     NodeIndexSetter setter(0);
     constexpr size_t nTestRecords = 2 * 8;
 
@@ -155,7 +155,7 @@ TEST_F(TestRecordStorage, TestImmortalLockdownWithErrors) {
     }
 }
 
-TEST_F(TestRecordStorage, TestImmortalLockdownPowerLoss) {
+TEST_F(TestRecordStorageFixture, TestImmortalLockdownPowerLoss) {
     NodeIndexSetter setter(0);
     constexpr size_t nTestImmortals = 15;
 
@@ -198,7 +198,7 @@ TEST_F(TestRecordStorage, TestImmortalLockdownPowerLoss) {
     }
 }
 
-TEST_F(TestRecordStorage, TestImmortalLockdownWhileDefragmenting) {
+TEST_F(TestRecordStorageFixture, TestImmortalLockdownWhileDefragmenting) {
     NodeIndexSetter setter(0);
 
     //Setup
@@ -282,7 +282,7 @@ TEST_F(TestRecordStorage, TestImmortalLockdownWhileDefragmenting) {
 }
 
 
-TEST_F(TestRecordStorage, TestCleanup) {
+TEST_F(TestRecordStorageFixture, TestCleanup) {
     NodeIndexSetter setter(0);
     logt("WARNING", "---- TEST CLEANUP ----");
 
@@ -361,7 +361,7 @@ TEST_F(TestRecordStorage, TestCleanup) {
     }
 }
 
-TEST_F(TestRecordStorage, TestSave) {
+TEST_F(TestRecordStorageFixture, TestSave) {
     NodeIndexSetter setter(0);
     u32 cmp = 0;
 
@@ -417,7 +417,7 @@ TEST_F(TestRecordStorage, TestSave) {
 
 //TODO: Check what happens if we use a record size that is larger than a page
 
-TEST_F(TestRecordStorage, TestRandomSingleRecordUpdates) {
+TEST_F(TestRecordStorageFixture, TestRandomSingleRecordUpdates) {
     NodeIndexSetter setter(0);
     logt("WARNING", "---- TEST RANDOM SINGLE RECORD UPDATE ----");
 
@@ -452,7 +452,7 @@ TEST_F(TestRecordStorage, TestRandomSingleRecordUpdates) {
     }
 }
 
-TEST_F(TestRecordStorage, TestGetNonExistentRecord) {
+TEST_F(TestRecordStorageFixture, TestGetNonExistentRecord) {
     NodeIndexSetter setter(0);
     logt("WARNING", "---- TEST GET NON EXISTENT RECORD ----");
 
@@ -467,7 +467,7 @@ TEST_F(TestRecordStorage, TestGetNonExistentRecord) {
     }
 }
 
-TEST_F(TestRecordStorage, TestGetNonExistentRecordAfterStore) {
+TEST_F(TestRecordStorageFixture, TestGetNonExistentRecordAfterStore) {
     NodeIndexSetter setter(0);
     logt("WARNING", "---- TEST GET NON EXISTENT RECORD AFTER STORE ----");
 
@@ -485,7 +485,7 @@ TEST_F(TestRecordStorage, TestGetNonExistentRecordAfterStore) {
     }
 }
 
-TEST_F(TestRecordStorage, TestDeactivateRecord) {
+TEST_F(TestRecordStorageFixture, TestDeactivateRecord) {
     NodeIndexSetter setter(0);
     logt("WARNING", "---- CLEANUP ----");
 
@@ -550,7 +550,7 @@ TEST_F(TestRecordStorage, TestDeactivateRecord) {
 }
 
 
-TEST_F(TestRecordStorage, TestImmortalizeRecord) {
+TEST_F(TestRecordStorageFixture, TestImmortalizeRecord) {
     NodeIndexSetter setter(0);
     logt("WARNING", "---- CLEANUP ----");
 
@@ -608,7 +608,7 @@ TEST_F(TestRecordStorage, TestImmortalizeRecord) {
 
 }
 
-TEST_F(TestRecordStorage, TestFlashBusy) {
+TEST_F(TestRecordStorageFixture, TestFlashBusy) {
     NodeIndexSetter setter(0);
     logt("WARNING", "---- CLEANUP ----");
 
@@ -650,7 +650,7 @@ TEST_F(TestRecordStorage, TestFlashBusy) {
 
 }
 
-TEST_F(TestRecordStorage, TestAsyncQueuing) {
+TEST_F(TestRecordStorageFixture, TestAsyncQueuing) {
     NodeIndexSetter setter(0);
     logt("WARNING", "---- CLEANUP ----");
 
@@ -713,7 +713,7 @@ TEST_F(TestRecordStorage, TestAsyncQueuing) {
 #define MULTI_RECORD_TEST_RECORD_MAX_SIZE 40
 u8 testBuffer[MULTI_RECORD_TEST_RECORD_MAX_SIZE * MULTI_RECORD_TEST_NUM_RECORD_IDS];
 
-TEST_F(TestRecordStorage, TestRandomMultiRecordUpdates) {
+TEST_F(TestRecordStorageFixture, TestRandomMultiRecordUpdates) {
     NodeIndexSetter setter(0);
     logt("WARNING", "---- TEST RANDOM MULTI RECORD UPDATE ----");
 
@@ -772,3 +772,27 @@ TEST_F(TestRecordStorage, TestRandomMultiRecordUpdates) {
         }
     }
 }
+
+//This makes sure that the FlashSorage will correctly process its queue, even if the BleStack was not initialized at some point
+#ifdef PROD_MESH_USB_NRF52840
+TEST(TestRecordStorage, TestFlashStorageBeforeBleStackInitBR14346)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.SetToPerfectConditions();
+    //testerConfig.verbose = true;
+    simConfig.nodeConfigName.insert({ "prod_mesh_usb_nrf52840", 1 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    //The page repair must be able to complete after the first boot of the node
+    //The Flash storage should not have any tasks left
+    tester.SimulateForGivenTime(10 * 1000);
+    ASSERT_EQ(cherrySimInstance->nodes[0].gs.flashStorage.GetNumberOfActiveTasks(), 0);
+
+    //The page repair must be able to complete as well after a reset
+    tester.SendTerminalCommand(1, "reset");
+    tester.SimulateForGivenTime(10 * 1000);
+    ASSERT_EQ(cherrySimInstance->nodes[0].gs.flashStorage.GetNumberOfActiveTasks(), 0);
+}
+#endif

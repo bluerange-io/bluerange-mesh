@@ -1,9 +1,9 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
 = Features
-FruityMesh can be seen both as a mesh and as a complete framework to make development of mesh applications very simple. It provides all the standards like meshing and the ability to connect to the mesh with a smartphone, but provides a lot more on top of that. Below is a non-exhaustive list of features that you get with FruityMesh.
+BlueRange Mesh can be seen both as a mesh and as a complete framework to make development of mesh applications very simple. It provides all the standards like meshing and the ability to connect to the mesh with a smartphone, but provides a lot more on top of that. Below is a non-exhaustive list of features that you get with BlueRange Mesh.
 
 == Mesh Features
-* Automatic meshing and self-healing capabilities with xref:The-FruityMesh-Algorithm.adoc[The FruityMesh Algorithm]
+* Automatic meshing and self-healing capabilities with xref:The-BlueRangeMesh-Algorithm.adoc[The BlueRange Mesh Algorithm]
 * Enrollment (Provisioning) of nodes both directly and over the mesh, e.g. using a QR code or with the "nearby" feature (see xref:EnrollmentModule.adoc[EnrollmentModule])
 * xref:MeshAccessModule.adoc[MeshAccessModule] for handling connections from/to smartphones and other devices
 * Encrypted mesh and smartphone connections by default using node (device), organization and multiple user keys (see xref:Specification.adoc#EncryptionKeys[Encryption Keys])
@@ -27,6 +27,7 @@ FruityMesh can be seen both as a mesh and as a complete framework to make develo
 * Predefined xref:Specification.adoc#UICR[UICR] structure that allows easy production of nodes with different xref:Specification.adoc#SerialNumbers[serial numbers] and settings
 * Small and highly optimized firmware size. It is modular and can be easily configured through the featureset
 * Abstraction from the BLE stack using our xref:FruityHal.adoc[FruityHal]
+* Choose between module messages or xref:RegisterAccess.adoc[register based access] to easily implement new sensor and actuator functionality
 * Lots of source code comments and easily understandable method and variable names (see source code ;-))
 
 == Reliability & Debugging
@@ -47,12 +48,12 @@ This is only an extract of the different features of the Modules. Make sure to t
 * xref:StatusReporterModule.adoc[StatusReporterModule] for monitoring the nodes
 
 == Closed Source Features
-A number of modules of FruityMesh are not yet open source but can be used by customers. Contact us if you are interested.
+A number of modules of BlueRange Mesh are not yet open source but can be used by customers. Contact us if you are interested.
 
-* xref:DfuModuleAbstract.adoc[DfuModule] firmware updates over the mesh. Not limited to FruityMesh, but also available for connected 3rd party controllers
+* xref:DfuModuleAbstract.adoc[DfuModule] firmware updates over the mesh. Not limited to BlueRange Mesh, but also available for connected 3rd party controllers
 * AssetModule: Broadcasting of asset telemetry messages that can be located indoors by our infrastructure
-* A number of xref:Tutorials.adoc[custom modules] and customization of FruityMesh have already been implemented for many customers.
-* A number of drivers, customized to work with FruityMesh
+* A number of xref:Tutorials.adoc[custom modules] and customization of BlueRange Mesh have already been implemented for many customers.
+* A number of drivers, customized to work with BlueRange Mesh
 
 == Upcoming Features
 
@@ -63,7 +64,7 @@ A number of modules of FruityMesh are not yet open source but can be used by cus
 
 [#CherrySim]
 === CherrySim
-* Compilation of *FruityMesh for x86* together with a simulator that abstracts the hardware and can simulate hundreds of nodes at the same time.
+* Compilation of *BlueRange Mesh for x86* together with a simulator that abstracts the hardware and can simulate hundreds of nodes at the same time.
 * Integrated *testing suite* to write tests against a mesh of multiple nodes that can all run with different featuresets.
 * Provides the ability to *Mock 3rd Party hardware*.
 * Supports stdio and TCP sockets
@@ -71,7 +72,7 @@ A number of modules of FruityMesh are not yet open source but can be used by cus
 * image:cherrysim.png[cherrysim]
 
 === Time Synchronisation
-FruityMesh has inbuilt time synchronization. A gateway or smartphone can act as a synchronisation device to send a unix timestamp to one node in the mesh. This node will then take care that this timestamp is synchronized to all other nodes in the mesh. If any number of nodes are rebooted, the time will be synchronized again if there is at least one node that still has the current time. By using a counter value, we make sure that the latest timestamp will be synchronized and that the time can be corrected in both directions. The time is always synchronized between two partners in a kind of handshake where first the time is sent to the other node and next, an offset is sent to account for the delay in sending that message. Further documentation can be found xref:Node.adoc#TimeSynchronization[here].
+BlueRange Mesh has inbuilt time synchronization. A gateway or smartphone can act as a synchronisation device to send a unix timestamp to one node in the mesh. This node will then take care that this timestamp is synchronized to all other nodes in the mesh. If any number of nodes are rebooted, the time will be synchronized again if there is at least one node that still has the current time. By using a counter value, we make sure that the latest timestamp will be synchronized and that the time can be corrected in both directions. The time is always synchronized between two partners in a kind of handshake where first the time is sent to the other node and next, an offset is sent to account for the delay in sending that message. Further documentation can be found xref:Node.adoc#TimeSynchronization[here].
 
 === Packet Splitting
 Depending on the configuration of the nodes in a network, the connection MTU (Maximum Transmission Unit) might only allow for a packet size of 20 bytes payload. As you will probably need to send bigger packets from time to time, we implemented automatic packet splitting. A packet can be queued with a size of up to 200 bytes and is then split automatically before it is sent to the next node at which point it is automatically reassembled. This process also makes sure that a packet uses the maximum possible MTU available.
@@ -83,7 +84,7 @@ During clustering, a new node performs a handshake with its partner node and exc
 If a sink is available through a connection, the number of hops to this sink will be sent with these packets. The sink itself has 0 hops to the sink. If there is no sink available, it is denoted with -1.
 
 === Connection Reestablishment
-FruityMesh relies an standard BLE GAP connections which have a configurable interval and timeout. These can be chosen depending on the use-case for either high throughput or low power consumption. If a small timeout is chosen and the environment has high radio interference, it can happen that these GAP connections are disconnected. In these cases, there is an extended timeout in which FruityMesh will try to reestablish the GAP connection multiple times until it succeeds. Packets will stay in the queue and will be sent after the connection was reestablished. This means, that aside from a higher latency, no packet loss will occur.
+BlueRange Mesh relies an standard BLE GAP connections which have a configurable interval and timeout. These can be chosen depending on the use-case for either high throughput or low power consumption. If a small timeout is chosen and the environment has high radio interference, it can happen that these GAP connections are disconnected. In these cases, there is an extended timeout in which BlueRange Mesh will try to reestablish the GAP connection multiple times until it succeeds. Packets will stay in the queue and will be sent after the connection was reestablished. This means, that aside from a higher latency, no packet loss will occur.
 
 === Watchdog With Safe Boot Mode
 The hardware watchdog is configured to restart a node after a certain time if it doesn't receive a keep alive packet from the gateway in the meantime. This is the last fallback to recover a node if there is some critical unknown issue. It is also possible to configure the Watchdog to work without a Gateway, it will then monitor the behaviour of the node itself.

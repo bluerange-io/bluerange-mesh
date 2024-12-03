@@ -838,11 +838,26 @@ void EnrollmentModule::DispatchPreEnrollment(Module* lastModuleCalled, PreEnroll
     logt("ENROLLMOD", "PreEnrollment succeeded");
 
     //First, clear all settings that are stored on the chip
-    RecordStorageResultCode errorCode = GS->recordStorage.LockDownAndClearAllSettings(Utility::GetWrappedModuleId(moduleId), this, (u32)EnrollmentModuleSaveActions::ERASE_RECORD_STORAGE);
-    if (errorCode != RecordStorageResultCode::SUCCESS)
-    {
-        logt("WARN", "Could not save because %u", (u32)errorCode);
-        GS->logger.LogCustomError(CustomErrorTypes::WARN_ENROLLMENT_LOCK_DOWN_FAILED, (u16)errorCode);
+    if (GS->config.enableRecordStorage) {
+        RecordStorageResultCode errorCode = GS->recordStorage.LockDownAndClearAllSettings(Utility::GetWrappedModuleId(moduleId), this, (u32)EnrollmentModuleSaveActions::ERASE_RECORD_STORAGE);
+        if (errorCode != RecordStorageResultCode::SUCCESS)
+        {
+            logt("WARNING", "Could not save because %u", (u32)errorCode);
+            GS->logger.LogCustomError(CustomErrorTypes::WARN_ENROLLMENT_LOCK_DOWN_FAILED, (u16)errorCode);
+        }
+
+        // => Continues in RecordStorageEventHandler
+    }
+    //For temporary enrollments, there is no need to do a factory reset, we can store the enrollment directly
+    //but we must call the naler afterwards to continue the code flow
+    else {
+        RecordStorageEventHandler(
+            Utility::GetWrappedModuleId(moduleId),
+            RecordStorageResultCode::SUCCESS,
+            (u32)EnrollmentModuleSaveActions::ERASE_RECORD_STORAGE,
+            nullptr,
+            0
+        );
     }
 }
 

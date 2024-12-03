@@ -35,6 +35,8 @@
 #include <Logger.h>
 
 #include <Terminal.h>
+#include <RegisterHandler.h>
+#include <AutoSenseModule.h>
 
 constexpr u8 STATUS_REPORTER_MODULE_CONFIG_VERSION = 2;
 constexpr u16 STATUS_REPORTER_MODULE_MAX_HOPS = NODE_ID_HOPS_BASE + NODE_ID_HOPS_BASE_SIZE - 1;
@@ -42,6 +44,7 @@ constexpr u16 STATUS_REPORTER_MODULE_MAX_HOPS = NODE_ID_HOPS_BASE + NODE_ID_HOPS
 constexpr size_t BATTERY_SAMPLES_IN_BUFFER = 1; //Number of SAADC samples in RAM before returning a SAADC event. For low power SAADC set this constant to 1. Otherwise the EasyDMA will be enabled for an extended time which consumes high current.
 
 enum class StatusReporterModuleComponent :u16 {
+    BASIC_REGISTER_HANDLER_FUNCTIONALITY = 0,
     DEBUG_TIME_SENSOR = 0xABCD,
 };
 
@@ -148,10 +151,12 @@ STATIC_ASSERT_SIZE(StatusReporterModuleKeepAliveMessage, 1);
  * or device status, current mesh connections, etc... it also does battery
  * measurement of the node and can be seen as a generic health service.
  */
-class StatusReporterModule: public Module
+class StatusReporterModule :
+    public Module,
+    public AutoSenseModuleDataProvider
 {
 public:
-        
+
         static constexpr RSSISamplingModes connectionRSSISamplingMode = RSSISamplingModes::HIGH;
         static constexpr u32 batteryMeasurementIntervalDs = SEC_TO_DS(6*60*60);
 
@@ -204,11 +209,13 @@ public:
             USB_PORT_CONNECTED = 1,
             USB_PORT_NOT_CONNECTED = 2, // overwrites the other states
             // 10.. set from outside, overwrites USB_PORT_CONNECTED
-            READY = 10,
-            USB_PORT_CONNECTED_BUT_UNKNOWN_STATUS = 11,
-            READY_BUT_NO_BLUERANGE_CONNECTION = 12,
-            READY_BUT_NOT_ENROLLED = 13,
-            READY_BUT_NO_MESH_CONNECTION = 14,
+            READY = 10, //Serial communication handshake done
+            USB_PORT_CONNECTED_BUT_UNKNOWN_STATUS = 11, // when the gateway failed to determine current state
+            READY_BUT_NO_BLUERANGE_CONNECTION = 12, // no server connection
+            READY_BUT_NOT_ENROLLED = 13, // edgerouter not enrolled
+            READY_BUT_NO_MESH_CONNECTION = 14, // enrolled but no other node is enrolled
+            READY_AND_DFU_IN_PROGRESS = 15, // dfu in progress, higher prio than NO_MESH_CONNECTION but lower prio than NOT_ENROLLED and NO_BLUERANGE_CONNECTION
+            EDGEROUTER_SHUTDOWN = 16, // edgerouter was shut down and _should_ be restarting
         };
 
 private:
@@ -401,5 +408,51 @@ private:
 
         // Device Capabilities
         CapabilityEntry GetCapability(u32 index, bool firstCall) override final;
+
+#if IS_ACTIVE(REGISTER_HANDLER)
+public:
+    // RegisterHandler
+
+    //Some generic default that works for some typical 2x AA rechargable batteries in row
+    // Overwrite this in your board configuration if you have a different battery setup
+    u32 referenceMilliVolt0Percent = 1800;
+    u32 referenceMilliVolt100Percent = 2600;
+    FruityHal::BleGapAddr gapAddrCache = {};
+    REGISTER_STRING(gapAddrStringCache, 18);
+
+    //Information Registers
+    constexpr static u32 REGISTER_GAP_ADDRESS_TYPE = 1000; //Size 1
+    constexpr static u32 REGISTER_GAP_ADDRESS = 1001; //Size 6
+    constexpr static u32 REGISTER_GAP_ZERO_PAD = 1007; //Size 1 (A rather hacky workaround to let a GAP address fit into a U64)
+    //Between these lines is a small bit of reserved space
+    constexpr static u32 REGISTER_GAP_ADDRESS_STRING = 1010; //Size 18
+
+    //Configuration Registers
+    constexpr static u32 REGISTER_REFERENCE_MILLI_VOLT_AT_0_PERCENT = 10000; //Size 4
+    constexpr static u32 REGISTER_REFERENCE_MILLI_VOLT_AT_100_PERCENT = 10004; //Size 4
+
+    //Data Registers
+    constexpr static u32 REGISTER_DEVICE_UPTIME = 30000; // Size 4
+    constexpr static u32 REGISTER_ABSOLUTE_UTC_TIME = 30004; // Size 4
+    constexpr static u32 REGISTER_ABSOLUTE_LOCAL_TIME = 30008; // Size 4
+
+    constexpr static u32 REGISTER_CLUSTER_SIZE = 30100; // Size 2
+    constexpr static u32 REGISTER_NUM_MESH_CONNECTIONS = 30102; // Size 1
+    constexpr static u32 REGISTER_NUM_OTHER_CONNECTIONS = 30103; // Size 1
+    constexpr static u32 REGISTER_MESH_CONNECTIONS_DROPPED = 30104; // Size 2
+    constexpr static u32 REGISTER_PACKETS_SENT_RELIABLE = 30106; // Size 4
+    constexpr static u32 REGISTER_PACKETS_SENT_UNRELIABLE = 30110; // Size 4
+    constexpr static u32 REGISTER_PACKETS_DROPPED = 30114; // Size 4
+    constexpr static u32 REGISTER_PACKETS_GENERATED = 30118; // Size 4
+
+    constexpr static u32 REGISTER_BATTERY_PERCENTAGE = 30200; // Size 1
+
+    protected:
+        virtual RegisterGeneralChecks GetGeneralChecks(u16 component, u16 reg, u16 length) const override final;
+        virtual void MapRegister(u16 component, u16 reg, SupervisedValue& out, u32& persistedId) override final;
+#endif //IS_ACTIVE(REGISTER_HANDLER)
+
+        // AutoSenseModuleDataProvider
+        void RequestData(u16 component, u16 register_, u8 length, AutoSenseModuleDataConsumer* provideTo) override;
 };
 

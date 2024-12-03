@@ -4,7 +4,7 @@ The terminal can be used to communicate with nodes either by connecting to them 
 
 == Setting Terminal Mode (Local Command)
 
-When working with UART (Terminal and UART must be enabled), FruityMesh
+When working with UART (Terminal and UART must be enabled), BlueRange Mesh
 supports a convenient blocking terminal mode with echo back
 functionality. For communication with another device such as a
 MeshGateway, an interrupt based input method and JSON output is used. To
@@ -27,7 +27,7 @@ feed '\r' is received. All output messages are in JSON format.
 
 
 == CRC checking on terminal commands and output
-FruityMesh supports CRC checks for terminal commands and JSON messages. There are multiple possibilities to enable CRC checks:
+BlueRange Mesh supports CRC checks for terminal commands and JSON messages. There are multiple possibilities to enable CRC checks:
 
 * Call `GS->terminal.EnableCrcChecks()` (done by prod_sink_nrf52 on boot)
 * Send some terminal command that contains a CRC at the end
@@ -76,4 +76,4 @@ This is a standardized way of providing a serial terminal via USB.
 
 Our implemention can e.g. be used with USB Dongles based on the nRF52840 SoC or with the nRF52840-DK which has a second Micro-USB port attached to the SoC which is used together with the USB peripheral.
 
-The FruityMesh binding is implemented in C in `src/c/drivers/nrf/virtual_com_port.[ch]` and used by the terminal implementation in `Terminal.cpp` for input and output.
+The BlueRange Mesh binding is implemented in C in `src/c/drivers/nrf/virtual_com_port.[ch]` and used by the terminal implementation in `Terminal.cpp` for input and output.

@@ -55,8 +55,10 @@ TEST(TestModule, TestCommands) {
     tester.SendTerminalCommand(1, "get_config 2 status");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"config\",\"module\":3,\"requestHandle\":0,\"config\":\"");
 
-    tester.SendTerminalCommand(1, "set_active 2 io on");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"set_active_result\",\"module\":6,\"requestHandle\":0,\"code\":0"); // 0 = SUCCESS
+    {
+        tester.SendTerminalCommand(1, "set_active 2 io on");
+        tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"set_active_result\",\"module\":6,\"requestHandle\":0,\"code\":0"); // 0 = SUCCESS
+    }
     {
         NodeIndexSetter setter(1);
         ASSERT_TRUE(static_cast<IoModule*>(GS->node.GetModuleById(ModuleId::IO_MODULE))->configurationPointer->moduleActive == true);
@@ -68,9 +70,10 @@ TEST(TestModule, TestCommands) {
         NodeIndexSetter setter(1);
         ASSERT_TRUE(static_cast<IoModule*>(GS->node.GetModuleById(ModuleId::IO_MODULE))->configurationPointer->moduleActive == true);
     }
-
-    tester.SendTerminalCommand(1, "set_active 2 io off");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"set_active_result\",\"module\":6,\"requestHandle\":0,\"code\":0"); // 0 = SUCCESS
+    {
+        tester.SendTerminalCommand(1, "set_active 2 io off");
+        tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":2,\"type\":\"set_active_result\",\"module\":6,\"requestHandle\":0,\"code\":0"); // 0 = SUCCESS
+    }
     {
         NodeIndexSetter setter(1);
         ASSERT_TRUE(static_cast<IoModule*>(GS->node.GetModuleById(ModuleId::IO_MODULE))->configurationPointer->moduleActive == false);

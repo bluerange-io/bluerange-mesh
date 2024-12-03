@@ -113,9 +113,12 @@ public:
 
     BaseConnection* pendingConnection = nullptr;
 
-    u16 droppedMeshPackets = 0;
-    u16 sentMeshPacketsUnreliable = 0;
-    u16 sentMeshPacketsReliable = 0;
+    //Some metric counters to measure the throughput
+    //A packet is always <= the MTU size and larger messages will count according to the packets they consisted of
+    u32 droppedMeshPackets = 0; //The total number of packets that had to be dropped due to peak traffic exceeding the queue size
+    u32 sentMeshPacketsUnreliable = 0; //The number of packets that were sent through the mesh on all connections without ACK
+    u32 sentMeshPacketsReliable = 0; //The number of packets that were sent through the mesh on all connections with ACK request
+    u32 generatedPackets = 0; // The amount of packets that this node has generated itself to be sent to the mesh or other partners.
 
     //ConnectionType Resolving
     void ResolveConnection(BaseConnection* oldConnection, BaseConnectionSendData* sendData, u8 const * data);
@@ -148,7 +151,7 @@ public:
     int ReestablishConnections() const;
 
     //Functions used for sending messages
-    void SendMeshMessage(u8* data, u16 dataLength) const;
+    void SendMeshMessage(u8* data, u16 dataLength);
 
     //Send a message with a ConnPacketModule header by using a ModuleId
     ErrorTypeUnchecked SendModuleActionMessage(MessageType messageType, ModuleId moduleId, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool lookback) const;
@@ -173,11 +176,11 @@ public:
 
     //Call this to dispatch a message to the node and all modules, this method will perform some basic
     //checks first, e.g. if the receiver matches
-    void DispatchMeshMessage(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packet, bool checkReceiver) const;
+    void DispatchMeshMessage(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packet, bool checkReceiver);
 
     //Internal use only, do not use
     //Can send packets as WRITE_REQ (required for some internal functionality) but can lead to problems with the SoftDevice
-    ErrorType SendMeshMessageInternal(u8* data, u16 dataLength, bool reliable, bool loopback, bool toMeshAccess) const;
+    ErrorType SendMeshMessageInternal(u8* data, u16 dataLength, bool reliable, bool loopback, bool toMeshAccess);
 
 
     BaseConnectionHandle GetConnectionFromHandle(u16 connectionHandle) const;

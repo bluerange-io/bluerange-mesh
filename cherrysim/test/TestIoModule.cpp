@@ -31,12 +31,13 @@
 
 #include <HelperFunctions.h>
 #include <CherrySimTester.h>
+#include <IoModule.h>
 
 TEST(TestIoModule, TestCommands) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
-    //testerConfig.verbose = false;
-    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 9 });
+    //testerConfig.verbose = true;
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2 });
     simConfig.SetToPerfectConditions();
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     //Could modify the default test or sim config here,...
@@ -46,28 +47,27 @@ TEST(TestIoModule, TestCommands) {
     tester.SendTerminalCommand(2, "action this io led on");
     tester.SimulateUntilMessageReceived(500, 2, "set_led_result");
 
-
     tester.SendTerminalCommand(1, "action 2 io pinset 1 high 2 high");
     tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"nodeId\":2,\"type\":\"set_pin_config_result\",\"module\":6");
 
-    // This only works because the virtual pins dont save their state and will always return 0.
+    // Reading a pin will configure it as an input and as there is no one setting it to high, it will be low
     // If tested for pinset low it will not work.
     // However, it's enough to test the command with response format.
     tester.SendTerminalCommand(1, "action 2 io pinread 1 2");
-    tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"nodeId\":2,\"type\":\"pin_level_result\",\"module\":6,\"pins\":[{\"pin_number\":1,\"pin_level\":1},{\"pin_number\":2,\"pin_level\":1}]");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"nodeId\":2,\"type\":\"pin_level_result\",\"module\":6,\"pins\":[{\"pin_number\":1,\"pin_level\":0},{\"pin_number\":2,\"pin_level\":0}]");
 
     // Test min. number of arguments
     tester.SendTerminalCommand(1, "action 2 io pinread 1");
-    tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"nodeId\":2,\"type\":\"pin_level_result\",\"module\":6,\"pins\":[{\"pin_number\":1,\"pin_level\":1}]");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, "{\"nodeId\":2,\"type\":\"pin_level_result\",\"module\":6,\"pins\":[{\"pin_number\":1,\"pin_level\":0}]");
 
     // Test max. number of arguments
     tester.SendTerminalCommand(1, "action 2 io pinread 1 2 3 4 5");
     tester.SimulateUntilMessageReceived(
         100 * 1000, 1, 
         "{\"nodeId\":2,\"type\":\"pin_level_result\",\"module\":6,\"pins\":"
-        "[{\"pin_number\":1,\"pin_level\":1},{\"pin_number\":2,\"pin_level\":1},"
-        "{\"pin_number\":3,\"pin_level\":1},{\"pin_number\":4,\"pin_level\":1},"
-        "{\"pin_number\":5,\"pin_level\":1}]"
+        "[{\"pin_number\":1,\"pin_level\":0},{\"pin_number\":2,\"pin_level\":0},"
+        "{\"pin_number\":3,\"pin_level\":0},{\"pin_number\":4,\"pin_level\":0},"
+        "{\"pin_number\":5,\"pin_level\":0}]"
     );
 }
 
@@ -154,3 +154,215 @@ TEST(TestIoModule, TestLedOnAssetOverMeshAccessSerialConnectWithOrgaKey)
         10 * 1000, 1, R"({"nodeId":33000,"type":"set_led_result","module":6,"requestHandle":55,"code":0})");
 }
 #endif
+
+#if defined(PROD_MESH_NRF52840_SDK17)
+TEST(TestIoModule, TestRegisterAccessBasic)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose = true;
+
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52840_sdk17", 1 });
+    simConfig.SetToPerfectConditions();
+
+    //The pin settings for the second node are loaded from board_19, which is the simulator board
+    //this board configures some acessible virtual pins that can be checked for their state
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    tester.Start();
+
+    // Test reading IO_OUTPUT_NUM
+    tester.SendTerminalCommand(1, "component_act 1 6 read 0 100 01");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":6,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x0064","payload":"Ag==")");
+
+    // Test reading IO_INPUT_NUM
+    tester.SendTerminalCommand(1, "component_act 1 6 read 0 101 01");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":6,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x0065","payload":"Aw==")");
+
+}
+
+//This tests that digital out registers can be written, read and change their state accordingly
+TEST(TestIoModule, TestRegisterAccessForDigitalOut)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose = true;
+
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52840_sdk17", 1 });
+    simConfig.SetToPerfectConditions();
+
+    //The pin settings for the second node are loaded from board_19, which is the simulator board
+    //this board configures some acessible virtual pins that can be checked for their state
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    tester.Start();
+    tester.SimulateUntilClusteringDone(60 * 1000);
+
+    tester.sim->EnableTagForAll("IOMOD");
+
+    {
+        // Set Register 20000 to 1
+        tester.SendTerminalCommand(1, "component_act 2 6 writeack 0 20000 01");
+        tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":2,"type":"component_sense","module":6,"requestHandle":0,"actionType":4,"component":"0x0000","register":"0x4E20")");
+
+        // The corresponding gpio should now be active
+        PinSettings& settings = tester.sim->nodes[1].gpioInitializedPins.at(100);
+        if (settings.currentState != true) SIMEXCEPTION(IllegalStateException);
+    }
+
+    {
+        // Set Register 20000 to 0 and 20001 to 1
+        tester.SendTerminalCommand(1, "component_act 2 6 writeack 0 20000 00:01");
+        tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":2,"type":"component_sense","module":6,"requestHandle":0,"actionType":4,"component":"0x0000","register":"0x4E20")");
+
+        // The corresponding first gpio should now be inactive again
+        PinSettings& settings = tester.sim->nodes[1].gpioInitializedPins.at(100);
+        if (settings.currentState != false) SIMEXCEPTION(IllegalStateException);
+
+        //Read back the two registers
+        tester.SendTerminalCommand(1, "component_act 2 6 read 0 20000 02");
+
+        //The states should be as written
+        tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":2,"type":"component_sense","module":6,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x4E20","payload":"AAE=")");
+
+    }
+}
+
+//This tests that digital input registers can be read
+TEST(TestIoModule, TestRegisterAccessForDigitalIn)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose = true;
+
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1 });
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52840_sdk17", 1 });
+    simConfig.SetToPerfectConditions();
+
+    //The pin settings for the second node are loaded from board_19, which is the simulator board
+    //this board configures some acessible virtual pins that can be checked for their state
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    tester.Start();
+    tester.SimulateUntilClusteringDone(60 * 1000);
+
+    tester.sim->EnableTagForAll("IOMOD");
+
+    {
+        // Read the gpio pin state of the second input pin
+        tester.SendTerminalCommand(1, "component_act 2 6 read 0 30001 01");
+        tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":2,"type":"component_sense","module":6,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x7531","payload":"AA==")");
+    }
+
+    {
+        //Modify the pin state of the second input pin
+        tester.sim->nodes[1].gpioInitializedPins.at(103).currentState = true;
+        
+        // Read the gpio pin state of both input pins
+        tester.SendTerminalCommand(1, "component_act 2 6 read 0 30000 02");
+        tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":2,"type":"component_sense","module":6,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x7530","payload":"AAE=")");
+    }
+
+    {
+        //Modify the pin state of the first input pin as well
+        tester.sim->nodes[1].gpioInitializedPins.at(102).currentState = true;
+
+        // Read the gpio pin state of both input pins again
+        tester.SendTerminalCommand(1, "component_act 2 6 read 0 30000 02");
+        tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":2,"type":"component_sense","module":6,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x7530","payload":"AQE=")");
+    }
+}
+
+//This uses AutoSense to capture events for a toggle input and uses AutoAct to set an output pin
+TEST(TestIoModule, TestRegisterInToOutLink)
+{
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose = true;
+
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52840_sdk17", 1 });
+    simConfig.SetToPerfectConditions();
+
+    //The pin settings for the second node are loaded from board_19, which is the simulator board
+    //this board configures some acessible virtual pins that can be checked for their state
+
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+
+    tester.Start();
+
+    tester.sim->EnableTagForAll("IOMOD");
+
+    //Check that setting the output pin works as expected
+    {
+        //Pin set to 1
+        tester.SendTerminalCommand(1, "component_act this 6 writeack 0 20000 01");
+        tester.SimulateUntilMessageReceived(10 * 1000, 1, "component_sense");
+        tester.SendTerminalCommand(1, "component_act this 6 read 0 20000 01");
+        tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":6,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x4E20","payload":"AQ=="})");
+
+        //Pin set to 0
+        tester.SendTerminalCommand(1, "component_act this 6 writeack 0 20000 00");
+        tester.SimulateUntilMessageReceived(10 * 1000, 1, "component_sense");
+        tester.SendTerminalCommand(1, "component_act this 6 read 0 20000 01");
+        tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":6,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x4E20","payload":"AA=="})");
+    }
+
+    //Configure AutoSense to report the first toggle input on change
+    AutoSenseTableEntryBuilder ast;
+    ast.entry.destNodeId = 0;
+    ast.entry.moduleId = Utility::GetWrappedModuleId(ModuleId::IO_MODULE);
+    ast.entry.component = 0;
+    ast.entry.register_ = IoModule::REGISTER_DIO_TOGGLE_PAIR_START;
+    ast.entry.length = 1;
+    ast.entry.dataType = DataTypeDescriptor::U8_LE;
+    ast.entry.pollingIvDs = 1;
+    ast.entry.reportingIvDs = 1;
+    ast.entry.reportFunction = AutoSenseFunction::ON_CHANGE_RATE_LIMITED;
+    tester.SendTerminalCommand(1, "action this autosense set_autosense_entry 0 0 %s", ast.getEntry().data());
+
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "set_autosense_entry_result");
+
+    //Configure AutoAct to relay the message into the first output register
+    AutoActTableEntryBuilder aat;
+    aat.entry.receiverNodeIdFilter = 0;
+    aat.entry.moduleIdFilter = Utility::GetWrappedModuleId(ModuleId::IO_MODULE);
+    aat.entry.componentFilter = 0; //0xF7 modbus device, 0x03 READ_SINGLE_HOLDING_REGISTER
+    aat.entry.registerFilter = IoModule::REGISTER_DIO_TOGGLE_PAIR_START;
+    aat.entry.targetModuleId = Utility::GetWrappedModuleId(ModuleId::IO_MODULE);
+    aat.entry.targetComponent = 0; //0xF7 modbus device, 0x03 WRITE_SINGLE_HOLDING_REGISTER
+    aat.entry.targetRegister = IoModule::REGISTER_DIO_OUTPUT_STATE_START;
+    aat.entry.orgDataType = DataTypeDescriptor::U8_LE;
+    aat.entry.targetDataType = DataTypeDescriptor::U8_LE;
+    aat.entry.flags = 0;
+    aat.addFunctionNoop();
+
+    tester.SendTerminalCommand(1, "action this autoact set_autoact_entry 0 0 %s", aat.getEntry().data());
+
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "set_autoact_entry_result");
+
+    tester.SimulateForGivenTime(1 * 1000);
+
+    //Set fake timestamps to make sure the toggle pair triggers
+    {
+        NodeIndexSetter setter(0);
+        IoModule* ioMod = (IoModule*)GS->node.GetModuleById(ModuleId::IO_MODULE);
+        ioMod->digitalInPinSettings[0].lastActiveTimeDs = 100;
+        ioMod->digitalInPinSettings[1].lastActiveTimeDs = 200;
+    }
+
+    tester.SendTerminalCommand(1, "sep");
+
+    //AutoSense correctly reports the DIO_TOGGLE_PAIR_1
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":6,"requestHandle":0,"actionType":0,"component":"0x0000","register":"0x7594","payload":"AQ=="})");
+
+    //Now, we expect that AutoAct generates the write to register 20000 for us
+    //Read register 20000 to see that it is now set to 1
+    tester.SendTerminalCommand(1, "component_act this 6 read 0 20000 01");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":6,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x4E20","payload":"AQ=="})");
+}
+
+#endif //defined(PROD_MESH_NRF52840_SDK17)

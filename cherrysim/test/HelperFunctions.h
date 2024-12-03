@@ -34,10 +34,8 @@
 
 #include <Exceptions.h>
 
-#ifndef GITHUB_RELEASE
 #include <AutoSenseModule.h>
 #include <AutoActModule.h>
-#endif //GITHUB_RELEASE
 
 template <typename ExceptionType, typename SetupFn, typename ActionFn>
 void RetryOrFail(int maxRetries, SetupFn setupFn, ActionFn actionFn)
@@ -60,7 +58,6 @@ void RetryOrFail(int maxRetries, SetupFn setupFn, ActionFn actionFn)
     ASSERT_LT(retry, maxRetries);
 }
 
-#ifndef GITHUB_RELEASE
 struct AutoSenseTableEntryBuilder
 {
 #pragma pack(push)
@@ -169,4 +166,3 @@ struct AutoActTableEntryBuilder
         CheckedMemset(functionList, 0, sizeof(functionList));
     }
 };
-#endif //GITHUB_RELEASE

@@ -62,7 +62,7 @@ void* fmBoardConfigPtr;
 
 Boardconf::Boardconf()
 {
-    CheckedMemset(&configuration, 0x00, sizeof(configuration));
+    configuration = {};
 }
 
 //A dummy so that we cannot have nullptr access issues
@@ -108,7 +108,7 @@ void Boardconf::ResetToDefaultConfiguration()
     configuration.dcDcEnabled = false;
     configuration.powerOptimizationEnabled = false;
 
-    getCustomPinset = &SetCustomPins_dummy;
+    configuration.getCustomPinset = &SetCustomPins_dummy;
 
     //Now, we load all Default boards (nRf Development kits)
     SetBoard_4(&configuration);
@@ -116,9 +116,7 @@ void Boardconf::ResetToDefaultConfiguration()
     SetBoard_39(&configuration);
 
 #ifdef SIM_ENABLED
-#ifndef GITHUB_RELEASE
     SetBoard_19(&configuration);
-#endif //GITHUB_RELEASE
 #endif
 
     //We call our featureset to check if additional boards are available and if they should be set

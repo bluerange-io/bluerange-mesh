@@ -827,7 +827,7 @@ ErrorType RuuviWeatherModule::Bme280Sensor::Initialize()
     }
 
     // make sure custom pinsets are available
-    const auto getCustomPinset = Boardconf::GetInstance().getCustomPinset;
+    const auto getCustomPinset = Boardconfig->getCustomPinset;
     if (!getCustomPinset)
     {
         logt(

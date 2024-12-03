@@ -81,16 +81,77 @@ uint8_t* simFlashPtr;
 
 extern "C"
 {
-    //################ UART ##################
-    void nrf_gpio_pin_set(uint32_t pin_number) {}
-    void nrf_gpio_pin_clear(uint32_t pin_number) {}
-    void nrf_gpio_pin_toggle(uint32_t pin_number) {}
-    void nrf_gpio_cfg_default(uint32_t pin_number) {}
-    void nrf_gpio_cfg_output(uint32_t pin_number) {}
-    void nrf_gpio_cfg_input(uint32_t pin_number, nrf_gpio_pin_pull_t pull_config) {}
-    void nrf_gpio_cfg_sense_input(uint32_t pin_number, nrf_gpio_pin_pull_t pull_config, nrf_gpio_pin_sense_t sense_config) {}
+    void nrf_gpio_pin_set(uint32_t pin_number) {
+        START_OF_FUNCTION();
+
+        if (cherrySimInstance->currentNode->gpioInitializedPins.find(pin_number) != cherrySimInstance->currentNode->gpioInitializedPins.end()) {
+            PinSettings& settings = cherrySimInstance->currentNode->gpioInitializedPins[pin_number];
+            if (settings.gpioConfig == GpioConfig::DIGITAL_OUTPUT) {
+                settings.currentState = true;
+            }
+        }
+    
+    }
+    void nrf_gpio_pin_clear(uint32_t pin_number) {
+        START_OF_FUNCTION();
+
+        if (cherrySimInstance->currentNode->gpioInitializedPins.find(pin_number) != cherrySimInstance->currentNode->gpioInitializedPins.end()) {
+            PinSettings& settings = cherrySimInstance->currentNode->gpioInitializedPins[pin_number];
+            if (settings.gpioConfig == GpioConfig::DIGITAL_OUTPUT) {
+                settings.currentState = false;
+            }
+        }
+    }
+    void nrf_gpio_pin_toggle(uint32_t pin_number) {
+        START_OF_FUNCTION();
+
+        if (cherrySimInstance->currentNode->gpioInitializedPins.find(pin_number) != cherrySimInstance->currentNode->gpioInitializedPins.end()) {
+            PinSettings& settings = cherrySimInstance->currentNode->gpioInitializedPins[pin_number];
+            if (settings.gpioConfig == GpioConfig::DIGITAL_OUTPUT) {
+                settings.currentState = !settings.currentState;
+            }
+        }
+    }
+    void nrf_gpio_cfg_default(uint32_t pin_number) {
+        START_OF_FUNCTION();
+
+        cherrySimInstance->currentNode->gpioInitializedPins.erase(pin_number);
+    }
+    void nrf_gpio_cfg_output(uint32_t pin_number) {
+        START_OF_FUNCTION();
+
+        PinSettings pinSettings;
+        pinSettings.gpioConfig = GpioConfig::DIGITAL_OUTPUT;
+
+        cherrySimInstance->currentNode->gpioInitializedPins.insert({ (u32)pin_number, pinSettings });
+    }
+    void nrf_gpio_cfg_input(uint32_t pin_number, nrf_gpio_pin_pull_t pull_config) {
+        START_OF_FUNCTION();
+
+        PinSettings pinSettings;
+        pinSettings.gpioConfig = GpioConfig::DIGITAL_INPUT;
+
+        DISCARD(pull_config); //We do not simulate the pull mode for now
+
+        cherrySimInstance->currentNode->gpioInitializedPins.insert({ (u32)pin_number, pinSettings });
+    }
+    uint32_t nrf_gpio_pin_read(uint32_t pin_number) {
+        START_OF_FUNCTION();
+
+        if (cherrySimInstance->currentNode->gpioInitializedPins.find(pin_number) != cherrySimInstance->currentNode->gpioInitializedPins.end()) {
+            PinSettings& settings = cherrySimInstance->currentNode->gpioInitializedPins[pin_number];
+            if (settings.gpioConfig == GpioConfig::DIGITAL_INPUT) {
+                return settings.currentState;
+            }
+        }
+        
+        return 0;
+    }
+    void nrf_gpio_cfg_sense_input(uint32_t pin_number, nrf_gpio_pin_pull_t pull_config, nrf_gpio_pin_sense_t sense_config) {
+        //TODO: Implement and generate a PORT event through the GPIOTE_IRQHandler
+
+    }
     void nrf_uart_baudrate_set(NRF_UART_Type *p_reg, nrf_uart_baudrate_t baudrate) {}
-    uint32_t nrf_gpio_pin_read(uint32_t pin) { return 1; }
     void nrf_uart_configure(NRF_UART_Type *p_reg, nrf_uart_parity_t parity, nrf_uart_hwfc_t hwfc) {}
     void nrf_uart_txrx_pins_set(NRF_UART_Type *p_reg, uint32_t pseltxd, uint32_t pselrxd) {}
     void nrf_uart_hwfc_pins_set(NRF_UART_Type *p_reg, uint32_t pselrts, uint32_t pselcts) {}
@@ -720,7 +781,7 @@ extern "C"
         if (cherrySimInstance->currentNode->gpioInitializedPins.find((u32)pin) != cherrySimInstance->currentNode->gpioInitializedPins.end())
         {
             //Pin was already initialized
-            SIMEXCEPTION(IllegalStateException);
+            SIMEXCEPTION(PinAlreadyInitializedException);
             return NRF_ERROR_INVALID_STATE;
         }
 
@@ -731,10 +792,11 @@ extern "C"
             return NRF_ERROR_NO_MEM;
         }
 
-        InterruptSettings interruptSettings;
-        interruptSettings.handler = evt_handler;
+        PinSettings pinSettings;
+        pinSettings.gpioConfig = GpioConfig::DIGITAL_INPUT;
+        pinSettings.handler = evt_handler;
 
-        cherrySimInstance->currentNode->gpioInitializedPins.insert({ (u32)pin, interruptSettings });
+        cherrySimInstance->currentNode->gpioInitializedPins.insert({ (u32)pin, pinSettings });
 
         return NRF_SUCCESS;
     }
@@ -742,7 +804,7 @@ extern "C"
     void nrf_drv_gpiote_in_event_enable(nrf_drv_gpiote_pin_t pin, bool enable)
     {
         if (cherrySimInstance->currentNode->gpioInitializedPins.find((u32)pin) != cherrySimInstance->currentNode->gpioInitializedPins.end()) {
-            cherrySimInstance->currentNode->gpioInitializedPins[pin].isEnabled = true;
+            cherrySimInstance->currentNode->gpioInitializedPins[pin].interruptEnabled = true;
         }
     }
 
@@ -1456,7 +1518,7 @@ extern "C"
     {
         START_OF_FUNCTION();
         if (tx_power == -40 || tx_power == -30 || tx_power == -20 || tx_power == -16
-            || tx_power == -12 || tx_power == -8 || tx_power == -4 || tx_power == 0 || tx_power == 4) {
+            || tx_power == -12 || tx_power == -8 || tx_power == -4 || tx_power == 0 || tx_power == 4 || tx_power == 8) {
             cherrySimInstance->currentNode->state.txPower = tx_power;
         }
         else {
@@ -1550,12 +1612,14 @@ extern "C"
             p[i] = 0xFFFFFFFF;
         }
 
-
-        if (cherrySimInstance->simConfig.simulateAsyncFlash) {
-            cherrySimInstance->currentNode->state.numWaitingFlashOperations++;
-        }
-        else {
-            DispatchSystemEvents(FruityHal::SystemEvents::FLASH_OPERATION_SUCCESS);
+        //If the stack is initialized, it will generate an event for the operation, if not, it will only return syncronously
+        if (cherrySimInstance->currentNode->state.initialized) {
+            if (cherrySimInstance->simConfig.simulateAsyncFlash) {
+                cherrySimInstance->currentNode->state.numWaitingFlashOperations++;
+            }
+            else {
+                DispatchSystemEvents(FruityHal::SystemEvents::FLASH_OPERATION_SUCCESS);
+            }
         }
 
         return NRF_SUCCESS;
@@ -1597,11 +1661,14 @@ extern "C"
             p_dst[i] &= p_src[i];
         }
 
-        if (cherrySimInstance->simConfig.simulateAsyncFlash) {
-            cherrySimInstance->currentNode->state.numWaitingFlashOperations++;
-        }
-        else {
-            DispatchSystemEvents(FruityHal::SystemEvents::FLASH_OPERATION_SUCCESS);
+        //If the stack is initialized, it will generate an event for the operation, if not, it will only return syncronously
+        if (cherrySimInstance->currentNode->state.initialized) {
+            if (cherrySimInstance->simConfig.simulateAsyncFlash) {
+                cherrySimInstance->currentNode->state.numWaitingFlashOperations++;
+            }
+            else {
+                DispatchSystemEvents(FruityHal::SystemEvents::FLASH_OPERATION_SUCCESS);
+            }
         }
 
         return NRF_SUCCESS;
@@ -1616,13 +1683,44 @@ extern "C"
 
         //TODO: Do the same checks for uuids, services, characteristics, etc,...
 
+        //The stack is now initialized
         cherrySimInstance->currentNode->state.initialized = true;
-        return 0;
+        return NRF_SUCCESS;
+    }
+
+    uint32_t sd_softdevice_is_enabled(uint8_t* p_softdevice_enabled)
+    {
+        START_OF_FUNCTION();
+
+        *p_softdevice_enabled = cherrySimInstance->currentNode->state.initialized ? 1 : 0;
+
+        return NRF_SUCCESS;
     }
 
     uint32_t nrf_sdh_enable_request()
     {
         START_OF_FUNCTION();
+        return NRF_SUCCESS;
+    }
+
+    uint32_t nrf_sdh_disable_request()
+    {
+        START_OF_FUNCTION();
+        cherrySimInstance->currentNode->state.initialized = false;
+        return NRF_SUCCESS;
+    }
+
+    uint32_t sd_softdevice_enable(nrf_clock_lf_cfg_t* clock_source, uint32_t* unsure)
+    {
+        START_OF_FUNCTION();
+        cherrySimInstance->currentNode->state.initialized = true;
+        return 0;
+    }
+
+    uint32_t sd_softdevice_disable()
+    {
+        START_OF_FUNCTION();
+        cherrySimInstance->currentNode->state.initialized = false;
         return 0;
     }
 
@@ -1839,17 +1937,6 @@ extern "C"
     //#### Not implemented for now ####
 
 
-    uint32_t sd_softdevice_enable(nrf_clock_lf_cfg_t* clock_source, uint32_t* unsure)
-    {
-        START_OF_FUNCTION();
-        return 0;
-    }
-
-    uint32_t sd_softdevice_disable()
-    {
-        START_OF_FUNCTION();
-        return 0;
-    }
 
     uint32_t sd_ble_gap_device_name_set(const ble_gap_conn_sec_mode_t* p_write_perm, const uint8_t* p_dev_name, uint16_t len)
     {

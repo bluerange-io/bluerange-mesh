@@ -14,7 +14,7 @@ For a complete list of error types, refer to the definitions in `Logger.h` as we
 == Logging Errors
 Errors are logged into different categories. See the `LoggingError` type in `Logger.h` for more information. One category is the REBOOT type that reports a number of different reasons for why a node has rebooted.
 
-To log an error in your custom application, use the `LogError` or `LogCount` methods from the `Logger` class. For an error, you have to give the LoggingError category which you should specify as `VENDOR`. Other categories are maintained by us and will be extended in future FruityMesh versions. You will be able to specify a 32bit error code and an extra with 32bits in which you can fill any information that you think might be helpful in finding the error.
+To log an error in your custom application, use the `LogError` or `LogCount` methods from the `Logger` class. For an error, you have to give the LoggingError category which you should specify as `VENDOR`. Other categories are maintained by us and will be extended in future BlueRange Mesh versions. You will be able to specify a 32bit error code and an extra with 32bits in which you can fill any information that you think might be helpful in finding the error.
 
 .Example
 [source,C++]

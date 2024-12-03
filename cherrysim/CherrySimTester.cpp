@@ -877,6 +877,8 @@ void SimulationMessage::MakeFound(const std::string & messageComplete)
 
 bool SimulationMessage::MatchesRegex(const std::string & message)
 {
+    //If you came here because of a std::regex_error, you might have missed escaping a special character such as {
+    // use \{ instead
     std::regex reg(messagePart);
     return std::regex_search(message, reg);
 }

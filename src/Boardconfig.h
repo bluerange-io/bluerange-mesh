@@ -96,6 +96,16 @@ typedef struct BoardConfiguration
 
     int8_t powerButton;
     uint8_t powerButtonActiveHigh;
+
+//This is also included from C code where we do not have access to some of the types that are accessible from C++
+//so we use void pointers instead
+#ifdef __cplusplus
+    void (*getCustomPinset)(CustomPins*) = nullptr;
+    void (*setCustomModuleSettings)(ModuleConfiguration* config, void* module) = nullptr;
+#else
+    void (*getCustomPinset)(void*);
+    void (*setCustomModuleSettings)(void* config, void* module);
+#endif
 } BoardConfiguration;
 #pragma pack(pop)
 
@@ -115,7 +125,6 @@ typedef struct BoardConfiguration
 
             void Initialize();
             void ResetToDefaultConfiguration();
-            void (*getCustomPinset)(CustomPins*) = nullptr;
 
             BoardConfiguration configuration;
 

@@ -2,7 +2,7 @@
 
 == Purpose
 
-The FruityMesh firmware supports routing packets to the closest sink in the mesh network, thus avoiding broadcasting packets through the whole mesh.
+The BlueRange Mesh firmware supports routing packets to the closest sink in the mesh network, thus avoiding broadcasting packets through the whole mesh.
 
 
 == Functionality
@@ -21,7 +21,7 @@ Please note that currently only one `DeviceType::SINK` is supported per network.
 === Validation During Normal Operation
 
 The value is validated through the `StatusModuleTriggerActionMessages::SET_KEEP_ALIVE` message of the `StatusReporterModule`.
-It uses the hops-counting mechanism of FruityMesh where the special node id range after `NODE_ID_HOPS_BASE` (see xref:Specification.adoc#NodeId[the specification]) is used.
+It uses the hops-counting mechanism of BlueRange Mesh where the special node id range after `NODE_ID_HOPS_BASE` (see xref:Specification.adoc#NodeId[the specification]) is used.
 
 This message is sent periodically by a sink to feed the watchdog, but is additionally used to count the hops to the sink.
 
@@ -43,4 +43,4 @@ In the simulator an exception is raised additionally (as the values should alway
 
 == More
 
-Please read the xref:Specification.adoc[] and the documents about the xref:The-FruityMesh-Algorithm.adoc[] and the xref:The-Algorithm-in-Detail.adoc[] for more details.
+Please read the xref:Specification.adoc[] and the documents about the xref:The-BlueRangeMesh-Algorithm.adoc[] and the xref:The-Algorithm-in-Detail.adoc[] for more details.

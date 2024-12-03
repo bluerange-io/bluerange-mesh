@@ -1,7 +1,7 @@
 = Mesh Access Connection
 
 == Purpose
-The MeshAccessConnection works closely with the xref:MeshAccessModule.adoc[MeshAccessModule] to provide a simple proxy for connecting to the mesh network from a device that does not need to implement the FruityMesh algorithm.
+The MeshAccessConnection works closely with the xref:MeshAccessModule.adoc[MeshAccessModule] to provide a simple proxy for connecting to the mesh network from a device that does not need to implement the BlueRange Mesh algorithm.
 
 == Functionality
 After discovering the MeshAccess Service and registering notifications for the TX characteristic, the ResolverConnection will instantiate a MeshAccessConnection. The MeshAccessConnection waits for an encryption handshake within a few seconds. If the handshake is not completed within this time, it will disconnect the connection to save resources.

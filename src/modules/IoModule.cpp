@@ -32,14 +32,15 @@
 #include "FmTypes.h"
 #include "FruityHal.h"
 #include <IoModule.h>
-
-
 #include <Logger.h>
 #include <Utility.h>
 #include <GlobalState.h>
 #include <Node.h>
+#include <AutoSenseModule.h>
+
 constexpr u8 IO_MODULE_CONFIG_VERSION = 1;
-#include <cstdlib>
+
+constexpr u32 HOLD_TIME_DURATION_DS = 5;
 
 IoModule::IoModule()
     : Module(ModuleId::IO_MODULE, "io")
@@ -72,21 +73,58 @@ void IoModule::ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableCo
     currentLedMode = configuration.ledMode;
 
     //Start the Module...
-    
     //Configure vibration motor and buzzer pin output pins
     vibrationPins.pinsetIdentifier = PinsetIdentifier::VIBRATION;
-    GS->boardconf.getCustomPinset(&vibrationPins);
+    Boardconfig->getCustomPinset(&vibrationPins);
     if(vibrationPins.vibrationPin != -1) FruityHal::GpioConfigureOutput(vibrationPins.vibrationPin);
 
     buzzerPins.pinsetIdentifier = PinsetIdentifier::BUZZER;
-    GS->boardconf.getCustomPinset(&buzzerPins);
+    Boardconfig->getCustomPinset(&buzzerPins);
     if(buzzerPins.buzzerPin != -1) FruityHal::GpioConfigureOutput(buzzerPins.buzzerPin);
+
+    //We only perform these actions when starting the module for the first time
+    //as we would otherwhise need to unregister some interrupts first
+    if (!moduleStarted) {
+        //Configure the Digital Output Pins
+        for (u32 i = 0; i < numDigitalOutPinSettings; i++) {
+            FruityHal::GpioConfigureOutput(digitalOutPinSettings[i].pin);
+            //Set to off by default
+            if (digitalOutPinSettings[i].activeHigh) {
+                FruityHal::GpioPinClear(digitalOutPinSettings[i].pin);
+            }
+            else {
+                FruityHal::GpioPinSet(digitalOutPinSettings[i].pin);
+            }
+        }
+
+        //Configure the Digital Input Pins
+        for (u32 i = 0; i < numDigitalInPinSettings; i++) {
+            FruityHal::GpioPullMode pullMode = digitalInPinSettings[i].activeHigh ? FruityHal::GpioPullMode::GPIO_PIN_PULLDOWN : FruityHal::GpioPullMode::GPIO_PIN_PULLUP;
+            FruityHal::GpioTransition gpioTransition = digitalInPinSettings[i].activeHigh ? FruityHal::GpioTransition::GPIO_TRANSITION_LOW_TO_HIGH : FruityHal::GpioTransition::GPIO_TRANSITION_HIGH_TO_LOW;
+
+            if (digitalInPinSettings[i].readMode == DigitalInReadMode::INTERRUPT) {
+                ErrorType err = FruityHal::GpioConfigureInterrupt(digitalInPinSettings[i].pin, pullMode, gpioTransition, GpioHandler);
+                if (err != ErrorType::SUCCESS) logt("ERROR", "Failed to initialize digital inputs: %u", (u32)err);
+            }
+            else {
+                FruityHal::GpioConfigureInput(digitalInPinSettings[i].pin, pullMode);
+            }
+        }
+
+        //Register our module as a data provider for AutoSense
+        AutoSenseModule* asMod = (AutoSenseModule*)GS->node.GetModuleById(ModuleId::AUTO_SENSE_MODULE);
+        if (asMod)
+        {
+            asMod->RegisterDataProvider(ModuleId::IO_MODULE, this);
+        }
+    }
 }
+
+
 
 void IoModule::TimerEventHandler(u16 passedTimeDs)
 {
-    //Do stuff on timer...
-
+    //LED control and Identification
     if (IsIdentificationActive())
     {
         // Check if identification time has run out.
@@ -195,6 +233,19 @@ void IoModule::TimerEventHandler(u16 passedTimeDs)
             // Controlled by other module
         }
     }
+
+    //DIO_INPUT_LAST_HOLD_TIME_#: Update the timestamp if the button is still pressed
+    //for use-cases such as dimming
+    for(u32 i=0; i<numDigitalInPinSettings; i++){
+        if (digitalInPinSettings[i].readMode == DigitalInReadMode::INTERRUPT)
+        {
+            u8 state = FruityHal::GpioPinRead(digitalInPinSettings[i].pin) ? 1 : 0;
+            u8 activeHigh = digitalInPinSettings[i].activeHigh;
+            if((state == activeHigh) && GS->appTimerDs >= digitalInPinSettings[i].lastActiveTimeDs + HOLD_TIME_DURATION_DS) {
+                digitalInPinSettings[i].lastHoldTimeDs = GS->appTimerDs;
+            }
+        }
+    }
 }
 
 #ifdef TERMINAL_ENABLED
@@ -271,6 +322,7 @@ TerminalCommandHandlerReturnType IoModule::TerminalCommandHandler(const char* co
 
                 if(TERMARGS(4, "on")) data.ledMode= LedMode::ON;
                 else if(TERMARGS(4, "off")) data.ledMode = LedMode::OFF;
+                else if(TERMARGS(4, "custom")) data.ledMode = LedMode::CUSTOM;
                 else if(TERMARGS(4, "connections")) data.ledMode = LedMode::CONNECTIONS;
                 else return TerminalCommandHandlerReturnType::UNKNOWN;
 
@@ -353,8 +405,8 @@ void IoModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnec
             IoModuleTriggerActionMessages actionType = (IoModuleTriggerActionMessages)packet->actionType;
             if(actionType == IoModuleTriggerActionMessages::SET_PIN_CONFIG){
 
-                configuration.ledMode = LedMode::OFF;
-                currentLedMode = LedMode::OFF;
+                configuration.ledMode = LedMode::CUSTOM;
+                currentLedMode = LedMode::CUSTOM;
 
                 //Parse the data and set the gpio ports to the requested
                 for(int i=0; i<dataFieldLength; i+=SIZEOF_GPIO_PIN_CONFIG)
@@ -580,4 +632,114 @@ void IoModule::StopIdentification()
 
     if(vibrationPins.vibrationPin >= 0) FruityHal::GpioPinClear(vibrationPins.vibrationPin);
     if(buzzerPins.buzzerPin >= 0) FruityHal::GpioPinClear(buzzerPins.buzzerPin);
+}
+
+#if IS_ACTIVE(REGISTER_HANDLER)
+RegisterGeneralChecks IoModule::GetGeneralChecks(u16 component, u16 reg, u16 length) const
+{
+    //We enable the RegisterHandler only for the implemented component id
+    if (component == (u16)IoModuleComponent::BASIC_REGISTER_HANDLER_FUNCTIONALITY) return RegisterGeneralChecks::RGC_SUCCESS;
+
+    return RegisterGeneralChecks::RGC_LOCATION_DISABLED;
+}
+
+void IoModule::MapRegister(u16 component, u16 register_, SupervisedValue& out, u32& persistedId)
+{
+    if (component == (u16)IoModuleComponent::BASIC_REGISTER_HANDLER_FUNCTIONALITY)
+    {
+        //Information Registers
+        if(register_ == REGISTER_DIO_OUTPUT_NUM) out.SetReadable(numDigitalOutPinSettings);
+        if(register_ == REGISTER_DIO_INPUT_NUM) out.SetReadable(numDigitalInPinSettings);
+        if(register_ == REGISTER_DIO_INPUT_TOGGLE_PAIR_NUM) out.SetReadable(numDigitalInTogglePairSettings);
+
+        //DIO_OUTPUT_STATE_#: Make the GPIO output pin states readable and writable
+        for(u32 i=0; i<numDigitalOutPinSettings; i++){
+            if(register_ == REGISTER_DIO_OUTPUT_STATE_START + i) out.SetWritable(&digitalOutPinSettings[i].state);
+        }
+
+        //DIO_INPUT_STATE_#: Make the GPIO input pin states readable
+        for(u32 i=0; i<numDigitalInPinSettings; i++){
+            if (register_ == REGISTER_DIO_INPUT_STATE_START + i)
+            {
+                u8 gpioVal = FruityHal::GpioPinRead(digitalInPinSettings[i].pin) ? 1 : 0;
+                if (!digitalInPinSettings[i].activeHigh) gpioVal = !gpioVal;
+                out.SetReadable(gpioVal);
+            }
+        }
+        
+        //DIO_TOGGLE_PAIR_#: Make the last toggled states for the interrupt based inputs readable
+        for(u32 i=0; i<numDigitalInTogglePairSettings; i++){
+            if (register_ == REGISTER_DIO_TOGGLE_PAIR_START + i)
+            {
+                u8 indexA = digitalInTogglePairSettings[i].pinIndexA;
+                u8 indexB = digitalInTogglePairSettings[i].pinIndexB;
+                u8 togglePairState = digitalInPinSettings[indexA].lastActiveTimeDs < digitalInPinSettings[indexB].lastActiveTimeDs;
+                out.SetReadable(togglePairState);
+            }
+        }
+
+        //DIO_INPUT_LAST_ACTIVE_TIME_#: Make the last toggled states for the interrupt based inputs readable
+        for(u32 i=0; i<numDigitalInPinSettings; i++){
+            if (register_ == REGISTER_DIO_INPUT_LAST_ACTIVE_TIME_START + i * sizeof(u32) && digitalInPinSettings[i].readMode == DigitalInReadMode::INTERRUPT)
+            {
+                out.SetReadable(digitalInPinSettings[i].lastActiveTimeDs);
+            }
+        }
+        
+        //DIO_INPUT_LAST_HOLD_TIME_#: Make the last toggled states for the interrupt based inputs readable
+        for(u32 i=0; i<numDigitalInPinSettings; i++){
+            if (register_ == REGISTER_DIO_INPUT_LAST_HOLD_TIME_START + i * sizeof(u32) && digitalInPinSettings[i].readMode == DigitalInReadMode::INTERRUPT)
+            {
+                out.SetReadable(digitalInPinSettings[i].lastHoldTimeDs);
+            }
+        }
+    }
+}
+
+void IoModule::ChangeValue(u16 component, u16 register_, u8* values, u16 length)
+{
+    if (component == 0)
+    {
+        //DIO_OUTPUT_STATE_#
+        //Set the GPIO output pins to the correct state once they are written
+        for(u32 i=0; i<numDigitalOutPinSettings; i++){
+            if(register_ == REGISTER_DIO_OUTPUT_STATE_START + i){
+                //Make sure the register cotains either 0 or 1
+                if(values[0] > 1) values[0] = 1;
+                u8 value = values[0];
+
+                //Set the Pin according to the received value
+                if(digitalOutPinSettings[i].activeHigh){
+                    if(value > 0 ) FruityHal::GpioPinSet(digitalOutPinSettings[i].pin);
+                        else FruityHal::GpioPinClear(digitalOutPinSettings[i].pin);
+                } else {
+                    if(value > 0 ) FruityHal::GpioPinClear(digitalOutPinSettings[i].pin);
+                        else FruityHal::GpioPinSet(digitalOutPinSettings[i].pin);
+                }
+            }
+        }
+    }
+}
+#endif //IS_ACTIVE(REGISTER_HANDLER)
+
+void IoModule::GpioHandler(u32 pin, FruityHal::GpioTransition transition)
+{
+    //trace("interrupt pin %u\n", pin);
+    //Once a digital-in interrupt triggers, we update the lastActiveTime for this entry
+    IoModule* ioMod = (IoModule*)GS->node.GetModuleById(ModuleId::IO_MODULE);
+    for (u32 i = 0; i < ioMod->numDigitalInPinSettings; i++) {
+        if (ioMod->digitalInPinSettings[i].pin == pin) {
+            ioMod->digitalInPinSettings[i].lastActiveTimeDs = GS->appTimerDs;
+            break;
+        }
+    }
+}
+
+void IoModule::RequestData(u16 component, u16 register_, u8 length, AutoSenseModuleDataConsumer* provideTo)
+{
+#if IS_ACTIVE(REGISTER_HANDLER)
+    DYNAMIC_ARRAY(buffer, length);
+    GetRegisterValues(component, register_, buffer, length);
+    provideTo->ConsumeData(ModuleId::IO_MODULE, component, register_, length, buffer);
+#endif //IS_ACTIVE(REGISTER_HANDLER)
 }
