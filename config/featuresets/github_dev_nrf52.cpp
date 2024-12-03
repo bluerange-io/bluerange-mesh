@@ -65,6 +65,7 @@ void SetFeaturesetConfiguration_github_dev_nrf52(ModuleConfiguration* config, vo
     }
     else if (config->moduleId == ModuleId::NODE)
     {
+#ifndef SIM_ENABLED
         //Specifies a default enrollment for the github configuration
         //This is just for illustration purpose so that all nodes are enrolled and connect to each other after flashing
         //For production, all nodes should have a unique nodeKey in the UICR and should be unenrolled
@@ -77,8 +78,8 @@ void SetFeaturesetConfiguration_github_dev_nrf52(ModuleConfiguration* config, vo
         c->networkId = 11;
         //Set a default network key of 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22
         CheckedMemcpy(c->networkKey, "\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22\x22", 16);
-
         //Info: The default node key and other keys are set in Conf::LoadDefaults()
+#endif //SIM_ENABLED
     }
 }
 

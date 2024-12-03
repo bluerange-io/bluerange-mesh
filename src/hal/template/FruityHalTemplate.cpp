@@ -231,6 +231,8 @@ void FruityHal::GpioPinClear(u32 pin){ }
 void FruityHal::GpioPinToggle(u32 pin){ }
 u32 FruityHal::GpioPinRead(u32 pin){ return 0; }
 ErrorType FruityHal::GpioConfigureInterrupt(u32 pin, GpioPullMode mode, GpioTransition trigger, GpioInterruptHandler handler){ return ErrorType::SUCCESS; }
+void FruityHal::GpioInterruptEventDisable(u32 pin){ }
+void FruityHal::GpioInterruptEventEnable(u32 pin){ }
 
 // ######################### ADC ############################
 

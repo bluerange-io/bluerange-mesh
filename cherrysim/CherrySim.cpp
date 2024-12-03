@@ -290,6 +290,9 @@ void CherrySim::PrepareSimulatedFeatureSets()
 #ifdef PROD_MESH_NRF52 //PROD_MESH_NRF52
     AddSimulatedFeatureSet(prod_mesh_nrf52);
 #endif //PROD_MESH_NRF52
+#ifdef PROD_MESH_NRF52840_SDK17 //PROD_MESH_NRF52840_SDK17
+    AddSimulatedFeatureSet(prod_mesh_nrf52840_sdk17);
+#endif //PROD_MESH_NRF52840_SDK17
 #ifdef PROD_MESH_USB_NRF52840
     AddSimulatedFeatureSet(prod_mesh_usb_nrf52840);
 #endif //PROD_MESH_USB_NRF52840
@@ -2001,11 +2004,11 @@ void CherrySim::QueueInterruptCurrentNode(u32 pin)
 
 void CherrySim::QueueAccelerationInterruptCurrentNode()
 {
-    if (GS->boardconf.getCustomPinset != nullptr && is_lis2dh12_moving_in_simulation() && is_lis2dh12_inertial_interrupt_enabled())
+    if (Boardconfig->getCustomPinset != nullptr && is_lis2dh12_moving_in_simulation() && is_lis2dh12_inertial_interrupt_enabled())
     {
         Lis2dh12Pins lis2dh12PinConfig;
         lis2dh12PinConfig.pinsetIdentifier = PinsetIdentifier::LIS2DH12;
-        GS->boardconf.getCustomPinset(&lis2dh12PinConfig);
+        Boardconfig->getCustomPinset(&lis2dh12PinConfig);
         if (lis2dh12PinConfig.interrupt1Pin != -1) QueueInterruptCurrentNode(lis2dh12PinConfig.interrupt1Pin);
         if (lis2dh12PinConfig.interrupt2Pin != -1) QueueInterruptCurrentNode(lis2dh12PinConfig.interrupt2Pin);
     }
@@ -2046,6 +2049,10 @@ void CherrySim::SetFeaturesets()
     }
     if (amountOfRedirectedFeaturesets > 0)
     {
+        //We do not include all of our source code files depending on the type of source code
+        //release, so we have to redirect some featuresets, which can cause some tests to fail
+        printf("WARNING: Featureset redirection is active for source code release" SEP);
+
         if (simConfig.nodeConfigName.find("github_dev_nrf52") == simConfig.nodeConfigName.end())
         {
             simConfig.nodeConfigName.insert({ "github_dev_nrf52", amountOfRedirectedFeaturesets });
@@ -3463,8 +3470,8 @@ void CherrySim::SimulateInterrupts()
             currentNode->interruptQueue.pop();
 
             if (cherrySimInstance->currentNode->gpioInitializedPins.find(pin) != cherrySimInstance->currentNode->gpioInitializedPins.end()) {
-                InterruptSettings &settings = currentNode->gpioInitializedPins[pin];
-                if (settings.isEnabled)
+                PinSettings &settings = currentNode->gpioInitializedPins[pin];
+                if (settings.gpioConfig == GpioConfig::DIGITAL_INPUT && settings.interruptEnabled)
                 {
                     //TODO The polarity is currently unused by every interrupt handler, thus we just pass 0 here.
                     settings.handler(pin, 0);

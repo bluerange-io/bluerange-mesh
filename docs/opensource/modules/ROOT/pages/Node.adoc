@@ -5,7 +5,7 @@ The _NodeModule_ has _ModuleId_ 0.
 
 == Purpose
 
-The _NodeModule_ is the central part of the FruityMesh algorithm. It is a mandatory module. It is responsible for clustering and other mesh related tasks and functionalities that are part of FruityMesh. It also has additional core functionality implemented.
+The _NodeModule_ is the central part of the BlueRange Mesh algorithm. It is a mandatory module. It is responsible for clustering and other mesh related tasks and functionalities that are part of BlueRange Mesh. It also has additional core functionality implemented.
 
 == Functionality
 

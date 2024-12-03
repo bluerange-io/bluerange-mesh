@@ -101,6 +101,29 @@ public:
     #endif
 
     CapabilityEntry GetCapability(u32 index, bool firstCall) override;
+
+#if IS_ACTIVE(REGISTER_HANDLER)
+public:
+    //####### Register Handler
+    constexpr static u32 DEMO_REGISTER_WRITABLE           = 20000; //Size 1
+    constexpr static u32 DEMO_REGISTER_SOME_STRING_BASE   = 20100; //Size 16
+    constexpr static u32 DEMO_REGISTER_CLAMPED_VALUE      = 20200; //Size 4
+
+    constexpr static u32 DEMO_REGISTER_READ_ONLY          = 30000; //Size 2
+
+    //Some variables to implement the demo functionality
+    u8 demoVarWritable = 0;
+    u16 demoVarReadOnly = 123;
+    REGISTER_STRING(demoVarSomeString, 16);
+    u32 demoVarClampedValue = 1000;
+
+protected:
+    virtual RegisterGeneralChecks GetGeneralChecks(u16 component, u16 reg, u16 length) const override final;
+    virtual RegisterHandlerCode CheckValues(u16 component, u16 reg, const u8* values, u16 length) const override final;
+    virtual void MapRegister(u16 component, u16 reg, SupervisedValue& out, u32& persistedId) override final;
+    virtual void ChangeValue(u16 component, u16 reg, u8* values, u16 length) override final;
+    virtual void OnRegisterRead(u16 component, u16 reg) override final;
+#endif //IS_ACTIVE(REGISTER_HANDLER)
 };
 
 #endif //IS_ACTIVE(VENDOR_TEMPLATE_MODULE)

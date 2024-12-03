@@ -2,7 +2,7 @@
 The former AdvertisingModule has been renamed to BeaconingModule to clear up confusion about its functionality and its naming similarity with the AdvertisingController. The short name of the Module is still adv to keep compatibility with the earlier naming of the BeaconingModule.
 
 == Purpose
-The _BeaconingModule_ with _ModuleId_ 1 allows the user to configure a number of advertising/beaconing messages to be sent periodically. It is possible to send iBeacon messages, EddyStone messages and other custom advertising messages without the need to update the firmware. Using FruityMesh in conjunction with a MeshGateway, a fully managed beacon infrastructure can be established.
+The _BeaconingModule_ with _ModuleId_ 1 allows the user to configure a number of advertising/beaconing messages to be sent periodically. It is possible to send iBeacon messages, EddyStone messages and other custom advertising messages without the need to update the firmware. Using BlueRange Mesh in conjunction with a MeshGateway, a fully managed beacon infrastructure can be established.
 
 The _BeaconingModule_ is only intended for beaconing messages that can subsequently be configured over the mesh. Take a look at the xref:AdvertisingController.adoc[AdvertisingController] documentation for how to schedule advertising messages in your implementation.
 

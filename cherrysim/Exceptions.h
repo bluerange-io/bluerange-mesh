@@ -93,7 +93,7 @@ CREATEEXCEPTIONINHERITING(DfuImageCrcException                         , Illegal
 CREATEEXCEPTIONINHERITING(TransformationFailedException                , IllegalStateException);
 CREATEEXCEPTIONINHERITING(PreambleNotAtStartException                  , IllegalStateException);
 CREATEEXCEPTIONINHERITING(DoubleDataOffsetException                    , IllegalStateException);
-
+CREATEEXCEPTIONINHERITING(PinAlreadyInitializedException               , IllegalStateException);
 
 CREATEEXCEPTION(BufferException);
 CREATEEXCEPTIONINHERITING(TriedToReadEmptyBufferException         , BufferException);

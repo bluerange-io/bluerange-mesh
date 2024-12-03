@@ -1,12 +1,12 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
-= Using RuuviTags with FruityMesh
+= Using RuuviTags with BlueRange Mesh
 
-FruityMesh can not only be used with the nRF52-DK or the nRF52840-DK from Nordic, but with many other boards with nRF52 Series SoCs.
+BlueRange Mesh can not only be used with the nRF52-DK or the nRF52840-DK from Nordic, but with many other boards with nRF52 Series SoCs.
 
-This article will teach you how to use the versatile https://ruuvi.com/ruuvitag-specs/[RuuviTags] from https://ruuvi.com[Ruuvi Innovations Oy] together with FruityMesh.
+This article will teach you how to use the versatile https://ruuvi.com/ruuvitag-specs/[RuuviTags] from https://ruuvi.com[Ruuvi Innovations Oy] together with BlueRange Mesh.
 We will flash the `prod_ruuvi_weather_nrf52` featureset which uses the `RuuviWeatherModule` that reads sensor data and sends it through the mesh to be advertised in a format compatible with the Ruuvi Station app from all connected nodes.
 
-This will give you multiple sensor nodes utilizing FruityMesh for establishing the self-finding, -maintaining, and -healing, bidirectional mesh based on scatter net logic.
+This will give you multiple sensor nodes utilizing BlueRange Mesh for establishing the self-finding, -maintaining, and -healing, bidirectional mesh based on scatter net logic.
 The mesh network is used to transport the sensor data from each node to every other node, which makes it possible to see sensor data from all mesh nodes regardless of the nodes you're physically close to.
 
 == Requirements
@@ -44,7 +44,7 @@ For a quick start you can flash the precompiled firmware `prod_ruuvi_weather_nrf
 Please follow xref:Quick-Start.adoc#Toolchain[toolchain installation guide] to setup your development environment.
 The commands in the following text were executed on a machine running Linux, you will have to adapt the paths according to your own setup.
 
-We will begin with a shell in your clone of the https://github.com/mwaylabs/fruitymesh[FruityMesh repository].
+We will begin with a shell in your clone of the https://github.com/bluerange-io/bluerange-mesh[BlueRange Mesh repository].
 
 ```
 ┏━ 2021-02-24 16:46:13 user@host:~/doc/code/fruitymesh

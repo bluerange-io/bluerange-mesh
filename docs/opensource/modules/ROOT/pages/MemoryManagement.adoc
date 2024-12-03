@@ -1,6 +1,6 @@
 = Memory Management
 
-FruityMesh does not use any Heap memory and thus prohibits the use auf malloc (see xref:BuildingWithCMake.adoc#allowMalloc[How to link with malloc]) and the C++ Keyword new (except placement new). There are two reasons for this:
+BlueRange Mesh does not use any Heap memory and thus prohibits the use auf malloc (see xref:BuildingWithCMake.adoc#allowMalloc[How to link with malloc]) and the C++ Keyword new (except placement new). There are two reasons for this:
 
 . The firmware gets smaller because the linker can remove all the heap allocation logic.
 . We can guarantee that the firmware will always behave the same and "works" from a memory perspective (except when a StackOverflow occurs).
@@ -11,7 +11,7 @@ To achieve a heap free project, several custom allocators were implemented. All 
 
 Although the name seems to suggest that the stack allocator is located on the stack (however, in our case this happens to be the case), this is not always true. The "stack" in "stack allocator" instead means the stack data structure. It is the simplest possible allocator. Is has continuous buffer and a readHead that is located at the start of the buffer on creation. If someone needs memory from the stack allocator, the readHead is moved forward in the buffer by the amount of bytes that were requested and the original readHead is returned.
 
-Other implementations also allow to pop memory off the stack, effectively freeing it. We did not need this however and thus this is not implemented in FruityMesh.
+Other implementations also allow to pop memory off the stack, effectively freeing it. We did not need this however and thus this is not implemented in BlueRange Mesh.
 
 == Pool Allocator
 
@@ -71,9 +71,9 @@ And when the last chunk is returned:
 +----------+
 ....
 
-== Usages of allocators in FruityMesh
+== Usages of allocators in BlueRange Mesh
 
-Currently three allocators exist in FruityMesh: ModuleAllocator, ConnectionAllocator, and ConnectionQueueMemoryAllocator.
+Currently three allocators exist in BlueRange Mesh: ModuleAllocator, ConnectionAllocator, and ConnectionQueueMemoryAllocator.
 
 === ModuleAllocator
 
@@ -91,7 +91,7 @@ u32 InitializeModules_prod_sink_nrf52(bool createModule)
 }
 ```
 
-These modules are located inside a StackAllocator, the ModuleAllocator. On FruityMesh startup, this function is called twice. Once with createModule == false, once with createModule == true. The purpose of the first pass is to find out how much memory is required to store all the modules, the second pass then allocates all required modules. The allocator is located inside the main stack frame (see src/Main.cpp) on real chips, and in the NodeEntry in the simulator.
+These modules are located inside a StackAllocator, the ModuleAllocator. On BlueRange Mesh startup, this function is called twice. Once with createModule == false, once with createModule == true. The purpose of the first pass is to find out how much memory is required to store all the modules, the second pass then allocates all required modules. The allocator is located inside the main stack frame (see src/Main.cpp) on real chips, and in the NodeEntry in the simulator.
 
 === ConnectionAllocator
 

@@ -29,6 +29,11 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include <FruityHal.h>
 #include <Boardconfig.h>
+#include <IoModule.h>
+#include <GlobalState.h>
+
+void SetCustomModuleSettings_18(ModuleConfiguration* config, void* module);
+
 //PCA10056 - nRF82840 Devkit
 void SetBoard_18(BoardConfiguration* c)
 {
@@ -53,5 +58,27 @@ void SetBoard_18(BoardConfiguration* c)
         c->dcDcEnabled = true;
         c->powerOptimizationEnabled = false;
         c->powerButton =  -1;
+        c->setCustomModuleSettings = &SetCustomModuleSettings_18;
+    }
+}
+
+void SetCustomModuleSettings_18(ModuleConfiguration* config, void* module)
+{
+    //We configure a number of digital outputs and inputs that were not
+    //configured as LEDs or buttons above
+    if (config->moduleId == ModuleId::IO_MODULE)
+    {
+        IoModule* mod = (IoModule*)module;
+        mod->currentLedMode = LedMode::CUSTOM;
+
+        //Digital Outputs
+        mod->AddDigitalOutForBoard(FruityHal::ConvertPortToGpio(0, 16), false); //LED4
+
+        //Digital Inputs
+        mod->AddDigitalInForBoard(FruityHal::ConvertPortToGpio(0, 24), false, IoModule::DigitalInReadMode::INTERRUPT); //Button3
+        mod->AddDigitalInForBoard(FruityHal::ConvertPortToGpio(0, 25), false, IoModule::DigitalInReadMode::INTERRUPT); //Button4
+
+        //Toggle Pairs
+        mod->AddTogglePairForBoard(0, 1);
     }
 }

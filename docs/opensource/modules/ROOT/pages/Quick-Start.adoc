@@ -3,12 +3,12 @@ ifndef::imagesdir[:imagesdir: ../assets/images]
 :page-partial:
 image:cpp.png[cplusplus]
 
-FruityMesh can be built using GCC and is mainly written in {cpp}, with some small {cpp}11 bits. Setting up the development environment has become pretty straightforward.
+BlueRange Mesh can be built using GCC and is mainly written in {cpp}, with some small {cpp}11 bits. Setting up the development environment has become pretty straightforward.
 
 You have three possibilities:
 
 * xref:#Precompiled[Flashing the precompiled firmware] will take you about *5 minutes*.
-* If you want to *compile it yourself* you need to xref:#Toolchain[setup the Toolchain with VsCode & Compile FruityMesh]. This will take you a few more minutes until everything is ready to go.
+* If you want to *compile it yourself* you need to xref:#Toolchain[setup the Toolchain with VsCode & Compile BlueRange Mesh]. This will take you a few more minutes until everything is ready to go.
 * We also offer a *simulator* that allows you to do a lot of the development work on your computer instead of on the hardware itself. You can set up mesh networks of hundreds of nodes at the same time while being able to control and debug them all. Take a look at xref:CherrySim.adoc[CherrySim] for building and usage instructions. It is possible to do most of the development work without even having access to a hardware development kit.
 
 [#Precompiled]
@@ -42,17 +42,17 @@ image:flashing.png[flashing]
 If you have multiple boards attached, you will be prompted for the id of your board that should be flashed.
 
 === Next Steps
-You're now ready to test FruityMesh. Continue by reading the <<Get Started,Get Started>> section.
+You're now ready to test BlueRange Mesh. Continue by reading the <<Get Started,Get Started>> section.
 
 [#Toolchain]
-== Compile FruityMesh
-FruityMesh is built using the GCC compiler toolchain together with CMake and GNU make. The installation process varies a little for each operating system.
+== Compile BlueRange Mesh
+BlueRange Mesh is built using the GCC compiler toolchain together with CMake and GNU make. The installation process varies a little for each operating system.
 
-=== Clone the FruityMesh Repository
+=== Clone the BlueRange Mesh Repository
 
-Clone the FruityMesh Repository in a folder of your choice, e.g. using the command line:
+Clone the BlueRange Mesh Repository in a folder of your choice, e.g. using the command line:
 
-`git clone https://github.com/mwaylabs/fruitymesh.git`
+`git clone https://github.com/bluerange-io/bluerange-mesh.git`
 
 === Installing the Toolchain
 ==== GNU ARM Embedded Toolchain
@@ -117,8 +117,8 @@ http://gnuwin32.sourceforge.net/downlinks/coreutils-dep-zip.php
 
 Finally, you should add the bin folders of the gnu buildtools to your PATH variable as well, e.g.  under System Environment. This will make sure that you can access these tools from anywhere.
 
-=== Building FruityMesh
-Now, you have a few options on how to build FruityMesh. We recommend using VsCode for building and coding with FruityMesh as it has a really nice CMake integration and can be set up in a short time.
+=== Building BlueRange Mesh
+Now, you have a few options on how to build BlueRange Mesh. We recommend using VsCode for building and coding with BlueRange Mesh as it has a really nice CMake integration and can be set up in a short time.
 
 === Option 1: Using VsCode
 If you do not have VsCode installed, get it for your platform from:
@@ -150,7 +150,7 @@ In order to configure the project, you should create the file `<fruitymesh-folde
 
 TIP: If you want to compile an SDK17 featureset, you need to change both the GCC_PATH to point to the `gcc-arm-none-eabi-9-2020-q2-update` version and your build directory should also be changed to e.g. `vscode_sdk17` as you will run into issues when using the same build directory for different toolchain versions.
 
-Now, if not already opened, you should open VsCode and use `File => Open Folder` to open the FruityMesh project folder. This should look similar to the following screenshot, with the `.vscode` folder as part of the repository.
+Now, if not already opened, you should open VsCode and use `File => Open Folder` to open the BlueRange Mesh project folder. This should look similar to the following screenshot, with the `.vscode` folder as part of the repository.
 
 image:vscode_project.png[vscode project]
 
@@ -175,7 +175,7 @@ For more information about VsCode, how to setup Debugging or for some Troublesho
 You can now continue with the xref:#GetStarted[Get Started] section.
 
 === Option 2: Manual CMake Project Configuration
-If you want to build FruityMesh on the command line, use the following instructions. Further explanation can be found under xref:BuildingWithCMake.adoc[Building With CMake]
+If you want to build BlueRange Mesh on the command line, use the following instructions. Further explanation can be found under xref:BuildingWithCMake.adoc[Building With CMake]
 
 Open a command line in `<fruitymesh-folder>/_build/commandline` and execute the following command within that directory. Make sure to replace the path to GCC to fit your installation (use forward slashes "*/*"):
 
@@ -210,14 +210,14 @@ To generate the project settings, open a commandline in the `fruitymesh_eclipse`
 
 `cmake ../fruitymesh -DBUILD_TYPE=FIRMWARE -DGCC_PATH="C:/<yourpath>/gcc-arm-none-eabi-4_9" -G "Eclipse CDT4 - Unix Makefiles"`
 
-After starting Eclipse, all you have to do is to import the generated FruityMesh project. You can then develop, flash and debug in a comfortable way.
+After starting Eclipse, all you have to do is to import the generated BlueRange Mesh project. You can then develop, flash and debug in a comfortable way.
 
 [#GetStarted]
 == Get Started
-Now, let's see how we can use FruityMesh. The precompiled firmware and the standard project settings are configured so that all devices immediately connect to each other. Start by plugging in your first development kit.
+Now, let's see how we can use BlueRange Mesh. The precompiled firmware and the standard project settings are configured so that all devices immediately connect to each other. Start by plugging in your first development kit.
 
 === Open Serial Terminal & Connect
-FruityMesh offers a xref:Terminal.adoc[Terminal] to interact with the firmware. On Windows, http://www.chiark.greenend.org.uk/~sgtatham/putty/download.html[PuTTY] is the best tool for this job. The screen utility can be used on macOS or Linux. You have to connect to UART using the following settings:
+BlueRange Mesh offers a xref:Terminal.adoc[Terminal] to interact with the firmware. On Windows, http://www.chiark.greenend.org.uk/~sgtatham/putty/download.html[PuTTY] is the best tool for this job. The screen utility can be used on macOS or Linux. You have to connect to UART using the following settings:
 
 * *Serial line to connect to:* COMX (see blow)
 * *Connection Type:* Serial
@@ -233,7 +233,7 @@ TIP: On Windows you can find the correct COM port to connect to by opening the d
 
 TIP: You can also use the Segger RTT viewer to connect to the terminal of the node. Just open the viewer and select the correct settings while the debugger is connected to your computer.
 
-Once FruityMesh is running, make sure to take a look at our native simulator xref:CherrySim.adoc[CherrySim] which you can use to fully develop FruityMesh based applications on your development machine without the need to work on the hardware itself. This greatly simplifies debugging and error analysis.
+Once BlueRange Mesh is running, make sure to take a look at our native simulator xref:CherrySim.adoc[CherrySim] which you can use to fully develop BlueRange Mesh based applications on your development machine without the need to work on the hardware itself. This greatly simplifies debugging and error analysis.
 
 === Reset Development Kit
 Once your terminal is connected to the serial port, press the reset button on the Development Kit and the Terminal should provide you with some output similar to this:
@@ -273,6 +273,6 @@ Some of the defaults that are currently used for demonstration purpose:
 
 
 == What's Next
-Take a look at the xref:Features.adoc[Features] page for a detailed overview of the possibilities and check out xref:BasicUsage.adoc[Basic Usage] for usage instructions. If you're ready to contribute to the development of FruityMesh, cf. xref:Developers.adoc[Developers] for a roadmap and for instructions on how to participate.
+Take a look at the xref:Features.adoc[Features] page for a detailed overview of the possibilities and check out xref:BasicUsage.adoc[Basic Usage] for usage instructions. If you're ready to contribute to the development of BlueRange Mesh, cf. xref:Developers.adoc[Developers] for a roadmap and for instructions on how to participate.
 
-If you want to start programming with FruityMesh, you should have a look at the xref:Tutorials.adoc[Tutorials] page for a guided introduction.
+If you want to start programming with BlueRange Mesh, you should have a look at the xref:Tutorials.adoc[Tutorials] page for a guided introduction.

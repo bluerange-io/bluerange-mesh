@@ -1,6 +1,6 @@
 = Implementation Details
 
-The following is an unordered list of in depth documentation of various bits of FruityMesh.
+The following is an unordered list of in depth documentation of various bits of BlueRange Mesh.
 
 == Time Sync
 Time syncing is documented here:

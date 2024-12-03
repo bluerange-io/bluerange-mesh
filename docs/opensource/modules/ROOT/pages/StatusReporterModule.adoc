@@ -164,8 +164,10 @@ enum class GatewayStatus : u8 {
     READY = 10, //Serial communication handshake done
     USB_PORT_CONNECTED_BUT_UNKNOWN_STATUS = 11, // when the gateway failed to determine current state
     READY_BUT_NO_BLUERANGE_CONNECTION = 12, // no server connection
-    READY_BUT_NOT_ENROLLED = 13,
+    READY_BUT_NOT_ENROLLED = 13, // edgerouter not enrolled
     READY_BUT_NO_MESH_CONNECTION = 14, // enrolled but no other node is enrolled
+    READY_AND_DFU_IN_PROGRESS = 15, // dfu in progress, higher prio than NO_MESH_CONNECTION but lower prio than NOT_ENROLLED and NO_BLUERANGE_CONNECTION
+    EDGEROUTER_SHUTDOWN = 16, // edgerouter was shut down and _should_ be restarting
 };
 ```
 
@@ -407,3 +409,61 @@ This feature is part of xref:SinkRouting.adoc[sink routing].
 |8 |xref:Specification.adoc#connPacketModule[connPacketModule] |header|*messageType:* MODULE_ACTION_RESPONSE(52), *actionType:* GATEWAY_STATUS(14)
 |1 |u8 |gatewayStatus |see xref:#SetGatewayStatusEnum[enum above]
 |===
+
+[#RegisterAccess]
+== Register Based Functionality
+
+We offer a xref:RegisterAccess.adoc[generic register based access] to a number of values as well. Using this functionality makes it very easy to configure health / status reporting based on the use-case using AutoSense.
+
+=== Register Mapping
+
+[cols="1,1,4,1,1,1,10"]
+|===
+|Component|Register|Name|DataType (Length)|Min ... Max (Default)|R/W|Description
+
+7+|*Information Registers*
+|0|1000|GAP_ADDRESS_TYPE|U8(1)|-|R|The GAP address Type as FruityHal::BleGapAddrType
+|0|1001|GAP_ADDRESS|RAW(6)|-|R|The current GAP address of the device, also known as MAC address
+|0|1007|GAP_ZERO_PAD|U8(1)|0 ... 0 (0)|R|Always set to 0 so that the Gap Address and Type can be read as a U64
+|0|1010|GAP_ADDR_STRING|ASCII(18)|-|R|The GAP address in its typical hex-string representation and zero terminated
+
+7+|*Configuration Registers*
+|0|10000|REFERENCE_MILLI_VOLT_AT_0_PERCENT|U32(4)|(1000)|R|Reference voltage (in millivolts) that represents the lowest level at which the device can still work correctly. (Currently only settable via board configuration)
+|0|10004|REFERENCE_MILLI_VOLT_AT_100_PERCENT|U32(4)|(2500)|R|Reference voltage (in millivolts) that represents the level of factory new batteries where they are fully charged. (Currently only settable via board configuration)
+
+7+|*Data Registers*
+|0|30000|DEVICE_UPTIME|U32(4)|-|R|Contains the time since device reboot in deciseconds
+|0|30004|ABSOLUTE_UTC_TIME|U32(4)|-|R|Contains the absolute UTC time in seconds that was synced to the device or 0 if not available.
+|0|30008|ABSOLUTE_LOCAL_TIME|U32(4)|-|R|Contains the local time (UTC time including timezone offset) in seconds that was synced to the device or 0 if not available.
+
+|0|30100|CLUSTER_SIZE|U16(2)|-|R|The amount of currently connected mesh nodes in the whole mesh, including the own node.
+|0|30102|NUM_MESH_CONNECTIONS|U8(1)|-|R|The amount of opened mesh relay connections to other nodes
+|0|30103|NUM_OTHER_CONNECTIONS|U8(1)|-|R|The amount of other BLE connections (e.g. MeshAccess) that are not used to form the mesh.
+|0|30104|MESH_CONNECTIONS_DROPPED|U16(2)|-|R|The total amount of mesh connections that were dropped accidentially or on purpose.
+|0|30106|PACKETS_SENT_RELIABLE|U32(4)|-|R|The number of packets that were sent through the mesh on all connections with ACK request.
+|0|30110|PACKETS_SENT_UNRELIABLE|U32(4)|-|R|The number of packets that were sent through the mesh on all connections without ACK.
+|0|30114|PACKETS_DROPPED|U32(4)|-|R|The total number of packets that had to be dropped due to peak traffic exceeding the queue size.
+|0|30118|PACKETS_GENERATED|U32(4)|-|R|The amount of packets that this node has generated itself to be sent to the mesh or other partners.
+
+|0|30200|BATTERY_PERCENTAGE|U8(1)|0 ... 100|R|The battery percentage, where 0% represents an empty battery and 0xFF an invalid measurement (e.g. connected to power supply).
+
+|===
+
+NOTE: The reference voltagses are currently not writable as the generic register implementation does not yet have persistence included. It should therefore be set through the board configuration.
+
+=== Potential Use-Cases
+
+* Use AutoSense to periodically report the battery percentage to monitor the expected remaining device runtime.
+* Detect device reboots by monitoring the device uptime.
+* Monitor the mesh stability through the cluster size.
+
+.Examples
+[source,C++]
+----
+//Check the device uptime
+component_act this 3 read 0 30000 04
+
+//Check the battery level
+component_act this 3 read 0 30200 01
+
+----

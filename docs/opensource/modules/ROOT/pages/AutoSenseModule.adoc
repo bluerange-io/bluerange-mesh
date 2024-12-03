@@ -1,0 +1,250 @@
+= Auto Sense Module (ID 15)
+
+== Purpose
+The _AutoSenseModule_ provides a configurable way to periodically poll data from a module or 3rd party controller and send the results to some chosen receiver. Data is reported as component_sense. The module itself is completely agonostic when it comes to what is polled. As long as it has a moduleId, a component, a register, and a length, it can be polled. Before polled values are sent to the receiver, they can be filtered. This way it's possible to e.g. only send values if the polled value changed since the last polling time. What exactly is polled is configured in "Table Entries". 
+
+== Preparing a Module to be polled
+If a Module should be pollable, it has to inherit the `AutoSenseModuleDataProvider` interface and register itself with the AutoSenseModule:
+```
+AutoSenseModule* asMod = (AutoSenseModule*)GS->node.GetModuleById(ModuleId::AUTO_SENSE_MODULE);
+if (asMod)
+{
+    asMod->RegisterDataProvider(ModuleId::YOUR_MODULE_ID, this);
+}
+```
+Once data is polled, the `RequestData` function of the implemented `AutoSenseModuleDataProvider` interface is called. The result of this polling must be reported back to the `AutoSenseModuleDataConsumer` which is passed to `RequestData`. In case some `component/register/length` triples are not supported, the `AutoSenseModuleDataProvider::AcceptsRegister` must be implemented as well, returning false for illegal triples.
+
+
+== Definition of a Table Entry
+A Table Entry has the following structure:
+[cols="1,2,2,5"]
+|===
+|Bytes |Type |Name  |Description
+
+|2 |NodeId|destNodeId|The Node ID where the polled data should be sent to.
+|4 |ModuleIdWrapper|moduleId|The module ID that should be polled.
+|2 |u16|component|The component that should be polled.
+|2 |u16|register|The register that should be polled.
+|1 |u8|length|The length of the data to be polled. This can be used to poll several contiguous registers at once.
+|1 |u8|requestHandle|The request handle that is used when reporting the data.
+|1 |TableEntryDataType|dataType|Currently no effect. Will be used to implement value thresholds.
+|3 bit|PeriodicReportInterval|periodicReportInterval|If 0, no effect. Else, the table entry is executed at synced times based on the clock synchronization.
+|5 bit|bits|reservedFlags|Must be 0.
+|2 |u16|pollingIvDs|The deciseconds between pollings if the event is relative. Else, an offset from the synced time.
+|2 |u16|reportingIvDs|The deciseconds between reports if the event is relative. Else, an offset from the synced time.
+|1 |TableEntryReportFunction|reportFunction|The report function.
+|varying|u8[]|functionParams|Additional, optional parameters for the report function. Length depends on the reportFunction.
+|===
+
+== Synced Time Polling
+If the PeriodicReportInterval is set to any value other than 0, then the table entry is polled based on intervals relative to the synced time. The possible values are:
+[cols="1,2,5"]
+|===
+|Value|Name|Description
+
+|0|NONE|The event is polled at relative times.
+|1|SECOND|The event is polled every full second.
+|2|TEN_SECONDS|The event is polled every full 10 seconds.
+|3|MINUTE|The event is polled every full minute.
+|4|TEN_MINUTES|The event is polled every full 10 minutes.
+|5|HALF_HOUR|The event is polled every full 30 minutes.
+|6|HOUR|The event is polled every full hour.
+|7|DAILY|The event is polled every day at midnight.
+|===
+
+== Report Functions
+A report function filters and potentially modifies the reported values. The following functions are currently defined:
+[cols="1,2,5"]
+|===
+|Value|Name|Description
+
+|0|LAST|The last polled value is always reported on every reporting interval.
+|1|ON_CHANGE_RATE_LIMITED|The value is only reported if the value has changed between the current and the previous reporting Interval. (It is possible that the same value is reported twice, e.g. if the polling is smaller than the reporting interval and the value has first changed to some other value and then back to the previously sent value.)
+|2|ON_CHANGE_WITH_PERIODIC_REPORT|The last polled value is always reported on every reporting interval. Additionally, values are reported on polling intervals if the value has changed.
+|===
+
+== Terminal Commands
+=== Setting table entry
+Sets a table entry.
+
+[source,C++]
+----
+action [nodeId] autosense set_autosense_entry [moduleVersion] [entryIndex] [hex/base64 tableEntry] {requestHandle=0}
+----
+
+=== Getting table entry
+Requests a table entry.
+
+[source,C++]
+----
+action [nodeId] autosense get_autosense_entry [entryIndex] {requestHandle=0}
+----
+
+The reported JSON has the following structure:
+[source,Javascript]
+----
+{
+   "type":"autosense_entry",
+   "nodeId":2,
+   "requestHandle":0,
+   "module":15,
+   "code":0,
+   "index":0,
+   "data":"AQAQ////BwADAAUAAQAKAAoAAA=="
+}"
+----
+
+=== Clearing a single or all table entries
+Clears a table entry and therefore no longer executes it. If the entryIndex is 255 (0xFF), all entries are cleared.
+
+[source,C++]
+----
+action [nodeId] autosense clear_autosense_entry [entryIndex] {requestHandle=0}
+----
+
+=== Getting the table overview
+Returns an overview that shows which table entries are set and which ones aren't.
+
+[source,C++]
+----
+action [nodeId] autosense get_autosense_table {requestHandle=0}
+----
+
+The reported JSON has the following structure:
+[source,Javascript]
+----
+{
+    "type":"autosense_table",
+    "nodeId":2,
+    "requestHandle":0,
+    "module":15,
+    "supportedAmount":20,
+    "entryMaxSize":19,
+    "bitmask":"00:00:00"
+}
+----
+
+=== Sets an example entry
+The exact entry definition is subject to change. The command is meant for demos.
+
+[source,C++]
+----
+action [nodeId] autosense set_example {requestHandle=0}
+----
+
+=== Clears the example entry
+The exact entry definition is subject to change. The command is meant for demos.
+
+[source,C++]
+----
+action [nodeId] autosense clear_example {requestHandle=0}
+----
+
+== Messages
+
+=== SetEntry
+==== Request
+[cols="1,2,2,5"]
+|===
+|Bytes |Type |Name  |Description
+
+|8|xref:Specification.adoc#connPacketModule[connPacketModule] |header|*messageType:* MODULE_TRIGGER_ACTION(51), *actionType:* SET_ENTRY(0)
+|1|u8|moduleVersion|Must be 0.
+|1|u8|entryIndex|The index of the entry to be set.
+|varying|Table Entry|The Table Entry.
+|===
+
+==== Response
+[cols="1,2,2,5"]
+|===
+|Bytes |Type |Name |Description
+
+|8|xref:Specification.adoc#connPacketModule[connPacketModule] |header|*messageType:* MODULE_ACTION_RESPONSE(52), *actionType:* SET_ENTRY(0)
+|1|AutoSenseModuleResponseCode|code|Error Code. 0 = SUCCESS.
+|===
+
+=== GetEntry
+==== Request
+[cols="1,2,2,5"]
+|===
+|Bytes |Type |Name  |Description
+
+|8|xref:Specification.adoc#connPacketModule[connPacketModule] |header|*messageType:* MODULE_TRIGGER_ACTION(51), *actionType:* GET_ENTRY(1)
+|1|u8|entryIndex|The index of the entry to query.
+|===
+
+==== Response
+[cols="1,2,2,5"]
+|===
+|Bytes |Type |Name |Description
+
+|8|xref:Specification.adoc#connPacketModule[connPacketModule] |header|*messageType:* MODULE_ACTION_RESPONSE(52), *actionType:* GET_ENTRY(1)
+|1|AutoSenseModuleResponseCode|code|Error Code. 0 = SUCCESS.
+|1|u8|entryIndex|The index of the entry.
+|varying|u8[]|entry|The table entry.
+|===
+
+=== ClearEntry
+==== Request
+[cols="1,2,2,5"]
+|===
+|Bytes |Type |Name  |Description
+
+|8|xref:Specification.adoc#connPacketModule[connPacketModule] |header|*messageType:* MODULE_TRIGGER_ACTION(51), *actionType:* CLEAR_ENTRY(2)
+|1|u8|entryIndex|The index of the entry to clear.
+|===
+
+==== Response
+[cols="1,2,2,5"]
+|===
+|Bytes |Type |Name |Description
+
+|8|xref:Specification.adoc#connPacketModule[connPacketModule] |header|*messageType:* MODULE_ACTION_RESPONSE(52), *actionType:* CLEAR_ENTRY(2)
+|1|AutoSenseModuleResponseCode|code|Error Code. 0 = SUCCESS.
+|1|u8|entryIndex|The index of the entry.
+|===
+
+=== Get Table
+==== Request
+[cols="1,2,2,5"]
+|===
+|Bytes |Type |Name  |Description
+
+|8|xref:Specification.adoc#connPacketModule[connPacketModule] |header|*messageType:* MODULE_TRIGGER_ACTION(51), *actionType:* GET_TABLE(4)
+|===
+
+==== Response
+[cols="1,2,2,5"]
+|===
+|Bytes |Type |Name |Description
+
+|8|xref:Specification.adoc#connPacketModule[connPacketModule] |header|*messageType:* MODULE_ACTION_RESPONSE(52), *actionType:* GET_TABLE(4)
+|1|u8|supportedAmount|The maximum supported amount of entries.
+|1|u8|entryMaxSize|The maximum size of a single entry.
+|varying|u8[]|data|Bitmask that describes which entries are active and which aren't.
+|===
+
+=== Set Example
+==== Request
+[cols="1,2,2,5"]
+|===
+|Bytes |Type |Name  |Description
+
+|8|xref:Specification.adoc#connPacketModule[connPacketModule] |header|*messageType:* MODULE_TRIGGER_ACTION(51), *actionType:* SET_EXAMPLE(5)
+|===
+
+==== Response
+Subject to change.
+
+=== Clear Example
+==== Request
+[cols="1,2,2,5"]
+|===
+|Bytes |Type |Name  |Description
+
+|8|xref:Specification.adoc#connPacketModule[connPacketModule] |header|*messageType:* MODULE_TRIGGER_ACTION(51), *actionType:* CLEAR_EXAMPLE(6)
+|===
+
+==== Response
+Subject to change.
+

@@ -87,6 +87,11 @@ void StatusReporterModule::ConfigurationLoadedHandler(u8* migratableConfig, u16 
 {
     //Start the Module...
 
+    AutoSenseModule* asMod = (AutoSenseModule*)GS->node.GetModuleById(ModuleId::AUTO_SENSE_MODULE);
+    if (asMod)
+    {
+        asMod->RegisterDataProvider(ModuleId::STATUS_REPORTER_MODULE, this);
+    }
 }
 
 void StatusReporterModule::TimerEventHandler(u16 passedTimeDs)
@@ -135,7 +140,8 @@ void StatusReporterModule::TimerEventHandler(u16 passedTimeDs)
     {
         timeSinceLastPeriodicTimeSendDs += passedTimeDs;
         if(IsPeriodicTimeSendActive() && 
-            (timeSinceLastPeriodicTimeSendDs > TIME_BETWEEN_PERIODIC_TIME_SENDS_DS || timeSinceLastPeriodicTimeSendDs > configuration.timeReportingIntervalDs)
+            (timeSinceLastPeriodicTimeSendDs >= TIME_BETWEEN_PERIODIC_TIME_SENDS_DS
+            || (configuration.timeReportingIntervalDs > 0 && timeSinceLastPeriodicTimeSendDs >= configuration.timeReportingIntervalDs))
             ){
             timeSinceLastPeriodicTimeSendDs = 0;
 
@@ -218,7 +224,7 @@ void StatusReporterModule::SendDeviceInfoV2(NodeId toNode, u8 requestHandle, Mes
     data.nodeVersion = GS->config.GetFruityMeshVersion();
     data.networkId = GS->node.configuration.networkId;
     data.dBmRX = Boardconfig->dBmRX;
-    data.dBmTX = Conf::defaultDBmTX;
+    data.dBmTX = Conf::GetInstance().defaultDBmTX;
     data.calibratedTX = Boardconfig->calibratedTX;
     data.chipGroupId = GS->config.fwGroupIds[0];
     data.featuresetGroupId = GS->config.fwGroupIds[1];
@@ -1448,4 +1454,81 @@ CapabilityEntry StatusReporterModule::GetCapability(u32 index, bool firstCall)
 
     // end of capabilities
     return Module::GetCapability(index, firstCall);
+}
+
+#if IS_ACTIVE(REGISTER_HANDLER)
+RegisterGeneralChecks StatusReporterModule::GetGeneralChecks(u16 component, u16 reg, u16 length) const
+{
+    //We enable the RegisterHandler only for the implemented component id
+    if(component == (u16)StatusReporterModuleComponent::BASIC_REGISTER_HANDLER_FUNCTIONALITY) return RegisterGeneralChecks::RGC_SUCCESS;
+
+    return RegisterGeneralChecks::RGC_LOCATION_DISABLED;
+}
+
+void StatusReporterModule::MapRegister(u16 component, u16 reg, SupervisedValue& out, u32& persistedId)
+{
+    if (component == (u16)StatusReporterModuleComponent::BASIC_REGISTER_HANDLER_FUNCTIONALITY)
+    {
+        //Information Registers
+        if (reg == REGISTER_GAP_ADDRESS_TYPE) {
+            gapAddrCache = FruityHal::GetBleGapAddress();
+            out.SetReadable((u8)gapAddrCache.addr_type);
+        }
+        if (reg == REGISTER_GAP_ADDRESS)
+        {
+            gapAddrCache = FruityHal::GetBleGapAddress();
+            out.SetReadableRange(gapAddrCache.addr.data(), gapAddrCache.addr.size());
+        }
+        if(reg == REGISTER_GAP_ZERO_PAD) out.SetReadable((u8)0);
+        if(reg == REGISTER_GAP_ADDRESS_STRING){
+            gapAddrCache = FruityHal::GetBleGapAddress();
+            sprintf((char*)gapAddrStringCache, "%02X:%02X:%02X:%02X:%02X:%02X", gapAddrCache.addr[5], gapAddrCache.addr[4], gapAddrCache.addr[3], gapAddrCache.addr[2], gapAddrCache.addr[1], gapAddrCache.addr[0]);
+            out.SetReadableRange(gapAddrStringCache, sizeof(gapAddrStringCache));
+        }
+
+        //Configuration Registers
+        if (reg == REGISTER_REFERENCE_MILLI_VOLT_AT_0_PERCENT) out.SetReadable(referenceMilliVolt0Percent); //TODO: Make writable once persistance is available
+        if (reg == REGISTER_REFERENCE_MILLI_VOLT_AT_100_PERCENT) out.SetReadable(referenceMilliVolt100Percent); //TODO: Make writable once persistance is available
+
+        //Data Registers
+        if (reg == REGISTER_DEVICE_UPTIME) out.SetReadable(GS->appTimerDs);
+        if (reg == REGISTER_ABSOLUTE_UTC_TIME) out.SetReadable(GS->timeManager.GetUtcTime());
+        if (reg == REGISTER_ABSOLUTE_LOCAL_TIME) out.SetReadable(GS->timeManager.GetLocalTime());
+        
+        if (reg == REGISTER_CLUSTER_SIZE) out.SetReadable(GS->node.GetClusterSize());
+        if (reg == REGISTER_NUM_MESH_CONNECTIONS) {
+            BaseConnections conns = GS->cm.GetConnectionsOfType(ConnectionType::FRUITYMESH, ConnectionDirection::INVALID);
+            u8 connCount = conns.count;
+            out.SetReadable(connCount);
+        }
+        if (reg == REGISTER_NUM_OTHER_CONNECTIONS) {
+            BaseConnections meshConns = GS->cm.GetConnectionsOfType(ConnectionType::FRUITYMESH, ConnectionDirection::INVALID);
+            BaseConnections allConns = GS->cm.GetConnectionsOfType(ConnectionType::INVALID, ConnectionDirection::INVALID);
+            u8 connCount = allConns.count - meshConns.count;
+            out.SetReadable(connCount);
+        }
+        if (reg == REGISTER_MESH_CONNECTIONS_DROPPED) out.SetReadable(GS->node.connectionLossCounter);
+        if (reg == REGISTER_PACKETS_SENT_RELIABLE) out.SetReadable(GS->cm.sentMeshPacketsReliable);
+        if (reg == REGISTER_PACKETS_SENT_UNRELIABLE) out.SetReadable(GS->cm.sentMeshPacketsUnreliable);
+        if (reg == REGISTER_PACKETS_DROPPED) out.SetReadable(GS->cm.droppedMeshPackets);
+        if (reg == REGISTER_PACKETS_GENERATED) out.SetReadable(GS->cm.generatedPackets);
+
+        if (reg == REGISTER_BATTERY_PERCENTAGE)
+        {
+            i32 batteryPercent = batteryVoltageDv * 100; // We start with millivolts
+            batteryPercent -= referenceMilliVolt0Percent;
+            batteryPercent = (batteryPercent * 100) / (i32)(referenceMilliVolt100Percent - referenceMilliVolt0Percent);
+            out.SetReadable((u8)Utility::Clamp(batteryPercent, 0, 100));
+        }
+    }
+}
+#endif //IS_ACTIVE(REGISTER_HANDLER)
+
+void StatusReporterModule::RequestData(u16 component, u16 register_, u8 length, AutoSenseModuleDataConsumer* provideTo)
+{
+#if IS_ACTIVE(REGISTER_HANDLER)
+    DYNAMIC_ARRAY(buffer, length);
+    GetRegisterValues(component, register_, buffer, length);
+    provideTo->ConsumeData(ModuleId::STATUS_REPORTER_MODULE, component, register_, length, buffer);
+#endif //IS_ACTIVE(REGISTER_HANDLER)
 }

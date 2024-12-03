@@ -477,7 +477,7 @@ ErrorType FruityHal::BleStackInit()
     logt(tag, "sd_power_mode_set %u", err);
     FRUITYMESH_ERROR_CHECK(err); //OK
 
-    err = (u32)FruityHal::RadioSetTxPower(Conf::defaultDBmTX, FruityHal::TxRole::SCAN_INIT, 0);
+    err = (u32)FruityHal::RadioSetTxPower(Conf::GetInstance().defaultDBmTX, FruityHal::TxRole::SCAN_INIT, 0);
     FRUITYMESH_ERROR_CHECK(err); //OK
 
     return (ErrorType)err;
@@ -485,9 +485,7 @@ ErrorType FruityHal::BleStackInit()
 
 void FruityHal::BleStackDeinit()
 {
-#ifndef SIM_ENABLED
     nrf_sdh_disable_request();
-#endif // SIM_ENABLED
 }
 
 #define __________________BLE_STACK_EVT_FETCHING____________________
@@ -1936,17 +1934,25 @@ ErrorType FruityHal::BleGattMtuExchangeRequest(u16 connHandle, u16 clientRxMtu)
 }
 
 // Supported tx_power values for this implementation: -40dBm, -20dBm, -16dBm, -12dBm, -8dBm, -4dBm, 0dBm, +3dBm and +4dBm.
+// nRF52840 supports +5dBm to +8dBm as well.
 ErrorType FruityHal::RadioSetTxPower(i8 tx_power, TxRole role, u16 handle)
 {
-    if (tx_power != -40 && 
-          tx_power != -30 && 
-          tx_power != -20 && 
-          tx_power != -16 && 
-          tx_power != -12 && 
-          tx_power != -8  && 
-          tx_power != -4  && 
-          tx_power != 0   && 
-          tx_power != 4) {
+    if (tx_power != -40
+          && tx_power != -30
+          && tx_power != -20
+          && tx_power != -16
+          && tx_power != -12
+          && tx_power != -8
+          && tx_power != -4
+          && tx_power != 0
+          && tx_power != 4
+#if defined(NRF52840) || SIM_ENABLED
+          && tx_power != 5    
+          && tx_power != 6    
+          && tx_power != 7    
+          && tx_power != 8    
+#endif
+          ) {
         SIMEXCEPTION(IllegalArgumentException);
         return ErrorType::INVALID_PARAM;
     }
@@ -2005,7 +2011,7 @@ ErrorType FruityHal::InitializeButtons()
     //IF this returns NO_MEM, increase GPIOTE_CONFIG_NUM_OF_LOW_POWER_EVENTS
     nrf_drv_gpiote_in_config_t buttonConfig;
     buttonConfig.sense = NRF_GPIOTE_POLARITY_TOGGLE;
-    buttonConfig.pull = NRF_GPIO_PIN_PULLUP;
+    buttonConfig.pull = Boardconfig->buttonsActiveHigh ? NRF_GPIO_PIN_PULLDOWN : NRF_GPIO_PIN_PULLUP;
     buttonConfig.is_watcher = 0;
     buttonConfig.hi_accuracy = 0;
 #if SDK >= 15
@@ -2500,12 +2506,40 @@ void FruityHal::EcbEncryptBlock(const u8 * p_key, const u8 * p_clearText, u8 * p
 
 ErrorType FruityHal::FlashPageErase(u32 page)
 {
-    return nrfErrToGeneric(sd_flash_page_erase(page));
+    ErrorType err = nrfErrToGeneric(sd_flash_page_erase(page));
+
+    //If the SoftDevice is not enabled, the sd_flash_page_erase will synchronously finish and will not generate an event
+    u8 softdeviceEnabled = 0;
+    u32 err2 = sd_softdevice_is_enabled(&softdeviceEnabled);
+    DISCARD(err2); //Will always return NRF_SUCCESS
+    if(!softdeviceEnabled){
+        if(err == ErrorType::SUCCESS){
+            DispatchSystemEvents(FruityHal::SystemEvents::FLASH_OPERATION_SUCCESS);
+        } else {
+            DispatchSystemEvents(FruityHal::SystemEvents::FLASH_OPERATION_ERROR);
+        }
+    }
+
+    return err;
 }
 
 ErrorType FruityHal::FlashWrite(u32 * p_addr, u32 * p_data, u32 len)
 {
-    return nrfErrToGeneric(sd_flash_write((uint32_t *)p_addr, (uint32_t *)p_data, len));
+    ErrorType err =  nrfErrToGeneric(sd_flash_write((uint32_t *)p_addr, (uint32_t *)p_data, len));
+    
+    //If the SoftDevice is not enabled, the sd_flash_page_erase will synchronously finish and will not generate an event
+    u8 softdeviceEnabled = 0;
+    u32 err2 = sd_softdevice_is_enabled(&softdeviceEnabled);
+    DISCARD(err2); //Will always return NRF_SUCCESS
+    if(!softdeviceEnabled){
+        if (err == ErrorType::SUCCESS) {
+            DispatchSystemEvents(FruityHal::SystemEvents::FLASH_OPERATION_SUCCESS);
+        } else {
+            DispatchSystemEvents(FruityHal::SystemEvents::FLASH_OPERATION_ERROR);
+        }
+    }
+
+    return err;
 }
 
 void FruityHal::NvicEnableIRQ(u32 irqType)
@@ -2642,6 +2676,18 @@ ErrorType FruityHal::GpioConfigureInterrupt(u32 pin, FruityHal::GpioPullMode mod
     nrf_drv_gpiote_in_event_enable(pin, true);
 
     return err;
+}
+
+void FruityHal::GpioInterruptEventDisable(u32 pin) {
+#ifndef SIM_ENABLED
+    nrf_drv_gpiote_in_event_disable(pin);
+#endif
+}
+
+void FruityHal::GpioInterruptEventEnable(u32 pin) {
+#ifndef SIM_ENABLED
+    nrf_drv_gpiote_in_event_enable(pin, true);
+#endif
 }
 
 // ######################### ADC ############################

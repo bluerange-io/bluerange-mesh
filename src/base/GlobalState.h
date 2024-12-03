@@ -38,6 +38,7 @@
 #include "ScanController.h"
 #include "GAPController.h"
 #include "GATTController.h"
+#include "RegisterHandler.h"
 
 #include "Config.h"
 #include "Boardconfig.h"
@@ -58,6 +59,7 @@
 #endif
 
 constexpr int MAX_MODULE_COUNT = 17;
+constexpr int MAX_REGISTER_HANDLER_COUNT = 4;
 
 class ClcComm;
 class VsComm;

@@ -55,10 +55,10 @@ class RecordStorageEventListener;
 
 // major (0-400), minor (0-999), patch (0-9999)
 #define FM_VERSION_MAJOR 1
-#define FM_VERSION_MINOR 1
+#define FM_VERSION_MINOR 2
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 1640
+#define FM_VERSION_PATCH 250
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -298,6 +298,12 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 #define ACTIVATE_BATTERY_MEASUREMENT 1
 #endif
 
+// Activate Generic Register Handler
+// Disabling this if not needed can save a few kb flash usage
+#ifndef ACTIVATE_REGISTER_HANDLER
+#define ACTIVATE_REGISTER_HANDLER 1
+#endif
+
 // ########### Config class ##########################################
 //This class holds the configuration and some bits are changeable at runtime
 
@@ -514,7 +520,8 @@ class Conf
         // ########### CONNECTION ################################################
 
         //Transmit Power used as default for this node
-        static constexpr i8 defaultDBmTX = 4;
+        //Can be overwritten e.g. in SetFeaturesetConfiguration_##featureset
+        i8 defaultDBmTX = 4;
 
         //Depending on platform capabilities, we need to set a different amount of
         //possible connnections, whereas the simulator will need to select that at runtime

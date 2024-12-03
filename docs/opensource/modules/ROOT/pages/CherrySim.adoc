@@ -2,9 +2,9 @@ ifndef::imagesdir[:imagesdir: ../assets/images]
 = CherrySim
 
 == General
-CherrySim uses the codebase of FruityMesh and provides a *SoftDevice abstraction layer* that simulates Bluetooth connections, advertising, flash access and much more. It gives the possibility to debug, develop and simulate multiple FruityMesh nodes on a development PC.
+CherrySim uses the codebase of BlueRange Mesh and provides a *SoftDevice abstraction layer* that simulates Bluetooth connections, advertising, flash access and much more. It gives the possibility to debug, develop and simulate multiple BlueRange Mesh nodes on a development PC.
 
-We are *developing and debugging most new features using CherrySim* which is a real time saver and swiss army knife. You will be able to do implement most of your application logic in the simulator with the ability to mock away drivers. If you are developing with FruityMesh you should consider using the simulator for your *day-to-day development*.
+We are *developing and debugging most new features using CherrySim* which is a real time saver and swiss army knife. You will be able to do implement most of your application logic in the simulator with the ability to mock away drivers. If you are developing with BlueRange Mesh you should consider using the simulator for your *day-to-day development*.
 
 image:cherrysim.png[cherrysim]
 
@@ -27,7 +27,7 @@ See xref:BuildingWithCMake.adoc#BuildingSimulator[here] for a guide how to build
 == How It Works
 CherrySim uses a header file _SystemTest.h_ that is force-included before all other header files to be able to abstract the SoftDevice. All SoftDevice calls are implemented in a way to closely mock the functionality of a real SoftDevice. For everything that uses the radio, such as advertising or connections, a simplified simulation is used that calculates the distances between nodes and simulates packet loss.
 
-CherrySim works with only one instance and is able to simulate many instances of FruityMesh. Hence FruityMesh must be written in a way that the code itself has no state variables. No global or functional static variables are allowed. Every variable that needs to be saved from one function call to the next needs to be a part of class since CherrySim creates instances of classes for every node. The `GlobalState.cpp` is used to store the whole state of a node and CherrySim switches the pointer to the currently simulated node for each simulation step.
+CherrySim works with only one instance and is able to simulate many instances of BlueRange Mesh. Hence BlueRange Mesh must be written in a way that the code itself has no state variables. No global or functional static variables are allowed. Every variable that needs to be saved from one function call to the next needs to be a part of class since CherrySim creates instances of classes for every node. The `GlobalState.cpp` is used to store the whole state of a node and CherrySim switches the pointer to the currently simulated node for each simulation step.
 
 CherrySim gives each node a different xref:Specification.adoc#SerialNumbers[serial numbers] starting at `BBBBB` and incrementing. Every forth byte of the node key, starting with the first byte is equal to the xref:Specification.adoc#SerialNumbers[serial number] index + 1. So for example, `BBBBB` has the node key `01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00`, `BBBBC` has the node key `02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00` and so on. By default, all nodes have the same networkId and networkKey so that they are in the same mesh network. If this is not desired, the simulated UICR can be overwritten or the nodes can be enrolled using the standard enrollment command. Default featuresets are given to each node but the featureset can also be individually configured for each node.
 
@@ -44,13 +44,13 @@ The LEDs are also visualized but all LED changes are mapped to a single one.
 [#Terminal]
 == Terminal Commands
 === General
-The simulator has a terminal that allows to input all commands that can be used with FruityMesh nodes. Depending on the simulator configuration (`simConfig.terminalId`), either no terminal is enabled (-1), all terminals are active (0) or the terminal of a specific node is active, e.g. 1. Additionally, the simulator adds a few commands for simulation control:
+The simulator has a terminal that allows to input all commands that can be used with BlueRange Mesh nodes. Depending on the simulator configuration (`simConfig.terminalId`), either no terminal is enabled (-1), all terminals are active (0) or the terminal of a specific node is active, e.g. 1. Additionally, the simulator adds a few commands for simulation control:
 
 [source,c++]
 ----
 sim term [terminalId] // e.g. "sim term 1" to interact with the first node
 ----
-The active terminal can be either 0 to see the terminal output of all nodes at the same time, or you can give the terminal id of a single node. The terminal id is equal to `nodeIndex + 1` (the _default_ node id), see the xref:#FeaturesetSimulation[documentation on featureset simulation] on how the node index is assigned. If you do _not_ change the node id (e.g. via enrollment) after the simulator starts, then the terminal id and node id will be the same. Additionally, the terminal id of a node will stay the same during the whole simulation and is _not_ affected by enrollments. Afterwards, you can directly interact with that node with the usual FruityMesh terminal commands.
+The active terminal can be either 0 to see the terminal output of all nodes at the same time, or you can give the terminal id of a single node. The terminal id is equal to `nodeIndex + 1` (the _default_ node id), see the xref:#FeaturesetSimulation[documentation on featureset simulation] on how the node index is assigned. If you do _not_ change the node id (e.g. via enrollment) after the simulator starts, then the terminal id and node id will be the same. Additionally, the terminal id of a node will stay the same during the whole simulation and is _not_ affected by enrollments. Afterwards, you can directly interact with that node with the usual BlueRange Mesh terminal commands.
 
 In xref:#SocketTerm[socket terminals] only strictly positive terminal ids - referring to a single node - can be used (i.e. you _cannot_ specify `0`).
 
@@ -209,7 +209,7 @@ sim animation load_path [path] //e.g. sim animation load_path /path/to/anim.json
 ----
 Loads animations from a JSON file. See "cherrysim/test/res/MoveAnimation.json" for an example.
 
-NOTE: The path is always relative to the normalized path, which is the "cherrySim" directory in the repository. This means that played animations must be part of the FruityMesh repository. This is mandatory as else the replay function will not work properly.
+NOTE: The path is always relative to the normalized path, which is the "cherrySim" directory in the repository. This means that played animations must be part of the BlueRange Mesh repository. This is mandatory as else the replay function will not work properly.
 
 Using commands such as *nodes 20*, *width 40*, *height 50* allows to modify the simulation scenario. Scenarios can also be imported as JSON files by first giving the paths (*site site1.json*, *devices dev1.json*) and then enabling JSON import (*json 1*). Each simulation is always run deterministically with a preset seed. This seed can be modified using e.g. *seed 123*, which will result in a new simulation.
 
@@ -233,11 +233,11 @@ We have included a fastLane option that allows you to speed up the simulation un
 === Globally Available Variables
 There are a number of global variables that are helpful for inspecting the state of the simulation:
 
-*simGlobalStatePtr* always references the GlobalState of the current node that is simulated. Only one node is simulated at a time and the GlobalState object contains the full state of a FruityMesh node.
+*simGlobalStatePtr* always references the GlobalState of the current node that is simulated. Only one node is simulated at a time and the GlobalState object contains the full state of a BlueRange Mesh node.
 
 *cherrySimInstance* points to the simulator and can be used to access all other information
 
-*cherrySimInstance->currentNode* can be used to see the complete state of the current node including SoftDevice and FruityMesh state.
+*cherrySimInstance->currentNode* can be used to see the complete state of the current node including SoftDevice and BlueRange Mesh state.
 
 *cherrySimInstance->currentNode->currentEvent* points to the event that is being processed. This can contain additional information under _additionalInfo_ such as the globalPacketId for all write events.
 

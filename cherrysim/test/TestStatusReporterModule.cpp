@@ -672,6 +672,139 @@ TEST(TestStatusReporterModule, TestNearbyNodesReportsOnlyWithSameNetworkId)
     }
 }
 
+TEST(TestStatusReporterModule, TestRegisters) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    testerConfig.verbose = false;
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.nodeConfigName.insert({"prod_mesh_nrf52", 1 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    tester.SimulateUntilClusteringDone(100 * 1000);
+
+    //GAP_ADDRESS_TYPE
+    tester.SendTerminalCommand(1, "component_act this 3 2 0 1000 01");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x03E8","payload":"AQ=="})"); // 01 (Random static)
+
+    //GAP_ADDRESS
+    tester.SendTerminalCommand(1, "component_act this 3 2 0 1001 06");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x03E9","payload":"AAABAAAA"})"); // 00:00:01:00:00:00
+
+    //GAP_ADDRESS_TYPE as U64 including type and padding
+    tester.SendTerminalCommand(1, "component_act this 3 2 0 1000 08");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x03E8","payload":"AQAAAQAAAAA="})"); // 01:00:00:01:00:00:00:00
+    
+    //Just so we can cross-check the string representation
+    tester.SendTerminalCommand(1, "action this status get_device_info");
+    tester.SimulateGivenNumberOfSteps(1);
+
+    //GAP_ADDRESS_STRING
+    tester.SendTerminalCommand(1, "component_act this 3 2 0 1010 12");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x03F2","payload":"MDA6MDA6MDA6MDE6MDA6MDAA"})"); // "00:00:00:01:00:00\0" (typically reversed when shown as string)
+
+    //REFERENCE_MILLI_VOLT_AT_0_PERCENT
+    tester.SendTerminalCommand(1, "component_act this 3 2 0 10000 04");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x2710","payload":"CAcAAA=="})"); // 1800 by default
+
+    //TODO: Add write test once persistance works
+
+    //REFERENCE_MILLI_VOLT_AT_100_PERCENT
+    tester.SendTerminalCommand(1, "component_act this 3 2 0 10004 04");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x2714","payload":"KAoAAA=="})"); // 2600 by default
+
+    //TODO: Add write test once persistance works
+
+    //DEVICE_UPTIME
+    tester.SendTerminalCommand(1, "component_act this 3 2 0 30000 04");
+    // TODO: Doesn't actually check that a correct value is returned, as that would be extremely sensitive to any change of timeings and would often break this test.
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x7530","payload":)");
+
+    //ABSOLUTE_UTC_TIME (not set)
+    tester.SendTerminalCommand(1, "component_act this 3 2 0 30004 04");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x7534","payload":"AAAAAA=="})"); //Reports 0 if time not synced
+
+    //ABSOLUTE_LOCAL_TIME (not set)
+    tester.SendTerminalCommand(1, "component_act this 3 2 0 30008 04");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x7538","payload":"AAAAAA=="})"); //Reports 0 if time not synced
+
+    tester.SendTerminalCommand(1, "settime 100000000 0");
+    tester.SimulateForGivenTime(1 * 1000);
+
+    //ABSOLUTE_UTC_TIME (set to >100000000)
+    tester.SendTerminalCommand(1, "component_act this 3 2 0 30004 04");
+    tester.SimulateUntilRegexMessageReceived(100 * 1000, 1, R"("nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x7534","payload":".*Q==")");
+
+    //ABSOLUTE_LOCAL_TIME (set to >100000000)
+    //TODO: This does not test that the timezone works
+    tester.SendTerminalCommand(1, "component_act this 3 2 0 30008 04");
+    tester.SimulateUntilRegexMessageReceived(100 * 1000, 1, R"("nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x7538","payload":".*Q==")");
+
+    //CLUSTER_SIZE
+    tester.SendTerminalCommand(1, "component_act this 3 2 0 30100 02");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x7594","payload":"AQA="})"); //Only 1 node in the cluster
+
+    //NUM_MESH_CONNECTIONS
+    tester.SendTerminalCommand(1, "component_act this 3 2 0 30102 01");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x7596","payload":"AA=="})");
+
+    //NUM_OTHER_CONNECTIONS
+    tester.SendTerminalCommand(1, "component_act this 3 2 0 30103 01");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x7597","payload":"AA=="})");
+
+    //MESH_CONNECTIONS_DROPPED
+    tester.SendTerminalCommand(1, "component_act this 3 read 0 30104 02");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x7598","payload":"AAA="})");
+
+    //PACKETS_SENT_RELIABLE
+    tester.SendTerminalCommand(1, "component_act this 3 read 0 30106 04");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x759A","payload":"AAAAAA=="})");
+
+    //PACKETS_SENT_UNRELIABLE
+    tester.SendTerminalCommand(1, "component_act this 3 read 0 30110 04");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x759E","payload":"AAAAAA=="})");
+
+    //PACKETS_DROPPED
+    tester.SendTerminalCommand(1, "component_act this 3 read 0 30114 04");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x75A2","payload":"AAAAAA=="})");
+
+    //PACKETS_GENERATED
+    tester.SendTerminalCommand(1, "component_act this 3 read 0 30118 04");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x75A6","payload":)"); //The exact amount varies so it cannot be easily tested
+
+    //BATTERY_PERCENTAGE
+    tester.SendTerminalCommand(1, "component_act this 3 2 0 30200 01");
+    tester.SimulateUntilMessageReceived(100 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x75F8","payload":"AA=="})"); //Measurement is 0V by default
+
+}
+
+#ifndef GITHUB_RELEASE
+TEST(TestStatusReporterModule, TestRegistersAutoSense) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    //testerConfig.verbose = true;
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 1 });
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    // Configure AutoSense to query the MAC Address repeatedly
+    AutoSenseTableEntryBuilder ast = {};
+    ast.entry.destNodeId = 1;
+    ast.entry.moduleId = Utility::GetWrappedModuleId(ModuleId::STATUS_REPORTER_MODULE);
+    ast.entry.component = 0;
+    ast.entry.register_ = 1000;
+    ast.entry.length = 8;
+    ast.entry.requestHandle = 0;
+    ast.entry.dataType = DataTypeDescriptor::RAW;
+    ast.entry.pollingIvDs = SEC_TO_DS(10);
+    ast.entry.reportingIvDs = SEC_TO_DS(10);
+    ast.entry.reportFunction = AutoSenseFunction::LAST;
+
+    //Set AutoSense to automatic reporting to query the MAC address
+    tester.SendTerminalCommand(1, "action this autosense set_autosense_entry 0 0 %s", ast.getEntry().data());
+    tester.SimulateUntilMessageReceived(20 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":0,"component":"0x0000","register":"0x03E8","payload":"AQAAAQAAAAA="})");
+}
+#endif //GITHUB_RELEASE
+
 #if defined(PROD_SINK_NRF52) && defined(PROD_ASSET_NRF52)
 //This test makes sure that the error logs can be queried from mesh nodes and asset tags
 TEST(TestStatusReporterModule, TestErrorLogQuerying) {

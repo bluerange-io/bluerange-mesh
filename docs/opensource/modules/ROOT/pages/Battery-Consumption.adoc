@@ -1,6 +1,6 @@
 = Battery Consumption
 
-Using a mesh on top of Bluetooth Low Energy does only make sense when it can operate at low energy. Simple, right? Well, not quite. There are many settings that affect the performance of FruityMesh and some use cases require different settings for some of these parameters. Many of these settings have been benchmarked with the current implementation. Measurements were made using the nRF51 DK chip, version QFACA1. The system consumption for many of these cases is detailed in this document. The same test applications on a nRF52 consume a little less energy.
+Using a mesh on top of Bluetooth Low Energy does only make sense when it can operate at low energy. Simple, right? Well, not quite. There are many settings that affect the performance of BlueRange Mesh and some use cases require different settings for some of these parameters. Many of these settings have been benchmarked with the current implementation. Measurements were made using the nRF51 DK chip, version QFACA1. The system consumption for many of these cases is detailed in this document. The same test applications on a nRF52 consume a little less energy.
 
 == Sleeping
 Doing nothing still costs some energy since RAM and low frequency clock have to run at all times. This costs about 5.6µA on average. As the mesh implementation is based on timers, different timer intervals have been tested:

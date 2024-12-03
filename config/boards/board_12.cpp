@@ -60,7 +60,7 @@ void SetBoard_12(BoardConfiguration* c)
         c->powerOptimizationEnabled = true;
         c->powerButtonActiveHigh = false;
         c->powerButton =  13;
-        GS->boardconf.getCustomPinset = &SetCustomPins_12;
+        c->getCustomPinset = &SetCustomPins_12;
     }
 }
 

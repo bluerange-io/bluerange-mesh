@@ -2,7 +2,7 @@ ifndef::imagesdir[:imagesdir: ../assets/images]
 = QR Code Generation
 
 == General
-We are using different types of QR codes that are used to provision devices. The QR codes contain a device identifier such as a xref:Specification.adoc#SerialNumbers[serial number] and some secret key that gives us access to that device. By scanning one of these codes, an enrollment can be generated in various apps and this enrollment can also be imported into our platform. It is recommended that this QR code format is used for all devices running FruityMesh to enable a uniform way of enrolling these devices with the same application. Vendors are free to use other ways of distributing the enrollment information but they will lose compatibility with our tools and the ecosystem.
+We are using different types of QR codes that are used to provision devices. The QR codes contain a device identifier such as a xref:Specification.adoc#SerialNumbers[serial number] and some secret key that gives us access to that device. By scanning one of these codes, an enrollment can be generated in various apps and this enrollment can also be imported into our platform. It is recommended that this QR code format is used for all devices running BlueRange Mesh to enable a uniform way of enrolling these devices with the same application. Vendors are free to use other ways of distributing the enrollment information but they will lose compatibility with our tools and the ecosystem.
 
 You can download our BlueRange Admin app from the link:https://apps.apple.com/de/app/bluerange-admin-app/id1474619288[Apple App Store] to enroll devices with our BlueRange platform.
 

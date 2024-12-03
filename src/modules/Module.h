@@ -41,6 +41,7 @@ constexpr int INVALID_U32_CONFIG = 0xFFFFFFFF;
 #include <RecordStorage.h>
 #include <MeshConnection.h>
 #include <BaseConnection.h>
+#include <RegisterHandler.h>
 
 #if IS_ACTIVE(SIG_MESH)
 #include <SigElement.h>
@@ -74,6 +75,27 @@ static_assert((u8)RecordStorageResultCode::LAST_ENTRY < 50, "RecordStorageResult
 
 class Node;
 
+#define REGISTER_STRING(name, size) alignas(u8) u8 name[size] = {};
+#define GET_REGISTER_STRING_ADDR(regIn, buffer) (reg >= (regIn) && register_ < (regIn) + sizeof(buffer)) addr.Set(((u8*)(buffer)) + reg - (regIn))
+#define GENERAL_CHECK_STRING(regIn, buffer)     if (    reg                >= (regIn) &&  reg                < (regIn) + sizeof(buffer) \
+                                                    && (reg + length - 1u) >= (regIn) && (reg + length - 1u) < (regIn) + sizeof(buffer)) return RGC_STRING
+
+constexpr u32 REGISTER_RECORDS_PER_MODULE = 4;
+// TODO load persistent storage
+
+class RegisterHandlerEventListener
+{
+public:
+    RegisterHandlerEventListener() {};
+
+    virtual ~RegisterHandlerEventListener() {};
+
+    //Struct is passed by value so that it can be dequeued before calling this handler
+    //If we passed a reference, this handler would have to clear the item from the TaskQueue
+    virtual void RegisterHandlerEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength, bool dataChanged) = 0;
+
+};
+
 /*
  * The Module class can be subclassed for a number of purposes:
  * - Implement a driver for a sensor or an actuator
@@ -92,6 +114,9 @@ class Node;
  * delivery of actions and responses.
  */
 class Module
+#if IS_ACTIVE(REGISTER_HANDLER)
+    : public RegisterHandlerEventListener
+#endif //IS_ACTIVE(REGISTER_HANDLER)
 {
     friend class FruityMesh;
 
@@ -130,6 +155,10 @@ public:
 
     //This is automatically set to the moduleId for core modules, vendor modules must set this to a defined record storage id
     u16 recordStorageId = RECORD_STORAGE_RECORD_ID_INVALID;
+
+    //Can be checked to make sure that certain module settings are not modified during runtime
+    //or that tasks are only performed once when starting the module for the first time
+    bool moduleStarted = false;
 
     enum class ModuleConfigMessages : u8
     {
@@ -252,7 +281,7 @@ public:
 #endif
 
 #if IS_ACTIVE(BUTTONS)
-    virtual void ButtonHandler(u8 buttonId, u32 holdTime) {};
+    virtual void ButtonHandler(u8 buttonId, u32 holdTimeDs) {};
 #endif
 
     //This method indicates if this module is interested in a mesh access connection that
@@ -291,4 +320,73 @@ private:
     RecordStorageEventListenerProxy proxy;
     void ProxyRecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength);
 
+
+#if IS_ACTIVE(REGISTER_HANDLER)
+
+#ifdef JSTODO_PERSISTENCE
+private:
+    // To make it easy for Modules to simply inherit from RecordStorageEventListener
+    // even if they inherit from RegisterHandler we proxy the callback here.
+    class RecordStorageEventListenerRegisterProxy : public RecordStorageEventListener
+    {
+        Module& mod;
+    public:
+        explicit RecordStorageEventListenerRegisterProxy(Module& handler);
+        virtual void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
+    };
+
+public:
+    void LoadFromFlash();
+
+    RecordStorageEventListenerProxy proxyRegister;
+    struct RecordStorageUserData
+    {
+        u16 component;
+        u16 reg;
+        u16 length;
+        RegisterHandlerSetSource source;
+        // Instead of giving the callback from the user, we give our own callback
+        // which is calling commit and then calls the callback from the user, which
+        // is this member.
+        RecordStorageEventListener* callback;
+        u8 userData[1]; // More data follows
+    };
+#endif //JSTODO_PERSISTENCE
+
+private:
+    virtual void RegisterHandlerEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength, bool dataChanged) override;
+    void RecordStorageEventHandlerRegisterProxy(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength);
+    u16 GetRecordBaseId() const;
+
+protected:
+    //In order to enable the register handler, this method has to be implemented and must return RGC_SUCCESS for regions managed by the RegisterHandler
+    virtual RegisterGeneralChecks GetGeneralChecks(u16 component, u16 reg, u16 length) const { return RegisterGeneralChecks::RGC_LOCATION_DISABLED; }
+    virtual RegisterHandlerCode CheckValues(u16 component, u16 reg, const u8* values, u16 length) const { return RegisterHandlerCode::SUCCESS; }
+    // CAREFUL! Mapping is assumed to be static, meaning two calls with the same parameters must always return the same value in the out parameters.
+    // Reporting different registers at different times will result in undefined behavior.
+    virtual void MapRegister(u16 component, u16 reg, SupervisedValue& out, u32& persistedId) { };
+    // Length of data was reported by the RegisterHandler through MapRegister.
+    virtual void ChangeValue(u16 component, u16 reg, u8* data, u16 length) { };
+    virtual void CommitRegisterChange(u16 component, u16 reg, RegisterHandlerSetSource source) { };
+    virtual void OnRegisterRead(u16 component, u16 reg) { };
+
+public:
+    RegisterHandlerCode GetRegisterValues(u16 component, u16 reg, u8* values, u16 length);
+    RegisterHandlerCodeStage SetRegisterValues(u16 component, u16 reg, const u8* values, u16 length, RegisterHandlerEventListener* callback = nullptr, u32 userType = 0, u8* userData = nullptr, u16 userDataLength = 0, RegisterHandlerSetSource source = RegisterHandlerSetSource::INTERNAL);
+
+
+#endif //IS_ACTIVE(REGISTER_HANDLER)
+
+private:
+
+    // Inherited via RecordStorageEventListener
+    constexpr static u32 USER_TYPE_COMPONENT_ACT_WRITE = 1;
+    struct RecordStorageUserData
+    {
+        NodeId receiver;
+        ModuleIdWrapper moduleId;
+        u16 component;
+        u16 registerAddress;
+        u8 requestHandle;
+    };
 };

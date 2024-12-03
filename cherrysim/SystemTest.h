@@ -163,6 +163,8 @@ extern "C" {
 #define ACTIVATE_BR_PIR_MODULE 1
 #define ACTIVATE_SOFTWARE_RS485_RESET 1
 
+#define ACTIVATE_REGISTER_HANDLER 1
+
 //#define ACTIVATE_ONLY_SINK_FUNCTIONALITY 1
 
 #define NRF_GPIOTE_POLARITY_TOGGLE 1
@@ -839,7 +841,9 @@ uint32_t sd_ble_evt_get(uint8_t *p_dest, uint16_t *p_len);
 uint32_t sd_app_evt_wait();
 uint32_t sd_nvic_ClearPendingIRQ(IRQn_Type IRQn);
 uint32_t nrf_sdh_ble_enable(uint32_t * p_app_ram_base);
+uint32_t sd_softdevice_is_enabled(uint8_t* p_softdevice_enabled);
 uint32_t nrf_sdh_enable_request();
+uint32_t nrf_sdh_disable_request();
 uint32_t sd_ble_cfg_set(uint32_t, ble_cfg_t*, uint32_t);
 uint32_t sd_ble_gap_tx_power_set(int8_t tx_power);
 uint32_t sd_nvic_EnableIRQ(IRQn_Type IRQn);

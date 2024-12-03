@@ -2,12 +2,12 @@
 
 == Debugging Stack Traces
 
-When Fruitymesh reboots, it tries to save the reason in the ramRetainStruct. The Stacked Program Counter (PC before e.g. the _hardfaultHandler_ was called) will be saved in `stacktrace[0]`.
+When BlueRange Mesh reboots, it tries to save the reason in the ramRetainStruct. The Stacked Program Counter (PC before e.g. the _hardfaultHandler_ was called) will be saved in `stacktrace[0]`.
 Using this information it is possible to get the source code line where the error happened. Use the following:
 
- <gccDir>\bin\arm-none-eabi-addr2line -e <fruitymeshDir>\_build\debug\NRF51_BOARD\FruityMesh.out 0x35BA5
+ <gccDir>\bin\arm-none-eabi-addr2line -e <fruitymeshDir>\_build\debug\NRF51_BOARD\BlueRange Mesh.out 0x35BA5
 
-TIP: The address must be given as a hex value, otherwise _addr2line_ doesn't print a valid result. FruityMesh must have been compiled with debug information using `-g`.
+TIP: The address must be given as a hex value, otherwise _addr2line_ doesn't print a valid result. BlueRange Mesh must have been compiled with debug information using `-g`.
 
 If the line is not given and you just get sth. like *??:?*, you can also use readelf or any online elf parser such as e.g. link:http://www.sunshine2k.de/coding/javascript/onlineelfviewer/onlineelfviewer.html[this one].
 
@@ -15,7 +15,7 @@ If the line is not given and you just get sth. like *??:?*, you can also use rea
 
 This will give you a list of addresses and sizes of where different methods are located in the binary. You can try to find an address that is a bit lower than the reported error address. Then check if your address is within the size of that method and you will know that the issue happened within this method.
 
-== Reading Flash Of A Broken FruityMesh Node
+== Reading Flash Of A Broken BlueRange Mesh Node
 
 In order to analyze a broken node, the flash and UICR can be read back. A good idea is to first read back UICR and flash and then compare the .hex with either the last .hex flashed onto this beacon (from the _fruitydeploy_ beacon directory) or flash the beacon again and read it back.
 
@@ -57,11 +57,11 @@ When the nodes are somewhere in the building and one of them is stuck in a hard 
 
 == Finding Problems In A Live System
 
-Often, an error only occurs sporadically and in a system that is only accessible remotely. FruityMesh has some built-in functionality to find errors in these cases. First, live reports can be used (cf. xref:StatusReporterModule.adoc[StatusReporterModule]). A number of live report statements may be added to the code and they will be reported through the mesh as soon as they get triggered. A drawback with live reports is that they may not be available if the trigger occurs while the mesh connection is lost. In this case, the error logging facility of the xref:Logger.adoc[Logger] class can be used. This way, the error is logged to RAM and can be requested once the node is available in the mesh again.
+Often, an error only occurs sporadically and in a system that is only accessible remotely. BlueRange Mesh has some built-in functionality to find errors in these cases. First, live reports can be used (cf. xref:StatusReporterModule.adoc[StatusReporterModule]). A number of live report statements may be added to the code and they will be reported through the mesh as soon as they get triggered. A drawback with live reports is that they may not be available if the trigger occurs while the mesh connection is lost. In this case, the error logging facility of the xref:Logger.adoc[Logger] class can be used. This way, the error is logged to RAM and can be requested once the node is available in the mesh again.
 
 == nRF Sniffer
 
-The nRF sniffer is used with Wireshark. A custom dissector for FruityMesh _JOIN_ME_ packets has been written and is saved in the `util/wireshark` folder. Integration into Wireshark described at the beginning of file `fruitymesh.lua`.
+The nRF sniffer is used with Wireshark. A custom dissector for BlueRange Mesh _JOIN_ME_ packets has been written and is saved in the `util/wireshark` folder. Integration into Wireshark described at the beginning of file `fruitymesh.lua`.
 
 The nRF Sniffer doesn't work with an updated Segger firmware. It is necessary to flash the Segger firmeware JLink_V498c onto the beacon with `JLinkConfig.exe`, option: replace firmware. Afterwards, the sniffer should work together with the fixed sniffer application received by Nordic Semiconductor.
 

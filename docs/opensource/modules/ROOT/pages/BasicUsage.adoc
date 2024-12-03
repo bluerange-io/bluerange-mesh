@@ -63,7 +63,7 @@ whether they are active or not.
 
 == More Commands
 
-FruityMesh is structured in Modules. Each module provides its own set of commands. A detailed listing of all available modules and their commands can be found on the xref:Modules.adoc[Modules] page.
+BlueRange Mesh is structured in Modules. Each module provides its own set of commands. A detailed listing of all available modules and their commands can be found on the xref:Modules.adoc[Modules] page.
 
 ____
 Have a look at the xref:Specification.adoc#NodeIds[NodeIDs section] for

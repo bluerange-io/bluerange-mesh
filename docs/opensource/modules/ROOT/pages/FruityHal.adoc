@@ -2,7 +2,7 @@ ifndef::imagesdir[:imagesdir: ../assets/images]
 = FruityHal
 
 == Purpose
-In order to compile and run FruityMesh on different chipsets and architectures, we decided to abstract chip specific behaviour in our FruityHal. This is an ongoing process and the documentation for this will continously be expanded. Our Hal is more than a standard Hal, it abstracts the functionality at a higher level to allow it to run on top of different BLE stacks. For the interface of the Hal, take a look at `FruityHal.h` and for the implementation for the nRF chipsets, take a look at `FruityHalNrf.cpp`
+In order to compile and run BlueRange Mesh on different chipsets and architectures, we decided to abstract chip specific behaviour in our FruityHal. This is an ongoing process and the documentation for this will continously be expanded. Our Hal is more than a standard Hal, it abstracts the functionality at a higher level to allow it to run on top of different BLE stacks. For the interface of the Hal, take a look at `FruityHal.h` and for the implementation for the nRF chipsets, take a look at `FruityHalNrf.cpp`
 
 == Data
 The following lists data and enums being used. These associated values are those that are used e.g. for internal logic or for storing in flash memory.

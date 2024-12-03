@@ -2,37 +2,51 @@
 
 == Purpose
 
-The _IoModule_ with _ModuleId_ 6 is driving and configuring all GPIOs. E.g. toggling a LED, a motor or reading values from a basic sensor.
+The _IoModule_ with _ModuleId_ 6 can be used for basic driving and configuring of GPIOs. E.g. toggling a LED, a motor or reading values from a basic sensor.
 
 == Functionality
-The IO module only supports toggling of LEDs and
-different pins at the moment. It will be extended to include support for basic sensors that can be read by e.g. analog/digital conversion.
+The IoModule only supports toggling of LEDs and different pins at the moment. It will be extended to include support for basic sensors that can be read by e.g. analog/digital conversion.
+
+The functionality was implemented using two different concepts:
+
+* xref:#LedAndDemo[LED and demo functionality] is available using dedicated terminal commands
+* Some more xref:#RegisterAccess[generic functionality] is available through component_* commands
+
+For more information on the Register based access, see xref:RegisterAccess.adoc[Register Access].
+
+[#LedAndDemo]
+== LED and Demo Functionality
+
+The following commands are either used to control the LED state or for demo purpose. To access input or output pins in a more generic way, see xref:#RegisterAccess[the register access chapter].
 
 === Change LED Mode
-Changes the LED mode to one of the states. It is possible to turn leds on or off, but also eg. signal number of connections.
+Changes the LED mode to one of the states. It is possible to turn leds on or off, but also eg. signal number of mesh connections. This is mostly used for showing off the mesh functionality and testing. Setting the LED mode is typically done in the featureset.
 
 [cols="1,2"]
 |===
 |Mode|Blink pattern
 
 |on|all LEDs are on
-|off|all LEDs are off
-|connections|if networkId = 1, red LED on + 
-if no connections red LED blinking + 
-if connected green LED blinking for connection count
+|off|all LEDs are forced off (will periodically make sure they are off)
+|custom|LEDs are not controlled by the IoModule and another module can control their states
+|connections|*no mesh connections*  => red LED blinking three times + 
+*connected to mesh* => green LED blinking for connection count +
+*in case networkId equals 1* => red LED constantly on (legacy functionality)
 |===
 
 [source,C++]
 ----
 //Set led mode
-action [nodeId] io led [mode = on / off / connections]
+action [nodeId] io led [mode = on / off / connections / custom]
 
-//Switch leds on on all nodes
+//Switch leds on for all nodes
 action 0 io led on
 ----
 
 === Set Pins
-Sets a pin to either high or low output.
+Sets a pin to either high or low output. This is mostly used for demo or testing purpose. Any pin number can be given.
+
+WARNING: Be aware that the pin will be configured as an output pin and the LED mode will be set to CUSTOM.
 
 [source,C++]
 ----
@@ -44,9 +58,9 @@ action 0 io pinset 21 high 22 low
 ----
 
 === Read Pins
-Reads the digital level of one or up to 5 pins (0 = low and 1 = high).
+Reads the digital level of one or up to 5 pins (0 = low and 1 = high). This is mostly a demo or testing command.
 
-WARNING: This changes the pin's GPIO configuration output (after it has changed it to input and read the pin).
+WARNING: This changes the pin's GPIO configuration to output after temporarily setting it to input.
 
 [source,C++]
 ----
@@ -77,7 +91,7 @@ Example response:
 
 [#Identify]
 === Start identification
-Starts identification procedure which will blink all board LEDs with a 200ms period for a total of 30 seconds. Can also be handled by other modules to start custom identification. This mode overrules curent led mode.
+Starts the identification procedure which will blink all LEDs with a 200ms period for a total of 30 seconds. Can also be handled by other modules to start custom identification. This mode overrules the curent led mode.
 
 [source,C++]
 ----
@@ -88,9 +102,59 @@ action [nodeId] io identify [mode = on / off]
 action 0 io identify on
 ----
 
+[#RegisterAccess]
+== Register Based Generic GPIO Functionality
+
+We offer a generic register based access to input and output pins that is well suited for reading out sensors or controlling actuators connected on the PCB. Combined with AutoSense and AutoAct, this allows for a number of sophisticated automation tasks as well.
+
+=== Register Mapping
+
+[cols="1,1,4,1,1,1,10"]
+|===
+|Component|Register|Name|DataType (Length)|Min ... Max (Default)|R/W|Description
+
+7+|*Information Registers*
+|0|100|DIO_OUTPUT_NUM|U8(1)|-|R|Provides the number of digital output pins configured through `numDigitalOutPins`
+|0|101|DIO_INPUT_NUM|U8(1)|-|R|Provides the number of digital input pins configured through `numDigitalInPins`
+|0|102|DIO_INPUT_TOGGLE_PAIR_NUM|U8(1)|-|R|Provides the number of digital input toggle pairs configured through `numDigitalInTogglePairSettings`
+
+7+|*Control Registers*
+|0|20000 ... 20099|DIO_OUTPUT_STATE_#|U8(1)|0 ... 1 (0)|RW|A range of registers that controls digital output pins suitable for driving simple actuators. These are configurable through the Boardsettings. (0=Inactive, 1=Active)
+
+7+|*Data Registers*
+|0|30000 ... 30099|DIO_INPUT_STATE_#|U8(1)|0 ... 1|R|A range of registers that provides digital input pins suitable for digital sensors or toggle buttons. (0=Inactive, 1=Active)
+|0|30100 ... 30199|DIO_TOGGLE_PAIR_#|U8(1)|0 ... 1|R|Provides the current state of the toggle pair. A toggle pair is an easy way of implementing a switch based on two pushbuttons. The pushbuttons need to be configured with interrupts and are then able to store the timestamp of when they were pressed the last time. A toggle pair will then compare the two timestamps to evaluate the current state of the toggle as 0 or 1.
+|0|31000 ... 31399|DIO_INPUT_LAST_ACTIVE_TIME_#|U32(4)|-|R|Provides a timestamp in deciseconds (since device boot) that is updated once the input pin is active. For a button, this is the timestamp when it was pressed the last time. The timestamp will not be updated periodically if the input is active for a long time.
+|0|30400 ... 30799|DIO_INPUT_LAST_HOLD_TIME_#|U32(4)|-|R|Provides a timestamp in deciseconds (since device boot) that is updated only when the input was active for more than 500ms. The timestamp will be updated periodically as long as the input is active. This is useful to e.g. detect a long press for a pushbutton.
+|===
+
+=== Potential Use-Cases
+
+* Manually query the state of an attached button or digital sensor: Use a component_act message with `read` for DIO_INPUT_STATE_1 as seen in the examples below.
+* Manually check the state of a digital output: Use component_act with `read` for DIO_OUTPUT_STATE_1.
+* Toggle an LED based on the state of a pushbutton: Use AutoSense to report DIO_INPUT_STATE_1 on change, then use AutoAct to push this value into DIO_OUTPUT_STATE_1.
+* Configure two buttons to toggle an LED: Configure AutoSense to report DIO_TOGGLE_PAIR_1 on change and use AutoAct to push this value into DIO_OUTPUT_STATE_1.
+* Report an event each time a button was pressed: Use AutoSense to watch the DIO_INPUT_LAST_ACTIVE_TIME_1 on change.
+* Report dimming events once a pushbutton was pressed for more than 500ms: Use AutoSense to report the DIO_INPUT_LAST_HOLD_TIME_1 on change.
+
+.Examples
+[source,C++]
+----
+//Set the first digital output to 1 and the second digital output to 0
+component_act this 6 writeack 0 20000 01:00
+
+//Read the state of the first two digital inputs
+component_act this 6 read 0 30000 02
+
+//Read the state of the first digital output
+component_act this 6 read 0 20000 01
+
+//Check the timestamp for when the first input was active
+component_act this 6 read 0 31000 04
+----
 
 [#ImplementationDetails]
 === Implementation Details
 
 The `SET_LED(_RESPONSE)` and `SET_IDENTIFICATION(_RESPONSE)` messages are also transmitted over via `MeshAccessConnections` which are established with the `FmKeyId::ORGANIZATION`.
-This is required for devices which are not part of the mesh network, but instead part of the overall organization.
+This is required for devices which are not part of the mesh network, but instead part of the organization.

@@ -46,7 +46,7 @@ void StartFruityMesh();
 
 //Event dispatchers
 void DispatchSystemEvents(FruityHal::SystemEvents sys_evt);
-void DispatchButtonEvents(u8 buttonId, u32 buttonHoldTime);
+void DispatchButtonEvents(u8 buttonId, u32 buttonHoldTimeDs);
 void DispatchTimerEvents(u16 passedTimeDs);
 
 void DispatchEvent(const FruityHal::GapRssiChangedEvent& e);

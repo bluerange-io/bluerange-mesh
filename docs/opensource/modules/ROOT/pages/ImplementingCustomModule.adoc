@@ -3,13 +3,13 @@ ifndef::imagesdir[:imagesdir: ../assets/images]
 
 WARNING: Judging from past experiences, the code snippets in this tutorial tend to outdate quite quickly. We always try to keep it up to date, however if something slips through that is not working anymore as described, please have a look at the reference implementation in `fruitymesh/src/examples/PingModule.cpp/.h`. We would also be very thankful if you open an issue on Github about your findings.
 
-This tutorial guides you through the process of creating a new FruityMesh module. You'll implement a PingModule that allows you to ping a node and get its response. You'd normally implement ping functionality into the Node, StatusReporter or DebugModule, which is where it belongs, but the use-case acts as a good and easy example for building your own module. You can find the finished files in the folder `src/examples` or you can just follow the tutorial.
+This tutorial guides you through the process of creating a new BlueRange Mesh module. You'll implement a PingModule that allows you to ping a node and get its response. You'd normally implement ping functionality into the Node, StatusReporter or DebugModule, which is where it belongs, but the use-case acts as a good and easy example for building your own module. You can find the finished files in the folder `src/examples` or you can just follow the tutorial.
 
 == What Is A Module?
 
 Modules are used to structure functionality that doesn't directly interfere with the mesh-logic. Modules extend the `Module` class. Each module has the possibility to save a *persistent configuration* in flash. It can be loaded or unloaded and it is possible to decide which modules are part of the firmware during compile time through a *featureset*. A module can choose to register a *UART listener* and react on commands or *output to UART* for logging or communication purposes. It can also *send data packets* through the mesh and *receive data*.
 
-There are two types of modules, the core modules that belong to FruityMesh and VendorModules, that allow every developer to extend the functionality with custom code.
+There are two types of modules, the core modules that belong to BlueRange Mesh and VendorModules, that allow every developer to extend the functionality with custom code.
 
 Here is an overview over some of the handlers that a Module can use:
 
@@ -27,7 +27,7 @@ The following guide outlines the steps to implement a simple module that can pin
 
 === Step 0
 
-Move the already existing PingModule implementation out of the FruityMesh repository. It is located in `fruitymesh/src/examples/PingModule.cpp/.h`. This guide will show you how you can reimplement this module. You might not want to remove it, so you can always compare your solution to the already existing one.
+Move the already existing PingModule implementation out of the BlueRange Mesh repository. It is located in `fruitymesh/src/examples/PingModule.cpp/.h`. This guide will show you how you can reimplement this module. You might not want to remove it, so you can always compare your solution to the already existing one.
 
 === Step 1
 
@@ -77,7 +77,7 @@ if(TERMARGS(0, "pingmod")){
 
 The command name and command arguments should be in lowercase letters to be consistent with other commands.
 
-Next, flash it to your device again and watch if it reacts on your pingmod command. If it does not, make sure you are using the logtag "PINGMOD" and you either enable it by writing *debug pingmod* in the terminal first, or you enable the logtag by default in FruityMesh.cpp.
+Next, flash it to your device again and watch if it reacts on your pingmod command. If it does not, make sure you are using the logtag "PINGMOD" and you either enable it by writing *debug pingmod* in the terminal first, or you enable the logtag by default in BlueRange Mesh.cpp.
 
 image:tutorial-pingmod.png[pingmod_1]
 
@@ -245,6 +245,6 @@ That's it. You should now be able to ping any node in the mesh network and see i
 
 image:tutorial-pingmod4.png[pingmod_4]
 
-You would probably want to use a counter with the ping message to generate a handle for a ping. Then, you'd be able to calculate the time that it took for the packet to come back through the mesh. And as indicated in the beginning, you would not necessarily want to create a new module for pinging other nodes but you'd have that functionality in a core module. Make sure to take a look at the appTimer and time syncing capabilities of FruityMesh if you want to extend your module with more functionality.
+You would probably want to use a counter with the ping message to generate a handle for a ping. Then, you'd be able to calculate the time that it took for the packet to come back through the mesh. And as indicated in the beginning, you would not necessarily want to create a new module for pinging other nodes but you'd have that functionality in a core module. Make sure to take a look at the appTimer and time syncing capabilities of BlueRange Mesh if you want to extend your module with more functionality.
 
-This concludes the tutorial. Have fun implementing new modules for FruityMesh!
+This concludes the tutorial. Have fun implementing new modules for BlueRange Mesh!

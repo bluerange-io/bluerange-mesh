@@ -69,7 +69,7 @@ The CMake build will fail if it cannot download an external dependency. In some 
 
 [#cmakeStructure]
 == CMake structure overview
-CMake Projects are often structured into libraries and executables. This is (mostly) not the case for FruityMesh however, because as it turned out, splitting the project into libraries increases the hex file size by quite a lot without giving us actual benefits. Due to this we have decided to compile everything and link everything individually per featureset/simulator instance. Each featurset as well as simulator configuration (tester/runner) is an individual executable. To avoid adding all the files to each target by hand, all the targets are stored in several lists. Currently the following lists exist (not all publicly available):
+CMake Projects are often structured into libraries and executables. This is (mostly) not the case for BlueRange Mesh however, because as it turned out, splitting the project into libraries increases the hex file size by quite a lot without giving us actual benefits. Due to this we have decided to compile everything and link everything individually per featureset/simulator instance. Each featurset as well as simulator configuration (tester/runner) is an individual executable. To avoid adding all the files to each target by hand, all the targets are stored in several lists. Currently the following lists exist (not all publicly available):
 
 * *ALL_TARGETS* - Every target
 * *NATIVE_TARGETS* - Only targets that are the product of a single feature set. Most of them run on actual hardware, though there are exceptions to this like prod_mesh_arm which is intended only to check that the HAL abstracts all vendor specific code out.

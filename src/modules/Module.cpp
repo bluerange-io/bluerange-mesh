@@ -63,7 +63,6 @@ Module::~Module()
 void Module::LoadModuleConfigurationAndStart()
 {
     //Load the configuration and replace the default configuration if it exists
-
     GS->config.LoadSettingsFromFlash(this, this->recordStorageId, (u8*)this->configurationPointer, this->configurationLength);
 }
 
@@ -176,6 +175,21 @@ TerminalCommandHandlerReturnType Module::TerminalCommandHandler(const char* comm
     return TerminalCommandHandlerReturnType::UNKNOWN;
 }
 #endif
+
+// Can be used to either send a Vendor component message (4 byte vendor module id) or a message
+// using only a ModuleId (1 byte) based on the given moduleId
+static void HelperSendComponentMessage(ConnPacketComponentMessageVendor* message, u16 size)
+{
+    if (!Utility::IsVendorModuleId(message->componentHeader.moduleId))
+    {
+        ConnPacketComponentMessage* actualStructure = (ConnPacketComponentMessage*)message;
+        CheckedMemmove(&(actualStructure->componentHeader.requestHandle), &(message->componentHeader.requestHandle), size - 3 - offsetof(ComponentMessageHeader, requestHandle));
+        size -= (sizeof(VendorModuleId) - sizeof(ModuleId));
+    }
+    GS->cm.SendMeshMessage(
+        (u8*)message,
+        size);
+}
 
 void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader)
 {
@@ -421,6 +435,101 @@ void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnecti
             packetHeader->sender, Utility::GetModuleIdString(wrappedModuleId).data(), requestHandle, (u32)data->result);
         }
     }
+
+#if IS_ACTIVE(REGISTER_HANDLER)
+    //Handles writing to our Generic Register Handlers
+    if (packetHeader->messageType == MessageType::COMPONENT_ACT)
+    {
+        ConnPacketModuleContents cpmc;
+        if (!Utility::ToConnPacketModuleContents(&cpmc, sendData, packetHeader)) return;
+        if (!Utility::IsSameModuleId(cpmc.moduleId, vendorModuleId)) return;
+        if (cpmc.dataSize < sizeof(ConnPacketComponentMessageContents) - 1) return;
+
+        u16 payloadLen = sendData->dataLength.GetRaw() - SIZEOF_CONN_PACKET_COMPONENT_MESSAGE;
+        if (Utility::IsVendorModuleId(vendorModuleId)) payloadLen = sendData->dataLength.GetRaw() - SIZEOF_CONN_PACKET_COMPONENT_MESSAGE_VENDOR;
+
+        const ConnPacketComponentMessageContents* cpcmc = (const ConnPacketComponentMessageContents*)cpmc.data;
+
+        if (cpmc.actionType == (u8)ActorMessageActionType::WRITE
+            || cpmc.actionType == (u8)ActorMessageActionType::WRITE_ACK)
+        {
+            RecordStorageUserData userData;
+            userData.receiver = cpmc.sender;
+            userData.moduleId = cpmc.moduleId;
+            userData.component = cpcmc->component;
+            userData.registerAddress = cpcmc->registerAddress;
+            userData.requestHandle = cpmc.requestHandle;
+
+            RegisterHandlerCodeStage code = SetRegisterValues(
+                cpcmc->component,
+                cpcmc->registerAddress,
+                cpcmc->payload,
+                payloadLen,
+                cpmc.actionType == (u8)ActorMessageActionType::WRITE_ACK ? this : nullptr,
+                USER_TYPE_COMPONENT_ACT_WRITE,
+                (u8*)&userData,
+                sizeof(userData),
+                RegisterHandlerSetSource::MESH
+            );
+            //If the register handler is disabled, we do not perform any further functionality and do not send errors
+            if (code.code == RegisterHandlerCode::LOCATION_DISABLED) return;
+
+            if (code.code != RegisterHandlerCode::SUCCESS
+                && cpmc.actionType == (u8)ActorMessageActionType::WRITE_ACK)
+            {
+                u8 buffer[SIZEOF_CONN_PACKET_COMPONENT_MESSAGE_VENDOR + 2] = {};
+                ConnPacketComponentMessageVendor* reply = (ConnPacketComponentMessageVendor*)buffer;
+                reply->componentHeader.header.messageType = MessageType::COMPONENT_SENSE;
+                reply->componentHeader.header.sender = GS->node.configuration.nodeId;
+                reply->componentHeader.header.receiver = cpmc.sender;
+                reply->componentHeader.moduleId = cpmc.moduleId;
+                reply->componentHeader.component = cpcmc->component;
+                reply->componentHeader.registerAddress = cpcmc->registerAddress;
+                reply->componentHeader.requestHandle = cpmc.requestHandle;
+
+                reply->componentHeader.actionType = (u8)SensorMessageActionType::ERROR_RSP;
+                reply->payload[0] = (u8)code.code;
+                reply->payload[1] = (u8)code.stage;
+
+                HelperSendComponentMessage(reply, SIZEOF_CONN_PACKET_COMPONENT_MESSAGE_VENDOR + 2);
+            }
+        }
+        //Handles Reading from the Generic Register Handlers
+        else if (cpmc.actionType == (u8)ActorMessageActionType::READ && sendData->dataLength >= SIZEOF_CONN_PACKET_COMPONENT_MESSAGE + 1)
+        {
+            DYNAMIC_ARRAY(buffer, SIZEOF_CONN_PACKET_COMPONENT_MESSAGE_VENDOR + cpcmc->payload[0]);
+            CheckedMemset(buffer, 0, SIZEOF_CONN_PACKET_COMPONENT_MESSAGE_VENDOR + cpcmc->payload[0]);
+
+            ConnPacketComponentMessageVendor* reply = (ConnPacketComponentMessageVendor*)buffer;
+            reply->componentHeader.header.messageType = MessageType::COMPONENT_SENSE;
+            reply->componentHeader.header.sender = GS->node.configuration.nodeId;
+            reply->componentHeader.header.receiver = cpmc.sender;
+            reply->componentHeader.moduleId = cpmc.moduleId;
+            reply->componentHeader.component = cpcmc->component;
+            reply->componentHeader.registerAddress = cpcmc->registerAddress;
+            reply->componentHeader.requestHandle = cpmc.requestHandle;
+
+            RegisterHandlerCode code = GetRegisterValues(cpcmc->component, cpcmc->registerAddress, reply->payload, cpcmc->payload[0]);
+            //Do not perform any functionality if the RegisterHandler is disabled for the given location
+            if (code == RegisterHandlerCode::LOCATION_DISABLED) return;
+
+
+            u16 totalLength = SIZEOF_COMPONENT_MESSAGE_HEADER_VENDOR;
+            if (code == RegisterHandlerCode::SUCCESS)
+            {
+                reply->componentHeader.actionType = (u8)SensorMessageActionType::READ_RSP;
+                totalLength += cpcmc->payload[0];
+            }
+            else
+            {
+                reply->componentHeader.actionType = (u8)SensorMessageActionType::ERROR_RSP;
+                reply->payload[0] = (u8)code;
+                totalLength += 1;
+            }
+            HelperSendComponentMessage(reply, totalLength);
+        }
+    }
+#endif //IS_ACTIVE(REGISTER_HANDLER)
 }
 
 PreEnrollmentReturnCode Module::PreEnrollmentHandler(ConnPacketModule* enrollmentPacket, MessageLength packetLength)
@@ -489,3 +598,318 @@ void Module::SendModuleConfigResult(NodeId senderId, ModuleIdWrapper moduleId, M
         false,
         true);
 }
+
+
+#if IS_ACTIVE(REGISTER_HANDLER)
+
+#ifdef JSTODO_PERSISTENCE
+void Module::RecordStorageEventHandlerRegisterProxy(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength)
+{
+    RecordStorageUserData* data = (RecordStorageUserData*)userData;
+    if (resultCode == RecordStorageResultCode::SUCCESS)
+    {
+        for (u32 i = 0; i < data->length; i++)
+        {
+            CommitRegisterChange(data->component, data->reg + i, data->source);
+        }
+    }
+    else
+    {
+        // Nothing. We have no idea how to handle errors in such a case. It's the duty of the passed callback to deal with it.
+    }
+
+    if (data->callback)
+    {
+        u8* userUserData = nullptr;
+        u16 userUserDataLength = userDataLength - offsetof(RecordStorageUserData, userData);
+        if (userUserDataLength > 0)
+        {
+            userUserData = data->userData;
+        }
+        data->callback->RecordStorageEventHandler(recordId, resultCode, userType, userUserData, userUserDataLength);
+    }
+}
+#endif
+
+u16 Module::GetRecordBaseId() const
+{
+    if (Utility::IsVendorModuleId(vendorModuleId))
+    {
+        return ((recordStorageId - RECORD_STORAGE_RECORD_ID_VENDOR_MODULE_CONFIG_BASE) * REGISTER_RECORDS_PER_MODULE) + RECORD_STORAGE_RECORD_ID_VENDOR_MODULES_REGISTER_ENTRIES_BASE;
+    }
+    else
+    {
+        return (((u32)moduleId) * REGISTER_RECORDS_PER_MODULE) + RECORD_STORAGE_RECORD_ID_INTERNAL_MODULES_REGISTER_ENTRIES_BASE;
+    }
+}
+
+RegisterHandlerCode Module::GetRegisterValues(u16 component, u16 reg, u8* values, u16 length)
+{
+    RegisterGeneralChecks generalChecks = GetGeneralChecks(component, reg, length);
+    if (generalChecks & RGC_LOCATION_DISABLED) return RegisterHandlerCode::LOCATION_DISABLED;
+
+    //TODO: Implement the other error codes
+
+    for (u32 i = 0; i < length; i++)
+    {
+        SupervisedValue val;
+        u32 dummy = 0;
+        MapRegister(component, reg + i, val, dummy);
+        if (val.GetError() != RegisterHandlerCode::SUCCESS)
+        {
+            return val.GetError();
+        }
+        if (!val.IsSet())
+        {
+            return RegisterHandlerCode::LOCATION_UNSUPPORTED;
+        }
+        const u32 bytesLeft = length - i;
+        if (bytesLeft < val.GetSize()
+            && val.GetType() != SupervisedValue::Type::DYNAMIC_RANGE_WRITABLE
+            && val.GetType() != SupervisedValue::Type::DYNAMIC_RANGE_READABLE) // It's totally fine to read a dynamic range only partially.
+        {
+            return RegisterHandlerCode::ILLEGAL_LENGTH;
+        }
+        val.ToBuffer(values + i, bytesLeft);
+        OnRegisterRead(component, reg + i);
+        i += val.GetSize() - 1; //-1 cause loop increment
+    }
+    return RegisterHandlerCode::SUCCESS;
+}
+
+RegisterHandlerCodeStage Module::SetRegisterValues(u16 component, u16 reg, const u8* values, u16 length, RegisterHandlerEventListener* callback, u32 userType, u8* userData, u16 userDataLength, RegisterHandlerSetSource source)
+{
+    if (source != RegisterHandlerSetSource::FLASH)
+    {
+        RegisterGeneralChecks generalChecks = GetGeneralChecks(component, reg, length);
+        if (generalChecks & RGC_LOCATION_DISABLED)
+        {
+            return { RegisterHandlerCode::LOCATION_DISABLED, RegisterHandlerStage::GENERAL_CHECK };
+        }
+        if (generalChecks & RGC_LOCATION_UNSUPPORTED)
+        {
+            return { RegisterHandlerCode::LOCATION_UNSUPPORTED, RegisterHandlerStage::GENERAL_CHECK };
+        }
+        if (generalChecks & RGC_NULL_TERMINATED)
+        {
+            u8 end = values[length - 1];
+            if (end != 0)
+            {
+                return { RegisterHandlerCode::ILLEGAL_VALUE, RegisterHandlerStage::GENERAL_CHECK };
+            }
+        }
+        if (generalChecks & RGC_NO_MIDDLE_NULL)
+        {
+            for (u32 i = 0; i < length - 1u; i++)
+            {
+                if (values[i] == 0)
+                {
+                    return { RegisterHandlerCode::ILLEGAL_VALUE, RegisterHandlerStage::GENERAL_CHECK };
+                }
+            }
+        }
+
+        RegisterHandlerCode checked = CheckValues(component, reg, values, length);
+        if (checked != RegisterHandlerCode::SUCCESS)
+        {
+            return { checked, RegisterHandlerStage::CHECK_VALUES };
+        }
+    }
+
+    if (reg < REGISTER_WRITABLE_RANGE_BASE || reg >= REGISTER_WRITABLE_RANGE_BASE + REGISTER_WRITABLE_RANGE_SIZE
+        || (reg + length - 1u) < REGISTER_WRITABLE_RANGE_BASE || (reg + length - 1u) >= REGISTER_WRITABLE_RANGE_BASE + REGISTER_WRITABLE_RANGE_SIZE)
+    {
+        return { RegisterHandlerCode::ILLEGAL_WRITE_LOCATION, RegisterHandlerStage::EARLY_CHECK };
+    }
+    if (length == 0)
+    {
+        return { RegisterHandlerCode::ILLEGAL_LENGTH, RegisterHandlerStage::EARLY_CHECK };
+    }
+
+    u32 persistedId = 0;
+    for (u32 i = 0; i < length; i++)
+    {
+        // First pass to check for errors.
+        SupervisedValue val;
+        u32 pId = 0; // TODO: Implement persistence stuff
+       MapRegister(component, reg + i, val, pId);
+
+        if (val.GetError() != RegisterHandlerCode::SUCCESS)
+        {
+            return { val.GetError(), RegisterHandlerStage::ADDR_FAIL };
+        }
+        if (!val.IsSet())
+        {
+            return { RegisterHandlerCode::LOCATION_UNSUPPORTED, RegisterHandlerStage::ADDR_FAIL };
+        }
+        if (!val.IsWritable())
+        {
+            return { RegisterHandlerCode::NOT_WRITABLE, RegisterHandlerStage::ADDR_FAIL };
+        }
+        if (i == 0) persistedId = pId;
+        else if (persistedId != pId)
+        {
+            // This is a limitation that could be removed in the future. Currently all registers in this
+            // range have to report the same persistedId. This simplifies the code in at least two ways:
+            //   1. We don't have to write multiple recordIds and wait for all their callbacks, somehow
+            //      keeping track of them all and making sure that they are written in an atomic manner.
+            //   2. It's clear which callback to call.
+            return { RegisterHandlerCode::PERSISTED_ID_MISMATCH, RegisterHandlerStage::ADDR_FAIL };
+        }
+        if (pId >= REGISTER_RECORDS_PER_MODULE)
+        {
+            return { RegisterHandlerCode::PERSISTED_ID_OUT_OF_RANGE, RegisterHandlerStage::ADDR_FAIL };
+        }
+        if (pId > 1)
+        {
+            // A temporary limitation. The actual limit should be REGISTER_RECORDS_PER_MODULE. This is in
+            // place because if we support multiple pIds, then we have to take possible migrations between
+            // recordIds into account. This is the case when coming from the flash and from the mesh.
+            // Deleting ranges from the flash is currently giving me a headache thinking about it. So
+            // implementing this is delayed until it's actually required.
+            return { RegisterHandlerCode::PERSISTED_ID_OUT_OF_RANGE, RegisterHandlerStage::ADDR_FAIL };
+        }
+        const u32 bytesLeft = length - i;
+        if (bytesLeft < val.GetSize()
+            && val.GetType() != SupervisedValue::Type::DYNAMIC_RANGE_WRITABLE) // It's totally fine to write a dynamic range only partially.
+        {
+            return { RegisterHandlerCode::ILLEGAL_LENGTH, RegisterHandlerStage::ADDR_FAIL };
+        }
+        i += val.GetSize() - 1;
+    }
+
+    bool valuesChanged = false;
+    for (u32 i = 0; i < length; i++)
+    {
+        // Second pass to actually write the values.
+        SupervisedValue val;
+        u32 dummy = 0;
+        MapRegister(component, reg + i, val, dummy);
+
+        DYNAMIC_ARRAY(changeBuffer, val.GetSize());
+        CheckedMemcpy(changeBuffer, values + i, val.GetSize());
+        ChangeValue(component, reg + i, changeBuffer, val.GetSize());
+        valuesChanged |= memcmp(values + i, changeBuffer, val.GetSize()) != 0;
+        val.FromBuffer(changeBuffer, length - i);
+        i += val.GetSize() - 1;
+    }
+
+    if (persistedId == 0 || source == RegisterHandlerSetSource::FLASH /*If we are already coming from the flash then there is no need to go back to the flash.*/)
+    {
+        for (u32 i = 0; i < length; i++)
+        {
+            CommitRegisterChange(component, reg + i, source);
+        }
+        // Calling the callback so that the caller doesn't have to care if this value is persisted or not.
+        if (callback)
+        {
+            callback->RegisterHandlerEventHandler(0, RecordStorageResultCode::SUCCESS, userType, userData, userDataLength, valuesChanged);
+        }
+
+        return { RegisterHandlerCode::SUCCESS, RegisterHandlerStage::SUCCESS };
+    }
+    else
+    {
+#ifndef JSTODO_PERSISTENCE
+        return { RegisterHandlerCode::NOT_IMPLEMENTED, RegisterHandlerStage::EARLY_RECORD_STORAGE };
+#else
+        const u16 recordId = GetRecordBaseId() + persistedId;
+        RecordStorageRecord* record = GS->recordStorage.GetRecord(recordId);
+        u32 maxSize = length * sizeof(u16);
+        const u16* oldRecordStorage = nullptr;
+        u16 oldRecordStorageLength = 0;
+        if (record)
+        {
+            maxSize += record->recordLength;
+            oldRecordStorage = (u16*)record->data;
+            oldRecordStorageLength = record->recordLength / sizeof(u16);
+        }
+        if (maxSize % sizeof(u16) == 1)
+        {
+            maxSize++;
+            // This should never happen - right?
+            SIMEXCEPTION(IllegalStateException);
+        }
+        DYNAMIC_ARRAY(buffer, maxSize);
+        const u16 actualLength = sizeof(u16) * InsertRegisterRange(oldRecordStorage, 0, component, reg, length, values, (u16*)buffer);
+
+        // TODO Missing a commit call here! Probably we have to put a record storage callback in between.
+
+        DYNAMIC_ARRAY(surroundingUserDataBuffer, sizeof(RecordStorageUserData) + userDataLength);
+        CheckedMemset(surroundingUserDataBuffer, 0, sizeof(RecordStorageUserData) + userDataLength);
+        RecordStorageUserData* surroundingUserData = (RecordStorageUserData*)buffer;
+        surroundingUserData->component = component;
+        surroundingUserData->reg = register_;
+        surroundingUserData->length = length;
+        surroundingUserData->source = source;
+        surroundingUserData->callback = callback;
+        if (userData)
+        {
+            CheckedMemcpy(surroundingUserData->userData, userData, userDataLength);
+        }
+
+        RecordStorageResultCode rsCode = GS->recordStorage.SaveRecord(
+            recordId,
+            buffer,
+            actualLength,
+            &proxy,
+            userType,
+            surroundingUserDataBuffer,
+            sizeof(RecordStorageUserData) + userDataLength
+        );
+        if (rsCode == RecordStorageResultCode::SUCCESS) return { RegisterHandlerCode::SUCCESS, RegisterHandlerStage::EARLY_RECORD_STORAGE };
+        else
+        {
+            static_assert((int)RecordStorageResultCode::LAST_ENTRY < (int)RegisterHandlerCode::RECORD_STORAGE_CODES_END - (int)RegisterHandlerCode::RECORD_STORAGE_CODES_START, "Not enough room to embed error code.");
+            return { (RegisterHandlerCode)((int)rsCode + (int)RegisterHandlerCode::RECORD_STORAGE_CODES_START), RegisterHandlerStage::EARLY_RECORD_STORAGE };
+        }
+#endif
+    }
+}
+
+#ifdef JSTODO_PERSISTENCE
+Module::RecordStorageEventListenerRegisterProxy::RecordStorageEventListenerRegisterProxy(Module& mod) :
+    mod(mod)
+{
+}
+
+void Module::RecordStorageEventListenerRegisterProxy::RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength)
+{
+    mod.RecordStorageEventHandlerRegisterProxy(recordId, resultCode, userType, userData, userDataLength);
+}
+#endif
+
+void Module::RegisterHandlerEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength, bool dataChanged)
+{
+    if (userType == USER_TYPE_COMPONENT_ACT_WRITE)
+    {
+        RecordStorageUserData* rs = (RecordStorageUserData*)userData;
+
+        u8 buffer[SIZEOF_CONN_PACKET_COMPONENT_MESSAGE_VENDOR + 2] = {};
+        ConnPacketComponentMessageVendor* reply = (ConnPacketComponentMessageVendor*)buffer;
+        reply->componentHeader.header.messageType = MessageType::COMPONENT_SENSE;
+        reply->componentHeader.header.sender = GS->node.configuration.nodeId;
+        reply->componentHeader.header.receiver = rs->receiver;
+        reply->componentHeader.moduleId = rs->moduleId;
+        reply->componentHeader.component = rs->component;
+        reply->componentHeader.registerAddress = rs->registerAddress;
+        reply->componentHeader.requestHandle = rs->requestHandle;
+
+        if (resultCode == RecordStorageResultCode::SUCCESS)
+        {
+            reply->componentHeader.actionType = (u8)SensorMessageActionType::RESULT_RSP;
+            reply->payload[0] = !dataChanged ? (u8)RegisterHandlerCode::SUCCESS : (u8)RegisterHandlerCode::SUCCESS_CHANGE;
+            reply->payload[1] = (u8)RegisterHandlerStage::SUCCESS;
+        }
+        else
+        {
+            reply->componentHeader.actionType = (u8)SensorMessageActionType::ERROR_RSP;
+            reply->payload[0] = (u8)RegisterHandlerCode::RECORD_STORAGE_CODES_START + (u8)resultCode;
+            reply->payload[1] = (u8)RegisterHandlerStage::LATE_RECORD_STORAGE;
+        }
+
+        HelperSendComponentMessage(reply, SIZEOF_CONN_PACKET_COMPONENT_MESSAGE_VENDOR + 2);
+    }
+}
+
+#endif //IS_ACTIVE(REGISTER_HANDLER)

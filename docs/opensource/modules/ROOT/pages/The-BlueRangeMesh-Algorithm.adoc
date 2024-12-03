@@ -1,5 +1,5 @@
 ifndef::imagesdir[:imagesdir: ../assets/images]
-= FruityMesh Algorithm
+= BlueRange Mesh Algorithm
 
 == Introduction
 A mesh should be able to build and

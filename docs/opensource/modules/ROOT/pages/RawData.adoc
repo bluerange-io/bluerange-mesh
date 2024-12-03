@@ -167,7 +167,7 @@ Once the last chunk is received, the receiver sends this message to the sender, 
 |receiverId | u16 | The node ID that this message should be sent to
 |destinationModuleId | u8 | The module ID is used for giving context to this message. If the transmission should only be printed on the receiver and otherwise be ignored by the firmware, it must be set to 0.
 |MissingChunkIds | Comma-separated integers or the literal string "-" (without "") | Up to three chunk IDs of missing chunks. Must not contain spaces! E.g. 2,17,312
-|requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions (Default: 0)
+|requestHandle | u8 | A handle that can be used to distinguish between different raw data transmissions. If the transmission has been started with a request handle, this message must use the same request handle. (Default: 0)
 |===
 
 If received by a JSON-capable device, the _raw_data_report_ is printed out like this:
@@ -236,7 +236,13 @@ This command indicates that some error occurred and the transmission must be clo
 | 5 | Malformed GZIP | The receiver got all chunks but could could not unpack the GZIP.
 | 6 | Malformed Type | Thrown in case of a GZIP communication. The unpacking worked, but the provided type inside the GZIP JSIN was unknown.
 | 7 | Invalid Chunk ID | The given chunk ID was out of range.
-| 8 - 199 | Reserved | Not yet used
+| 8 | Transmission Aborted | The transmission was aborted on purpose.
+| 9 | Metadata Unparsable | The metadata that was sent in raw_data_start could not be parsed.
+| 10 | Not Interested | The receiver is not interested in the transmission because of the parsed metadata.
+| 11 | Out of Memory | There is not enough memory left to continue the transmission
+| 12 | Terminal not Reachable | A terminal to forward the data is not connected or not available.
+| 13 | Implementation not Reachable | The implementation is not ready to process any data.
+| ... | Reserved | Not yet used
 | 200 - 255 | User defined | May be different in each implementation.
 |===
 

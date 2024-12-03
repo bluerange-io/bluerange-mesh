@@ -2,7 +2,7 @@ ifndef::imagesdir[:imagesdir: ../assets/images]
 = The Timeslot API
 
 The nRF52 SDK and SoftDevice allows an application to have full control over the `RADIO` peripheral using the _Timeslot API_.
-Usage of this API in FruityMesh is handled via the `Timeslot` class, declared in `Timeslot.hpp` and the HAL.
+Usage of this API in BlueRange Mesh is handled via the `Timeslot` class, declared in `Timeslot.hpp` and the HAL.
 
 In order to be used, the featureset must define `#define ACTIVATE_TIMESLOT 1` which makes the API available.
 

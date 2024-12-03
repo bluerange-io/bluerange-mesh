@@ -15,7 +15,7 @@ The AppUartModule uses 0x024D (Company identifier of M-Way Solutions GmbH. This 
 The following smartphone applications can be used with the AppUartModule. Please refer to the linked documentation for details.
 
 * https://github.com/nishinohi/FruityMeshAppUart[FruityMeshAppUart]
-  The smartphone app is an external project and is not supported or maintained by the maintainers of FruityMesh.
+  The smartphone app is an external project and is not supported or maintained by the maintainers of BlueRange Mesh.
 
 == Functionality
 

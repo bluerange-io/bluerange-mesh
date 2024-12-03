@@ -520,6 +520,8 @@ namespace FruityHal
     void GpioPinToggle(u32 pin);
     typedef void (*GpioInterruptHandler)(u32 pin, GpioTransition transition);
     ErrorType GpioConfigureInterrupt(u32 pin, GpioPullMode mode, GpioTransition trigger, GpioInterruptHandler handler);
+    void GpioInterruptEventDisable(u32 pin);
+    void GpioInterruptEventEnable(u32 pin);
 
     // ######################### ADC ############################
 

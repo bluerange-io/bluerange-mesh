@@ -1,6 +1,6 @@
 = Modules Overview
 
-FruityMesh consists of a number of different modules. There are the core modules which are part of the open source distribution, which deliver standard functionality. Also, there are other modules, some developed by us or by other developers that can provide specific functionality and built on our mesh framework.
+BlueRange Mesh consists of a number of different modules. There are the core modules which are part of the open source distribution, which deliver standard functionality. Also, there are other modules, some developed by us or by other developers that can provide specific functionality and built on our mesh framework.
 
 == General
 All modules share a set of commands for loading and retrieving their configuration, for activating and deactivating them and for triggering actions.

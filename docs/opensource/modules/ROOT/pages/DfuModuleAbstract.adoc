@@ -5,12 +5,12 @@ NOTE: The _DfuModule_ with _ModuleId_ 4 is not open source at the moment, but ca
 == Purpose
 The _DfuModule_ allows all nodes participating in a mesh to be updated over the mesh. Using a MeshGateway makes it possible to update the whole infrastructure from the cloud. It is even possible to update a heterogenous mesh with different devices that need different firmware.
 
-Not only does the _DfuModule_ allow to replace FruityMesh, the SoftDevice and the Bootloader, it can also be used to update 3rd party controllers connected via UART, SPI, I2C, etc.
+Not only does the _DfuModule_ allow to replace BlueRange Mesh, the SoftDevice and the Bootloader, it can also be used to update 3rd party controllers connected via UART, SPI, I2C, etc.
 
 == Functionality
-In order to update FruityMesh, the _DfuModule_ works in conjunction with a proprietary bootloader. The mesh stays fully functional while an update is received and all services on the mesh can still run during update distribution. Once all nodes have received the update, it is installed by all nodes in less than a few seconds and the infrastructure reboots.
+In order to update BlueRange Mesh, the _DfuModule_ works in conjunction with a proprietary bootloader. The mesh stays fully functional while an update is received and all services on the mesh can still run during update distribution. Once all nodes have received the update, it is installed by all nodes in less than a few seconds and the infrastructure reboots.
 
-When updating a 3rd party component, the update is distributed by the standard implementation to all relevant nodes. Afterwards, a custom update protocol needs to be implemented between the FruityMesh controller and the 3rd party controller.
+When updating a 3rd party component, the update is distributed by the standard implementation to all relevant nodes. Afterwards, a custom update protocol needs to be implemented between the BlueRange Mesh controller and the 3rd party controller.
 
 == DFU_CHUNK_DROPPED message
 If a node finds out that is has to drop a DFU chunk (e.g. because the flash is currently busy) it is allowed, but not enforced to send out a DFU_CHUNK_DROPPED message. This message is sent to the DFU sender to immediately inform him about the dropped chunk so that the sender is able to immediately put that chunk back into the queue of chunks to send.

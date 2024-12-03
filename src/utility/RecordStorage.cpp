@@ -739,6 +739,8 @@ void RecordStorage::RepairPages()
     {
         repairStage = RepairStage::NO_REPAIR;
 
+        logt("RS", "RepairPages done");
+
         //If this repair process was initiated from a lock down.
         if (recordStorageLockDown)
         {

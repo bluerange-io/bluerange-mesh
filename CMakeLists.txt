@@ -149,7 +149,7 @@ if(BUILD_TYPE STREQUAL "FIRMWARE")
       set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_SDK "NRF_SDK_15_2_0")
       set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_CHIPSET "NRF52832_XXAA")
       set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_STACK "NRF_S140_V6_1_0")
-      set_property(TARGET ${FEATURE_SET} PROPERTY FM_MAX_APP_SIZE 254000) # Calculated with a chunk size of 128 for updates
+      set_property(TARGET ${FEATURE_SET} PROPERTY FM_MAX_APP_SIZE 245000) # Calculated with a chunk size of 128 for updates
       list(APPEND SDK_15_TARGETS ${FEATURE_SET})
     elseif(${PLATFORM} STREQUAL "ARM")
       set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_SDK "NO_SDK")
