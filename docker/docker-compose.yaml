@@ -1,0 +1,9 @@
+services:
+  bluerange-simulator:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    container_name: bluerange-simulator
+    ports:
+      - "8000:8000"
