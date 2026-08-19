@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -63,9 +72,9 @@ constexpr u8 RUUVI_WEATHER_MODULE_CONFIG_VERSION = 1;
 struct RuuviWeatherModuleConfiguration : VendorModuleConfiguration {
     /// Interval at which sensor data is read in deci-seconds.
     u16 sensorMeasurementIntervalDs;
-    /// Transmission power in dBm used for sensor advertisments.
+    /// Transmission power in dBm used for sensor advertisements.
     i8 advertiserTxPower;
-    /// If true, transmit sensor advertisments.
+    /// If true, transmit sensor advertisements.
     bool advertiserEnabled : 1;
 
     u8 padding0 : 7;
@@ -102,7 +111,7 @@ class RuuviWeatherModule : public Module
     #pragma pack(1)
 
     /// Mesh message with the measured fields for a RAWv2 (data format 5)
-    /// beacon advertisment.
+    /// beacon advertisement.
     /// Message version 1.
     struct AdvertiseRuuviRawV2MessageV1
     {
@@ -121,7 +130,7 @@ class RuuviWeatherModule : public Module
         u16 relativeHumidity;
 
         /// Athmospheric pressure in Pa above 50000 Pa.
-        u16 athmosphericPressure;
+        u16 atmosphericPressure;
 
         /// Battery voltage in mV above 1.6V.
         u16 batteryVoltage : 11;
@@ -134,7 +143,7 @@ class RuuviWeatherModule : public Module
     /// Mesh message to configure the advertiser for Ruuvi sensor data.
     struct ConfigureAdvertiserMessage
     {
-        /// If true, use the advertiserEnabled value to configure the destination. 
+        /// If true, use the advertiserEnabled value to configure the destination.
         bool advertiserEnabledUsed : 1;
         bool txPowerUsed : 1;
         /// Padding to 16 bits to allow extension of this message to 16 settings.
@@ -147,7 +156,7 @@ class RuuviWeatherModule : public Module
         u8 padding2 : 7;
         u8 padding3;
 
-        /// Transmission power in dBm, the ususal range is between -40 dBm and +8 dBm.
+        /// Transmission power in dBm, the usual range is between -40 dBm and +8 dBm.
         i8 txPower;
     };
     static constexpr size_t CONFIGURE_ADVERTISER_MESSAGE_SIZE = 5;
@@ -155,10 +164,10 @@ class RuuviWeatherModule : public Module
 
     #pragma pack(pop)
 
-    struct AdvertismentSlot
+    struct AdvertisementSlot
     {
         bool isSlotAdvertising : 1;
-        u8 advertismentCounter : 7;
+        u8 advertisementCounter : 7;
         std::array<u8, 40> pdu;
 
         bool HasAdvertiserAddress(const FruityHal::BleGapAddr & address) const;
@@ -213,7 +222,7 @@ class RuuviWeatherModule : public Module
 
 private:
     constexpr static size_t MAX_SLOTS = 8;
-    std::array<AdvertismentSlot, MAX_SLOTS> advertismentSlots = {};
+    std::array<AdvertisementSlot, MAX_SLOTS> advertisementSlots = {};
     std::array<u8, 64> transmissionBuffer;
 
     bool checkForAdvertisableSlots = false;
@@ -252,15 +261,15 @@ public:
     FruityHal::RadioCallbackAction HandleRadioSignal(FruityHal::RadioCallbackSignalType signalType);
 
 private:
-    /// Choose a advertisment slot for an incoming measurement.
+    /// Choose a advertisement slot for an incoming measurement.
     /// This function prioritized slots that have been used for the specified
     /// address before any other slot.
-    AdvertismentSlot* ChooseSlotForMeasurementFrom(const FruityHal::BleGapAddr& address);
+    AdvertisementSlot* ChooseSlotForMeasurementFrom(const FruityHal::BleGapAddr& address);
 
-    /// Choose a advertisment slot for an outgoing transmission (BLE
-    /// advertisment packet). This function prioritized slots that have the
-    /// smalled advertisment counter.
-    AdvertismentSlot* ChooseSlotForTransmission();
+    /// Choose a advertisement slot for an outgoing transmission (BLE
+    /// advertisement packet). This function prioritized slots that have the
+    /// smalled advertisement counter.
+    AdvertisementSlot* ChooseSlotForTransmission();
 
     /// Encode an incoming measurement as a protocol data unit (PDU) suitable
     /// for transmission. The sensor data is encoded in the Ruuvi data format

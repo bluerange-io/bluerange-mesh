@@ -246,6 +246,14 @@ SECTIONS
 		__HeapLimit = .;
 	} > RAM
 
+	 /* Reserves 128 bytes for our StackWatcher to detect Stack Overflows during runtime */
+	.stackWatcherRegion : ALIGN(4)
+	{
+		. = ALIGN(4);
+		KEEP(*(.stackWatcherRegion))
+		. = . + 128;
+	} > RAM
+
 	/* Not named __StackLimit as that might be used by Nordic. */
 	__FruityStackLimit = .;
 

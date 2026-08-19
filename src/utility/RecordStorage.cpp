@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -39,7 +48,7 @@
  *
  * GetRecordData is synchronous and will return the requested data immediately if available.
  *
- * Each record is stored using a recordId and only the latest version of a Record is accessable.
+ * Each record is stored using a recordId and only the latest version of a Record is accessible.
  *
  * A configurable number of flash pages can be used for RecordStorage and only one Page is used
  * as a swap page. Only a single swap is done internally, so the swap page changes.
@@ -244,7 +253,7 @@ void RecordStorage::SaveRecordInternal(SaveRecordOperation& op)
 
     if (op.stage == RecordStorageSaveStage::SAVE) {
 
-        //Data must be saved als multiple of 4 bytes, so we pad the data with 0xFF
+        //Data must be saved as multiple of 4 bytes, so we pad the data with 0xFF
         //userData needs no padding as it is not written to flash
         u8 padding = (4-op.dataLength%4)%4;
 
@@ -272,7 +281,7 @@ void RecordStorage::SaveRecordInternal(SaveRecordOperation& op)
             RecordStorageRecord* newRecord = (RecordStorageRecord*)buffer;
             newRecord->recordActive = 1;
             newRecord->mortal = 1; //By default a record will be erased by a factory reset
-            newRecord->padding = padding; //Padding must be stored so we can substract it later when retrieving the record
+            newRecord->padding = padding; //Padding must be stored so we can subtract it later when retrieving the record
             newRecord->recordLength = recordLength;
             newRecord->recordId = op.recordId;
             newRecord->versionCounter = recordVersion;
@@ -307,7 +316,7 @@ void RecordStorage::SaveRecordInternal(SaveRecordOperation& op)
             return RecordOperationFinished(op.op, RecordStorageResultCode::NO_SPACE);
         }
     }
-    
+
     if (op.stage == RecordStorageSaveStage::CALLBACKS_AND_FINISH)
     {
         return RecordOperationFinished(op.op, RecordStorageResultCode::SUCCESS);
@@ -339,7 +348,7 @@ void RecordStorage::DeactivateRecordInternal(DeactivateRecordOperation& op)
         GS->flashStorage.CacheAndWriteData((u32*)&newRecordHeader, (u32*)record, SIZEOF_RECORD_STORAGE_RECORD_HEADER, this, (u32)FlashUserTypes::DEFAULT);
         return;
     }
-    
+
     if (op.stage == RecordStorageDeactivateStage::CALLBACKS_AND_FINISH)
     {
         return RecordOperationFinished(op.op, RecordStorageResultCode::SUCCESS);
@@ -374,7 +383,7 @@ void RecordStorage::ImmortalizeRecordInternal(ImmortalizeRecordOperation& op)
         GS->flashStorage.CacheAndWriteData((u32*)&newRecordHeader, (u32*)record, SIZEOF_RECORD_STORAGE_RECORD_HEADER, this, (u32)FlashUserTypes::DEFAULT);
         return;
     }
-    
+
     if (op.stage == RecordStorageImmortalizeStage::CALLBACKS_AND_FINISH)
     {
         return RecordOperationFinished(op.op, RecordStorageResultCode::SUCCESS);
@@ -591,7 +600,7 @@ RecordStorageResultCode RecordStorage::LockDownAndClearAllSettings(ModuleIdWrapp
             // finish the ongoing operation, once it is done LockDownAndClearAllSettingsImmortalRecords will be called from the itemExecutedHandler
             lockDownStageImmortalRecords = LockDownStageImmortalRecords::LOCKDOWN_SCHEDULED;
         }
-            
+
         return RecordStorageResultCode::SUCCESS;
     }
     else {
@@ -627,7 +636,7 @@ void RecordStorage::RepairPages()
     if (GS->flashStorage.GetNumberOfActiveTasks() != 0){
         return;
     }
-    
+
     if (repairStage == RepairStage::ERASE_CORRUPT_PAGES)
     {
         //Erase all corrupt pages
@@ -643,7 +652,7 @@ void RecordStorage::RepairPages()
 
         repairStage = RepairStage::CLEAR_SWAP_PAGE_IF_NEEDED;
     }
-    
+
     if (repairStage == RepairStage::CLEAR_SWAP_PAGE_IF_NEEDED)
     {
         //Check if there is now at least one swap page
@@ -669,7 +678,7 @@ void RecordStorage::RepairPages()
 
         repairStage = RepairStage::ACTIVATE_PAGES;
     }
-    
+
     if (repairStage == RepairStage::ACTIVATE_PAGES)
     {
         RecordStoragePage* swapPage = GetSwapPage();
@@ -700,7 +709,7 @@ void RecordStorage::RepairPages()
 
         repairStage = RepairStage::VALIDATE_PAGES;
     }
-    
+
     //TODO: untested
     //Check if, for all active pages, there is only free space after the last valid record
     //if not, defragment this page. There can only be one such page after a power loss
@@ -833,7 +842,7 @@ void RecordStorage::DefragmentPage(RecordStoragePage& pageToDefragment, bool for
 
         defragmentationStage = DefragmentationStage::WRITE_PAGE_HEADER;
     }
-    
+
     if (defragmentationStage == DefragmentationStage::WRITE_PAGE_HEADER)
     {
 
@@ -865,7 +874,7 @@ void RecordStorage::DefragmentPage(RecordStoragePage& pageToDefragment, bool for
         pageHeader.versionCounter = maxVersionCounter + 1;
 
         GS->flashStorage.CacheAndWriteData((u32*)&pageHeader, (u32*)defragmentSwapPage, SIZEOF_RECORD_STORAGE_PAGE_HEADER, nullptr, (u32)FlashUserTypes::DEFAULT);
-        
+
         defragmentationStage = DefragmentationStage::ERASE_OLD_PAGE;
     }
     else if (defragmentationStage == DefragmentationStage::ERASE_OLD_PAGE)
@@ -885,7 +894,7 @@ void RecordStorage::DefragmentPage(RecordStoragePage& pageToDefragment, bool for
 }
 
 
-/*##################################### 
+/*#####################################
 # Various functions to read and helpers
 ##################################### */
 
@@ -1141,7 +1150,7 @@ RecordStoragePage* RecordStorage::GetSwapPage() const
 }
 
 //This will only check if a record is valid in terms of crc and basic check against corruption
-//If a record is markes as deactivated, it is still valid
+//If a record is marked as deactivated, it is still valid
 bool RecordStorage::IsRecordValid(const RecordStoragePage& page, RecordStorageRecord const * record) const
 {
     //Check if length is within page boundaries
@@ -1186,7 +1195,7 @@ void RecordStorage::ProcessQueue(bool force)
 //This is the handler that is notified once a FlashStorage task has executed
 void RecordStorage::FlashStorageItemExecuted(FlashStorageTaskItem* task, FlashStorageError errorCode)
 {
-    //####### 
+    //#######
     //This is the logic for processing the records if no immortal records are present or once
     //the storage was successfully erased and locked down after processing all records and immortal records
     if (
@@ -1234,7 +1243,7 @@ void RecordStorage::FlashStorageItemExecuted(FlashStorageTaskItem* task, FlashSt
         }
         else if (task != nullptr && task->header.userType == (u32)FlashUserTypes::LOCK_DOWN)
         {
-            //If we were not successful and havn't exceeded our retry counter, we try again. 
+            //If we were not successful and haven't exceeded our retry counter, we try again.
             if (errorCode != FlashStorageError::SUCCESS && lockDownRetryCounter < LOCK_DOWN_RETRY_MAX)
             {
                 lockDownRetryCounter++;
@@ -1347,7 +1356,7 @@ void RecordStorage::FlashStorageQueueEmptyHandler()
     }
     else if (defragmentationStage != DefragmentationStage::NO_DEFRAGMENTATION)
     {
-        // This means that there are immortal records present because lock down is progressing in stages 
+        // This means that there are immortal records present because lock down is progressing in stages
         if (lockDownStageImmortalRecords == LockDownStageImmortalRecords::LOCKING_DOWN) {
             ClearPageAndSaveImmortals(*defragmentPage, false);
         }

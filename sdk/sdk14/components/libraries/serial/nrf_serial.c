@@ -514,6 +514,11 @@ ret_code_t nrf_serial_read(nrf_serial_t const * p_serial,
     return NRF_SUCCESS;
 }
 
+//Function added by BlueRange
+void nrf_serial_abort_rx(nrf_serial_t const * p_serial){
+    nrf_drv_uart_rx_abort(&p_serial->instance);
+}
+
 ret_code_t nrf_serial_flush(nrf_serial_t const * p_serial, uint32_t timeout_ms)
 {
 

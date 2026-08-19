@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -47,6 +56,13 @@ constexpr int INVALID_U32_CONFIG = 0xFFFFFFFF;
 #include <SigElement.h>
 #include <SigModel.h>
 #include <SigState.h>
+#endif
+
+#ifdef FM_NATIVE_RENDERER_ENABLED
+namespace bbe
+{
+    class PrimitiveBrush2D;
+}
 #endif
 
 //This struct is used to report a list of modules and their state for a node
@@ -80,8 +96,169 @@ class Node;
 #define GENERAL_CHECK_STRING(regIn, buffer)     if (    reg                >= (regIn) &&  reg                < (regIn) + sizeof(buffer) \
                                                     && (reg + length - 1u) >= (regIn) && (reg + length - 1u) < (regIn) + sizeof(buffer)) return RGC_STRING
 
+/**
+ * @brief Declares a register with a default value.
+ *
+ * Defines a constant REGISTER_##name for the given address and a variable with the given name and default value.
+ *
+ * @param[in] address      Register address.
+ * @param[in] type         Data type of the register value.
+ * @param[in] name         Register name (used as identifier).
+ * @param[in] defaultValue Default value of the register.
+ */
+#define DECLARE_REGISTER(address, type, name, defaultValue)                                                            \
+    constexpr static u32 REGISTER_##name = address;                                                                    \
+    type name = defaultValue;
+
+/**
+ * @brief Declares a register with clamping bounds.
+ *
+ * Extends DECLARE_REGISTER by additionally defining the constants
+ * REGISTER_MIN_##name and REGISTER_MAX_##name for the given bounds.
+ *
+ * @param[in] address      Register address.
+ * @param[in] type         Data type of the register value.
+ * @param[in] name         Register name (used as identifier).
+ * @param[in] defaultValue Default value of the register.
+ * @param[in] minVal       Lower clamping bound.
+ * @param[in] maxVal       Upper clamping bound.
+ *
+ * @warning This macro only declares the bounds. The actual clamping must be
+ *          performed separately via CLAMP_REGISTER_U8 / _U16 / _U32.
+ */
+#define DECLARE_REGISTER_CLAMPED(address, type, name, defaultValue, minVal, maxVal)                                    \
+    DECLARE_REGISTER(address, type, name, defaultValue)                                                                \
+    constexpr static type REGISTER_MIN_##name = minVal;                                                                \
+    constexpr static type REGISTER_MAX_##name = maxVal;
+
+/**
+ * @brief Declares a register with validation bounds and a default fallback.
+ *
+ * Extends DECLARE_REGISTER by additionally defining REGISTER_MIN_##name,
+ * REGISTER_MAX_##name, and REGISTER_DEFAULT_##name. The default is used for
+ * register initialization and as a fallback if validation fails.
+ *
+ * @param[in] address      Register address.
+ * @param[in] type         Data type of the register value.
+ * @param[in] name         Register name (used as identifier).
+ * @param[in] defaultValue Default value applied when validation fails.
+ * @param[in] minVal       Lower validation bound.
+ * @param[in] maxVal       Upper validation bound.
+ *
+ * @warning This macro only declares the bounds and default. The actual range
+ *          check must be performed separately via CHECK_REGISTER_U8 or an
+ *          equivalent macro.
+ */
+#define DECLARE_REGISTER_CHECKED(address, type, name, defaultValue, minVal, maxVal)                                    \
+    DECLARE_REGISTER(address, type, name, defaultValue)                                                                \
+    constexpr static type REGISTER_MIN_##name = minVal;                                                                \
+    constexpr static type REGISTER_MAX_##name = maxVal;                                                                \
+    constexpr static type REGISTER_DEFAULT_##name = defaultValue;
+
+/**
+ * @brief Clamps a u32 register value to its declared bounds.
+ *
+ * Reads the u32 at @p reg from @p values, clamps it to
+ * [REGISTER_MIN_##name, REGISTER_MAX_##name], and writes it back.
+ * Requires the register to have been declared with DECLARE_REGISTER_CLAMPED.
+ *
+ * @param[in] name Register name whose REGISTER_MIN/MAX constants are used.
+ */
+#define CLAMP_REGISTER_U32(name)                                                                                       \
+    if (reg == REGISTER_##name) {                                                                                      \
+        u32 _v = Utility::ToAlignedU32(values);                                                                        \
+        _v = Utility::Clamp<u32>(_v, REGISTER_MIN_##name, REGISTER_MAX_##name);                                        \
+        CheckedMemcpy(values, &_v, sizeof(_v));                                                                        \
+    }
+
+/**
+ * @brief Clamps a u16 register value to its declared bounds.
+ *
+ * Reads the u16 at @p reg from @p values, clamps it to
+ * [REGISTER_MIN_##name, REGISTER_MAX_##name], and writes it back.
+ * Requires the register to have been declared with DECLARE_REGISTER_CLAMPED.
+ *
+ * @param[in] name Register name whose REGISTER_MIN/MAX constants are used.
+ */
+#define CLAMP_REGISTER_U16(name)                                                                                       \
+    if (reg == REGISTER_##name) {                                                                                      \
+        u16 _v = Utility::ToAlignedU16(values);                                                                        \
+        _v = Utility::Clamp<u16>(_v, REGISTER_MIN_##name, REGISTER_MAX_##name);                                        \
+        CheckedMemcpy(values, &_v, sizeof(_v));                                                                        \
+    }
+
+/**
+ * @brief Clamps a u8 register value to its declared bounds.
+ *
+ * Reads the u8 at @p reg from @p values[0], clamps it to
+ * [REGISTER_MIN_##name, REGISTER_MAX_##name], and writes it back.
+ * Requires the register to have been declared with DECLARE_REGISTER_CLAMPED.
+ *
+ * @param[in] name Register name whose REGISTER_MIN/MAX constants are used.
+ */
+#define CLAMP_REGISTER_U8(name)                                                                                        \
+    if (reg == REGISTER_##name) {                                                                                      \
+        values[0] = Utility::Clamp<u8>(values[0], REGISTER_MIN_##name, REGISTER_MAX_##name);                           \
+    }
+
+/**
+ * @brief Validates a u8 register value and resets it to the default on failure.
+ *
+ * If @p values[0] exceeds REGISTER_MAX_##name, it is replaced with
+ * REGISTER_DEFAULT_##name. Requires the register to have been declared
+ * with DECLARE_REGISTER_CHECKED.
+ *
+ * @param[in] name Register name whose REGISTER_MAX and REGISTER_DEFAULT constants
+ *                 are used.
+ */
+#define CHECK_REGISTER_U8(name)                                                                                        \
+    if (reg == REGISTER_##name) {                                                                                      \
+        if (values[0] > REGISTER_MAX_##name) {                                                                         \
+            values[0] = REGISTER_DEFAULT_##name;                                                                       \
+        }                                                                                                              \
+    }
+
+/**
+ * @brief Maps a register to a persistent configuration field.
+ *
+ * If @p reg matches REGISTER_##name, exposes the field as writable via
+ * @p out and marks it as a persisted configuration entry (persistedId = 1).
+ *
+ * @param[in] name Register name to match against @p reg.
+ */
+#define MAP_CONFIGURATION_REGISTER(name)                                                                               \
+    if (reg == REGISTER_##name) {                                                                                      \
+        out.SetWritable(&name);                                                                                        \
+        persistedId = 1;                                                                                               \
+}
+
+/**
+ * @brief Maps a register to a writable control field.
+ *
+ * If @p reg matches REGISTER_##name, exposes the field as writable via
+ * @p out. Unlike MAP_CONFIGURATION_REGISTER, no persistent ID is set.
+ *
+ * @param[in] name Register name to match against @p reg.
+ */
+#define MAP_CONTROL_REGISTER(name)                                                                                     \
+    if (reg == REGISTER_##name) {                                                                                      \
+        out.SetWritable(&name);                                                                                        \
+    }
+
+/**
+ * @brief Maps a register to a readable field.
+ *
+ * If @p reg matches REGISTER_##name, exposes the field as readable via
+ * @p out. The field is not writable through this mapping.
+ *
+ * @param[in] name Register name to match against @p reg.
+ */
+#define MAP_READABLE_REGISTER(name)                                                                                    \
+    if (reg == REGISTER_##name) {                                                                                      \
+        out.SetReadable(name);                                                                                         \
+    }
+
 constexpr u32 REGISTER_RECORDS_PER_MODULE = 4;
-// TODO load persistent storage
 
 class RegisterHandlerEventListener
 {
@@ -107,7 +284,7 @@ public:
  *
  * Module ids start with 1, this id is also used for saving persistent
  * module configurations with the RecordStorage class
- * Module ids must persist between updates to guearantee that the
+ * Module ids must persist between updates to guarantee that the
  * same module receives the same storage slot.
  *
  * ModuleIds must also be the same within a mesh network to guarantee the correct
@@ -253,6 +430,11 @@ public:
         return retVal;
     };
 
+#ifdef FM_NATIVE_RENDERER_ENABLED
+    // Let's you render custom things in native rendering mode.
+    virtual void NativeDraw(bbe::PrimitiveBrush2D& brush) {};
+#endif
+
 #if IS_ACTIVE(SIG_MESH)
     //This handler is called once a sig mesh state changes. This is called on all modules for all states so that they can also react
     //on state changes for elements or models that they have not originally created
@@ -323,7 +505,6 @@ private:
 
 #if IS_ACTIVE(REGISTER_HANDLER)
 
-#ifdef JSTODO_PERSISTENCE
 private:
     // To make it easy for Modules to simply inherit from RecordStorageEventListener
     // even if they inherit from RegisterHandler we proxy the callback here.
@@ -334,12 +515,12 @@ private:
         explicit RecordStorageEventListenerRegisterProxy(Module& handler);
         virtual void RecordStorageEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength) override;
     };
+    RecordStorageEventListenerRegisterProxy registerProxy;
 
 public:
-    void LoadFromFlash();
+    void LoadRegisterHandlerDataFromFlash();
 
-    RecordStorageEventListenerProxy proxyRegister;
-    struct RecordStorageUserData
+    struct RegisterHandlerRecordStorageUserData
     {
         u16 component;
         u16 reg;
@@ -348,10 +529,10 @@ public:
         // Instead of giving the callback from the user, we give our own callback
         // which is calling commit and then calls the callback from the user, which
         // is this member.
-        RecordStorageEventListener* callback;
+        RegisterHandlerEventListener* callback;
+        bool dataChanged;
         u8 userData[1]; // More data follows
     };
-#endif //JSTODO_PERSISTENCE
 
 private:
     virtual void RegisterHandlerEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength, bool dataChanged) override;

@@ -85,6 +85,7 @@ Below is a list of all messages that we have currently openly specified. These a
 |0x05|Sensor Broadcast
 |0x06|Asset BLE Broadcast
 |0x07|Asset INS Broadcast
+|0x08|xref:MeshAccessModule.adoc#MeshAccessBroadcast[MeshAccess Broadcast] sent in xref:MeshAccessModule.adoc#_mesh_access_emergency_connect_mode[emergency connect mode]
 |===
 
 === Other Advertising Packets
@@ -105,7 +106,7 @@ The mesh uses a number of packets that are sent over connections. Most packets t
 |===
 
 == Modules
-BlueRange Mesh uses a concept of modules to group functionality into different parts. This works together nicely with the featuresets. A user is able to write his own modules that extend the basic functionality of BlueRange Mesh. Each module is identified using a module id. 
+BlueRange Mesh uses a concept of modules to group functionality into different parts. This works together nicely with the featuresets. A user is able to write his own modules that extend the basic functionality of BlueRange Mesh. Each module is identified using a module id.
 
 [#ModuleIds]
 === ModuleIds
@@ -208,7 +209,7 @@ There are different node ID ranges that are used for different purposes:
 |NODE_ID_DYNAMIC_GROUP_BROADCAST_RESERVED|21000| Currently unused
 |NODE_ID_DYNAMIC_GROUP_BASE|21001...21999| Address a group of devices, the groups are dynamically assigned at run time and saved persistently
 |NODE_ID_LOCAL_LOOPBACK|30000| Address for the current node itself (similar to localhost)
-|NODE_ID_HOPS_BASE|30001...30999| Specify the number of hops that a packet can travel. Used for xref:SinkRouting.adoc[sink routing]. (30 001 e.g. specifies that the packet must only reach the direct neighbours)
+|NODE_ID_HOPS_BASE|30001...30999| Specify the number of hops that a packet can travel. Used for xref:SinkRouting.adoc[sink routing]. (30 001 e.g. specifies that the packet must only reach the direct neighbors)
 |NODE_ID_SHORTEST_SINK|31000| Used to send a packet to sink nodes (the closest one if xref:SinkRouting.adoc[sink routing] is enabled or all if disabled) (see xref:#deviceTypes[Device Types])
 |NODE_ID_APP_BASE|32000| NodeId given to non-mesh devices that can connect via a MeshAccessConnection (e.g. a Smartphone). This is replaced by a virtual partner id during communication.
 |NODE_ID_GLOBAL_DEVICE_BASE|33000...57999| Assign nodeIds uniquely over multiple meshes for the same organization (used for assets that roam between different networks)
@@ -254,7 +255,7 @@ removing the enrollment.
 
 === Network key (FM_KEY_ID_NETWORK = 2)
 The network key is shared
-between all nodes that belong to a mesh network. Whoever is in posession
+between all nodes that belong to a mesh network. Whoever is in possession
 of this key can configure all nodes in the network and can send any
 message. It is important to keep this key secret, but it is
 possible to change it if it is compromised.
@@ -267,7 +268,7 @@ used to connect. It is used to derive all other user keys.
 The organization key
 is shared between all networks of an organization. It allows access to a
 limited set of functionality, e.g. necessary for tracking assets between
-differen meshes. If the organization key leaks, it is necessary to
+different meshes. If the organization key leaks, it is necessary to
 reconfigure all meshes of the organization.
 
 === Restrained Key (FM_KEY_ID_RESTRAINED = 5)
@@ -326,7 +327,7 @@ For more explanation, see xref:Concepts.adoc#deviceTypes[Device Types].
 
 [#UICR]
 == UICR
-The UICR is a special persistant storage that is used to store factory defaults once a node is flashed. The NRF_UICR->CUSTOMER area is used to store the data on nRF chips.
+The UICR is a special persistent storage that is used to store factory defaults once a node is flashed. The NRF_UICR->CUSTOMER area is used to store the data on nRF chips.
 
 If you want to store a serial number, _nodeKey_, etc. for a node, you must write the UICR during flashing. The NRF_UICR->CUSTOMER area is used for that purpose and starts at 0x10001080. You can use http://srecord.sourceforge.net/[srec_cat] to produce a .hex file containing the desired UICR data. This can then be merged with the SoftDevice and Application or you can flash each one separately. For detailed instructions, see our xref:Developers.adoc#UICR[Developers chapter].
 

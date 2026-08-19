@@ -4,7 +4,7 @@
 This is the entry point of the application. It just calls two functions in `FruityMesh.cpp`. The first one boots up the node and the second one runs an endless loop to fetch and process events.
 
 == src/FruityMesh.cpp
-During bootup, classes such as the _SoftDevice_, _Terminal_, _Logger_, _Storage_, and others are initialized. After everything has been started, the event handling routine takes over. All event dispatching routines, as well as interrupt and error handlers are implemented here.
+During boot-up, classes such as the _SoftDevice_, _Terminal_, _Logger_, _Storage_, and others are initialized. After everything has been started, the event handling routine takes over. All event dispatching routines, as well as interrupt and error handlers are implemented here.
 
 == src/base/
 The base folder contains a few classes that are meant as wrappers for the S130 API. The most central one is the _FruityHal_, which wraps all nRF functionality (not yet complete).

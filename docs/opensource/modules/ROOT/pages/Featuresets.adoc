@@ -2,9 +2,9 @@
 
 == Featureset concept
 
-A featureset is a file that describes a set of features that a given target supports. This relates mainly to software features, unlike xref:BoardConfig.adoc[BoardConfig] which describes hardware capabilites. This useful idea is taking advantage of the modularity of BlueRange Mesh. Different modules can be included at any time to optimize for power or for size.
+A featureset is a file that describes a set of features that a given target supports. This relates mainly to software features, unlike xref:BoardConfig.adoc[BoardConfig] which describes hardware capabilities. This useful idea is taking advantage of the modularity of BlueRange Mesh. Different modules can be included at any time to optimize for power or for size.
 
-At the same time featureset files describe default behaviours, e.g. terminal operation mode, default LED behaviour or even default network assignment.
+At the same time featureset files describe default behaviors, e.g. terminal operation mode, default LED behaviour or even default network assignment.
 
 == Default enrollment
 
@@ -38,7 +38,7 @@ This featureset is targeted for the NRF52-DK from Nordic Semiconductors. It enab
 
 === github_dev_nrf52840
 
-This featureset is similiar to `github_dev_nrf52`, but is targeted for the NRF52840-DK from Nordic Semiconductors. It also enables most of the features and logging methods.
+This featureset is similar to `github_dev_nrf52`, but is targeted for the NRF52840-DK from Nordic Semiconductors. It also enables most of the features and logging methods.
 
 === github_sink_nrf52
 
@@ -50,10 +50,10 @@ This featureset is targeted for the NRF52-DK. It implements a standard mesh node
 
 === github_sink_usb_nrf52840
 
-This featureset is mainly targeted for the NRF52840-DK. It implements a node that serves as a bridge between the mesh and a mesh gateway. This featurest does not use UART communication for sending JSON messages, but the USB peripheral of the NRF52840 chip which is attached to a separate USB connector on the DK.
+This featureset is mainly targeted for the NRF52840-DK. It implements a node that serves as a bridge between the mesh and a mesh gateway. This featureset does not use UART communication for sending JSON messages, but the USB peripheral of the NRF52840 chip which is attached to a separate USB connector on the DK.
 
 NOTE: This target can also work on the NRF52840-DONGLE, but we do _not_ support that platform. For instructions on how to flash the NRF52840-DONGLE refer to this https://devzone.nordicsemi.com/nordic/short-range-guides/b/getting-started/posts/nrf52840-dongle-programming-tutorial[tutorial].
 
 === prod_ruuvi_weather_nrf52
 
-This featureset is targeted for the https://ruuvi.com/ruuvitag-specs/[RuuviTag]. It uses the `RuuviWeatherModule` which reads sensor data and sends it through the mesh to be advertised in a format compatible with the Ruuvi Station app. For more information please have a look at xref:UsingRuuviTagsWithBlueRange Mesh.adoc[this tutorial].
+This featureset is targeted for the https://ruuvi.com/ruuvitag-specs/[RuuviTag]. It uses the `RuuviWeatherModule` which reads sensor data and sends it through the mesh to be advertised in a format compatible with the Ruuvi Station app. For more information please have a look at xref:UsingRuuviTagsWithBlueRangeMesh.adoc[this tutorial].

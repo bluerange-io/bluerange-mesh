@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #ifdef SIM_ENABLED
@@ -35,6 +44,7 @@
 #include <SocketTerm.h>
 #include <FruityHal.h>
 #include <FruityMesh.h>
+#include <SimulatedTimers.h>
 #include "PathLossModel.h"
 
 #include <malloc.h>
@@ -151,7 +161,7 @@ void CherrySim::StoreFlashToFile()
     if (simConfig.storeFlashToFile == "") return;
 
     std::ofstream file(simConfig.storeFlashToFile, std::ios::binary);
-    
+
     FlashFileHeader ffh;
     CheckedMemset(&ffh, 0, sizeof(ffh));
 
@@ -250,7 +260,7 @@ void CherrySim::LoadFlashFromFile()
 
 void CherrySim::PrepareSimulatedFeatureSets()
 {
-    //NOTE: Add the featureset in order in which NodeIds will be assigned e.g 
+    //NOTE: Add the featureset in order in which NodeIds will be assigned e.g
     //if we have defined 3 nodes with sink featureset and 2 with mesh featureset then
     //NodeId 1,2,3 will have sink featureset and 4,5 with mesh featureset
 
@@ -269,7 +279,7 @@ void CherrySim::PrepareSimulatedFeatureSets()
 #ifdef GITHUB_MESH_NRF52 //GITHUB_MESH_NRF52
     AddSimulatedFeatureSet(github_mesh_nrf52);
 #endif //GITHUB_MESH_NRF52
-#ifdef GITHUB_SINK_USB_NRF52840 //GITHUB_SINK_USB_NRF52840    
+#ifdef GITHUB_SINK_USB_NRF52840 //GITHUB_SINK_USB_NRF52840
     AddSimulatedFeatureSet(github_sink_usb_nrf52840);
 #endif //GITHUB_SINK_USB_NRF52840
 #ifdef PROD_RUUVI_WEATHER_NRF52 //PROD_RUUVI_WEATHER_NRF52
@@ -344,6 +354,15 @@ void CherrySim::PrepareSimulatedFeatureSets()
 #ifdef PROD_EL_MO_NRF52832 //PROD_EL_MO_NRF52832
     AddSimulatedFeatureSet(prod_el_mo_nrf52832);
 #endif //PROD_EL_MO_NRF52832
+#ifdef PROD_BLIND_NRF52832 //PROD_BLIND_NRF52832
+    AddSimulatedFeatureSet(prod_blind_nrf52832);
+#endif //PROD_BLIND_NRF52832
+#ifdef PROD_SWITCH_NRF52832 //PROD_SWITCH_NRF52832
+    AddSimulatedFeatureSet(prod_switch_nrf52832);
+#endif //PROD_SWITCH_NRF52832
+#ifdef PROD_SWITCH_NRF52840_SDK17 //PROD_SWITCH_NRF52840_SDK17
+    AddSimulatedFeatureSet(prod_switch_nrf52840_sdk17);
+#endif //PROD_SWITCH_NRF52840_SDK17
 #ifdef PROD_EURO_UART_NRF52840 //PROD_EURO_UART_NRF52840
     AddSimulatedFeatureSet(prod_euro_uart_nrf52840);
 #endif //PROD_EURO_UART_NRF52840
@@ -421,7 +440,7 @@ CherrySim::CherrySim(const SimConfiguration &simConfig)
 #endif
 
 #ifdef CI_PIPELINE
-    //Static is okay, as the seg fault handler works accross all simulations.
+    //Static is okay, as the seg fault handler works across all simulations.
     static bool segfaultHandlerSet = false;
     if (!segfaultHandlerSet)
     {
@@ -512,7 +531,7 @@ void CherrySim::Init()
         TerminalPrintHandler(versionString.c_str());
     }
 
-    //Generate a psuedo random number generator with a uniform distribution
+    //Generate a pseudo random number generator with a uniform distribution
     simState.rnd.SetSeed(simConfig.seed);
 
     //Load site and device data from a json if given
@@ -692,7 +711,7 @@ void CherrySim::ImportDataFromJson()
     simConfig.mapElevationInMeters = siteJson["results"][0].contains("elevationInMeter") ? (uint32_t)siteJson["results"][0]["elevationInMeter"] : 1;
 
     //Get number of nodes
-    for (size_t i = 0; i < devicesJson["results"].size(); i++) 
+    for (size_t i = 0; i < devicesJson["results"].size(); i++)
     {
         if (IsUsableDeviceEntry(devicesJson["results"][i]))
         {
@@ -732,7 +751,7 @@ void CherrySim::ImportPositionsAndDataFromJson()
     }
 
     //Get other data from our devices
-    for (u32 i = 0; i < devicesJson["results"].size(); i++) 
+    for (u32 i = 0; i < devicesJson["results"].size(); i++)
     {
         if (IsUsableDeviceEntry(devicesJson["results"][i]))
         {
@@ -852,7 +871,7 @@ void CherrySim::PositionNodesRandomly()
     }
 
     u32 numNoneAssetNodes = GetTotalNodes() - GetAssetNodes();
-    //Next, we must check if the configuraton can cluster
+    //Next, we must check if the configuration can cluster
     std::vector<point_t> points = {};
     points.resize(GetTotalNodes());
 
@@ -861,7 +880,7 @@ void CherrySim::PositionNodesRandomly()
     //nodes to DBScan.
     HelperPositionNodesRandomly(*this, points, numNoneAssetNodes);
     HelperPositionNodesRandomly(*this, points, GetTotalNodes());
-    
+
 }
 
 
@@ -1070,7 +1089,7 @@ void CherrySim::SimulateStepForAllNodes()
     //Check if the webserver has some open requests to process
     webserver->ProcessServerRequests();
 
-    //Check if there is Terminal input / ouput waiting to be processed over TCP sockets
+    //Check if there is Terminal input / output waiting to be processed over TCP sockets
     socketTerm->ProcessSockets();
 #endif
 
@@ -1145,7 +1164,7 @@ void CherrySim::SimulateStepForAllNodes()
     if(simConfig.enableClusteringValidityCheck) CheckMeshingConsistency();
 
     simState.simTimeMs += simConfig.simTickDurationMs;
-    
+
     //Back up the flash every flashToFileWriteInterval's step.
     flashToFileWriteCycle++;
     if (flashToFileWriteCycle % flashToFileWriteInterval == 0) StoreFlashToFile();
@@ -1340,7 +1359,7 @@ TerminalCommandHandlerReturnType CherrySim::TerminalCommandHandler(const std::ve
 
                     char nodeKeyHex[128];
                     Logger::ConvertBufferToHexString(node->gs.config.configuration.nodeKey, 16, nodeKeyHex, sizeof(nodeKeyHex));
-                    
+
 
                     printf("       Addr %02X:%02X:%02X:%02X:%02X:%02X, NetworkId %u, NodeKey %s" EOL EOL,
                         node->address.addr[5],
@@ -1359,11 +1378,11 @@ TerminalCommandHandlerReturnType CherrySim::TerminalCommandHandler(const std::ve
         }
         else if (commandArgs[1] == "nodes") {
             if (commandArgs.size() < 4) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
-            
+
             bool didError = false;
             const u32 amountOfNodes = Utility::StringToU32(commandArgs[2].c_str(), &didError);
             if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
-            
+
             if (amountOfNodes > 0)
             {
                 simConfig.nodeConfigName.insert_or_assign(commandArgs[3].c_str(), amountOfNodes);
@@ -1815,7 +1834,7 @@ TerminalCommandHandlerReturnType CherrySim::TerminalCommandHandler(const std::ve
                 y /= simConfig.mapHeightInMeters;
                 z /= simConfig.mapElevationInMeters;
             }
-            
+
             if (commandArgs[1] == "set_position" || commandArgs[1] == "set_position_norm")
             {
                 SetPosition(index, x, y, z);
@@ -2086,7 +2105,7 @@ void CherrySim::SetFeaturesets()
                 featureset = "dev_nrf52";
                 entry = cherrySimInstance->featuresetPointers.find(featureset);
             }
-            else 
+            else
             {
                 SIMEXCEPTIONFORCE(IllegalStateException); //Featureset is not defined yet, add it to CherrySim::PrepareSimulatedFeatureSets
             }
@@ -2126,7 +2145,7 @@ void CherrySim::WriteSerialNumberToUicr(const char * serialNumber, u32 nodeIndex
         SIMEXCEPTIONFORCE(IllegalParameterException);
     }
     CheckedMemcpy(nodes[nodeIndex].uicr.CUSTOMER + 2, serialNumber, len);
-    
+
     bool didError = false;
     u32 serialNumberIndex = Utility::GetIndexForSerial(serialNumber, &didError);
     if (didError) {
@@ -2278,7 +2297,10 @@ void CherrySim::BootCurrentNode()
 
     //FIXME: Move to runner / tester
     //Lets us do some configuration after the boot
-    if(Conf::GetInstance().terminalMode == TerminalMode::DISABLED) Conf::GetInstance().terminalMode = TerminalMode::PROMPT;
+    //Do not override DISABLED when the board explicitly manages terminal mode based on enrollment state
+    if(Conf::GetInstance().terminalMode == TerminalMode::DISABLED && !Boardconfig->enableUartIfNotEnrolled) {
+        Conf::GetInstance().terminalMode = TerminalMode::PROMPT;
+    }
 }
 
 void CherrySim::ErasePage(u32 pageAddress)
@@ -2323,7 +2345,7 @@ void CherrySim::WriteRecordToFlash(u16 recordId, u8* data, u16 dataLength) {
 }
 
 void CherrySim::ResetCurrentNode(RebootReason rebootReason, bool throwException, bool powerLoss) {
-    if (simConfig.verbose) printf("Node %d resetted\n", currentNode->GetNodeId());
+    if (simConfig.verbose) printf("Node %d reset\n", currentNode->GetNodeId());
 
     //Save the node index because it will be gone after node shutdown
     u32 index = currentNode->index;
@@ -2357,6 +2379,7 @@ void CherrySim::ResetCurrentNode(RebootReason rebootReason, bool throwException,
 void CherrySim::ShutdownCurrentNode() {
     //Clean up everything that is remaining
     delete[] currentNode->moduleMemoryBlock;
+    CherrySimTimers_FreeTimers(currentNode);
 
     //Delete all simulation step handlers
     CleanSimulationStepHandlers(currentNode);
@@ -2376,7 +2399,7 @@ void CherrySim::SimulateFruityLoader()
 {
     const u32 settingsPageAddress = FruityHal::GetBootloaderSettingsAddress();
     const auto settings = (const BootloaderSettings*)settingsPageAddress;
-    
+
     //The bootloader will only be activated once a magic number is stored
     if (settings->updatePending == BOOTLOADER_MAGIC_NUMBER)
     {
@@ -2438,7 +2461,7 @@ void CherrySim::SimulateFlashCommit() {
 
 //Calls the system event dispatcher to mark flash operations complete
 //The erases/writes themselves are executed immediately at the moment, though
-//This will loop until all flash operations (also those that are queued in response to a successfuly operation) are executed
+//This will loop until all flash operations (also those that are queued in response to a successful operation) are executed
 void CherrySim::SimCommitFlashOperations()
 {
     if (cherrySimInstance->simConfig.simulateAsyncFlash) {
@@ -2784,20 +2807,26 @@ void CherrySim::SimulateTimeouts() {
 
 void CherrySim::SimulateUartInterrupts()
 {
-    u32 i = 0;
-    const SoftdeviceState &state = currentNode->state;
-    while (state.uartReadIndex != state.uartBufferLength && cherrySimInstance->currentNode->state.currentlyEnabledUartInterrupts != 0) {
+    //GeneralComm uses EasyDMA, that does not support byte-level interrupts
+    if (currentNode->gs.generalComm != nullptr) {
         UART0_IRQHandler();
+    }
+    else {
+        u32 i = 0;
+        const SoftdeviceState& state = currentNode->state;
+        while (state.uartReadIndex != state.uartBufferLength && cherrySimInstance->currentNode->state.currentlyEnabledUartInterrupts != 0) {
+            UART0_IRQHandler();
 
-        //Check if we are stuck in an "endless" loop of generating interrupts
-        //This might only happen in the simulator if the interrupt handling is implemented in a different way than on physical hardware
-        if (++i > 10000) {
-            SIMEXCEPTION(InterruptDeadlockException)
-            break;
+            //Check if we are stuck in an "endless" loop of generating interrupts
+            //This might only happen in the simulator if the interrupt handling is implemented in a different way than on physical hardware
+            if (++i > 10000) {
+                SIMEXCEPTION(InterruptDeadlockException)
+                    break;
+            }
         }
     }
 }
-
+//Used by UART mocks to send data to the application
 void CherrySim::SendUartCommand(NodeId nodeId, const u8* message, u32 messageLength)
 {
     SoftdeviceState* state = &(cherrySimInstance->FindUniqueNodeById(nodeId)->state);
@@ -2857,7 +2886,7 @@ void CherrySim::SendUnreliableTxCompleteEvent(NodeEntry* node, int connHandle, u
 
 void CherrySim::SimulateConnections() {
     /* Currently, the simulation will only take one connection event to transmit a reliable packet and both the packet event and the ACK will be generated
-    * at the same time. Also, all unreliable packets are always sent in one conneciton event.
+    * at the same time. Also, all unreliable packets are always sent in one connection event.
     * If many connections exist with short connection intervals, the behaviour is not realistic as the amount of packets that are being sent should decrease.
     * There is also no probability of failure and the buffer is always emptied
     */
@@ -2879,7 +2908,7 @@ void CherrySim::SimulateConnections() {
             //FIXME: This is a workaround as the simulation timestep is probably not dividable by (int)7.5
             if (connectionIntervalMs == (int)7.5f) connectionIntervalMs = 10;
 
-            //Each connecitonInterval, we see if there are any packets to send
+            //Each connectionInterval, we see if there are any packets to send
             if (ShouldSimConnectionIvTrigger(connectionIntervalMs, connection)) {
 
                 //Depending on the number of connections, we send a random amount of packets from the unreliable buffers
@@ -2900,7 +2929,7 @@ void CherrySim::SimulateConnections() {
                 {
                     currentNode->state.connections[i].lastReceivedPacketTimestampMs = this->simState.simTimeMs;
                 }
-                
+
 
                 //Simulate timeouts if messages can't be send anymore.
                 SoftDeviceBufferedPacket* packet = getNextPacketToWrite(connection);
@@ -2915,8 +2944,8 @@ void CherrySim::SimulateConnections() {
                 }
 
                 // Simulate timeouts if there was no message received within connection interval
-                if (simState.simTimeMs >= 
-                    (currentNode->state.connections[i].lastReceivedPacketTimestampMs + 
+                if (simState.simTimeMs >=
+                    (currentNode->state.connections[i].lastReceivedPacketTimestampMs +
                      currentNode->state.connections[i].connectionSupervisionTimeoutMs))
                 {
                     DisconnectSimulatorConnection(&currentNode->state.connections[i], BLE_HCI_CONNECTION_TIMEOUT, BLE_HCI_CONNECTION_TIMEOUT);
@@ -2966,7 +2995,7 @@ void CherrySim::SimulateConnections() {
                         s2.bleEvent.header.evt_id = BLE_GATTC_EVT_WRITE_RSP;
                         s2.bleEvent.header.evt_len = s2.globalId;
                         s2.bleEvent.evt.gattc_evt.conn_handle = connection->connectionHandle;
-                        s2.bleEvent.evt.gattc_evt.gatt_status = (u16)FruityHal::BleGattEror::SUCCESS;
+                        s2.bleEvent.evt.gattc_evt.gatt_status = (u16)FruityHal::BleGattError::SUCCESS;
                         //Save the global packet id so that we can track where a packet was generated after we receive it
                         s2.additionalInfo = packet->globalPacketId;
                         currentNode->eventQueue.push_back(s2);
@@ -3177,13 +3206,13 @@ void CherrySim::SimulateServiceDiscovery()
         dbEvt.type = FruityHal::BleGattDBDiscoveryEventType::COMPLETE;
         dbEvt.serviceUUID.uuid = currentNode->state.uuid.uuid;
         dbEvt.serviceUUID.type = currentNode->state.uuid.type;
-        dbEvt.charateristicsCount = p_tempService->charCount;
+        dbEvt.characteristicsCount = p_tempService->charCount;
         for (int i = 0; i < p_tempService->charCount; i++)
         {
-            dbEvt.dbChar[i].handleValue = p_tempService->charateristics[i].handle;
-            dbEvt.dbChar[i].charUUID.uuid = p_tempService->charateristics[i].uuid.uuid;
-            dbEvt.dbChar[i].charUUID.type = p_tempService->charateristics[i].uuid.type;
-            dbEvt.dbChar[i].cccdHandle = p_tempService->charateristics[i].cccd_handle;
+            dbEvt.dbChar[i].handleValue = p_tempService->characteristics[i].handle;
+            dbEvt.dbChar[i].charUUID.uuid = p_tempService->characteristics[i].uuid.uuid;
+            dbEvt.dbChar[i].charUUID.type = p_tempService->characteristics[i].uuid.type;
+            dbEvt.dbChar[i].cccdHandle = p_tempService->characteristics[i].cccd_handle;
         }
     }
 
@@ -3203,6 +3232,30 @@ void CherrySim::SimulateMovement()
 // Checks the features that are activated on a node and estimates the battery usage
 //#########################################################################################
 
+struct PowerConsumptionConfig
+{
+    u32 idleDraw = 10 * 1000; //10 uA idle current usage
+    u32 ledUsage = 10 * 1000 * 1000; //10 mA led on usage
+    u32 adv20Ms = 800 * 1000; //imaginary value for 20ms advertising
+    u32 adv100Ms = 220 * 1000; //220 uA advertising at 100ms interval
+    u32 adv200Ms = 110 * 1000; //110 uA advertising at 200ms interval
+    u32 adv400Ms = 84 * 1000; //84 uA advertising at 400ms interval
+    u32 adv1000Ms = 70 * 1000; //70 uA advertising at 1000ms interval
+    u32 adv2000Ms = 63 * 1000; //63 uA advertising at 2000ms interval
+    u32 adv4000Ms = 50 * 1000; //50 uA advertising at 4000ms interval
+    u32 adv8000Ms = 45 * 1000; //45 uA advertising at 8000ms interval (imaginary value)
+    u32 adv30000Ms = 30 * 1000; //30 uA advertising at 30000ms interval
+    u32 conn100Ms = 130 * 1000; //70 uA per connection at 100ms interval
+    u32 conn7_5Ms = 1000 * 1000; //1000 uA per connection at 7.5ms interval (imaginary value)
+    u32 conn10Ms = 900 * 1000; //900 uA per connection at 10ms interval (imaginary value)
+    u32 conn15Ms = 750 * 1000; //750 uA per connection at 15ms interval (imaginary value)
+    u32 conn30Ms = 600 * 1000; //600 uA per connection at 30ms interval (imaginary value)
+    u32 conn90Ms = 300 * 1000; //300 uA per connection at 90ms interval (imaginary value)
+
+    //Other values
+    u32 scanUsage = 11 * 1000 * 1000; //11mA for scanning at 100% duty cycle
+};
+
 void CherrySim::SimulateBatteryUsage()
 {
     //Have a look at: https://devzone.nordicsemi.com/b/blog/posts/nrf51-current-consumption-for-common-scenarios
@@ -3216,46 +3269,56 @@ void CherrySim::SimulateBatteryUsage()
 
     u32 divider = 1000UL / simConfig.simTickDurationMs;
 
-    //All current usages are given as nano ampere per step
-    u32 idleDraw = 10 * 1000 / divider; //10 uA idle current usage
-    u32 ledUsage = 10 * 1000 * 1000 / divider; //10 mA led on usage
-    u32 adv20Ms = 800 * 1000 / divider; //imaginary value for 20ms advertising
-    u32 adv100Ms = 220 * 1000 / divider; //220 uA advertising at 100ms interval
-    u32 adv200Ms = 110 * 1000 / divider; //110 uA advertising at 200ms interval
-    u32 adv400Ms = 84 * 1000 / divider; //84 uA advertising at 400ms interval
-    u32 adv1000Ms = 70 * 1000 / divider; //70 uA advertising at 1000ms interval
-    u32 adv2000Ms = 63 * 1000 / divider; //63 uA advertising at 2000ms interval 
-    u32 adv4000Ms = 50 * 1000 / divider; //50 uA advertising at 4000ms interval
-    u32 adv8000Ms = 45 * 1000 / divider; //45 uA advertising at 8000ms interval (imaginary value)
-    u32 adv30000Ms = 30 * 1000 / divider; //30 uA advertising at 30000ms interval
-    u32 conn100Ms = 130 * 1000 / divider; //70 uA per connection at 100ms interval
-    u32 conn7_5Ms = 1000 * 1000 / divider; //1000 uA per connection at 7.5ms interval (imaginary value)
-    u32 conn10Ms = 900 * 1000 / divider; //900 uA per connection at 10ms interval (imaginary value)
-    u32 conn15Ms = 750 * 1000 / divider; //750 uA per connection at 15ms interval (imaginary value)
-    u32 conn30Ms = 600 * 1000 / divider; //600 uA per connection at 30ms interval (imaginary value)
-    u32 conn90Ms = 300 * 1000 / divider; //300 uA per connection at 90ms interval (imaginary value)
+    PowerConsumptionConfig c;
 
-    //Other values
-    u32 scanUsage = 11 * 1000 * 1000 / divider; //11mA for scanning at 100% duty cycle
+    if (currentNode->featuresetPointers->getChipsetPtr() == Chipset::CHIP_NRF52840)
+    {
+        //Created with Nordic Online Power Profiler.
+        //Settings: 3V, DCDC on, LF clock: external crystal, radio TX: 4dBm, BLE: Advertising TX/RX, TX payload: 31 byte (max)
+        //Value = Total average current - Idle current
+        c = {
+            .idleDraw = 4'000,
+            .ledUsage = 10 * 1000 * 1000, //not sure
+            .adv20Ms = 772'300,
+            .adv100Ms = 184'300,
+            .adv200Ms = 94'300,
+            .adv400Ms = 47'300,
+            .adv1000Ms = 19'300,
+            .adv2000Ms = 9'300,
+            .adv4000Ms = 4'800,
+            .adv8000Ms = 2'400,
+            .adv30000Ms = 1'900, // not possible, used 10240ms
 
+            //Settings: Connection (peripheral), TX payload 27, RX 0, PHY 1Mbps, Slave Latency 0, Master ppm 20, Slave ppm 20
+            .conn100Ms = 24'300,
+            .conn7_5Ms = 318'300,
+            .conn10Ms = 238'300,
+            .conn15Ms = 159'300,
+            .conn30Ms = 79'300,
+            .conn90Ms = 26'300,
+
+            //Other values
+            .scanUsage = 11 * 1000 * 1000,
+        };
+    }
 
     //Next, we add up all the numbers for all active features
-    currentNode->nanoAmperePerMsTotal += idleDraw;
+    currentNode->nanoAmperePerMsTotal += c.idleDraw / divider;
 
-    if (currentNode->led1On) currentNode->nanoAmperePerMsTotal += ledUsage;
-    if (currentNode->led2On) currentNode->nanoAmperePerMsTotal += ledUsage;
-    if (currentNode->led3On) currentNode->nanoAmperePerMsTotal += ledUsage;
+    if (currentNode->led1On) currentNode->nanoAmperePerMsTotal += c.ledUsage / divider;
+    if (currentNode->led2On) currentNode->nanoAmperePerMsTotal += c.ledUsage / divider;
+    if (currentNode->led3On) currentNode->nanoAmperePerMsTotal += c.ledUsage / divider;
 
     if (currentNode->state.advertisingActive) {
-        if (currentNode->state.advertisingIntervalMs == 20) currentNode->nanoAmperePerMsTotal += adv20Ms;
-        else if (currentNode->state.advertisingIntervalMs == 100) currentNode->nanoAmperePerMsTotal += adv100Ms;
-        else if (currentNode->state.advertisingIntervalMs == 200) currentNode->nanoAmperePerMsTotal += adv200Ms;
-        else if (currentNode->state.advertisingIntervalMs == 400) currentNode->nanoAmperePerMsTotal += adv400Ms;
-        else if (currentNode->state.advertisingIntervalMs == 1000) currentNode->nanoAmperePerMsTotal += adv1000Ms;
-        else if (currentNode->state.advertisingIntervalMs == 2000) currentNode->nanoAmperePerMsTotal += adv2000Ms;
-        else if (currentNode->state.advertisingIntervalMs == 4000) currentNode->nanoAmperePerMsTotal += adv4000Ms;
-        else if (currentNode->state.advertisingIntervalMs == 8000) currentNode->nanoAmperePerMsTotal += adv8000Ms;
-        else if (currentNode->state.advertisingIntervalMs == 30000) currentNode->nanoAmperePerMsTotal += adv30000Ms;
+        if (currentNode->state.advertisingIntervalMs == 20) currentNode->nanoAmperePerMsTotal += c.adv20Ms / divider;
+        else if (currentNode->state.advertisingIntervalMs == 100) currentNode->nanoAmperePerMsTotal += c.adv100Ms / divider;
+        else if (currentNode->state.advertisingIntervalMs == 200) currentNode->nanoAmperePerMsTotal += c.adv200Ms / divider;
+        else if (currentNode->state.advertisingIntervalMs == 400) currentNode->nanoAmperePerMsTotal += c.adv400Ms / divider;
+        else if (currentNode->state.advertisingIntervalMs == 1000) currentNode->nanoAmperePerMsTotal += c.adv1000Ms / divider;
+        else if (currentNode->state.advertisingIntervalMs == 2000) currentNode->nanoAmperePerMsTotal += c.adv2000Ms / divider;
+        else if (currentNode->state.advertisingIntervalMs == 4000) currentNode->nanoAmperePerMsTotal += c.adv4000Ms / divider;
+        else if (currentNode->state.advertisingIntervalMs == 8000) currentNode->nanoAmperePerMsTotal += c.adv8000Ms / divider;
+        else if (currentNode->state.advertisingIntervalMs == 30000) currentNode->nanoAmperePerMsTotal += c.adv30000Ms / divider;
         else {
             printf("Adv interval not integrated into battery test, %u" EOL, (u32)currentNode->state.advertisingIntervalMs);
             SIMEXCEPTION(IllegalAdvertismentStateException);
@@ -3264,13 +3327,13 @@ void CherrySim::SimulateBatteryUsage()
 
     if (currentNode->state.scanningActive) {
         u32 scanDutyCycle = currentNode->state.scanWindowMs * 1000UL / currentNode->state.scanIntervalMs;
-        u32 usagePerStepWithGivenDutyCycle = scanUsage * scanDutyCycle / 1000;
+        u32 usagePerStepWithGivenDutyCycle = c.scanUsage / divider * scanDutyCycle / 1000;
         currentNode->nanoAmperePerMsTotal += usagePerStepWithGivenDutyCycle;
     }
 
     if (currentNode->state.connectingActive) {
         u32 scanDutyCycle = currentNode->state.connectingWindowMs * 1000UL / currentNode->state.connectingIntervalMs;
-        u32 usagePerStepWithGivenDutyCycle = scanUsage * scanDutyCycle / 1000;
+        u32 usagePerStepWithGivenDutyCycle = c.scanUsage / divider * scanDutyCycle / 1000;
         currentNode->nanoAmperePerMsTotal += usagePerStepWithGivenDutyCycle;
     }
 
@@ -3278,22 +3341,22 @@ void CherrySim::SimulateBatteryUsage()
         SoftdeviceConnection* conn = currentNode->state.connections + i;
         if (conn->connectionActive) {
             if (conn->connectionInterval == 100) {
-                currentNode->nanoAmperePerMsTotal += conn100Ms;
+                currentNode->nanoAmperePerMsTotal += c.conn100Ms / divider;
             }
             else if (conn->connectionInterval == 7) {
-                currentNode->nanoAmperePerMsTotal += conn7_5Ms;
+                currentNode->nanoAmperePerMsTotal += c.conn7_5Ms / divider;
             }
             else if (conn->connectionInterval == 10) {
-                currentNode->nanoAmperePerMsTotal += conn10Ms;
+                currentNode->nanoAmperePerMsTotal += c.conn10Ms / divider;
             }
             else if (conn->connectionInterval == 15) {
-                currentNode->nanoAmperePerMsTotal += conn15Ms;
+                currentNode->nanoAmperePerMsTotal += c.conn15Ms / divider;
             }
             else if (conn->connectionInterval == 30) {
-                currentNode->nanoAmperePerMsTotal += conn30Ms;
+                currentNode->nanoAmperePerMsTotal += c.conn30Ms / divider;
             }
             else if (conn->connectionInterval == 90) {
-                currentNode->nanoAmperePerMsTotal += conn90Ms;
+                currentNode->nanoAmperePerMsTotal += c.conn90Ms / divider;
             }
             else {
                 printf("Conn interval not integrated into battery test" EOL);
@@ -3317,7 +3380,7 @@ void CherrySim::SimulateTimeslot() {
         currentNode->timeslotRequested = false;
         currentNode->timeslotActive = true;
         currentNode->timeslotRadioSignalCallback(
-            NRF_RADIO_CALLBACK_SIGNAL_TYPE_START 
+            NRF_RADIO_CALLBACK_SIGNAL_TYPE_START
         );
     }
     else if (currentNode->timeslotActive)
@@ -3426,6 +3489,7 @@ extern "C" void app_timer_handler(void * p_context); //Get access to ap_timer_ha
 void CherrySim::SimulateTimer() {
     //Advance time of this node
     currentNode->state.timeMs += simConfig.simTickDurationMs;
+    CherrySimTimers_SimulateTimers(currentNode);
 
     if (ShouldSimIvTrigger(100L * MAIN_TIMER_TICK * 10 / ticksPerSecond)) {
         app_timer_handler(nullptr);
@@ -3493,7 +3557,7 @@ void CherrySim::SimulateInterrupts()
 //See, which nodes produce the issue and filter the log for these two nodes, then analyze the logs around this timestep.
 //
 //It tries to predict the outcome of the current cluster configuration if all packets reach their recipient
-//It acceses the current cluster size of each node and pulls the clusterInfoUpdatePackets from various places
+//It accesses the current cluster size of each node and pulls the clusterInfoUpdatePackets from various places
 //in the pipeline and then predicts their flow through the current mesh
 //If the clustering is deemed to be wrong, it will print a warning
 //
@@ -3773,7 +3837,7 @@ ClusterSize CherrySim::DetermineClusterSizeAndPropagateClusterUpdates(NodeEntry*
 }
 
 //################################## Configuration Management #############################
-// 
+//
 //#########################################################################################
 
 FeaturesetPointers* getFeaturesetPointers()
@@ -3874,7 +3938,7 @@ void CherrySim::SetBleStack(NodeEntry* node)
 }
 
 //################################## Helper functions #####################################
-// 
+//
 //#########################################################################################
 
 void CherrySim::AddSimulationStepHandler(std::function<void(void)> lambda)

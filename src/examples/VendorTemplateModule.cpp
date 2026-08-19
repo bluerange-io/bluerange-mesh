@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -92,7 +101,7 @@ enum class VendorTemplateComponents : u16
 
 //For each component (and each actionType) you can have a list of up to 65535 different "registers"
 //that you can map to any functionality you like
-//If you want, to can use seperate mappings for READ, WRITE, .... but it might make sense to keep them
+//If you want, to can use separate mappings for READ, WRITE, .... but it might make sense to keep them
 //in the same address range, e.g. similar to the Modbus protocol
 //Normally, you would place this definition in your header file
 enum class VendorTemplateComponent1Registers : u16
@@ -113,7 +122,7 @@ void VendorTemplateModule::TimerEventHandler(u16 passedTimeDs)
         ConnPacketComponentMessageVendor* message = (ConnPacketComponentMessageVendor*)buffer;
         message->componentHeader.header.messageType = MessageType::COMPONENT_SENSE;
         message->componentHeader.header.sender = GS->node.configuration.nodeId;
-        //Use NODE_ID_SHORTEST_SINK if other Mesh Nodes do not need to reveice the message
+        //Use NODE_ID_SHORTEST_SINK if other Mesh Nodes do not need to receive the message
         //Sending the event to NODE_ID_BROADCAST is less common in production setups
         message->componentHeader.header.receiver = NODE_ID_BROADCAST;
         message->componentHeader.moduleId = VENDOR_TEMPLATE_MODULE_ID;
@@ -235,7 +244,7 @@ void VendorTemplateModule::MeshMessageReceivedHandler(BaseConnection* connection
     if(packetHeader->messageType == MessageType::COMPONENT_ACT && sendData->dataLength >= SIZEOF_CONN_PACKET_COMPONENT_MESSAGE_VENDOR){
         ConnPacketComponentMessageVendor const * packet = (ConnPacketComponentMessageVendor const *)packetHeader;
 
-        //Check if the component_act message was adressed to our module
+        //Check if the component_act message was addressed to our module
         if(packet->componentHeader.moduleId == vendorModuleId){
             if(
                 sendData->dataLength >= SIZEOF_CONN_PACKET_COMPONENT_MESSAGE_VENDOR + 1
@@ -290,7 +299,7 @@ void VendorTemplateModule::MeshMessageReceivedHandler(BaseConnection* connection
 
 CapabilityEntry VendorTemplateModule::GetCapability(u32 index, bool firstCall)
 {
-    if (index == 0) 
+    if (index == 0)
     {
         CapabilityEntry retVal;
         CheckedMemset(&retVal, 0, sizeof(retVal));
@@ -298,7 +307,7 @@ CapabilityEntry VendorTemplateModule::GetCapability(u32 index, bool firstCall)
         strcpy(retVal.manufacturer, "Example Vendor");
         strcpy(retVal.modelName   , "Example Device");
         strcpy(retVal.revision    , "1");
-        
+
         return retVal;
     }
     else

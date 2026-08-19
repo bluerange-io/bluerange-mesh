@@ -29,7 +29,7 @@ Changes the LED mode to one of the states. It is possible to turn leds on or off
 |on|all LEDs are on
 |off|all LEDs are forced off (will periodically make sure they are off)
 |custom|LEDs are not controlled by the IoModule and another module can control their states
-|connections|*no mesh connections*  => red LED blinking three times + 
+|connections|*no mesh connections*  => red LED blinking three times +
 *connected to mesh* => green LED blinking for connection count +
 *in case networkId equals 1* => red LED constantly on (legacy functionality)
 |===
@@ -91,7 +91,7 @@ Example response:
 
 [#Identify]
 === Start identification
-Starts the identification procedure which will blink all LEDs with a 200ms period for a total of 30 seconds. Can also be handled by other modules to start custom identification. This mode overrules the curent led mode.
+Starts the identification procedure which will blink all LEDs with a 200ms period for a total of 30 seconds. Can also be handled by other modules to start custom identification. This mode overrules the current led mode.
 
 [source,C++]
 ----

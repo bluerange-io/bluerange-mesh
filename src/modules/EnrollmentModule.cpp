@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -166,7 +175,7 @@ TerminalCommandHandlerReturnType EnrollmentModule::TerminalCommandHandler(const 
 
         if(TERMARGS(0 ,"action"))
         {
-            if(TERMARGS(3,"basic"))
+            if(TERMARGS(3,"basic") || TERMARGS(3,"update"))
             {
                 if (commandArgsSize < 7) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
                 EnrollmentModuleSetEnrollmentBySerialMessage enrollmentMessage;
@@ -198,9 +207,11 @@ TerminalCommandHandlerReturnType EnrollmentModule::TerminalCommandHandler(const 
                 if(commandArgsSize > 10){
                     Logger::ParseEncodedStringToBuffer(commandArgs[10], enrollmentMessage.nodeKey.data(), 16);
                 }
-                enrollmentMessage.timeoutSec = commandArgsSize > 11? Utility::StringToU8(commandArgs[11], &didError) : 10;
+                u8 timeoutSec = commandArgsSize > 11? Utility::StringToU8(commandArgs[11], &didError) : 10;
+                enrollmentMessage.timeoutSec = timeoutSec > 63 ? 63 : timeoutSec;
                 enrollmentMessage.enrollOnlyIfUnenrolled = commandArgsSize > 12 ? Utility::StringToU8(commandArgs[12], &didError) : 0;
                 u8 requestHandle = commandArgsSize > 13 ? Utility::StringToU8(commandArgs[13], &didError) : 0;
+                enrollmentMessage.skipFactoryReset = TERMARGS(3,"update") ? 1 : 0;
 
                 if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
 
@@ -349,7 +360,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
                 EnrollmentModuleSetNetworkResponseMessage response;
                 CheckedMemset(&response, 0, sizeof(response));
                 response.response = EnrollmentModuleSetNetworkResponse::INVALID;
-                
+
                 if (GET_DEVICE_TYPE() == DeviceType::ASSET)
                 {
                     GS->node.configuration.networkId = data->newNetworkId;
@@ -378,7 +389,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
             {
                 EnrollmentModuleRequestProposalMessage const * data = (EnrollmentModuleRequestProposalMessage const *)packet->data;
                 const u32 payloadLength = sendData->dataLength.GetRaw() - SIZEOF_CONN_PACKET_MODULE;
-                
+
                 if (payloadLength % sizeof(u32) != 0)
                 {
                     GS->logger.LogCustomError(CustomErrorTypes::WARN_REQUEST_PROPOSALS_UNEXPECTED_LENGTH, payloadLength);
@@ -405,7 +416,7 @@ void EnrollmentModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
                 {
                     requestProposalIndices[i] = data->serialNumberIndices[i];
                 }
-                reqeustProposalReqeusterNodeId = packet->header.sender;
+                requestProposalRequesterNodeId = packet->header.sender;
                 requestProposalTimestampDs = GS->appTimerDs;
                 requestProposalRequestHandle = packet->requestHandle;
 
@@ -518,7 +529,7 @@ void EnrollmentModule::Enroll(ConnPacketModule const * packet, MessageLength pac
     EnrollmentModuleSetEnrollmentBySerialMessage const * data = (EnrollmentModuleSetEnrollmentBySerialMessage const *)packet->data;
 
 
-    logt("WARNING", "Enrollment (by serial) received nodeId:%u, networkid:%u, key[0]=%u, key[1]=%u, key[14]=%u, key[15]=%u", data->newNodeId, data->newNetworkId, data->newNetworkKey[0], data->newNetworkKey[1], data->newNetworkKey[14], data->newNetworkKey[15]);
+    logt("WARNING", "Enrollment (by serial) received nodeId:%u, networkid:%u, key[0]=%u, key[1]=%u, key[14]=%u, key[15]=%u, skipFactoryReset=%u", data->newNodeId, data->newNetworkId, data->newNetworkKey[0], data->newNetworkKey[1], data->newNetworkKey[14], data->newNetworkKey[15], data->skipFactoryReset);
 
     //If enrollment is the same, we respond with OK, no reboot necessary
     if(
@@ -566,10 +577,11 @@ void EnrollmentModule::Enroll(ConnPacketModule const * packet, MessageLength pac
     }
 #endif //IS_ACTIVE(SIG_MESH)
 
-    // Check if nodeId comes from a wrong range
+    // Check if nodeId comes from a wrong range.
     if (
            (GET_DEVICE_TYPE() == DeviceType::ASSET && (data->newNodeId < NODE_ID_GLOBAL_DEVICE_BASE || data->newNodeId > (NODE_ID_GLOBAL_DEVICE_BASE + NODE_ID_GLOBAL_DEVICE_BASE_SIZE)))
         || (GET_DEVICE_TYPE() != DeviceType::ASSET && (data->newNodeId < NODE_ID_DEVICE_BASE        || data->newNodeId > (NODE_ID_DEVICE_BASE        + NODE_ID_DEVICE_BASE_SIZE)))
+        || (data->skipFactoryReset && GS->node.configuration.enrollmentState == EnrollmentState::ENROLLED && data->newNodeId != GS->node.configuration.nodeId) //skipFactoryReset currently only allowed for same node id! (See ticket VS-8), may be removed if needed.
         )
     {
         SendEnrollmentResponse(
@@ -657,7 +669,7 @@ void EnrollmentModule::CommitTemporaryEnrollment(SaveEnrollmentAction* userData,
     GS->temporaryEnrollmentPtr->crc32 = Utility::CalculateCrc32((u8*)GS->temporaryEnrollmentPtr, sizeof(TemporaryEnrollment) - sizeof(u32));
 
     //In case persistence is disabled, we have a successful temporary enrollment
-    //We need to call the 
+    //We need to call the
     RecordStorageEventHandler(
         (u16)ModuleId::NODE,
         RecordStorageResultCode::SUCCESS,
@@ -731,7 +743,7 @@ void EnrollmentModule::SendRequestProposalResponse(u32 serialIndex)
 
     SendModuleActionMessage(
         MessageType::MODULE_ACTION_RESPONSE,
-        reqeustProposalReqeusterNodeId,
+        requestProposalRequesterNodeId,
         (u8)EnrollmentModuleActionResponseMessages::REQUEST_PROPOSALS_RESPONSE,
         requestProposalRequestHandle,
         (u8*)&msg,
@@ -838,7 +850,7 @@ void EnrollmentModule::DispatchPreEnrollment(Module* lastModuleCalled, PreEnroll
     logt("ENROLLMOD", "PreEnrollment succeeded");
 
     //First, clear all settings that are stored on the chip
-    if (GS->config.enableRecordStorage) {
+    if (GS->config.enableRecordStorage && !ted.requestData.skipFactoryReset) {
         RecordStorageResultCode errorCode = GS->recordStorage.LockDownAndClearAllSettings(Utility::GetWrappedModuleId(moduleId), this, (u32)EnrollmentModuleSaveActions::ERASE_RECORD_STORAGE);
         if (errorCode != RecordStorageResultCode::SUCCESS)
         {
@@ -988,7 +1000,7 @@ void EnrollmentModule::EnrollNodeViaMeshAccessConnection(FruityHal::BleGapAddr& 
 
     ted.uniqueConnId = MeshAccessConnection::ConnectAsMaster(&addr, 10, timeLeftSec, fmKeyId, ted.requestData.nodeKey.data(), MeshAccessTunnelType::PEER_TO_PEER);
 
-    logt("ENROLLMOD", "uiniqueId: %u", ted.uniqueConnId);
+    logt("ENROLLMOD", "uniqueId: %u", ted.uniqueConnId);
 
     //Now, we use our Timer handler to check if the Connection reaches the handshake state
 }
@@ -1005,9 +1017,9 @@ void EnrollmentModule::EnrollmentConnectionConnectedHandler()
 
 
     MeshAccessConnectionHandle conn = GS->cm.GetMeshAccessConnectionByUniqueId(ted.uniqueConnId);
-    
+
     //We need to overwrite the receiver as our node might have been instructed to enroll the remote node
-    //If we send the message unmodified, our partner would not accept the packet as it was not adressed to him
+    //If we send the message unmodified, our partner would not accept the packet as it was not addressed to him
     ted.requestHeader.header.receiver = conn ? conn.GetVirtualPartnerId() : 0;
 
     //Send the enrollment to our partner after we are connected
@@ -1236,4 +1248,3 @@ MeshAccessAuthorization EnrollmentModule::CheckMeshAccessPacketAuthorization(Bas
 
     return MeshAccessAuthorization::UNDETERMINED;
 }
-

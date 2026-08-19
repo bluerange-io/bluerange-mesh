@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -32,13 +41,41 @@
  * This file implements the usb cdc acm terminal functionality for the nrf52840 chipset.
  * The USBD IRQ Priority must be lower than the SD_EVT IRQ Priority
  *
+ * # Sequences:
  *
+ * ## Firmware boots
  *
- * Known issues:
- *   - If many short lines (e.g. 3 characters) are sent to the node within a short time, reading from the usb port
- *     will stop working. This is probably due to a lost update issue with the lineToReadAvailable variable.
- *     If this error happens from time to time, it should be fixed.
- *     Workaround: Closing and opening the port again will restart the communication correctly.
+ * USB power detected
+ * USB ready
+ * USB started
+ * USB suspend
+ * USB resume
+ *
+ * ## USB plugged in
+ *
+ * USB port open
+ *
+ * ## USB disconnected from software on PC (while USB still plugged in)
+ *
+ * USB port close
+ *
+ * ## USB plugged out (device still powered externally to get logs)
+ *
+ * USB port open
+ * USB suspend
+ * USB resume
+ * USB power removed
+ * USB stopped
+ *
+ * ## USB plugged in after plugging out
+ *
+ * USB power detected
+ * USB ready
+ * USB started
+ * USB suspend
+ * USB resume
+ * USB suspend
+ * USB resume
  * */
 
 #include <sdk_config.h>
@@ -95,6 +132,8 @@ extern void SeggerRttPrintf_c(const char* message, ...);
 #define FRUITYMESH_VCOM_LOG_DEBUG(...) do {} while(0)
 #endif
 
+static bool isRxInProgress = false;
+static void onRxDone();
 
 static void cdc_acm_user_ev_handler(app_usbd_class_inst_t const * p_inst, app_usbd_cdc_acm_user_event_t event);
 
@@ -110,7 +149,7 @@ APP_USBD_CDC_ACM_GLOBAL_DEF(m_app_cdc_acm,
 );
 
 
-//We can only read one byte at a time, otherwhise, we will not get the input before a chunk is completed
+//We can only read one byte at a time, otherwise, we will not get the input before a chunk is completed
 #define READ_SIZE 1
 static char m_rx_buffer[READ_SIZE];
 
@@ -122,7 +161,9 @@ static bool lineToReadAvailable = false;
 
 static void (*portEventHandlerPtr)(bool) = NULL;
 
-static bool virtualComInitialized = false;
+/// Whether the underlying nrf usbd driver is initialized
+static bool virtualComUsbdInitialized = false;
+/// Whether the actual USB port virtual COM port is opened
 static bool virtualComOpened = false;
 static uint32_t virtualComInitializedCounter = 0;
 
@@ -171,7 +212,7 @@ static ProcessSingleReceivedByteResult ProcessSingleReceivedByte(uint8_t byte)
     // Check if buffer is full to avoid potential buffer overflow.
     if (lineBufferOffset >= VIRTUAL_COM_LINE_BUFFER_SIZE - 1) {
         // Terminate the line to avoid buffer overflow
-        lineBuffer[VIRTUAL_COM_LINE_BUFFER_SIZE-1] = '\0'; 
+        lineBuffer[VIRTUAL_COM_LINE_BUFFER_SIZE-1] = '\0';
         lineToReadAvailable = true;
         return FRUITYMESH_VCOM_WHOLE_LINE_BUFFERED;
     }
@@ -232,37 +273,13 @@ static void cdc_acm_user_ev_handler(app_usbd_class_inst_t const * p_inst,
             FRUITYMESH_VCOM_LOG_DEBUG("USB port close\n");
             break;
         case APP_USBD_CDC_ACM_USER_EVT_TX_DONE:
+            FRUITYMESH_VCOM_LOG_DEBUG("USB TX DONE\n");
             currentlySendingData = false;
             break;
         case APP_USBD_CDC_ACM_USER_EVT_RX_DONE:
         {
-            ret_code_t ret;
-
-            do
-            {
-                // Print received char
-                //FRUITYMESH_VCOM_LOG_DEBUG("char: %u\n", m_rx_buffer[0]);
-
-                const uint32_t processingResult = ProcessSingleReceivedByte(m_rx_buffer[0]);
-
-                if (processingResult == FRUITYMESH_VCOM_MORE_BYTES_REQUIRED)
-                {
-                    // Restart the _potentially_ asynchronous read. This will cause execution to break out of the loop
-                    // if the read could not be fulfilled immediately and allows the event handler to end.
-                    ret = app_usbd_cdc_acm_read(&m_app_cdc_acm, m_rx_buffer, READ_SIZE);
-                }
-                else
-                {
-                    // Instruct the event processing function to set the event irq to pending. The event handler _must
-                    // exit_ before the irq is set to pending.
-                    setEventIrqPendingAfterProcessUsbEvents = true;
-
-                    // Since we have read a full line, we defer rescheduling another read until the line has actually
-                    // been processed, after the event handler has exited.
-                    break;
-                }
-            }
-            while (ret == NRF_SUCCESS);
+            FRUITYMESH_VCOM_LOG_DEBUG("USB RX DONE\n");
+            onRxDone();
 
             break;
         }
@@ -277,23 +294,26 @@ static void usbd_user_ev_handler(app_usbd_event_type_t event)
     {
         case APP_USBD_EVT_DRV_SUSPEND:
             FRUITYMESH_VCOM_LOG_DEBUG("USB suspend\n");
-            virtualComInitialized = false;
+            virtualComUsbdInitialized = false;
             virtualComOpened = false;
             break;
         case APP_USBD_EVT_DRV_RESUME:
             FRUITYMESH_VCOM_LOG_DEBUG("USB resume\n");
-            virtualComInitialized = true;
+            virtualComUsbdInitialized = true;
             ++virtualComInitializedCounter;
+            break;
+        case APP_USBD_EVT_DRV_RESET:
+            FRUITYMESH_VCOM_LOG_DEBUG("USB reset\n");
             break;
         case APP_USBD_EVT_STOPPED:
             FRUITYMESH_VCOM_LOG_DEBUG("USB stopped\n");
             app_usbd_disable();
-            virtualComInitialized = false;
-            virtualComOpened = true;
+            virtualComUsbdInitialized = false;
+            virtualComOpened = false;
             break;
         case APP_USBD_EVT_STARTED:
             FRUITYMESH_VCOM_LOG_DEBUG("USB started\n");
-            virtualComInitialized = true;
+            virtualComUsbdInitialized = true;
             ++virtualComInitializedCounter;
             break;
         case APP_USBD_EVT_POWER_DETECTED:
@@ -431,7 +451,7 @@ uint32_t virtualComCheckAndProcessLine(uint8_t* buffer, uint16_t bufferLength)
 
 uint32_t virtualComWriteData(const uint8_t* buffer, uint16_t bufferLength)
 {
-    if (!virtualComInitialized || !virtualComOpened) return 0;
+    if (!virtualComUsbdInitialized || !virtualComOpened) return 0;
 
     uint32_t err;
 
@@ -454,9 +474,9 @@ uint32_t virtualComWriteData(const uint8_t* buffer, uint16_t bufferLength)
             {
                 // Drop the write if we are stuck in an 'infinite' loop. On a nRF52840-DK the counter reached at most
                 // 550 when sending large messages (578 bytes written at a time).
-                if (++processEventQueueCounter == 10000u || !virtualComOpened || !virtualComInitialized)
+                if (++processEventQueueCounter == 10000u || !virtualComOpened || !virtualComUsbdInitialized)
                 {
-                    FRUITYMESH_VCOM_LOG_ERROR("Write dropped due to timeout");
+                    FRUITYMESH_VCOM_LOG_ERROR("Write dropped due to timeout\n");
                     currentlySendingData = false;
                     break;
                 }
@@ -473,16 +493,66 @@ uint32_t virtualComWriteData(const uint8_t* buffer, uint16_t bufferLength)
     return err;
 }
 
-bool isVirtualComPortOpen() {
-    return virtualComOpened;
-}
-
 bool isVirtualComPortInitialized() {
-    return virtualComInitialized;
+    return virtualComUsbdInitialized;
 }
 
 uint32_t getVirtualComPortInitializedCounter() {
     return virtualComInitializedCounter;
+}
+
+static void onRxDone() {
+    bool shouldExit = false; // necessary as critical region will not be exited if we returned directly inside the if below
+CRITICAL_REGION_ENTER()
+    if (isRxInProgress) {
+        // this method may be called from the outside, so we have to ensure that it is not called again by an interrupt handler
+        FRUITYMESH_VCOM_LOG_DEBUG("concurrent\n");
+        shouldExit = true;
+    }
+    isRxInProgress = true;
+CRITICAL_REGION_EXIT();
+    if (shouldExit) {
+        return;
+    }
+
+    ret_code_t ret;
+
+    do
+    {
+        // Print received char
+        //FRUITYMESH_VCOM_LOG_DEBUG("char: %u\n", m_rx_buffer[0]);
+
+        const uint32_t processingResult = ProcessSingleReceivedByte(m_rx_buffer[0]);
+
+        if (processingResult == FRUITYMESH_VCOM_MORE_BYTES_REQUIRED)
+        {
+            // Restart the _potentially_ asynchronous read. This will cause execution to break out of the loop
+            // if the read could not be fulfilled immediately and allows the event handler to end.
+            ret = app_usbd_cdc_acm_read(&m_app_cdc_acm, m_rx_buffer, READ_SIZE);
+        }
+        else
+        {
+            // Instruct the event processing function to set the event irq to pending. The event handler _must
+            // exit_ before the irq is set to pending.
+            setEventIrqPendingAfterProcessUsbEvents = true;
+
+            // Since we have read a full line, we defer rescheduling another read until the line has actually
+            // been processed, after the event handler has exited.
+            break;
+        }
+    }
+    while (ret == NRF_SUCCESS);
+
+    isRxInProgress = false;
+}
+
+uint32_t virtualComProcessReceivedBytesIfAvailable() {
+    app_usbd_cdc_acm_ctx_t * p_cdc_acm_ctx = &(&m_app_cdc_acm)->specific.p_data->ctx;
+    uint32_t bytesLeft = p_cdc_acm_ctx->bytes_left;
+    if (bytesLeft > 0) {
+        onRxDone();
+    }
+    return bytesLeft;
 }
 
 #endif //IS_ACTIVE(VIRTUAL_COM_PORT)

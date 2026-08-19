@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include <FmTypes.h>
@@ -141,7 +150,7 @@ void ConnectionManager::DeleteConnection(BaseConnection* connection, AppDisconne
 
     logt("CM", "Cleaning up conn %u", connection->connectionId);
 
-    // store parts of the addresse so it can be sent as a live_report when the gatt disconnect event fires as the Connection instance could be already deleted at that time
+    // store parts of the address so it can be sent as a live_report when the gatt disconnect event fires as the Connection instance could be already deleted at that time
     CheckedMemcpy(&recentlyDisconnectedMACAddressPart, connection->partnerAddress.addr.data(), sizeof(recentlyDisconnectedMACAddressPart));
     recentlyDisconnectedConnectionHandle = connection->connectionHandle;
 
@@ -254,7 +263,7 @@ void ConnectionManager::UpdateConnectionIntervalForLongTermMeshConnections() con
             // in BaseConnection::ConnectionSuccessfulHandler.
             const auto connectionAgeDs = GS->appTimerDs - connection->handshakeStartedDs;
             // Check that the connection is older than the long term age.
-            const bool isCentral = 
+            const bool isCentral =
                 connection->direction == ConnectionDirection::DIRECTION_OUT;
             const auto ageThresholdDs =
                 Conf::meshConnectionLongTermAgeDs
@@ -422,8 +431,8 @@ ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, b
         MeshAccessConnections maConn = GetMeshAccessConnections(ConnectionDirection::INVALID);
         for (u32 i = 0; i < maConn.count; i++) {
             MeshAccessConnectionHandle mach = maConn.handles[i];
-            if (!mach 
-                || 
+            if (!mach
+                ||
                 (
                     GET_DEVICE_TYPE() != DeviceType::ASSET // Assets only have mesh access connections. They should not filter anything that they want to send through them.
                     && !mach.ShouldSendDataToNodeId(packetHeader->receiver)
@@ -467,7 +476,7 @@ ErrorType ConnectionManager::SendMeshMessageInternal(u8* data, u16 dataLength, b
                 err = ErrorType::INTERNAL;
             }
         }
-        // If message was adressed to sink but there is no route to sink broadcast message
+        // If message was addressed to sink but there is no route to sink broadcast message
         else
         {
             bool result = BroadcastMeshPacket(data, dataLength, reliable);
@@ -635,7 +644,7 @@ bool ConnectionManager::BroadcastMeshPacket(u8* data, u16 dataLength, bool relia
         }
         else {
             bool result = conn.handles[i].SendData(data, dataLength, reliable);
-            ret = result && ret; 
+            ret = result && ret;
         }
     }
 
@@ -693,7 +702,7 @@ void ConnectionManager::GattcWriteResponseEventHandler(const FruityHal::GattcWri
     //The EVT_WRITE_RSP comes after a WRITE_REQ and notifies that a buffer
     //for one specific connection has been cleared
 
-    if (writeResponseEvent.GetGattStatus() != FruityHal::BleGattEror::SUCCESS)
+    if (writeResponseEvent.GetGattStatus() != FruityHal::BleGattError::SUCCESS)
     {
         logt("ERROR", "GATT status problem %d %s", (u8)writeResponseEvent.GetGattStatus(), Logger::GetGattStatusErrorString(writeResponseEvent.GetGattStatus()));
 
@@ -708,7 +717,7 @@ void ConnectionManager::GattcWriteResponseEventHandler(const FruityHal::GattcWri
         logt("CONN_DATA", "write_REQ complete");
         BaseConnection* connection = GetRawConnectionFromHandle(writeResponseEvent.GetConnectionHandle());
 
-        //Connection could have been disconneced
+        //Connection could have been disconnected
         if (connection == nullptr) return;
 
         connection->HandlePacketSent(0, 1);
@@ -797,7 +806,7 @@ void ConnectionManager::RouteMeshData(BaseConnection* connection, BaseConnection
         {
             connectionSink.SendData(sendData, data);
         }
-        // If message was adressed to sink but there is no route to sink broadcast message
+        // If message was addressed to sink but there is no route to sink broadcast message
         else
         {
             BroadcastMeshData(connection, sendData, data, routingDecision);
@@ -818,7 +827,7 @@ void ConnectionManager::RouteMeshData(BaseConnection* connection, BaseConnection
 
         //TODO: We can refactor this to use the new MessageRoutingInterceptor
         //Do not forward ...
-        //        ... cluster info update packets, these are handeled by the node
+        //        ... cluster info update packets, these are handled by the node
         //        ... timestamps, these are only directly sent to one node and propagate through the mesh by other means
         if(packetHeader->messageType != MessageType::CLUSTER_INFO_UPDATE
             && packetHeader->messageType != MessageType::UPDATE_TIMESTAMP)
@@ -843,7 +852,7 @@ void ConnectionManager::BroadcastMeshData(const BaseConnection* ignoreConnection
     }
 
     //Route to all MeshAccess Connections
-    //Iterate through all mesh access connetions except the ignored one and send the packet
+    //Iterate through all mesh access connections except the ignored one and send the packet
     if (!(routingDecision & ROUTING_DECISION_BLOCK_TO_MESH_ACCESS)) {
         MeshAccessConnections conn2 = GetMeshAccessConnections(ConnectionDirection::INVALID);
         for (u32 i = 0; i < conn2.count; i++) {
@@ -885,12 +894,12 @@ bool ConnectionManager::IsReceiverOfNodeId(NodeId nodeId) const
 
 bool ConnectionManager::IsValidFruityMeshPacket(const u8* data, MessageLength dataLength) const
 {
-    //After a packet was decripted and reassembled, it must at least have a full header
+    //After a packet was decrypted and reassembled, it must at least have a full header
     if(dataLength < SIZEOF_CONN_PACKET_HEADER){
         SIMEXCEPTION(MessageTooSmallException);
         return false;
     }
-    
+
     const ConnPacketHeader* header = (const ConnPacketHeader*)data;
 
     if (dataLength < MessageTypeToMinimumPacketSize(header->messageType))
@@ -1002,14 +1011,14 @@ void ConnectionManager::GapConnectionConnectedHandler(const FruityHal::GapConnec
     }
 
 
-    logt("CM", "Connection handle %u success as %s, partner:%02x:%02x:%02x:%02x:%02x:%02x", 
-        connectedEvent.GetConnectionHandle(), 
-        connectedEvent.GetRole() == FruityHal::GapRole::CENTRAL ? "Central" : "Peripheral", 
-        peerAddr[5], 
+    logt("CM", "Connection handle %u success as %s, partner:%02x:%02x:%02x:%02x:%02x:%02x",
+        connectedEvent.GetConnectionHandle(),
+        connectedEvent.GetRole() == FruityHal::GapRole::CENTRAL ? "Central" : "Peripheral",
+        peerAddr[5],
         peerAddr[4],
-        peerAddr[3], 
-        peerAddr[2], 
-        peerAddr[1], 
+        peerAddr[3],
+        peerAddr[2],
+        peerAddr[1],
         peerAddr[0]);
 
     GS->logger.LogCustomCount(CustomErrorTypes::COUNT_CONNECTION_SUCCESS);
@@ -1072,7 +1081,7 @@ void ConnectionManager::GapConnectionConnectedHandler(const FruityHal::GapConnec
         i8 id = GetFreeConnectionSpot();
         if(id < 0){
             logt("CM", "No spot available");
-            
+
             //We must drop the connection
             GS->logger.LogCustomError(CustomErrorTypes::WARN_CM_FAIL_NO_SPOT, 0);
             const ErrorType err = FruityHal::Disconnect(connectedEvent.GetConnectionHandle(), FruityHal::BleHciError::REMOTE_USER_TERMINATED_CONNECTION);
@@ -1166,10 +1175,10 @@ void ConnectionManager::GapConnectionReadyForHandshakeHandler(BaseConnection* c)
 
 ErrorType ConnectionManager::RequestDataLengthExtensionAndMtuExchange(BaseConnection* c)
 {
-    //Request a higher MTU for the GATT Layer, errors are ignored as there are non that need to be handeled
+    //Request a higher MTU for the GATT Layer, errors are ignored as there are non that need to be handled
     ErrorType err = FruityHal::BleGattMtuExchangeRequest(c->connectionHandle, FruityHal::BleGattGetMaxMtu());
 
-    //Request Data Length Extension (DLE) for the Link Layer packets, errors are ignored as there are non that need to be handeled
+    //Request Data Length Extension (DLE) for the Link Layer packets, errors are ignored as there are non that need to be handled
     if (err == ErrorType::SUCCESS) {
         err = FruityHal::BleGapDataLengthExtensionRequest(c->connectionHandle);
     }
@@ -1189,7 +1198,7 @@ void ConnectionManager::MtuUpdatedHandler(u16 connHandle, u16 mtu)
 //Is called whenever a connection had been established and is now disconnected
 //due to a timeout, deliberate disconnection by the localhost, remote, etc,...
 //We might however decide to sustain it. it will only be lost after
-//the finalDisconnectionHander is called
+//the finalDisconnectionHandler is called
 void ConnectionManager::GapConnectionDisconnectedHandler(const FruityHal::GapDisconnectedEvent& disconnectedEvent)
 {
     BaseConnection* connection = GetRawConnectionFromHandle(disconnectedEvent.GetConnectionHandle());
@@ -1565,11 +1574,11 @@ void ConnectionManager::TimerEventHandler(u16 passedTimeDs)
                 continue; //The connection was already removed in a previous iteration.
             }
 
-            //The average rssi is caluclated using a moving average with 5% influece per time step
+            //The average rssi is calculated using a moving average with 5% influence per time step
             conn->rssiAverageTimes1000 = (95 * (i32)conn->rssiAverageTimes1000 + 5000 * (i32)conn->lastReportedRssi) / 100;
 
             //Check if an implementation failure did not clear the pending connection
-            //FIXME: Should use a timeout stored in the connection as we do not know what connectingTimout this connection has
+            //FIXME: Should use a timeout stored in the connection as we do not know what connectingTimeout this connection has
             if (pendingConnection != nullptr)
             {
                 const u32 timeoutTimeDs = (
@@ -1648,7 +1657,7 @@ void ConnectionManager::TimerEventHandler(u16 passedTimeDs)
 
             if (conn->timeSyncState == MeshConnection::TimeSyncState::UNSYNCED)
             {
-                alignas(u32) TimeSyncInitial dataToSend = GS->timeManager.GetTimeSyncIntialMessage(conn->partnerId);
+                alignas(u32) TimeSyncInitial dataToSend = GS->timeManager.GetTimeSyncInitialMessage(conn->partnerId);
 
                 conn->syncSendingOrdered = GS->timeManager.GetLocalTimePoint();
 
@@ -1686,7 +1695,7 @@ void ConnectionManager::TimerEventHandler(u16 passedTimeDs)
         }
     }
 
-    // Enolled nodes syncing
+    // Enrolled nodes syncing
     timeSinceLastEnrolledNodesSyncDs += passedTimeDs;
     if(timeSinceLastEnrolledNodesSyncDs >= ENROLLED_NODES_SYNC_INTERVALS_DS)
     {
@@ -1696,7 +1705,7 @@ void ConnectionManager::TimerEventHandler(u16 passedTimeDs)
         for (u32 i = 0; i < conns.count; i++)
         {
             MeshConnectionHandle handle = conns.handles[i];
-            if (!handle) 
+            if (!handle)
             {
                 // The Connection was already removed
                 SIMEXCEPTION(IllegalStateException);
@@ -1831,7 +1840,7 @@ void ConnectionManager::SetEnrolledNodesReceived(NodeId sender)
     for (u32 i = 0; i < conns.count; i++)
     {
         MeshConnectionHandle handle = conns.handles[i];
-        if (!handle) 
+        if (!handle)
         {
             // The Connection was already removed
             SIMEXCEPTION(IllegalStateException);
@@ -1842,7 +1851,7 @@ void ConnectionManager::SetEnrolledNodesReceived(NodeId sender)
 
         if (handle.GetPartnerId() == sender)
         {
-            handle.SetEnrolledNodesSync(true);    
+            handle.SetEnrolledNodesSync(true);
         }
         else
         {
@@ -1858,7 +1867,7 @@ void ConnectionManager::SetEnrolledNodesReplyReceived(NodeId sender, u16 enrolle
     for (u32 i = 0; i < conns.count; i++)
     {
         MeshConnectionHandle handle = conns.handles[i];
-        if (!handle) 
+        if (!handle)
         {
             // The Connection was already removed
             SIMEXCEPTION(IllegalStateException);
@@ -1885,4 +1894,3 @@ u32 ConnectionManager::GenerateUniqueConnectionId()
     }
     return uniqueConnectionIdCounter;
 }
-

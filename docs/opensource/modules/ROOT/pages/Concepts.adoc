@@ -13,7 +13,7 @@ BlueRange Mesh is based on the Bluetooth low energy part of the Bluetooth 4.1 Sp
 
 In contrast to the SIG mesh, there is no use-case specific node configuration necessary. There is no concept of relay nodes, friend nodes or proxy nodes as each Node can do this decision based on the BlueRange Mesh Algorithm at Runtime. There is however a concept of a Gateway (Sink) and Asset Nodes (movable nodes with very little battery capacity). Also, leaf nodes (aka. friend nodes) can be used for very specific use-cases. See xref:#deviceTypes[Device Types] for more explanation.
 
-image:fruitymesh.png[BlueRange Mesh]
+image:bluerange_mesh_layers.png[BlueRange Mesh]
 
 == Application areas
 
@@ -92,7 +92,7 @@ Currently there are few generic modules that ease development of BlueRange Mesh 
 
 == Enrollment / Provisioning
 
-This documentation is often referring to the term _enrolling_ which is essentially the same as _provisioning_. Those terms are referring to the same actions of adding node to a network. 
+This documentation is often referring to the term _enrolling_ which is essentially the same as _provisioning_. Those terms are referring to the same actions of adding node to a network.
 
 Before a device can participate in a mesh network, it must be provisioned. During provisioning, a device is added to the network by assigning a NodeId, the NetworkKey and a number of other optional keys. The provisioning is done by a Provisioner, which is a trusted device with access to the full list of devices in the network. BlueRange Mesh enables provisioning through mobile apps or Gateways, such as the SIG mesh. In addition to that, provisioning over the mesh is also possible. This allows us to provision whole buildings with a single provisioner that does not need to move around. A more detailed description can be found in the xref:EnrollmentModule.adoc[EnrollmentModule] documentation.
 
@@ -108,7 +108,7 @@ Both mesh connections and MeshAccessConnections use AES encryption and are prote
 
 === BlueRange Mesh is easy to setup
 
-There is no need for configuring anything options such as proxy node, relay node, advertising channels, etc,... manually such as in SIG mesh. As BlueRange Mesh allows provisioning over the mesh and with a Gateway it can be done from remote, which is not possible for Bluetooth Mesh. 
+There is no need for configuring anything options such as proxy node, relay node, advertising channels, etc,... manually such as in SIG mesh. As BlueRange Mesh allows provisioning over the mesh and with a Gateway it can be done from remote, which is not possible for Bluetooth Mesh.
 
 === BlueRange Mesh is low power
 
@@ -124,6 +124,6 @@ BlueRange Mesh can work with other Bluetooth 4.1 or higher devices. It supports 
 
 === Relation to Bluetooth SIG Mesh
 
-BlueRange Mesh is a technology very similar to Bluetooth Mesh. They both utilize BLE technology to transfer some data to nearby devices, they both require some provisioning to get started, they both use a similar addressing model and both provide many-to-many communication. 
+BlueRange Mesh is a technology very similar to Bluetooth Mesh. They both utilize BLE technology to transfer some data to nearby devices, they both require some provisioning to get started, they both use a similar addressing model and both provide many-to-many communication.
 
 However, the main difference is the transport layer where BlueRange Mesh uses standard BLE connections while Bluetooth Mesh uses advertising / scanning for communication. BlueRange Mesh approach has many advantages without having any major drawbacks.

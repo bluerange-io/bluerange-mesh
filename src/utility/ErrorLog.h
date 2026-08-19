@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -39,7 +48,7 @@ enum class LoggingError : u8 {
     GENERAL_ERROR = 0, //Defined in "FmTypes.h" (ErrorType)
     HCI_ERROR = 1, //Defined in "FruityHalError.h" (BleHciError)
     CUSTOM = 2, //Defined below (CustomErrorTypes)
-    GATT_STATUS = 3, //Defined in "FruityHalError.h" (BleGattEror)
+    GATT_STATUS = 3, //Defined in "FruityHalError.h" (BleGattError)
     REBOOT = 4, //Defined below (RebootReason)
     VENDOR = 5, //A placeholder for vendor/3rd party error codes, feel free to use this category for your own implementation of custom error types
 };
@@ -55,7 +64,7 @@ enum class CustomErrorTypes : u8 {
     WARN_CONNECTION_SUSTAIN_FAILED_TO_ESTABLISH = 3,
     COUNT_CONNECTION_SUCCESS = 4,
     COUNT_HANDSHAKE_DONE = 5,
-    //REBOOT=6, deprectated, use error type REBOOT
+    //REBOOT=6, deprecated, use error type REBOOT
     WARN_HANDSHAKE_TIMEOUT = 7,
     WARN_CM_FAIL_NO_SPOT = 8,
     FATAL_QUEUE_NUM_MISMATCH = 9,
@@ -149,7 +158,10 @@ enum class CustomErrorTypes : u8 {
     COUNT_VENDOR_BYTES_SENT = 97,
     ERROR_TOO_MANY_REGISTER_HANDLERS = 98,
     ERROR_RECORD_STORAGE_REGISTER_HANDLER = 99,
-    // When adding new error type please also add in frutyapi in BeaconErrorMessage.java
+    COUNT_VENDOR_FRAMES_DROPPED_QUEUE_FULL = 100,
+    COUNT_VENDOR_TX_ERRORS = 101,
+    COUNT_USB_RX_MANUALLY_PROCESSED_BYTES = 102, //bytes not handled by usb rx events, ideal case is always 0
+    // When adding new error type please also add in fruityapi in BeaconErrorMessage.java
 };
 
 struct ErrorLogEntry {

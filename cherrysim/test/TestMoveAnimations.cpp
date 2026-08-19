@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
@@ -66,8 +75,8 @@ TEST(TestMoveAnimation, TestSimpleDiamondAnimation) {
     //Tests a simple animation that moves along a diamond shape (not looped)
     /*
     *    4. key point -> o
-    *                   / 
-    *                  /   
+    *                   /
+    *                  /
     * 3. key point -> o     o <- 1. key point
     *                  \   /
     *                   \ /
@@ -131,8 +140,8 @@ TEST(TestMoveAnimation, TestSimpleDiamondAnimationCosine) {
     //Tests a simple animation that moves along a diamond shape (not looped, with cosine types)
     /*
     *    4. key point -> o
-    *                   / 
-    *                  /   
+    *                   /
+    *                  /
     * 3. key point -> o     o <- 1. key point
     *                  \   /
     *                   \ /
@@ -201,8 +210,8 @@ TEST(TestMoveAnimation, TestSimpleDiamondAnimationBoolean) {
     //Tests a simple animation that moves along a diamond shape (not looped, with boolean types)
     /*
     *    4. key point -> o
-    *                   / 
-    *                  /   
+    *                   /
+    *                  /
     * 3. key point -> o     o <- 1. key point
     *                  \   /
     *                   \ /
@@ -569,7 +578,7 @@ TEST(TestMoveAnimation, TestLoadFromFile)
     ASSERT_FLOAT_EQ(tester.sim->loadedMoveAnimations["first-test-animation"].keyPoints[2].y, 0.456);
     ASSERT_FLOAT_EQ(tester.sim->loadedMoveAnimations["first-test-animation"].keyPoints[2].z, 0.789);
     ASSERT_FLOAT_EQ(tester.sim->loadedMoveAnimations["first-test-animation"].keyPoints[2].duration, 0.1);
-    
+
     ASSERT_EQ      (tester.sim->loadedMoveAnimations["second-test-animation"].defaultAnimationType, MoveAnimationType::COSINE);
     ASSERT_EQ      (tester.sim->loadedMoveAnimations["second-test-animation"].looped, false);
     ASSERT_EQ      (tester.sim->loadedMoveAnimations["second-test-animation"].keyPoints.size(), 4);
@@ -630,7 +639,7 @@ TEST(TestMoveAnimation, TestLoadFromFile)
     ASSERT_FLOAT_EQ(tester.sim->nodes[1].y, 0);
     ASSERT_FLOAT_EQ(tester.sim->nodes[1].z, 0);
 
-    
+
     tester.SimulateForGivenTime(2500);
     ASSERT_NEAR(tester.sim->nodes[1].x, 1.3, acceptableError);
     ASSERT_NEAR(tester.sim->nodes[1].y, 0.2, acceptableError);
@@ -698,7 +707,7 @@ TEST(TestMoveAnimation, TestMovementZ) {
     //No mesh access message should be received by a node that is positioned very high in the building
     tester.SendTerminalCommand(7, "malog BBBBK");
     ASSERT_THROW(tester.SimulateUntilRegexMessageReceived(20 * 1000, 7, "Serial BBBBK, Addr"), TimeoutException);
-    
+
     //We move the asset tag to the upmost floor
     tester.SendTerminalCommand(1, "sim animation create animation_a");
     tester.SendTerminalCommand(1, "sim animation add_keypoint animation_a 0.4 0.4 1.0 5");

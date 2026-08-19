@@ -10,7 +10,7 @@ image:cherrysim.png[cherrysim]
 
 == Functionality
 * Simulates all nodes in a time step based simulation
-* Full support for simulating *different featuresets* at the same time creating a heterogenous mesh
+* Full support for simulating *different featuresets* at the same time creating a heterogeneous mesh
 * Allows *easy xref:#Debugging[debugging]* of mesh-behaviour with a deterministic pseudo random number generator
 * Includes CherrySimRunner for xref:#Terminal[manual testing] and simulation
 * xref:#CherrySimTester[CherrySimTester] is used for *automated testing* using the google test framework
@@ -250,7 +250,7 @@ If some event, connection or packet is causing trouble it might be useful to bre
 
 * *globalEventIdCounter*: A different ID is given to each event so that breakpoints can be set for specific events.
 * *globalConnHandleCounter*: Each connection is given a globally unique id so they can be tracked easily (After a long simulation, these will wrap and a warning will be printed)
-* *globalPacketIdCounter*: Each packet is assigned a global ID so that the creation of the packet can be debugged. This is usefuly as packet creation and processing of the packet happen asynchronously and are not directly linked. Check the _additionalInfo_ of the _currentEvent_ during debugging and break in the _sd_ble_gattc_write_ when this is assigned.
+* *globalPacketIdCounter*: Each packet is assigned a global ID so that the creation of the packet can be debugged. This is usefully as packet creation and processing of the packet happen asynchronously and are not directly linked. Check the _additionalInfo_ of the _currentEvent_ during debugging and break in the _sd_ble_gattc_write_ when this is assigned.
 
 To break in the debugger before some error happens, use:
 
@@ -384,11 +384,11 @@ If CherrySim has trouble loading some files (mostly with the integrated webserve
 [#ImplementationRSSI]
 === RSSI Computation and Reception Probability
 
-The Received Signal Strength Indicator of a simulated signal between nodes is computed from paramters of both nodes.
+The Received Signal Strength Indicator of a simulated signal between nodes is computed from parameters of both nodes.
 Most importantly it considers the distance between the nodes and uses the Path-Loss-Model (see `cherrysim/PathLossModel.h`).
 Signal noise is modeled using zero-mean Gaussian noise.
 
-Computing the probability of receiving an advertisement (important for the simulated BLE connection establishment) must also take into account how much time is spent by the central device on listenting for an advertisement of the peripheral device.
+Computing the probability of receiving an advertisement (important for the simulated BLE connection establishment) must also take into account how much time is spent by the central device on listening for an advertisement of the peripheral device.
 These parameters are found in form of the relation of the `scan window` and `scan interval`, where the `window` is the (absolute) duration used for listening of the full `interval` in which the BLE channel is kept constant.
 
 In order to balance the effect of the `simulateAdvertisingIndexStep` setting in the xref:JsonFilesIncludedInCherrySim.adoc#meshGwCommunication[configuration file], which causes advertising simulation only being executed every other simulation step, the probability is multiplied by the simulation step.

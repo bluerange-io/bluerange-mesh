@@ -1,4 +1,4 @@
 // The nav file can be found in docs/opensource/modules/ROOT/pages/_partials/...
 // this has been done to be able to reference the nav.adoc as a partial include in this and other components(commercial version)
 
-include::fruitymesh:ROOT:partial$nav-opensource.adoc[]
+include::bluerange-mesh-community:ROOT:partial$nav-opensource.adoc[]

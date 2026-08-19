@@ -10,7 +10,7 @@ CherrySim uses several json files for configuration and debugging purposes. It d
 
 [#meshGwCommunication]
 === meshGwCommunication
-This file includes all the cherrysim configurations e.g. number of nodes, number of assets, featureset etc. By default cherrsim only uses this file if the `MeshGwCommunication` argument is passed to `cherrySim_runner`. Below is an example meshGwCommunication.json file.
+This file includes all the cherrysim configurations e.g. number of nodes, number of assets, featureset etc. By default cherrysim only uses this file if the `MeshGwCommunication` argument is passed to `cherrySim_runner`. Below is an example meshGwCommunication.json file.
 [source,json]
 ----
 {
@@ -52,10 +52,10 @@ This file includes all the cherrysim configurations e.g. number of nodes, number
     "simulateAdvertisingIndexStep": 1
 }
 ----
-Most of the fields are self explanatory but some noteworthy fields are 
+Most of the fields are self explanatory but some noteworthy fields are
 
-* `importFromJson` can be set to true if  xref:#devices[device] and  xref:#sites[sites] configuration needs to be extracted from devices.json and sites.json files. 
-** There file locations can be provided in the properties `devicesJsonPath` and `siteJsonPath` in this file. 
+* `importFromJson` can be set to true if  xref:#devices[device] and  xref:#sites[sites] configuration needs to be extracted from devices.json and sites.json files.
+** There file locations can be provided in the properties `devicesJsonPath` and `siteJsonPath` in this file.
 * One can also set `verbose` to true in order to enable cherrysim logs.
 * Field 'verboseCommands' is deprecated and only retained for compatibility reasons.
 * `realTime` if set to true, the simulator will only tick when the real time clock passed the necessary time otherwise as fast as possible.  It can be a bit of a pitfall if you want to test something with a long replay log.
@@ -63,7 +63,7 @@ Most of the fields are self explanatory but some noteworthy fields are
 * `simTickDurationMs` simulation time per tick. It should not be changed unless one is really sure what he is doing.
 * `nodeConfigName` is a key pair value in a map (map<std::string, int>) where key defines the featureset and value defines number of nodes with that featureset e.g
 {"prod_sink_nrf52":1,"prod_mesh_nrf52":7} will have one node with prod_sink_nrf52 featureset and 7 nodes with prod_mesh_nrf52 featureset. In case we have `importFromJson` field set to true, these values will be ignored and the input will be directly taken from xref:#devices[device].
-* `interruptProbability` is the probability with which a queued interrupt is simulated. if it has a value 0 means that interrupt wont be simulated.
+* `interruptProbability` is the probability with which a queued interrupt is simulated. if it has a value 0 means that interrupt won't be simulated.
 * `preDefinedPositions` is the defined position in the space where beacon will be simulated. By default, if its not provided, the position will be defined randomly.
 * 'simOtherDelay' is deprecated and retained only for compatibility reasons.
 *  'playDelay' allows us to view the simulation slower than simulated, delay is added after each step.
@@ -76,7 +76,7 @@ Most of the fields are self explanatory but some noteworthy fields are
   The parameter was introduced to make real-time simulations with many nodes feasible (hundreds, depends on the hardware).
   See the xref:CherrySim.adoc#ImplementationRSSI[simulator documentation] for some more information.
 
-NOTE:  Adding and removing fields in the file wont work out the box, cherrysim code needs to be adjusted accordingly.
+NOTE:  Adding and removing fields in the file won't work out the box, cherrysim code needs to be adjusted accordingly.
 
 [#devices]
 === devices
@@ -126,9 +126,9 @@ Some of the fields that should be noted is that
 
 * `platform` field can have `BLENODE`, `ASSET` and `EDGEROUTER` depending on the type of platform one need and this field is mandatory.
 
-* In the properties, the mandatory fields that must be present are the `x`, `y` and `onMap` must be true. While others will get default values if not present i.e 
-** `zNorm`: `0`,  
-** `cherrySimFeatureSet` if not present will get 
+* In the properties, the mandatory fields that must be present are the `x`, `y` and `onMap` must be true. While others will get default values if not present i.e
+** `zNorm`: `0`,
+** `cherrySimFeatureSet` if not present will get
 *** `cherrySimFeatureSet`: `prod_mesh_nrf52` in case of `platform`: `BLENODE`.
 *** `cherrySimFeatureSet`: `prod_sink_nrf52` in case of `platform`: `EDGEROUTER`.
 *** `cherrySimFeatureSet`: `prod_asset_nrf52` in case of `platform`: `ASSET`.

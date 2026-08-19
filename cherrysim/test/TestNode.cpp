@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
@@ -95,7 +104,7 @@ TEST(TestNode, TestCommands) {
 
     tester.SendTerminalCommand(1, "gettime");
     tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "Time is currently approx. 1970 years, 1 days, 00h:22m:17s,\\d+ ticks");
-    
+
     //We must wait for some time until the time was properly synced and corrected
     tester.SimulateForGivenTime(10 * 1000);
     tester.SendTerminalCommand(1, "action 2 node gettime");
@@ -251,7 +260,7 @@ TEST(TestNode, TestDynamicGroups)
     tester.SimulateUntilMessageReceived(20 * 1000, 1, "{\"type\":\"get_groups_result\",\"nodeId\":1,\"module\":0,\"groups\":[21001]}");
 
     // The same command from above should now return a result.
-    tester.SendTerminalCommand(1, "action 21001 status get_status"); 
+    tester.SendTerminalCommand(1, "action 21001 status get_status");
     tester.SimulateUntilMessageReceived(20 * 1000, 1, "\"type\":\"status\",\"");
 
     // Even after a restart
@@ -635,7 +644,7 @@ TEST(TestNode, TestDiscoveryStates) {
     tester.SendTerminalCommand(1, "reset");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "-- DISCOVERY HIGH --");
 
-    
+
     // Expect that single node will stay in discovery high forever
     tester.SendTerminalCommand(2, "action this enroll remove BBBBC");
     tester.SimulateForGivenTime(5 * 1000);
@@ -782,14 +791,14 @@ TEST(TestNode, DISABLED_TestDiscoveryOffWillAllowConnectingNewNodes) {
     simConfig.SetToPerfectConditions();
     simConfig.preDefinedPositions = { {0.2, 0.2}, {0.2, 0.25}, {0.25, 0.2} };
     //testerConfig.verbose = true;
-    
+
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
     tester.SendTerminalCommand(1, "action this enroll basic BBBBB 1 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
     tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
     tester.SendTerminalCommand(3, "action this enroll basic BBBBD 3 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
     tester.SimulateUntilClusteringDone(100 * 1000);
-    
+
     // remove node from network
     tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 11 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
     tester.SimulateForGivenTime(10 * 1000);
@@ -805,7 +814,7 @@ TEST(TestNode, DISABLED_TestDiscoveryOffWillAllowConnectingNewNodes) {
         SimulationMessage(1, "-- DISCOVERY IDLE --"),
         SimulationMessage(3, "-- DISCOVERY IDLE --"), };
     tester.SimulateUntilMessagesReceived(10 * 1000, messagesOff);
-    
+
     // enroll node again in the same network and expect it will join network
     tester.SendTerminalCommand(2, "action this enroll basic BBBBC 2 10 04:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00");
     tester.SimulateUntilMessageReceived(20 * 1000, 2, "ClusterSize set to %d", 3);

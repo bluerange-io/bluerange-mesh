@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -41,8 +50,8 @@ FruityHal::GapConnParamUpdateEvent::GapConnParamUpdateEvent(void const* _evt)
     :GapEvent(_evt) {}
 FruityHal::GapEvent::GapEvent(void const* _evt)
     : BleEvent(_evt) {}
-u16 FruityHal::GapEvent::GetConnectionHandle() const { return 0; } 
-u16 FruityHal::GapConnParamUpdateEvent::GetMaxConnectionInterval() const { return 0; } 
+u16 FruityHal::GapEvent::GetConnectionHandle() const { return 0; }
+u16 FruityHal::GapConnParamUpdateEvent::GetMaxConnectionInterval() const { return 0; }
 FruityHal::GapRssiChangedEvent::GapRssiChangedEvent(void const* _evt)
     :GapEvent(_evt) {}
 i8 FruityHal::GapRssiChangedEvent::GetRssi() const { return 0; }
@@ -50,16 +59,16 @@ FruityHal::GapAdvertisementReportEvent::GapAdvertisementReportEvent(void const* 
     :GapEvent(_evt) {}
 i8 FruityHal::GapAdvertisementReportEvent::GetRssi() const { return 0; }
 const u8 * FruityHal::GapAdvertisementReportEvent::GetData() const { return 0; }
-u32 FruityHal::GapAdvertisementReportEvent::GetDataLength() const { return 0; } 
+u32 FruityHal::GapAdvertisementReportEvent::GetDataLength() const { return 0; }
 FruityHal::BleGapAddrBytes FruityHal::GapAdvertisementReportEvent::GetPeerAddr() const { return FruityHal::BleGapAddrBytes(); }
 FruityHal::BleGapAddrType FruityHal::GapAdvertisementReportEvent::GetPeerAddrType() const { return FruityHal::BleGapAddrType::PUBLIC; }
-bool FruityHal::GapAdvertisementReportEvent::IsConnectable() const { return false; } 
+bool FruityHal::GapAdvertisementReportEvent::IsConnectable() const { return false; }
 FruityHal::BleEvent::BleEvent(void const* _evt) {}
 FruityHal::GapConnectedEvent::GapConnectedEvent(void const* _evt)
     :GapEvent(_evt) {}
 FruityHal::GapRole FruityHal::GapConnectedEvent::GetRole() const { return FruityHal::GapRole::INVALID; }
-u8 FruityHal::GapConnectedEvent::GetPeerAddrType() const { return 0; } 
-u16 FruityHal::GapConnectedEvent::GetMinConnectionInterval() const { return 0; } 
+u8 FruityHal::GapConnectedEvent::GetPeerAddrType() const { return 0; }
+u16 FruityHal::GapConnectedEvent::GetMinConnectionInterval() const { return 0; }
 FruityHal::BleGapAddrBytes FruityHal::GapConnectedEvent::GetPeerAddr() const { return FruityHal::BleGapAddrBytes(); }
 FruityHal::GapDisconnectedEvent::GapDisconnectedEvent(void const* _evt)
     : GapEvent(_evt) {}
@@ -71,34 +80,34 @@ FruityHal::GapSecurityInfoRequestEvent::GapSecurityInfoRequestEvent(void const* 
     : GapEvent(_evt) {}
 FruityHal::GapConnectionSecurityUpdateEvent::GapConnectionSecurityUpdateEvent(void const* _evt)
     : GapEvent(_evt) {}
-u8 FruityHal::GapConnectionSecurityUpdateEvent::GetKeySize() const { return 0; } 
+u8 FruityHal::GapConnectionSecurityUpdateEvent::GetKeySize() const { return 0; }
 FruityHal::SecurityLevel FruityHal::GapConnectionSecurityUpdateEvent::GetSecurityLevel() const { return FruityHal::SecurityLevel::NO_PERMISSION; }
 FruityHal::SecurityMode FruityHal::GapConnectionSecurityUpdateEvent::GetSecurityMode() const { return FruityHal::SecurityMode::NO_PERMISSION; }
 FruityHal::GattcEvent::GattcEvent(void const* _evt)
     : BleEvent(_evt) {}
-u16 FruityHal::GattcEvent::GetConnectionHandle() const { return 0; } 
-FruityHal::BleGattEror FruityHal::GattcEvent::GetGattStatus() const { return FruityHal::BleGattEror::SUCCESS; }
+u16 FruityHal::GattcEvent::GetConnectionHandle() const { return 0; }
+FruityHal::BleGattError FruityHal::GattcEvent::GetGattStatus() const { return FruityHal::BleGattError::SUCCESS; }
 FruityHal::GattcWriteResponseEvent::GattcWriteResponseEvent(void const* _evt)
     : GattcEvent(_evt) {}
 FruityHal::GattcTimeoutEvent::GattcTimeoutEvent(void const* _evt)
     : GattcEvent(_evt) {}
 FruityHal::GattDataTransmittedEvent::GattDataTransmittedEvent(void const* _evt)
     :BleEvent(_evt) {}
-u16 FruityHal::GattDataTransmittedEvent::GetConnectionHandle() const { return 0; } 
-bool FruityHal::GattDataTransmittedEvent::IsConnectionHandleValid() const { return false; } 
-u32 FruityHal::GattDataTransmittedEvent::GetCompleteCount() const { return 0; } 
+u16 FruityHal::GattDataTransmittedEvent::GetConnectionHandle() const { return 0; }
+bool FruityHal::GattDataTransmittedEvent::IsConnectionHandleValid() const { return false; }
+u32 FruityHal::GattDataTransmittedEvent::GetCompleteCount() const { return 0; }
 FruityHal::GattsWriteEvent::GattsWriteEvent(void const* _evt)
     : BleEvent(_evt) {}
-u16 FruityHal::GattsWriteEvent::GetAttributeHandle() const { return 0; } 
-bool FruityHal::GattsWriteEvent::IsWriteRequest() const { return false; } 
-u16 FruityHal::GattsWriteEvent::GetLength() const { return 0; } 
-u16 FruityHal::GattsWriteEvent::GetConnectionHandle() const { return 0; } 
-u8 const * FruityHal::GattsWriteEvent::GetData() const { return 0; } 
+u16 FruityHal::GattsWriteEvent::GetAttributeHandle() const { return 0; }
+bool FruityHal::GattsWriteEvent::IsWriteRequest() const { return false; }
+u16 FruityHal::GattsWriteEvent::GetLength() const { return 0; }
+u16 FruityHal::GattsWriteEvent::GetConnectionHandle() const { return 0; }
+u8 const * FruityHal::GattsWriteEvent::GetData() const { return 0; }
 FruityHal::GattcHandleValueEvent::GattcHandleValueEvent(void const* _evt)
     :GattcEvent(_evt) {}
-u16 FruityHal::GattcHandleValueEvent::GetHandle() const { return 0; } 
-u16 FruityHal::GattcHandleValueEvent::GetLength() const { return 0; } 
-u8 const * FruityHal::GattcHandleValueEvent::GetData() const { return 0; } 
+u16 FruityHal::GattcHandleValueEvent::GetHandle() const { return 0; }
+u16 FruityHal::GattcHandleValueEvent::GetLength() const { return 0; }
+u8 const * FruityHal::GattcHandleValueEvent::GetData() const { return 0; }
 
 
 // ######################### Ble Stack and Event Handling ############################
@@ -141,7 +150,7 @@ ErrorType FruityHal::BleGapRssiStart(u16 conn_handle, u8 threshold_dbm, u8 skip_
 ErrorType FruityHal::BleGapRssiStop(u16 conn_handle){ return ErrorType::SUCCESS; }
 
 // ######################### GATT ############################
-ErrorType FruityHal::DiscovereServiceInit(DBDiscoveryHandler dbEventHandler){ return ErrorType::SUCCESS; }
+ErrorType FruityHal::DiscoveryServiceInit(DBDiscoveryHandler dbEventHandler){ return ErrorType::SUCCESS; }
 ErrorType FruityHal::DiscoverService(u16 connHandle, const BleGattUuid &p_uuid){ return ErrorType::SUCCESS; }
 bool FruityHal::DiscoveryIsInProgress(){ return true; }
 
@@ -238,8 +247,8 @@ void FruityHal::GpioInterruptEventEnable(u32 pin){ }
 
 ErrorType FruityHal::AdcInit(AdcEventHandler){ return ErrorType::SUCCESS; }
 void FruityHal::AdcUninit(){ }
-ErrorType FruityHal::AdcConfigureChannel(u32 pin, AdcReference reference, AdcResoultion resolution, AdcGain gain){ return ErrorType::SUCCESS; }
-ErrorType FruityHal::AdcSample(i16 & buffer, u8 len){ return ErrorType::SUCCESS; } // triggers non-blocking convertion which end will be reported by calling AdcEventHandler
+ErrorType FruityHal::AdcConfigureChannel(u32 pin, AdcReference reference, AdcResolution resolution, AdcGain gain){ return ErrorType::SUCCESS; }
+ErrorType FruityHal::AdcSample(i16 & buffer, u8 len){ return ErrorType::SUCCESS; } // triggers non-blocking conversion which end will be reported by calling AdcEventHandler
 u8 FruityHal::AdcConvertSampleToDeciVoltage(u32 sample){ return 0; }
 u8 FruityHal::AdcConvertSampleToDeciVoltage(u32 sample, u16 voltageDivider){ return 0; }
 
@@ -270,7 +279,7 @@ FruityHal::UartStopBits FruityHal::UartStopBitsFromNumber(u8 number) { return Fr
 FruityHal::UartDataBits FruityHal::UartDataBitsFromNumber(u8 number) { return FruityHal::UartDataBits::INVALID; }
 
 u32 FruityHal::GetMasterBootRecordSize(){ return 0; }
-u32 FruityHal::GetLicenseSectionAdress(u32 sdBaseAddr) { return 0; }
+u32 FruityHal::GetLicenseSectionAddress(u32 sdBaseAddr) { return 0; }
 u32 FruityHal::GetSoftDeviceSize(u32 sdBaseAddress){ return 0; }
 u32 FruityHal::GetSoftDeviceVersion(){ return 0; }
 BleStackType FruityHal::GetBleStackType(){ return BleStackType::INVALID; }
@@ -287,3 +296,6 @@ u32 FruityHal::GetCodeSize(){ return 0; }
 u32 FruityHal::GetDeviceId(){ return 0; }
 void FruityHal::GetDeviceIdLong(u32 * p_data) {}
 void FruityHal::GetDeviceAddress(u8 * p_address){ }
+
+u32 FruityHal::GetHalMemorySize(){ return 0; }
+void FruityHal::InitHalMemory(){}

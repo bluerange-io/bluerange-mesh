@@ -9,7 +9,7 @@ import os
 def main():
     # Config
     terminalPath = 'putty.exe'
-	
+
     global input
     try:
         input = raw_input

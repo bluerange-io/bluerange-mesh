@@ -271,6 +271,16 @@ void BBERenderer::draw2D(bbe::PrimitiveBrush2D& brush)
         }
     }
 
+    //Draw Module custom stuff
+    for (u32 i = 0; i < sim->GetTotalNodes(); i++)
+    {
+        NodeIndexSetter setter(i);
+        for (u32 k = 0; k < GS->amountOfModules; k++)
+        {
+            GS->activeModules[k]->NativeDraw(brush);
+        }
+    }
+
     if (showPackets)
     {
         brush.setColorRGB(1, 1, 1);
@@ -312,7 +322,7 @@ void BBERenderer::draw2D(bbe::PrimitiveBrush2D& brush)
                 brush.setColorRGB(c);
             }
             //Draw each node with the color of its cluster
-            else if(drawMode == 1) 
+            else if(drawMode == 1)
             {
                 NodeIndexSetter setter(i);
 

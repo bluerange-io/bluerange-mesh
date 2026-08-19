@@ -98,7 +98,7 @@ You also have to download and install Python 3.x if not already installed from h
 link:https://www.python.org/downloads/[]
 
 === Install the nRF Command Line Tools
-If you haven't already installed the nRF5 Command Line Tools, you can see how do so xref:#NrfTools[here]. It is important that the tools are installed and available in the PATH of your operating system as the build will otherwhise fail with an error such as: `mergehex` could not be found.
+If you haven't already installed the nRF5 Command Line Tools, you can see how do so xref:#NrfTools[here]. It is important that the tools are installed and available in the PATH of your operating system as the build will otherwise fail with an error such as: `mergehex` could not be found.
 
 ==== Unix Tools Installation (Windows Only)
 Next, if you are working on windows, you have to download and install some unix utilities, the GNU ARM Eclipse Build Tools. This includes _make_, _sh_, _rm_ and some others. Version 2.4 has been tested successfully and the executable installer can be downloaded from here:
@@ -181,7 +181,7 @@ Open a command line in `<fruitymesh-folder>/_build/commandline` and execute the 
 
 `cmake "../../" -DBUILD_TYPE=FIRMWARE -DGCC_PATH="C:/<yourpath>/gcc-arm-none-eabi-4_9" -G "Unix Makefiles"`
 
-WARNING: The GCC_PATH must be specified using forward slashes "*/*", not backward slashes "*\*", otherwhise cmake will complain about `Invalid character escape '\m'`. You have to delete all files in your build directory before executing the command again to solve the issue! In case of other errors, make sure to have a look at xref:BuildingWithCMake.adoc#Troubleshooting[Building With CMake]
+WARNING: The GCC_PATH must be specified using forward slashes "*/*", not backward slashes "*\*", otherwise cmake will complain about `Invalid character escape '\m'`. You have to delete all files in your build directory before executing the command again to solve the issue! In case of other errors, make sure to have a look at xref:BuildingWithCMake.adoc#Troubleshooting[Building With CMake]
 
 Next, from the same directory, execute the following command:
 
@@ -206,7 +206,7 @@ image:eclipsescreen.png[eclipsescreenshot]
 
 Eclipse is a good development IDE but its CMake integration is a bit outdated. The following setup will work, but you might experience issues with the code indexer. You should create a directory next to the fruitymesh directory, that you can call e.g. `fruitymesh_eclipse`. This is necessary as eclipse will otherwise not properly display the sourcecode directory in the project.
 
-To generate the project settings, open a commandline in the `fruitymesh_eclipse` folder and execute: 
+To generate the project settings, open a commandline in the `fruitymesh_eclipse` folder and execute:
 
 `cmake ../fruitymesh -DBUILD_TYPE=FIRMWARE -DGCC_PATH="C:/<yourpath>/gcc-arm-none-eabi-4_9" -G "Eclipse CDT4 - Unix Makefiles"`
 

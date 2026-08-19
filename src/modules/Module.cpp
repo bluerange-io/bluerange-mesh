@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -46,7 +55,10 @@ Module::Module(ModuleId moduleId, const char* name)
 }
 
 Module::Module(VendorModuleId _vendorModuleId, const char* name)
-    :vendorModuleId(_vendorModuleId), moduleName(name), proxy(*this)
+    :vendorModuleId(_vendorModuleId), moduleName(name), proxy(*this),
+#if IS_ACTIVE(REGISTER_HANDLER)
+    registerProxy(*this)
+#endif
 {
     //Overwritten by Modules
     this->configurationPointer = nullptr;
@@ -71,7 +83,7 @@ ErrorTypeUnchecked Module::SendModuleActionMessage(MessageType messageType, Node
     return SendModuleActionMessage(messageType, toNode, actionType, requestHandle, additionalData, additionalDataSize, reliable, true);
 }
 
-//Constructs a simple trigger action message and can take aditional payload data
+//Constructs a simple trigger action message and can take additional payload data
 ErrorTypeUnchecked Module::SendModuleActionMessage(MessageType messageType, NodeId toNode, u8 actionType, u8 requestHandle, const u8* additionalData, u16 additionalDataSize, bool reliable, bool loopback) const
 {
     if (moduleId == ModuleId::VENDOR_MODULE_ID_PREFIX) {
@@ -80,7 +92,7 @@ ErrorTypeUnchecked Module::SendModuleActionMessage(MessageType messageType, Node
     else {
         return GS->cm.SendModuleActionMessage(messageType, moduleId, toNode, actionType, requestHandle, additionalData, additionalDataSize, reliable, loopback);
     }
-    
+
 }
 
 #ifdef TERMINAL_ENABLED
@@ -129,7 +141,7 @@ TerminalCommandHandlerReturnType Module::TerminalCommandHandler(const char* comm
         else if(TERMARGS(0, "get_config"))
         {
             const NodeId receiver = Utility::TerminalArgumentToNodeId(commandArgs[1]);
-            
+
             u8 requestHandle = commandArgsSize >= 4 ? Utility::StringToU8(commandArgs[3]) : 0;
 
             //We can simply use the wrappedModuleId as the following method will pick the correct packet type to send
@@ -151,7 +163,7 @@ TerminalCommandHandlerReturnType Module::TerminalCommandHandler(const char* comm
             if(commandArgsSize <= 3) return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
 
             const NodeId receiver = Utility::TerminalArgumentToNodeId(commandArgs[1]);
-            
+
             u8 buffer[1];
             buffer[0] = TERMARGS(3, "on") ? 1: 0;
             u8 requestHandle = commandArgsSize >= 5 ? Utility::StringToU8(commandArgs[4]) : 0;
@@ -231,13 +243,13 @@ void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnecti
             //We return in case the packet is invalid or does not belong to our module
             return;
         }
-        
+
         //#### PART 2: Request Handling ############################
-        
+
         if(actionType == ModuleConfigMessages::SET_CONFIG)
         {
             SetConfigResultCodes result = SetConfigResultCodes::SUCCESS;
-            
+
             //We do not allow setting the configuration for core modules except the StatusReporterModule (IOT-4327)
             if (!Utility::IsVendorModuleId(moduleId) && moduleId != ModuleId::STATUS_REPORTER_MODULE) {
                 result = SetConfigResultCodes::NO_CONFIGURATION;
@@ -374,14 +386,14 @@ void Module::MeshMessageReceivedHandler(BaseConnection* connection, BaseConnecti
                 bool active = packetVendor->data[0];
                 vendorConfigurationPointer->moduleActive = active ? 1 : 0;
             }
-            
+
             if(result == SetConfigResultCodes::SUCCESS){
                 ConfigurationLoadedHandler(nullptr, 0);
 
                 //Save the module config to flash
                 SaveModuleConfigAction userData;
                 CheckedMemset(&userData, 0x00, sizeof(userData));
-                
+
                 userData.moduleId = wrappedModuleId;
                 userData.sender = senderId;
                 userData.requestHandle = requestHandle;
@@ -602,10 +614,9 @@ void Module::SendModuleConfigResult(NodeId senderId, ModuleIdWrapper moduleId, M
 
 #if IS_ACTIVE(REGISTER_HANDLER)
 
-#ifdef JSTODO_PERSISTENCE
 void Module::RecordStorageEventHandlerRegisterProxy(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength)
 {
-    RecordStorageUserData* data = (RecordStorageUserData*)userData;
+    RegisterHandlerRecordStorageUserData* data = (RegisterHandlerRecordStorageUserData*)userData;
     if (resultCode == RecordStorageResultCode::SUCCESS)
     {
         for (u32 i = 0; i < data->length; i++)
@@ -621,15 +632,14 @@ void Module::RecordStorageEventHandlerRegisterProxy(u16 recordId, RecordStorageR
     if (data->callback)
     {
         u8* userUserData = nullptr;
-        u16 userUserDataLength = userDataLength - offsetof(RecordStorageUserData, userData);
+        u16 userUserDataLength = userDataLength - offsetof(RegisterHandlerRecordStorageUserData, userData);
         if (userUserDataLength > 0)
         {
             userUserData = data->userData;
         }
-        data->callback->RecordStorageEventHandler(recordId, resultCode, userType, userUserData, userUserDataLength);
+        data->callback->RegisterHandlerEventHandler(recordId, resultCode, userType, userUserData, userUserDataLength, data->dataChanged);
     }
 }
-#endif
 
 u16 Module::GetRecordBaseId() const
 {
@@ -810,39 +820,23 @@ RegisterHandlerCodeStage Module::SetRegisterValues(u16 component, u16 reg, const
     }
     else
     {
-#ifndef JSTODO_PERSISTENCE
-        return { RegisterHandlerCode::NOT_IMPLEMENTED, RegisterHandlerStage::EARLY_RECORD_STORAGE };
-#else
-        const u16 recordId = GetRecordBaseId() + persistedId;
-        RecordStorageRecord* record = GS->recordStorage.GetRecord(recordId);
-        u32 maxSize = length * sizeof(u16);
-        const u16* oldRecordStorage = nullptr;
-        u16 oldRecordStorageLength = 0;
-        if (record)
-        {
-            maxSize += record->recordLength;
-            oldRecordStorage = (u16*)record->data;
-            oldRecordStorageLength = record->recordLength / sizeof(u16);
-        }
-        if (maxSize % sizeof(u16) == 1)
-        {
-            maxSize++;
-            // This should never happen - right?
-            SIMEXCEPTION(IllegalStateException);
-        }
+        // About the -1 here: persistedId == 0 means that we don't want to persist, thus all other values need to be shifted down so that we don't waste any recordIds.
+        const u16 recordId = GetRecordBaseId() + persistedId - 1;
+        const SizedData existingRecord = GS->recordStorage.GetRecordData(recordId);
+        // About the "4 * sizeof(u16)" here: A single entry requires at least 4 u16 values: component, amount_of_ranges, register, length.
+        const u32 maxSize = length + 4 * sizeof(u16) + existingRecord.length.GetRaw();
         DYNAMIC_ARRAY(buffer, maxSize);
-        const u16 actualLength = sizeof(u16) * InsertRegisterRange(oldRecordStorage, 0, component, reg, length, values, (u16*)buffer);
+        const u16 actualLength = InsertRegisterRange(existingRecord.data, existingRecord.length.GetRaw(), component, reg, length, values, buffer);
 
-        // TODO Missing a commit call here! Probably we have to put a record storage callback in between.
-
-        DYNAMIC_ARRAY(surroundingUserDataBuffer, sizeof(RecordStorageUserData) + userDataLength);
-        CheckedMemset(surroundingUserDataBuffer, 0, sizeof(RecordStorageUserData) + userDataLength);
-        RecordStorageUserData* surroundingUserData = (RecordStorageUserData*)buffer;
+        DYNAMIC_ARRAY(surroundingUserDataBuffer, sizeof(RegisterHandlerRecordStorageUserData) + userDataLength);
+        CheckedMemset(surroundingUserDataBuffer, 0, sizeof(RegisterHandlerRecordStorageUserData) + userDataLength);
+        RegisterHandlerRecordStorageUserData* surroundingUserData = (RegisterHandlerRecordStorageUserData*)surroundingUserDataBuffer;
         surroundingUserData->component = component;
-        surroundingUserData->reg = register_;
+        surroundingUserData->reg = reg;
         surroundingUserData->length = length;
         surroundingUserData->source = source;
         surroundingUserData->callback = callback;
+        surroundingUserData->dataChanged = valuesChanged;
         if (userData)
         {
             CheckedMemcpy(surroundingUserData->userData, userData, userDataLength);
@@ -852,7 +846,7 @@ RegisterHandlerCodeStage Module::SetRegisterValues(u16 component, u16 reg, const
             recordId,
             buffer,
             actualLength,
-            &proxy,
+            &registerProxy,
             userType,
             surroundingUserDataBuffer,
             sizeof(RecordStorageUserData) + userDataLength
@@ -863,11 +857,9 @@ RegisterHandlerCodeStage Module::SetRegisterValues(u16 component, u16 reg, const
             static_assert((int)RecordStorageResultCode::LAST_ENTRY < (int)RegisterHandlerCode::RECORD_STORAGE_CODES_END - (int)RegisterHandlerCode::RECORD_STORAGE_CODES_START, "Not enough room to embed error code.");
             return { (RegisterHandlerCode)((int)rsCode + (int)RegisterHandlerCode::RECORD_STORAGE_CODES_START), RegisterHandlerStage::EARLY_RECORD_STORAGE };
         }
-#endif
     }
 }
 
-#ifdef JSTODO_PERSISTENCE
 Module::RecordStorageEventListenerRegisterProxy::RecordStorageEventListenerRegisterProxy(Module& mod) :
     mod(mod)
 {
@@ -877,7 +869,6 @@ void Module::RecordStorageEventListenerRegisterProxy::RecordStorageEventHandler(
 {
     mod.RecordStorageEventHandlerRegisterProxy(recordId, resultCode, userType, userData, userDataLength);
 }
-#endif
 
 void Module::RegisterHandlerEventHandler(u16 recordId, RecordStorageResultCode resultCode, u32 userType, u8* userData, u16 userDataLength, bool dataChanged)
 {

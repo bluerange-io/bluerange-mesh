@@ -6,7 +6,7 @@ Besides the web renderer, CherrySim also supports a native renderer. The native 
 
 .Comparison
 |===
-|Advantages |Disadvantages 
+|Advantages |Disadvantages
 
 |Much more responsive rendering. The current state of the simulator is represented accurate.|More complex to set up.
 |The renderer can give data back to the simulator.|Can slow down execution as it is run in the same thread as the simulator.

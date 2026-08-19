@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
@@ -183,8 +192,8 @@ TEST(TestUtility, TestGetRandomInteger) {
             randoms.insert(rand);
         }
     }
-    //Yes I know its random, but think about it for a second. We generate 10000 random 32 bit integers (4.294.967.296 different values). 
-    //Having more than 10 clashes would be surprising, having more than 100 definetly means there is something wrong with the random function.
+    //Yes I know its random, but think about it for a second. We generate 10000 random 32 bit integers (4.294.967.296 different values).
+    //Having more than 10 clashes would be surprising, having more than 100 definitely means there is something wrong with the random function.
     ASSERT_TRUE(amountOfClashes < 100);
 }
 
@@ -364,7 +373,7 @@ TEST(TestUtility, TestConfigurableBackOff)
     ASSERT_EQ(result, 0);
 
     //appTimer changed from 500 to 700
-    //Should TRIGGER as the second interval at 600 is hit inbetween
+    //Should TRIGGER as the second interval at 600 is hit in between
     result = Utility::ShouldBackOffIvTrigger(700, 200, 0, backOffIvsDs, sizeof(backOffIvsDs));
     ASSERT_EQ(result, 1);
 
@@ -392,7 +401,7 @@ TEST(TestUtility, TestConfigurableBackOff)
     }
 }
 
-// Sample string (without NULL terminator) for which hash was calcualted using online tools
+// Sample string (without NULL terminator) for which hash was calculated using online tools
 static const char text[6] = {'F', 'r', 'i', 'e', 'n', 'd'}; // Friend
 u8 ecdsa_hash[] =
 {
@@ -427,7 +436,7 @@ u8 ecdsa_private_key[][32] =
     }
 };
 
-u8 ecdsa_public_key[][64] = 
+u8 ecdsa_public_key[][64] =
 {
     {
         0xc6, 0xed, 0x4, 0x94, 0x57, 0x81, 0x7c, 0xe8,
@@ -604,7 +613,7 @@ TEST(TestUtility, TestMultischeduler)
     // Remove two events...
     ms.removeEvent(18);
     ms.removeEvent(21);
-    // ... and make sure they don't occure anymore.
+    // ... and make sure they don't occur anymore.
     set.clear();
     for (u32 i = 0; i < 8; i++)
     {
@@ -630,7 +639,7 @@ TEST(TestUtility, TestMultischeduler)
         ASSERT_THROW(ms.addEvent(10, 17, 0, EventTimeType::RELATIVE), BufferTooSmallException);
     }
     {
-        
+
         MultiScheduler<u8, 3> ms;
         Exceptions::DisableDebugBreakOnException disabler;
         Exceptions::ExceptionDisabler<BufferTooSmallException> btse;

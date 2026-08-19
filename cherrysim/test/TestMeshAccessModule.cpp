@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
@@ -84,7 +93,7 @@ TEST(TestMeshAccessModule, TestReceivingClusterUpdate)
 
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
 
-    tester.sim->nodes[2].uicr.CUSTOMER[9] = 123; // Change default network id of node 3 so it will not connet to the cluster
+    tester.sim->nodes[2].uicr.CUSTOMER[9] = 123; // Change default network id of node 3 so it will not connect to the cluster
 
     tester.Start();
 
@@ -96,7 +105,7 @@ TEST(TestMeshAccessModule, TestReceivingClusterUpdate)
 
     // We should initially get a message that gives us info about the cluster, size 2 and 1 hop to sink
     tester.SimulateUntilMessageReceived(5000, 3, "Received ClusterInfoUpdate over MACONN with size:2 and hops:1");
-    
+
     //Send a reset command to node 1 to generate a change in the cluster
     tester.SendTerminalCommand(1, "reset");
 
@@ -127,7 +136,7 @@ TEST(TestMeshAccessModule, TestAdvertisement) {
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("MAMOD");
     tester.sim->FindNodeById(2)->gs.logger.EnableTag("MAMOD");
 
-    tester.SendTerminalCommand(1, "malog"); // enable advertisment log reading
+    tester.SendTerminalCommand(1, "malog"); // enable advertisement log reading
     tester.SendTerminalCommand(2, "malog");
 
     //Test if we receive the advertisement packets, once with sink 0, once with sink 1.
@@ -148,10 +157,10 @@ TEST(TestMeshAccessModule, TestAdvertisementLegacy)
     tester.Start();
 
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("MAMOD");
-    
-    tester.SendTerminalCommand(1, "malog"); // enable advertisment log reading
+
+    tester.SendTerminalCommand(1, "malog"); // enable advertisement log reading
     tester.SimulateGivenNumberOfSteps(1);
-    
+
     alignas(ble_evt_t) u8 buffer[sizeof(ble_evt_hdr_t) + sizeof(ble_gap_evt_t) - (SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA - SIZEOF_ADV_STRUCTURE_MESH_ACCESS_SERVICE_DATA_LEGACY)];
     CheckedMemset(buffer, 0, sizeof(buffer));
     ble_evt_t& evt = *(ble_evt_t*)buffer;
@@ -216,7 +225,7 @@ TEST(TestMeshAccessModule, TestUnsecureNoneKeyConnection) {
     tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 0"); //0 = FmKeyId::ZERO
 
     tester.SimulateUntilRegexMessageReceived(20 * 1000, 1, "\\{\"nodeId\":1,\"type\":\"ma_conn_state\",\"module\":10,\"requestHandle\":0,\"partnerId\":\\d+,\"state\":4\\}");
-    
+
     //Disable unsecure connections.
     {
         NodeIndexSetter setter(0);
@@ -235,7 +244,7 @@ TEST(TestMeshAccessModule, TestUnsecureNoneKeyConnection) {
         tester.SimulateUntilMessageReceived(10 * 1000, 1, "Received remote mesh data");
         ASSERT_TRUE(tester.sim->CheckExceptionWasThrown(typeid(TimeoutException)));
     }
-    
+
 }
 
 #if defined(PROD_SINK_NRF52)
@@ -387,7 +396,7 @@ TEST(TestMeshAccessModule, TestDiscoveryAlwaysBusy) {
     simConfig.SetToPerfectConditions();
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.sim->nodes[0].uicr.CUSTOMER[9] = 123; // Change default network id of node 0
-    
+
     tester.Start();
 
     tester.SimulateForGivenTime(1000); //Give nodes a bit time to boot up
@@ -434,7 +443,7 @@ TEST(TestMeshAccessModule, TestInfoRetrievalOverOrgaKey) {
     tester.SendTerminalCommand(1, "action 0 enroll basic BBBBB 1 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00 10 0 0");
     tester.SendTerminalCommand(2, "action 0 enroll basic BBBBC 2 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 10 0 0");
     tester.SendTerminalCommand(3, "action 0 enroll basic BBBBD 33000 10000 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 03:00:00:00:03:00:00:00:03:00:00:00:03:00:00:00 10 0 0");
-    
+
     tester.SimulateUntilMessageReceived(100 * 1000, 1, "clusterSize\":2"); //Wait until the nodes have clustered.
 
     //Connect using the orga key.
@@ -446,13 +455,13 @@ TEST(TestMeshAccessModule, TestInfoRetrievalOverOrgaKey) {
             tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"serial_connect_response\",\"module\":10,\"nodeId\":2,\"requestHandle\":13,\"code\":0,\"partnerId\":33011}");
         });
 
-    //Retriev the information using explicit nodeId
+    //Retrieve the information using explicit nodeId
     tester.SendTerminalCommand(1, "action 33011 status get_device_info");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":33011,\"type\":\"device_info\"");
     tester.SendTerminalCommand(1, "action 33011 status get_status");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":33011,\"type\":\"status\"");
 
-    //Retriev the information using broadcast
+    //Retrieve the information using broadcast
     tester.SendTerminalCommand(1, "action 0 status get_device_info");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"nodeId\":33011,\"type\":\"device_info\"");
     tester.SendTerminalCommand(1, "action 0 status get_status");
@@ -520,7 +529,7 @@ TEST(TestMeshAccessModule, TestConnectWithNodeKeyAndQuerySomeBasicInformation)
         tester.sim->FindNodeById(nodeId)->gs.logger.EnableTag("MAMOD");
         tester.sim->FindNodeById(nodeId)->gs.logger.EnableTag("CONN_DATA");
     }
-    // Change default network id of all three nodes so they donot create a mesh
+    // Change default network id of all three nodes so they do not create a mesh
     tester.sim->nodes[0].uicr.CUSTOMER[9] = 123;
     tester.sim->nodes[1].uicr.CUSTOMER[9] = 456;
     tester.sim->nodes[2].uicr.CUSTOMER[9] = 789;
@@ -566,7 +575,7 @@ TEST(TestMeshAccessModule, TestConnectWithNodeKeyAndQuerySomeBasicInformation)
     //with the virtual node id of the partner.
     tester.SendTerminalCommand(1, "action %u status get_device_info", virtualPartnerId);
     tester.SimulateUntilRegexMessageReceived(5000, 1, R"("nodeId":%u,.*"type":"device_info")", virtualPartnerId);
-    // Tell node 3 to connect to node 2 using a mesh access connection with  
+    // Tell node 3 to connect to node 2 using a mesh access connection with
     // FmKeyId::NODE (1) and MeshAccessTunnelType::REMOTE_MESH (1).
     tester.SendTerminalCommand(3, "action this ma connect 00:00:00:02:00:00 1 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 1");
     // Simulate until the mesh access connection has been successfully
@@ -692,7 +701,7 @@ TEST(TestMeshAccessModule, TestConnectWithNodeKeyAndNestedConnection)
        //Request the device info from partner node
        tester.SendTerminalCommand(1, "action 0 status get_device_info");
        //We check if get_status message was received at node 2
-       //The Hex can be interpreted as such 
+       //The Hex can be interpreted as such
        //33->MODULE_TRIGGER_ACTION_MESSAGE
        //01:00->senderNode
        //00:00->receiverNode
@@ -919,7 +928,7 @@ TEST(TestMeshAccessModule, TestActionViaNodeKeyRemoteMeshOnNonPartnerNode)
     tester.SendTerminalCommand(1, "action %u status get_device_info", virtualPartnerId);
     tester.SimulateUntilRegexMessageReceived(5000, 1, R"("nodeId":%u,.*"type":"device_info")", virtualPartnerId);
 
-    {   
+    {
         Exceptions::ExceptionDisabler<TimeoutException> te;
         // Request the device info of the partner node using it's non-virtual
         // node id and verify it is not received.
@@ -948,7 +957,7 @@ TEST(TestMeshAccessModule, TestActionViaNodeKeyRemoteMeshOnNonPartnerNode)
 
     tester.SimulateForGivenTime(10000);
 
-    {   
+    {
         Exceptions::ExceptionDisabler<TimeoutException> te;
         // Request the device info via broadcast and verify no response is
         // received from the non-partner remote node.
@@ -1012,7 +1021,7 @@ TEST(TestMeshAccessModule, TestConnectionAttemptWithAlreadyOpenConnection)
     tester.Start();
 
     tester.SimulateGivenNumberOfSteps(100);
-    
+
     //open Mesh Access connection serial
     tester.SendTerminalCommand(1, "action this ma serial_connect BBBBC 1 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 33012 60");
     //Wait for serial_connection_reponse code 0
@@ -1023,7 +1032,7 @@ TEST(TestMeshAccessModule, TestConnectionAttemptWithAlreadyOpenConnection)
     tester.SimulateUntilMessageReceived(10 * 10000, 1, R"({"type":"serial_connect_response","module":10,"nodeId":1,"requestHandle":0,"code":0,"partnerId":33012})");
     //Wait for disconnect
     tester.SimulateUntilMessageReceived(60*10 * 1000, 1, R"({"nodeId":1,"type":"ma_conn_state","module":10,"requestHandle":0,"partnerId":33012,"state":0})");
-    
+
     //Open Mesh Access connection with BLE address
     tester.SendTerminalCommand(1, "action this ma connect 00:00:00:02:00:00 1 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00");
     //Wait for ma_conn_state response state 4

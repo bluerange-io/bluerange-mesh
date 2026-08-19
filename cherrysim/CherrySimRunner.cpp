@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "CherrySimRunner.h"
@@ -122,7 +131,7 @@ int main(int argc, char** argv) {
                 printf("Could not open sim config %s" EOL, simConfigPath.c_str());
                 SIMEXCEPTIONFORCE(FileException);
             }
-            
+
             nlohmann::json simConfigJson = nlohmann::json::parse(simConfigFile, nullptr, false, true);
             from_json(simConfigJson, simConfig);
 
@@ -192,7 +201,7 @@ int main(int argc, char** argv) {
 
     //@ReplayFeature@ <- Don't change this, it's a label used in the documentation.
     //You may use the following line to enable the replay feature. As this change
-    //should not get commited anyway, you may use absolut or a relative path.
+    //should not get committed anyway, you may use an absolute or a relative path.
     //simConfig.replayPath = "../../cherry-sim.log";
 
     CherrySimRunner* runner = new CherrySimRunner(runnerConfig, simConfig, meshGwCommunication);
@@ -230,7 +239,7 @@ void CherrySimRunner::TerminalReaderMain() {
         catch (const std::ios_base::failure &e)
         {
             running = false;
-            std::cout << "Some communication failure happend which probably means that the meshgw "
+            std::cout << "Some communication failure happened which probably means that the meshgw "
                 "closed the connection. Thus this application is no longer needed." << std::endl;
             std::cout << "The details: " << std::endl;
             std::cout << e.what() << std::endl;
@@ -239,7 +248,7 @@ void CherrySimRunner::TerminalReaderMain() {
 
         if (input == "")
         {
-            //Normally a null char should not be sent. If this happend, the communication probably hung up.
+            //Normally a null char should not be sent. If this happened, the communication probably hung up.
             running = false;
             return;
         }
@@ -262,7 +271,7 @@ NodeEntry* CherrySimRunner::GetSinkNodeForTerminalMainReader()
     }
     else
     {
-        // If simConfig.terminalId <= 0, we return the first actual sink node 
+        // If simConfig.terminalId <= 0, we return the first actual sink node
         for (u32 index = 0; index < sim->GetTotalNodes(); index++)
         {
             auto currentNodeEntry = &(sim->nodes[index]);
@@ -299,13 +308,16 @@ SimConfiguration CherrySimRunner::CreateDefaultSimConfiguration()
 
     simConfig.nodeConfigName.insert({ "prod_sink_nrf52", 1});
     simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 7 });
+#ifdef PROD_BLIND_NRF52832
+    simConfig.nodeConfigName.insert({ "prod_blind_nrf52832", 1 });
+#endif //PROD_BLIND_NRF52832
 
     simConfig.simOtherDelay = 100000; // Enter 1 - 100000 to send sim_other message only each ... simulation steps, this increases the speed significantly
     simConfig.playDelay = 0; //Allows us to view the simulation slower than simulated, is added after each step
 
     simConfig.interruptProbability = UINT32_MAX / 10;
 
-    simConfig.connectionTimeoutProbabilityPerSec = 0;// UINT32_MAX * 0.00001; //Every minute or so: 0.00001, randomly generates timout events for connections and disconnects them;
+    simConfig.connectionTimeoutProbabilityPerSec = 0;// UINT32_MAX * 0.00001; //Every minute or so: 0.00001, randomly generates timeout events for connections and disconnects them;
     simConfig.sdBleGapAdvDataSetFailProbability = 0;// UINT32_MAX * 0.0001; //Simulate fails on setting adv Data in the softdevice
     simConfig.sdBusyProbability = UINT32_MAX / 100;// UINT32_MAX * 0.0001; //Simulates getting back busy errors from the softdevice
     simConfig.simulateAsyncFlash = true; //Simulates asynchronous flash operations, rather then sending the ACK immediately
