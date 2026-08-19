@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
@@ -162,6 +171,77 @@ TEST(TestEnrollmentModule, TestFactoryResetDuringReenrollment) {
     //... and make sure that the data is no longer there (factory reset)
     tester.SendTerminalCommand(1, "getrec 1337");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "Record not found");
+}
+
+TEST(TestEnrollmentModule, TestSkipFactoryResetDuringReenrollment) {
+    CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
+    SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
+    //testerConfig.verbose = true;
+    simConfig.nodeConfigName.insert({ "prod_mesh_nrf52", 2 });
+    simConfig.asyncFlashCommitTimeProbability = UINT32_MAX;
+    simConfig.defaultNetworkId = 0; //unenrolled by default
+    simConfig.SetToPerfectConditions();
+    CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
+    tester.Start();
+
+    //This test makes sure that a node can be enrolled without a factory reset.
+
+    //Store some dummy values
+    tester.SendTerminalCommand(1, "saverec 1337 AA:BB:CC:DD:EE:FF");
+    tester.SendTerminalCommand(2, "saverec 1337 AA:BB:CC:DD:EE:FF");
+    tester.SimulateGivenNumberOfSteps(1);
+
+    //Check that the data is present...
+    tester.SendTerminalCommand(1, "getrec 1337");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "AA:BB:CC:DD:EE:FF");
+    tester.SendTerminalCommand(2, "getrec 1337");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "AA:BB:CC:DD:EE:FF");
+
+    //Enroll node in new mesh but disable factory reset
+    tester.SendTerminalCommand(1, "action this enroll update BBBBB 11 100 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00 10 0 0");
+
+    //Check for successful enrollment
+    std::vector<SimulationMessage> messages = {
+        SimulationMessage(1, "{\"nodeId\":11,\"type\":\"enroll_response_serial\",\"module\":5,\"requestId\":0,\"serialNumber\":\"BBBBB\",\"code\":0}"),
+    };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messages);
+
+    //... and make sure that the data is still there (no factory reset)
+    tester.SendTerminalCommand(1, "getrec 1337");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "AA:BB:CC:DD:EE:FF");
+
+    //-----------------------------------------------------------------------------
+
+    //Enrolling node with same nodeId, different network should work
+    tester.SendTerminalCommand(1, "action this enroll update BBBBB 11 200 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:12 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00 10 0 0");
+    messages = {
+        SimulationMessage(1, "{\"nodeId\":11,\"type\":\"enroll_response_serial\",\"module\":5,\"requestId\":0,\"serialNumber\":\"BBBBB\",\"code\":0}"),
+    };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messages);
+    tester.SendTerminalCommand(1, "getrec 1337");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "AA:BB:CC:DD:EE:FF");
+
+    //-----------------------------------------------------------------------------
+
+    //Enrolling node with different nodeId, different network should fail
+    tester.SendTerminalCommand(1, "action this enroll update BBBBB 12 300 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:13 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 01:00:00:00:01:00:00:00:01:00:00:00:01:00:00:00 10 0 0");
+    messages = {
+        SimulationMessage(1, "{\"nodeId\":11,\"type\":\"enroll_response_serial\",\"module\":5,\"requestId\":0,\"serialNumber\":\"BBBBB\",\"code\":19}"),
+    };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messages);
+    tester.SendTerminalCommand(1, "getrec 1337");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "AA:BB:CC:DD:EE:FF");
+
+    //-----------------------------------------------------------------------------
+
+    //Enrolling the second node should work without factory reset
+    tester.SendTerminalCommand(1, "action this enroll update BBBBC 21 200 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:12 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22 33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33 02:00:00:00:02:00:00:00:02:00:00:00:02:00:00:00 10 0 0");
+    messages = {
+        SimulationMessage(1, "{\"nodeId\":21,\"type\":\"enroll_response_serial\",\"module\":5,\"requestId\":0,\"serialNumber\":\"BBBBC\",\"code\":0}"),
+    };
+    tester.SimulateUntilMessagesReceived(10 * 1000, messages);
+    tester.SendTerminalCommand(2, "getrec 1337");
+    tester.SimulateUntilMessageReceived(10 * 1000, 2, "AA:BB:CC:DD:EE:FF");
 }
 
 TEST(TestEnrollmentModule, TestFactoryResetWithImmortalRecords) {
@@ -536,7 +616,7 @@ TEST(TestEnrollmentModule, TestRequestProposals) {
         SimulationMessage(1, "{\"nodeId\":2,\"type\":\"request_proposals_response\",\"serialNumber\":\"BBBBG\",\"module\":5,\"requestHandle\":0}"),
     };
     tester.SimulateUntilMessagesReceived(10 * 1000, messages);
-    
+
     {
         //Send the previous command again and make sure that no request_proposals_responses about serialIndex 2 are deliverd (because it is too far away)
         Exceptions::ExceptionDisabler<TimeoutException> te;

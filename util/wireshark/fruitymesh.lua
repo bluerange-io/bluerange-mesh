@@ -20,7 +20,7 @@ function print_r(arr, indentLevel)
     for index,value in pairs(arr) do
         if type(value) == "table" then
             str = str..indentStr..index..": \n"..print_r(value, (indentLevel + 1))
-        else 
+        else
             str = str..indentStr..index..": "..value.."\n"
         end
     end
@@ -38,11 +38,11 @@ Proto_Fruitymesh_Asset = Proto("fruitymesh_asset", "FruityMesh Asset")
 -- The dissector function
 function Proto_Fruitymesh.dissector (buffer, pinfo, tree)
 	nordic_dissector:call(buffer, pinfo, tree)
-  
+
   local manufacturer_id = buffer(34, 2)
 
   local service_uuid16 = buffer(34, 2)
-  
+
   -- check if this packet was sent from our manufacturer id
   if manufacturer_id(0, 2):le_uint() == 0x024d then
 
@@ -52,10 +52,10 @@ function Proto_Fruitymesh.dissector (buffer, pinfo, tree)
     if first_byte(0, 1):uint() == 0xf0 then
 
       local manufacturer_data = buffer(36, 25)
-    
+
       -- Add fruitymesh protocol to the tree
       local t = tree:add(Proto_Fruitymesh);
-     
+
       -- Add values
       t:add(packet_identifier, manufacturer_data(0, 1):le_uint())
       t:add(network_id, manufacturer_data(1,2):le_uint())
@@ -65,14 +65,14 @@ function Proto_Fruitymesh.dissector (buffer, pinfo, tree)
       c:add(cluster_id_node_id_part, manufacturer_data(6,2):le_uint())
       c:add(cluster_id_loss_part, manufacturer_data(8,2):le_uint())
       t:add(cluster_size, manufacturer_data(10,2):le_uint())
-      
+
       local freeInOut = manufacturer_data(12,1):uint();
       local freeIn = bit.band(freeInOut, 0x07)
       local freeOut = bit.rshift(freeInOut, 3)
-      
+
       t:add(free_in, freeIn)
       t:add(free_out, freeOut)
-      
+
       t:add(batteryRuntime, manufacturer_data(13,1):le_uint())
       t:add(txPower, manufacturer_data(14,1):le_int())
       t:add(deviceType, manufacturer_data(15,1):le_uint())
@@ -109,7 +109,7 @@ function Proto_Fruitymesh.dissector (buffer, pinfo, tree)
 
   debug("test1")
 
-  
+
   -- check if this packet was sent from our service
   if service_uuid16(0, 2):le_uint() == 0xfe12 then
 
@@ -121,10 +121,10 @@ function Proto_Fruitymesh.dissector (buffer, pinfo, tree)
     if message_type(0, 2):le_uint() == 0x03 then
 
       local ma_data = buffer(40, 12)
-    
+
       -- Add fruitymesh mesh access protocol to the tree
       local t = tree:add(Proto_Fruitymesh_MeshAccess);
-     
+
       -- Add values
       t:add(ma_message_type, ma_data(0, 2):le_uint())
       t:add(ma_network_id, ma_data(2,2):le_uint())
@@ -145,10 +145,10 @@ function Proto_Fruitymesh.dissector (buffer, pinfo, tree)
     if message_type(0, 2):le_uint() == 0x02 then
 
       local asset_data = buffer(40, 15)
-    
+
       -- Add fruitymesh mesh access protocol to the tree
       local t = tree:add(Proto_Fruitymesh_Asset);
-     
+
       -- Add values
       t:add(asset_message_type, asset_data(0, 2):le_uint())
       t:add(asset_timestamp, asset_data(2, 2):le_uint())
@@ -297,4 +297,3 @@ nordic_dissector = wtap_table:get_dissector(55)
 wtap_table:add (55, Proto_Fruitymesh)
 
 debug("FruityMesh Dissector registered")
-

@@ -14,7 +14,8 @@ if(CMAKE_CROSSCOMPILING)
   if(FEATURESET STREQUAL "prod_asset_nrf52" OR
      FEATURESET STREQUAL "dev_all_nrf52" OR
      FEATURESET STREQUAL "prod_asset_ins_nrf52840")
-    file(GLOB   DRIVERS_SRC         ./bme280.cpp
+    file(GLOB   DRIVERS_SRC         ./bma400.cpp
+                                    ./bme280.cpp
                                     ./bmg250.cpp
                                     ./lis2dh12.cpp
                                     ./tlv493d.cpp)

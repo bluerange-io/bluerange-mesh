@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #ifdef SIM_ENABLED
@@ -90,7 +99,7 @@ extern "C"
                 settings.currentState = true;
             }
         }
-    
+
     }
     void nrf_gpio_pin_clear(uint32_t pin_number) {
         START_OF_FUNCTION();
@@ -144,7 +153,7 @@ extern "C"
                 return settings.currentState;
             }
         }
-        
+
         return 0;
     }
     void nrf_gpio_cfg_sense_input(uint32_t pin_number, nrf_gpio_pin_pull_t pull_config, nrf_gpio_pin_sense_t sense_config) {
@@ -247,6 +256,18 @@ extern "C"
     }
 
     void nrf_delay_ms(uint32_t volatile number_of_ms) {}
+
+    uint32_t nrf_serial_read_byte_cherrysim(uint8_t* p_data, size_t* p_read) {
+        const SoftdeviceState& state = cherrySimInstance->currentNode->state;
+        if (state.uartBufferLength != state.uartReadIndex) {
+            p_data[0] = nrf_uart_rxd_get(NRF_UART0);
+            *p_read = 1;
+        }
+        else {
+            *p_read = 0;
+        }
+        return NRF_SUCCESS;
+    }
 
     uint8_t nrf_uart_rxd_get(NRF_UART_Type * p_reg)
     {
@@ -493,7 +514,7 @@ extern "C"
         START_OF_FUNCTION();
         cherrySimInstance->currentNode->state.advertisingActive = false;
 
-        //TODO: could return invalid sate
+        //TODO: could return invalid state
 
         return 0;
     }
@@ -860,7 +881,7 @@ extern "C"
         return (int32_t)ErrorType::SUCCESS;
     }
 
-    
+
     uint32_t bme280_init(int32_t slaveSelectPin)
     {
         START_OF_FUNCTION();
@@ -1035,7 +1056,7 @@ extern "C"
         if (
             memcmp(connection->partner->state.currentLtkForEstablishingSecurity, p_enc_info->ltk, 16) == 0
         ) {
-            //Set our own conneciton to encrypted
+            //Set our own connection to encrypted
             connection->connectionEncrypted = true;
             simBleEvent s1;
             CheckedMemset(&s1, 0, sizeof(s1));
@@ -1216,7 +1237,7 @@ extern "C"
             cpurp.minConnInterval = p_conn_params->min_conn_interval;
             cpurp.maxConnInterval = p_conn_params->max_conn_interval;
             cpurp.slaveLatency = p_conn_params->slave_latency;
-            cpurp.connSupTimeout = p_conn_params->conn_sup_timeout; 
+            cpurp.connSupTimeout = p_conn_params->conn_sup_timeout;
             // Compute the timeout and set the pending flag.
             centralConnection->connParamUpdateRequestTimeoutDs =
                 centralConnection->owningNode->gs.appTimerDs + 20;
@@ -1286,7 +1307,7 @@ extern "C"
 
     uint32_t sd_ble_gap_addr_get(ble_gap_addr_t* p_addr)
     {
-        START_OF_FUNCTION();        
+        START_OF_FUNCTION();
         FruityHal::BleGapAddr addr = cherrySimInstance->currentNode->address;
         CheckedMemcpy(p_addr->addr, addr.addr.data(), BLE_GAP_ADDR_LEN);
         p_addr->addr_type = (u8)addr.addr_type;
@@ -1326,7 +1347,7 @@ extern "C"
         START_OF_FUNCTION();
         //TODO: Should have a table with maybe 128 UUIDs (probably depending on the sd ble enable params)
         //TODO: Should add UUID to an array of uuids and should write a new id starting at BLE_UUID_TYPE_VENDOR_BEGIN into type
-        
+
 
         return 0;
     }
@@ -1374,10 +1395,10 @@ extern "C"
         // TODO: Not all information is stored for now
         // Generate handle value pseudorandomly
         p_handles->value_handle = p_tempService->uuid.uuid + p_tempService->charCount * 2 + 1;
-        p_tempService->charateristics[p_tempService->charCount].handle = p_handles->value_handle;
-        p_tempService->charateristics[p_tempService->charCount].uuid = *p_attr_char_value->p_uuid;
-        // FIXME: Enabling of notifications not yet implemented and ignroed in simulator
-        p_tempService->charateristics[p_tempService->charCount].cccd_handle = p_handles->value_handle + 1;
+        p_tempService->characteristics[p_tempService->charCount].handle = p_handles->value_handle;
+        p_tempService->characteristics[p_tempService->charCount].uuid = *p_attr_char_value->p_uuid;
+        // FIXME: Enabling of notifications not yet implemented and ignored in simulator
+        p_tempService->characteristics[p_tempService->charCount].cccd_handle = p_handles->value_handle + 1;
 
         p_tempService->charCount++;
 
@@ -1452,7 +1473,7 @@ extern "C"
         return NRF_SUCCESS;
     }
 
-    uint32_t sd_ble_gap_data_length_update(uint16_t connHandle, ble_gap_data_length_params_t const* p_dl_params, ble_gap_data_length_limitation_t* p_dl_limitation) 
+    uint32_t sd_ble_gap_data_length_update(uint16_t connHandle, ble_gap_data_length_params_t const* p_dl_params, ble_gap_data_length_limitation_t* p_dl_limitation)
     {
         START_OF_FUNCTION();
 
@@ -1466,7 +1487,7 @@ extern "C"
 
     }
 
-    uint32_t sd_ble_gatts_exchange_mtu_reply(uint16_t connHandle, uint16_t serverRxMtu) 
+    uint32_t sd_ble_gatts_exchange_mtu_reply(uint16_t connHandle, uint16_t serverRxMtu)
     {
         START_OF_FUNCTION();
 
@@ -1497,7 +1518,7 @@ extern "C"
         s1.bleEvent.evt.gattc_evt.gatt_status = BLE_GATT_STATUS_SUCCESS;
         s1.bleEvent.evt.gattc_evt.params.exchange_mtu_rsp.server_rx_mtu = serverRxMtu;
 
-  
+
         connection->partner->eventQueue.push_back(s1);
 
 
@@ -1552,7 +1573,7 @@ extern "C"
         NodeEntry* partnerNode = connection->partner;
         SoftdeviceConnection* partnerConnection = connection->partnerConnection;
 
-        //Should not happen, sim connection is always terminated at both ends simultaniously
+        //Should not happen, sim connection is always terminated at both ends simultaneously
         if (partnerConnection == nullptr) {
             SIMEXCEPTION(IllegalStateException);
         }
@@ -1587,7 +1608,7 @@ extern "C"
         buffer->params.writeParams = *p_write_params;
         buffer->params.writeParams.p_value = buffer->data; //Reassign data pointer to our buffer
         buffer->isHvx = false;
-        
+
         //Record statistics for every packet queued in the SoftDevice
         cherrySimInstance->AddMessageToStats(cherrySimInstance->currentNode->routedPackets, buffer->data, buffer->params.writeParams.len);
 
@@ -1612,7 +1633,7 @@ extern "C"
             p[i] = 0xFFFFFFFF;
         }
 
-        //If the stack is initialized, it will generate an event for the operation, if not, it will only return syncronously
+        //If the stack is initialized, it will generate an event for the operation, if not, it will only return synchronously
         if (cherrySimInstance->currentNode->state.initialized) {
             if (cherrySimInstance->simConfig.simulateAsyncFlash) {
                 cherrySimInstance->currentNode->state.numWaitingFlashOperations++;
@@ -1661,7 +1682,7 @@ extern "C"
             p_dst[i] &= p_src[i];
         }
 
-        //If the stack is initialized, it will generate an event for the operation, if not, it will only return syncronously
+        //If the stack is initialized, it will generate an event for the operation, if not, it will only return synchronously
         if (cherrySimInstance->currentNode->state.initialized) {
             if (cherrySimInstance->simConfig.simulateAsyncFlash) {
                 cherrySimInstance->currentNode->state.numWaitingFlashOperations++;
@@ -1727,7 +1748,7 @@ extern "C"
     uint32_t sd_ble_cfg_set(uint32_t type, ble_cfg_t* cfg, uint32_t)
     {
         START_OF_FUNCTION();
-        
+
         //Apply the settings
         if (type == BLE_CONN_CFG_GAP)
         {
@@ -1786,7 +1807,7 @@ extern "C"
 
         // TODO: The actual SoftDevice checks that the event actually fits
         //       into the buffer. If you compile this check in, the simulator
-        //       fails. This is becaue (in the simulator) we use the evt_len
+        //       fails. This is because (in the simulator) we use the evt_len
         //       field of the header to transport the global event id.
         //       Tracked in BR-1360.
         //if (*p_len < simBleEvent.simBleEvent.header.evt_len)
@@ -1851,6 +1872,14 @@ extern "C"
     uint32_t sd_app_evt_wait()
     {
         START_OF_FUNCTION();
+
+        return 0;
+    }
+
+    uint32_t sd_nvic_SetPendingIRQ(IRQn_Type IRQn)
+    {
+        START_OF_FUNCTION();
+
 
         return 0;
     }
@@ -1993,7 +2022,7 @@ extern "C"
         NodeEntry* partnerNode = connection->partner;
         SoftdeviceConnection*  partnerConnection = connection->partnerConnection;
 
-        //Should not happen, sim connection is always terminated at both ends simultaniously
+        //Should not happen, sim connection is always terminated at both ends simultaneously
         if (partnerConnection == nullptr) {
             SIMEXCEPTION(IllegalStateException);
         }

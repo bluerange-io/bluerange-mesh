@@ -11,11 +11,11 @@ This is a list and description of the most important folders in the repository.
 ├── linker/                   linker scripts
 ├── sdk/                      modified nRF SDKs
 ├── softdevice/               softdevice hex files
-├── src/                      
+├── src/
 |   ├── base/                 wrappers for BLE stack functionality
 |   ├── c/                    drivers and other c code
 |   ├── mesh/                 mesh functionality
-|   |   └── FruityMesh.cpp    bootup and main functionality
+|   |   └── FruityMesh.cpp    boot-up and main functionality
 |   ├── modules/              functionality wrapped in modules
 |   ├── utility/              helper classes
 |   ├── Boardconfig.cpp       runtime pin and board configuration
@@ -141,7 +141,7 @@ We'd love to develop the BlueRange Mesh protocol as an interoperable protocol th
 When adding documentation for a module, make sure to check the xref:ModuleDocumentationTemplate.adoc[Module Documentation Template].
 
 == About Contributions
-The implementation is written in C++. This makes it easy to implement new functionality and separate it from other parts in a clean way. Refactoring or refinement tips are welcome. If you contribute, please comment your code thorougly and keep the implementation as readable as possible. This will help other contributors understand the code quickly.
+The implementation is written in C++. This makes it easy to implement new functionality and separate it from other parts in a clean way. Refactoring or refinement tips are welcome. If you contribute, please comment your code thoroughly and keep the implementation as readable as possible. This will help other contributors understand the code quickly.
 If you have documentation to add, please post a pull request as well.
 
 == ErrorType/ErrorTypeUnchecked and SIMEXCEPTION
@@ -174,12 +174,12 @@ and Base64 strings of the form
 
 ```
 I0kJ8N/+AvBd+yJJCfDa/gLwWPsgSQnw1f4C8FP7H0kJ8ND+AvBO+yEcCfDL/gLwSfsbSQnwxv4M8Mz8A3wAKwPRAvA/+xdJOOAM8MP8A3wBKyvRAvA2+xNJL+CAEAAQkDQAIA1VAgAAtAEAgJaYAIBpZ/8QJwAA8Nj//8inAgA=
-``` 
+```
 .
 
 The advantage of the hex string is that its more human friendly. When debugging, it is almost immediately clear which the fifth byte is and (roughly) which value it has. The same does not apply for the base 64 string as one char can be affected by two bytes at once. The advantage of the base64 string however is that it contains much more information and is thus able to transfer more byte per char. This can help if the uart communication is a bottleneck. One char in a hex string transfers 1/3 byte, one char in a base64 string transfers 3/4 byte.
 
-Most terminal arguments that accept one of the two also accept the other. Determining which one it is, is done automatically. This is possible because ":" is not a valid Base64 character. If the third char is a ":" the firmware can thus safely assume that the string is a hex string, if it is not, it can do the same for a base64 string as the separating ":" chars are mandatory for the hex strings. One may assume that an edge case could be if only a single byte is sent. This is not the case however, because there is no valid 2 char Base64 string. All Base64 Strings must have a length that is a multiple of 4. So, the firmware can equally safely assume a hex string if only two chars are transmitted. 
+Most terminal arguments that accept one of the two also accept the other. Determining which one it is, is done automatically. This is possible because ":" is not a valid Base64 character. If the third char is a ":" the firmware can thus safely assume that the string is a hex string, if it is not, it can do the same for a base64 string as the separating ":" chars are mandatory for the hex strings. One may assume that an edge case could be if only a single byte is sent. This is not the case however, because there is no valid 2 char Base64 string. All Base64 Strings must have a length that is a multiple of 4. So, the firmware can equally safely assume a hex string if only two chars are transmitted.
 
 == Following a RawData message from Bluerange Gateway to Smartphone
 In this chapter we follow a big message through the mesh, discussing all the splits that happen along the way. In this explanation we will start with a large file and first look where it is split, but without explanation for these splits yet. Once we have reached the most low level split, we will go back up again, explaining the reasons behind every single split. Let's assume our mesh looks like this:
@@ -197,13 +197,13 @@ Once the message is completely reassembled by N2, it interprets the message and 
 In case you are wondering why we reassemble each message on every hop instead of sending through the splits, waiting with the reassembly until the splits reach A2: The main reason is that a mesh typically does not build up as a straight line but instead as a tree. This means that multiple data flows can come from multiple directions, possibly intertwining two different messages in the reassembly buffer of the target device. To fix this, the target device would require multiple reassembly buffers, potentially one for each member of the mesh (+ more for other devices that connect to the mesh). If it had less, then the target device would somehow have to tell the sender that it currently is unable to receive the message. This is most likely not possible in all cases so the message would have to be dropped if no reassembly buffer is available. As it is unrealistic to have such a large amount of reassembly buffers, it is much more reliable to reassemble on every hop.
 
 == Monkey Test
-To test for unknown and strange behaviour of the firmware on non typical input, a monkey test was introduced (see TestMonkey.cpp). The monkey test executes random commands. These commands are either completely valid or sometimes corrupt. If some exception occures, the monkey test fails and tries the simplify the list of executed commands that produced the exception so that a human reader can analyze it more easily. To do so, all the commands are executed again, removing one from the list. If the exception still occures, then this command was not vital for reproducing the error. This is repeated until no command can be removed anymore. The final list of commands that created the exception is then printed out before failure.
+To test for unknown and strange behaviour of the firmware on non typical input, a monkey test was introduced (see TestMonkey.cpp). The monkey test executes random commands. These commands are either completely valid or sometimes corrupt. If some exception occurs, the monkey test fails and tries the simplify the list of executed commands that produced the exception so that a human reader can analyze it more easily. To do so, all the commands are executed again, removing one from the list. If the exception still occurs, then this command was not vital for reproducing the error. This is repeated until no command can be removed anymore. The final list of commands that created the exception is then printed out before failure.
 
 Once you have the list of commands, copy it into the prepared test "TestMonkey.ReproductionTest" that is prepared for your convenience.
 
 NOTE: Make sure that the correct seed is used!
 
-The list of commands that the Monkey Test can execute can be found in the templates vector inside TestMonkey.cpp. The list follows a special syntax, customly developed:
+The list of commands that the Monkey Test can execute can be found in the templates vector inside TestMonkey.cpp. The list follows a special syntax, custom developed:
 
 . `[[[a-b]]]` replaces this token with any number between a and b (both inclusive)
 . `{{{a|b|...|z}}}` replaces this token with a random entry in the list, e.g. a, b, or z.
@@ -217,7 +217,7 @@ if(handle) //...
 ```
 
 == Stack overflow detection
-In case of a hard fault, the firmware tries to determine if the underlying reason for that hard fault was because of a stack overflow. If this is the case, the reboot reason is changed to `STACKOVERFLOW`. To do so, a stack guard was introduced. This stack guard is at the end of the stack and a well known pattern of data is written to it on boot. If the hard fault ocurres, the firmware checks if the well known pattern of data is still present. At the time of writing the size of the stack guard is 128 byte (see: STACK_WATCHER_LENGTH * sizeof(u32)).
+In case of a hard fault, the firmware tries to determine if the underlying reason for that hard fault was because of a stack overflow. If this is the case, the reboot reason is changed to `STACKOVERFLOW`. To do so, a stack guard was introduced. This stack guard is at the end of the stack and a well known pattern of data is written to it on boot. If the hard fault occurs, the firmware checks if the well known pattern of data is still present. At the time of writing the size of the stack guard is 128 byte (see: STACK_WATCHER_LENGTH * sizeof(u32)).
 
 NOTE: The check will fail to determine a stack overflow if the stack frames are too big and nothing was written to the stack guard as a consequence. In practice this can happen if a function is called that has a lot of unused stack data in it, followed by either a change to some stack data or a call to any function that puts another stackframe on the stack.
 
@@ -232,10 +232,10 @@ BlueRange Mesh keeps track of how much stack RAM was used. To do so, at boot tim
 There are two reboot reasons that indicate that we don't know the exact reason of the reboot: `UNKNOWN` and `UNKNOWN_BUT_BOOTED`. The first one indicates that we were unable to read the reboot reason from the RAM retain struct. This most likely indicates that some kind of power shortage happened. The second reason indicates that although we don't know why the node is rebooting, we know that it was successfully booted previously within the current power cycle, so know that power was not lost. One possible explanation for this is when we flash a node. This resets the node, without removing power from it. If this was not the cause, then this reboot reason indicates something more sinister. Something rebooted the node without even calling any fault handler or the fault handler was for some reason unable to correctly store the RebootReason.
 
 == MultiScheduler
-Using the MultiScheduler class allows you to manage multiple arbitrary, repeating events in both relative and absolute time. Simply instantiate an object with the type of the events and how many events should be handles `MultiScheduler<u32, 10> scheduler;`, add events `scheduler.addEvent(1, 10, 0, EventTimeType::RELATIVE);`, advance time `scheduler.advanceTime(5);`, check if events are ready `scheduler.isEventReady()`, and retriev them `u32 event = scheduler.getAndReenter();`.
+Using the MultiScheduler class allows you to manage multiple arbitrary, repeating events in both relative and absolute time. Simply instantiate an object with the type of the events and how many events should be handles `MultiScheduler<u32, 10> scheduler;`, add events `scheduler.addEvent(1, 10, 0, EventTimeType::RELATIVE);`, advance time `scheduler.advanceTime(5);`, check if events are ready `scheduler.isEventReady()`, and retrieve them `u32 event = scheduler.getAndReenter();`.
 
 == BitMask
-The `BitMask` template offers a simple way to work with Bit Masks of arbitrary length. Instantiate the Bit Mask with the desired length `BitMask<10> bitMask;`, set some values `bitMask.set(2, true);`, and retriev values `bitMask.get(7);`.
+The `BitMask` template offers a simple way to work with Bit Masks of arbitrary length. Instantiate the Bit Mask with the desired length `BitMask<10> bitMask;`, set some values `bitMask.set(2, true);`, and retrieve values `bitMask.get(7);`.
 
 == HAL memory
 TODO: Move to memory management
@@ -260,10 +260,10 @@ There are a few exceptions to this:
 
 The simulator additionally allows the usage of container classes like std::vector and std::map, as heap allocations are no problem in the simulator.
 
-== Licence
+== license
 BlueRange Mesh is published under the GPLv3 version, which is available in the repository.
 
 == Watchdog timeout handler
-For better analysis, the watchdog timeout handler was implemented. This interrupt handler triggers shortly before a watchdog reboot. The result is reported upon next boot by using the custom error type `WATCHDOG_REBOOT`. This error log entry is reported after the reboot reason WATCHDOG and contains a bitmask with extra information. This represents a number of collected runtime information and will be gradually extended. It is helpful to analyse why a device was rebooted by the watchdog.
+For better analysis, the watchdog timeout handler was implemented. This interrupt handler triggers shortly before a watchdog reboot. The result is reported upon next boot by using the custom error type `WATCHDOG_REBOOT`. This error log entry is reported after the reboot reason WATCHDOG and contains a bitmask with extra information. This represents a number of collected runtime information and will be gradually extended. It is helpful to analyze why a device was rebooted by the watchdog.
 
 To decode the watchdog bitmask extra easily, use `watchdogExtraDecoder.py`, found under `util/watchdog`. It can be used directly from the command line. Just pass the extra info as an argument, e.g. `python util/watchdog/watchdogExtraDecoder.py 123`. It can also be run by using an online IDE e.g. https://replit.com/languages/python3 when assigning the extra value directly to the watchdogFlags variable in the beginning of the script.

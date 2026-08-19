@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -96,7 +105,7 @@ void StatusReporterModule::ConfigurationLoadedHandler(u8* migratableConfig, u16 
 
 void StatusReporterModule::TimerEventHandler(u16 passedTimeDs)
 {
-    //Peridoic Message sending does not make sense for Assets as they are not connected most of the time.
+    //Periodic Message sending does not make sense for Assets as they are not connected most of the time.
     //So instead, the asset fully relies on manual querying these messages. Other than "not making sense"
     //this can lead to issues on the Gateway if it receives a messages through a MA-Connection that has a
     //virtual partnerId as the gateway gets confused by the unknown nodeId.
@@ -119,7 +128,7 @@ void StatusReporterModule::TimerEventHandler(u16 passedTimeDs)
             SendNearbyNodes(NODE_ID_BROADCAST, 0, MessageType::MODULE_ACTION_RESPONSE);
         }
     }
-    //BatteryMeasurement (measure short after reset and then priodically)
+    //BatteryMeasurement (measure short after reset and then periodically)
     if( (GS->appTimerDs < SEC_TO_DS(40) && Boardconfig->batteryAdcInputPin != -1 )
         || SHOULD_IV_TRIGGER(GS->appTimerDs, passedTimeDs, batteryMeasurementIntervalDs)){
         BatteryVoltageADC();
@@ -139,7 +148,7 @@ void StatusReporterModule::TimerEventHandler(u16 passedTimeDs)
     if (IsPeriodicTimeSendActive())
     {
         timeSinceLastPeriodicTimeSendDs += passedTimeDs;
-        if(IsPeriodicTimeSendActive() && 
+        if(IsPeriodicTimeSendActive() &&
             (timeSinceLastPeriodicTimeSendDs >= TIME_BETWEEN_PERIODIC_TIME_SENDS_DS
             || (configuration.timeReportingIntervalDs > 0 && timeSinceLastPeriodicTimeSendDs >= configuration.timeReportingIntervalDs))
             ){
@@ -387,7 +396,7 @@ void StatusReporterModule::SendErrors(NodeId toNode, u8 requestHandle)
 {
     auto &logger = Logger::GetInstance();
 
-    //If our time is synced we report the absolute uptime, otherwhise the relative uptime is all we know
+    //If our time is synced we report the absolute uptime, otherwise the relative uptime is all we know
     if(GS->timeManager.IsTimeSynced()){
         //Reports the absolute UTC boot timestamp
         u32 startTimeUtcSec = GS->timeManager.GetUtcTime() - DS_TO_SEC(GS->appTimerDs);
@@ -1114,9 +1123,9 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
             {
                 const SetTimeReportingMessageResponse* data = (const SetTimeReportingMessageResponse*)packet->data;
                 logjson(
-                    "STATUSMOD", "{\"type\":\"time_reporting_state\",\"intervalDs\":%u,\"nodeId\":%u,\"module\":%u,\"code\":%u}" SEP, 
-                    data->timeReportingIntervalDs, 
-                    packet->header.sender, 
+                    "STATUSMOD", "{\"type\":\"time_reporting_state\",\"intervalDs\":%u,\"nodeId\":%u,\"module\":%u,\"code\":%u}" SEP,
+                    data->timeReportingIntervalDs,
+                    packet->header.sender,
                     (u8)ModuleId::STATUS_REPORTER_MODULE,
                     (u8)data->recordStorageResultCode
                 );
@@ -1126,8 +1135,8 @@ void StatusReporterModule::MeshMessageReceivedHandler(BaseConnection* connection
             {
                 const GatewayStatusMessage* data = (const GatewayStatusMessage*)packet->data;
                 logjson(
-                    "STATUSMOD", "{\"type\":\"gw_status\",\"nodeId\":%u,\"module\":%u,\"status\":%u}" SEP, 
-                    packet->header.sender, 
+                    "STATUSMOD", "{\"type\":\"gw_status\",\"nodeId\":%u,\"module\":%u,\"status\":%u}" SEP,
+                    packet->header.sender,
                     (u8)ModuleId::STATUS_REPORTER_MODULE,
                     (u8)data->gatewayStatus
                 );
@@ -1215,7 +1224,7 @@ void StatusReporterModule::InitBatteryVoltageADC() {
     FRUITYMESH_ERROR_CHECK((u32)error);
 
     u32 pin = Boardconfig->batteryAdcInputPin;
-    if(Boardconfig->batteryAdcInputPin == -2) 
+    if(Boardconfig->batteryAdcInputPin == -2)
     {
         // Battery input
         pin = 0xFF;
@@ -1224,21 +1233,21 @@ void StatusReporterModule::InitBatteryVoltageADC() {
 #if FEATURE_AVAILABLE(ADC_INTERNAL_MEASUREMENT)
     if(Boardconfig->batteryAdcInputPin == -2) {
         err = FruityHal::AdcConfigureChannel(pin,
-                                       FruityHal::AdcReference::ADC_REFERENCE_0_6V, 
-                                       FruityHal::AdcResoultion::ADC_10_BIT, 
+                                       FruityHal::AdcReference::ADC_REFERENCE_0_6V,
+                                       FruityHal::AdcResolution::ADC_10_BIT,
                                        FruityHal::AdcGain::ADC_GAIN_1_6);
     }
     else
     {
         err = FruityHal::AdcConfigureChannel(pin,
-                                       FruityHal::AdcReference::ADC_REFERENCE_1_4_POWER_SUPPLY, 
-                                       FruityHal::AdcResoultion::ADC_10_BIT, 
+                                       FruityHal::AdcReference::ADC_REFERENCE_1_4_POWER_SUPPLY,
+                                       FruityHal::AdcResolution::ADC_10_BIT,
                                        FruityHal::AdcGain::ADC_GAIN_1_5);
     }
 #else
-    err = FruityHal::AdcConfigureChannel(pin, 
-                                   FruityHal::AdcReference::ADC_REFERENCE_1_2V, 
-                                   FruityHal::AdcResoultion::ADC_8_BIT, 
+    err = FruityHal::AdcConfigureChannel(pin,
+                                   FruityHal::AdcReference::ADC_REFERENCE_1_2V,
+                                   FruityHal::AdcResolution::ADC_8_BIT,
                                    FruityHal::AdcGain::ADC_GAIN_1);
 #endif // FEATURE_AVAILABLE(ADC_INTERNAL_MEASUREMENT)
     if (err != ErrorType::SUCCESS)
@@ -1259,7 +1268,7 @@ void StatusReporterModule::BatteryVoltageADC(){
         FruityHal::GpioConfigureOutput(Boardconfig->batteryMeasurementEnablePin);
         FruityHal::GpioPinSet(Boardconfig->batteryMeasurementEnablePin);
     }
-    
+
     ErrorType err = FruityHal::AdcSample(*m_buffer, 1);
     FRUITYMESH_ERROR_CHECK((u32)err);
 
@@ -1433,7 +1442,7 @@ CapabilityEntry StatusReporterModule::GetCapability(u32 index, bool firstCall)
             softDevicePatch
         );
         return retVal;
-            
+
     }
 
     // Our custom Bootloader called FruityLoader internally
@@ -1487,14 +1496,14 @@ void StatusReporterModule::MapRegister(u16 component, u16 reg, SupervisedValue& 
         }
 
         //Configuration Registers
-        if (reg == REGISTER_REFERENCE_MILLI_VOLT_AT_0_PERCENT) out.SetReadable(referenceMilliVolt0Percent); //TODO: Make writable once persistance is available
-        if (reg == REGISTER_REFERENCE_MILLI_VOLT_AT_100_PERCENT) out.SetReadable(referenceMilliVolt100Percent); //TODO: Make writable once persistance is available
+        MAP_CONFIGURATION_REGISTER(referenceMilliVolt0Percent);
+        MAP_CONFIGURATION_REGISTER(referenceMilliVolt100Percent);
 
         //Data Registers
         if (reg == REGISTER_DEVICE_UPTIME) out.SetReadable(GS->appTimerDs);
         if (reg == REGISTER_ABSOLUTE_UTC_TIME) out.SetReadable(GS->timeManager.GetUtcTime());
         if (reg == REGISTER_ABSOLUTE_LOCAL_TIME) out.SetReadable(GS->timeManager.GetLocalTime());
-        
+
         if (reg == REGISTER_CLUSTER_SIZE) out.SetReadable(GS->node.GetClusterSize());
         if (reg == REGISTER_NUM_MESH_CONNECTIONS) {
             BaseConnections conns = GS->cm.GetConnectionsOfType(ConnectionType::FRUITYMESH, ConnectionDirection::INVALID);

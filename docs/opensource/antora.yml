@@ -1,7 +1,7 @@
 # This is the OPEN-SOURCE part of BlueRange Mesh
-name: fruitymesh
-title: 'BlueRange Firmware'
+name: bluerange-mesh-community
+title: 'BlueRange Mesh'
 version: master
-# start_page: fruitymesh:ROOT:index.adoc
+# start_page: bluerange-mesh-community:ROOT:index.adoc
 nav:
   - modules/ROOT/nav.adoc

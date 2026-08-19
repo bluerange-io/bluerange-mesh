@@ -42,7 +42,7 @@ where "code" can have the following values:
 |Code|Name|Description
 
 |0|SUCCESS|The node successfully advertises the data and stored it in its persistent storage.
-|1|FULL|Too many adveritings have been stored in the node. To clear the advertisings you can reenroll the node.
+|1|FULL|Too many advertising's have been stored in the node. To clear the advertising's you can re-enroll the node.
 |2|RECORD_STORAGE_ERROR|The node was unable to persist the adv data. It is advertising it only until the next reboot.
 |===
 

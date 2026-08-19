@@ -114,7 +114,7 @@ WARNING: This only analyses the stack size used by isolated functions. This mean
 
 === Generate Stack Usage
 
-To use this, activate the `-fstack-usage` GCC flag in CMake. This can be done e.g. in a featureset `.cmake` file by adding the line 
+To use this, activate the `-fstack-usage` GCC flag in CMake. This can be done e.g. in a featureset `.cmake` file by adding the line
 ```cmake
 set(GCC_FSTACK_USAGE_FLAGS "-fstack-usage")
 add_definitions(${GCC_FSTACK_USAGE_FLAGS})
@@ -130,12 +130,12 @@ This flag conflicts with `-flto`, which stands for link time optimization. Thus,
 +  # target_compile_options_multi("${NATIVE_TARGETS}" "-flto")
 ----
 
-The `.su` files are generated alongide object files in the `src` directory of the build.
+The `.su` files are generated alongside object files in the `src` directory of the build.
 
 === Merge .su Files
 NOTE: The following script is only available for PowerShell.
 
-Place the script `merge_and_sort_stack_usage.ps1` inside the desired folder and execute it. For a featureset built with FruityDeploy, this might be `_build\vscode\CMakeFiles\prod_sink_nrf52.dir`
+Place the script `merge_and_sort_stack_usage.ps1` inside the desired folder and execute it. For a featureset built with BlueRange OEM Kit, this might be `_build\vscode\CMakeFiles\prod_sink_nrf52.dir`
 
 The result might look like this:
 ```shell

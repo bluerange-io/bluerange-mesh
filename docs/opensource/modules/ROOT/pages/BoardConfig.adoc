@@ -30,7 +30,7 @@ void setCustomPinset_4(CustomPins* pinConfig){
 
 * Struct `CustomPins` consists of pinset identifier and the other struct e.g. `Lis2dh12Pins` inherits from this struct.
 
-* Finally, function  'setCustomPins_4' could be passed to `getCustomPinset` function pointer e.g. 
+* Finally, function  'setCustomPins_4' could be passed to `getCustomPinset` function pointer e.g.
 [source,C++]
 ----
 GS->boardconf.getCustomPinset= &setCustomPinset_4;

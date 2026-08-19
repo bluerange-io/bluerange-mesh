@@ -14,7 +14,7 @@ This section shows an exemplary encryption handshake, which should make it easie
 TIP: You can reproduce and debug all these steps by setting up the xref:CherrySim.adoc[CherrySim] simulator and by executing the test `TestMeshAccessModule.TestConnectWithNetworkKey`. There are a number of commented out log statements in `MeshAccessConnection.cpp` which you can uncomment when executing this test. You can then easily step through the whole handshake by setting breakpoints at `StartHandshake`, `HandshakeANonce`, `OnANonceReceived`, `OnSNonceReceived`, `EncryptPacket` and `DecryptPacket`.
 
 === Encrypt Custom Start
-Once a Central is connected to a Peripheral, the MeshAccess Service was discoverd and Notifications were set up properly, the Central is expected to start the Encryption Handshake by sending the ENCRYPT_CUSTOM_START packet. This packet is also sent in cleartext.
+Once a Central is connected to a Peripheral, the MeshAccess Service was discovered and Notifications were set up properly, the Central is expected to start the Encryption Handshake by sending the ENCRYPT_CUSTOM_START packet. This packet is also sent in cleartext.
 
 TIP: The packet structure is also documented as part of the xref:MeshAccessModule.adoc[MeshAccessModule].
 
@@ -26,7 +26,7 @@ This packet contains:
 * the keyId, which specifies if e.g. NODE_KEY, NETWORK_KEY, etc... should be used for the connection. Different keys have different permissions and only certain messages can be sent depending on the key.
 * the tunnelType which specifies if this is a peer to peer connection or if one side of the connection has other nodes attached that will take part in the communication.
 
-The following is an examplary ENCRYPT_CUSTOM_START packet sent from a Central to a Periphal which is sent in cleartext:
+The following is an exemplary ENCRYPT_CUSTOM_START packet sent from a Central to a Peripheral which is sent in cleartext:
 
 `19:01:00:00:00:01:02:00:00:00:00`
 

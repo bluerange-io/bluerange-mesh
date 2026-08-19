@@ -2,7 +2,7 @@
 
 == Purpose
 
-The _EnrollmentModule_ has _ModuleId_ 5. New nodes are normally flashed without a `networkId` assigned (set to 0). This means they will not connect to a mesh as long as they are not enrolled. The term enrolled is used in synonym with provisioned or commisioned.
+The _EnrollmentModule_ has _ModuleId_ 5. New nodes are normally flashed without a `networkId` assigned (set to 0). This means they will not connect to a mesh as long as they are not enrolled. The term enrolled is used in synonym with provisioned or commissioned.
 
 In order to assign a node to a mesh, the user has to give a `networkId`, the `networkKey` and a unique `nodeId` for this mesh. This can be done by a MeshGateway or a dedicated enrollment app. The enrollment packet should be sent to the broadcast address 0 and must contain to xref:Specification.adoc#SerialNumbers[serial number] of the node to be enrolled.
 
@@ -125,6 +125,23 @@ The nodes then scan for one minute if they see any of the specified xref:Specifi
 }
 ----
 
+=== Updating an enrollment and skipping factory reset
+By default, the persistent xref:RecordStorage.adoc[RecordStorage] is cleared after enrollment. However, there are cases where configuration should be kept across enrollments. For example, NetworkKey may be rotated by re-enrolling all nodes of a mesh into a new network, therefore mitigating the risk of a compromised NetworkKey.
+
+NOTE: This can be used both when the Node is enrolled or unenrolled. If the Node is enrolled, the `newNodeId` must be the same as before, or the `EnrollmentResponseCode::INCORRECT_NODE_ID` is returned.
+
+Skipping factory reset is achieved via the `skipFactoryReset` flag in the module message. The terminal command has exactly the same syntax as `enroll basic`, behaves the same except for the record storage and can be used in the terminal in the following way:
+
+[source, C++]
+----
+//Enroll node BBBBB into networkId 5 with nodeId 2 and skip factory reset.
+//Note that this only works if BBBBB is unenrolled or if enrolled and the nodeId is the same as before.
+//The enroll update command has exactly the same syntax as enroll basic and beha
+action 0 enroll update BBBBB 2 5 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11 22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22
+33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33
+73:63:92:12:63:94:30:44:63:67:23:11:90:11:42:52 10 0
+----
+
 == Messages
 === Message Types
 [source, C++]
@@ -152,10 +169,11 @@ actionType: SET_ENROLLMENT
 |2|newNodeId|The new node id that should be assigned to this node (Set to 0 to leave unchanged)
 |2|newNetworkId|The new network id to be assigned (Set to 0 to leave unchanged)
 |16|newNetworkKey|The network encryption key to be used (Set to 000....000 to leave unchanged)
-|16|newUserBaseKey|The new user base key to derrive all user keys from (Set to 000....000 to leave unchanged)
+|16|newUserBaseKey|The new user base key to derive all user keys from (Set to 000....000 to leave unchanged)
 |16|newOrganizationKey|A key used for an organization, e.g. used by assets because these must work organization wide.
 |16|nodeKey (optional)|If the enrollment should be done over the mesh, the nodeKey must be given so that another node can connect securely to the to-be-enrolled node
-|7 bit|timeoutSec (optional)|Enrollment over the mesh uses a timeout how long a node will try to look for the to-be-enrolled node. A good default value is 10 seconds which will result in a maximum of 14 seconds time for an enrollment. (Sending 0 will use the default value)
+|6 bit|timeoutSec (optional)|Enrollment over the mesh uses a timeout how long a node will try to look for the to-be-enrolled node. A good default value is 10 seconds which will result in a maximum of 14 seconds time for an enrollment. (Sending 0 will use the default value). Maximum 63s
+|1 bit|skipFactoryReset (optional)|Set to 1 to only save the enrollment without resetting persistent settings like module configs. Useful for changing the NetworkKey without resetting the device.
 |1 bit|enrollOnlyIfUnenrolled (optional)|If set to 0, the enrollment will be done even if the other node is already enrolled. If set to 1, the node will generate an error response for the enrollment (ENROLL_RESPONSE with error code .
 |===
 
@@ -169,6 +187,8 @@ This acknowledges a received enrollment.
 0x03 = ENROLL_RESPONSE_NO_SPACE //(fatal error)
 0x10 = ENROLL_RESPONSE_ALREADY_ENROLLED_WITH_DIFFERENT_DATA //(can use enrollOnlyIfUnenrolled = 0 to force the enrollment)
 0x11 = ENROLL_RESPONSE_PREENROLLMENT_FAILED //Another module that needs to enroll itself first, failed to enroll in the required time
+0x12 = ENROLL_RESPONSE_SIG_CONFIGURATION_INVALID //SIG Mesh configuration invalid
+0x13 = ENROLL_RESPONSE_INCORRECT_NODE_ID //nodeId out of the range for BLENODE or ASSET device type, see Specification for values, or the nodeId
 ----
 
 actionType: `ENROLLMENT_RESPONSE`

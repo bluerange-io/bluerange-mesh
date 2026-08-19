@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -40,11 +49,11 @@ This is a list of known issues that need to be covered.
 
 - The NRF Gatt Queue Size should be determined and set to a tested value
 - Test if Hardfault handler works as expected with stacked registers
-- Search for all occurences of "FIXME SDK17"
+- Search for all occurrences of "FIXME SDK17"
 - Go through migration documents for SDK 16 and SDK 17 once more
 - Go through migration documents of SoftDevice v6 and v7
 - Do throughput, latency, performance and stability testing
-- Integrate into automated inegration test and longevity installation
+- Integrate into automated integration test and longevity installation
 */
 
 #include <array>
@@ -59,17 +68,11 @@ This is a list of known issues that need to be covered.
 #include "Utility.h"
 #ifdef SIM_ENABLED
 #include <CherrySim.h>
+#include <SimulatedTimers.h>
+#include <map>
 #endif
-#ifndef GITHUB_RELEASE
-#if IS_ACTIVE(CLC_MODULE)
-#include <ClcComm.h>
-#endif
-#if IS_ACTIVE(VS_MODULE)
-#include <VsComm.h>
-#endif
-#if IS_ACTIVE(WM_MODULE)
-#include <WmComm.h>
-#endif
+#if IS_ACTIVE(GENERAL_COMM)
+#include <GeneralComm.h>
 #endif //GITHUB_RELEASE
 
 extern "C" {
@@ -77,7 +80,17 @@ extern "C" {
 #include <ble_db_discovery.h>
 #ifndef SIM_ENABLED
 #include <app_util_platform.h>
+
+//TODO: Remove include workaround because of legacy UART library issue
+//Our issue is that types are e.g. defined as nrf_uart_hwfc_t OR nrf_uarte_hwfc_t depending on what is active
+//Not sure if there is a combined type we can use. But how does including nrf_serial help with that?
+//Issue happens with SDK15, does not happen with SDK14, so e.g. for featureset prod_bp_nrf52840
+#if IS_ACTIVE(GENERAL_COMM)
+#include <nrf_serial.h>
+#else
 #include <nrf_uart.h>
+#endif
+
 #include <nrf_mbr.h>
 #include <nrf_drv_gpiote.h>
 #include <nrf_wdt.h>
@@ -130,14 +143,14 @@ extern "C" {
 #define SD_EVT_IRQ_PRIORITY     7 //IRQ prio of our whole main application event fetching, timer handling, etc,....
 #ifdef NRF52_SERIES
 
-//The priority of the SoftDevice event reporting is changed to the lowest priority (7) because we need two interrupt 
-//levels that are called at a higher priority than our main context logic. On the other hand, we cannot use priority 
-//3 as this would interrupt low priority SoftDevice logic too often. Therefore all handlers should be set to interrupt 
-//level 7 so that they cannot occur at the same time and cause race conditions. This also applies to the timer interrupt. 
-//High priority handling can use IRQ priority 6 or in some special cases even priority 3 but must make sure that it will 
+//The priority of the SoftDevice event reporting is changed to the lowest priority (7) because we need two interrupt
+//levels that are called at a higher priority than our main context logic. On the other hand, we cannot use priority
+//3 as this would interrupt low priority SoftDevice logic too often. Therefore all handlers should be set to interrupt
+//level 7 so that they cannot occur at the same time and cause race conditions. This also applies to the timer interrupt.
+//High priority handling can use IRQ priority 6 or in some special cases even priority 3 but must make sure that it will
 //not cause race conditions with application code.
 // In short, we are using:
-//   - main context: long running processing (seldomly used)
+//   - main context: long running processing (seldom used)
 //   - application interrupt level (7): most application logic, timer event handler, event processing, ....
 //   - interrupt level 6: used for e.g. UART and other peripherals that write into buffers and do not interfere with the application logic
 //   - interrupt level 3: very important high priority interrupts
@@ -216,7 +229,7 @@ constexpr int BOOTLOADER_DFU_START2 = (0xB2);      /**< Value to set in GPREGRET
 
 //Forward declarations
 static ErrorType nrfErrToGeneric(u32 code);
-static FruityHal::BleGattEror nrfErrToGenericGatt(u32 code);
+static FruityHal::BleGattError nrfErrToGenericGatt(u32 code);
 static const char* getBleEventNameString(u16 bleEventId);
 u32 ClearGeneralPurposeRegister(u32 gpregId, u32 mask);
 u32 WriteGeneralPurposeRegister(u32 gpregId, u32 mask);
@@ -239,25 +252,25 @@ static u32 getramend(void)
     return 0x20000000 + ram_total_size;
 }
 
-static inline FruityHal::BleGattEror nrfErrToGenericGatt(u32 code)
+static inline FruityHal::BleGattError nrfErrToGenericGatt(u32 code)
 {
     if (code == BLE_GATT_STATUS_SUCCESS)
     {
-        return FruityHal::BleGattEror::SUCCESS;
+        return FruityHal::BleGattError::SUCCESS;
     }
     else if ((code == BLE_GATT_STATUS_ATTERR_INVALID) || (code == BLE_GATT_STATUS_ATTERR_INVALID_HANDLE))
     {
-        return FruityHal::BleGattEror::UNKNOWN;
+        return FruityHal::BleGattError::UNKNOWN;
     }
     else
     {
-        return FruityHal::BleGattEror(code - 0x0100);
+        return FruityHal::BleGattError(code - 0x0100);
     }
 }
 
 static inline ErrorType nrfErrToGeneric(u32 code)
 {
-    //right now generic error has the same meaning and numering
+    //right now generic error has the same meaning and numbering
     //FIXME: This is not true
     if (code <= NRF_ERROR_RESOURCES) return (ErrorType)code;
     else{
@@ -339,7 +352,7 @@ ErrorType FruityHal::BleStackInit()
         const u32 softDeviceMinor = ((softDeviceVersion % 1000000) - softDevicePatch) / 1000;
         const u32 softDeviceMajor = softDeviceVersion / 1000000;
 
-        logt("NODE", "Init Softdevice version %u.%u.%u, Boardid %d", 
+        logt("NODE", "Init Softdevice version %u.%u.%u, Boardid %d",
             softDeviceMajor,
             softDeviceMinor,
             softDevicePatch,
@@ -501,7 +514,7 @@ void FruityHal::BleStackDeinit()
         The SoftDevice Handler library is used to fetch events interrupt based.
         The SoftDevice Interrupt is defined as SD_EVT_IRQn, which is SWI2_IRQn and is set to IRQ_PRIO 7.
         All high level functionality must be called from IRQ PRIO 7 so that it cannot interrupt the other handlers.
-        Events such as Timer, UART RX, SPI RX, etc,... can be handeled on IRQ PRIO 6 but should only perform very
+        Events such as Timer, UART RX, SPI RX, etc,... can be handled on IRQ PRIO 6 but should only perform very
         little processing (mostly buffering). They can then set the SWI2 pending using the SetPendingEventIRQ method.
         IRQ PRIO 6 tasks should not modify any data except their own variables.
         The main() thread can be used as well but care must be taken as this will be interrupted by IRQ PRIO 7.
@@ -557,6 +570,10 @@ void ProcessAppEvents()
     //Check if there is input on uart
     GS->terminal.CheckAndProcessLine();
 
+#if IS_ACTIVE(GENERAL_COMM)
+    if(GS->generalComm != nullptr) ((GeneralComm*)GS->generalComm)->ProcessPacket();
+#endif
+
 #if IS_ACTIVE(BUTTONS)
     //Handle waiting button event
     if(GS->button1HoldTimeDs != 0){
@@ -568,14 +585,24 @@ void ProcessAppEvents()
 #endif
 
     //Handle Timer event that was waiting
-    if (GS->passsedTimeSinceLastTimerHandlerDs > 0)
+    if (GS->passedTimeSinceLastTimerHandlerDs > 0)
     {
-        u16 timerDs = GS->passsedTimeSinceLastTimerHandlerDs;
+        u16 timerDs = GS->passedTimeSinceLastTimerHandlerDs;
 
         //Dispatch timer to all other modules
         DispatchTimerEvents(timerDs);
 
-        GS->passsedTimeSinceLastTimerHandlerDs -= timerDs;
+        GS->passedTimeSinceLastTimerHandlerDs -= timerDs;
+
+#if IS_ACTIVE(VIRTUAL_COM_PORT)
+        // Read bytes from USB driver in case of missing RX events
+        {
+            u32 bytesLeft = virtualComProcessReceivedBytesIfAvailable();
+            if (bytesLeft > 0) {
+                GS->logger.LogCustomCount(CustomErrorTypes::COUNT_USB_RX_MANUALLY_PROCESSED_BYTES);
+            }
+        }
+    #endif //IS_ACTIVE(VIRTUAL_COM_PORT)
     }
 }
 
@@ -687,7 +714,7 @@ void FruityHal::EventLooper()
 
     // If the Virtual COM Port events are not processed in the main context, some unknown issue arises when FruityMesh
     // is running with the Nordic Secure Bootloader (e.g. the intermediate bootloader of the Laird BL654 dongles).
-    // The issue manifests in Windows not being able to recognize the USB device and leads to FruityDeploy failing
+    // The issue manifests in Windows not being able to recognize the USB device and leads to BlueRange OEM Kit failing
     // during flashing of the USB sticks. The issue only impacts the flashing process on Windows, not actual
     // functionality of the Mesh Bridge. See BR-2164.
     FruityHal::VirtualComEventLoop();
@@ -725,7 +752,7 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
     else {
         logt("EVENTS", "BLE EVENT %s (%d)", getBleEventNameString(eventId), eventId);
     }
-    
+
     //Calls the Db Discovery modules event handler
 #if defined(NRF52_SERIES)
     NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
@@ -754,7 +781,7 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
                     (err != NRF_ERROR_RESOURCES)) FRUITYMESH_ERROR_CHECK(err);
             }
 #endif
-            GS->advertismentReceivedTimestamp = GetRtcMs();
+            GS->advertisementReceivedTimestamp = GetRtcMs();
             GapAdvertisementReportEvent are(&bleEvent);
             DispatchEvent(are);
         }
@@ -802,7 +829,7 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
             DispatchEvent(cpure);
         }
         break;
-#else 
+#else
     case BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST:
         {
             //We reject the request to update the connection parameters
@@ -894,8 +921,8 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
 
 
 
-        /* Extremly platform dependent or yet unsupported events below! 
-           Because they are so platform dependent, 
+        /* Extremely platform dependent or yet unsupported events below!
+           Because they are so platform dependent,
            there is no handler for them and we have
            to deal with them here. */
 
@@ -936,7 +963,7 @@ void FruityHal::DispatchBleEvents(void const * eventVirtualPointer)
             sd_ble_gap_auth_key_reply(bleEvent.evt.gap_evt.conn_handle, BLE_GAP_AUTH_KEY_TYPE_NONE, NULL);
         }
         break;
-    
+
     case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
         {
             //We are currently not supporting this
@@ -1249,7 +1276,7 @@ u16 FruityHal::GattcEvent::GetConnectionHandle() const
     return ((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gattc_evt.conn_handle;
 }
 
-FruityHal::BleGattEror FruityHal::GattcEvent::GetGattStatus() const
+FruityHal::BleGattError FruityHal::GattcEvent::GetGattStatus() const
 {
     return nrfErrToGenericGatt(((NrfHalMemory*)GS->halMemory)->currentEvent->evt.gattc_evt.gatt_status);
 }
@@ -1425,7 +1452,7 @@ ErrorType FruityHal::BleGapScanStart(BleGapScanParams const &scanParams)
     scan_params.timeout = scanParams.timeout;
     scan_params.window = scanParams.window;
 
-#if (SDK >= 15)    
+#if (SDK >= 15)
     scan_params.report_incomplete_evts = 0;
     scan_params.filter_policy = BLE_GAP_SCAN_FP_ACCEPT_ALL;
     scan_params.extended = 0;
@@ -1507,11 +1534,19 @@ ErrorType FruityHal::BleGapAdvStart(u8 * advHandle, BleGapAdvParams const &advPa
               &adv_params
             );
     logt("FH", "Adv data set (%u) typ %u, iv %u, mask %u, handle %u", err, adv_params.properties.type, (u32)adv_params.interval, adv_params.channel_mask[4], *advHandle);
-    if (err != NRF_SUCCESS) return nrfErrToGeneric(err);
+    if (err != NRF_SUCCESS) {
+        //BR-15738: find out why the softdevice is not able to restart adv
+        logjson("ERROR", "{\"type\":\"log\",\"message\": \"Error sd_ble_gap_adv_set_configure %u, typ %u, iv %u, mask %u, handle %u\"}", err, adv_params.properties.type, (u32)adv_params.interval, adv_params.channel_mask[4], *advHandle);
+        return nrfErrToGeneric(err);
+    }
 
     err = sd_ble_gap_adv_start(*advHandle, BLE_CONN_CFG_TAG_FM);
     logt("FH", "Adv start (%u)", err);
-#else      
+    if (err != NRF_SUCCESS) {
+        //BR-15738: find out why the softdevice is not able to restart adv
+        logjson("ERROR", "{\"type\":\"log\",\"message\": \"Error sd_ble_gap_adv_start %u, typ %u, iv %u, mask %u, handle %u\"}", err, adv_params.properties.type, (u32)adv_params.interval, adv_params.channel_mask[4], *advHandle);
+    }
+#else
     ble_gap_adv_params_t adv_params;
     adv_params.channel_mask.ch_37_off = advParams.channelMask.ch37Off;
     adv_params.channel_mask.ch_38_off = advParams.channelMask.ch38Off;
@@ -1523,6 +1558,10 @@ ErrorType FruityHal::BleGapAdvStart(u8 * advHandle, BleGapAdvParams const &advPa
     adv_params.type = AdvertisingTypeToNrf(advParams.type);
     err = sd_ble_gap_adv_start(&adv_params, BLE_CONN_CFG_TAG_FM);
     logt("FH", "Adv start (%u) typ %u, iv %u, mask %u", err, adv_params.type, adv_params.interval, *((u8*)&adv_params.channel_mask));
+    if (err != NRF_SUCCESS) {
+        //BR-15738: find out why the softdevice is not able to restart adv
+        logjson("ERROR", "{\"type\":\"log\",\"message\": \"Error sd_ble_gap_adv_start %u, typ %u, iv %u, mask %u\"}", err, adv_params.type, adv_params.interval, *((u8*)&adv_params.channel_mask));
+    }
 #endif // (SDK >= 15)
     return nrfErrToGeneric(err);
 }
@@ -1585,7 +1624,7 @@ ErrorType FruityHal::BleGapConnect(FruityHal::BleGapAddr const &peerAddress, Ble
     p_scan_params.timeout = scanParams.timeout;
     p_scan_params.window = scanParams.window;
 
-#if (SDK >= 15)    
+#if (SDK >= 15)
     p_scan_params.report_incomplete_evts = 0;
     p_scan_params.filter_policy = BLE_GAP_SCAN_FP_ACCEPT_ALL;
     p_scan_params.extended = 0;
@@ -1758,8 +1797,8 @@ static void DatabaseDiscoveryHandler(ble_db_discovery_evt_t * p_evt)
     bleDbEvent.type = p_evt->evt_type == BLE_DB_DISCOVERY_COMPLETE ? FruityHal::BleGattDBDiscoveryEventType::COMPLETE : FruityHal::BleGattDBDiscoveryEventType::SERVICE_NOT_FOUND;
     bleDbEvent.serviceUUID.uuid = p_evt->params.discovered_db.srv_uuid.uuid;
     bleDbEvent.serviceUUID.type = p_evt->params.discovered_db.srv_uuid.type;
-    bleDbEvent.charateristicsCount = p_evt->params.discovered_db.char_count;
-    for (u8 i = 0; i < bleDbEvent.charateristicsCount; i++)
+    bleDbEvent.characteristicsCount = p_evt->params.discovered_db.char_count;
+    for (u8 i = 0; i < bleDbEvent.characteristicsCount; i++)
     {
       bleDbEvent.dbChar[i].handleValue = p_evt->params.discovered_db.charateristics[i].characteristic.handle_value;
       bleDbEvent.dbChar[i].charUUID.uuid = p_evt->params.discovered_db.charateristics[i].characteristic.uuid.uuid;
@@ -1771,7 +1810,7 @@ static void DatabaseDiscoveryHandler(ble_db_discovery_evt_t * p_evt)
 }
 #endif //SIM_ENABLED
 
-ErrorType FruityHal::DiscovereServiceInit(DBDiscoveryHandler dbEventHandler)
+ErrorType FruityHal::DiscoveryServiceInit(DBDiscoveryHandler dbEventHandler)
 {
 #ifndef SIM_ENABLED
     #if SDK < 17
@@ -1832,7 +1871,7 @@ bool FruityHal::DiscoveryIsInProgress()
 }
 
 ErrorType FruityHal::BleGattSendNotification(u16 connHandle, BleGattWriteParams & params)
-{    
+{
     ble_gatts_hvx_params_t notificationParams;
     CheckedMemset(&notificationParams, 0, sizeof(ble_gatts_hvx_params_t));
     notificationParams.handle = params.handle;
@@ -1843,7 +1882,7 @@ ErrorType FruityHal::BleGattSendNotification(u16 connHandle, BleGattWriteParams 
     if (params.type == BleGattWriteType::NOTIFICATION) notificationParams.type = BLE_GATT_HVX_NOTIFICATION;
     else if (params.type == BleGattWriteType::INDICATION) notificationParams.type = BLE_GATT_HVX_INDICATION;
     else return ErrorType::INVALID_PARAM;
-    
+
     ErrorType retVal = nrfErrToGeneric(sd_ble_gatts_hvx(connHandle, &notificationParams));
 
     logt("FH", "BleGattSendNotification(%u)", (u32)retVal);
@@ -1864,7 +1903,7 @@ ErrorType FruityHal::BleGattWrite(u16 connHandle, BleGattWriteParams const & par
     else if (params.type == BleGattWriteType::WRITE_CMD) writeParameters.write_op = BLE_GATT_OP_WRITE_CMD;
     else return ErrorType::INVALID_PARAM;
 
-    return nrfErrToGeneric(sd_ble_gattc_write(connHandle, &writeParameters));    
+    return nrfErrToGeneric(sd_ble_gattc_write(connHandle, &writeParameters));
 }
 
 ErrorType FruityHal::BleUuidVsAdd(u8 const * p_vs_uuid, u8 * p_uuid_type)
@@ -1888,7 +1927,7 @@ ErrorType FruityHal::BleGattCharAdd(u16 service_handle, BleGattCharMd const & ch
 {
     ble_gatts_char_md_t sd_char_md;
     ble_gatts_attr_t sd_attr_char_value;
-    
+
     static_assert(SDK <= 17, "Make sure that mapping is correct with newer SDK version");
 
     CheckedMemcpy(&sd_char_md, &char_md, sizeof(ble_gatts_char_md_t));
@@ -1947,10 +1986,10 @@ ErrorType FruityHal::RadioSetTxPower(i8 tx_power, TxRole role, u16 handle)
           && tx_power != 0
           && tx_power != 4
 #if defined(NRF52840) || SIM_ENABLED
-          && tx_power != 5    
-          && tx_power != 6    
-          && tx_power != 7    
-          && tx_power != 8    
+          && tx_power != 5
+          && tx_power != 6
+          && tx_power != 7
+          && tx_power != 8
 #endif
           ) {
         SIMEXCEPTION(IllegalArgumentException);
@@ -2082,7 +2121,7 @@ extern "C"{
 
     void app_timer_handler(void * p_context){
         UNUSED_PARAMETER(p_context);
-        
+
         // This line must be kept to provide recalculations of global time
         FruityHal::GetRtcMs();
 
@@ -2093,7 +2132,7 @@ extern "C"{
         GS->tickRemainderTimesTen += ((u32)MAIN_TIMER_TICK) * 10;
         u32 passedDs = GS->tickRemainderTimesTen / TICKS_PER_DS_TIMES_TEN;
         GS->tickRemainderTimesTen -= passedDs * TICKS_PER_DS_TIMES_TEN;
-        GS->passsedTimeSinceLastTimerHandlerDs += passedDs;
+        GS->passedTimeSinceLastTimerHandlerDs += passedDs;
 
         FruityHal::SetPendingEventIRQ();
 
@@ -2128,48 +2167,46 @@ ErrorType FruityHal::StartTimers()
     return nrfErrToGeneric(err);
 }
 
-ErrorType FruityHal::CreateTimer(FruityHal::swTimer &timer, bool repeated, TimerHandler handler)
-{    
-    SIMEXCEPTION(NotImplementedException);
-#ifndef SIM_ENABLED
 
+ErrorType FruityHal::CreateTimer(FruityHal::swTimer& timer, bool repeated, TimerHandler handler)
+{
+#ifdef SIM_ENABLED
+    return CherrySimTimers_CreateTimer(timer, repeated, handler);
+#else
+    app_timer_mode_t mode = repeated ? APP_TIMER_MODE_REPEATED : APP_TIMER_MODE_SINGLE_SHOT;
     NrfHalMemory* halMemory = (NrfHalMemory*)GS->halMemory;
-    timer = (u32 *)&halMemory->swTimers[halMemory->timersCreated];
+    timer = (u32*)&halMemory->swTimers[halMemory->timersCreated];
     CheckedMemset(timer, 0x00, sizeof(app_timer_t));
 
-    app_timer_mode_t mode = repeated ? APP_TIMER_MODE_REPEATED : APP_TIMER_MODE_SINGLE_SHOT;
-    
-    u32 err = app_timer_create((app_timer_id_t *)(&timer), mode, handler);
+    u32 err = app_timer_create((app_timer_id_t*)(&timer), mode, handler);
     if (err != NRF_SUCCESS) return nrfErrToGeneric(err);
 
     halMemory->timersCreated++;
-#endif
     return ErrorType::SUCCESS;
+#endif
 }
 
 ErrorType FruityHal::StartTimer(FruityHal::swTimer timer, u32 timeoutMs)
 {
-    SIMEXCEPTION(NotImplementedException);
-#ifndef SIM_ENABLED
     if (timer == nullptr) return ErrorType::INVALID_PARAM;
 
+#ifdef SIM_ENABLED
+    return CherrySimTimers_StartTimer(timer, timeoutMs);
+#else
     u32 err = app_timer_start((app_timer_id_t)timer, APP_TIMER_TICKS(timeoutMs), NULL);
     return nrfErrToGeneric(err);
-#else
-    return ErrorType::SUCCESS;
 #endif
 }
 
 ErrorType FruityHal::StopTimer(FruityHal::swTimer timer)
 {
-    SIMEXCEPTION(NotImplementedException);
-#ifndef SIM_ENABLED
+#ifdef SIM_ENABLED
+    return CherrySimTimers_StopTimer(timer);
+#else
     if (timer == nullptr) return ErrorType::INVALID_PARAM;
 
     u32 err = app_timer_stop((app_timer_id_t)timer);
     return nrfErrToGeneric(err);
-#else
-    return ErrorType::SUCCESS;
 #endif
 }
 
@@ -2190,7 +2227,7 @@ u32 FruityHal::GetRtcMs()
         {
             ((NrfHalMemory*)GS->halMemory)->time_ms += 2000;
             ((NrfHalMemory*)GS->halMemory)->overflowPending = false;
-        } 
+        }
     }
     return ((rtcTicks * 1000) / APP_TIMER_CLOCK_FREQ) + ((NrfHalMemory*)GS->halMemory)->time_ms;
 }
@@ -2306,7 +2343,7 @@ void FruityHal::SystemReset()
 
 void FruityHal::SystemReset(bool softdeviceEnabled)
 {
-    if (softdeviceEnabled) 
+    if (softdeviceEnabled)
         sd_nvic_SystemReset();
     else
         NVIC_SystemReset();
@@ -2407,7 +2444,7 @@ extern "C"{
                 if (handle)
                 {
                     ConnectionState cs = handle.GetConnectionState();
-                    if (cs == ConnectionState::HANDSHAKE_DONE) 
+                    if (cs == ConnectionState::HANDSHAKE_DONE)
                     {
                         if (handle.GetConnection()->connectionType == ConnectionType::FRUITYMESH)
                         {
@@ -2439,7 +2476,7 @@ extern "C"{
 
 //Starts the Watchdog with a static interval so that changing a config can do no harm
 void FruityHal::StartWatchdog(bool safeBoot)
-{    
+{
     if (GET_WATCHDOG_TIMEOUT() == 0) return;
 
     //Configure Watchdog to default: Run while CPU sleeps
@@ -2526,7 +2563,7 @@ ErrorType FruityHal::FlashPageErase(u32 page)
 ErrorType FruityHal::FlashWrite(u32 * p_addr, u32 * p_data, u32 len)
 {
     ErrorType err =  nrfErrToGeneric(sd_flash_write((uint32_t *)p_addr, (uint32_t *)p_data, len));
-    
+
     //If the SoftDevice is not enabled, the sd_flash_page_erase will synchronously finish and will not generate an event
     u8 softdeviceEnabled = 0;
     u32 err2 = sd_softdevice_is_enabled(&softdeviceEnabled);
@@ -2572,7 +2609,7 @@ void FruityHal::NvicClearPendingIRQ(u32 irqType)
 
 #ifndef SIM_ENABLED
 extern "C"{
-//Eliminate Exception overhead when using pure virutal functions
+//Eliminate Exception overhead when using pure virtual functions
 //http://elegantinvention.com/blog/information/smaller-binary-size-with-c-on-baremetal-g/
     void __cxa_pure_virtual() {
         // Must never be called.
@@ -2790,12 +2827,12 @@ static nrf_adc_config_input_t NrfPinToAnalogInput(u32 pin)
 #endif
 #endif //SIM_ENABLED
 
-ErrorType FruityHal::AdcConfigureChannel(u32 pin, AdcReference reference, AdcResoultion resolution, AdcGain gain)
+ErrorType FruityHal::AdcConfigureChannel(u32 pin, AdcReference reference, AdcResolution resolution, AdcGain gain)
 {
 #ifndef SIM_ENABLED
 
 #if defined(NRF52_SERIES)
-    nrf_saadc_resolution_t nrfResolution = resolution == FruityHal::AdcResoultion::ADC_8_BIT ? NRF_SAADC_RESOLUTION_8BIT : NRF_SAADC_RESOLUTION_10BIT;
+    nrf_saadc_resolution_t nrfResolution = resolution == FruityHal::AdcResolution::ADC_8_BIT ? NRF_SAADC_RESOLUTION_8BIT : NRF_SAADC_RESOLUTION_10BIT;
     nrf_saadc_gain_t nrfGain = NRF_SAADC_GAIN1_6;
     nrf_saadc_reference_t nrfReference = NRF_SAADC_REFERENCE_VDD4;
     switch (reference)
@@ -2864,7 +2901,7 @@ ErrorType FruityHal::AdcSample(i16 & buffer, u8 len)
     if (err == NRF_SUCCESS)
     {
         err = nrf_drv_saadc_sample(); // Non-blocking triggering of SAADC Sampling
-    } 
+    }
 #endif
 #endif //SIM_ENABLED
     return nrfErrToGeneric(err);
@@ -2903,7 +2940,7 @@ u8 FruityHal::ConvertPortToGpio(u8 port, u8 pin)
 #if defined(NRF52_SERIES) || defined(SIM_ENABLED)
     return NRF_GPIO_PIN_MAP(port, pin);
 #else
-    static_assert(false,"Convertion is not yet defined for this board");
+    static_assert(false,"Conversion is not yet defined for this board");
 #endif
 }
 
@@ -2937,7 +2974,7 @@ u32 FruityHal::GetMasterBootRecordSize()
 #endif
 }
 
-u32 FruityHal::GetLicenseSectionAdress(u32 sdBaseAddr)
+u32 FruityHal::GetLicenseSectionAddress(u32 sdBaseAddr)
 {
     u32 appBaseAddr = sdBaseAddr + GetSoftDeviceSize(sdBaseAddr) - 0x1000;
     u32 licenseSectionAddr = appBaseAddr + LICENSE_APP_IV_OFFSET;
@@ -3132,7 +3169,7 @@ const char* getBleEventNameString(u16 bleEventId)
 
 ErrorType FruityHal::GetDeviceConfiguration(DeviceConfiguration & config)
 {
-    //We are using a magic number to determine if the UICR data present was put there by fruitydeploy
+    //We are using a magic number to determine if the UICR data present was put there by BlueRange OEM Kit
     if (NRF_UICR->CUSTOMER[0] == UICR_SETTINGS_MAGIC_WORD) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-qual"
@@ -3306,7 +3343,7 @@ FruityHal::UartBaudRate FruityHal::UartBaudRateFromNumber(u32 number) {
 FruityHal::UartParity FruityHal::UartParityFromNumber(u8 number) {
     switch (number) {
         case 0: return FruityHal::UartParity::NONE;
-        case 1: 
+        case 1:
             if (GET_CHIPSET() == Chipset::CHIP_NRF52833 && SDK >= 17) {
                 return FruityHal::UartParity::ODD;
             }
@@ -3381,14 +3418,14 @@ nrf_uart_parity_t UartParityToNrf(FruityHal::UartParity parity)
 
 /*
 * FH_NRF_ENABLE_EASYDMA_TERMINAL: FruityHalNrf EasyDMA support for UART
-* 
+*
 * We implemented the possibility to use UART together with EasyDMA to consume less CPU time when
 * logging data through our UART terminal. This has only been tested with our Terminal with TerminalMode::JSON
-* 
+*
 * The implementation might be usable for other use-cases but further testing is required.
 *
 * KNOWN ISSUES:
-*    - When receiving lots of data during power-on, the controller migh reboot with an app error
+*    - When receiving lots of data during power-on, the controller might reboot with an app error
 *      because functionality will be called before the softdevice was properly enabled.
 *    - When receiving many lines in a very short time, data might get lost.
 *    - Implementation was only tested with nRf52832
@@ -3414,7 +3451,7 @@ include(config/featuresets/CMakeFragments/AddNrfEasyDmaUart.cmake)
 #define FH_EASYDMA_UART_SERIAL_BUFF_RX_SIZE                 1
 
 //This is the FIFO for sending data, it should be big enough to be able to fit all the data that is being
-//logged for one received packet. In the best case, it can fit all data being logged for all packets of a 
+//logged for one received packet. In the best case, it can fit all data being logged for all packets of a
 //connectionEvent. Only a short memcopy will have to be done by the CPU and the event handling will only be blocked
 //for a very short time. Once the TX FIFO is full, any call to logging will block until the data was written out.
 #define FH_EASYDMA_UART_SERIAL_FIFO_TX_SIZE                 2048
@@ -3463,7 +3500,7 @@ static void nrf_serial_event_handler(struct nrf_serial_s const * p_serial, nrf_s
         } break;
 
         //Called as soon as the FIFO is full
-        //TODO: Currently not properly handeled but only an issue if a lot of data is received at a time
+        //TODO: Currently not properly handled but only an issue if a lot of data is received at a time
         case NRF_SERIAL_EVENT_FIFO_ERR: {
             //SEGGER_RTT_WriteString(0, "NRF_SERIAL_EVENT_FIFO_ERR" EOL);
             halMemory->nrfSerialErrorDetected = true;
@@ -3522,7 +3559,7 @@ void FruityHal::EnableUart(bool promptAndEchoMode)
         halMemory->nrfSerialDataAvailable = false;
         halMemory->nrfSerialErrorDetected = false;
     }
-#else
+#elif IS_ACTIVE(UART)
 
     //Configure pins
     nrf_gpio_pin_set(Boardconfig->uartTXPin);
@@ -3590,7 +3627,7 @@ void FruityHal::DisableUart()
         halMemory->nrfSerialDataAvailable = false;
         halMemory->nrfSerialErrorDetected = false;
     }
-#else 
+#elif IS_ACTIVE(UART)
 
     logt("FH", "Disable UART");
 
@@ -3642,7 +3679,7 @@ void FruityHal::UartHandleError(u32 error)
     DisableUart();
     EnableUart(false); //TODO: We should store the promptAndEchoMode state once we use easydma uart for PROMPT mode as well
 
-#else
+#elif IS_ACTIVE(UART)
 
     //Errorsource is given, but has to be cleared to be handled
     NRF_UART0->ERRORSRC = error;
@@ -3655,8 +3692,10 @@ bool FruityHal::UartCheckInputAvailable()
 {
 #if FH_NRF_ENABLE_EASYDMA_TERMINAL
     return ((NrfHalMemory*)GS->halMemory)->nrfSerialDataAvailable;
-#else
+#elif IS_ACTIVE(UART)
     return NRF_UART0->EVENTS_RXDRDY == 1;
+#else
+    return false;
 #endif
 }
 
@@ -3670,13 +3709,13 @@ FruityHal::UartReadCharBlockingResult FruityHal::UartReadCharBlocking()
         nrf_serial_read(&serial_uart, &retVal.c, 1, &bytesRead, 0);
         if(((NrfHalMemory*)GS->halMemory)->nrfSerialErrorDetected) retVal.didError = true;
     }
-#else
+#elif IS_ACTIVE(UART)
     while (NRF_UART0->EVENTS_RXDRDY != 1) {
         if (NRF_UART0->EVENTS_ERROR) {
             FruityHal::UartHandleError(NRF_UART0->ERRORSRC);
             retVal.didError = true;
         }
-        // Info: No timeout neede here, as we are waiting for user input
+        // Info: No timeout needed here, as we are waiting for user input
     }
     NRF_UART0->EVENTS_RXDRDY = 0;
     retVal.c = NRF_UART0->RXD;
@@ -3721,9 +3760,9 @@ void FruityHal::UartPutStringBlockingWithTimeout(const char* message)
             //In case we fail to write the message for a longer time, we time out
             if(i++ > 10000) return;
         }
-        
+
     }
-#else
+#elif IS_ACTIVE(UART)
     uint_fast8_t i = 0;
     uint8_t byte = message[i++];
 
@@ -3756,7 +3795,7 @@ bool FruityHal::IsUartErroredAndClear()
     } else {
         return false;
     }
-#else
+#elif IS_ACTIVE(UART)
     if (nrf_uart_int_enable_check(NRF_UART0, NRF_UART_INT_MASK_ERROR) &&
         nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_ERROR))
     {
@@ -3767,6 +3806,8 @@ bool FruityHal::IsUartErroredAndClear()
         return true;
     }
     return false;
+#else
+    return false;
 #endif
 }
 
@@ -3776,7 +3817,7 @@ bool FruityHal::IsUartTimedOutAndClear()
 #if FH_NRF_ENABLE_EASYDMA_TERMINAL
     //There is no known way that this can happen with EasyDMA UART
     return false;
-#else
+#elif IS_ACTIVE(UART)
     if (nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_RXTO))
     {
         nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXTO);
@@ -3788,6 +3829,8 @@ bool FruityHal::IsUartTimedOutAndClear()
 
         //TODO: can we check if this works???
     }
+    return false;
+#else
     return false;
 #endif
 }
@@ -3801,7 +3844,7 @@ FruityHal::UartReadCharResult FruityHal::UartReadChar()
     nrf_serial_read(&serial_uart, &retVal.c, 1, &bytesRead, 0);
     if(bytesRead) retVal.hasNewChar = true;
     else ((NrfHalMemory*)GS->halMemory)->nrfSerialDataAvailable = false;
-#else
+#elif IS_ACTIVE(UART)
     if (nrf_uart_int_enable_check(NRF_UART0, NRF_UART_INT_MASK_RXDRDY) &&
         nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_RXDRDY))
     {
@@ -3811,7 +3854,7 @@ FruityHal::UartReadCharResult FruityHal::UartReadChar()
         retVal.c = NRF_UART0->RXD;
 #else
         retVal.c = nrf_uart_rxd_get(NRF_UART0);
-#endif
+#endif //SIM_ENABLED
         retVal.hasNewChar = true;
 
         //Disable the interrupt to stop receiving until instructed further
@@ -3838,7 +3881,7 @@ void FruityHal::UartEnableReadInterrupt()
     //We trigger SWI1 to check if there is any more UART data
     volatile u32 err = sd_nvic_SetPendingIRQ(SWI1_EGU1_IRQn);
 
-#else
+#elif IS_ACTIVE(UART)
     nrf_uart_int_enable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
 #endif
 }
@@ -3848,7 +3891,7 @@ bool FruityHal::CheckAndHandleUartTimeout()
 #if FH_NRF_ENABLE_EASYDMA_TERMINAL
     //Can not happen for EasyDMA UART with nrf_serial library
     return false;
-#else
+#elif IS_ACTIVE(UART)
 #ifndef SIM_ENABLED
     if (nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_RXTO))
     {
@@ -3860,6 +3903,8 @@ bool FruityHal::CheckAndHandleUartTimeout()
         return true;
     }
 #endif //SIM_ENABLED
+    return false;
+#else
     return false;
 #endif
 }
@@ -3874,8 +3919,8 @@ u32 FruityHal::CheckAndHandleUartError()
     } else {
         return 0;
     }
-#else
-    //Checks if an error occured
+#elif IS_ACTIVE(UART)
+    //Checks if an error occurred
     if (nrf_uart_int_enable_check(NRF_UART0, NRF_UART_INT_MASK_ERROR) &&
         nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_ERROR))
     {
@@ -3886,6 +3931,8 @@ u32 FruityHal::CheckAndHandleUartError()
         //TODO: How does this work, isn't it already cleared, isn't that the same as UartHandleError?
         return NRF_UART0->ERRORSRC;
     }
+    return 0;
+#else
     return 0;
 #endif
 }
@@ -4007,7 +4054,7 @@ void FruityHal::TwiStart(i32 sclPin, i32 sdaPin)
 #endif
 }
 
-//Manually switch off twi register so we are not consuming power when not being 
+//Manually switch off twi register so we are not consuming power when not being
 //used. TwiStart() should be used to restart the twi bus if we want to switch
 //it back on
 void FruityHal::TwiStop()
@@ -4153,7 +4200,7 @@ void spi_event_handler(nrf_drv_spi_evt_t const * p_event, void* p_context)
 void FruityHal::SpiInit(i32 sckPin, i32 misoPin, i32 mosiPin)
 {
 #ifndef SIM_ENABLED
-    /* Conigure SPI Interface */
+    /* Configure SPI Interface */
     nrf_drv_spi_config_t spi_config = NRF_DRV_SPI_DEFAULT_CONFIG;
     spi_config.sck_pin = (u32)sckPin;
     spi_config.miso_pin = (misoPin == -1) ? NRF_DRV_SPI_PIN_NOT_USED : (u32)misoPin;
@@ -4408,7 +4455,7 @@ ErrorType FruityHal::TimeslotRequestNextEvent()
 
     return nrfErrToGeneric(sd_radio_request(&radioRequest));
 }
-    
+
 // ######################### RADIO ############################
 
 void FruityHal::RadioUnmaskEvent(RadioEvent radioEvent)
@@ -4419,7 +4466,7 @@ void FruityHal::RadioUnmaskEvent(RadioEvent radioEvent)
         case RadioEvent::DISABLED:
             NRF_RADIO->EVENTS_DISABLED_MASKED = false;
             break;
-        
+
         default:
             SIMEXCEPTION(IllegalArgumentException);
     }
@@ -4450,7 +4497,7 @@ void FruityHal::RadioMaskEvent(RadioEvent radioEvent)
         case RadioEvent::DISABLED:
             NRF_RADIO->EVENTS_DISABLED_MASKED = true;
             break;
-        
+
         default:
             SIMEXCEPTION(IllegalArgumentException);
     }
@@ -4534,7 +4581,7 @@ void FruityHal::RadioTriggerTask(RadioTask radioTask)
             FRUITY_HAL_RADIO_TRIGGER_TASK(TXEN);
             break;
 
-#if defined(SIM_ENABLED)    
+#if defined(SIM_ENABLED)
         default:
             SIMEXCEPTION(IllegalArgumentException);
             break;
@@ -4631,7 +4678,7 @@ void FruityHal::RadioHandleBleAdvTxStart(u8 *packet)
     // https://github.com/NordicPlayground/nRF51-multi-role-conn-observer-advertiser
     //
 #if !defined(SIM_ENABLED)
-    // Power-cycle the radio, this resets the peripheral and registersto its initial state.
+    // Power-cycle the radio, this resets the peripheral and registers to its initial state.
     NRF_RADIO->POWER = 1;
 #endif
 
@@ -4719,7 +4766,7 @@ static uint32_t sdAppEvtWaitAnomaly87()
 //twi is only activated for ASSET_MODULE so to avoid the cpp warning of unused functions. Tracked in BR-2082.
 #if !defined(SIM_ENABLED)
 /// Implements fix for anomaly 89 (CPU:Consumes static current
-/// when using GPIOTE and TWI togther
+/// when using GPIOTE and TWI together
 /// https://infocenter.nordicsemi.com/topic/errata_nRF52832_EngC/ERR/nRF52832/EngineeringC/latest/anomaly_832_89.html
 static void twiTurnOnAnomaly89()
 {
@@ -4745,7 +4792,7 @@ static void twiTurnOnAnomaly89()
     }
 }
 /// Implements fix for anomaly 89 (CPU:Consumes static current
-/// when using GPIOTE and TWI togther
+/// when using GPIOTE and TWI together
 /// https://infocenter.nordicsemi.com/topic/errata_nRF52832_EngC/ERR/nRF52832/EngineeringC/latest/anomaly_832_89.html
 static void twiTurnOffAnomaly89()
 {

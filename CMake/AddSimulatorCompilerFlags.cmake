@@ -11,7 +11,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   else()
     set(COVERAGE_FLAGS  "")
   endif()
-  
+
   set(CMAKE_C_FLAGS           "-include ${PROJECT_SOURCE_DIR}/cherrysim/SystemTest.h -m32 -Wno-unknown-pragmas -fno-builtin -fno-strict-aliasing -fomit-frame-pointer -std=gnu99" CACHE INTERNAL "c compiler flags")
   set(CMAKE_CXX_FLAGS         "-include ${PROJECT_SOURCE_DIR}/cherrysim/SystemTest.h -m32 -Wno-unknown-pragmas ${COVERAGE_FLAGS} -fno-builtin -fno-strict-aliasing -fomit-frame-pointer -fdata-sections -ffunction-sections -fsingle-precision-constant -std=c++17 -pthread ${SANITIZER} -fno-omit-frame-pointer " CACHE INTERNAL "cxx compiler flags")
   set(CMAKE_EXE_LINKER_FLAGS  "-rdynamic ${COVERAGE_FLAGS} ${SANITIZER} -fno-omit-frame-pointer"  CACHE INTERNAL "exe link flags")
@@ -19,14 +19,18 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   set(CMAKE_C_FLAGS_DEBUG     "-Og -g3 -ggdb3"  CACHE INTERNAL "c debug compiler flags")
   set(CMAKE_CXX_FLAGS_DEBUG   "-Og -g3 -ggdb3"  CACHE INTERNAL "cxx debug compiler flags")
   set(CMAKE_ASM_FLAGS_DEBUG   "-g -ggdb3"       CACHE INTERNAL "asm debug compiler flags")
-   
+
   set(CMAKE_C_FLAGS_RELEASE   "-O3 -g3 -ggdb3"  CACHE INTERNAL "c release compiler flags")
   set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g3 -ggdb3"  CACHE INTERNAL "cxx release compiler flags")
   set(CMAKE_ASM_FLAGS_RELEASE "-g3 -ggdb3"      CACHE INTERNAL "asm release compiler flags")
-    
-  set(CMAKE_C_FLAGS_MINSIZEREL   "-Os -g3 -ggdb3"   CACHE INTERNAL "c mininum size compiler flags")
-  set(CMAKE_CXX_FLAGS_MINSIZEREL "-Os -g3 -ggdb3"   CACHE INTERNAL "cxx mininum size compiler flags")
-  set(CMAKE_ASM_FLAGS_MINSIZEREL "-g3 -ggdb3"       CACHE INTERNAL "asm mininum size compiler flags")
+
+  set(CMAKE_C_FLAGS_MINSIZEREL   "-Os -g3 -ggdb3"   CACHE INTERNAL "c minimum size compiler flags")
+  set(CMAKE_CXX_FLAGS_MINSIZEREL "-Os -g3 -ggdb3"   CACHE INTERNAL "cxx minimum size compiler flags")
+  set(CMAKE_ASM_FLAGS_MINSIZEREL "-g3 -ggdb3"       CACHE INTERNAL "asm minimum size compiler flags")
+  # Avoid "variable tracking size limit exceeded with -fvar-tracking-assignments, retrying without"
+  # notes on large test translation units. The feature only refines debug-info accuracy.
+  target_compile_options_multi("${SIMULATOR_TARGETS}" "-fno-var-tracking-assignments")
+
   target_compile_options_multi("${SIMULATOR_TARGETS}" "-Wall")
   target_compile_options_multi("${SIMULATOR_TARGETS}" "-Wextra")
   target_compile_options_multi("${SIMULATOR_TARGETS}" "-Werror")

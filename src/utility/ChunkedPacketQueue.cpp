@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -97,7 +106,7 @@ u16 ChunkedPacketQueue::PeekPacketRaw(u8* outData, u16 outDataSize, const Connec
         return 0;
     }
 
-    // If the following static_assert failes, the messageStart calculation would be wrong.
+    // If the following static_assert fails, the messageStart calculation would be wrong.
     static_assert(sizeof(ExtendedQueueEntryHeader) % sizeof(u32) == 0, "Sizeof ExtendedQueueEntryHeader must be a multiple of 4!");
     static_assert(sizeof(QueueEntryHeader) % sizeof(u32) == 0, "Sizeof QueueEntryHeader must be a multiple of 4!");
     const u32 messageStartOffset = head + headerSize;
@@ -113,7 +122,7 @@ u16 ChunkedPacketQueue::PeekPacketRaw(u8* outData, u16 outDataSize, const Connec
             *messageHandle = 0;
         }
     }
-    
+
     if (messageStartOffset + header->size < CONNECTION_QUEUE_MEMORY_CHUNK_SIZE)
     {
         // The message can be read from a single chunk.
@@ -299,7 +308,7 @@ bool ChunkedPacketQueue::AddMessage(u8* data, u16 size, u32 * messageHandle, boo
         return false;
     }
 
-    // The following assumption is because the implementation never splits data over mutliple chunks. Thus, if one
+    // The following assumption is because the implementation never splits data over multiple chunks. Thus, if one
     // chunk is completely full, the message must always be placable in a new chunk (as long as one is available).
     // A "split" in this context means a split across multiple chunks, NOT across multiple packets.
     static_assert(MAX_MESH_PACKET_SIZE + sizeof(ExtendedQueueEntryHeader) <= CONNECTION_QUEUE_MEMORY_CHUNK_SIZE,
@@ -356,7 +365,7 @@ bool ChunkedPacketQueue::AddMessage(u8* data, u16 size, u32 * messageHandle, boo
             // the last chunk and then add a new message, the lookAhead is not moved to the new chunk.
             lookAheadChunk = lookAheadChunk->nextChunk;
         }
-        
+
     }
 
     return true;

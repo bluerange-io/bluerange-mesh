@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -45,7 +54,7 @@
 #define NO_DISCARD
 #endif
 
-//If a NO_DISCARD value is intentionally unhandeled, use this
+//If a NO_DISCARD value is intentionally unhandled, use this
 #define DISCARD(value) static_cast<void>(value)
 
 // The [[fallthrough]] attribute is a C++17 feature
@@ -70,7 +79,7 @@
 //Unsigned ints
 typedef uint8_t u8;
 typedef uint16_t u16;
-typedef unsigned u32;   //This is not defined uint32_t because GCC defines uint32_t as unsigned long, 
+typedef unsigned u32;   //This is not defined uint32_t because GCC defines uint32_t as unsigned long,
                         //which is a problem when working with printf placeholders.
 
 //Signed ints
@@ -224,6 +233,8 @@ enum class ModuleId : u8 {
     ST_NET_MODULE = 164,
     EL_MO_MODULE = 165,
     EURO_MODULE = 166,
+    VENETIAN_BLIND_MODULE = 167,
+    SWITCH_MODULE = 168,
 
     //Other Modules, this range (200 - 239) can be used for experimenting but must not be used if FruityMesh
     //nodes are to be used in a network with nodes of different vendors as their moduleIds will clash
@@ -253,7 +264,7 @@ typedef u32 ModuleIdWrapper;
 constexpr u32 INVALID_WRAPPED_MODULE_ID = 0xFFFFFFFFUL;
 
 //The ModuleIdWrapper is used to build a wrapped module id
-//This wrapper is mostly inteded for internal usage, use the appropriate Methods from the Utility class
+//This wrapper is mostly intended for internal usage, use the appropriate Methods from the Utility class
 #pragma pack(push, 1)
 typedef union {
     struct {
@@ -305,6 +316,7 @@ enum class RebootReason : u8 {
     PREPARE_DEVICE_OFF = 28,
     DEVICE_WAKE_UP = 29,
     FACTORY_RESET = 30,
+    WATCHDOG_FROM_SAFEBOOT = 31,
 
     //INFO: Make sure to add new enum values to the Logger.cpp class
 
@@ -363,7 +375,10 @@ enum class PinsetIdentifier : u16 {
     BMG250 = 4, //Gyroscope
     GDEWO27W3 = 5, //Eink Display
     BUZZER = 6, //Buzzer (similar to a speaker)
-    VIBRATION = 7 //Vibration Motor
+    VIBRATION = 7, //Vibration Motor
+    BMA400 = 8, // Bosch BMA400 accelerometer
+    SG_MOTOR = 9, // SG window motor control
+    TWO_RELAYS = 10, //Two relays that e.g. drive a motor up and down
 };
 
 struct CustomPins {
@@ -398,6 +413,15 @@ struct Bmg250Pins : CustomPins {
     bool twiEnablePinActiveHigh = true;
 };
 
+struct Bma400Pins : CustomPins {
+    i32 sckPin = -1;
+    i32 mosiPin = -1;
+    i32 misoPin = -1;
+    i32 ssPin = -1;
+    i32 interrupt1Pin = -1;
+    i32 interrupt2Pin = -1;
+};
+
 struct Lis2dh12Pins : CustomPins {
     i32 mosiPin = -1;
     i32 misoPin = -1;
@@ -428,6 +452,16 @@ struct BuzzerPins : CustomPins {
 
 struct VibrationPins : CustomPins {
     i32 vibrationPin = -1;
+};
+
+struct SgMotorPins : CustomPins {
+    i32 motorIn1Pin = -1;
+    i32 motorIn2Pin = -1;
+};
+
+struct TwoRelaysPins : CustomPins {
+    i32 relay1Pin = -1;
+    i32 relay2Pin  = -1;
 };
 
 // Not as primitive as one might hope but other primitive types require this class.
@@ -619,7 +653,7 @@ enum class DeviceType : u8 {
 // The different terminal modes
 enum class TerminalMode : u8 {
     JSON = 0, //Interrupt based terminal input and blocking output
-    PROMPT = 1, //blockin in and out with echo and backspace options
+    PROMPT = 1, //blocking in and out with echo and backspace options
     DISABLED = 2, //Terminal is disabled, no in and output
 };
 
@@ -633,7 +667,7 @@ enum class EnrollmentState : u8 {
 enum class PreEnrollmentReturnCode : u8 {
     DONE = 0, //PreEnrollment of the Module was either not necessary or successfully done
     WAITING = 1, //PreEnrollment must do asynchronous work and will afterwards call the PreEnrollmentDispatcher
-    FAILED = 2, //PreEnrollment was not successfuly, so enrollment should continue
+    FAILED = 2, //PreEnrollment was not successfully, so enrollment should continue
 };
 
 //Used for intercepting messages befoure they are routed through the mesh
@@ -706,7 +740,7 @@ enum class DfuStartDfuResponseCode : u8
     CHUNKS_TOO_BIG = 7,
     MODULE_NOT_AVAILABLE = 8,
     MODULE_NOT_UPDATABLE = 9,
-    COMPONENT_NOT_UPDATEABLE = 10,
+    COMPONENT_NOT_UPDATABLE = 10,
     MODULE_QUERY_WAITING = 11, //Special code that is used internally if a module queries another controller and continues the process later
     TOO_MANY_CHUNKS = 12,
 };

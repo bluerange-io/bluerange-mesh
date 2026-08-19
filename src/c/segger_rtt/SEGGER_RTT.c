@@ -38,7 +38,7 @@ Purpose : Implementation of SEGGER real-time terminal (RTT) which allows
 */
 
 #ifndef   BUFFER_SIZE_UP
-  #define BUFFER_SIZE_UP                                  (1024)  // Size of the buffer for terminal output of target, up to host
+  #define BUFFER_SIZE_UP                                  (2048)  // Size of the buffer for terminal output of target, up to host
 #endif
 
 #ifndef   BUFFER_SIZE_DOWN

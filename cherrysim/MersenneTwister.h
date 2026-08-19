@@ -75,5 +75,3 @@ public:
 
     bool NextPsrng(uint32_t probability);
 };
-
-

@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -41,6 +50,7 @@
 constexpr u8 IO_MODULE_CONFIG_VERSION = 1;
 
 constexpr u32 HOLD_TIME_DURATION_DS = 5;
+constexpr u32 DEBOUNCE_DURATION_DS = 5;
 
 IoModule::IoModule()
     : Module(ModuleId::IO_MODULE, "io")
@@ -83,7 +93,7 @@ void IoModule::ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableCo
     if(buzzerPins.buzzerPin != -1) FruityHal::GpioConfigureOutput(buzzerPins.buzzerPin);
 
     //We only perform these actions when starting the module for the first time
-    //as we would otherwhise need to unregister some interrupts first
+    //as we would otherwise need to unregister some interrupts first
     if (!moduleStarted) {
         //Configure the Digital Output Pins
         for (u32 i = 0; i < numDigitalOutPinSettings; i++) {
@@ -102,7 +112,7 @@ void IoModule::ConfigurationLoadedHandler(u8* migratableConfig, u16 migratableCo
             FruityHal::GpioPullMode pullMode = digitalInPinSettings[i].activeHigh ? FruityHal::GpioPullMode::GPIO_PIN_PULLDOWN : FruityHal::GpioPullMode::GPIO_PIN_PULLUP;
             FruityHal::GpioTransition gpioTransition = digitalInPinSettings[i].activeHigh ? FruityHal::GpioTransition::GPIO_TRANSITION_LOW_TO_HIGH : FruityHal::GpioTransition::GPIO_TRANSITION_HIGH_TO_LOW;
 
-            if (digitalInPinSettings[i].readMode == DigitalInReadMode::INTERRUPT) {
+            if (digitalInPinSettings[i].readMode == DigitalInReadMode::INTERRUPT || digitalInPinSettings[i].readMode == DigitalInReadMode::INTERRUPT_DEBOUNCED) {
                 ErrorType err = FruityHal::GpioConfigureInterrupt(digitalInPinSettings[i].pin, pullMode, gpioTransition, GpioHandler);
                 if (err != ErrorType::SUCCESS) logt("ERROR", "Failed to initialize digital inputs: %u", (u32)err);
             }
@@ -196,7 +206,7 @@ void IoModule::TimerEventHandler(u16 passedTimeDs)
                 BaseConnection *conn = conns.handles[i].GetConnection();
                 if(conn != nullptr && conn->HandshakeDone()) countHandshakeDone++;
             }
-            
+
             u8 i = ledBlinkPosition / 2;
             if(i < (Conf::GetInstance().meshMaxInConnections + Conf::GetInstance().meshMaxOutConnections)){
                 if(ledBlinkPosition % 2 == 0){
@@ -237,7 +247,7 @@ void IoModule::TimerEventHandler(u16 passedTimeDs)
     //DIO_INPUT_LAST_HOLD_TIME_#: Update the timestamp if the button is still pressed
     //for use-cases such as dimming
     for(u32 i=0; i<numDigitalInPinSettings; i++){
-        if (digitalInPinSettings[i].readMode == DigitalInReadMode::INTERRUPT)
+        if (digitalInPinSettings[i].readMode == DigitalInReadMode::INTERRUPT || digitalInPinSettings[i].readMode == DigitalInReadMode::INTERRUPT_DEBOUNCED)
         {
             u8 state = FruityHal::GpioPinRead(digitalInPinSettings[i].pin) ? 1 : 0;
             u8 activeHigh = digitalInPinSettings[i].activeHigh;
@@ -343,7 +353,7 @@ TerminalCommandHandlerReturnType IoModule::TerminalCommandHandler(const char* co
 
             if (TERMARGS(3, "identify"))
             {
-                if (commandArgsSize < 5) 
+                if (commandArgsSize < 5)
                 {
                     return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
                 }
@@ -666,29 +676,45 @@ void IoModule::MapRegister(u16 component, u16 register_, SupervisedValue& out, u
                 out.SetReadable(gpioVal);
             }
         }
-        
+
         //DIO_TOGGLE_PAIR_#: Make the last toggled states for the interrupt based inputs readable
         for(u32 i=0; i<numDigitalInTogglePairSettings; i++){
             if (register_ == REGISTER_DIO_TOGGLE_PAIR_START + i)
             {
                 u8 indexA = digitalInTogglePairSettings[i].pinIndexA;
                 u8 indexB = digitalInTogglePairSettings[i].pinIndexB;
-                u8 togglePairState = digitalInPinSettings[indexA].lastActiveTimeDs < digitalInPinSettings[indexB].lastActiveTimeDs;
+                u8 togglePairState = 0;
+                if (indexA != indexB) {
+                    togglePairState = digitalInPinSettings[indexA].lastActiveTimeDs < digitalInPinSettings[indexB].lastActiveTimeDs;
+                } else {
+                    //Same index means a single toggle button
+                    if (digitalInPinSettings[indexA].lastActiveTimeDs > digitalInTogglePairSettings[i].previousActiveTimeDs) {
+                        digitalInTogglePairSettings[i].previousActiveTimeDs = digitalInPinSettings[indexA].lastActiveTimeDs;
+                        togglePairState = digitalInTogglePairSettings[i].previousState == 0 ? 1 : 0;
+                    } else {
+                        togglePairState = digitalInTogglePairSettings[i].previousState;
+                    }
+                    digitalInTogglePairSettings[i].previousState = togglePairState;
+                }
                 out.SetReadable(togglePairState);
             }
         }
 
         //DIO_INPUT_LAST_ACTIVE_TIME_#: Make the last toggled states for the interrupt based inputs readable
         for(u32 i=0; i<numDigitalInPinSettings; i++){
-            if (register_ == REGISTER_DIO_INPUT_LAST_ACTIVE_TIME_START + i * sizeof(u32) && digitalInPinSettings[i].readMode == DigitalInReadMode::INTERRUPT)
+            if (register_ == REGISTER_DIO_INPUT_LAST_ACTIVE_TIME_START + i * sizeof(u32)
+                && (digitalInPinSettings[i].readMode == DigitalInReadMode::INTERRUPT || digitalInPinSettings[i].readMode == DigitalInReadMode::INTERRUPT_DEBOUNCED)
+            )
             {
                 out.SetReadable(digitalInPinSettings[i].lastActiveTimeDs);
             }
         }
-        
+
         //DIO_INPUT_LAST_HOLD_TIME_#: Make the last toggled states for the interrupt based inputs readable
         for(u32 i=0; i<numDigitalInPinSettings; i++){
-            if (register_ == REGISTER_DIO_INPUT_LAST_HOLD_TIME_START + i * sizeof(u32) && digitalInPinSettings[i].readMode == DigitalInReadMode::INTERRUPT)
+            if (register_ == REGISTER_DIO_INPUT_LAST_HOLD_TIME_START + i * sizeof(u32)
+                && (digitalInPinSettings[i].readMode == DigitalInReadMode::INTERRUPT || digitalInPinSettings[i].readMode == DigitalInReadMode::INTERRUPT_DEBOUNCED)
+            )
             {
                 out.SetReadable(digitalInPinSettings[i].lastHoldTimeDs);
             }
@@ -704,17 +730,17 @@ void IoModule::ChangeValue(u16 component, u16 register_, u8* values, u16 length)
         //Set the GPIO output pins to the correct state once they are written
         for(u32 i=0; i<numDigitalOutPinSettings; i++){
             if(register_ == REGISTER_DIO_OUTPUT_STATE_START + i){
-                //Make sure the register cotains either 0 or 1
+                //Make sure the register contains either 0 or 1
                 if(values[0] > 1) values[0] = 1;
                 u8 value = values[0];
 
                 //Set the Pin according to the received value
                 if(digitalOutPinSettings[i].activeHigh){
                     if(value > 0 ) FruityHal::GpioPinSet(digitalOutPinSettings[i].pin);
-                        else FruityHal::GpioPinClear(digitalOutPinSettings[i].pin);
+                    else FruityHal::GpioPinClear(digitalOutPinSettings[i].pin);
                 } else {
                     if(value > 0 ) FruityHal::GpioPinClear(digitalOutPinSettings[i].pin);
-                        else FruityHal::GpioPinSet(digitalOutPinSettings[i].pin);
+                    else FruityHal::GpioPinSet(digitalOutPinSettings[i].pin);
                 }
             }
         }
@@ -729,7 +755,11 @@ void IoModule::GpioHandler(u32 pin, FruityHal::GpioTransition transition)
     IoModule* ioMod = (IoModule*)GS->node.GetModuleById(ModuleId::IO_MODULE);
     for (u32 i = 0; i < ioMod->numDigitalInPinSettings; i++) {
         if (ioMod->digitalInPinSettings[i].pin == pin) {
-            ioMod->digitalInPinSettings[i].lastActiveTimeDs = GS->appTimerDs;
+            if (ioMod->digitalInPinSettings[i].readMode != DigitalInReadMode::INTERRUPT_DEBOUNCED
+                || GS->appTimerDs >= ioMod->digitalInPinSettings[i].lastActiveTimeDs + DEBOUNCE_DURATION_DS)
+            {
+                ioMod->digitalInPinSettings[i].lastActiveTimeDs = GS->appTimerDs;
+            }
             break;
         }
     }

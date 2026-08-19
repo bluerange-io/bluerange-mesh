@@ -75,7 +75,7 @@ typedef struct
 
     uint8_t * p_out;                        /**< (Out) Encrypted/decrypted output. */
 
-    uint8_t * p_mic;                        /**< (Out) Message Integrety Check value */
+    uint8_t * p_mic;                        /**< (Out) Message Integrity Check value */
     uint8_t   mic_len;                      /**< Length of the message integrity check value. */
 } ccm_soft_data_t;
 

@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -116,31 +125,31 @@ enum class AppDisconnectReason : u8 {
 
 
 //Connection Direction: In => We are peripheral, Out => We are central
-enum class ConnectionDirection : u8{ 
-    DIRECTION_IN,    //Can't make it shorter like "IN", because thats a predefined Microsoft macro.
-    DIRECTION_OUT, 
-    INVALID 
+enum class ConnectionDirection : u8{
+    DIRECTION_IN,    //Can't make it shorter like "IN", because that's a predefined Microsoft macro.
+    DIRECTION_OUT,
+    INVALID
 };
 
 enum class DataDirection : u8 {
-    DIRECTION_IN,    //Can't make it shorter like "IN", because thats a predefined Microsoft macro.
+    DIRECTION_IN,    //Can't make it shorter like "IN", because that's a predefined Microsoft macro.
     DIRECTION_OUT
 };
 
 //Possible states for a connection
 enum class ConnectionState : u8{
-    DISCONNECTED=0, 
-    CONNECTING=1, 
-    CONNECTED=2, 
-    HANDSHAKING=3, 
-    HANDSHAKE_DONE=4, 
-    REESTABLISHING = 5, 
+    DISCONNECTED=0,
+    CONNECTING=1,
+    CONNECTED=2,
+    HANDSHAKING=3,
+    HANDSHAKE_DONE=4,
+    REESTABLISHING = 5,
     REESTABLISHING_HANDSHAKE = 6,
 };
 //State of connection encryption
 enum class EncryptionState : u8{
-    NOT_ENCRYPTED=0, 
-    ENCRYPTING=1, 
+    NOT_ENCRYPTED=0,
+    ENCRYPTING=1,
     ENCRYPTED=2
 };
 
@@ -151,7 +160,7 @@ enum class EncryptionState : u8{
  */
 class BaseConnection
 {
-    private: 
+    private:
         bool currentMessageIsMissingASplit = false;
     protected:
         DeliveryPriority overwritePriority = DeliveryPriority::INVALID;
@@ -171,7 +180,7 @@ class BaseConnection
         ConnectionType connectionType = ConnectionType::INVALID;
         ConnectionState connectionState = ConnectionState::CONNECTING;
         EncryptionState encryptionState = EncryptionState::NOT_ENCRYPTED;
-        //Backup for the last conneciton state before it was disconnected
+        //Backup for the last connection state before it was disconnected
         ConnectionState connectionStateBeforeDisconnection = ConnectionState::DISCONNECTED;
         FruityHal::BleHciError disconnectionReason = FruityHal::BleHciError::SUCCESS;
         AppDisconnectReason appDisconnectionReason = AppDisconnectReason::UNKNOWN;
@@ -251,7 +260,7 @@ class BaseConnection
 
         u8 clusterUpdateCounter : 1;
         u8 nextExpectedClusterUpdateCounter : 1;
-        
+
         //RSSI measurement
         i32 rssiAverageTimes1000 = 0; //The averaged rssi of the connection multiplied by 1000
         i8 lastReportedRssi = 0; //The last rssi measurement that was reported

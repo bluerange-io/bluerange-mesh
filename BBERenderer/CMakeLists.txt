@@ -22,9 +22,9 @@ else()
   if(NOT bbe_POPULATED)
     FetchContent_Populate(bbe)
   endif()
-  
+
   add_subdirectory(${bbe_SOURCE_DIR} ${bbe_BINARY_DIR})
-  
+
   add_compile_definitions(BBE_APPLICATION_ASSET_PATH="${CMAKE_CURRENT_SOURCE_DIR}")
   target_link_libraries(cherrySim_tester PRIVATE BrotBoxEngine)
   target_link_libraries(cherrySim_runner PRIVATE BrotBoxEngine)

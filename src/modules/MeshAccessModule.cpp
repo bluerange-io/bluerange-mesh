@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -163,7 +172,7 @@ void MeshAccessModule::RegisterGattService()
     rxCharacteristicMetadata.charProperties.write = 1; /*Writing value with Write Request permitted*/
     rxCharacteristicMetadata.charProperties.writeWithoutResponse = 1; /*Writing value with Write Command permitted*/
     rxCharacteristicMetadata.charProperties.authSignedWrite = 0; /*Writing value with Signed Write Command not permitted*/
-    rxCharacteristicMetadata.charProperties.notify = 0; /*Notications of value permitted*/
+    rxCharacteristicMetadata.charProperties.notify = 0; /*Notifications of value permitted*/
     rxCharacteristicMetadata.charProperties.indicate = 0; /*Indications of value not permitted*/
     rxCharacteristicMetadata.p_cccdMd = nullptr;//&clientCharacteristicConfigurationDescriptor;
 
@@ -194,7 +203,7 @@ void MeshAccessModule::RegisterGattService()
     txCharacteristicMetadata.charProperties.write = 0; /*Writing value with Write Request permitted*/
     txCharacteristicMetadata.charProperties.writeWithoutResponse = 0; /*Writing value with Write Command permitted*/
     txCharacteristicMetadata.charProperties.authSignedWrite = 0; /*Writing value with Signed Write Command not permitted*/
-    txCharacteristicMetadata.charProperties.notify = 1; /*Notications of value permitted*/
+    txCharacteristicMetadata.charProperties.notify = 1; /*Notifications of value permitted*/
     txCharacteristicMetadata.charProperties.indicate = 0; /*Indications of value not permitted*/
     txCharacteristicMetadata.p_cccdMd = nullptr; /*Default values*/
 
@@ -232,7 +241,7 @@ void MeshAccessModule::RegisterGattService()
 
 void MeshAccessModule::UpdateMeshAccessBroadcastPacket(u16 advIntervalMs)
 {
-    // EmergencyAccess so that a node can still be contacted from time to time using the Node Key for tasks such as enrollmen / unenrollment
+    // EmergencyAccess so that a node can still be contacted from time to time using the Node Key for tasks such as enrollment / unenrollment
     bool emergencyAccess = false;
 
     if(    !enableAdvertising
@@ -256,7 +265,7 @@ void MeshAccessModule::UpdateMeshAccessBroadcastPacket(u16 advIntervalMs)
                 logt("MAMOD", "In Mesh, disabling MA broadcast");
                 DisableBroadcast();
                 emergencyAccess = true;
-                advIntervalMs = GS->config.emergencyMeshAdvertisingInterval;
+                advIntervalMs = GS->config.emergencyMeshAdvertisingIntervalMs;
             }
         }
     }
@@ -265,7 +274,7 @@ void MeshAccessModule::UpdateMeshAccessBroadcastPacket(u16 advIntervalMs)
         DisableBroadcast();
         return;
     }
-    
+
     //build advertising packet
     AdvJob job = {
         AdvJobTypes::SCHEDULED, //JobType
@@ -357,7 +366,7 @@ void MeshAccessModule::UpdateMeshAccessBroadcastPacket(u16 advIntervalMs)
         GS->advertisingController.RefreshJob(discoveryJobHandle);
     }
 
-    //FIXME: Adv data must be worng, not advertising
+    //FIXME: Adv data must be wrong, not advertising
 
     char cbuffer[100];
     Logger::ConvertBufferToHexString(buffer, length, cbuffer, sizeof(cbuffer));
@@ -427,7 +436,7 @@ void MeshAccessModule::MeshMessageReceivedHandler(BaseConnection* connection, Ba
 
     if(packetHeader->messageType == MessageType::MODULE_TRIGGER_ACTION){
         ConnPacketModule const * packet = (ConnPacketModule const *)packetHeader;
-        
+
         //Check if our module is meant and we should trigger an action
         if(packet->moduleId == moduleId){
             MeshAccessModuleTriggerActionMessages actionType = (MeshAccessModuleTriggerActionMessages)packet->actionType;
@@ -539,7 +548,7 @@ void MeshAccessModule::ReceivedMeshAccessDisconnectMessage(ConnPacketModule cons
 
     MeshAccessConnections conns = GS->cm.GetMeshAccessConnections(ConnectionDirection::INVALID);
 
-    //Look for a connection with a matchin mac address
+    //Look for a connection with a matching mac address
     for(u32 i=0; i<conns.count; i++){
         BaseConnection *conn = conns.handles[i].GetConnection();
         if(conn != nullptr && memcmp(&(conn->partnerAddress), &message->targetAddress, FH_BLE_SIZEOF_GAP_ADDR) == 0)
@@ -567,7 +576,7 @@ void MeshAccessModule::ReceivedMeshAccessSerialConnectMessage(ConnPacketModule c
     u32 minLength =  (packetLength < sizeof(latestMeshAccessSerialConnectMessage)) ? packetLength.GetRaw() : sizeof(latestMeshAccessSerialConnectMessage);
 
     //Check if the same request is in progress or cancel any other previous request
-    if (meshAccessSerialConnectMessageReceiveTimeDs != 0 && 
+    if (meshAccessSerialConnectMessageReceiveTimeDs != 0 &&
         (
             memcmp(&latestMeshAccessSerialConnectMessage, message, minLength) != 0
             || meshAccessSerialConnectSender != packet->header.sender
@@ -915,7 +924,7 @@ TerminalCommandHandlerReturnType MeshAccessModule::TerminalCommandHandler(const 
 
             u8 requestHandle = (commandArgsSize > 9) ? Utility::StringToU8(commandArgs[9], &didError) : 0;
             if (commandArgsSize > 10) {
-                //Currently, we only support random static adresses as most other calls only support these as well.
+                //Currently, we only support random static addresses as most other calls only support these as well.
                 message.targetAddress.addr_type = FruityHal::BleGapAddrType::RANDOM_STATIC;
                 Logger::ParseEncodedStringToBuffer(commandArgs[10], message.targetAddress.addr.data(), message.targetAddress.addr.size(), &didError);
                 Utility::SwapBytes(message.targetAddress.addr.data(), message.targetAddress.addr.size());
@@ -987,7 +996,7 @@ void MeshAccessModule::GapAdvertisementReportEventHandler(const FruityHal::GapAd
             }
         }
     }
-    
+
     FruityHal::BleGapAddr addr;
     addr.addr_type = advertisementReportEvent.GetPeerAddrType();
     addr.addr = advertisementReportEvent.GetPeerAddr();

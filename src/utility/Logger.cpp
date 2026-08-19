@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -89,7 +98,7 @@ void Logger::Log_f(bool printLine, bool isJson, bool isEndOfMessage, bool skipJs
                 if (strchr(mhTraceBuffer, '}') == nullptr && strstr(mhTraceBuffer, "CRC:") == nullptr)
                 {
                     //Found end of json message that didn't contain a "}", which is
-                    //probably a  bug. Did you mean to split a json message accross
+                    //probably a  bug. Did you mean to split a json message across
                     //several lines? If so, use logjson_partial for all of the logs
                     //except the last one (that should still be logjson!)
                     SIMEXCEPTION(IllegalArgumentException);
@@ -189,7 +198,7 @@ void Logger::LogTag_f(LogType logType, const char* file, i32 line, const char* t
 #ifdef SIM_ENABLED
     if (strcmp(tag, "ERROR") == 0)
     {
-        //ERRORs are classified as severe enough that they should not happend
+        //ERRORs are classified as severe enough that they should not happen
         //during normal execution. If they are logged, something went wrong
         //and must be analyzed.
         SIMEXCEPTION(ErrorLoggedException);
@@ -230,12 +239,14 @@ static const char* GetUartErrorString(Logger::UartErrorType uartError)
         case Logger::UartErrorType::INTERNAL_ERROR:
             return "internal error";
             break;
+        case Logger::UartErrorType::LOGIN_REQUIRED:
+            return "Login required";
         default:
             return "unknown error";
             break;
     }
     #else
-    return "?";
+    return "-";
     #endif
 }
 
@@ -329,7 +340,7 @@ void Logger::DisableTag(const char* tag)
 void Logger::ToggleTag(const char* tag)
 {
 #if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
-    
+
     if (strlen(tag) + 1 > MAX_LOG_TAG_LENGTH) {
         logt("ERROR", "Too long");                //LCOV_EXCL_LINE assertion
         SIMEXCEPTION(IllegalArgumentException);    //LCOV_EXCL_LINE assertion
@@ -385,7 +396,7 @@ u32 Logger::GetAmountOfEnabledTags()
 void Logger::PrintEnabledTags() const
 {
 #if IS_ACTIVE(LOGGING) && defined(TERMINAL_ENABLED)
-    
+
     if (logEverything) trace("LOG ALL IS ACTIVE" EOL);
     for (u32 i = 0; i < MAX_ACTIVATE_LOG_TAG_NUM; i++) {
         if (activeLogTags[i * MAX_LOG_TAG_LENGTH] != '\0') {
@@ -635,6 +646,16 @@ const char* Logger::GetErrorLogCustomError(CustomErrorTypes type)
         return "WARN_AUTO_SENSE_REPORT_WITHOUT_DATA";
     case CustomErrorTypes::COUNT_VENDOR_BYTES_SENT:
         return "COUNT_VENDOR_BYTES_SENT";
+    case CustomErrorTypes::ERROR_TOO_MANY_REGISTER_HANDLERS:
+        return "ERROR_TOO_MANY_REGISTER_HANDLERS";
+    case CustomErrorTypes::ERROR_RECORD_STORAGE_REGISTER_HANDLER:
+        return "ERROR_RECORD_STORAGE_REGISTER_HANDLER";
+    case CustomErrorTypes::COUNT_VENDOR_FRAMES_DROPPED_QUEUE_FULL:
+        return "COUNT_VENDOR_FRAMES_DROPPED_QUEUE_FULL";
+    case CustomErrorTypes::COUNT_VENDOR_TX_ERRORS:
+        return "COUNT_VENDOR_TX_ERRORS";
+    case CustomErrorTypes::COUNT_USB_RX_MANUALLY_PROCESSED_BYTES:
+        return "COUNT_USB_RX_MANUALLY_PROCESSED_BYTES";
     default:
         SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
         return "UNKNOWN_ERROR";
@@ -644,68 +665,68 @@ const char* Logger::GetErrorLogCustomError(CustomErrorTypes type)
 #endif
 }
 
-const char* Logger::GetGattStatusErrorString(FruityHal::BleGattEror gattStatusCode)
+const char* Logger::GetGattStatusErrorString(FruityHal::BleGattError gattStatusCode)
 {
 #if IS_ACTIVE(ENUM_TO_STRING)
     switch (gattStatusCode)
     {
-    case FruityHal::BleGattEror::SUCCESS:
+    case FruityHal::BleGattError::SUCCESS:
         return "Success";
-    case FruityHal::BleGattEror::UNKNOWN:
+    case FruityHal::BleGattError::UNKNOWN:
         return "Unknown or not applicable status";
-    case FruityHal::BleGattEror::READ_NOT_PERMITTED:
+    case FruityHal::BleGattError::READ_NOT_PERMITTED:
         return "ATT Error: Read not permitted";
-    case FruityHal::BleGattEror::WRITE_NOT_PERMITTED:
+    case FruityHal::BleGattError::WRITE_NOT_PERMITTED:
         return "ATT Error: Write not permitted";
-    case FruityHal::BleGattEror::INVALID_PDU:
+    case FruityHal::BleGattError::INVALID_PDU:
         return "ATT Error: Used in ATT as Invalid PDU";
-    case FruityHal::BleGattEror::INSUF_AUTHENTICATION:
+    case FruityHal::BleGattError::INSUF_AUTHENTICATION:
         return "ATT Error: Authenticated link required";
-    case FruityHal::BleGattEror::REQUEST_NOT_SUPPORTED:
+    case FruityHal::BleGattError::REQUEST_NOT_SUPPORTED:
         return "ATT Error: Used in ATT as Request Not Supported";
-    case FruityHal::BleGattEror::INVALID_OFFSET:
+    case FruityHal::BleGattError::INVALID_OFFSET:
         return "ATT Error: Offset specified was past the end of the attribute";
-    case FruityHal::BleGattEror::INSUF_AUTHORIZATION:
+    case FruityHal::BleGattError::INSUF_AUTHORIZATION:
         return "ATT Error: Used in ATT as Insufficient Authorisation";
-    case FruityHal::BleGattEror::PREPARE_QUEUE_FULL:
+    case FruityHal::BleGattError::PREPARE_QUEUE_FULL:
         return "ATT Error: Used in ATT as Prepare Queue Full";
-    case FruityHal::BleGattEror::ATTRIBUTE_NOT_FOUND:
+    case FruityHal::BleGattError::ATTRIBUTE_NOT_FOUND:
         return "ATT Error: Used in ATT as Attribute not found";
-    case FruityHal::BleGattEror::ATTRIBUTE_NOT_LONG:
+    case FruityHal::BleGattError::ATTRIBUTE_NOT_LONG:
         return "ATT Error: Attribute cannot be read or written using read/write blob requests";
-    case FruityHal::BleGattEror::INSUF_ENC_KEY_SIZE:
+    case FruityHal::BleGattError::INSUF_ENC_KEY_SIZE:
         return "ATT Error: Encryption key size used is insufficient";
-    case FruityHal::BleGattEror::INVALID_ATT_VAL_LENGTH:
+    case FruityHal::BleGattError::INVALID_ATT_VAL_LENGTH:
         return "ATT Error: Invalid value size";
-    case FruityHal::BleGattEror::UNLIKELY_ERROR:
+    case FruityHal::BleGattError::UNLIKELY_ERROR:
         return "ATT Error: Very unlikely error";
-    case FruityHal::BleGattEror::INSUF_ENCRYPTION:
+    case FruityHal::BleGattError::INSUF_ENCRYPTION:
         return "ATT Error: Encrypted link required";
-    case FruityHal::BleGattEror::UNSUPPORTED_GROUP_TYPE:
+    case FruityHal::BleGattError::UNSUPPORTED_GROUP_TYPE:
         return "ATT Error: Attribute type is not a supported grouping attribute";
-    case FruityHal::BleGattEror::INSUF_RESOURCES:
+    case FruityHal::BleGattError::INSUF_RESOURCES:
         return "ATT Error: Encrypted link required";
-    case FruityHal::BleGattEror::RFU_RANGE1_BEGIN:
+    case FruityHal::BleGattError::RFU_RANGE1_BEGIN:
         return "ATT Error: Reserved for Future Use range #1 begin";
-    case FruityHal::BleGattEror::RFU_RANGE1_END:
+    case FruityHal::BleGattError::RFU_RANGE1_END:
         return "ATT Error: Reserved for Future Use range #1 end";
-    case FruityHal::BleGattEror::APP_BEGIN:
+    case FruityHal::BleGattError::APP_BEGIN:
         return "ATT Error: Application range begin";
-    case FruityHal::BleGattEror::APP_END:
+    case FruityHal::BleGattError::APP_END:
         return "ATT Error: Application range end";
-    case FruityHal::BleGattEror::RFU_RANGE2_BEGIN:
+    case FruityHal::BleGattError::RFU_RANGE2_BEGIN:
         return "ATT Error: Reserved for Future Use range #2 begin";
-    case FruityHal::BleGattEror::RFU_RANGE2_END:
+    case FruityHal::BleGattError::RFU_RANGE2_END:
         return "ATT Error: Reserved for Future Use range #2 end";
-    case FruityHal::BleGattEror::RFU_RANGE3_BEGIN:
+    case FruityHal::BleGattError::RFU_RANGE3_BEGIN:
         return "ATT Error: Reserved for Future Use range #3 begin";
-    case FruityHal::BleGattEror::RFU_RANGE3_END:
+    case FruityHal::BleGattError::RFU_RANGE3_END:
         return "ATT Error: Reserved for Future Use range #3 end";
-    case FruityHal::BleGattEror::CPS_CCCD_CONFIG_ERROR:
+    case FruityHal::BleGattError::CPS_CCCD_CONFIG_ERROR:
         return "ATT Common Profile and Service Error: Client Characteristic Configuration Descriptor improperly configured";
-    case FruityHal::BleGattEror::CPS_PROC_ALR_IN_PROG:
+    case FruityHal::BleGattError::CPS_PROC_ALR_IN_PROG:
         return "ATT Common Profile and Service Error: Procedure Already in Progress";
-    case FruityHal::BleGattEror::CPS_OUT_OF_RANGE:
+    case FruityHal::BleGattError::CPS_OUT_OF_RANGE:
         return "ATT Common Profile and Service Error: Out Of Range";
     default:
         SIMEXCEPTION(ErrorCodeUnknownException); //Could be an error or should be added to the list
@@ -812,7 +833,7 @@ const char* Logger::GetHciErrorString(FruityHal::BleHciError hciErrorCode)
         return "Different Transaction Collision";
 
     case FruityHal::BleHciError::DIRECTED_ADVERTISER_TIMEOUT:
-        return "Directed Adverisement Timeout";
+        return "Directed Advertisement Timeout";
 
     case FruityHal::BleHciError::INSTANT_PASSED:
         return "Instant Passed";
@@ -934,6 +955,8 @@ const char* Logger::GetErrorLogRebootReason(RebootReason type)
         return "DEVICE_WAKE_UP";
     case RebootReason::FACTORY_RESET:
         return "FACTORY_RESET";
+    case RebootReason::WATCHDOG_FROM_SAFEBOOT:
+        return "WATCHDOG_FROM_SAFEBOOT";
     default:
         {
             if(type >= RebootReason::USER_DEFINED_START && type < RebootReason::USER_DEFINED_END){
@@ -961,7 +984,7 @@ const char * Logger::GetErrorLogError(LoggingError type, u32 code)
     case LoggingError::CUSTOM:
         return GetErrorLogCustomError((CustomErrorTypes)code);
     case LoggingError::GATT_STATUS:
-        return GetGattStatusErrorString((FruityHal::BleGattEror)code);
+        return GetGattStatusErrorString((FruityHal::BleGattError)code);
     case LoggingError::REBOOT:
         return GetErrorLogRebootReason((RebootReason)code);
     default:
@@ -1125,7 +1148,7 @@ u32 parseBase64Block(const char* base64Block, u8 * dstBuffer, u16 dstBufferSize,
 {
     const char* base64Ptr[4];
     u32 base64Index[4];
-    for (int i = 0; i < 4; i++) 
+    for (int i = 0; i < 4; i++)
     {
         base64Ptr[i] = strchr(base64Alphabet, base64Block[i]);
         base64Index[i] = (u32)(base64Ptr[i] - base64Alphabet);
@@ -1148,7 +1171,7 @@ u32 parseBase64Block(const char* base64Block, u8 * dstBuffer, u16 dstBufferSize,
     if(length >= 2 && dstBufferSize >= 2) dstBuffer[1] = ((base64Index[1] & 0b001111) << 4) + ((base64Index[2] & 0b111100) >> 2);
     if(length >= 3 && dstBufferSize >= 3) dstBuffer[2] = ((base64Index[2] & 0b000011) << 6) + ((base64Index[3] & 0b111111));
 
-    if (length > dstBufferSize) 
+    if (length > dstBufferSize)
     {
         if (didError != nullptr) *didError = true;
         SIMEXCEPTION(BufferTooSmallException);

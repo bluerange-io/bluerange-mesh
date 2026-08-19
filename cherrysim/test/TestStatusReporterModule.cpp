@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
@@ -72,7 +81,7 @@ TEST(TestStatusReporterModule, TestCommands) {
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"set_init_result\",\"nodeId\":2,\"module\":3}");
 
     //tester.SendTerminalCommand(1, "action 2 status keep_alive"); //TODO: Hard to test!
-    //tester.SimulateUntilMessageReceived(10 * 1000, 1, "TODO"); 
+    //tester.SimulateUntilMessageReceived(10 * 1000, 1, "TODO");
 
     tester.SendTerminalCommand(1, "action 2 status get_errors");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,");
@@ -87,7 +96,7 @@ TEST(TestStatusReporterModule, TestCommands) {
 #if defined(PROD_SINK_NRF52) && defined(PROD_MESH_NRF52)
 #ifndef GITHUB_RELEASE
 TEST(TestStatusReporterModule, TestLiveReportMacAddressPart) {
-    // Tests whether the mac addresse part is successfully transmitted when a node disconnects
+    // Tests whether the mac address part is successfully transmitted when a node disconnects
 
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
@@ -102,7 +111,7 @@ TEST(TestStatusReporterModule, TestLiveReportMacAddressPart) {
     tester.sim->FindNodeById(3)->gs.logger.EnableTag("STATUSMOD");
     tester.sim->FindNodeById(1)->gs.logger.EnableTag("STATUSMOD");
     tester.sim->FindNodeById(2)->gs.logger.EnableTag("STATUSMOD");
-    
+
 
     NodeEntry* disconnectingNode = &tester.sim->nodes[1];
     u32 disconnectingNodeAddress;
@@ -111,7 +120,7 @@ TEST(TestStatusReporterModule, TestLiveReportMacAddressPart) {
     u32 otherNodeAddress;
     CheckedMemcpy(&otherNodeAddress, (tester.sim->nodes + 2)->address.addr.data(), 4);
 
-    
+
 
     char msg1[100];
     snprintf(msg1, 100, "{\"type\":\"live_report\",\"nodeId\":2,\"module\":3,\"code\":52,\"extra\":%u,", otherNodeAddress);
@@ -153,7 +162,7 @@ TEST(TestStatusReporterModule, TestLiveReportMacAddressPart) {
         [&] {
             tester.SimulateUntilMessagesReceived(1000 * 1000, messages);
         });
-    
+
 }
 #endif //GITHUB_RELEASE
 #endif
@@ -314,11 +323,11 @@ TEST(TestStatusReporterModule, TestHopsToSinkFixing) {
 
     tester.SendTerminalCommand(1, "action max_hops status keep_alive");
     tester.SimulateForGivenTime(1000 * 10);
-    
+
     tester.SendTerminalCommand(2, "action this status get_errors");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,");
 
-    // We expect that incorrect hops error wont be received as hopsToSink should have been fixed together with first keep_alive message.
+    // We expect that incorrect hops error won't be received as hopsToSink should have been fixed together with first keep_alive message.
     {
         Exceptions::ExceptionDisabler<TimeoutException> te;
         tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":%u,\"code\":%u", (u32)LoggingError::CUSTOM, (u32)CustomErrorTypes::FATAL_INCORRECT_HOPS_TO_SINK);
@@ -330,7 +339,7 @@ TEST(TestStatusReporterModule, TestHopsToSinkFixing) {
 
 #ifndef GITHUB_RELEASE
 TEST(TestStatusReporterModule, TestKeepAlive) {
-    // Executes keep_alive and makes sure that no IncorrectHopsToSinkException occures.
+    // Executes keep_alive and makes sure that no IncorrectHopsToSinkException occurs.
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.terminalId = 0;
@@ -345,13 +354,13 @@ TEST(TestStatusReporterModule, TestKeepAlive) {
 
     tester.SendTerminalCommand(1, "action this status keep_alive");
 
-    tester.SimulateForGivenTime(10 * 1000); // Just simulate a little and make sure that no IncorrectHopsToSinkException occures
+    tester.SimulateForGivenTime(10 * 1000); // Just simulate a little and make sure that no IncorrectHopsToSinkException occurs
 }
 #endif //GITHUB_RELEASE
 
 #ifndef GITHUB_RELEASE
 TEST(TestStatusReporterModule, TestConnectionRssiReportingWithoutNoise) {
-    //Test Rssi reporting when RssiNoise is disabled 
+    //Test Rssi reporting when RssiNoise is disabled
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
     //testerConfig.verbose = true;
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
@@ -674,7 +683,7 @@ TEST(TestStatusReporterModule, TestNearbyNodesReportsOnlyWithSameNetworkId)
 
 TEST(TestStatusReporterModule, TestRegisters) {
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
-    testerConfig.verbose = false;
+    //testerConfig.verbose = true;
     SimConfiguration simConfig = CherrySimTester::CreateDefaultSimConfiguration();
     simConfig.nodeConfigName.insert({"prod_mesh_nrf52", 1 });
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
@@ -682,6 +691,14 @@ TEST(TestStatusReporterModule, TestRegisters) {
 
     tester.SimulateUntilClusteringDone(100 * 1000);
 
+
+
+    //####################
+    //###              ###
+    //###   READABLE   ###
+    //###              ###
+    //####################
+    
     //GAP_ADDRESS_TYPE
     tester.SendTerminalCommand(1, "component_act this 3 2 0 1000 01");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x03E8","payload":"AQ=="})"); // 01 (Random static)
@@ -693,7 +710,7 @@ TEST(TestStatusReporterModule, TestRegisters) {
     //GAP_ADDRESS_TYPE as U64 including type and padding
     tester.SendTerminalCommand(1, "component_act this 3 2 0 1000 08");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x03E8","payload":"AQAAAQAAAAA="})"); // 01:00:00:01:00:00:00:00
-    
+
     //Just so we can cross-check the string representation
     tester.SendTerminalCommand(1, "action this status get_device_info");
     tester.SimulateGivenNumberOfSteps(1);
@@ -701,18 +718,6 @@ TEST(TestStatusReporterModule, TestRegisters) {
     //GAP_ADDRESS_STRING
     tester.SendTerminalCommand(1, "component_act this 3 2 0 1010 12");
     tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x03F2","payload":"MDA6MDA6MDA6MDE6MDA6MDAA"})"); // "00:00:00:01:00:00\0" (typically reversed when shown as string)
-
-    //REFERENCE_MILLI_VOLT_AT_0_PERCENT
-    tester.SendTerminalCommand(1, "component_act this 3 2 0 10000 04");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x2710","payload":"CAcAAA=="})"); // 1800 by default
-
-    //TODO: Add write test once persistance works
-
-    //REFERENCE_MILLI_VOLT_AT_100_PERCENT
-    tester.SendTerminalCommand(1, "component_act this 3 2 0 10004 04");
-    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x2714","payload":"KAoAAA=="})"); // 2600 by default
-
-    //TODO: Add write test once persistance works
 
     //DEVICE_UPTIME
     tester.SendTerminalCommand(1, "component_act this 3 2 0 30000 04");
@@ -774,6 +779,53 @@ TEST(TestStatusReporterModule, TestRegisters) {
     //BATTERY_PERCENTAGE
     tester.SendTerminalCommand(1, "component_act this 3 2 0 30200 01");
     tester.SimulateUntilMessageReceived(100 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x75F8","payload":"AA=="})"); //Measurement is 0V by default
+    
+
+
+
+    //#####################
+    //###               ###
+    //###   WRITABLES   ###
+    //###               ###
+    //#####################
+    
+    //REFERENCE_MILLI_VOLT_AT_0_PERCENT
+    //Read default
+    tester.SendTerminalCommand(1, "component_act this 3 read 0 10000 04");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x2710","payload":"CAcAAA=="})"); // 1800 by default
+    //Change value
+    tester.SendTerminalCommand(1, "component_act this 3 write 0 10000 AA:BB:CC:DD");
+    tester.SimulateForGivenTime(1 * 1000);
+    //And read back
+    tester.SendTerminalCommand(1, "component_act this 3 read 0 10000 04");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x2710","payload":"qrvM3Q=="})"); // qrvM3Q== is AA:BB:CC:DD
+
+
+    //REFERENCE_MILLI_VOLT_AT_100_PERCENT
+    //Read default
+    tester.SendTerminalCommand(1, "component_act this 3 2 0 10004 04");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x2714","payload":"KAoAAA=="})"); // 2600 by default
+    //Change value
+    tester.SendTerminalCommand(1, "component_act this 3 write 0 10004 11:22:33:44");
+    tester.SimulateForGivenTime(1 * 1000);
+    //And read back
+    tester.SendTerminalCommand(1, "component_act this 3 read 0 10004 04");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x2714","payload":"ESIzRA=="})"); // ESIzRA== is 11:22:33:44
+
+
+    // Reboot the node
+    ASSERT_EQ(tester.sim->nodes[0].restartCounter, 1);
+    tester.SendTerminalCommand(1, "reset");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, "reboot");
+    ASSERT_EQ(tester.sim->nodes[0].restartCounter, 2);
+    // Make sure that the writable registers have been persisted successfully.
+    //REFERENCE_MILLI_VOLT_AT_0_PERCENT
+    tester.SendTerminalCommand(1, "component_act this 3 read 0 10000 04");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x2710","payload":"qrvM3Q=="})"); // qrvM3Q== is AA:BB:CC:DD
+    //REFERENCE_MILLI_VOLT_AT_100_PERCENT
+    tester.SendTerminalCommand(1, "component_act this 3 read 0 10004 04");
+    tester.SimulateUntilMessageReceived(10 * 1000, 1, R"({"nodeId":1,"type":"component_sense","module":3,"requestHandle":0,"actionType":2,"component":"0x0000","register":"0x2714","payload":"ESIzRA=="})"); // ESIzRA== is 11:22:33:44
+
 
 }
 
@@ -844,7 +896,7 @@ TEST(TestStatusReporterModule, TestErrorLogQuerying) {
 
 
     //////// Node 3 (same network)
-    //Establish a mesh access connection as nodeId=3 is an asset using the network key 
+    //Establish a mesh access connection as nodeId=3 is an asset using the network key
     RetryOrFail<TimeoutException>(
         2, [&] {
             // action [nodeId] ma serial_connect [serial number] [keyId] [key] [nodeId_of_partner_after_connect] [initial_keep_alive] {requestHandle=0} {bleAddress=""} {forceMode=0}
@@ -861,7 +913,7 @@ TEST(TestStatusReporterModule, TestErrorLogQuerying) {
 
 
     //////// Node 4 (different network)
-    //Establish a mesh access connection as nodeId=4 is an asset using the orga key 
+    //Establish a mesh access connection as nodeId=4 is an asset using the orga key
     RetryOrFail<TimeoutException>(
         2, [&] {
             // action [nodeId] ma serial_connect [serial number] [keyId] [key] [nodeId_of_partner_after_connect] [initial_keep_alive] {requestHandle=0} {bleAddress=""} {forceMode=0}

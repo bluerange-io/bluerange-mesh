@@ -4,7 +4,7 @@
 The _DebugModule_ with _ModuleId_ 7 contains a collection of commands to debug network problems and test other functionality.
 
 == Functionality
-The _Debug_ module does not perform a lot of functionality itself. It triggers actions from other moduels for debug purposes. It provides a flooding mode.
+The _Debug_ module does not perform a lot of functionality itself. It triggers actions from other modules for debug purposes. It provides a flooding mode.
 
 == Terminal Commands
 
@@ -156,8 +156,8 @@ Useful in combination with scanlog, this will register a scanjob with a given ti
 scanboost {boostTimeSec=60}
 ----
 
-=== Heap
-Prints statistics about the current heap usage.
+=== RAM Usage
+Prints statistics about the current RAM usage.
 [source, C++]
 ----
 heap

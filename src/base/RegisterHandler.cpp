@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "RegisterHandler.h"
@@ -196,49 +205,57 @@ SupervisedValue::Type SupervisedValue::GetType() const
     return type;
 }
 
-#define READ() oldRecordStorage[i++]
-#define WRITE(val) newRecordStorage[writeHead++] = (val)
+#define READ_U16() Utility::ToAlignedU16(oldRecordStorage + i); i += 2
+#define WRITE_U16(val) CheckedMemcpy(newRecordStorage + writeHead, &val, 2); writeHead += 2
 // TODO replace with CheckedMemcpy
-#define COPY(amount) for(u32 warglspargl = 0; warglspargl < (amount); warglspargl++) newRecordStorage[writeHead++] = oldRecordStorage[i++]
+#define COPY(amount) CheckedMemcpy(newRecordStorage + writeHead, oldRecordStorage + i, amount); writeHead += amount; i += amount
 #define SKIP(amount) i += (amount)
-#define WRITE_NEW_RANGE() WRITE(newRegister); WRITE(newLength); for (u32 m = 0; m < newLength; m++) { WRITE(newValues[m]); }
+#define WRITE_NEW_RANGE() WRITE_U16(newRegister); WRITE_U16(newLength); CheckedMemcpy(newRecordStorage + writeHead, newValues, newLength); writeHead += newLength
 
-#ifdef JSTODO_PERSISTENCE
-void RegisterHandler::LoadFromFlash()
+void Module::LoadRegisterHandlerDataFromFlash()
 {
     const u16 baseId = GetRecordBaseId();
     for (u32 k = 0; k < REGISTER_RECORDS_PER_MODULE; k++)
     {
         const u16 id = baseId + k;
-        RecordStorageRecord* record = GS->recordStorage.GetRecord(id);
-        if (record)
-        {
-            if (record->recordLength % sizeof(u16) == 1)
-            {
-                GS->logger.LogCustomError(CustomErrorTypes::ERROR_RECORD_STORAGE_REGISTER_HANDLER, 0);
-                SIMEXCEPTION(IllegalStateException);
-                continue;
-            }
-            u16* oldRecordStorage = (u16*)record->data;
-            const u16 amountOfU16 = record->recordLength / sizeof(u16);
-            for (u32 i = 0; i < amountOfU16; i++)
-            {
-                // Basic sanity check. We need at least 2 u16 for component, amount_of_ranges
-                if(amountOfU16 - i < 2) GS->logger.LogCustomError(CustomErrorTypes::ERROR_RECORD_STORAGE_REGISTER_HANDLER, 1);
+        const SizedData record = GS->recordStorage.GetRecordData(id);
+        if (record.length.GetRaw() == 0) continue;
 
-                const u16 component = READ();
-                const u16 amount_of_ranges = READ();
-                for (u32 k = 0; k < amount_of_ranges; k++)
+        u8* oldRecordStorage = record.data;
+        const u16 recordLength = record.length.GetRaw();
+        for (u32 i = 0; i < recordLength; i++)
+        {
+            // Basic sanity check. We need at least a length of 9, because 4 u16 values (component, amount_of_ranges, reg, length) and 1 u8 value (the actual data)
+            if (recordLength - i < 9)
+            {
+                GS->logger.LogCustomError(CustomErrorTypes::ERROR_RECORD_STORAGE_REGISTER_HANDLER, 1);
+                SIMEXCEPTION(IllegalStateException);
+                return;
+            }
+
+            const u16 component = READ_U16();
+            const u16 amount_of_ranges = READ_U16();
+            for (u32 k = 0; k < amount_of_ranges; k++)
+            {
+                // Basic sanity check. We need at least a length of 5, because 2 u16 values (reg, length) and 1 u8 value (the actual data)
+                // Note that the check above is not sufficient, as we can have multiple ranges.
+                if (recordLength - i < 5)
                 {
-                    // Basic sanity check. We need at least 3 u16 for component, register, value[s]
-                    if (amountOfU16 - i < 3) GS->logger.LogCustomError(CustomErrorTypes::ERROR_RECORD_STORAGE_REGISTER_HANDLER, 2);
-                    const u16 reg = READ();
-                    const u16 length = READ();
-                    // Checking that we have enough data left for the length
-                    if (amountOfU16 - i < length) GS->logger.LogCustomError(CustomErrorTypes::ERROR_RECORD_STORAGE_REGISTER_HANDLER, 3);
-                    SetRegisterValues(component, reg, oldRecordStorage + i, length, nullptr, 0, nullptr, 0, RegisterHandlerSetSource::FLASH);
-                    SKIP(length);
+                    GS->logger.LogCustomError(CustomErrorTypes::ERROR_RECORD_STORAGE_REGISTER_HANDLER, 2);
+                    SIMEXCEPTION(IllegalStateException);
+                    return;
                 }
+                const u16 reg = READ_U16();
+                const u16 length = READ_U16();
+                // Checking that we have enough data left for the length
+                if (recordLength - i < length)
+                {
+                    GS->logger.LogCustomError(CustomErrorTypes::ERROR_RECORD_STORAGE_REGISTER_HANDLER, 3);
+                    SIMEXCEPTION(IllegalStateException);
+                    return;
+                }
+                SetRegisterValues(component, reg, oldRecordStorage + i, length, nullptr, 0, nullptr, 0, RegisterHandlerSetSource::FLASH);
+                SKIP(length);
             }
         }
     }
@@ -263,14 +280,14 @@ static bool DoRangesOverlap(u16 s1, u16 l1, u16 s2, u16 l2)
 // [4, 10] and [10, 13]
 // [4, 10] and [5, 6]
 // But these do not overlap:
-// [4, 10] and [11, 13]
-static u16 DetermineAmountOfOverlaps(const u16* oldRecordStorage, u32 i, u16 amountOfRanges, u16 newRegister, u16 newLength)
+// [4, 10] and [12, 13]
+static u16 DetermineAmountOfOverlaps(const u8* oldRecordStorage, u32 i, u16 amountOfRanges, u16 newRegister, u16 newLength)
 {
     u16 retVal = 0;
     for (u32 k = 0; k < amountOfRanges; k++)
     {
-        u16 oldRegister = READ();
-        u16 oldLength = READ();
+        u16 oldRegister = READ_U16();
+        u16 oldLength = READ_U16();
         SKIP(oldLength);
         if (DoRangesOverlap(oldRegister, oldLength, newRegister, newLength))
         {
@@ -280,10 +297,10 @@ static u16 DetermineAmountOfOverlaps(const u16* oldRecordStorage, u32 i, u16 amo
     return retVal;
 }
 
-static u16 DetermineOverlappingRangeSize(const u16* oldRecordStorage, u32 i, u16 amountOfOverlaps, u16 newRegister, u16 newLength)
+static u16 DetermineOverlappingRangeSize(const u8* oldRecordStorage, u32 i, u16 amountOfOverlaps, u16 newRegister, u16 newLength)
 {
-    const u16 oldRegister = READ();
-    const u16 oldLength = READ();
+    const u16 oldRegister = READ_U16();
+    const u16 oldLength = READ_U16();
     const u16 start = (oldRegister < newRegister) ? oldRegister : newRegister;
     const u16 oldEnd = oldRegister + oldLength;
     const u16 newEnd = newRegister + newLength;
@@ -292,8 +309,8 @@ static u16 DetermineOverlappingRangeSize(const u16* oldRecordStorage, u32 i, u16
     SKIP(oldLength);
     for (u32 k = 1; k < amountOfOverlaps; k++)
     {
-        const u16 reg = READ();
-        const u16 len = READ();
+        const u16 reg = READ_U16();
+        const u16 len = READ_U16();
         length += len - (start + length - reg);
     }
     return length;
@@ -305,18 +322,18 @@ u16 InsertRegisterRange(const u8* oldRecordStorage, u16 oldRecordStorageLength, 
     bool foundComponent = false;
     for (u32 i = 0; i < oldRecordStorageLength; i++)
     {
-        u16 oldComponent = READ();
-        u16 amountOfRanges = READ();
-        WRITE(oldComponent);
+        u16 oldComponent = READ_U16();
+        u16 amountOfRanges = READ_U16();
+        WRITE_U16(oldComponent);
         if (oldComponent != newComponent)
         {
             // We aren't in the right component, copy paste fast forward
-            WRITE(amountOfRanges);
+            WRITE_U16(amountOfRanges);
             for (u32 k = 0; k < amountOfRanges; k++)
             {
-                COPY(1);
-                u16 length = READ();
-                WRITE(length);
+                COPY(2);
+                u16 length = READ_U16();
+                WRITE_U16(length);
                 COPY(length);
             }
         }
@@ -325,15 +342,15 @@ u16 InsertRegisterRange(const u8* oldRecordStorage, u16 oldRecordStorageLength, 
             foundComponent = true;
             const u16 amountOfOverlaps = DetermineAmountOfOverlaps(oldRecordStorage, i, amountOfRanges, newRegister, newLength);
             const u16 newAmountOfRanges = amountOfRanges + 1 - amountOfOverlaps;
-            WRITE(newAmountOfRanges);
+            WRITE_U16(newAmountOfRanges);
             bool wroteRegister = false;
             for (u32 k = 0; k < amountOfRanges; k++)
             {
-                u16 oldRegister = READ();
-                u16 oldLength = READ();
+                u16 oldRegister = READ_U16();
+                u16 oldLength = READ_U16();
                 if (DoRangesOverlap(oldRegister, oldLength, newRegister, newLength))
                 {
-                    i -= 2; // So that we can reread the register and length below. Avoids special cases.
+                    i -= 4; // So that we can reread the register and length below. Avoids special cases.
                     const u16 newMergedRangeSize = DetermineOverlappingRangeSize(oldRecordStorage, i, amountOfOverlaps, newRegister, newLength);
                     const u16 start = (oldRegister < newRegister) ? oldRegister : newRegister;
                     DYNAMIC_ARRAY(mergedRange, newMergedRangeSize * sizeof(u16));
@@ -342,40 +359,33 @@ u16 InsertRegisterRange(const u8* oldRecordStorage, u16 oldRecordStorageLength, 
                     k += amountOfOverlaps - 1;
                     for (u32 m = 0; m < amountOfOverlaps; m++)
                     {
-                        u16 reg = READ();
-                        u16 len = READ();
+                        u16 reg = READ_U16();
+                        u16 len = READ_U16();
                         u16 offset = reg - start;
-                        for (u32 z = 0; z < len; z++)
-                        {
-                            mergedRange[z + offset] = READ();
-                        }
+                        CheckedMemcpy(mergedRange + offset, oldRecordStorage + i, len);
+                        i += len;
                     }
                     // Write the new range to the merge area
                     u16 offset = newRegister - start;
-                    for (u32 z = 0; z < newLength; z++)
-                    {
-                        mergedRange[z + offset] = newValues[z];
-                    }
-                    WRITE(start);
-                    WRITE(newMergedRangeSize);
-                    for (u32 z = 0; z < newMergedRangeSize; z++)
-                    {
-                        WRITE(mergedRange[z]);
-                    }
+                    CheckedMemcpy(mergedRange + offset, newValues, newLength);
+                    WRITE_U16(start);
+                    WRITE_U16(newMergedRangeSize);
+                    CheckedMemcpy(newRecordStorage + writeHead, mergedRange, newMergedRangeSize);
+                    writeHead += newMergedRangeSize;
                     wroteRegister = true;
                 }
                 else if (newRegister <= oldRegister && !wroteRegister)
                 {
                     wroteRegister = true;
                     WRITE_NEW_RANGE();
-                    WRITE(oldRegister);
-                    WRITE(oldLength);
+                    WRITE_U16(oldRegister);
+                    WRITE_U16(oldLength);
                     COPY(oldLength);
                 }
                 else
                 {
-                    WRITE(oldRegister);
-                    WRITE(oldLength);
+                    WRITE_U16(oldRegister);
+                    WRITE_U16(oldLength);
                     COPY(oldLength);
                 }
             }
@@ -389,13 +399,14 @@ u16 InsertRegisterRange(const u8* oldRecordStorage, u16 oldRecordStorageLength, 
     if (!foundComponent)
     {
         // The right component wasn't found, so we have to append it.
-        WRITE(newComponent);
-        WRITE(1); // Amount of register ranges in this component. As this is the first one, we only have one.
+        WRITE_U16(newComponent);
+        // Amount of register ranges in this component. As this is the first one, we only have one.
+        const u16 newRegisterRanges = 1;
+        WRITE_U16(newRegisterRanges);
         WRITE_NEW_RANGE();
     }
 
     return writeHead;
 }
-#endif
 
 #endif //IS_ACTIVE(REGISTER_HANDLER)

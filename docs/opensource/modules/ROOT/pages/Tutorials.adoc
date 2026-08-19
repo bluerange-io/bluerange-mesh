@@ -17,4 +17,4 @@ BlueRange Mesh can not just be used with Nordics nRF52-DK and nRF52840-DK.
 If you want to know how to use other hardware together with BlueRange Mesh,
 have a look at the following examples.
 
-Tutorial: xref:fruitymesh::UsingRuuviTagsWithBlueRangeMesh.adoc[Using RuuviTags with BlueRange Mesh]
+Tutorial: xref:bluerange-mesh-community::UsingRuuviTagsWithBlueRangeMesh.adoc[Using RuuviTags with BlueRange Mesh]

@@ -1,37 +1,46 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
 /*
  * This file contains the mesh configuration, which is a singleton. Some of the
  * values can be changed at runtime to alter the meshing behaviour.
- * 
+ *
  * *** ATTENTION! ***
  * The preferred way to change this configuration is by using a featureset
  * in which you are able to define all values and they will have precedence over the
@@ -53,12 +62,20 @@ class RecordStorageEventListener;
 
 // ########### FruityMesh Version ##########################################
 
+// CalVer scheme YEAR.MINOR.PATCH, mapped onto the historic major.minor.patch integer encoding:
+//   major field = 2-digit calendar year (e.g. 26 = 2026), increased manually
+//   minor field = release within the year, increased manually
+//   patch field = increased automatically by a python script on every master merge
+// Note: the leading field is the calendar year, NOT a classic SemVer major.
+// Keep the version macro names out of these comment lines: external tooling
+// (bluerange_oem_kit) greps for the first occurrence of the major/minor/patch
+// define and parses the token right after it, so a mention here breaks the build.
 // major (0-400), minor (0-999), patch (0-9999)
-#define FM_VERSION_MAJOR 1
-#define FM_VERSION_MINOR 2
+#define FM_VERSION_MAJOR 26
+#define FM_VERSION_MINOR 1
 //WARNING! The Patch version line is automatically changed by a python script on every master merge!
 //Do not change by hand unless you understood the exact behaviour of the said script.
-#define FM_VERSION_PATCH 250
+#define FM_VERSION_PATCH 80
 #define FM_VERSION (10000000 * FM_VERSION_MAJOR + 10000 * FM_VERSION_MINOR + FM_VERSION_PATCH)
 #ifdef __cplusplus
 static_assert(FM_VERSION_MAJOR >= 0                            , "Malformed Major version!");
@@ -165,7 +182,7 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 #endif
 
 // The maximum amount of chunks one connection can hold is limited by CONNECTION_QUEUE_MEMORY_MAX_CHUNKS_PER_CONNECTION.
-// This is because some connections may have a siginificant delay in sending out packets, e.g. due to a Connection
+// This is because some connections may have a significant delay in sending out packets, e.g. due to a Connection
 // Reestablishment. In such a case the rest of the connections have to share the rest of the chunks. If this rest gets
 // to low, a high amount of dropped packets is to be expected and should therefore be avoided.
 #ifndef CONNECTION_QUEUE_MEMORY_MAX_CHUNKS_PER_CONNECTION
@@ -197,6 +214,11 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 //The maximum number of advertising jobs that can be managed by the AdvertisingController
 #ifndef ADVERTISING_CONTROLLER_MAX_NUM_JOBS
 #define ADVERTISING_CONTROLLER_MAX_NUM_JOBS 4
+#endif
+
+//The maximum number of scan jobs that can be managed by the ScanController
+#ifndef SCAN_CONTROLLER_MAX_NUM_JOBS
+#define SCAN_CONTROLLER_MAX_NUM_JOBS 5
 #endif
 
 // ########### Flash Settings ##########################################
@@ -232,7 +254,7 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 #define ACTIVATE_SET_TERMINAL_TITLE 0
 #endif
 
-// Allows us to unwind the stack if an error occured, to save space (5 kb), we can enable this
+// Allows us to unwind the stack if an error occurred, to save space (5 kb), we can enable this
 // but we must also add -funwind-tables to the Makefile.
 #ifndef ACTIVATE_STACK_UNWINDING
 #define ACTIVATE_STACK_UNWINDING 0
@@ -280,7 +302,7 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 #define ACTIVATE_APP_UART 0
 #endif
 
-// In case stdout should be used, enable this (wont't work on nrf hardware)
+// In case stdout should be used, enable this (won't work on nrf hardware)
 #ifndef ACTIVATE_STDIO
 #define ACTIVATE_STDIO 0
 #endif
@@ -311,7 +333,7 @@ static_assert(false, "Featureset was not defined, which is mandatory!");
 enum class PreferredConnectionMode : u8 {
     // Unpreferred connections...
     PENALTY = 0,    //        ...receive a penalty in cluster score
-    IGNORED = 1        //        ...are completly ignored (cluster score is set to zero)
+    IGNORED = 1        //        ...are completely ignored (cluster score is set to zero)
 };
 
 class Module;
@@ -376,7 +398,7 @@ class Conf
         NodeId defaultNodeId = 0;
         //Used to set a static random BLE address (loaded from DeviceConfiguration if type set to 0xFF)
         FruityHal::BleGapAddr staticAccessAddress;
-        
+
         //By default, the RecordStorage library is used to persist settings in flash, this can be disabled.
         //If disabled, enrollments will be stored in RAM across soft reboots
         //The enrollment will be lost after power was lost for a short time
@@ -408,11 +430,14 @@ class Conf
         u16 meshPeripheralSlaveLatency = 0;
 
         //we add slave latency for the serial connect to the asset in order to save power
-        static constexpr u16 serialConnectSlaveLatency = 15; 
+        static constexpr u16 serialConnectSlaveLatency = 15;
 
         //(20-1024) (100-1024 for non connectable advertising!) Determines advertising interval in units of 0.625 millisecond.
         static constexpr u16 meshAdvertisingIntervalLow = (u16)MSEC_TO_UNITS(200, CONFIG_UNIT_0_625_MS);
-        static constexpr u16 emergencyMeshAdvertisingInterval = (u16)MSEC_TO_UNITS(2000, CONFIG_UNIT_0_625_MS);
+
+        //Advertising interval in milliseconds for the MeshAccess emergency advertising. This is passed to
+        //MeshAccessModule::UpdateMeshAccessBroadcastPacket, which expects milliseconds and converts to units itself.
+        static constexpr u16 emergencyMeshAdvertisingIntervalMs = 2000;
 
         //INITIATING
         //(20-1024) in 0.625ms units
@@ -463,14 +488,14 @@ class Conf
         //If not enough nodes were found, decide after this timeout
         static constexpr u16 maxTimeUntilDecisionDs = SEC_TO_DS(2);
         //Delay before setting new discovery after cluster size change
-        static constexpr u16 clusterSizeDiscoveryChangeDelaySec = 10;        
+        static constexpr u16 clusterSizeDiscoveryChangeDelaySec = 10;
         //Switch to low discovery if no other nodes were found for # seconds, set to 0 to disable low discovery state
         u16 highDiscoveryTimeoutSec = 0; // if is not configured in featureset, low discovery will be disabled and will always be in high discovery mode
 
         LedMode defaultLedMode = LedMode::OFF;
 
         //If set, the node won't send anything via UART if the reboot reason is unknown and it hasn't received anything yet.
-        //This is so because the meshGW bootloader thinks that incomming UART chars are keyboard inputs.
+        //This is so because the meshGW bootloader thinks that incoming UART chars are keyboard inputs.
         bool silentStart = false;
 
         //Configures whether the terminal will start in interactive mode or not
@@ -524,7 +549,7 @@ class Conf
         i8 defaultDBmTX = 4;
 
         //Depending on platform capabilities, we need to set a different amount of
-        //possible connnections, whereas the simulator will need to select that at runtime
+        //possible connections, whereas the simulator will need to select that at runtime
         //Having two meshInConnections allows us to perform clustering more easily and
         //prevents most denial of service attacks
 #ifndef SIM_ENABLED
@@ -586,7 +611,7 @@ class Conf
 #endif
 
 //Alright, I know this is bad, but it's for readability....
-//And static classes do need a seperate declaration and definition...
+//And static classes do need a separate declaration and definition...
 #ifndef Config
 #define RamConfig (&(Conf::GetInstance()))
 #endif
