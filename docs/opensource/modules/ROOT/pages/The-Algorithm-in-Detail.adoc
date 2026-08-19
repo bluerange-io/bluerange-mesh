@@ -226,7 +226,7 @@ each node can choose between many connection partners. This seems
 counter intuitive at first because more connection partners should
 result in a faster network setup. But it is visible that clusters tend
 to reconnect and dissolve often. The dense setup also shows that nodes
-do not connect to their nearest neighbours because the RSSI has not been
+do not connect to their nearest neighbors because the RSSI has not been
 used in the Cluster Score function.
 
 .Figure: Comparing a sparse (left) and a dense (right) 20-node setup

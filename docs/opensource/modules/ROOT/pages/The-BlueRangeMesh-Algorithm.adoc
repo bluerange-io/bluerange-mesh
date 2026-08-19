@@ -17,7 +17,7 @@ image:mesh-overview.png[impossible]
 There is no way to know the size - or the participating nodes - of a
 mesh in advance. Distributing the presence of a node over long distances
 would be a bad idea because of the time it takes and the energy it
-costs. This means that every node can only see its surroundig nodes.
+costs. This means that every node can only see its surrounding nodes.
 
 == Simulator
 There is a xref:CherrySim.adoc[Simulator] available that
@@ -43,7 +43,7 @@ node knows the size of the cluster that it's part of, it uses this information
 as a criteria when connecting to others. Big clusters can always decide to
 which nodes they want to connect and smaller clusters will have to obey.
 Any change in cluster size due to connection or disconnection is
-broadcast through the exisiting connections.
+broadcast through the existing connections.
 
 image:clustering.png[cluster forming]
 

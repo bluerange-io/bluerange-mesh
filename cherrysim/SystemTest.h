@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -41,11 +50,11 @@
 #endif
 
 #ifndef __INLINE
-#define __INLINE            
+#define __INLINE
 #endif
 
 #ifndef __WEAK
-#define __WEAK              
+#define __WEAK
 #endif
 
 #ifndef __ALIGN
@@ -57,7 +66,7 @@
 #endif
 
 #ifndef __STATIC_INLINE
-#define __STATIC_INLINE static inline 
+#define __STATIC_INLINE static inline
 #endif
 
 #define GET_SP()                __current_sp()
@@ -164,6 +173,12 @@ extern "C" {
 #define ACTIVATE_SOFTWARE_RS485_RESET 1
 
 #define ACTIVATE_REGISTER_HANDLER 1
+
+#ifndef GITHUB_RELEASE
+#define ACTIVATE_GENERAL_COMM 1
+#endif
+
+#define ACTIVATE_UART 1
 
 //#define ACTIVATE_ONLY_SINK_FUNCTIONALITY 1
 
@@ -290,7 +305,7 @@ typedef struct
     uint32_t PACKETPTR;
     uint32_t TXPOWER;
 
-    // The actial radio has more event registers.
+    // The actual radio has more event registers.
     bool EVENTS_DISABLED;
     bool EVENTS_DISABLED_MASKED;
 
@@ -306,10 +321,11 @@ typedef enum
 } nrf_uart_hwfc_t;
 
 #undef SD_EVT_IRQn
-typedef enum 
+typedef enum
 {
     SD_EVT_IRQn = 1,
     UART0_IRQn = 2,
+    SWI1_EGU1_IRQn = 3,
 } IRQn_Type;
 
 typedef enum
@@ -333,7 +349,7 @@ typedef enum
     APP_IRQ_PRIORITY_LOW = 2 // Not the original value!
 } app_irq_priority_t;
 
-typedef struct 
+typedef struct
 {
     uint32_t ERRORSRC;
     uint32_t EVENTS_RXDRDY;
@@ -358,7 +374,7 @@ typedef enum
 //****************************************
 //NOTE: if we want to change NRF_SDH_BLE_GATT_MAX_MTU_SIZE value in future, We
 //Should also change in sdk_config.h . in order to keep this value consistent
-//in both simulatore and frimware
+//in both simulator and firmware
 #define NRF_SDH_BLE_GATT_MAX_MTU_SIZE 63
 
 //*****************************
@@ -387,6 +403,7 @@ void nrf_uart_task_trigger(NRF_UART_Type *p_reg, nrf_uart_task_t task);
 bool nrf_uart_int_enable_check(NRF_UART_Type *p_reg, uint32_t int_mask);
 bool nrf_uart_event_check(NRF_UART_Type *p_reg, nrf_uart_event_t event);
 void nrf_uart_int_disable(NRF_UART_Type *p_reg, uint32_t int_mask);
+uint32_t nrf_serial_read_byte_cherrysim(uint8_t* p_data, size_t* p_read);
 void nrf_wdt_reload_request_set(int rr_register);
 void nrf_wdt_task_trigger(int task);
 void nrf_wdt_behaviour_set(int behaviour);
@@ -396,7 +413,7 @@ void nrf_delay_ms(uint32_t volatile number_of_ms);
 uint8_t nrf_uart_rxd_get(NRF_UART_Type * p_reg);
 void nrf_power_system_off();
 
-//Unfortunatly can't return RebootReason, as this would create a circular dependency.
+//Unfortunately can't return RebootReason, as this would create a circular dependency.
 uint8_t ST_getRebootReason();
 
 //Dummy implementation for bmg
@@ -517,7 +534,7 @@ int8_t bmg250_get_fifo_data(const bmg250_dev *dev);
 int8_t bmg250_extract_gyro(bmg250_sensor_data *gyro_data, uint8_t *data_length, const bmg250_dev *dev);
 int8_t bmg250_set_fifo_wm(uint8_t wm_frame_count, uint16_t *fifo_length, const bmg250_dev *dev);
 uint32_t bmg250_init(bmg250_dev* data);
-uint8_t bmg250_set_power_mode(const bmg250_dev *dev); 
+uint8_t bmg250_set_power_mode(const bmg250_dev *dev);
 uint8_t bmg250_get_sensor_settings(bmg250_cfg *gyro_cfg, const bmg250_dev *dev);
 uint32_t bmg250_set_sensor_settings(const bmg250_cfg *gyro_cfg, const bmg250_dev *dev);
 int8_t bmg250_get_sensor_data(uint8_t data_sel, bmg250_sensor_data *gyro, const bmg250_dev *dev);
@@ -769,7 +786,7 @@ uint32_t bme280_get_humidity();
 
 #define BOOTLOADER_ADDRESS (NRF_UICR->BOOTLOADERADDR)
 
-extern int globalBreakCounter; 
+extern int globalBreakCounter;
 
 //We keep a number of pointers to hardware peripherals so that our FruityMesh implementation
 //does not have to include the simulator. It will access all hardware using these pointers and we can
@@ -815,7 +832,7 @@ uint32_t sd_ble_gatts_sys_attr_set(uint16_t conn_handle, uint8_t const *p_sys_at
 uint32_t sd_ble_gattc_primary_services_discover(uint16_t conn_handle, uint16_t start_handle, ble_uuid_t const *p_srvc_uuid);
 //********************************************************
 // NOTE: This implementation simulates the mtu request by pushing the event directly into the queue of the partner node
-//On real nodes, softdevice will send a message of mtu request which could be affected by some other factors as well like order of queue etc 
+//On real nodes, softdevice will send a message of mtu request which could be affected by some other factors as well like order of queue etc
 uint32_t sd_ble_gattc_exchange_mtu_request(uint16_t connHandle, uint16_t clientRxMtu);
 uint32_t sd_ble_gap_data_length_update(uint16_t connHandle, ble_gap_data_length_params_t const* p_dl_params, ble_gap_data_length_limitation_t* p_dl_limitation);
 uint32_t sd_ble_gatts_exchange_mtu_reply(uint16_t connHandle, uint16_t serverRxMtu);
@@ -839,6 +856,7 @@ uint32_t sd_flash_write(uint32_t * const p_dst, uint32_t const * const p_src, ui
 uint32_t sd_rand_application_vector_get(uint8_t * p_buff, uint8_t length);
 uint32_t sd_ble_evt_get(uint8_t *p_dest, uint16_t *p_len);
 uint32_t sd_app_evt_wait();
+uint32_t sd_nvic_SetPendingIRQ(IRQn_Type IRQn);
 uint32_t sd_nvic_ClearPendingIRQ(IRQn_Type IRQn);
 uint32_t nrf_sdh_ble_enable(uint32_t * p_app_ram_base);
 uint32_t sd_softdevice_is_enabled(uint8_t* p_softdevice_enabled);

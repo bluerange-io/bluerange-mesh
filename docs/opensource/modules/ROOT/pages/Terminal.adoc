@@ -74,6 +74,41 @@ In addition, all JSON messages from the firmware have a CRC32 appended:
 The `nRF52840` SoC includes a USB peripheral and the Nordic SDK includes code to provide the communications device class (CDC) abstract control model (ACM).
 This is a standardized way of providing a serial terminal via USB.
 
-Our implemention can e.g. be used with USB Dongles based on the nRF52840 SoC or with the nRF52840-DK which has a second Micro-USB port attached to the SoC which is used together with the USB peripheral.
+Our implementation can e.g. be used with USB Dongles based on the nRF52840 SoC or with the nRF52840-DK which has a second Micro-USB port attached to the SoC which is used together with the USB peripheral.
 
 The BlueRange Mesh binding is implemented in C in `src/c/drivers/nrf/virtual_com_port.[ch]` and used by the terminal implementation in `Terminal.cpp` for input and output.
+
+
+== Locking the Terminal
+
+The terminal can be locked, requiring the user to login before any incoming command is processed.
+
+It can be enabled in code, e.g. in the board configuration with
+
+[source,C++]
+----
+GS->terminal.EnableLogin();
+----
+
+=== Example
+
+[source,Javascript]
+----
+// Trying to execute commands when terminal is locked
+action this status get_device_info
+{"type":"error","code":9,"text":"Login required"}
+
+// Providing the wrong password
+login abc
+{"type":"error","code":4,"text":"Too few arguments"}
+
+// Successful with `login [Node Key Hex with colons or as base64]
+login 61:5B:..........:25:88
+
+// Now commands can be executed
+action this status get_device_info
+{"nodeId":94,"type":"device_info","module":3,"dBmRX" ..................}
+
+// Logout to lock the terminal again. Same is achieved when resetting the device.
+logout
+----

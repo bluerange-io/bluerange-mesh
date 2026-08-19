@@ -46,7 +46,7 @@ namespace bbe
         virtual ~PrimitiveBrush2D();
         int brush2d;
     };
-    
+
     template <typename T>
     class List
     {
@@ -82,7 +82,7 @@ namespace bbe
 
         bool isLoaded() const { return false; };
     };
-    
+
     class GameTime
     {
     public:

@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -40,7 +49,7 @@
 #include <FruityHalBleGap.h>
 
 /*
- * This is the FruityMesh HAL Layer for abstracting platform specific 
+ * This is the FruityMesh HAL Layer for abstracting platform specific
  * code which makes things easier when porting to other platforms.
  */
 namespace FruityHal
@@ -59,25 +68,25 @@ namespace FruityHal
         UNKOWN_EVENT,
         NUMBER_OF_EVTS
     };
-    
+
     typedef void(*UartEventHandler) (void);
     typedef void(*AppErrorHandler) (u32 error_code);
     typedef void(*DBDiscoveryHandler) (BleGattDBDiscoveryEvent * p_dbEvent);
     typedef void(*ApplicationInterruptHandler) (void);
     typedef void(*MainContextHandler) (void);
-    
+
     #define ______________________EVENT_DEFINITIONS_______________________
 
     class BleEvent
     {
     protected:
         explicit BleEvent(void const * evt);
-    #ifdef SIM_ENABLED //Unfortunatly a virtual destructor is too expensive for the real firmware.
+    #ifdef SIM_ENABLED //Unfortunately a virtual destructor is too expensive for the real firmware.
         virtual ~BleEvent();
     #endif
     };
 
-    class GapEvent : public BleEvent 
+    class GapEvent : public BleEvent
     {
     protected:
         explicit GapEvent(void const * evt);
@@ -85,7 +94,7 @@ namespace FruityHal
         u16 GetConnectionHandle() const;
     };
 
-    class GapConnParamUpdateEvent : public GapEvent 
+    class GapConnParamUpdateEvent : public GapEvent
     {
     public:
         explicit GapConnParamUpdateEvent(void const * evt);
@@ -95,7 +104,7 @@ namespace FruityHal
         u16 GetConnectionSupervisionTimeout() const;
     };
 
-    class GapConnParamUpdateRequestEvent : public GapEvent 
+    class GapConnParamUpdateRequestEvent : public GapEvent
     {
     public:
         explicit GapConnParamUpdateRequestEvent(void const * evt);
@@ -201,7 +210,7 @@ namespace FruityHal
     public:
         explicit GattcEvent(void const * evt);
         u16 GetConnectionHandle() const;
-        FruityHal::BleGattEror GetGattStatus() const;
+        FruityHal::BleGattError GetGattStatus() const;
     };
 
     class GattcWriteResponseEvent : public GattcEvent
@@ -283,8 +292,8 @@ namespace FruityHal
     };
 
     enum class ClockSource : u8 {
-        CLOCK_SOURCE_RC     = 0, 
-        CLOCK_SOURCE_XTAL   = 1, 
+        CLOCK_SOURCE_RC     = 0,
+        CLOCK_SOURCE_XTAL   = 1,
         CLOCK_SOURCE_SYNTH  = 2
     };
 
@@ -318,7 +327,7 @@ namespace FruityHal
         ADC_GAIN_4    = 8,
     };
 
-    enum class AdcResoultion {
+    enum class AdcResolution {
         ADC_8_BIT        = 0,
         ADC_10_BIT    = 1,
     };
@@ -421,7 +430,7 @@ namespace FruityHal
     ErrorType BleGapRssiStop(u16 connHandle);
 
     // ######################### GATT ############################
-    ErrorType DiscovereServiceInit(DBDiscoveryHandler dbEventHandler);
+    ErrorType DiscoveryServiceInit(DBDiscoveryHandler dbEventHandler);
     ErrorType DiscoverService(u16 connHandle, const BleGattUuid& p_uuid);
     bool DiscoveryIsInProgress();
 
@@ -434,7 +443,7 @@ namespace FruityHal
 
     u32 BleGattGetMaxMtu();
     ErrorType BleGattMtuExchangeRequest(u16 connHandle, u16 clientRxMtu);
-    
+
     // ######################### Radio ############################
     ErrorType RadioSetTxPower(i8 txPower, TxRole role, u16 handle);
 
@@ -476,7 +485,7 @@ namespace FruityHal
     void DelayMs(u32 delayMs);
     void EcbEncryptBlock(const u8 * p_key, const u8 * p_clearText, u8 * p_cipherText);
     u8 ConvertPortToGpio(u8 port, u8 pin);
-    
+
 
     // ######################### FLASH ############################
 
@@ -528,8 +537,8 @@ namespace FruityHal
     typedef void (*AdcEventHandler)(void);
     ErrorType AdcInit(AdcEventHandler);
     void AdcUninit();
-    ErrorType AdcConfigureChannel(u32 pin, AdcReference reference, AdcResoultion resolution, AdcGain gain);
-    ErrorType AdcSample(i16 & buffer, u8 len); // triggers non-blocking convertion which end will be reported by calling AdcEventHandler
+    ErrorType AdcConfigureChannel(u32 pin, AdcReference reference, AdcResolution resolution, AdcGain gain);
+    ErrorType AdcSample(i16 & buffer, u8 len); // triggers non-blocking conversion which end will be reported by calling AdcEventHandler
     u8 AdcConvertSampleToDeciVoltage(u32 sample);
     u8 AdcConvertSampleToDeciVoltage(u32 sample, u16 voltageDivider);
 
@@ -567,7 +576,7 @@ namespace FruityHal
     //as this is where the SoftDevice starts
     u32 GetSoftDeviceSize(u32 sdBaseAddr = FLASH_REGION_START_ADDRESS + GetMasterBootRecordSize());
     u32 GetSoftDeviceVersion();
-    u32 GetLicenseSectionAdress(u32 sdBaseAddr = FLASH_REGION_START_ADDRESS + GetMasterBootRecordSize());
+    u32 GetLicenseSectionAddress(u32 sdBaseAddr = FLASH_REGION_START_ADDRESS + GetMasterBootRecordSize());
     BleStackType GetBleStackType();
     void BleStackErrorHandler(u32 id, u32 info);
 
@@ -628,7 +637,7 @@ namespace FruityHal
 
     /// Request the configured timeslot.
     ErrorType TimeslotRequestNextEvent();
-    
+
     // ######################### RADIO ############################
 
     /// Events that are generated by the radio peripheral.
@@ -658,7 +667,7 @@ namespace FruityHal
     {
         /// Disables the radio.
         DISABLE,
-        
+
         /// Enables the radio in transmission mode.
         TXEN,
     };
@@ -675,18 +684,18 @@ namespace FruityHal
     /// Set the transmission power in dBm.
     ///
     /// Typically supported values range from -40dBm to +4dBm (nRF52832)
-    /// or +8dBm (nRF52840) with varyingly sized steps inbetween.
+    /// or +8dBm (nRF52840) with varyingly sized steps in between.
     ///
     /// If dryRun is true this function does not write the value to the
     /// corresponding peripheral register.
     ///
     /// Returns:
     /// The actual transmission power used by the device is returned from this
-    /// function and might be different from the specified hint. 
+    /// function and might be different from the specified hint.
     /// NOTE: The specific rounding method is deliberately left unspecified.
     signed RadioChooseTxPowerHint(signed txPowerHint = 0, bool dryRun = false);
 
-    /// Configure the radio for sending BLE advertisments. The PDU is
+    /// Configure the radio for sending BLE advertisements. The PDU is
     /// specified by the packet pointer.
     void RadioHandleBleAdvTxStart(u8 *packet);
 }

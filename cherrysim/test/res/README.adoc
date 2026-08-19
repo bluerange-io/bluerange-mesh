@@ -16,7 +16,7 @@ var outputJson = {"results":[]};
 inputJson.results.forEach ((device, index) => {
 	outputJson.results[index] = {};
 	outputJson.results[index].platform = device.platform;
-    
+
     outputJson.results[index].properties = {
     	x:device.properties.x,
     	y:device.properties.y,

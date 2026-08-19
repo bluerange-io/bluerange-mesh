@@ -21,7 +21,7 @@ Cppcheck is used in our pipeline. For the most accurate results for the internal
 ** File -> Open Project File -> Select the modified cppcheck.cppcheck
 ** If asked if the build dir should be created, click "Yes"
 ** Cppcheck now scans the repository. This might take some time.
-* (Advanced) **Use CMake to execute Cppcheck on Windows**. 
+* (Advanced) **Use CMake to execute Cppcheck on Windows**.
 ** According to https://cmake.org/cmake/help/v3.17/prop_tgt/LANG_CPPCHECK.html#prop_tgt:%3CLANG%3E_CPPCHECK[the CMake docs], this is only supported with Makefile and Ninja Generators but will produce the closest result to the one of our pipeline. Cppcheck must be placed in your PATH variable.
 ** Download and install https://releases.llvm.org/9.0.0/LLVM-9.0.0-win32.exe[clang 9.0 32-bit] (part of LLVM). We highly recommend not changing the default installation path so you can directly use the commands down below as they are.
 ** Create a sibling directory next to the BlueRange Mesh repository

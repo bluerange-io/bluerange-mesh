@@ -78,7 +78,7 @@ static inline void utils_reverse_memcpy(uint8_t * p_dst, const uint8_t * p_src, 
  *
  * @param p_dst  Destination address.
  * @param p_src1 First source address.
- * @param p_src2 Secound source address.
+ * @param p_src2 Second source address.
  * @param size   Number of bytes to XOR.
  */
 static inline void utils_xor(uint8_t * p_dst, const uint8_t * p_src1, const uint8_t * p_src2, uint16_t size)

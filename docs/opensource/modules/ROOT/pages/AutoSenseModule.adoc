@@ -1,7 +1,7 @@
 = Auto Sense Module (ID 15)
 
 == Purpose
-The _AutoSenseModule_ provides a configurable way to periodically poll data from a module or 3rd party controller and send the results to some chosen receiver. Data is reported as component_sense. The module itself is completely agonostic when it comes to what is polled. As long as it has a moduleId, a component, a register, and a length, it can be polled. Before polled values are sent to the receiver, they can be filtered. This way it's possible to e.g. only send values if the polled value changed since the last polling time. What exactly is polled is configured in "Table Entries". 
+The _AutoSenseModule_ provides a configurable way to periodically poll data from a module or 3rd party controller and send the results to some chosen receiver. Data is reported as component_sense. The module itself is completely agnostic when it comes to what is polled. As long as it has a moduleId, a component, a register, and a length, it can be polled. Before polled values are sent to the receiver, they can be filtered. This way it's possible to e.g. only send values if the polled value changed since the last polling time. What exactly is polled is configured in "Table Entries".
 
 == Preparing a Module to be polled
 If a Module should be pollable, it has to inherit the `AutoSenseModuleDataProvider` interface and register itself with the AutoSenseModule:
@@ -247,4 +247,3 @@ Subject to change.
 
 ==== Response
 Subject to change.
-

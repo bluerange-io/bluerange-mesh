@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -149,7 +158,7 @@ private:
             NOT_ALL_CONNECTIONS_USED_UP = 1,
             CANT_DISCONNECT_ANYBODY     = 2,
         };
-        
+
         enum class TimeSyncState : u8
         {
             UNSYNCED = 0,
@@ -208,7 +217,7 @@ private:
 
         //struct GetDynamicGroupsMessage
         //{
-        //    EMPTY MESSSAGE
+        //    EMPTY MESSAGE
         //};
 
         struct GetDynamicGroupsResponseMessage
@@ -233,7 +242,7 @@ private:
         bool CreateRawHeader(RawDataHeader* outVal, RawDataActionType type, const char* commandArgs[], const char* requestHandle) const;
 
         u32 ModifyScoreBasedOnPreferredPartners(u32 score, NodeId partner) const;
-        
+
         joinMeBufferPacket* DetermineBestCluster        (u32(Node::*clusterRatingFunction)(const joinMeBufferPacket& packet) const);
         joinMeBufferPacket* DetermineBestClusterAsSlave ();
         joinMeBufferPacket* DetermineBestClusterAsMaster();
@@ -287,7 +296,7 @@ private:
         void SendGroupResponse(NodeId receiver, NodeModuleActionResponseMessages actionType, u8 requestHandle, NodeId group, RecordStorageResultCode code);
         void SaveRecordStorageDynamicGroup(NodeId receiver, NodeModuleActionResponseMessages actionType, u8 requestHandle, NodeId group);
 
-    public:    
+    public:
         DECLARE_CONFIG_AND_PACKED_STRUCT(NodeConfiguration);
 
 
@@ -330,8 +339,8 @@ private:
         // Result of the bestCluster calculation
         enum class DecisionResult : u8
         {
-            CONNECT_AS_SLAVE, 
-            CONNECT_AS_MASTER, 
+            CONNECT_AS_SLAVE,
+            CONNECT_AS_MASTER,
             NO_NODES_FOUND
         };
 
@@ -372,7 +381,7 @@ private:
 
         //Connection
         void HandshakeTimeoutHandler() const;
-        void HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinner); 
+        void HandshakeDoneHandler(MeshConnection* connection, bool completedAsWinner);
         MeshAccessAuthorization CheckMeshAccessPacketAuthorization(BaseConnectionSendData* sendData, u8 const * data, FmKeyId fmKeyId, DataDirection direction) override final;
 
         //Stuff
@@ -408,7 +417,7 @@ private:
         void ReceiveClusterInfoUpdate(MeshConnection* connection, ConnPacketClusterInfoUpdate const * packet);
 
         void HandOverMasterBitIfNecessary() const;
-        
+
         bool HasAllMasterBits() const;
 
         void PrintStatus() const;
@@ -419,6 +428,7 @@ private:
 
         void Reboot(u32 delayDs, RebootReason reason);
         bool IsRebootScheduled();
+        u32 GetRebootTimeDs() const;
 
         //Receiving
         void MeshMessageReceivedHandler(BaseConnection* connection, BaseConnectionSendData* sendData, ConnPacketHeader const * packetHeader) override final;
@@ -432,14 +442,14 @@ private:
         //Methods of TerminalCommandListener
         #ifdef TERMINAL_ENABLED
         TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
-        
+
         //Helper method for parsing component_act or _sense Terminal command
         ErrorTypeUnchecked SendComponentMessageFromTerminal(MessageType componentMessageType, const char* commandArgs[], u8 commandArgsSize);
         #endif
 
         //Methods of ConnectionManagerCallback
         void MeshConnectionDisconnectedHandler(AppDisconnectReason appDisconnectReason, ConnectionState connectionStateBeforeDisconnection, u8 hadConnectionMasterBit, i16 connectedClusterSize, u32 connectedClusterId);
-        
+
         bool GetKey(FmKeyId fmKeyId, u8* keyOut) const;
         bool IsPreferredConnection(NodeId id) const;
 };

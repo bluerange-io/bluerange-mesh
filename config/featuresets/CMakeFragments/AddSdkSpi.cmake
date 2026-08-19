@@ -1,7 +1,7 @@
 # This will add the SDK drivers for SPI (Serial Peripheral Interface)
 
 if (${PLATFORM} STREQUAL "NRF52832")
-  file(GLOB   LOCAL_SRC CONFIGURE_DEPENDS  "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/drivers_nrf/spi_master/nrf_drv_spi.cpp" 
+  file(GLOB   LOCAL_SRC CONFIGURE_DEPENDS  "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/drivers_nrf/spi_master/nrf_drv_spi.cpp"
                                            "${PROJECT_SOURCE_DIR}/sdk/sdk14/components/drivers_nrf/spi_master/nrf_drv_spi.c")
   target_sources(${FEATURE_SET} PRIVATE ${LOCAL_SRC})
 elseif (${PLATFORM} STREQUAL "NRF52840")

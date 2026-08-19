@@ -101,7 +101,7 @@ The queried nodes will respond with their complete error log that they have stor
 ----
 
 === Component periodic timestamp sending
-The StatusReporterModule includes functionality for periodically sending the nodes current timestamp. 
+The StatusReporterModule includes functionality for periodically sending the nodes current timestamp.
 It has temporary and persistent time reporting functionality.
 
 Temporary time reporting can be enabled and disabled via component_act. When enabled, it is automatically disabled after a few minutes to avoid unnecessary battery usage.
@@ -140,7 +140,7 @@ The payload of the answer is the base 64 timestamp of the target node.
 
 [#UsbGwStatus]
 === Gateway status for Sink Nodes with USB support
-For nodes that use the `ACTIVATE_ONLY_SINK_FUNCTIONALITY` and the `ACTIVATE_VIRTUAL_COM_PORT` defines, the current USB serial Terminal and Gateway status can be retreived and updated.
+For nodes that use the `ACTIVATE_ONLY_SINK_FUNCTIONALITY` and the `ACTIVATE_VIRTUAL_COM_PORT` defines, the current USB serial Terminal and Gateway status can be retrieved and updated.
 
 This value is stored as a `u8` in RAM only. It is updated
 
@@ -360,7 +360,7 @@ enum LiveReportTypes {
 
     //========
     LIVE_REPORT_TYPES_DEBUG = 150,
-    LIVE_REPORT_TYPE_DECISION_RESULT //extra is decision type, extra2 is preferedPartner
+    LIVE_REPORT_TYPE_DECISION_RESULT //extra is decision type, extra2 is preferredPartner
 };
 ----
 
@@ -439,7 +439,7 @@ We offer a xref:RegisterAccess.adoc[generic register based access] to a number o
 |0|30100|CLUSTER_SIZE|U16(2)|-|R|The amount of currently connected mesh nodes in the whole mesh, including the own node.
 |0|30102|NUM_MESH_CONNECTIONS|U8(1)|-|R|The amount of opened mesh relay connections to other nodes
 |0|30103|NUM_OTHER_CONNECTIONS|U8(1)|-|R|The amount of other BLE connections (e.g. MeshAccess) that are not used to form the mesh.
-|0|30104|MESH_CONNECTIONS_DROPPED|U16(2)|-|R|The total amount of mesh connections that were dropped accidentially or on purpose.
+|0|30104|MESH_CONNECTIONS_DROPPED|U16(2)|-|R|The total amount of mesh connections that were dropped accidentally or on purpose.
 |0|30106|PACKETS_SENT_RELIABLE|U32(4)|-|R|The number of packets that were sent through the mesh on all connections with ACK request.
 |0|30110|PACKETS_SENT_UNRELIABLE|U32(4)|-|R|The number of packets that were sent through the mesh on all connections without ACK.
 |0|30114|PACKETS_DROPPED|U32(4)|-|R|The total number of packets that had to be dropped due to peak traffic exceeding the queue size.
@@ -449,7 +449,7 @@ We offer a xref:RegisterAccess.adoc[generic register based access] to a number o
 
 |===
 
-NOTE: The reference voltagses are currently not writable as the generic register implementation does not yet have persistence included. It should therefore be set through the board configuration.
+NOTE: The reference voltages are currently not writable as the generic register implementation does not yet have persistence included. It should therefore be set through the board configuration.
 
 === Potential Use-Cases
 

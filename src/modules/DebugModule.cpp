@@ -1,35 +1,45 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
 
 #include <DebugModule.h>
+#include <Terminal.h>
 
 
 #include <Utility.h>
@@ -43,6 +53,8 @@
 #include <GlobalState.h>
 
 constexpr u8 DEBUG_MODULE_CONFIG_VERSION = 2;
+
+extern u32 __FruityStackLimit[];
 
 #if IS_ACTIVE(EINK_MODULE)
 #ifndef GITHUB_RELEASE
@@ -96,6 +108,11 @@ void DebugModule::ConfigurationLoadedHandler(u8* migratableConfig, u16 migratabl
 {
     //Do additional initialization upon loading the config
 
+    const bool notEnrolled = GS->node.configuration.enrollmentState == EnrollmentState::NOT_ENROLLED;
+    if (Boardconfig->enableUartIfNotEnrolled && notEnrolled) {
+        Terminal::GetInstance().ApplyTerminalMode(TerminalMode::JSON);
+        logt("DEBUGMOD", "Node is not enrolled, enabling JSON terminal mode");
+    }
 }
 
 void DebugModule::SendStatistics(NodeId receiver) const
@@ -304,7 +321,7 @@ void DebugModule::PrintAdvMessage(const FruityHal::GapAdvertisementReportEvent& 
             && messageType == (u16)ServiceDataMessageType::LEGACY_ASSET_V1
             && (scanLogIdentifier.advMessageTypeFilter == 0 || scanLogIdentifier.advMessageTypeFilter == (u16)ServiceDataMessageType::LEGACY_ASSET_V1)
         ) {
-        
+
             knownFormat = true;
 
             const AdvPacketLegacyAssetServiceData* payload = (const AdvPacketLegacyAssetServiceData*) (data + 7);
@@ -401,7 +418,7 @@ void DebugModule::PrintAdvMessage(const FruityHal::GapAdvertisementReportEvent& 
             if (scanLogIdentifier.type == DeviceIdentifier::SERIAL_NUMBER_INDEX && memcmp(&payload->encryptedField.unencrypted.serialNumberIndex, scanLogIdentifier.value, sizeof(u32)) != 0) return;
 
             PrintAdvMessageHeader("SENSOR_MESSAGE(5)", advertisementReportEvent);
-            
+
             if (!payload->isEncrypted)
             {
                 char serialString[NODE_SERIAL_NUMBER_MAX_CHAR_LENGTH];
@@ -425,9 +442,9 @@ void DebugModule::PrintAdvMessage(const FruityHal::GapAdvertisementReportEvent& 
 
             const AdvPacketAssetServiceData* payload = (const AdvPacketAssetServiceData*) (data + 7);
             const AdvPacketAssetBleServiceDataPayload* blePayload = (const AdvPacketAssetBleServiceDataPayload*)payload->payload;
-            
+
             PrintAdvMessageHeader("ASSET_BLE(6)", advertisementReportEvent);
-            
+
             trace("    > moving:%u, freeIn:%u, wantsConn:%u, nodeId:%u, networkId:%u" EOL,
                 payload->moving,
                 payload->hasFreeInConnection,
@@ -449,7 +466,7 @@ void DebugModule::PrintAdvMessage(const FruityHal::GapAdvertisementReportEvent& 
             const AdvPacketAssetInsServiceDataPayload* insPayload = (const AdvPacketAssetInsServiceDataPayload*)payload->payload;
 
             PrintAdvMessageHeader("ASSET_INS(7)", advertisementReportEvent);
-            
+
             trace("    > moving:%u, freeIn:%u, wantsConn:%u, nodeId:%u, insMeta:%u" EOL,
                 payload->moving,
                 payload->hasFreeInConnection,
@@ -477,7 +494,7 @@ void DebugModule::PrintAdvMessage(const FruityHal::GapAdvertisementReportEvent& 
             const AdvPacketPayloadJoinMeV0* payload = (const AdvPacketPayloadJoinMeV0*)(data + 11);
 
             PrintAdvMessageHeader("JOIN_ME(1)", advertisementReportEvent);
-            
+
             trace("    > network:%u, sender:%u, clId:%u, clSize:%u, freeIn:%u, freeOut:%u, devType:%u, hops:%u" EOL,
                 header->networkId,
                 payload->sender,
@@ -664,7 +681,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
                 return TerminalCommandHandlerReturnType::SUCCESS;
             }
-            //Tell any node to generate a hardfault            
+            //Tell any node to generate a hardfault
 #if IS_ACTIVE(UNSECURE_DEBUG_FUNCTIONALITY)
             else if(TERMARGS(3, "hardfault"))
             {
@@ -691,7 +708,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
                 data.address = Utility::StringToU32(commandArgs[4]);
                 data.length = Utility::StringToU16(commandArgs[5]);
-                
+
                 SendModuleActionMessage(
                     MessageType::MODULE_TRIGGER_ACTION,
                     destinationNode,
@@ -846,12 +863,32 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
 
         return TerminalCommandHandlerReturnType::SUCCESS;
     }
-    //Display the free heap
     else if (TERMARGS(0, "heap"))
     {
         u8 checkvar = 1;
         logjson("NODE", "{\"stack\":%u}" SEP, (u32)(&checkvar - 0x20000000));
-        logt("NODE", "Module usage: %u" SEP, GS->moduleAllocator.GetMemorySize());
+
+#ifndef SIM_ENABLED
+       //Some detailed information about the RAM usage
+        trace(">>>>>>" EOL);
+        trace("SD RAM Bytes %u" EOL, (u32)((u8*)__application_ram_start_address - 0x20000000));
+        trace("appRamBase @%d" EOL, (u32)((u8*)__application_ram_start_address - 0x20000000));
+        u32 bssBytes = (u32)((u8*)__FruityStackLimit - 0x20000000) - (u32)((u8*)__application_ram_start_address - 0x20000000);
+        trace("bss Bytes %d" EOL, bssBytes);
+        trace(" - GlobalState Bytes %d" EOL, sizeof(GlobalState));
+        trace(" - Other static stuff %d" EOL, bssBytes - sizeof(GlobalState));
+        trace("stackLimit @%d" EOL, (u32)((u8*)__FruityStackLimit - 0x20000000));
+        trace(">>>>>>" EOL);
+        trace("untouchedStack Bytes %u" EOL, Utility::GetAmountOfUnusedStackBytes());
+        trace("currentStack Bytes %u" EOL, (u32)(&checkvar - 0x20000000) - (u32)((u8*)__FruityStackLimit - 0x20000000));
+        trace("<<<<<<" EOL);
+        trace("currentStackPtr @%d" EOL, (u32)(&checkvar - 0x20000000));
+        trace(" - moduleUsage Bytes %u" EOL, GS->moduleAllocator.GetMemorySize());
+        trace("stackAtMain @%d" EOL, (u32)((u8*)GS->halMemory - 0x20000000));
+        trace(" - halMemory Bytes %u" EOL, FruityHal::GetHalMemorySize());
+        trace("appRamEnd @65376" EOL);
+        trace("<<<<<<" EOL);
+#endif
 
         return TerminalCommandHandlerReturnType::SUCCESS;
 
@@ -1257,7 +1294,7 @@ TerminalCommandHandlerReturnType DebugModule::TerminalCommandHandler(const char*
                 scanLogIdentifier.type = DeviceIdentifier::SERIAL_NUMBER_INDEX;
                 u32 serialIndex = Utility::GetIndexForSerial(commandArgs[1]);
                 CheckedMemcpy(scanLogIdentifier.value, &serialIndex, sizeof(u32));
-                
+
             }
             else return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
         }
@@ -1374,7 +1411,7 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
                 else {
                     //Note the start of flooding
                     if(firstFloodPacketMs == 0) firstFloodPacketMs = lastFloodPacketMs = FruityHal::GetRtcMs();
-                    //Increase flood time as long as packets are continuously received withing a threshold of 2 second at least
+                    //Increase flood time as long as packets are continuously received within a threshold of 2 second at least
                     if(firstFloodPacketMs && FruityHal::GetRtcMs() < lastFloodPacketMs + 2000){
                         lastFloodPacketMs = FruityHal::GetRtcMs();
                         autoFloodSum += sendData->dataLength.GetRaw();
@@ -1606,13 +1643,13 @@ void DebugModule::MeshMessageReceivedHandler(BaseConnection* connection, BaseCon
                         break;
                     }
                 }
-                logjson("DEBUGMOD", "{\"nodeId\":%u,\"type\":\"send_max_message_response\", \"correctValues\":%u, \"expectedCorrectValues\":%u}" SEP, packet->header.sender, i, sizeof(message->data));
+                logjson("DEBUGMOD", "{\"nodeId\":%u,\"type\":\"send_max_message_response\", \"correctValues\":%u, \"expectedCorrectValues\":%u}" SEP, packet->header.sender, i, (u32)sizeof(message->data));
             }
             else if (actionType == DebugModuleActionResponseMessages::MEMORY) {
                 if (sendData->dataLength < SIZEOF_CONN_PACKET_MODULE + SIZEOF_DEBUG_MODULE_MEMORY_MESSAGE_HEADER) return;
 
                 DebugModuleMemoryMessage const * message = (DebugModuleMemoryMessage const *)packet->data;
-                
+
                 u16 memoryLength = sendData->dataLength.GetRaw() - SIZEOF_CONN_PACKET_MODULE - SIZEOF_DEBUG_MODULE_MEMORY_MESSAGE_HEADER;
 
                 u16 bufferLength = memoryLength * 3 + 1;

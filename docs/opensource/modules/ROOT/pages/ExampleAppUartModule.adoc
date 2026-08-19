@@ -110,4 +110,3 @@ actionType: `RECEIVE_LOG`
 |1 |partLen|Log length sent
 |186 |data|Log
 |===
-

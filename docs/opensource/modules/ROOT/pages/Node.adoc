@@ -165,7 +165,7 @@ The response acknowledges the receipt of these commands.
 ----
 
 === Dynamic Group Ids
-A node can be added to and removed from one or more dynamic groups. The assignment is stored persistently until a factory reset is performed. These IDs - a subset of the NodeId range - can be used to broadcast messages to a selected group of nodes simultaniously. All nodes that are part of the group will respond to a message that is adressed to it. See the xref:Specification.adoc#NodeIds[specification] for the range of NodeIds belonging to the dynamic group range. Trying to set groupIDs outside of this range will result in an error. A node can belong to up to 20 groups, although this limitation is potentially subject to change in the future.
+A node can be added to and removed from one or more dynamic groups. The assignment is stored persistently until a factory reset is performed. These IDs - a subset of the NodeId range - can be used to broadcast messages to a selected group of nodes simultaneously. All nodes that are part of the group will respond to a message that is addressed to it. See the xref:Specification.adoc#NodeIds[specification] for the range of NodeIds belonging to the dynamic group range. Trying to set groupIDs outside of this range will result in an error. A node can belong to up to 20 groups, although this limitation is potentially subject to change in the future.
 [source, C++]
 ----
 //Add the node to a group
@@ -234,7 +234,7 @@ and starts sending generate_load_chunk messages to node 3. Node 3 then logs:
 
 Requests the capabilities of the node with _nodeId_ (NodeId 0 cannot be used with this command). The receiver then answers with several messages, each representing a single capability. After all capabilities are sent, the receiver sends a last message indicating the end of the transaction.
 
-WARNING: A single capability message is a rather big message with 128 bytes in size. As such only a single node in the mesh should be queried for it's capabilities at a time, else the mesh would be put under heavy load. Broadcasting this command is not supported by the firmware for this reason. 
+WARNING: A single capability message is a rather big message with 128 bytes in size. As such only a single node in the mesh should be queried for it's capabilities at a time, else the mesh would be put under heavy load. Broadcasting this command is not supported by the firmware for this reason.
 
 Examples
 
@@ -306,7 +306,7 @@ The response acknowledges the receipt of the command.
 {"type":"set_preferred_connections_result","nodeId":123,"module":0}
 ----
 
-=== Setting number of enrolled nodes 
+=== Setting number of enrolled nodes
 
 `action [nodeId] node set_enrolled_nodes {number of nodes in network}`
 
@@ -348,7 +348,7 @@ To query the local time of a node in the network with e.g nodeId 1234, the follo
 
 `action 1234 node gettime`
 
-Sample response: 
+Sample response:
 
 `{"type":"get_time_result","nodeId":1234,"module":0,"syncState":2,"time":1654247506,"offset":120,"master":0}`
 

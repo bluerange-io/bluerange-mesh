@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -47,7 +56,7 @@ constexpr int ASSET_PACKET_BUFFER_SIZE = 30;
 constexpr int ASSET_PACKET_RSSI_SEND_THRESHOLD = -88;
 
 enum class GroupingType : u8 {
-    GROUP_BY_ADDRESS =1, 
+    GROUP_BY_ADDRESS =1,
     NO_GROUPING      =2,
 };
 
@@ -85,7 +94,7 @@ class ScanningModule : public Module
 private:
     static constexpr u16 groupedReportingIntervalDs = 0;
     /*
-     * Filters coud be:
+     * Filters could be:
      *     - group all filtered packets by address and sum their RSSI and count
      *     - scan for specific packets and send them back
      *     -
@@ -111,7 +120,7 @@ private:
     //uint8_t addressPointer;
     //std::array<SimpleArray<u8, FH_BLE_GAP_ADDR_LEN>, NUM_ADDRESSES_TRACKED> addresses;
     //std::array<u32, NUM_ADDRESSES_TRACKED> totalRSSIsPerAddress;
-    //std::array<u32, NUM_ADDRESSES_TRACKED> totalMessagesPerAdress;
+    //std::array<u32, NUM_ADDRESSES_TRACKED> totalMessagesPerAddress;
 
     u32 totalMessages;
     u32 totalRSSI;
@@ -189,7 +198,7 @@ private:
 
     std::array<ScannedAssetTrackingStorage, ASSET_PACKET_BUFFER_SIZE> assetPackets{};
 
-    //####### End of Module specitic messages
+    //####### End of Module specific messages
 #pragma pack(pop)
 
 
@@ -200,7 +209,7 @@ private:
     void ReceiveTrackedAssetsLegacy(BaseConnectionSendData* sendData, ScanModuleTrackedAssetsLegacyMessage const * packet) const;
     void ReceiveTrackedAssets(TrackedAssetMessage const * msg, u32 amount, NodeId sender) const;
     void RssiRunningAverageCalculationInPlace(RssiContainer &container, u8 advertisingChannel, i8 rssi);
-    
+
     void SendTrackedAssets();
 
 
@@ -234,4 +243,3 @@ public:
     TerminalCommandHandlerReturnType TerminalCommandHandler(const char* commandArgs[], u8 commandArgsSize) override final;
 #endif
 };
-

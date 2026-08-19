@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -41,8 +50,8 @@
 #ifndef REGISTER_DIGITAL_IN_NUM_MAX
 #define REGISTER_DIGITAL_IN_NUM_MAX 10
 #endif
-#ifndef REGISTER_DIGITAL_IN_TOGGLE_PARIS_NUM_MAX
-#define REGISTER_DIGITAL_IN_TOGGLE_PARIS_NUM_MAX 10
+#ifndef REGISTER_DIGITAL_IN_TOGGLE_PAIRS_NUM_MAX
+#define REGISTER_DIGITAL_IN_TOGGLE_PAIRS_NUM_MAX 10
 #endif
 
 #pragma pack(push, 1)
@@ -93,7 +102,7 @@ class IoModule:
         static constexpr int SIZEOF_GPIO_PIN_CONFIG = 2;
         struct gpioPinConfig{
             u8 pinNumber : 5;
-            u8 direction : 1; //configure pin as either input (0) or output (1) 
+            u8 direction : 1; //configure pin as either input (0) or output (1)
             u8 inputBufferConnected : 1; //disconnect input buffer when port not used to save energy
             u8 pull : 2; //pull down (1) or up (2) or disable pull (0) on pin (GpioPullMode)
             u8 driveStrength : 3; // GPIO_PIN_CNF_DRIVE_*
@@ -141,7 +150,7 @@ class IoModule:
                 u8 pinLevel;
             }IoModuleGetPinMessage;
             STATIC_ASSERT_SIZE(IoModuleGetPinMessage, SIZEOF_IO_MODULE_GET_PIN_MESSAGE);
-            
+
             static constexpr int SIZEOF_IO_MODULE_SET_IDENTIFICATION_MESSAGE = 1;
             typedef struct
             {
@@ -174,8 +183,9 @@ class IoModule:
         #endif
 
         enum class DigitalInReadMode : u8 {
-            ON_DEMAND = 0, // Default
-            INTERRUPT = 1
+            ON_DEMAND           = 0, // Default
+            INTERRUPT           = 1,
+            INTERRUPT_DEBOUNCED = 2, //Blocks further processing of the state for DEBOUNCE_DURATION_DS
         };
 
         //Information Registers
@@ -185,7 +195,7 @@ class IoModule:
 
         //Control Registers
         constexpr static u32 REGISTER_DIO_OUTPUT_STATE_START             = 20000;
-        
+
         //Data Registers
         constexpr static u32 REGISTER_DIO_INPUT_STATE_START              = 30000;
         constexpr static u32 REGISTER_DIO_TOGGLE_PAIR_START              = 30100;
@@ -223,9 +233,11 @@ class IoModule:
         typedef struct {
             u8 pinIndexA;
             u8 pinIndexB;
+            u8 previousState;
+            u32 previousActiveTimeDs;
         } DigitalInTogglePair;
         u8 numDigitalInTogglePairSettings = 0;
-        std::array<DigitalInTogglePair, REGISTER_DIGITAL_IN_TOGGLE_PARIS_NUM_MAX> digitalInTogglePairSettings = {};
+        std::array<DigitalInTogglePair, REGISTER_DIGITAL_IN_TOGGLE_PAIRS_NUM_MAX> digitalInTogglePairSettings = {};
 
     public:
         //Should be called through setCustomModuleSettings in the boardconfig
@@ -257,14 +269,17 @@ class IoModule:
         void AddTogglePairForBoard(i8 pinIndexA, u8 pinIndexB) {
             if (
                 !moduleStarted
-                && numDigitalInTogglePairSettings < REGISTER_DIGITAL_IN_TOGGLE_PARIS_NUM_MAX
-                && pinIndexA != pinIndexB
+                && numDigitalInTogglePairSettings < REGISTER_DIGITAL_IN_TOGGLE_PAIRS_NUM_MAX
                 && pinIndexA < numDigitalInPinSettings // PinIndexA and B must be configured as digital inputs before
                 && pinIndexB < numDigitalInPinSettings
-                && digitalInPinSettings[pinIndexA].readMode == DigitalInReadMode::INTERRUPT // PinIndexA and B must be configured interrupt based
-                && digitalInPinSettings[pinIndexB].readMode == DigitalInReadMode::INTERRUPT
+                && (
+                    (pinIndexA != pinIndexB
+                    && digitalInPinSettings[pinIndexA].readMode == DigitalInReadMode::INTERRUPT // PinIndexA and B must be configured interrupt based
+                    && digitalInPinSettings[pinIndexB].readMode == DigitalInReadMode::INTERRUPT)
+                    || (pinIndexA == pinIndexB
+                    && digitalInPinSettings[pinIndexA].readMode == DigitalInReadMode::INTERRUPT_DEBOUNCED) // Single pin allows for a debounced toggle button
+                )
             ) {
-
                 digitalInTogglePairSettings[numDigitalInTogglePairSettings].pinIndexA = pinIndexA;
                 digitalInTogglePairSettings[numDigitalInTogglePairSettings].pinIndexB = pinIndexB;
                 numDigitalInTogglePairSettings++;
@@ -281,4 +296,3 @@ class IoModule:
         virtual void ChangeValue(u16 component, u16 register_, u8* values, u16 length) override final;
 #endif //IS_ACTIVE(REGISTER_HANDLER)
 };
-

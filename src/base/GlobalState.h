@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -103,9 +112,9 @@ class GlobalState
 
         //App timer uses deciseconds because milliseconds will overflow a u32 too fast
         u32 tickRemainderTimesTen = 0;
-        u16 passsedTimeSinceLastTimerHandlerDs = 0;
+        u16 passedTimeSinceLastTimerHandlerDs = 0;
         u16 appTimerRandomOffsetDs = 0;
-        u32 appTimerDs = 0; //The app timer is used for all mesh and module timings and keeps track of the time in ds since bootup
+        u32 appTimerDs = 0; //The app timer is used for all mesh and module timings and keeps track of the time in ds since boot-up
 
         TimeManager timeManager;
 
@@ -169,9 +178,9 @@ class GlobalState
                     if (Utility::IsVendorModuleId(activeModules[amountOfModules]->moduleId)) {
                         if (recordId < RECORD_STORAGE_RECORD_ID_VENDOR_MODULE_CONFIG_BASE || recordId > RECORD_STORAGE_RECORD_ID_VENDOR_MODULE_CONFIG_MAX) {
                             recordId = RECORD_STORAGE_RECORD_ID_INVALID;
-                            // If this error occured then you probably forgot to pass the record id to the InitializeModule function in your featureset cpp file.
+                            // If this error occurred then you probably forgot to pass the record id to the InitializeModule function in your featureset cpp file.
                             // It should look like this: GS->InitializeModule<RuuviWeatherModule>(createModule, RECORD_STORAGE_RECORD_ID_VENDOR_MODULE_CONFIG_BASE + 0);
-                            // The second argument is neccessary for vendor modules with vendor module ids.
+                            // The second argument is necessary for vendor modules with vendor module ids.
                             logt("ERROR", "Invalid recordId");
                         }
                         activeModules[amountOfModules]->recordStorageId = recordId;
@@ -210,7 +219,7 @@ class GlobalState
         u32 fruitymeshEventLooperTriggerTimestamp;
         u32 bleEventLooperTriggerTimestamp;
         u32 socEventLooperTriggerTimestamp;
-        u32 advertismentReceivedTimestamp;
+        u32 advertisementReceivedTimestamp;
         bool inGetRandomLoop;
         bool inPullEventsLoop;
         bool safeBootEnabled;
@@ -241,4 +250,6 @@ class GlobalState
         //This registers a handler that will be called from the main context (non-interrupt)
         //It allows us to execute logic in the main Thread that will be interrupted by every interrupt priority
         void RegisterMainContextHandler(FruityHal::MainContextHandler handler);
+
+        void* generalComm = nullptr;
 };

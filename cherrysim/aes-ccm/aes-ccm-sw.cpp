@@ -75,28 +75,28 @@ CIMPORT_C CRYSError_t  CC_AESCCM(
 #else
   if (EncrDecrMode == SASI_AES_ENCRYPT)
   {
-    ret = aes_ccm_ae(CCM_Key, //const u8 *key, 
-                     16, //size_t key_len, 
+    ret = aes_ccm_ae(CCM_Key, //const u8 *key,
+                     16, //size_t key_len,
                      N_ptr, //const u8 *nonce,
-                     4, //size_t M, 
-                     TextDataIn_ptr,// const u8 *plain, 
+                     4, //size_t M,
+                     TextDataIn_ptr,// const u8 *plain,
                      TextDataInSize ,//size_t plain_len,
-                     ADataIn_ptr,// const u8 *aad, 
-                     ADataInSize, //size_t aad_len, 
-                     TextDataOut_ptr,// u8 *crypt, 
+                     ADataIn_ptr,// const u8 *aad,
+                     ADataInSize, //size_t aad_len,
+                     TextDataOut_ptr,// u8 *crypt,
                      Mac_Res);// u8 *auth);
   }
   else if (EncrDecrMode == SASI_AES_DECRYPT)
   {
-    ret = aes_ccm_ad(CCM_Key, 
-                     16, 
+    ret = aes_ccm_ad(CCM_Key,
+                     16,
                      N_ptr,
-                     4, 
-                     TextDataIn_ptr, 
+                     4,
+                     TextDataIn_ptr,
                      TextDataInSize,
-                     ADataIn_ptr, 
-                     ADataInSize, 
-                     Mac_Res, 
+                     ADataIn_ptr,
+                     ADataInSize,
+                     Mac_Res,
                      TextDataOut_ptr);
   }
 #endif

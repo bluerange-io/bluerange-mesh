@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -61,7 +70,7 @@ enum class AutoActFunction : u8
     FLOAT_MULT    = 8,
 
     LAST_VALID_VALUE = FLOAT_MULT,
-    
+
     UNUSED_BUT_RESERVED_FLOOR = 9,
     UNUSED_BUT_RESERVED_CEIL = 10,
     UNUSED_BUT_RESERVED_ROUND = 11,
@@ -86,7 +95,7 @@ enum class AutoActModuleResponseCode : u8
     DATA_LENGTH_NOT_IN_PREAMBLE = 9,
     DATA_OFFSET_MULTIPLE = 10,
     DATA_LENGTH_MULTIPLE = 11,
-    INPUT_DATA_LEGNTH_TOO_SMALL = 12,
+    INPUT_DATA_LENGTH_TOO_SMALL = 12,
     INPUT_TOO_SMALL = 13,
     FAILED_TO_LOAD_DATATYPE = 14,
     FAILED_TO_APPLY_TRANSFORMATION = 15,
@@ -174,7 +183,7 @@ typedef struct
 STATIC_ASSERT_SIZE(AutoActModuleClearEntryResponse, 2);
 #pragma pack(pop)
 
-class AutoActModule : 
+class AutoActModule :
     public Module,
     public RecordStorageEventListener
 {
@@ -182,7 +191,7 @@ TESTER_PUBLIC:
     static constexpr u8 ALL_ENTRIES = 0xFF;
     static constexpr u32 MAX_AMOUNT_OF_ENTRIES = 20;
     static constexpr u32 MAX_IO_SIZE = 256; //Maximum size of any transformation input or output
-    
+
     // For the AutoActModule, both the trigger and response messages have the same value.
     enum class AutoActModuleTriggerAndResponseMessages : u8
     {

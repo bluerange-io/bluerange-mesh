@@ -7,7 +7,7 @@ BlueRange Mesh can be seen both as a mesh and as a complete framework to make de
 * Enrollment (Provisioning) of nodes both directly and over the mesh, e.g. using a QR code or with the "nearby" feature (see xref:EnrollmentModule.adoc[EnrollmentModule])
 * xref:MeshAccessModule.adoc[MeshAccessModule] for handling connections from/to smartphones and other devices
 * Encrypted mesh and smartphone connections by default using node (device), organization and multiple user keys (see xref:Specification.adoc#EncryptionKeys[Encryption Keys])
-* Automatic time synchronisation over the mesh (cf. <<Time Synchronisation>>)
+* Automatic time synchronization over the mesh (cf. <<Time Synchronization>>)
 * Automatic packet splitting if packets are bigger than the connection MTU (<<Packet Splitting>>)
 * <<Sink Determination>> allows us to detect a Gateway in our Mesh
 * <<Connection Reestablishment>> in case a GAP connection drops, with automatic packet resending
@@ -71,8 +71,8 @@ A number of modules of BlueRange Mesh are not yet open source but can be used by
 * Find the simulator documentation on the xref:CherrySim.adoc[CherrySim] page.
 * image:cherrysim.png[cherrysim]
 
-=== Time Synchronisation
-BlueRange Mesh has inbuilt time synchronization. A gateway or smartphone can act as a synchronisation device to send a unix timestamp to one node in the mesh. This node will then take care that this timestamp is synchronized to all other nodes in the mesh. If any number of nodes are rebooted, the time will be synchronized again if there is at least one node that still has the current time. By using a counter value, we make sure that the latest timestamp will be synchronized and that the time can be corrected in both directions. The time is always synchronized between two partners in a kind of handshake where first the time is sent to the other node and next, an offset is sent to account for the delay in sending that message. Further documentation can be found xref:Node.adoc#TimeSynchronization[here].
+=== Time Synchronization
+BlueRange Mesh has inbuilt time synchronization. A gateway or smartphone can act as a synchronization device to send a unix timestamp to one node in the mesh. This node will then take care that this timestamp is synchronized to all other nodes in the mesh. If any number of nodes are rebooted, the time will be synchronized again if there is at least one node that still has the current time. By using a counter value, we make sure that the latest timestamp will be synchronized and that the time can be corrected in both directions. The time is always synchronized between two partners in a kind of handshake where first the time is sent to the other node and next, an offset is sent to account for the delay in sending that message. Further documentation can be found xref:Node.adoc#TimeSynchronization[here].
 
 === Packet Splitting
 Depending on the configuration of the nodes in a network, the connection MTU (Maximum Transmission Unit) might only allow for a packet size of 20 bytes payload. As you will probably need to send bigger packets from time to time, we implemented automatic packet splitting. A packet can be queued with a size of up to 200 bytes and is then split automatically before it is sent to the next node at which point it is automatically reassembled. This process also makes sure that a packet uses the maximum possible MTU available.
@@ -89,4 +89,6 @@ BlueRange Mesh relies an standard BLE GAP connections which have a configurable 
 === Watchdog With Safe Boot Mode
 The hardware watchdog is configured to restart a node after a certain time if it doesn't receive a keep alive packet from the gateway in the meantime. This is the last fallback to recover a node if there is some critical unknown issue. It is also possible to configure the Watchdog to work without a Gateway, it will then monitor the behaviour of the node itself.
 
-It is possible to configure the watchdog to use safe boot. In safe boot mode, the node will boot up without loading any persistant configuration. This also means that the node will not be enrolled in this mode, but it will reboot in normal mode after the watchdog triggers again. This makes it possible to rescue a node that received a faulty persistent configuration.
+It is possible to configure the watchdog to use safe boot. In safe boot mode, the node will boot up without loading any persistent configuration. This also means that the node will not be enrolled in this mode, but it will reboot in normal mode after the watchdog triggers again. This makes it possible to rescue a node that received a faulty persistent configuration.
+
+NOTE: Once configured and started, the watchdog can not be reconfigured, not even after a soft reboot. This means that the hardware watchdog will not bet set to the desired timeout (smaller) in safe boot, and a software-based watchdog is used instead.

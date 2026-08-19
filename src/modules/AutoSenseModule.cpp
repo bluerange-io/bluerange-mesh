@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -175,7 +184,7 @@ TerminalCommandHandlerReturnType AutoSenseModule::TerminalCommandHandler(const c
                 const u32 entrySize = Logger::ParseEncodedStringToBuffer(commandArgs[6], entryBuffer, sizeof(entryBuffer), &didError);
                 const u8 requestHandle = commandArgsSize >= 8 ? Utility::StringToU8(commandArgs[7], &didError) : 0;
                 if (didError || entrySize == 0) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
-                
+
                 u32 sendBufferSize = sizeof(AutoSenseModuleSetEntryMessage) - sizeof(AutoSenseModuleSetEntryMessage::data) + entrySize;
                 DYNAMIC_ARRAY(sendBuffer, sendBufferSize);
                 CheckedMemset(sendBuffer, 0, sendBufferSize);
@@ -202,7 +211,7 @@ TerminalCommandHandlerReturnType AutoSenseModule::TerminalCommandHandler(const c
                 msg.entryIndex = Utility::StringToU8(commandArgs[4], &didError);
                 const u8 requestHandle = commandArgsSize >= 6 ? Utility::StringToU8(commandArgs[5], &didError) : 0;
                 if (didError) return TerminalCommandHandlerReturnType::WRONG_ARGUMENT;
-                
+
                 SendModuleActionMessage(
                     MessageType::MODULE_TRIGGER_ACTION,
                     destinationNode,
@@ -328,8 +337,10 @@ bool AutoSenseModule::ConsumeData(ModuleIdWrapper moduleId, u16 component, u16 r
         }
         else if (tableEntry->reportFunction == AutoSenseFunction::ON_CHANGE_RATE_LIMITED)
         {
+            //FIXME: remove the first !anyValueRecorded check because it leads to an initial "0" value being published into the mesh. Check for side-effects.
             if (!anyValueRecorded.get(entryIndex)
                 || 0 != memcmp(writePointer, data, length))
+
             {
                 readyForSending.set(entryIndex, true);
                 CheckedMemcpy(writePointer, data, length);
@@ -340,6 +351,7 @@ bool AutoSenseModule::ConsumeData(ModuleIdWrapper moduleId, u16 component, u16 r
         else if (tableEntry->reportFunction == AutoSenseFunction::ON_CHANGE_WITH_PERIODIC_REPORT)
         {
             bool changed = false;
+            //FIXME: remove the first !anyValueRecorded check because it leads to an initial "0" value being published into the mesh. Check for side-effects.
             if (!anyValueRecorded.get(entryIndex)
                 || 0 != memcmp(writePointer, data, length))
             {
@@ -701,7 +713,7 @@ void AutoSenseModule::SetEntry(u8 entryIndex, const AutoSenseTableEntryV0* table
     bool foundMatchingDataProvider = false;
     for (u32 i = 0; i < MAX_AMOUNT_DATA_PROVIDERS; i++)
     {
-        if (dataProviders[i].dataProvider 
+        if (dataProviders[i].dataProvider
             && Utility::IsSameModuleId(dataProviders[i].moduleId, tableEntry->moduleId)
             && dataProviders[i].dataProvider->AcceptsRegister(tableEntry->component, tableEntry->register_, tableEntry->length))
         {
@@ -865,7 +877,7 @@ void AutoSenseModule::MeshMessageReceivedHandler(BaseConnection* connection, Bas
 
         }
     }
-    
+
 #endif //IS_INACTIVE(ONLY_SINK_FUNCTIONALITY)
 
     //Parse Module responses
@@ -879,7 +891,7 @@ void AutoSenseModule::MeshMessageReceivedHandler(BaseConnection* connection, Bas
             if (packet->actionType == (u8)AutoSenseModuleTriggerAndResponseMessages::SET_ENTRY && sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE + sizeof(AutoSenseModuleSetEntryResponse))
             {
                 const AutoSenseModuleSetEntryResponse* msg = (const AutoSenseModuleSetEntryResponse*)packet->data;
-                logjson("ASMOD", 
+                logjson("ASMOD",
                     "{"
                         "\"type\":\"set_autosense_entry_result\","
                         "\"nodeId\":%u,"
@@ -917,7 +929,7 @@ void AutoSenseModule::MeshMessageReceivedHandler(BaseConnection* connection, Bas
             else if (packet->actionType == (u8)AutoSenseModuleTriggerAndResponseMessages::CLEAR_ENTRY && sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE + sizeof(AutoSenseModuleClearEntryResponse))
             {
                 const AutoSenseModuleClearEntryResponse* msg = (const AutoSenseModuleClearEntryResponse*)packet->data;
-                logjson("ASMOD", 
+                logjson("ASMOD",
                     "{"
                         "\"type\":\"clear_autosense_entry_result\","
                         "\"nodeId\":%u,"

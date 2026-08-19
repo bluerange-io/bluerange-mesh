@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -50,9 +59,9 @@
  *     - Central connects to peripheral
  *     - Central discovers the MeshAccessService of the peripheral with its rx/tx characteristics and the cccd of the tx characteristic
  *     - Central enables notifications on cccd of tx characteristic
- *     - Peripheral will notice the enabled notification and will instantiate a MeshAccessConnection throught the ResolverConnections
+ *     - Peripheral will notice the enabled notification and will instantiate a MeshAccessConnection through the ResolverConnections
  *     - Central starts handshake by requesting a nonce
- *     - Peripheral anwers with ANonce
+ *     - Peripheral answers with ANonce
  *     - Central answers with SNonce in an encrypted packet (enables auto encrypt/decrypt)
  *     - Peripheral checks encrypted packet, sends encrypted HandshakeDone packet and enables auto encrypt/decrypt
  *
@@ -143,8 +152,8 @@ BaseConnection* MeshAccessConnection::ConnTypeResolver(BaseConnection* oldConnec
                     &oldConnection->partnerAddress,
                     FmKeyId::ZERO, //fmKeyId unknown at this point, partner must query
                     MeshAccessTunnelType::INVALID, //TunnelType also unknown
-                    0 //We don't want to overwrite the virtual nodeId for incomming connections.
-                ); 
+                    0 //We don't want to overwrite the virtual nodeId for incoming connections.
+                );
         }
     }
 
@@ -368,7 +377,7 @@ void MeshAccessConnection::OnANonceReceived(ConnPacketEncryptCustomANonce const 
         (u8*)packet,
         SIZEOF_CONN_PACKET_ENCRYPT_CUSTOM_SNONCE,
         false);
-    
+
     // => Continues after MessageType::ENCRYPT_CUSTOM_DONE is received
 }
 
@@ -506,8 +515,8 @@ bool MeshAccessConnection::GenerateSessionKey(const u8* nonce, NodeId centralNod
         CheckedMemcpy(ltKey, key, 16);
     } else if(fmKeyId == FmKeyId::ZERO
             && meshAccessMod->IsZeroKeyConnectable(direction)) {
-        //If the fmKeyId is FmKeyId::ZERO and we allow unsecure connections, we use
-        //the zero encryption key (basically no encryption) if we are not enrolled or 
+        //If the fmKeyId is FmKeyId::ZERO and we allow insecure connections, we use
+        //the zero encryption key (basically no encryption) if we are not enrolled or
         //we are the one opening the connection.
         logt("MACONN", "Using key none");
         CheckedMemset(ltKey, 0x00, 16);
@@ -653,7 +662,7 @@ void MeshAccessConnection::EncryptPacket(u8* data, MessageLength dataLength)
     //Increment nonce being used as a counter
     encryptionNonce[1]++;
 
-    //Generate a new Keystream with an updated counter for MIC calculateion
+    //Generate a new Keystream with an updated counter for MIC calculation
     CheckedMemset(cleartext, 0x00, 16);
     CheckedMemcpy(cleartext, encryptionNonce, MESH_ACCESS_HANDSHAKE_NONCE_LENGTH);
 
@@ -801,7 +810,7 @@ bool MeshAccessConnection::ShouldSendDataToNodeId(NodeId nodeId) const
         nodeId == virtualPartnerId
         //Broadcasts, by definition always go everywhere
         || nodeId == NODE_ID_BROADCAST
-        //NODE_ID_ANYCAST_THEN_BROADCAST is inteded to be sent through MeshAccessConnections
+        //NODE_ID_ANYCAST_THEN_BROADCAST is intended to be sent through MeshAccessConnections
         || nodeId == NODE_ID_ANYCAST_THEN_BROADCAST
         //A given hops count may also go through a MeshAccessConnection
         || (nodeId >= NODE_ID_HOPS_BASE && nodeId < (NODE_ID_HOPS_BASE + NODE_ID_HOPS_BASE_SIZE))
@@ -997,7 +1006,7 @@ void MeshAccessConnection::ReceiveDataHandler(BaseConnectionSendData* sendData, 
         {
             OnEncryptCustomDoneReceived((ConnPacketEncryptCustomDone const*) data);
         }
-        else 
+        else
         {
             logt("ERROR", "Wrong handshake packet");
             DisconnectAndRemove(AppDisconnectReason::INVALID_HANDSHAKE_PACKET);
@@ -1076,7 +1085,7 @@ void MeshAccessConnection::ReceiveMeshAccessMessageHandler(BaseConnectionSendDat
 
     //Block unauthorized packets
     if(
-        auth == MeshAccessAuthorization::UNDETERMINED 
+        auth == MeshAccessAuthorization::UNDETERMINED
         || auth == MeshAccessAuthorization::BLACKLIST
     ){
         logt("WARNING", "Packet unauthorized");
@@ -1152,7 +1161,7 @@ void MeshAccessConnection::GATTServiceDiscoveredHandler(FruityHal::BleGattDBDisc
     //Once the remote service was discovered, we must register for notifications
     if(evt.serviceUUID.uuid == meshAccessService->serviceUuid.uuid
         && evt.serviceUUID.type == meshAccessService->serviceUuid.type){
-        for(u32 j = 0; j < evt.charateristicsCount; j++)
+        for(u32 j = 0; j < evt.characteristicsCount; j++)
         {
             logt("MACONN", "Found service");
             //Save a reference to the rx handle of our partner

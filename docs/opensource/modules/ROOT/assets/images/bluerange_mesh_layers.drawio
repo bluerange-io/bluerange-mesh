@@ -1,0 +1,70 @@
+<mxfile host="65bd71144e" pages="1" scale="2" border="0">
+    <diagram id="8S3EAorNkWL-dzGtETf0" name="Page-1">
+        <mxGraphModel dx="828" dy="648" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" background="#ffffff" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="Dw_2jRZYT2J4uOGL5Bsu-3" value="Physical Layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CCE5FF;strokeColor=#9673a6;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="480" width="380" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="Dw_2jRZYT2J4uOGL5Bsu-4" value="Link Layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CCE5FF;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="430" width="380" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="Dw_2jRZYT2J4uOGL5Bsu-6" value="L2CAP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3399FF;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="380" width="380" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="Dw_2jRZYT2J4uOGL5Bsu-7" value="ATT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3399FF;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="340" width="190" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="Dw_2jRZYT2J4uOGL5Bsu-8" value="Security Manager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3399FF;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="300" width="190" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="Dw_2jRZYT2J4uOGL5Bsu-9" value="GATT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3399FF;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="300" width="190" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="Dw_2jRZYT2J4uOGL5Bsu-10" value="GAP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3399FF;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="250" width="380" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="Dw_2jRZYT2J4uOGL5Bsu-11" value="GATT Services" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3399FF;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="200" width="380" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="Dw_2jRZYT2J4uOGL5Bsu-15" value="BlueRange Mesh" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="150" width="380" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="Dw_2jRZYT2J4uOGL5Bsu-16" value="Application" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="70" width="180" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="Dw_2jRZYT2J4uOGL5Bsu-17" value="UART" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="360" y="110" width="180" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="Dw_2jRZYT2J4uOGL5Bsu-19" value="3rd party device application" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="360" y="70" width="180" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="Dw_2jRZYT2J4uOGL5Bsu-21" value="Bluetooth Low Energy" style="text;html=1;resizable=0;points=[];autosize=1;align=left;verticalAlign=top;spacingTop=-4;" parent="1" vertex="1">
+                    <mxGeometry x="550" y="205" width="130" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="Dw_2jRZYT2J4uOGL5Bsu-22" value="BlueRange Mesh application" style="text;html=1;resizable=0;points=[];autosize=1;align=left;verticalAlign=top;spacingTop=-4;" parent="1" vertex="1">
+                    <mxGeometry x="550" y="180" width="180" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-Nn8WJ45un1sUzDWG0X-1" value="" style="endArrow=none;dashed=1;html=1;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="80" y="429.5" as="sourcePoint"/>
+                        <mxPoint x="640" y="429.5" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-Nn8WJ45un1sUzDWG0X-2" value="BLE Host" style="text;html=1;resizable=0;points=[];autosize=1;align=left;verticalAlign=top;spacingTop=-4;" parent="1" vertex="1">
+                    <mxGeometry x="545" y="405" width="70" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-Nn8WJ45un1sUzDWG0X-3" value="BLE Controller" style="text;html=1;resizable=0;points=[];autosize=1;align=left;verticalAlign=top;spacingTop=-4;" parent="1" vertex="1">
+                    <mxGeometry x="545" y="435" width="90" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-Nn8WJ45un1sUzDWG0X-4" value="" style="endArrow=none;html=1;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="80" y="200" as="sourcePoint"/>
+                        <mxPoint x="641" y="200" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

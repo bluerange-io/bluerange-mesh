@@ -24,12 +24,9 @@ if (${PLATFORM} STREQUAL "NRF52840")
                                                            "${PROJECT_SOURCE_DIR}/sdk/sdk15/components/libraries/atomic_fifo"
                                                            "${PROJECT_SOURCE_DIR}/sdk/sdk15/components/libraries/atomic_fifo"
                                                            "${PROJECT_SOURCE_DIR}/sdk/sdk15/external/utf_converter")
-  
+
 else(${PLATFORM} STREQUAL "NRF52840")
   message(FATAL_ERROR "PLATFORM ${PLATFORM} does not support Virtual Com Port!")
 endif(${PLATFORM} STREQUAL "NRF52840")
 
 list(APPEND VIRTUAL_COM_TARGETS ${FEATURE_SET})
-
-
-

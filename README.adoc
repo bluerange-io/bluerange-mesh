@@ -18,6 +18,3 @@ https://www.bluerange.io/docs/fruitymesh/index.html[Documentation]
 
 You can also have a look in the `docs` folder for a version of the documentation that matches a certain commit.
 |===
-
-
-

@@ -32,6 +32,7 @@ file(GLOB   CHERRYSIM_SRC   CONFIGURE_DEPENDS   "./*.c"
                                                 "./MersenneTwister.cpp"
                                                 "./PathLossModel.cpp"
                                                 "./StackWatcher.cpp"
+                                                "./SimulatedTimers.cpp"
                                                 )
 SET(visual_studio_source_list ${visual_studio_source_list} ${CHERRYSIM_SRC} ${TESTERCPP} ${RUNNERCPP} CACHE INTERNAL "")
 

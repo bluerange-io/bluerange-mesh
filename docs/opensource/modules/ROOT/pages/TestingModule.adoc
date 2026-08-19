@@ -119,7 +119,7 @@ starttest E3:8F:26:AD:82:DE adv 100 0 0 10
 ----
 starttest [bleAddress] scan [scanInterval] [scanWindow]
 ----
-This command sends a message to the slave node to start a scanning test. The slave node will scan for 30 secondss after it receives this message.
+This command sends a message to the slave node to start a scanning test. The slave node will scan for 30 seconds after it receives this message.
 
 [cols="1,2"]
 |===

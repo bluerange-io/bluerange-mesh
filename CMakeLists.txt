@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.16.3 FATAL_ERROR)
 
 # An in-source build will cause errors during build, so we prohibit it
 if("${CMAKE_BINARY_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
-  message(FATAL_ERROR "In-Source Build is prohibited. Please execute cmake from a different directory, e.g. the build directory. NOTE: Delete everything that was just created by CMake. Best to use git reset --hard to reset the repository in a state how it was cloned, otherwhise this error might persist.")
+  message(FATAL_ERROR "In-Source Build is prohibited. Please execute cmake from a different directory, e.g. the build directory. NOTE: Delete everything that was just created by CMake. Best to use git reset --hard to reset the repository in a state how it was cloned, otherwise this error might persist.")
 endif()
 
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type")
@@ -79,7 +79,7 @@ if(BUILD_TYPE STREQUAL "FIRMWARE")
     message("Did you want to build the Simulator? Then you need to generate the project using -DBUILD_TYPE=SIMULATOR or modify your CMakeCache.txt file in your build directory to set BUILD_TYPE:STRING=SIMULATOR")
     message(FATAL_ERROR "Wrong Generator selected: ${CMAKE_GENERATOR} but \"Unix Makefiles\" or \"Ninja\" was expected. Remove all files that were just created and call cmake again with -G \"Unix Makefiles\".")
   endif()
-  
+
   set(GCC_PATH "" CACHE STRING "Path to GCC 4.9 or 9.3.1 depending on SDK version")
   if(GCC_PATH STREQUAL "")
     message(FATAL_ERROR "GCC_PATH was unspecified! Set it e.g. via -DGCC_PATH=C:/path/to/gcc-arm-embedded-4.9")
@@ -90,7 +90,7 @@ if(BUILD_TYPE STREQUAL "FIRMWARE")
   if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     message(FATAL_ERROR "Only GCC is supported when compiling feature sets!")
   endif()
-  
+
   # Builds a list of .cmake files from our featureset directory to check what featuresets we have
   file(GLOB FEATURE_SET_MAKE_FILES CONFIGURE_DEPENDS ./config/featuresets/*.cmake)
 
@@ -126,10 +126,10 @@ if(BUILD_TYPE STREQUAL "FIRMWARE")
     unset(ALLOW_MALLOC)
     set(FAIL_ON_SIZE_TOO_BIG 1)
     set(MAX_SIZE "UNKNOWN_MAX_SIZE")
-    
+
     # Includes our <featureset>.cmake
     include(${f})
-    
+
     set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_SDK "${TARGET_SDK}")
     set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_CHIPSET "${TARGET_CHIPSET}")
     set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_STACK "${TARGET_STACK}")
@@ -147,7 +147,7 @@ if(BUILD_TYPE STREQUAL "FIRMWARE")
       list(APPEND SDK_14_TARGETS ${FEATURE_SET})
     elseif(${PLATFORM} STREQUAL "NRF52840")
       set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_SDK "NRF_SDK_15_2_0")
-      set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_CHIPSET "NRF52832_XXAA")
+      set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_CHIPSET "NRF52840_XXAA")
       set_property(TARGET ${FEATURE_SET} PROPERTY FM_TARGET_STACK "NRF_S140_V6_1_0")
       set_property(TARGET ${FEATURE_SET} PROPERTY FM_MAX_APP_SIZE 245000) # Calculated with a chunk size of 128 for updates
       list(APPEND SDK_15_TARGETS ${FEATURE_SET})
@@ -158,7 +158,7 @@ if(BUILD_TYPE STREQUAL "FIRMWARE")
       set_property(TARGET ${FEATURE_SET} PROPERTY FM_MAX_APP_SIZE 167936) # Used the same value as for NRF52832 for no specific reason
       list(APPEND ARM_TARGETS ${FEATURE_SET})
     else()
-      message(FATAL_ERROR "Featureset ${FEATURE_SET} unsed unsupported SDK or PLATFORM")
+      message(FATAL_ERROR "Featureset ${FEATURE_SET} uses unsupported SDK or PLATFORM")
     endif()
 
     if(${PLATFORM} STREQUAL "ARM")
@@ -167,22 +167,22 @@ if(BUILD_TYPE STREQUAL "FIRMWARE")
       # Currently, we do not support any other chip family within this cmake build
       set(CHIP NRF)
     endif ()
-    
+
     # We block malloc usage as all the allocations should be done statically or on the stack
     if(NOT DEFINED ALLOW_MALLOC)
       target_link_options_multi("${FEATURE_SET}" "LINKER:--wrap=malloc")
       target_link_options_multi("${FEATURE_SET}" "LINKER:--wrap=calloc")
     endif()
-    
+
     target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-x assembler-with-cpp>)
-    target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__HEAP_SIZE=4096>)
+    target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__HEAP_SIZE=0>)
     target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:ASM>:-D__STACK_SIZE=4096>)
-        
+
     # Some options to optimize the size of our binary
     target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
     target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-use-cxa-atexit>)
     target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-threadsafe-statics>)
-    
+
     # The following lines enable a number of compile time warnings and errors
     target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall>)
     target_compile_options(${FEATURE_SET} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wextra>)
@@ -205,7 +205,7 @@ if(BUILD_TYPE STREQUAL "FIRMWARE")
       COMMENT "Creating hex file ${FEATURE_SET}"
       BYPRODUCTS "${CMAKE_CURRENT_BINARY_DIR}/${FEATURE_SET}.hex"
     )
-    
+
     # Depending on the given platform, we select the correct BLE Stack
     if (${CHIP} STREQUAL "NRF")
       if(${TARGET_STACK} STREQUAL "NRF_S132_V7_3_0")
@@ -251,7 +251,7 @@ if(BUILD_TYPE STREQUAL "FIRMWARE")
   set_property_multi("${NATIVE_TARGETS}" "CXX_STANDARD" "11")
   set_property_multi("${NATIVE_TARGETS}" "C_STANDARD" "99")
   set_property_multi("${NATIVE_TARGETS}" "CMAKE_CXX_STANDARD_REQUIRED" "ON")
-  
+
   target_compile_options_multi("${NATIVE_TARGETS}" "-mthumb")
   target_compile_options_multi("${NATIVE_TARGETS}" "-fmessage-length=0")
   target_compile_options_multi("${NATIVE_TARGETS}" "-fsigned-char")
@@ -268,7 +268,7 @@ if(BUILD_TYPE STREQUAL "FIRMWARE")
   target_compile_options_multi("${NATIVE_TARGETS}" "-DNDEBUG")
   target_compile_options_multi("${NATIVE_TARGETS}" "-Os")
   target_compile_options_multi("${NATIVE_TARGETS}" "-g")
-  
+
   # Why do we have LINKER: here?
   target_link_options_multi("${NATIVE_TARGETS}" "LINKER:--gc-sections")
   target_link_options_multi("${NATIVE_TARGETS}" "--specs=nano.specs")
@@ -276,7 +276,7 @@ if(BUILD_TYPE STREQUAL "FIRMWARE")
   target_link_options_multi("${NATIVE_TARGETS}" "-lc")
   target_link_options_multi("${NATIVE_TARGETS}" "-lnosys")
   target_link_options_multi("${NATIVE_TARGETS}" "-mthumb")
-  
+
   add_subdirectory(config)
   add_subdirectory(src)
   add_subdirectory(sdk)
@@ -331,7 +331,7 @@ else(BUILD_TYPE STREQUAL "FIRMWARE")
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/util/WebServer/Server.py" "${CMAKE_CURRENT_BINARY_DIR}/Server.py" COPYONLY)
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/BBERenderer/Emscripten/bluerange_nav_logo.png" "${CMAKE_CURRENT_BINARY_DIR}/bluerange_nav_logo.png" COPYONLY)
   endif()
-  
+
   # We can not build our Simulator for 64bit architectures, so we fail if this is selected
   if(NOT CMAKE_SIZEOF_VOID_P STREQUAL 4)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
@@ -342,14 +342,14 @@ else(BUILD_TYPE STREQUAL "FIRMWARE")
       message(FATAL_ERROR "Only 32-bit is supported by CherrySim!")
     endif()
   endif()
-  
+
   add_executable(cherrySim_tester)
   add_executable(cherrySim_runner)
   list(APPEND ALL_TARGETS cherrySim_tester cherrySim_runner)
   list(APPEND SIMULATOR_TARGETS cherrySim_tester cherrySim_runner)
-  
+
   include(CMake/AddSimulatorCompilerFlags.cmake)
-  
+
   target_compile_definitions(cherrySim_runner PRIVATE "SDK=11")
   target_compile_definitions(cherrySim_runner PRIVATE "CHERRYSIM_RUNNER_ENABLED")
   if(NOT EMSCRIPTEN)
@@ -366,7 +366,7 @@ else(BUILD_TYPE STREQUAL "FIRMWARE")
     target_compile_definitions(cherrySim_runner PRIVATE "CI_PIPELINE")
     target_compile_definitions(cherrySim_tester PRIVATE "CI_PIPELINE")
   endif()
-  
+
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config/featuresets/CMakeFragments/AddIns.cmake")
   include(config/featuresets/CMakeFragments/AddIns.cmake)
 endif()
@@ -416,11 +416,11 @@ endif()
   else()
     message(STATUS "Could not find cppcheck! Install it for additional useful warnings!")
   endif()
-  
+
   add_subdirectory(config)
   add_subdirectory(cherrysim)
   add_subdirectory(src)
-  
+
   if(NOT EMSCRIPTEN)
     set_target_properties(event event_core event_extra gtest gtest_main PROPERTIES FOLDER Dependencies)
   else(NOT EMSCRIPTEN)
@@ -432,6 +432,6 @@ endif()
     add_compile_definitions(FM_NATIVE_RENDERER_ENABLED)
     add_subdirectory(BBERenderer)
   endif()
-  
+
   source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX fruitymesh FILES ${visual_studio_source_list})
 endif()

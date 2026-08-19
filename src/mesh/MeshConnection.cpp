@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -173,12 +182,12 @@ void MeshConnection::DisconnectAndRemove(AppDisconnectReason reason)
 
 bool MeshConnection::GapDisconnectionHandler(const FruityHal::BleHciError hciDisconnectReason)
 {
-    logt("CONN", "disconnection handler"); 
+    logt("CONN", "disconnection handler");
 
     BaseConnection::GapDisconnectionHandler(hciDisconnectReason);
 
 #if IS_ACTIVE(CONN_PARAM_UPDATE)
-    // Reset the flag indicating that the long term connection inteval was
+    // Reset the flag indicating that the long term connection interval was
     // requested, such that after re-establishment the parameters will be
     // updated again.
     if (longTermConnectionIntervalRequested)
@@ -225,7 +234,7 @@ bool MeshConnection::GapDisconnectionHandler(const FruityHal::BleHciError hciDis
         GS->logger.LogCustomError(CustomErrorTypes::INFO_TRYING_CONNECTION_SUSTAIN, partnerId);
 
         connectionState = ConnectionState::REESTABLISHING;
-        
+
         //Set the reestablishment started time only if the connection was stable before
         if (connectionStateBeforeDisconnection == ConnectionState::HANDSHAKE_DONE) {
             reestablishmentStartedDs = GS->appTimerDs;
@@ -283,7 +292,7 @@ void MeshConnection::GapConnParamUpdateRequestHandler(
         params.minConnInterval, params.maxConnInterval,
         params.slaveLatency, params.connSupTimeout
     ));
-    
+
     // TODO: Add code that validates the requested parameters (e.g. compare
     //       with our settings for long term connections). If we accept,
     //       call GAPController::RequestConnectionParameterUpdate with the
@@ -462,7 +471,7 @@ void MeshConnection::PacketSuccessfullyQueuedWithSoftdevice(SizedData* sentData)
 {
     //Save a queue handle for that packet
     HandlePacketQueued();
-    
+
     //Check if this was the end of a handshake, if yes, mark handshake as completed
     if (((ConnPacketHeader*)sentData->data)->messageType == MessageType::CLUSTER_ACK_2)
     {
@@ -573,7 +582,7 @@ void MeshConnection::ConnectionMtuUpgradedHandler(u16 gattPayloadSize)
     }
 }
 
-//This is called in case our node is the central, otherwhise, the handshake is started by the partner
+//This is called in case our node is the central, otherwise, the handshake is started by the partner
 void MeshConnection::StartHandshake()
 {
     //Before starting our mesh handshake, we upgrade to a higher MTU if possible
@@ -598,7 +607,7 @@ void MeshConnection::StartHandshakeAfterMtuExchange()
     //must not use values that are saved in the node because these might have changed in the meantime
     clusterIDBackup = GS->node.clusterId;
     clusterSizeBackup = GS->node.GetClusterSize();
-    
+
     ClearCurrentClusterInfoUpdatePacket();
 
     if (connectionState >= ConnectionState::HANDSHAKING)
@@ -641,7 +650,7 @@ void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendD
 
     LiveReportHandshakeFailCode handshakeFailCode = LiveReportHandshakeFailCode::SUCCESS;
 
-    /*#################### RECONNETING_HANDSHAKE ############################*/
+    /*#################### RECONNECTING_HANDSHAKE ############################*/
     if(packetHeader->messageType == MessageType::RECONNECT)
     {
         ReceiveReconnectionHandshakePacket((ConnPacketReconnect const *) data);
@@ -666,7 +675,7 @@ void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendD
             //must not use values that are saved in the node because these might have changed in the meantime
             clusterIDBackup = GS->node.clusterId;
             clusterSizeBackup = GS->node.GetClusterSize();
-            
+
             ClearCurrentClusterInfoUpdatePacket();
 
             logt("HANDSHAKE", "############ Handshake starting ###############");
@@ -692,7 +701,7 @@ void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendD
                     logt("HANDSHAKE", "############ Handshake stopped ###############");
                     //We should have connected using an OUT connection, not an IN connection, disconnect
                     DisconnectAndRemove(AppDisconnectReason::WRONG_DIRECTION);
-                    
+
                     handshakeFailCode = LiveReportHandshakeFailCode::WRONG_DIRECTION;
                 }
 
@@ -737,7 +746,7 @@ void MeshConnection::ReceiveHandshakePacketHandler(BaseConnectionSendData* sendD
                 logt("HANDSHAKE", "OUT => %d CLUSTER_ACK_1, hops:%d", outPacket.header.receiver, outPacket.payload.hopsToSink);
 
                 SendHandshakeMessage((u8*) &outPacket, SIZEOF_CONN_PACKET_CLUSTER_ACK_1, true);
-                
+
                 //Kill other Connections and check if this connection has been removed in the process
                 GS->cm.ForceDisconnectOtherMeshConnections(this, AppDisconnectReason::I_AM_SMALLER);
 
@@ -863,7 +872,7 @@ void MeshConnection::SendReconnectionHandshakePacket()
 ErrorType MeshConnection::SendReconnectionHandshakePacketAfterMtuExchange()
 {
     //Can not be done using the send queue because there might be data packets in these queues
-    //So instead, we queue the data directly in the softdevice. We can assume that this succeeds most of the time, otherwise reconneciton fails
+    //So instead, we queue the data directly in the softdevice. We can assume that this succeeds most of the time, otherwise reconnection fails
 
     logt("HANDSHAKE", "OUT => conn(%u) RECONNECT", connectionId);
 
@@ -892,7 +901,7 @@ ErrorType MeshConnection::SendReconnectionHandshakePacketAfterMtuExchange()
         manualPacketsSent++;
     }
     else {
-        //We must disconnect, as otherwhise other packets from the queue will get sent, this will break the reestablishment
+        //We must disconnect, as otherwise other packets from the queue will get sent, this will break the reestablishment
         //We cannot disconnect the GAP connection on purpose as the partner will then stop the reestablishment
         this->DisconnectAndRemove(AppDisconnectReason::RECONNECT_BLE_ERROR);
 

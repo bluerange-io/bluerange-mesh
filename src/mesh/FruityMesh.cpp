@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -101,7 +110,7 @@ void BootFruityMesh()
     //Check for reboot reason
     CheckRamRetainStruct();
 
-    //If reboot reason is empty (clean power bootup) or
+    //If reboot reason is empty (clean power boot-up) or
     bool safeBootEnabled = false;
     if(GET_WATCHDOG_TIMEOUT_SAFE_BOOT() != 0)
     {
@@ -124,7 +133,7 @@ void BootFruityMesh()
     //from starting the DFU process
     FruityHal::SetRetentionRegisterTwo(0x0);
 
-    //Instanciate RecordStorage to load the board config
+    //Instantiate RecordStorage to load the board config
     RecordStorage::GetInstance().Init();
 
     //Load the board configuration which should then give us all the necessary pins and
@@ -206,6 +215,7 @@ void BootFruityMesh()
 //    Logger::GetInstance().EnableTag("CLCCOMM");
 //    Logger::GetInstance().EnableTag("VSMOD");
     Logger::GetInstance().EnableTag("VSDBG");
+    Logger::GetInstance().EnableTag("GENCOM");
 //    Logger::GetInstance().EnableTag("VSCOMM");
 //    Logger::GetInstance().EnableTag("ASMOD");
 //    Logger::GetInstance().EnableTag("GYRO");
@@ -216,10 +226,10 @@ void BootFruityMesh()
 //    Logger::GetInstance().EnableTag("BME");
 //    Logger::GetInstance().EnableTag("ADVS");
       Logger::GetInstance().EnableTag("OFF");
-    
+
     //Log the reboot reason to our ram log so that it is automatically queried by the sink
     Logger::GetInstance().LogError(LoggingError::REBOOT, (u32)GS->ramRetainStructPtr->rebootReason, GS->ramRetainStructPtr->code1);
-    
+
     //If the nordic secure dfu bootloader is enabled, disable it as soon as fruitymesh boots the first time
     FruityHal::DisableHardwareDfuBootloader();
 
@@ -286,12 +296,12 @@ void BootFruityMesh()
 
 void BootModules()
 {
-    //Instanciating the node is mandatory as many other modules use its functionality
+    //Instantiating the node is mandatory as many other modules use its functionality
     GS->node.Init();
     GS->activeModules[0] = &GS->node;
     GS->amountOfModules++;
 
-    //Instanciate all other modules as necessary
+    //Instantiate all other modules as necessary
 
     // Init timers in case any module is using it.
 #ifndef SIM_ENABLED
@@ -308,7 +318,7 @@ void BootModules()
             Boardconfig->setCustomModuleSettings(GS->activeModules[i]->configurationPointer, GS->activeModules[i]);
         }
 
-        //Loading the module configuraton will call the ConfigurationLoadedHandler
+        //Loading the module configuration will call the ConfigurationLoadedHandler
         //after which the module will be initialized
         GS->activeModules[i]->LoadModuleConfigurationAndStart();
 
@@ -345,7 +355,7 @@ void BootModules()
     CheckedMemset(GS->ramRetainStructPtr, 0, sizeof(RamRetainStruct));
     GS->ramRetainStructPtr->rebootReason = RebootReason::UNKNOWN_BUT_BOOTED;
     GS->ramRetainStructPtr->crc32 = Utility::CalculateCrc32((u8*)GS->ramRetainStructPtr, sizeof(RamRetainStruct) - 4);
-    
+
     DeviceConfiguration config;
     if (FruityHal::GetDeviceConfiguration(config) == ErrorType::SUCCESS)
     {
@@ -365,12 +375,10 @@ void BootModules()
     }
 
     // Load the RegisterHandlers after everything else booted up.
-#ifdef JSTODO_PERSISTENCE
-    for (u32 i = 0; i < GS->amountOfRegisterHandlers; i++)
+    for (u32 i = 0; i < GS->amountOfModules; i++)
     {
-        GS->registerHandlers[i]->LoadFromFlash();
+        GS->activeModules[i]->LoadRegisterHandlerDataFromFlash();
     }
-#endif
 }
 
 void StartFruityMesh()            //LCOV_EXCL_LINE Simulated in a different way
@@ -484,7 +492,7 @@ void DispatchEvent(const FruityHal::GapTimeoutEvent & e)
 
 void DispatchEvent(const FruityHal::GapSecurityInfoRequestEvent & e)
 {
-    GAPController::GetInstance().GapSecurityInfoRequestEvenetHandler(e);
+    GAPController::GetInstance().GapSecurityInfoRequestEventHandler(e);
 }
 
 void DispatchEvent(const FruityHal::GapConnectionSecurityUpdateEvent & e)
@@ -593,7 +601,7 @@ void FruityMeshErrorHandler(u32 err)
 #ifndef SIM_ENABLED
 // It is safer to have an extra variable for the RamRetainStruct and use that in the ErrorHandlers instead
 // of using the pointer within the GlobalState. This is because within the error handlers, the GlobalState
-// Object might have become corrupt (e.g. due to a stack overflow). 
+// Object might have become corrupt (e.g. due to a stack overflow).
 extern RamRetainStruct ramRetainStruct;
 
 //If the BLE Stack fails, it will call this function with the error id, the programCounter and some additional info
@@ -669,7 +677,7 @@ void HardFaultErrorHandler(stacked_regs_t* stack)
         return ~crc;
     }((u8*)&ramRetainStruct, sizeof(RamRetainStruct) -4);
 
-    
+
     if(Conf::debugMode){
         GS->ledBlue.Off();
         GS->ledGreen.Off();
@@ -689,7 +697,7 @@ void HardFaultErrorHandler(stacked_regs_t* stack)
 
 /**
  * The RamRetainStruct is saved in a special section in RAM that is persisted between system resets (most of the time)
- * We use this section to store information about the last error that occured before a reboot
+ * We use this section to store information about the last error that occurred before a reboot
  * After rebooting, we can read that struct to send the error information over the mesh
  * Because the ram might be corrupted upon reset, we also save a crc and clear the struct if it does not match
  */

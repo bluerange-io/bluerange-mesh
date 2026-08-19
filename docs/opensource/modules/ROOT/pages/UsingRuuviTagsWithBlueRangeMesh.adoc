@@ -20,12 +20,12 @@ To follow this tutorial we recommend that you have
 *** and a shield for the DK that connects to the RuuviTag using pogopins
 ** or alternatively
 *** a Segger J-Link programmer
-    footnote:[Check if you're elegible for a https://www.segger.com/products/debug-probes/j-link/models/j-link-edu/[J-Link EDU].]
+    footnote:[Check if you're eligible for a https://www.segger.com/products/debug-probes/j-link/models/j-link-edu/[J-Link EDU].]
 *** and a programming cable compatible with your RuuviTag.
-    footnote:[Check the https://lab.ruuvi.com/pinout/[pinout] of your RuuviTag.]
+    footnote:[Check the https://ruuvi.com/ruuvitag-pinout-information/[pinout] of your RuuviTag.]
     footnote:[Standard 10-pin ARM Cortex debug connector for the RuuviTag Rev.B5 and below.
               The cable might be included with your programmer already.
-              You _have to solder the male pin-header_ onto the RuuviTag yourself.] 
+              You _have to solder the male pin-header_ onto the RuuviTag yourself.]
     footnote:[http://www.tag-connect.com/TC2030-CTX-NL[TC2030 Tag-Connect] for the RuuviTag Rev.B6 and above.
               This does not require any soldering but you will have to buy the cable.]
 
@@ -49,7 +49,7 @@ We will begin with a shell in your clone of the https://github.com/bluerange-io/
 ```
 ┏━ 2021-02-24 16:46:13 user@host:~/doc/code/fruitymesh
 $ ls
-buildsettings   config                      LICENCE.txt  softdevice
+buildsettings   config                      license.txt  softdevice
 cherrysim       CONTRIBUTE.adoc             linker       src
 CMake           cppcheck.cppcheck.template  README.adoc  util
 CMakeLists.txt  docs                        sdk
@@ -83,7 +83,7 @@ $ cmake -S. -B../fruitymesh_build -DBUILD_TYPE=FIRMWARE -DGCC_PATH=$HOME/var/loc
 -- Check for working CXX compiler: /home/user/var/local/gcc-arm-none-eabi/v4.9-2015q3//bin/arm-none-eabi-g++ - skipped
 -- Detecting CXX compile features
 -- Detecting CXX compile features - done
--- Found Python3: /usr/bin/python3.9 (found version "3.9.1") found components: Interpreter 
+-- Found Python3: /usr/bin/python3.9 (found version "3.9.1") found components: Interpreter
 -- Added feature set: github_dev_nrf52
 -- Added feature set: github_dev_nrf52840
 -- Added feature set: github_mesh_nrf52
@@ -155,8 +155,8 @@ make: *** [Makefile:138: prod_ruuvi_weather_nrf52_flash] Error 2
 ┗━ ✗ (2)
 ```
 
-To programm the RuuviTag, just press it on the pogopins such that the three alignment pins slide into the holes of the RuuviTag.
-Then hold it on the shield and execute the flash command (a bit of an excercise for your hand and the reason Ruuvi provided you with cable ties).
+To program the RuuviTag, just press it on the pogopins such that the three alignment pins slide into the holes of the RuuviTag.
+Then hold it on the shield and execute the flash command (a bit of an exercise for your hand and the reason Ruuvi provided you with cable ties).
 
 ```
 ┏━ 2021-02-24 17:06:04 user@host:~/doc/code/fruitymesh

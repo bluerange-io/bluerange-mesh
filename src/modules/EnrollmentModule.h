@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
@@ -35,16 +44,16 @@
 
 #include <MeshAccessModule.h>
 
-enum class EnrollmentModuleSaveActions : u8{ 
-    SAVE_ENROLLMENT_ACTION, 
+enum class EnrollmentModuleSaveActions : u8{
+    SAVE_ENROLLMENT_ACTION,
     SAVE_REMOVE_ENROLLMENT_ACTION,
     ERASE_RECORD_STORAGE,
 };
 
-enum class enrollmentMethods : u8{ 
-    SERIAL_2 = 0, 
-    CHIP_ID = 1, 
-    SERIAL = 2 
+enum class enrollmentMethods : u8{
+    SERIAL_2 = 0,
+    CHIP_ID = 1,
+    SERIAL = 2
 };
 
 enum class EnrollmentResponseCode : u8 {
@@ -79,8 +88,9 @@ struct EnrollmentModuleConfiguration : ModuleConfiguration {
         std::array<u8, 16> newUserBaseKey;
         std::array<u8, 16> newOrganizationKey;
         std::array<u8, 16> nodeKey; // Key used to connect to the unenrolled node
-        u8 timeoutSec : 7; //how long to try to connect to the unenrolled node, 0 means default time
-        u8 enrollOnlyIfUnenrolled : 1; //Set to 1 in order to return an error if already enrolled
+        u8 timeoutSec : 6; //how long to try to connect to the unenrolled node, 0 means default time
+        u8 skipFactoryReset : 1; //Set to 1 to only save the enrollment without resetting persistent settings like module configs (2nd highest bit)
+        u8 enrollOnlyIfUnenrolled : 1; //Set to 1 in order to return an error if already enrolled (MSB (bit) is here, https://developer.arm.com/documentation/ka004521/latest/)
 
     }EnrollmentModuleSetEnrollmentBySerialMessage;
     STATIC_ASSERT_SIZE(EnrollmentModuleSetEnrollmentBySerialMessage, 73);
@@ -225,7 +235,7 @@ class EnrollmentModule: public Module, public RecordStorageEventListener
 
         static constexpr u32 REQUEST_PROPOSAL_INDICES_LENGTH = 11;
         u32 requestProposalIndices[REQUEST_PROPOSAL_INDICES_LENGTH];
-        NodeId reqeustProposalReqeusterNodeId = 0;
+        NodeId requestProposalRequesterNodeId = 0;
         static constexpr u32 REQUEST_PROPOSAL_TIMEOUT_DS = SEC_TO_DS(60);
         u32 requestProposalTimestampDs = 0;
         u8 requestProposalRequestHandle = 0;

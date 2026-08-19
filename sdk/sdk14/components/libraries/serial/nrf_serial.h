@@ -391,6 +391,9 @@ ret_code_t nrf_serial_tx_abort(nrf_serial_t const * p_serial);
  * */
 ret_code_t nrf_serial_rx_drain(nrf_serial_t const * p_serial);
 
+
+void nrf_serial_abort_rx(nrf_serial_t const * p_serial);
+
 /** @} */
 
 #ifdef __cplusplus

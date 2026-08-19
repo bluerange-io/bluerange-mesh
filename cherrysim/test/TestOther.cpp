@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
@@ -321,7 +330,7 @@ TEST(TestOther, TestJsonConfigSerialization)
     // memory region previously filled with garbage. Note that the object itself must not
     // be created as that would call the construction of each value, silently leading to
     // some probably valid values. CAREFUL THOUGH! If you add some member that needs
-    // propper construction/destruction you have to call placement new and the destructor!
+    // proper construction/destruction you have to call placement new and the destructor!
 
     static_assert(std::is_polymorphic<SimConfiguration>::value == false, "SimConfiguration must not be polymorphic as it does not get a valid v-table in this test.");
 
@@ -575,7 +584,7 @@ TEST(TestOther, TestSimCommandCrc)
     tester.Start();
     tester.SimulateGivenNumberOfSteps(1);
     tester.SendTerminalCommand(1, "sim animation create geofence-move-inside CRC: 2393378599"); //Correct CRC
-    tester.SimulateGivenNumberOfSteps(1); //Test that no exception occures.
+    tester.SimulateGivenNumberOfSteps(1); //Test that no exception occurs.
     tester.SendTerminalCommand(1, "sim animation create geofence-move-inside-2 CRC: 1337"); //Incorrect CRC
     {
         Exceptions::ExceptionDisabler<CRCInvalidException> ed;
@@ -602,7 +611,7 @@ TEST(TestOther, SinkInMesh)
     //TODO: check that configurations were used
 }
 
-//Not sure what this test is doing, could ressurect it, but maybe not worth the effort
+//Not sure what this test is doing, could resurrect it, but maybe not worth the effort
 TEST(TestOther, TestEncryption) {
     //Boot up a simulator for our Logger
     CherrySimTesterConfig testerConfig = CherrySimTester::CreateDefaultTesterConfiguration();
@@ -693,7 +702,7 @@ TEST(TestOther, TestConnectionAllocator) {
     std::vector<BaseConnection*> conns;
     NodeIndexSetter setter(0);
 
-    for (int i = 0; i < 10000; i++) 
+    for (int i = 0; i < 10000; i++)
     {
         if ((mt.NextU32(0, 1) && conns.size() > 0) || conns.size() == TOTAL_NUM_CONNECTIONS) { //dealloc
             int index = mt.NextU32(0, conns.size() - 1);
@@ -705,19 +714,19 @@ TEST(TestOther, TestConnectionAllocator) {
             addr.addr_type = FruityHal::BleGapAddrType::PUBLIC;
             addr.addr = {};
             int type = mt.NextU32(0, 3);
-            if (type == 0) 
+            if (type == 0)
             {
                 conns.push_back(ConnectionAllocator::GetInstance().AllocateClcAppConnection(0, ConnectionDirection::DIRECTION_IN, &addr));
             }
-            else if (type == 1) 
+            else if (type == 1)
             {
                 conns.push_back(ConnectionAllocator::GetInstance().AllocateMeshAccessConnection(0, ConnectionDirection::DIRECTION_IN, &addr, FmKeyId::ZERO, MeshAccessTunnelType::INVALID, 0));
             }
-            else if (type == 2) 
+            else if (type == 2)
             {
                 conns.push_back(ConnectionAllocator::GetInstance().AllocateMeshConnection(0, ConnectionDirection::DIRECTION_IN, &addr, 0));
             }
-            else 
+            else
             {
                 conns.push_back(ConnectionAllocator::GetInstance().AllocateResolverConnection(0, ConnectionDirection::DIRECTION_IN, &addr));
             }
@@ -738,7 +747,7 @@ TEST(TestOther, TestMultiMessageSimulation) {
     tester.Start();
 
     //Multiple copies of the same message should also happen multiple times. So, SimulateUntilMessagesReceived
-    //only returnes if node 1 and 2, both send live_report twice.
+    //only returns if node 1 and 2, both send live_report twice.
     std::vector<SimulationMessage> msgs = {
         SimulationMessage(1, "Handshake starting"),
         SimulationMessage(2, "Handshake starting"),
@@ -947,7 +956,7 @@ TEST(TestOther, TestBulkMode) {
 
     tester.SendTerminalCommand(2, "action 2002 bulk get_uicr_custom");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":2002,\"type\":\"get_uicr_custom_result\",\"data\":\"FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF\"}");
-    
+
     tester.SendTerminalCommand(2, "action 2002 bulk set_uicr_custom AA:BB:CC:DD");
     tester.SimulateUntilMessageReceived(10 * 1000, 2, "{\"nodeId\":2002,\"type\":\"set_uicr_custom_result\",\"code\":0}");
     tester.SimulateForGivenTime(20 * 1000); //Give the node time to reboot.
@@ -1294,7 +1303,7 @@ TEST(TestOther, TestNoOfReceivedMsgs) {
     // The number of received messages will be at least 3:
     // - 2 'get_device_info' messages
     // - 1 'get_errors' message
-    // It can e.g. happen that a 'set_enrolled_nodes' message gets inbetween the two (depends on
+    // It can e.g. happen that a 'set_enrolled_nodes' message gets in between the two (depends on
     // the seed).
     tester.SimulateUntilRegexMessageReceived(10 * 1000, 1, "\\{\"type\":\"error_log_entry\",\"nodeId\":2,\"module\":3,\"errType\":2,\"code\":81,\"extra\":[3-9],\"time\":\\d+");
 }
@@ -1320,7 +1329,7 @@ TEST(TestOther, TestSimulatorFlashToFileStorage) {
         simConfig.SetToPerfectConditions();
         CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
         tester.Start();
-        
+
         if (i == 0)
         {
             {
@@ -1423,7 +1432,7 @@ TEST(TestOther, TestConnectionSupervisionTimeoutWillDisconnect) {
     tester.SimulateUntilClusteringDone(100 * 1000);
 
     // With following settings static RSSI is around -89.95dbm which is just above reception level (0.3 probability).
-    // With variable noise it should casue connection timeout
+    // With variable noise it should cause connection timeout
     tester.sim->SetPosition(1, 0, 0.25, 0);
     tester.SimulateUntilMessageReceived(1000 * 1000, 2, "Disconnected device %u", (u32)FruityHal::BleHciError::CONNECTION_TIMEOUT);
 }
@@ -1468,7 +1477,7 @@ TEST(TestOther, TestDataSentSplit) {
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
     tester.SimulateUntilClusteringDone(100 * 1000);
-    
+
     alignas(4) u8 buffer[MAX_MESH_PACKET_SIZE];
 
     // Put a message header in the beginning of buffer
@@ -1497,7 +1506,7 @@ TEST(TestOther, TestDataSentSplit) {
 
     Logger::ConvertBufferToBase64String(buffer, len, bufferHex, sizeof(bufferHex));
     tester.SimulateUntilMessageReceived(100 * 1000, 2, "DataSentHandler: %s", bufferHex);
-    
+
     // Test mid-size message
     len = MAX_MESH_PACKET_SIZE / 3;
     {

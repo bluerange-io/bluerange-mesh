@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -54,7 +63,7 @@ namespace
     /// SoftDevice to schedule the timeslot.
     constexpr u32 DEFAULT_INITIAL_TIMESLOT_LENGTH_US = 2000;
 
-    /// Recommended interval in µs between advertisments for increased
+    /// Recommended interval in µs between advertisements for increased
     /// discoverability by apple devices. See "Accessory Design Guidelines
     /// for Apple Devices" (Release R13), section 36.5 (p. 143).
     constexpr u32 DEFAULT_NORMAL_TIMESLOT_DISTANCE_US = 1022500;
@@ -62,9 +71,9 @@ namespace
     /// The interval between sensor measurements (and mesh broadcasts).
     constexpr u16 DEFAULT_SENSOR_MEASUREMENT_INTERVAL_DS = 300;
 
-    /// The maximum number of advertisments sent per slot before the slot is
+    /// The maximum number of advertisements sent per slot before the slot is
     /// marked inactive.
-    constexpr u8 MAX_ADVERTISMENTS_PER_SLOT = 3;
+    constexpr u8 MAX_ADVERTISEMENTS_PER_SLOT = 3;
 
     void systemEventHandlerTrampoline(
             FruityHal::SystemEvents systemEvent,
@@ -214,7 +223,7 @@ void RuuviWeatherModule::TimerEventHandler(u16 passedTimeDs)
 
         // BME280: Fixed-Point Q24.8 in [Pa]
         // Ruuvi:  Unsigned in [Pa] with 0 <=> 50000 Pa
-        msg.athmosphericPressure = [] (u32 input) -> u16 {
+        msg.atmosphericPressure = [] (u32 input) -> u16 {
             constexpr u32 offset          = 50000;
             constexpr u16 invalidPressure = 0xFFFF;
 
@@ -256,7 +265,7 @@ void RuuviWeatherModule::TimerEventHandler(u16 passedTimeDs)
         SendModuleActionMessage(
             MessageType::MODULE_TRIGGER_ACTION, // message type
             NODE_ID_BROADCAST,                  // destination node id
-            (u8)TriggerActionType::ADVERTISE_RUUVI_RAW_V2_MESSAGE_V1,    
+            (u8)TriggerActionType::ADVERTISE_RUUVI_RAW_V2_MESSAGE_V1,
             0,                                  // request handle
             (const u8*)&msg,                    // data pointer
             sizeof(msg),                        // data length
@@ -291,7 +300,7 @@ TerminalCommandHandlerReturnType RuuviWeatherModule::TerminalCommandHandler(cons
         if (commandArgsSize < 4)
         {
             return TerminalCommandHandlerReturnType::NOT_ENOUGH_ARGUMENTS;
-        }        
+        }
 
         if (TERMARGS(3, "advertiser"))
         {
@@ -340,7 +349,7 @@ TerminalCommandHandlerReturnType RuuviWeatherModule::TerminalCommandHandler(cons
 
             if (sendMsg)
             {
-                // Send the configuration message to the destination. 
+                // Send the configuration message to the destination.
                 SendModuleActionMessage(
                     MessageType::MODULE_TRIGGER_ACTION, // message type
                     destinationNode,                    // destination node id
@@ -389,7 +398,7 @@ void RuuviWeatherModule::MeshMessageReceivedHandler(BaseConnection* connection, 
                     EncodeRawV2(slot->pdu.data(), *msg);
                     // Start advertising the slot.
                     slot->isSlotAdvertising = true;
-                    slot->advertismentCounter = 0;
+                    slot->advertisementCounter = 0;
                     // Start to advertise if we weren't.
                     checkForAdvertisableSlots = true;
                 }
@@ -451,13 +460,13 @@ void RuuviWeatherModule::HandleRadioSystemEvent(FruityHal::SystemEvents systemEv
         case FruityHal::SystemEvents::RADIO_BLOCKED:
             timeslotInProgress = false;
             // The next timeslot will be started from the timer or the receive
-            // handler if neccessary.
+            // handler if necessary.
             break;
 
         case FruityHal::SystemEvents::RADIO_CANCELED:
             timeslotInProgress = false;
             // The next timeslot will be started from the timer or the receive
-            // handler if neccessary.
+            // handler if necessary.
             break;
 
         case FruityHal::SystemEvents::RADIO_SIGNAL_CALLBACK_INVALID_RETURN:
@@ -489,7 +498,7 @@ FruityHal::RadioCallbackAction RuuviWeatherModule::HandleRadioSignal(FruityHal::
                 auto * slot = ChooseSlotForTransmission();
                 if (!slot)
                 {
-                    // If there is no active advertisment slot, deactivate
+                    // If there is no active advertisement slot, deactivate
                     // advertising and end the timeslot.
                     checkForAdvertisableSlots = false;
                     return FruityHal::RadioCallbackAction::END;
@@ -498,22 +507,22 @@ FruityHal::RadioCallbackAction RuuviWeatherModule::HandleRadioSignal(FruityHal::
                 // Copy the PDU to the transmission buffer.
                 CheckedMemcpy(transmissionBuffer.data(), slot->pdu.data(), slot->pdu.size());
 
-                // Increment the advertisment counter of the slot.
-                ++slot->advertismentCounter;
+                // Increment the advertisement counter of the slot.
+                ++slot->advertisementCounter;
 
-                // If the maximum number of advertisments was reached,
-                // deactivate advertisment for this slot.
-                if (slot->advertismentCounter >= MAX_ADVERTISMENTS_PER_SLOT)
+                // If the maximum number of advertisements was reached,
+                // deactivate advertisement for this slot.
+                if (slot->advertisementCounter >= MAX_ADVERTISEMENTS_PER_SLOT)
                 {
                     slot->isSlotAdvertising = false;
                 }
             }
-            
+
             #ifdef NRF52840
             GS->ledRed.On();
             #endif
 
-            // Configure the radio and make sure the DISBALED event is unmasked.
+            // Configure the radio and make sure the DISABLED event is unmasked.
             FruityHal::RadioHandleBleAdvTxStart(transmissionBuffer.data());
             FruityHal::RadioChooseTxPowerHint(configuration.advertiserTxPower);
             FruityHal::RadioUnmaskEvent(FruityHal::RadioEvent::DISABLED);
@@ -549,7 +558,7 @@ FruityHal::RadioCallbackAction RuuviWeatherModule::HandleRadioSignal(FruityHal::
                         FruityHal::RadioUnmaskEvent(FruityHal::RadioEvent::DISABLED);
                         advertiserState = AdvertiserState::TX_ADV_38_SEND;
                         break;
-                    
+
                     case AdvertiserState::TX_ADV_38_SEND:
                         FruityHal::RadioChooseBleAdvertisingChannel(38);
                         FruityHal::RadioTriggerTask(FruityHal::RadioTask::TXEN);
@@ -598,13 +607,13 @@ FruityHal::RadioCallbackAction RuuviWeatherModule::HandleRadioSignal(FruityHal::
     return FruityHal::RadioCallbackAction::NONE;
 }
 
-RuuviWeatherModule::AdvertismentSlot * RuuviWeatherModule::ChooseSlotForMeasurementFrom(const FruityHal::BleGapAddr &address)
+RuuviWeatherModule::AdvertisementSlot * RuuviWeatherModule::ChooseSlotForMeasurementFrom(const FruityHal::BleGapAddr &address)
 {
-    AdvertismentSlot * byAddress = nullptr;
-    AdvertismentSlot * byCounter = nullptr;
-    AdvertismentSlot * byAdvertisingState = nullptr;
+    AdvertisementSlot * byAddress = nullptr;
+    AdvertisementSlot * byCounter = nullptr;
+    AdvertisementSlot * byAdvertisingState = nullptr;
 
-    for (auto &slot : advertismentSlots)
+    for (auto &slot : advertisementSlots)
     {
         // Cache any slot with matching address.
         if (slot.HasAdvertiserAddress(address))
@@ -619,13 +628,13 @@ RuuviWeatherModule::AdvertismentSlot * RuuviWeatherModule::ChooseSlotForMeasurem
         }
 
         // Cache any slot that has been advertised the most.
-        if (!byCounter || slot.advertismentCounter > byCounter->advertismentCounter)
+        if (!byCounter || slot.advertisementCounter > byCounter->advertisementCounter)
         {
             byCounter = &slot;
         }
     }
 
-    auto *selected = [byAddress, byCounter, byAdvertisingState] () -> AdvertismentSlot * {
+    auto *selected = [byAddress, byCounter, byAdvertisingState] () -> AdvertisementSlot * {
         // Always reuse the slot with matching address if set.
         if (byAddress)
         {
@@ -645,11 +654,11 @@ RuuviWeatherModule::AdvertismentSlot * RuuviWeatherModule::ChooseSlotForMeasurem
     return selected;
 }
 
-RuuviWeatherModule::AdvertismentSlot * RuuviWeatherModule::ChooseSlotForTransmission()
+RuuviWeatherModule::AdvertisementSlot * RuuviWeatherModule::ChooseSlotForTransmission()
 {
-    AdvertismentSlot * byCounter = nullptr;
+    AdvertisementSlot * byCounter = nullptr;
 
-    for (auto &slot : advertismentSlots)
+    for (auto &slot : advertisementSlots)
     {
         // Skip slots that are not advertising.
         if (!slot.isSlotAdvertising)
@@ -658,7 +667,7 @@ RuuviWeatherModule::AdvertismentSlot * RuuviWeatherModule::ChooseSlotForTransmis
         }
 
         // Cache any slot that has been advertised the least.
-        if (!byCounter || slot.advertismentCounter < byCounter->advertismentCounter)
+        if (!byCounter || slot.advertisementCounter < byCounter->advertisementCounter)
         {
             byCounter = &slot;
         }
@@ -695,7 +704,7 @@ void RuuviWeatherModule::EncodeRawV2(u8 *pdu, const AdvertiseRuuviRawV2MessageV1
     // Configure the PDU Header.
     // The exact mapping from this structure to the on-air packet layout is
     // documented in e.g. "nRF52832 Product Specification / RADIO / Packet
-    // configuration" or the corresponding secion of the nRF52840 series SOCs.
+    // configuration" or the corresponding section of the nRF52840 series SOCs.
     pdu[offset++] = pduType;   //     S0 (1 byte) - PDU type
     packetLengthFieldIndex = offset;
     pdu[offset++] = 0;         // LENGTH (6 bits) - Packet length
@@ -758,7 +767,7 @@ void RuuviWeatherModule::EncodeRawV2(u8 *pdu, const AdvertiseRuuviRawV2MessageV1
     pdu[offset++] = 0x05; // Data Format 5
     WriteBE<u16>(pduNext(2), msg.temperature);
     WriteBE<u16>(pduNext(2), msg.relativeHumidity);
-    WriteBE<u16>(pduNext(2), msg.athmosphericPressure);
+    WriteBE<u16>(pduNext(2), msg.atmosphericPressure);
     WriteBE<u16>(pduNext(2), 0x8000); // acceleration x (n.a.)
     WriteBE<u16>(pduNext(2), 0x8000); // acceleration y (n.a.)
     WriteBE<u16>(pduNext(2), 0x8000); // acceleration z (n.a.)
@@ -788,7 +797,7 @@ void RuuviWeatherModule::EncodeRawV2(u8 *pdu, const AdvertiseRuuviRawV2MessageV1
     pdu[cmdLengthFieldIndex]    = offset - cmdLengthStartIndex;
 }
 
-bool RuuviWeatherModule::AdvertismentSlot::HasAdvertiserAddress(const FruityHal::BleGapAddr & address) const
+bool RuuviWeatherModule::AdvertisementSlot::HasAdvertiserAddress(const FruityHal::BleGapAddr & address) const
 {
     // TxAdd == 0: Public, TxAdd == 1: Random
     const bool publicAddress = !((pdu[0] >> 6u) & 0x1);
@@ -964,7 +973,7 @@ ErrorType RuuviWeatherModule::Bme280Sensor::ReadData(Data &data)
     const auto ret = bme280_read_measurements();
     if (ret != BME280_RET_OK)
     {
-        logt("RUUVI", "bme280_read_mesaurements error %x", (u32)ret);
+        logt("RUUVI", "bme280_read_measurements error %x", (u32)ret);
         return ErrorType::INTERNAL;
     }
 

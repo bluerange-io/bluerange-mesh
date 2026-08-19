@@ -14,7 +14,7 @@ Using packet splitting results in significant throughput reduction and an increa
 
 === Measurement Results
 
-Measurements were done with an active scanner at 75 ms scan interval and 7.5 ms scan window. The advertiser was also active with a 100 ms interval. Disabling advertising and scanning, for example after the mesh was sucessfully set up, will increase the connection throughput.
+Measurements were done with an active scanner at 75 ms scan interval and 7.5 ms scan window. The advertiser was also active with a 100 ms interval. Disabling advertising and scanning, for example after the mesh was successfully set up, will increase the connection throughput.
 
 Devices were placed close to each other for this test, so they had a good link budget. Increasing the distance of devices to each other until they reach the stable connection threshold RSSI of around -85 will result in a slightly decreased throughput by around 10 to 20%. If devices are forced to communicate to each other with a link budget worse than -85, the throughput will decrease a lot. This is however prevented in the mesh implementation. Having a lot of other devices transmitting on the BLE advertising and connection channels could also affect the mesh performance in different ways that are hard to measure or predict.
 

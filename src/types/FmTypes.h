@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH.
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -80,8 +89,10 @@ extern "C" {
 
 #ifdef CHERRYSIM_TESTER_ENABLED
 #define TESTER_PUBLIC public
+#define TESTER_PUBLIC_ELSE_PROTECTED public
 #else
 #define TESTER_PUBLIC private
+#define TESTER_PUBLIC_ELSE_PROTECTED protected
 #endif
 
 #ifdef IAR
@@ -108,7 +119,7 @@ constexpr u32 SERIAL_NUMBER_FM_TESTING_RANGE_END = 2699999;
 constexpr u32 INVALID_SERIAL_NUMBER_INDEX = 0xFFFFFFFFUL;
 constexpr u32 SHORT_SERIAL_NUMBER_INDEX_MAX = 24300000UL;
 
-// End of line seperators to use
+// End of line separators to use
 #define EOL "\r\n"
 #define SEP "\r\n"
 
@@ -122,7 +133,7 @@ constexpr size_t BLE_GAP_SCAN_PACKET_BUFFER_SIZE = 31;
 constexpr u32 EMPTY_WORD = 0xFFFFFFFFUL;
 
 // Default value when we intends to use slave latency provided in the Config.h
-constexpr u16 GAP_CONTROLLER_USE_CONFIGURED_SLAVE_LATENCY = 0xFFFFUL; 
+constexpr u16 GAP_CONTROLLER_USE_CONFIGURED_SLAVE_LATENCY = 0xFFFFUL;
 
 // Set in the first 4 bytes of UICR if factory settings are available
 constexpr u32 UICR_SETTINGS_MAGIC_WORD = 0xF07700;
@@ -142,7 +153,7 @@ constexpr u32 REBOOT_MAGIC_NUMBER = 0xE0F7213C;
 enum class FeatureSetGroup : NodeId
 {
     INVALID                                                     = 0,
-    //These comments are used to parse values with FruityDeploy (do not remove)
+    //These comments are used to parse values with BlueRange OEM Kit (do not remove)
     //                              CHIP_NRF51                  = 20000,
     //                              CHIP_NRF52                  = 20001,
     //                              NRF51_SINK                  = 20002, //Deprecated as of 09.04.2020
@@ -164,7 +175,7 @@ enum class FeatureSetGroup : NodeId
     /*FruityDeploy-FeatureSetGroup*/NRF52840_MESH_USB           = 20018,
     /*FruityDeploy-FeatureSetGroup*/NRF52840_BP_MESH            = 20019,
     /*FruityDeploy-FeatureSetGroup*/NRF52_EINK                  = 20020,
-    // Reserved for Cypress (currently on a seperate branch)    = 20021,
+    // Reserved for Cypress (currently on a separate branch)    = 20021,
     /*FruityDeploy-FeatureSetGroup*/NRF52_ET_MESH               = 20022,
     /*FruityDeploy-FeatureSetGroup*/NRF52_ET_ASSET              = 20023,
     /*FruityDeploy-FeatureSetGroup*/NRF52_ET_ASSET2             = 20024,
@@ -193,6 +204,10 @@ enum class FeatureSetGroup : NodeId
     /*FruityDeploy-FeatureSetGroup*/NRF52832_EL_MO              = 20047,
     /*FruityDeploy-FeatureSetGroup*/NRF52840_CS_CORESENSING     = 20048,
     /*FruityDeploy-FeatureSetGroup*/NRF52840_EL_MO              = 20049,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_SG_WINDOW          = 20050,
+    /*FruityDeploy-FeatureSetGroup*/NRF52832_BLIND              = 20051,
+    /*FruityDeploy-FeatureSetGroup*/NRF52832_SWITCH             = 20052,
+    /*FruityDeploy-FeatureSetGroup*/NRF52840_SWITCH_SDK17      = 20053,
 };
 
 //Sets the maximum number of firmware group ids that can be compiled into the firmware
@@ -262,7 +277,7 @@ typedef struct ModuleConfiguration{
 } ModuleConfiguration;
 STATIC_ASSERT_SIZE(ModuleConfiguration, SIZEOF_MODULE_CONFIGURATION_HEADER);
 
-//The ModuleConfiguration used for vendor moduls, same comments as above apply
+//The ModuleConfiguration used for vendor modules, same comments as above apply
 constexpr size_t SIZEOF_VENDOR_MODULE_CONFIGURATION_HEADER = 8;
 typedef struct VendorModuleConfiguration {
     VendorModuleId moduleId;
@@ -326,12 +341,12 @@ struct BootloaderSettings {
 
     ModuleId moduleId; //Stores the moduleId that handles the update
     u8 reserved2[3];
-    u32 componentId; //Stores the componentId (if many updateable devices are connected to a module)
+    u32 componentId; //Stores the componentId (if many updatable devices are connected to a module)
 };
 STATIC_ASSERT_SIZE(BootloaderSettings, (16 + BOOTLOADER_BITMASK_SIZE + BOOTLOADER_BITMASK_SIZE) * sizeof(u32));
 
 /*## Alignment #############################################################*/
-//In order to send data packets across the mesh in an efficiant manner
+//In order to send data packets across the mesh in an efficient manner
 //we have to keep the size as small as possible which is why all network structures
 //are packed. Storing module data also has to be as small as possible to save flash
 //space, but we need to align each module configuration on a 4-byte boundary
@@ -360,14 +375,22 @@ constexpr u32 CONFIG_UNIT_10_MS = 10000
 
 /*############ HELPFUL MACROS ################*/;
 
-//Returns true if the timer should have trigered the interval in the passedTime
+//Returns true if the timer should have triggered the interval in the passedTime
 #define SHOULD_IV_TRIGGER(timer, passedTime, interval) (interval != 0 && (((timer)-(passedTime)) % (interval) >= (timer) % (interval)))
 
 //Returns true if the button action should execute
 #define SHOULD_BUTTON_EVT_EXEC(BUTTON_DS) (BUTTON_DS != 0 && holdTimeDs > BUTTON_DS && holdTimeDs < (u32)(BUTTON_DS + 20))
-//Converts Seconds to Deciseconds and vice versa
+//Converts time units to one another.
 #define SEC_TO_DS(sec) (((u32)(sec))*10)
 #define DS_TO_SEC(ds)  (((u32)(ds))/10)
+#define DS_TO_MS(ds)   (((u32)(ds))*100)
+#define MS_TO_DS(ms)   (((u32)(ms))/100)
+
+// Converts Milliseconds to Deciseconds
+#define MSEC_TO_DS(msec) (((u32)(msec)) / 100)
+// Converts Deciseconds to Milliseconds
+#define DS_TO_MSEC(ds) (((u32)(ds)) * 100)
+
 //Checks if packet contains the variable
 #define CHECK_MSG_SIZE(packetHeader, variable, size, dataLength) ((((const u8*)variable) + (size)) - ((const u8*)packetHeader) <= (dataLength))
 //Macros for concatenating

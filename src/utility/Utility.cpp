@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -67,7 +76,7 @@ constexpr u32 UNUSED_STACK_INDICATOR = 0xA9B8C7D6;
 SizedData Utility::GetStackWatcherAddress()
 {
     SizedData retVal = {};
-    constexpr u32 STACK_WATCHER_LENGTH = 32;
+    constexpr u32 STACK_WATCHER_LENGTH = 32; //DO NOT CHANGE (reserved region as stackWatcherRegion in linker)
     retVal.length = STACK_WATCHER_LENGTH * sizeof(u32);
     retVal.data = (u8*)(((u32*)((u32)__FruityStackLimit - ((u32)__FruityStackLimit % alignof(u32)))) - STACK_WATCHER_LENGTH);
     return retVal;
@@ -106,7 +115,7 @@ void Utility::FillStackSizeDetector()
 {
     u32 dummyVar = 0;
     u32* currentStackPointer = &dummyVar;
-    u32* currentStackPointerWithSafetyDistance = currentStackPointer - 256; //Just to make sure we don't overwrite anything unwanted we keep 1 kb distance.
+    u32* currentStackPointerWithSafetyDistance = currentStackPointer - 256; //Just to make sure we don't overwrite anything unwanted we keep 1 kb distance (4*256).
 
     volatile u32* writePointer = (u32*)(GetStackWatcherAddress().data + GetStackWatcherAddress().length); // volatile because the stack detector is no valid C++ data object
     while(writePointer < currentStackPointerWithSafetyDistance)
@@ -192,7 +201,7 @@ bool Utility::IsValidModuleIdFormat(ModuleIdWrapper moduleId)
     }
     else
     {
-        return (wrapper.subId    ==   0xFF || wrapper.subId    ==   0x00) 
+        return (wrapper.subId    ==   0xFF || wrapper.subId    ==   0x00)
             && (wrapper.vendorId == 0xFFFF || wrapper.vendorId == 0x0000);
     }
 }
@@ -307,7 +316,7 @@ u32 Utility::MessageLengthToAmountOfSplitPackets(const u32 messageLength, const 
     if (messageLength <= mtu) return 1;
 
     const u32 payloadPerSplit = mtu - SIZEOF_CONN_PACKET_SPLIT_HEADER;
-    
+
     u32 retVal = messageLength / payloadPerSplit;
     if (messageLength % payloadPerSplit != 0) retVal++;
 
@@ -322,7 +331,7 @@ ErrorType Utility::ECDSASecp256r1Sign(const u8 * privateKey, const u8 * hash, u1
         return ErrorType::INTERNAL;
     }
 
-    return ErrorType::SUCCESS;    
+    return ErrorType::SUCCESS;
 }
 
 ErrorType Utility::ECDSASecp256r1Verify(const u8 * publicKey, const u8 * hash, u16 hashLen, const u8 * signature)
@@ -333,7 +342,7 @@ ErrorType Utility::ECDSASecp256r1Verify(const u8 * publicKey, const u8 * hash, u
         return ErrorType::INTERNAL;
     }
 
-    return ErrorType::SUCCESS;  
+    return ErrorType::SUCCESS;
 }
 
 void Utility::SHA256HashCalculate(const u8 * data, u32 len, u8 * hash)
@@ -469,7 +478,7 @@ NodeId Utility::TerminalArgumentToNodeId(const char * arg, bool* didErrorArg)
 bool Utility::IsUnknownRebootReason(RebootReason rebootReason)
 {
     return (
-           rebootReason == RebootReason::UNKNOWN 
+           rebootReason == RebootReason::UNKNOWN
         || rebootReason == RebootReason::UNKNOWN_BUT_BOOTED
         );
 }
@@ -628,7 +637,7 @@ bool Utility::ToConnPacketModuleContents(ConnPacketModuleContents* destinationCo
     else if (sendData->dataLength >= SIZEOF_CONN_PACKET_MODULE_VENDOR)
     {
         ConnPacketModuleVendor const* packetVendor = (ConnPacketModuleVendor const*)packetHeader;
-        
+
         destinationContents->messageType   = packetVendor->header.messageType;
         destinationContents->sender        = packetVendor->header.sender;
         destinationContents->receiver      = packetVendor->header.receiver;

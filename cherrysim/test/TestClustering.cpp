@@ -1,30 +1,39 @@
 ////////////////////////////////////////////////////////////////////////////////
 // /****************************************************************************
+// ** BlueRange Mesh – Community Edition (CE)
+// ** Copyright (c) 2015-2021 MWAY DIGITAL GmbH, Germany
+// ** Copyright (c) 2021-2026 BlueRange GmbH, Germany
 // **
-// ** Copyright (C) 2015-2022 M-Way Solutions GmbH
-// ** Contact: https://www.blureange.io/licensing
+// ** This file is part of BlueRange Mesh Community Edition (formerly known as
+// ** FruityMesh).
 // **
-// ** This file is part of the Bluerange/FruityMesh implementation
+// ** BlueRange Mesh Community Edition is free software: you can redistribute it
+// ** and/or modify it under the terms of the GNU General Public License as
+// ** published by the Free Software Foundation, either version 3 of the
+// ** License, or (at your option) any later version.
 // **
-// ** $BR_BEGIN_LICENSE:GPL-EXCEPT$
-// ** Commercial License Usage
-// ** Licensees holding valid commercial Bluerange licenses may use this file in
-// ** accordance with the commercial license agreement provided with the
-// ** Software or, alternatively, in accordance with the terms contained in
-// ** a written agreement between them and M-Way Solutions GmbH. 
-// ** For licensing terms and conditions see https://www.bluerange.io/terms-conditions. For further
-// ** information use the contact form at https://www.bluerange.io/contact.
+// ** BlueRange Mesh Community Edition is distributed in the hope that it will
+// ** be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// ** See the GNU General Public License for more details.
 // **
-// ** GNU General Public License Usage
-// ** Alternatively, this file may be used under the terms of the GNU
-// ** General Public License version 3 as published by the Free Software
-// ** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
-// ** included in the packaging of this file. Please review the following
-// ** information to ensure the GNU General Public License requirements will
-// ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+// ** You should have received a copy of the GNU General Public License along
+// ** with this program. If not, see https://www.gnu.org/licenses/.
 // **
-// ** $BR_END_LICENSE$
+// ** IMPORTANT:
+// ** Any modification, extension, or derivative work of this file MUST also be
+// ** licensed under the GNU General Public License v3 or later and the complete
+// ** corresponding source code MUST be made available.
 // **
+// ** Commercial Use:
+// ** If you wish to use this software without the obligations of the GPLv3
+// ** (including source code disclosure), a commercial license for
+// ** BlueRange Mesh OEM Edition is required.
+// **
+// ** License violations automatically terminate your rights under this license
+// ** and may result in legal action under applicable law.
+// ** For further information please use the contact form at:
+// ** https://bluerange.io/en/contact
 // ****************************************************************************/
 ////////////////////////////////////////////////////////////////////////////////
 #include "gtest/gtest.h"
@@ -255,7 +264,7 @@ TEST(TestClustering, TestMessagesInOrder) {
             failCounter++;
             if (failCounter > 100) SIMEXCEPTION(IllegalStateException);
         }
-        
+
     }
 
 }
@@ -310,7 +319,7 @@ TEST(TestClustering, TestBasicClusteringWithNodeReset_scheduled) {
     //Exceptions::DisableDebugBreakOnException disabler;
 
     u32 seed = (u32)time(NULL);
-    
+
     for (u32 i = 0; i < clusteringIterations; i++) {
         seed++;
         u32 numNodes = seed % 200 + 2;
@@ -370,7 +379,7 @@ TEST(TestClustering, TestBasicClusteringWithNodeReset_scheduled) {
     }
 }
 
-//FIXME: This will corrently result in an error
+//FIXME: This will currently result in an error
 // Tests reestablishing against errors, first we simulate connection timeouts for a period of 60 seconds
 // where some nodes will need to reestablish their connection, then we stop simulating timeouts and check
 //If the cluster is still valid
@@ -414,7 +423,7 @@ TEST(TestClustering, TestBasicClusteringWithNodeResetAndConnectionTimeouts_sched
 
         tester.SimulateForGivenTime(60 * 1000);
 
-        //Disable timouts after some time so that we can check against clustering timeouts without them solveing themselves after some time
+        //Disable timeouts after some time so that we can check against clustering timeouts without them solving themselves after some time
         tester.sim->simConfig.connectionTimeoutProbabilityPerSec = 0;
 
         tester.SimulateUntilClusteringDone(maxClusteringTimeMs);
@@ -556,7 +565,7 @@ TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
         tester.SimulateGivenNumberOfSteps(1);
         tester.SendTerminalCommandToAllNodes("debug statusmod");
         tester.SimulateGivenNumberOfSteps(1);
-        
+
         //Disable terminal again
         tester.sim->simConfig.terminalId = -1;
 
@@ -595,7 +604,7 @@ TEST_P(MultiStackFixture, TestSinkDetectionWithSingleSink)
                         FAIL() << "Another connection already had hops to sink";
                     }
                 }
-                
+
             }
             if (GET_DEVICE_TYPE() == DeviceType::SINK) {
                 //The sink will not have the number of hops saved as all its connections point to non-sinks
@@ -690,7 +699,7 @@ TEST(TestClustering, TestEmergencyDisconnect) {
     u32 numNodes = 10;
     simConfig.terminalId = 0;
     //testerConfig.verbose = true;
-    
+
     //Place Node 0 in the middle and the others in a circle around it.
     simConfig.preDefinedPositions.push_back({ 0.5, 0.5 });
     for (u32 i = 1; i < numNodes; i++)
@@ -729,7 +738,7 @@ TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
     //testerConfig.verbose = true;
     //testerConfig.terminalFilter = 1;
     simConfig.nodeConfigName.insert( { "prod_mesh_nrf52", 5 } );
-    // Place nodes close to each other so that faked JOIN_ME packets would affect all the nodes. 
+    // Place nodes close to each other so that faked JOIN_ME packets would affect all the nodes.
     simConfig.preDefinedPositions = { {0.5, 0.5}, {0.55, 0.5}, {0.5, 0.55}, {0.55, 0.55}, {0.5, 0.45} };
     CherrySimTester tester = CherrySimTester(testerConfig, simConfig);
     tester.Start();
@@ -747,20 +756,20 @@ TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
     u32 clusterId = simConfig.defaultNetworkId;
     u32 failCounter = 0;
     bool clusteringDone = false;
-    tester.SendTerminalCommand(3, "action this adv add 02:01:06:1B:FF:4D:02:F0:0A:00:01:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:19:00:04:01:FF:FF:01:00:00:00:00:00 10", 
+    tester.SendTerminalCommand(3, "action this adv add 02:01:06:1B:FF:4D:02:F0:0A:00:01:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:19:00:04:01:FF:FF:01:00:00:00:00:00 10",
                                                                 (u8)(nodeId & 0xFF), (u8)((nodeId >> 8) & 0xFF),
                                                                 (u8)(clusterId & 0xFF), (u8)((clusterId >> 8) & 0xFF), (u8)((clusterId >> 16) & 0xFF), (u8)((clusterId >> 24) & 0xFF),
                                                                 (u8)(clusterSize & 0xFF), (u8)((clusterSize >> 8) & 0xFF));
 
     // TEST #1
     // Track node 4 cluster information and make node 3 advertise fake JOIN_ME data
-    
+
     // Simulation time for this subtest
     u32 timeoutSec = tester.sim->simState.simTimeMs + 100 * 1000;
 
     // Expected clustering time
     u32 clusteringTimeoutSec = tester.sim->simState.simTimeMs + 20 * 1000;
-    
+
     // reset all nodes to cause reclustering
     tester.SendTerminalCommandToAllNodes("reset");
 
@@ -799,7 +808,7 @@ TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
             clusterId = tester.sim->currentNode->gs.node.clusterId;
         }
 
-        tester.SendTerminalCommand(3, "action this adv set 0 02:01:06:1B:FF:4D:02:F0:0A:00:01:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:19:00:04:01:FF:FF:01:00:00:00:00:00 10", 
+        tester.SendTerminalCommand(3, "action this adv set 0 02:01:06:1B:FF:4D:02:F0:0A:00:01:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:19:00:04:01:FF:FF:01:00:00:00:00:00 10",
                                                                 (u8)(nodeId & 0xFF), (u8)((nodeId >> 8) & 0xFF),
                                                                 (u8)(clusterId & 0xFF), (u8)((clusterId >> 8) & 0xFF), (u8)((clusterId >> 16) & 0xFF), (u8)((clusterId >> 24) & 0xFF),
                                                                 (u8)(clusterSize & 0xFF), (u8)((clusterSize >> 8) & 0xFF));
@@ -817,7 +826,7 @@ TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
             }
             catch (TimeoutException& e)
             {
-                // Not all the nodes may receive fake JOIN_ME packets everytime, we accept that sometimes nodes are not getting those. 
+                // Not all the nodes may receive fake JOIN_ME packets every time, we accept that sometimes nodes are not getting those.
                 failCounter++;
                 if (failCounter > 100) SIMEXCEPTION(IllegalStateException);
             }
@@ -827,7 +836,7 @@ TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
 
     // TEST #2
     // Fake being a bigger cluster
-    
+
     // Simulation time for this subtest
     timeoutSec = tester.sim->simState.simTimeMs + 100 * 1000;
 
@@ -841,7 +850,7 @@ TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
     nodeId = 3;
     clusterSize = 10;
     clusterId = 0x01ABCDEF;
-    tester.SendTerminalCommand(3, "action this adv set 0 02:01:06:1B:FF:4D:02:F0:0A:00:01:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:19:00:04:01:FF:FF:01:00:00:00:00:00 10", 
+    tester.SendTerminalCommand(3, "action this adv set 0 02:01:06:1B:FF:4D:02:F0:0A:00:01:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:19:00:04:01:FF:FF:01:00:00:00:00:00 10",
                                                             (u8)(nodeId & 0xFF), (u8)((nodeId >> 8) & 0xFF),
                                                             (u8)(clusterId & 0xFF), (u8)((clusterId >> 8) & 0xFF), (u8)((clusterId >> 16) & 0xFF), (u8)((clusterId >> 24) & 0xFF),
                                                             (u8)(clusterSize & 0xFF), (u8)((clusterSize >> 8) & 0xFF));
@@ -887,24 +896,24 @@ TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
             }
             catch (TimeoutException& e)
             {
-                // Not all the nodes may receive fake JOIN_ME packets everytime, we accept that sometimes nodes are not getting those. 
+                // Not all the nodes may receive fake JOIN_ME packets every time, we accept that sometimes nodes are not getting those.
                 failCounter++;
                 if (failCounter > 100) SIMEXCEPTION(IllegalStateException);
             }
         }
     }
     ASSERT_TRUE(clusteringDone);
-    
+
 
     // TEST #3
     // Follow other nodes cluster information and advertise the same with different node id
-    
+
     // Simulation time for this subtest
     timeoutSec = tester.sim->simState.simTimeMs + 100 * 1000;
 
     // Expected clustering time
     clusteringTimeoutSec = tester.sim->simState.simTimeMs + 30 * 1000;
-    
+
     // reset all nodes to cause reclustering
     tester.SendTerminalCommandToAllNodes("reset");
 
@@ -950,7 +959,7 @@ TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
             currentFollowedNodeId %= 5;
         }
 
-        tester.SendTerminalCommand(3, "action this adv set 0 02:01:06:1B:FF:4D:02:F0:0A:00:01:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:19:00:04:01:FF:FF:01:00:00:00:00:00 10", 
+        tester.SendTerminalCommand(3, "action this adv set 0 02:01:06:1B:FF:4D:02:F0:0A:00:01:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:19:00:04:01:FF:FF:01:00:00:00:00:00 10",
                                                                 (u8)(nodeId & 0xFF), (u8)((nodeId >> 8) & 0xFF),
                                                                 (u8)(clusterId & 0xFF), (u8)((clusterId >> 8) & 0xFF), (u8)((clusterId >> 16) & 0xFF), (u8)((clusterId >> 24) & 0xFF),
                                                                 (u8)(clusterSize & 0xFF), (u8)((clusterSize >> 8) & 0xFF));
@@ -968,24 +977,24 @@ TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
             }
             catch (TimeoutException& e)
             {
-                // Not all the nodes may receive fake JOIN_ME packets everytime, we accept that sometimes nodes are not getting those. 
+                // Not all the nodes may receive fake JOIN_ME packets every time, we accept that sometimes nodes are not getting those.
                 failCounter++;
                 if (failCounter > 100) SIMEXCEPTION(IllegalStateException);
             }
         }
     }
     ASSERT_TRUE(clusteringDone);
-    
+
 
     // TEST #4
     // Change JOIN_ME packet very often to generate a lot of traffic.
-    
+
     // Simulation time for this subtest
     timeoutSec = tester.sim->simState.simTimeMs + 100 * 1000;
 
     // Expected clustering time
     clusteringTimeoutSec = tester.sim->simState.simTimeMs + 30 * 1000;
-    
+
     // reset all nodes to cause reclustering
     tester.SendTerminalCommandToAllNodes("reset");
 
@@ -1029,7 +1038,7 @@ TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
             tester.sim->currentNode->gs.node.configuration.nodeId = nodeId;
         }
 
-        tester.SendTerminalCommand(3, "action this adv set 0 02:01:06:1B:FF:4D:02:F0:0A:00:01:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:19:00:04:01:FF:FF:01:00:00:00:00:00 10", 
+        tester.SendTerminalCommand(3, "action this adv set 0 02:01:06:1B:FF:4D:02:F0:0A:00:01:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:19:00:04:01:FF:FF:01:00:00:00:00:00 10",
                                                                 (u8)(nodeId & 0xFF), (u8)((nodeId >> 8) & 0xFF),
                                                                 (u8)(clusterId & 0xFF), (u8)((clusterId >> 8) & 0xFF), (u8)((clusterId >> 16) & 0xFF), (u8)((clusterId >> 24) & 0xFF),
                                                                 (u8)(clusterSize & 0xFF), (u8)((clusterSize >> 8) & 0xFF));
@@ -1049,7 +1058,7 @@ TEST(TestClustering, TestFakedJoinMeAffectOnClustering) {
             }
             catch (TimeoutException& e)
             {
-                // Not all the nodes may receive fake JOIN_ME packets everytime, we accept that sometimes nodes are not getting those. 
+                // Not all the nodes may receive fake JOIN_ME packets every time, we accept that sometimes nodes are not getting those.
                 failCounter++;
                 if (failCounter > 200) SIMEXCEPTION(IllegalStateException);
             }

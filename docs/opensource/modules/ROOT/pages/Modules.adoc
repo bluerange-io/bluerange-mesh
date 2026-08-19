@@ -34,7 +34,7 @@ Every module in fruitymesh has its own configuration and version number. This co
 
 Sends a new module configuration to any node.
 The resulting binary configuration will be copied to the
-modulen configuration of the specified module.
+module configuration of the specified module.
 
 [source,C++]
 ----
@@ -94,7 +94,7 @@ Where "code" can have one of the following values:
 |===
 
 === Module List (version 2)
-This is the response to the xref:Node.adoc#queryingActiveModules[_get_modules_] command. 
+This is the response to the xref:Node.adoc#queryingActiveModules[_get_modules_] command.
 
 The Module List message provides information about available modules on a given device with some details like their _moduleId_, their version and whether they are currently active. This information can be used to find out, what a node is capable of doing.
 
@@ -156,8 +156,10 @@ open source release:
 * xref:IoModule.adoc[IoModule (ModuleId 6)]
 * xref:DebugModule.adoc[DebugModule (ModuleId 7)]
 * xref:MeshAccessModule.adoc[MeshAccessModule (ModuleId 10)]
+* xref:AutoSenseModule.adoc[AutoSenseModule (ModuleId 15)]
+* AutoActModule (ModuleId 17, no docs yet)
 
 == Proprietary Modules
 * xref:DfuModuleAbstract.adoc[DfuModule (ModuleId 4)]
-* EnOcean, Eink, Asset and other proprietary modules can be provided upon
+* Modbus, EnOcean, Eink, Asset and other proprietary modules can be provided upon
 request.

@@ -1,4 +1,4 @@
-import subprocess 
+import subprocess
 import sys
 
 output = subprocess.check_output([sys.argv[1], sys.argv[2]])
